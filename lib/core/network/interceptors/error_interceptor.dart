@@ -1,0 +1,18 @@
+import 'package:chopper/chopper.dart';
+
+/// Chopper interceptor for handling errors
+class ErrorInterceptor implements ResponseInterceptor {
+  ErrorInterceptor({this.onUnauthorized});
+
+  final void Function()? onUnauthorized;
+
+  @override
+  Future<Response> onResponse(Response response) async {
+    if (response.statusCode == 401) {
+      // Handle unauthorized - trigger logout or token refresh
+      onUnauthorized?.call();
+    }
+
+    return response;
+  }
+}
