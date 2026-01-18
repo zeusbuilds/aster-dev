@@ -1,8 +1,8 @@
-/// Shape tokens configuration
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'radius_tokens.freezed.dart';
 
+/// Shape tokens configuration
 @freezed
 class RadiusTokens with _$RadiusTokens {
   const factory RadiusTokens({

@@ -1,4 +1,5 @@
 import 'package:chopper/chopper.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -14,17 +15,17 @@ part 'providers.g.dart';
 
 // Network providers
 @riverpod
-Connectivity connectivity(ConnectivityRef ref) {
+Connectivity connectivity(Ref ref) {
   return Connectivity();
 }
 
 @riverpod
-NetworkInfo networkInfo(NetworkInfoRef ref) {
+NetworkInfo networkInfo(Ref ref) {
   return NetworkInfoImpl(ref.read(connectivityProvider));
 }
 
 @riverpod
-ChopperClient chopperClient(ChopperClientRef ref) {
+ChopperClient chopperClient(Ref ref) {
   return NetworkModule.getChopperClient(
     ref,
     enableLogging: false, // Set to true for debugging
@@ -33,17 +34,17 @@ ChopperClient chopperClient(ChopperClientRef ref) {
 
 // Storage providers
 @riverpod
-Future<SharedPreferences> sharedPreferences(SharedPreferencesRef ref) async {
+Future<SharedPreferences> sharedPreferences(Ref ref) async {
   return await SharedPreferences.getInstance();
 }
 
 @riverpod
-SecureStorageService secureStorageService(SecureStorageServiceRef ref) {
+SecureStorageService secureStorageService(Ref ref) {
   return SecureStorageServiceImpl();
 }
 
 @riverpod
-PreferencesService preferencesService(PreferencesServiceRef ref) {
+PreferencesService preferencesService(Ref ref) {
   final prefsAsync = ref.watch(sharedPreferencesProvider);
   return prefsAsync.when(
     data: (prefs) => PreferencesServiceImpl(prefs),
@@ -54,13 +55,13 @@ PreferencesService preferencesService(PreferencesServiceRef ref) {
 }
 
 @riverpod
-DatabaseService databaseService(DatabaseServiceRef ref) {
+DatabaseService databaseService(Ref ref) {
   return DatabaseServiceImpl();
 }
 
 // Wallet providers
 @riverpod
-WalletRepository walletRepository(WalletRepositoryRef ref) {
+WalletRepository walletRepository(Ref ref) {
   return WalletRepositoryImpl(
     databaseService: ref.read(databaseServiceProvider),
     secureStorageService: ref.read(secureStorageServiceProvider),

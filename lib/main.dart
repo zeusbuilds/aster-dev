@@ -53,13 +53,11 @@ void main() async {
   final migrationService = WalletMigrationService(walletRepository);
   await migrationService.migrateIfNeeded();
 
-  runApp(
-    UncontrolledProviderScope(container: container, child: const asterApp()),
-  );
+  runApp(UncontrolledProviderScope(container: container, child: const Aster()));
 }
 
-class asterApp extends ConsumerWidget {
-  const asterApp({super.key});
+class Aster extends ConsumerWidget {
+  const Aster({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
