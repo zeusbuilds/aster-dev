@@ -1,4 +1,4 @@
-# Sster
+# Aster
 
 Aster - A secure Bitcoin & Layer 2 wallet built with Flutter
 
