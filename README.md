@@ -1,6 +1,6 @@
-# aster
+# Sster
 
-A new Flutter project.
+Aster - A secure Bitcoin & Layer 2 wallet built with Flutter
 
 ## Getting Started
 
