@@ -1,6 +1,6 @@
 # Aster
 
-<img src="assets/brand/banner.png" alt="Banner" width="750px">
+<img src="assets/brand/banner.png" alt="Banner">
 
 Aster - A secure Bitcoin & Layer 2 wallet built with Flutter
 
