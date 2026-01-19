@@ -252,20 +252,25 @@ When deciding whether to add haptic feedback to an interaction, consider:
 
 ## Implementation
 
-Always check device capability before triggering haptic feedback:
+Always check device capability before triggering haptic feedback. Haptic feedback should be triggered on `onTapDown` for immediate feedback:
 
 ```dart
 import 'package:haptic_feedback/haptic_feedback.dart';
 
 // Basic usage pattern
-onTap: () async {
-  final canVibrate = await Haptics.canVibrate();
-  if (canVibrate) {
-    await Haptics.vibrate(HapticsType.selection);
-  }
-  // Perform your action here
-  performAction();
-}
+GestureDetector(
+  onTapDown: (_) async {
+    final canVibrate = await Haptics.canVibrate();
+    if (canVibrate) {
+      await Haptics.vibrate(HapticsType.selection);
+    }
+  },
+  onTap: () {
+    // Perform your action here
+    performAction();
+  },
+  // ...
+)
 ```
 
 ## References

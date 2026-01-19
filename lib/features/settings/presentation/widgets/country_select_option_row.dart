@@ -29,15 +29,15 @@ class CountrySelectOptionRow extends StatelessWidget {
     final textTheme = context.textTheme;
 
     return GestureDetector(
-      onTap: onTap != null
-          ? () async {
+      onTapDown: onTap != null
+          ? (_) async {
               final canVibrate = await Haptics.canVibrate();
               if (canVibrate) {
                 await Haptics.vibrate(HapticsType.selection);
               }
-              onTap?.call();
             }
           : null,
+      onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: EdgeInsets.symmetric(

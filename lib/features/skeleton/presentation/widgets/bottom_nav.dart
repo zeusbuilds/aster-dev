@@ -156,13 +156,13 @@ class _NavItem extends StatelessWidget {
     final spacing = context.spacing;
 
     return GestureDetector(
-      onTap: () async {
+      onTapDown: (_) async {
         final canVibrate = await Haptics.canVibrate();
         if (canVibrate) {
           await Haptics.vibrate(HapticsType.selection);
         }
-        onTap();
       },
+      onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Container(
         padding: EdgeInsets.symmetric(
