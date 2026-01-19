@@ -156,6 +156,7 @@ class _NavItem extends StatelessWidget {
 
     return GestureDetector(
       onTap: onTap,
+      behavior: HitTestBehavior.opaque,
       child: Container(
         padding: EdgeInsets.symmetric(
           horizontal: spacing.spacing12,
