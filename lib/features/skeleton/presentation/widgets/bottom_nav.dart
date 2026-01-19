@@ -1,6 +1,7 @@
 import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:haptic_feedback/haptic_feedback.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
 import '../providers/providers.dart';
 
@@ -155,7 +156,13 @@ class _NavItem extends StatelessWidget {
     final spacing = context.spacing;
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: () async {
+        final canVibrate = await Haptics.canVibrate();
+        if (canVibrate) {
+          await Haptics.vibrate(HapticsType.light);
+        }
+        onTap();
+      },
       behavior: HitTestBehavior.opaque,
       child: Container(
         padding: EdgeInsets.symmetric(
