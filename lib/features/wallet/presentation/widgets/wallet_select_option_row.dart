@@ -1,5 +1,6 @@
 import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
+import 'package:haptic_feedback/haptic_feedback.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
 import '../../data/models/models.dart';
 
@@ -29,7 +30,15 @@ class WalletSelectOptionRow extends StatelessWidget {
     final textTheme = context.textTheme;
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: onTap != null
+          ? () async {
+              final canVibrate = await Haptics.canVibrate();
+              if (canVibrate) {
+                await Haptics.vibrate(HapticsType.selection);
+              }
+              onTap?.call();
+            }
+          : null,
       behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: EdgeInsets.symmetric(

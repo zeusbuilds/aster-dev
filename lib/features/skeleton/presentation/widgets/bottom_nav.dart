@@ -159,7 +159,7 @@ class _NavItem extends StatelessWidget {
       onTap: () async {
         final canVibrate = await Haptics.canVibrate();
         if (canVibrate) {
-          await Haptics.vibrate(HapticsType.light);
+          await Haptics.vibrate(HapticsType.selection);
         }
         onTap();
       },

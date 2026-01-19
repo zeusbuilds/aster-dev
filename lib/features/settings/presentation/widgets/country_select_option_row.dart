@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:aster/shared/shared.dart';
 import 'package:country_flags/country_flags.dart';
+import 'package:haptic_feedback/haptic_feedback.dart';
 
 /// Widget representing a single country option in the country selection list
 /// Shows country flag, name, and selection indicator
@@ -28,7 +29,15 @@ class CountrySelectOptionRow extends StatelessWidget {
     final textTheme = context.textTheme;
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: onTap != null
+          ? () async {
+              final canVibrate = await Haptics.canVibrate();
+              if (canVibrate) {
+                await Haptics.vibrate(HapticsType.selection);
+              }
+              onTap?.call();
+            }
+          : null,
       behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: EdgeInsets.symmetric(

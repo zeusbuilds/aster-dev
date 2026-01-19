@@ -1,6 +1,7 @@
 import 'package:circle_flags/circle_flags.dart';
 import 'package:flutter/material.dart';
 import 'package:aster/shared/shared.dart';
+import 'package:haptic_feedback/haptic_feedback.dart';
 
 /// Widget representing a single currency option in the currency selection list
 /// Shows currency flag, name, symbol, code, and selection indicator
@@ -28,7 +29,15 @@ class CurrencySelectOptionRow extends StatelessWidget {
     final textTheme = context.textTheme;
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: onTap != null
+          ? () async {
+              final canVibrate = await Haptics.canVibrate();
+              if (canVibrate) {
+                await Haptics.vibrate(HapticsType.selection);
+              }
+              onTap?.call();
+            }
+          : null,
       behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: EdgeInsets.symmetric(
