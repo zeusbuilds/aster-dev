@@ -6,6 +6,7 @@ import 'package:ming_cute_icons/ming_cute_icons.dart';
 enum ToastVariant { success, failure, warning }
 
 /// Custom toast widget that appears from the bottom of the screen
+///
 /// Supports three variants: success, failure, and warning
 class CustomToast extends StatelessWidget {
   /// Title text (required)
@@ -137,9 +138,13 @@ class ToastHelper {
   /// Show a toast message
   ///
   /// [context] - BuildContext to show the toast
+  ///
   /// [title] - Title text (required)
+  ///
   /// [message] - Message text (optional)
+  ///
   /// [variant] - Toast variant (success, failure, warning)
+  ///
   /// [duration] - How long the toast should be visible (default: 3 seconds)
   static Future<void> show(
     BuildContext context, {

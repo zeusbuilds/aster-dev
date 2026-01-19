@@ -20,6 +20,7 @@ class WalletRepositoryImpl implements WalletRepository {
   Box<WalletModel> get _walletBox => _databaseService.box<WalletModel>();
 
   /// Retrieves all wallets from the database
+  ///
   /// Returns a list of all WalletModel instances
   @override
   Future<List<WalletModel>> getAllWallets() async {
@@ -27,6 +28,7 @@ class WalletRepositoryImpl implements WalletRepository {
   }
 
   /// Gets the currently active wallet
+  ///
   /// Returns the active wallet if found, null if no active wallet is set
   @override
   Future<WalletModel?> getActiveWallet() async {
@@ -44,6 +46,7 @@ class WalletRepositoryImpl implements WalletRepository {
   /// Gets a wallet by its ID
   ///
   /// [walletId] - The wallet ID (can be display or compact format)
+  ///
   /// Returns the wallet if found, null otherwise
   @override
   Future<WalletModel?> getWalletById(String walletId) async {
@@ -61,9 +64,13 @@ class WalletRepositoryImpl implements WalletRepository {
   /// Saves a new wallet from a seed phrase
   ///
   /// [seedPhrase] - The 12 or 24 word seed phrase
+  ///
   /// Validates seed phrase, creates wallet model, saves to database and secure storage
+  ///
   /// Sets as active if it's the first wallet
+  ///
   /// Throws ArgumentError if seed phrase is invalid
+  ///
   /// Throws StateError if wallet already exists
   @override
   Future<WalletModel> saveWallet(String seedPhrase) async {
@@ -102,6 +109,7 @@ class WalletRepositoryImpl implements WalletRepository {
   /// Retrieves the seed phrase for a wallet from secure storage
   ///
   /// [walletId] - The wallet ID (can be display or compact format)
+  ///
   /// Returns the seed phrase if found, null otherwise
   @override
   Future<String?> getSeedPhrase(String walletId) async {
@@ -114,7 +122,9 @@ class WalletRepositoryImpl implements WalletRepository {
   /// Sets a wallet as the active wallet
   ///
   /// [walletId] - The wallet ID to activate
+  ///
   /// Deactivates all other wallets and updates preferences
+  ///
   /// Throws StateError if wallet is not found
   @override
   Future<void> setActiveWallet(String walletId) async {
@@ -144,6 +154,7 @@ class WalletRepositoryImpl implements WalletRepository {
   /// Updates wallet metadata in the database
   ///
   /// [wallet] - The wallet model with updated fields
+  ///
   /// Updates the updatedAt timestamp automatically
   @override
   Future<void> updateWallet(WalletModel wallet) async {
@@ -153,7 +164,9 @@ class WalletRepositoryImpl implements WalletRepository {
   /// Deletes a wallet from database and secure storage
   ///
   /// [walletId] - The wallet ID to delete
+  ///
   /// Switches to another wallet if deleting the active wallet
+  ///
   /// Throws StateError if wallet not found or trying to delete the only wallet
   @override
   Future<void> deleteWallet(String walletId) async {
@@ -189,6 +202,7 @@ class WalletRepositoryImpl implements WalletRepository {
   /// Checks if a wallet exists in the database
   ///
   /// [walletId] - The wallet ID to check
+  ///
   /// Returns true if wallet exists, false otherwise
   @override
   Future<bool> walletExists(String walletId) async {

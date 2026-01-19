@@ -7,6 +7,7 @@ class WalletMigrationService {
   final WalletRepository _repository;
 
   /// Hardcoded test wallets to migrate
+  ///
   /// These are the two wallets that were previously hardcoded in the app
   static const List<String> _testWallets = [
     'joy amount topple panic struggle crystal mammal guilt nature mandate uniform demise',

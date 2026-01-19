@@ -6,7 +6,11 @@ import 'auth_state.dart';
 
 part 'auth_view_model.g.dart';
 
-/// Authentication ViewModel
+/// ViewModel for managing authentication state and operations
+///
+/// Handles login, email verification, logout, and manages authentication state
+///
+/// including loading states, error messages, and user information
 @riverpod
 class AuthViewModel extends _$AuthViewModel {
   @override
@@ -15,7 +19,9 @@ class AuthViewModel extends _$AuthViewModel {
   /// Logs in with email and password
   ///
   /// [email] - User email address
+  ///
   /// [password] - User password
+  ///
   /// Updates state with loading, success, or error messages
   Future<void> login(String email, String password) async {
     state = state.copyWith(
@@ -46,7 +52,9 @@ class AuthViewModel extends _$AuthViewModel {
   /// Verifies email with verification code
   ///
   /// [email] - User email address
+  ///
   /// [code] - Verification code from email
+  ///
   /// Updates state with authentication status and user info
   Future<void> verify(String email, String code) async {
     state = state.copyWith(
@@ -81,6 +89,7 @@ class AuthViewModel extends _$AuthViewModel {
   }
 
   /// Logs out the current user
+  ///
   /// Clears authentication state and removes access token
   Future<void> logout() async {
     final repository = ref.read(authRepositoryProvider);

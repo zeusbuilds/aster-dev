@@ -3,6 +3,7 @@ import 'package:aster/features/settings/presentation/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 
 /// Screen for selecting a currency
+///
 /// Displays a scrollable list of currencies with names, symbols, and codes
 class CurrencySelectionScreen extends StatefulWidget {
   const CurrencySelectionScreen({super.key});

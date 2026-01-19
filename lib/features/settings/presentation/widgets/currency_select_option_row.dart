@@ -4,6 +4,7 @@ import 'package:aster/shared/shared.dart';
 import 'package:haptic_feedback/haptic_feedback.dart';
 
 /// Widget representing a single currency option in the currency selection list
+///
 /// Shows currency flag, name, symbol, code, and selection indicator
 class CurrencySelectOptionRow extends StatelessWidget {
   /// The currency model to display

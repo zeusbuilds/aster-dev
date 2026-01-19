@@ -5,6 +5,13 @@ import '../../constants/constants.dart';
 
 /// Network module for dependency injection
 class NetworkModule {
+  /// Sets up network-related providers
+  ///
+  /// [container] - The provider container to set up providers in
+  ///
+  /// Note: Network providers are already set up in providers.dart.
+  ///
+  /// This method can be extended for additional network-related setup.
   static void setup(ProviderContainer container) {
     // Network providers are already set up in providers.dart
     // This module can be extended for additional network-related setup

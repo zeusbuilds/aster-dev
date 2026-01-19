@@ -6,7 +6,9 @@ class WalletIdGenerator {
   WalletIdGenerator._();
 
   /// Generates a deterministic wallet ID from seed phrase
+  ///
   /// Format: First 8 chars + Last 8 chars of SHA-256 hash
+  ///
   /// Example: "1F29A3B4" + "C5D6E7F8" = "1F29A3B4 C5D6E7F8"
   static String generateWalletId(String seedPhrase) {
     final bytes = utf8.encode(seedPhrase.trim().toLowerCase());
@@ -27,7 +29,9 @@ class WalletIdGenerator {
   }
 
   /// Generates wallet display name from seed phrase
+  ///
   /// Currently: First letter of first word, uppercase
+  ///
   /// TODO: Allow user customization
   static String generateWalletName(String seedPhrase) {
     final words = seedPhrase.trim().split(' ');

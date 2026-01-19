@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
 
 /// Settings screen displaying wallet, app, and support options
+///
 /// Shows active wallet, wallet management, app preferences, and support links
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});

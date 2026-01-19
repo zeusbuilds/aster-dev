@@ -6,8 +6,13 @@ part 'verify_request.g.dart';
 /// Verify request model
 @freezed
 class VerifyRequest with _$VerifyRequest {
-  const factory VerifyRequest({required String email, required String code}) =
-      _VerifyRequest;
+  const factory VerifyRequest({
+    /// User's email address to verify
+    required String email,
+
+    /// Verification code sent to the email
+    required String code,
+  }) = _VerifyRequest;
 
   factory VerifyRequest.fromJson(Map<String, dynamic> json) =>
       _$VerifyRequestFromJson(json);

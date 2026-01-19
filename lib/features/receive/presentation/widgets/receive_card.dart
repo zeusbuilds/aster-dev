@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:unicons/unicons.dart';
 
 /// Card widget displaying receive amount information
+///
 /// Shows amount, asset, market price, balance, and fiat currency selector
 class ReceiveCard extends StatelessWidget {
   /// Amount to receive

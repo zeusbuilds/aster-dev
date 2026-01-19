@@ -6,6 +6,13 @@ class ErrorInterceptor implements ResponseInterceptor {
 
   final void Function()? onUnauthorized;
 
+  /// Intercepts incoming responses and handles 401 unauthorized errors
+  ///
+  /// [response] - The incoming HTTP response
+  ///
+  /// Calls [onUnauthorized] callback if response status is 401
+  ///
+  /// Returns the response unchanged
   @override
   Future<Response> onResponse(Response response) async {
     if (response.statusCode == 401) {

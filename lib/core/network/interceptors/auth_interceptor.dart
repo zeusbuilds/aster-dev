@@ -6,6 +6,11 @@ class AuthInterceptor implements RequestInterceptor {
 
   final String? Function() getAccessToken;
 
+  /// Intercepts outgoing requests and adds Authorization header if token is available
+  ///
+  /// [request] - The outgoing HTTP request
+  ///
+  /// Returns the request with Authorization header added if token exists
   @override
   Future<Request> onRequest(Request request) async {
     final token = getAccessToken();

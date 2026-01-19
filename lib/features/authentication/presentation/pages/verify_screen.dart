@@ -26,6 +26,7 @@ class _VerifyScreenState extends ConsumerState<VerifyScreen> {
   }
 
   /// Handles verification form submission
+  ///
   /// Validates form and triggers verification with email and code
   void _handleVerify() {
     if (_formKey.currentState?.validate() ?? false) {

@@ -6,6 +6,7 @@ import 'typography.dart';
 /// App theme configuration with light and dark mode support
 ///
 /// This class provides comprehensive ThemeData for both light and dark modes,
+///
 /// using design tokens for consistency across the application.
 class AppTheme {
   AppTheme._();

@@ -6,6 +6,7 @@ import 'package:ming_cute_icons/ming_cute_icons.dart';
 import '../providers/providers.dart';
 
 /// Bottom navigation bar with animated selection indicator
+///
 /// Displays four navigation items with a smooth animated circle background
 class BottomNav extends ConsumerStatefulWidget {
   const BottomNav({super.key});
@@ -177,6 +178,7 @@ class _NavItem extends StatelessWidget {
 }
 
 /// Animated circle background that moves behind the selected navigation item
+///
 /// Provides smooth animation when switching between navigation items
 class _AnimatedCircle extends StatefulWidget {
   /// Currently selected navigation index
@@ -241,7 +243,9 @@ class _AnimatedCircleState extends State<_AnimatedCircle>
   }
 
   /// Updates the position of the animated circle based on selected item
+  ///
   /// Calculates the center position of the selected navigation item
+  ///
   /// [isInitial] - Whether this is the initial position setup
   void _updatePosition({bool isInitial = false}) {
     final BuildContext? itemContext =

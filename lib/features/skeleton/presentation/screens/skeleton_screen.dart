@@ -7,6 +7,7 @@ import '../widgets/bottom_nav.dart';
 import '../providers/skeleton_index_provider.dart';
 
 /// Main skeleton screen containing bottom navigation and screen stack
+///
 /// Manages navigation between home, cards, settings, and other screens
 class SkeletonScreen extends ConsumerWidget {
   const SkeletonScreen({super.key});

@@ -4,6 +4,7 @@ import 'package:country_flags/country_flags.dart';
 import 'package:haptic_feedback/haptic_feedback.dart';
 
 /// Widget representing a single country option in the country selection list
+///
 /// Shows country flag, name, and selection indicator
 class CountrySelectOptionRow extends StatelessWidget {
   /// The country model to display

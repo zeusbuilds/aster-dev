@@ -6,11 +6,46 @@ import '../models/models.dart';
 
 /// Abstract authentication repository interface
 abstract class AuthRepository {
+  /// Logs in with email and password
+  ///
+  /// [request] - Login request containing email and password
+  ///
+  /// Returns AuthResponse with token and user info on success
+  ///
+  /// Returns Failure on error (network, server, or unknown)
   Future<Result<AuthResponse>> login(LoginRequest request);
+
+  /// Verifies email with verification code
+  ///
+  /// [request] - Verify request containing email and code
+  ///
+  /// Returns AuthResponse with token and user info on success
+  ///
+  /// Returns Failure on error (network, server, or unknown)
   Future<Result<AuthResponse>> verify(VerifyRequest request);
+
+  /// Logs out the current user
+  ///
+  /// Clears the access token from secure storage
+  ///
+  /// Returns success or failure result
   Future<Result<void>> logout();
+
+  /// Retrieves the current access token from secure storage
+  ///
+  /// Returns the token if found, null otherwise
   Future<String?> getAccessToken();
+
+  /// Saves access token to secure storage
+  ///
+  /// [token] - The access token to save
+  ///
+  /// Returns success or failure result
   Future<Result<void>> saveAccessToken(String token);
+
+  /// Clears the access token from secure storage
+  ///
+  /// Returns success or failure result
   Future<Result<void>> clearAccessToken();
 }
 
@@ -33,7 +68,9 @@ class AuthRepositoryImpl implements AuthRepository {
   /// Logs in with email and password
   ///
   /// [request] - Login request containing email and password
+  ///
   /// Returns AuthResponse with token and user info on success
+  ///
   /// Returns Failure on error (network, server, or unknown)
   @override
   Future<Result<AuthResponse>> login(LoginRequest request) async {
@@ -73,7 +110,9 @@ class AuthRepositoryImpl implements AuthRepository {
   /// Verifies email with verification code
   ///
   /// [request] - Verify request containing email and code
+  ///
   /// Returns AuthResponse with token and user info on success
+  ///
   /// Returns Failure on error (network, server, or unknown)
   @override
   Future<Result<AuthResponse>> verify(VerifyRequest request) async {
@@ -111,7 +150,9 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   /// Logs out the current user
+  ///
   /// Clears the access token from secure storage
+  ///
   /// Returns success or failure result
   @override
   Future<Result<void>> logout() async {
@@ -124,6 +165,7 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   /// Retrieves the current access token from secure storage
+  ///
   /// Returns the token if found, null otherwise
   @override
   Future<String?> getAccessToken() async {
@@ -137,6 +179,7 @@ class AuthRepositoryImpl implements AuthRepository {
   /// Saves access token to secure storage
   ///
   /// [token] - The access token to save
+  ///
   /// Returns success or failure result
   @override
   Future<Result<void>> saveAccessToken(String token) async {
@@ -149,6 +192,7 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   /// Clears the access token from secure storage
+  ///
   /// Returns success or failure result
   @override
   Future<Result<void>> clearAccessToken() async {

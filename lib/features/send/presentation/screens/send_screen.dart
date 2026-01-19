@@ -4,6 +4,7 @@ import 'package:custom_numeric_pad/custom_numpad_package.dart';
 import 'package:flutter/material.dart';
 
 /// Screen for sending Bitcoin
+///
 /// Displays send amount card and numeric keypad for entering the send amount
 class SendScreen extends StatelessWidget {
   const SendScreen({super.key});

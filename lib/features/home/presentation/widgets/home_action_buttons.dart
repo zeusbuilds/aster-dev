@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:remixicon/remixicon.dart';
 
 /// Row of action buttons for Send, Receive, and Swap operations
+///
 /// Provides quick access to main wallet operations from the home screen
 class HomeActionButtons extends StatelessWidget {
   const HomeActionButtons({super.key});

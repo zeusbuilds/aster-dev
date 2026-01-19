@@ -4,6 +4,7 @@ import 'package:custom_numeric_pad/custom_numpad_package.dart';
 import 'package:flutter/material.dart';
 
 /// Screen for setting the amount to receive
+///
 /// Displays amount card and numeric keypad for entering the receive amount
 class ReceiveSetAmountScreen extends StatelessWidget {
   const ReceiveSetAmountScreen({super.key});

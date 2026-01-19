@@ -7,6 +7,7 @@ import 'package:remixicon/remixicon.dart';
 import 'package:unicons/unicons.dart';
 
 /// Widget displaying Bitcoin price information with chart
+///
 /// Shows current price, price change percentage, and 24-hour price chart
 class PriceCard extends StatefulWidget {
   const PriceCard({super.key});
@@ -184,6 +185,7 @@ class _PriceCardState extends State<PriceCard> {
 }
 
 /// Custom painter for drawing grid lines with fade effects
+///
 /// Used for chart background decoration
 class GridPainter extends CustomPainter {
   /// Color of the grid lines
@@ -202,6 +204,7 @@ class GridPainter extends CustomPainter {
   });
 
   /// Calculates opacity for grid lines based on vertical position
+  ///
   /// Creates fade effect at top and bottom edges
   double _getOpacity(double y, double height) {
     if (y < fadeHeight) {

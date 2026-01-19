@@ -6,6 +6,7 @@ import 'package:ming_cute_icons/ming_cute_icons.dart';
 import '../widgets/widgets.dart';
 
 /// Screen for swapping between different assets
+///
 /// Displays swap card, conversion rate, and transaction details with animations
 class SwapScreen extends StatefulWidget {
   const SwapScreen({super.key});
@@ -90,6 +91,7 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
   }
 
   /// Handles continue button tap
+  ///
   /// Hides keyboard, shows swap details with staggered animation, and displays cancel option
   void _onContinueTap() {
     // Dismiss keyboard with fade
@@ -128,6 +130,7 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
   }
 
   /// Handles cancel button tap
+  ///
   /// Fades out details, hides cancel text, and shows keyboard again
   void _onCancelTap() {
     // Phase 1: Fade out all detail rows at once

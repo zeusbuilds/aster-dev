@@ -5,6 +5,7 @@ import 'package:remixicon/remixicon.dart';
 import '../widgets/widgets.dart';
 
 /// Screen displaying list of Bitcoin transactions
+///
 /// Shows balance summary and grouped transaction history
 class TransactionListScreen extends StatelessWidget {
   const TransactionListScreen({super.key});

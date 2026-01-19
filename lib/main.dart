@@ -56,6 +56,11 @@ void main() async {
   runApp(UncontrolledProviderScope(container: container, child: const Aster()));
 }
 
+/// Main application widget
+///
+/// Sets up MaterialApp with routing, theming, and Riverpod provider scope.
+///
+/// This is the root widget of the application.
 class Aster extends ConsumerWidget {
   const Aster({super.key});
 

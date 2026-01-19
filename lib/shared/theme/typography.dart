@@ -5,9 +5,13 @@ import 'package:google_fonts/google_fonts.dart';
 /// Typography system using design tokens
 ///
 /// This system follows industry best practices for design tokens:
+///
 /// - Base tokens for font families, weights, sizes, line heights, letter spacing
+///
 /// - Material Design 3 text styles built from base tokens
+///
 /// - Platform-agnostic approach for consistency across platforms
+///
 /// - Professional typography scale optimized for financial/crypto applications
 class TypographySystem {
   TypographySystem._();
@@ -15,7 +19,9 @@ class TypographySystem {
   /// Creates a TextTheme using design tokens from TypographyTokens
   ///
   /// This method builds composite typography styles by combining base tokens
+  ///
   /// into semantic, reusable text styles following Material Design 3 patterns.
+  ///
   /// Optimized for financial/crypto applications with clear hierarchy and readability.
   static TextTheme buildTextTheme({
     required TypographyTokens tokens,
@@ -162,6 +168,7 @@ class TypographySystem {
   /// Builds a TextStyle from design tokens
   ///
   /// This is a helper method that combines base tokens into a complete
+  ///
   /// TextStyle, ensuring consistency across all text styles.
   static TextStyle buildStyle({
     required String fontFamily,

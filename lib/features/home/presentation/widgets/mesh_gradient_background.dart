@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:mesh/mesh.dart';
 
 /// Background widget with animated mesh gradient effect
+///
 /// Creates a blue gradient mesh with blur and noise texture overlay
 class MeshGradientBackground extends StatelessWidget {
   const MeshGradientBackground({super.key});

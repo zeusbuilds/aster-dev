@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 /// Screen for selecting and switching between available wallets
+///
 /// Displays a list of all wallets with the currently active wallet highlighted
 class WalletSelectionScreen extends ConsumerWidget {
   const WalletSelectionScreen({super.key});

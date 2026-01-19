@@ -2,6 +2,7 @@ import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
 
 /// Widget displaying a single transaction item
+///
 /// Shows transaction type, amount, time, and icon with proper formatting
 class TransactionItem extends StatelessWidget {
   /// Type of transaction (e.g., "Sent", "Received", "Swap")
@@ -97,6 +98,7 @@ class TransactionItem extends StatelessWidget {
   }
 
   /// Builds text spans for time display with proper numeric formatting
+  ///
   /// Separates time digits from AM/PM for styling
   List<TextSpan> _buildTimeSpans(BuildContext context, String time) {
     final colors = context.colors;

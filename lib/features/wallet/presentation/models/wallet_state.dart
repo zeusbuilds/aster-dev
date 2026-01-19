@@ -4,6 +4,7 @@ import '../../data/models/wallet_model.dart';
 part 'wallet_state.freezed.dart';
 
 /// State model for wallet management
+///
 /// Contains the list of wallets, active wallet, loading state, and error messages
 @freezed
 class WalletState with _$WalletState {

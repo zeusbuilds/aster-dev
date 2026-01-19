@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 /// Widget displaying a single asset row with name, balance, and icon
+///
 /// Navigates to transaction list when tapped
 class AssetRow extends StatelessWidget {
   /// Asset name (e.g., "BTC", "LBTC")
@@ -110,6 +111,7 @@ class AssetRow extends StatelessWidget {
   }
 
   /// Builds text spans for balance display with proper numeric formatting
+  ///
   /// Separates numeric value from currency unit for styling
   List<TextSpan> _buildBalanceSpans(
     BuildContext context,

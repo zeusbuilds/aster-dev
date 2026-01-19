@@ -3,6 +3,11 @@ import 'package:chopper/chopper.dart';
 
 /// Chopper interceptor for logging requests and responses
 class LoggingInterceptor implements RequestInterceptor, ResponseInterceptor {
+  /// Logs outgoing HTTP requests with method, URL, body, and parameters
+  ///
+  /// [request] - The outgoing HTTP request to log
+  ///
+  /// Returns the request unchanged
   @override
   Future<Request> onRequest(Request request) async {
     final method = request.method;
@@ -21,6 +26,11 @@ class LoggingInterceptor implements RequestInterceptor, ResponseInterceptor {
     return request;
   }
 
+  /// Logs incoming HTTP responses with status code, URL, and body
+  ///
+  /// [response] - The incoming HTTP response to log
+  ///
+  /// Returns the response unchanged
   @override
   Future<Response> onResponse(Response response) async {
     final statusCode = response.statusCode;

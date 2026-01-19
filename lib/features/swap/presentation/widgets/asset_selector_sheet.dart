@@ -18,8 +18,11 @@ class AssetSelectorSheet extends StatelessWidget {
   /// Shows the asset selector as a modal bottom sheet
   ///
   /// [context] - Build context for showing the bottom sheet
+  ///
   /// [assets] - List of available assets to choose from
+  ///
   /// [selectedAssetName] - Currently selected asset name (for highlighting)
+  ///
   /// Returns the selected asset or null if dismissed
   static Future<AssetModel?> show(
     BuildContext context, {
@@ -113,6 +116,7 @@ class AssetSelectorSheet extends StatelessWidget {
 }
 
 /// Individual asset item in the selector list
+///
 /// Displays asset icon, name, chain, and balance information
 class _AssetItem extends StatelessWidget {
   /// Asset model to display

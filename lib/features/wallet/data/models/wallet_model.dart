@@ -1,12 +1,18 @@
 import 'package:objectbox/objectbox.dart';
 import '../../../../core/core.dart';
 
+/// Wallet data model for ObjectBox persistence
+///
+/// Represents a wallet with its ID, name, timestamps, and active status.
+///
+/// The wallet ID is deterministically generated from a seed phrase.
 @Entity()
 class WalletModel {
   @Id()
   int id = 0;
 
   /// Deterministic wallet ID derived from seed phrase
+  ///
   /// Format: "1F29A3B4 C5D6E7F8" (display format)
   String walletId;
 
@@ -58,6 +64,7 @@ class WalletModel {
   /// Creates a copy of this wallet model with updated fields
   ///
   /// All parameters are optional - only provided fields will be updated
+  ///
   /// Returns a new WalletModel instance with the updated values
   WalletModel copyWith({
     int? id,

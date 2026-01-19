@@ -6,6 +6,7 @@ import 'package:ming_cute_icons/ming_cute_icons.dart';
 import 'package:unicons/unicons.dart';
 
 /// Widget displaying the list of assets/balances for the wallet
+///
 /// Shows loading indicator when balance is null or empty
 class AssetsSection extends StatelessWidget {
   /// The GDK balance object containing asset amounts

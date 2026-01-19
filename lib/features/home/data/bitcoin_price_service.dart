@@ -7,6 +7,7 @@ class BitcoinPriceService {
   static const String baseUrl = 'https://api.coingecko.com/api/v3';
 
   /// Fetches hourly Bitcoin price data for the last 24 hours
+  ///
   /// Returns a list of ChartDataItem for plotting
   static Future<List<ChartDataItem>> fetchTodayPriceData() async {
     try {
@@ -60,6 +61,7 @@ class BitcoinPriceService {
   }
 
   /// Fetches current Bitcoin price as fallback when historical data is unavailable
+  ///
   /// Returns a flat line chart with the current price repeated 24 times
   static Future<List<ChartDataItem>> _fetchCurrentPriceFallback() async {
     try {
@@ -89,6 +91,7 @@ class BitcoinPriceService {
   }
 
   /// Fetches the current Bitcoin price in USD from CoinGecko API
+  ///
   /// Returns the current price, or null if the request fails
   static Future<double?> fetchCurrentPrice() async {
     try {
@@ -113,6 +116,7 @@ class BitcoinPriceService {
   /// Calculates the price change percentage from first to last data point
   ///
   /// [data] - List of chart data items
+  ///
   /// Returns the percentage change, or null if insufficient data or first price is zero
   static double? calculatePriceChange(List<ChartDataItem> data) {
     if (data.length < 2) return null;

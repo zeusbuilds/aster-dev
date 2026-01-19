@@ -1,6 +1,9 @@
 import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
 
+/// Reusable row widget for displaying key-value pairs with optional icons
+///
+/// Displays a title and value with optional prefix/suffix icons.
 class DetailRow extends StatelessWidget {
   final IconData? prefixIcon;
   final IconData? suffixIcon;

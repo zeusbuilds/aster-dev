@@ -2,18 +2,55 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// Service for preferences storage operations
 abstract class PreferencesService {
+  /// Retrieves a string value for the given key
+  ///
+  /// Returns the string value if found, null otherwise
   Future<String?> getString(String key);
+
+  /// Stores a string value for the given key
   Future<void> setString(String key, String value);
+
+  /// Retrieves a boolean value for the given key
+  ///
+  /// Returns the boolean value if found, null otherwise
   Future<bool?> getBool(String key);
+
+  /// Stores a boolean value for the given key
   Future<void> setBool(String key, bool value);
+
+  /// Retrieves an integer value for the given key
+  ///
+  /// Returns the integer value if found, null otherwise
   Future<int?> getInt(String key);
+
+  /// Stores an integer value for the given key
   Future<void> setInt(String key, int value);
+
+  /// Retrieves a double value for the given key
+  ///
+  /// Returns the double value if found, null otherwise
   Future<double?> getDouble(String key);
+
+  /// Stores a double value for the given key
   Future<void> setDouble(String key, double value);
+
+  /// Retrieves a list of strings for the given key
+  ///
+  /// Returns the list if found, null otherwise
   Future<List<String>?> getStringList(String key);
+
+  /// Stores a list of strings for the given key
   Future<void> setStringList(String key, List<String> value);
+
+  /// Removes the value for the given key
   Future<void> remove(String key);
+
+  /// Clears all stored preferences
   Future<void> clear();
+
+  /// Checks if a key exists in preferences
+  ///
+  /// Returns true if the key exists, false otherwise
   Future<bool> containsKey(String key);
 }
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:remixicon/remixicon.dart';
 
 /// Reusable row widget for settings options
+///
 /// Displays title, optional icon, details, and navigation indicator
 class SettingsOptionRow extends StatelessWidget {
   /// Title text to display

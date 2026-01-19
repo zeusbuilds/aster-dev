@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:remixicon/remixicon.dart';
 
+/// Custom app bar widget with consistent styling
+///
+/// Provides a standardized app bar with title, optional leading icon for navigation,
+/// and optional action widget. Supports custom title alignment and leading icon.
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final bool leadingIcon;

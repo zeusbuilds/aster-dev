@@ -1,6 +1,7 @@
 import '../models/wallet_model.dart';
 
 /// Repository interface for wallet operations
+///
 /// Follows dependency inversion principle
 abstract class WalletRepository {
   /// Get all wallets

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 /// Card widget displaying send amount information
+///
 /// Shows amount, asset, market price, balance, and fiat currency selector
 class SendCard extends StatelessWidget {
   /// Amount to send

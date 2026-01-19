@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:remixicon/remixicon.dart';
 
 /// Card widget displaying swap pair (from/to assets)
+///
 /// Shows asset selection, amounts, balances, and swap arrow indicator
 class SwapCard extends StatefulWidget {
   const SwapCard({super.key});
@@ -17,6 +18,7 @@ class _SwapCardState extends State<SwapCard> {
   AssetModel _toAsset = AssetModel.usdt;
 
   /// Shows asset selector bottom sheet
+  ///
   /// [isFrom] - Whether selecting the "from" asset (true) or "to" asset (false)
   Future<void> _showAssetSelector(bool isFrom) async {
     final selected = await AssetSelectorSheet.show(

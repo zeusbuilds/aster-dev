@@ -7,7 +7,10 @@ part 'login_request.g.dart';
 @freezed
 class LoginRequest with _$LoginRequest {
   const factory LoginRequest({
+    /// User's email address
     required String email,
+
+    /// User's password
     required String password,
   }) = _LoginRequest;
 

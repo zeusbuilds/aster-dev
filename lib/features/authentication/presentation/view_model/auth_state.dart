@@ -4,6 +4,7 @@ import '../../data/models/models.dart';
 part 'auth_state.freezed.dart';
 
 /// Authentication state model
+///
 /// Tracks authentication status, user info, loading state, and messages
 @freezed
 class AuthState with _$AuthState {

@@ -3,6 +3,7 @@ import 'package:aster/features/settings/presentation/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 
 /// Screen for selecting a country
+///
 /// Displays a scrollable list of countries with flags and names
 class CountrySelectionScreen extends StatefulWidget {
   const CountrySelectionScreen({super.key});

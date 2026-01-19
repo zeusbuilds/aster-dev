@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
 
 /// Header widget for the home screen
+///
 /// Displays the app logo and active wallet name with navigation to wallet selection
 class HomeHeader extends ConsumerWidget {
   const HomeHeader({super.key});

@@ -8,6 +8,7 @@ const _kSkeletonChartItemsCount = 31;
 const _kPaddingRatio = 0.995;
 
 /// Widget displaying a line chart of Bitcoin price data
+///
 /// Shows animated chart with blinking dot indicator at the latest price point
 class PriceChart extends StatefulWidget {
   const PriceChart({super.key, required this.data, required this.isSkeleton});
@@ -141,6 +142,7 @@ class _PriceChartState extends State<PriceChart>
 }
 
 /// Data model for a single chart data point
+///
 /// Represents x (index) and y (price) coordinates
 class ChartDataItem {
   /// X coordinate (index/time)

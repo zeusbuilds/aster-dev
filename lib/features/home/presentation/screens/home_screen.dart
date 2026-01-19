@@ -9,6 +9,7 @@ import 'package:gdk_flutter/gdk_flutter.dart';
 import 'package:gdk_flutter/src/models/gdk_wallet_models.dart';
 
 /// Main home screen displaying wallet balance, Bitcoin price, and asset list
+///
 /// Manages GDK session and balance fetching for the active wallet
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -36,6 +37,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   /// Logs into GDK with the active wallet and fetches the balance
+  ///
   /// Creates a new GDK session, connects to the network, and retrieves balance information
   Future<void> _loginAndFetchBalances(WidgetRef ref) async {
     final walletState = ref.read(walletViewModelProvider);

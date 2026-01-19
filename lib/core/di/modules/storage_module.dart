@@ -7,6 +7,13 @@ import '../providers.dart';
 
 /// Storage module for dependency injection
 class StorageModule {
+  /// Sets up storage-related providers
+  ///
+  /// [container] - The provider container to set up providers in
+  ///
+  /// Note: Storage providers are already set up in providers.dart.
+  ///
+  /// This method can be extended for additional storage-related setup.
   static void setup(ProviderContainer container) {
     // Storage providers are already set up in providers.dart
     // This module can be extended for additional storage-related setup

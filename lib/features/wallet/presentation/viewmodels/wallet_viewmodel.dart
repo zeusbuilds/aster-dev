@@ -5,6 +5,7 @@ import '../models/models.dart';
 part 'wallet_viewmodel.g.dart';
 
 /// ViewModel for managing wallet state and operations
+///
 /// Handles loading wallets, switching active wallet, adding new wallets, and retrieving seed phrases
 @riverpod
 class WalletViewModel extends _$WalletViewModel {
@@ -16,6 +17,7 @@ class WalletViewModel extends _$WalletViewModel {
   }
 
   /// Loads all wallets and sets the active wallet
+  ///
   /// Updates the state with the loaded wallets and active wallet information
   Future<void> loadWallets() async {
     // ignore: avoid_print
@@ -50,6 +52,7 @@ class WalletViewModel extends _$WalletViewModel {
   /// Switches the active wallet to the specified wallet ID
   ///
   /// [walletId] - The compact wallet ID to switch to
+  ///
   /// Throws an error if the wallet is not found
   Future<void> switchWallet(String walletId) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
@@ -69,6 +72,7 @@ class WalletViewModel extends _$WalletViewModel {
   /// Adds a new wallet from a seed phrase
   ///
   /// [seedPhrase] - The 12 or 24 word seed phrase to create the wallet from
+  ///
   /// Throws an error if the seed phrase is invalid or wallet already exists
   Future<void> addWallet(String seedPhrase) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
@@ -88,6 +92,7 @@ class WalletViewModel extends _$WalletViewModel {
   /// Retrieves the seed phrase for a specific wallet from secure storage
   ///
   /// [walletId] - The compact wallet ID to get the seed phrase for
+  ///
   /// Returns the seed phrase if found, null otherwise
   Future<String?> getSeedPhrase(String walletId) async {
     try {

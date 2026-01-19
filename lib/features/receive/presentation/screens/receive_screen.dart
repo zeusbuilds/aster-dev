@@ -5,6 +5,7 @@ import 'package:ming_cute_icons/ming_cute_icons.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 
 /// Screen for receiving Bitcoin
+///
 /// Displays QR code, address, and options for setting amount, generating new address, etc.
 class ReceiveScreen extends StatefulWidget {
   const ReceiveScreen({super.key});

@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:remixicon/remixicon.dart';
 
 /// Widget displaying a single swap pair (from or to asset)
+///
 /// Shows asset icon, name, amount, balance, and market price
 class SwapPair extends StatelessWidget {
   /// Whether this is the "from" pair (true) or "to" pair (false)

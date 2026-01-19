@@ -1,6 +1,10 @@
 import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
 
+/// Widget that applies a squircle (rounded superellipse) shape to its child
+///
+/// Provides a modern rounded rectangle shape with customizable border radius,
+/// colors, gradients, shadows, and borders. Commonly used for cards and containers.
 class Squircle extends StatelessWidget {
   final Widget child;
   final double borderRadius;

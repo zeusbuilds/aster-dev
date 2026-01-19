@@ -5,6 +5,7 @@ import 'package:ming_cute_icons/ming_cute_icons.dart';
 import '../../data/models/models.dart';
 
 /// Widget representing a single wallet option in the wallet selection list
+///
 /// Shows wallet name, ID, and selection indicator
 class WalletSelectOptionRow extends StatelessWidget {
   /// The wallet model to display

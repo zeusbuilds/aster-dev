@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
 
 /// Screen for entering recipient address when sending Bitcoin
+///
 /// Displays address input field with QR code scanner option
 class SendAddressScreen extends StatelessWidget {
   const SendAddressScreen({super.key});

@@ -2,6 +2,7 @@ import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
 
 /// Market tile widget displaying a squircle with icon and label
+///
 /// Icon is inside the squircle, label is below it
 class MarketTile extends StatelessWidget {
   final String label;

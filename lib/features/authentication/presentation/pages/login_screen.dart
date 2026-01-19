@@ -27,6 +27,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   /// Handles login form submission
+  ///
   /// Validates form and triggers login with email and password
   void _handleLogin() {
     if (_formKey.currentState?.validate() ?? false) {

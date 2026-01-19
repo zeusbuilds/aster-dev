@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 /// Card widget for entering recipient address
+///
 /// Displays address input field with paste/clear functionality
 class SendAddressCard extends StatefulWidget {
   /// Asset model for the send operation
