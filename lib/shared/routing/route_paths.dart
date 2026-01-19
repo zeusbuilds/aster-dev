@@ -17,6 +17,7 @@ class RoutePaths {
   static const String receive = '/receive';
   static const String receiveSetAmount = '/receive/set-amount';
   static const String swap = '/swap';
+  static const String market = '/market';
   static const String transactionList = '/transactions';
   static const String settings = '/settings';
   static const String walletSelection = 'wallet-selection';

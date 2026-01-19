@@ -1,4 +1,5 @@
 import 'package:aster/features/home/presentation/screens/home_screen.dart';
+import 'package:aster/features/market/presentation/screens/market_screen.dart';
 import 'package:aster/features/settings/presentation/screens/settings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,7 +18,7 @@ class SkeletonScreen extends ConsumerWidget {
     final screens = <Widget>[
       const HomeScreen(),
       const Center(child: Text('Card Screen')),
-      const Center(child: Text('Market Screen')),
+      const MarketScreen(),
       const SettingsScreen(),
     ];
 

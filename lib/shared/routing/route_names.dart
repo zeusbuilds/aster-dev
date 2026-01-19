@@ -17,6 +17,7 @@ class RouteNames {
   static const String receive = 'receive';
   static const String receiveSetAmount = 'receiveSetAmount';
   static const String swap = 'swap';
+  static const String market = 'market';
   static const String transactionList = 'transactionList';
   static const String settings = 'settings';
   static const String walletSelection = 'walletSelection';

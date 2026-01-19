@@ -1,4 +1,5 @@
 import 'package:aster/features/home/presentation/screens/home_screen.dart';
+import 'package:aster/features/market/presentation/screens/market_screen.dart';
 import 'package:aster/features/transaction/presentation/screens/transaction_list_screen.dart';
 import 'package:aster/features/receive/presentation/screens/screens.dart';
 import 'package:aster/features/send/presentation/screens/screens.dart';
@@ -84,6 +85,11 @@ class RouteConfig {
         path: RoutePaths.swap,
         name: RouteNames.swap,
         builder: (context, state) => const SwapScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.market,
+        name: RouteNames.market,
+        builder: (context, state) => const MarketScreen(),
       ),
       GoRoute(
         path: RoutePaths.transactionList,

@@ -30,6 +30,7 @@ class WalletSelectOptionRow extends StatelessWidget {
 
     return GestureDetector(
       onTap: onTap,
+      behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: EdgeInsets.symmetric(
           horizontal: spacing.spacing20,
