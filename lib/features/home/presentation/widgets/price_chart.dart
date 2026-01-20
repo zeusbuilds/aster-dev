@@ -1,7 +1,9 @@
-import 'package:aster/shared/shared.dart';
+import 'package:flutter/material.dart';
+
 import 'package:collection/collection.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:flutter/material.dart';
+
+import 'package:aster/shared/shared.dart';
 
 const _kSkeletonPrice = 100000.0;
 const _kSkeletonChartItemsCount = 31;

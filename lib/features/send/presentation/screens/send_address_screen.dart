@@ -1,8 +1,10 @@
-import 'package:aster/features/send/presentation/widgets/widgets.dart';
-import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
+
 import 'package:go_router/go_router.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
+
+import 'package:aster/features/send/presentation/widgets/widgets.dart';
+import 'package:aster/shared/shared.dart';
 
 /// Screen for entering recipient address when sending Bitcoin
 ///

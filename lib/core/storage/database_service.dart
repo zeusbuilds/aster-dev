@@ -1,5 +1,7 @@
-import 'package:path_provider/path_provider.dart';
 import 'dart:io';
+
+import 'package:path_provider/path_provider.dart';
+
 import '../../objectbox.g.dart';
 
 /// Service for database operations using ObjectBox

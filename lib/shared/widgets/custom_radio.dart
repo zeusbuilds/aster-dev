@@ -1,6 +1,8 @@
-import 'package:easy_radio/easy_radio.dart';
-import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
+
+import 'package:easy_radio/easy_radio.dart';
+
+import 'package:aster/shared/shared.dart';
 
 /// Custom radio button widget with consistent styling
 ///

@@ -1,7 +1,9 @@
-import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
+
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:haptic_feedback/haptic_feedback.dart';
+
+import 'package:aster/shared/shared.dart';
 
 /// Bottom sheet for selecting an asset
 class AssetSelectorSheet extends StatelessWidget {

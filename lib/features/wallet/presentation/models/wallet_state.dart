@@ -1,4 +1,5 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
+
 import '../../data/models/wallet_model.dart';
 
 part 'wallet_state.freezed.dart';

@@ -1,12 +1,14 @@
-import 'package:aster/features/home/presentation/widgets/widgets.dart';
-import 'package:aster/features/wallet/presentation/viewmodels/viewmodels.dart';
-import 'package:aster/features/wallet/presentation/models/models.dart';
-import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gdk_flutter/gdk_flutter.dart';
 import 'package:gdk_flutter/src/models/gdk_wallet_models.dart';
+
+import 'package:aster/features/home/presentation/widgets/widgets.dart';
+import 'package:aster/features/wallet/presentation/models/models.dart';
+import 'package:aster/features/wallet/presentation/viewmodels/viewmodels.dart';
+import 'package:aster/shared/shared.dart';
 
 /// Main home screen displaying wallet balance, Bitcoin price, and asset list
 ///

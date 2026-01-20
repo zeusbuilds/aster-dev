@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+
 import 'tokens/color_tokens.dart';
-import 'tokens/spacing_tokens.dart';
 import 'tokens/radius_tokens.dart';
-import 'tokens/typography_tokens.dart';
 import 'tokens/shadow_tokens.dart';
+import 'tokens/spacing_tokens.dart';
+import 'tokens/typography_tokens.dart';
 
 /// Extension on BuildContext to easily access theme tokens
 extension ThemeContext on BuildContext {

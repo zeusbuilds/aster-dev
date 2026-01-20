@@ -1,7 +1,9 @@
-import 'package:aster/shared/shared.dart';
-import 'package:country_flags/country_flags.dart';
 import 'package:flutter/material.dart';
+
+import 'package:country_flags/country_flags.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+
+import 'package:aster/shared/shared.dart';
 
 /// Card widget displaying send amount information
 ///

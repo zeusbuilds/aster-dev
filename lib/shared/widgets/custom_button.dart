@@ -1,6 +1,8 @@
-import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
+
 import 'package:haptic_feedback/haptic_feedback.dart';
+
+import 'package:aster/shared/shared.dart';
 
 /// Button variant types
 enum ButtonVariant {

@@ -1,4 +1,5 @@
 import 'package:dartz/dartz.dart';
+
 import 'failures.dart';
 
 /// Result type alias for Either`<Failure, T>`

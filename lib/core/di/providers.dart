@@ -1,13 +1,13 @@
 import 'package:chopper/chopper.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 
+import '../../features/wallet/data/repository/repository.dart';
 import '../network/network_info.dart';
 import '../storage/storage.dart';
 import 'modules/network_module.dart';
-import '../../features/wallet/data/repository/repository.dart';
 
 part 'providers.g.dart';
 

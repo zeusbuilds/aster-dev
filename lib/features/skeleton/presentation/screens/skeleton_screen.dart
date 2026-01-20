@@ -1,10 +1,12 @@
+import 'package:flutter/material.dart';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import 'package:aster/features/home/presentation/screens/home_screen.dart';
 import 'package:aster/features/market/presentation/screens/market_screen.dart';
 import 'package:aster/features/settings/presentation/screens/settings_screen.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../widgets/bottom_nav.dart';
 import '../providers/skeleton_index_provider.dart';
+import '../widgets/bottom_nav.dart';
 
 /// Main skeleton screen containing bottom navigation and screen stack
 ///

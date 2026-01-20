@@ -1,6 +1,7 @@
-import 'package:aster/shared/shared.dart';
-import 'package:aster/features/settings/presentation/widgets/widgets.dart';
 import 'package:flutter/material.dart';
+
+import 'package:aster/features/settings/presentation/widgets/widgets.dart';
+import 'package:aster/shared/shared.dart';
 
 /// Screen for selecting a country
 ///

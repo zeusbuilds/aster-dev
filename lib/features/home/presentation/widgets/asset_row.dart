@@ -1,6 +1,8 @@
-import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
+
 import 'package:go_router/go_router.dart';
+
+import 'package:aster/shared/shared.dart';
 
 /// Widget displaying a single asset row with name, balance, and icon
 ///

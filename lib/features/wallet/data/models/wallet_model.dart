@@ -1,4 +1,5 @@
 import 'package:objectbox/objectbox.dart';
+
 import '../../../../core/core.dart';
 
 /// Wallet data model for ObjectBox persistence

@@ -1,5 +1,6 @@
-import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
+
+import 'package:aster/shared/shared.dart';
 
 /// Widget displaying a single transaction item
 ///

@@ -1,7 +1,9 @@
-import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
+
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:remixicon/remixicon.dart';
+
+import 'package:aster/shared/shared.dart';
 
 /// Widget displaying a single swap pair (from or to asset)
 ///

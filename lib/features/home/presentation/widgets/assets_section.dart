@@ -1,9 +1,11 @@
-import 'package:aster/features/home/presentation/widgets/widgets.dart';
-import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
+
 import 'package:gdk_flutter/src/models/gdk_wallet_models.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
 import 'package:unicons/unicons.dart';
+
+import 'package:aster/features/home/presentation/widgets/widgets.dart';
+import 'package:aster/shared/shared.dart';
 
 /// Widget displaying the list of assets/balances for the wallet
 ///

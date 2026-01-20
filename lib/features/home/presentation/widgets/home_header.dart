@@ -1,10 +1,12 @@
-import 'package:aster/features/wallet/presentation/viewmodels/viewmodels.dart';
-import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
+
+import 'package:aster/features/wallet/presentation/viewmodels/viewmodels.dart';
+import 'package:aster/shared/shared.dart';
 
 /// Header widget for the home screen
 ///

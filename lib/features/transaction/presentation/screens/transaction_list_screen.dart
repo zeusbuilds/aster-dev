@@ -1,7 +1,8 @@
-import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
+
 import 'package:remixicon/remixicon.dart';
 
+import 'package:aster/shared/shared.dart';
 import '../widgets/widgets.dart';
 
 /// Screen displaying list of Bitcoin transactions

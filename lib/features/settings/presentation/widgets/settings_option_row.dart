@@ -1,6 +1,8 @@
-import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
+
 import 'package:remixicon/remixicon.dart';
+
+import 'package:aster/shared/shared.dart';
 
 /// Reusable row widget for settings options
 ///

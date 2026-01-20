@@ -1,4 +1,5 @@
 import 'dart:developer' as developer;
+
 import 'package:chopper/chopper.dart';
 
 /// Chopper interceptor for logging requests and responses

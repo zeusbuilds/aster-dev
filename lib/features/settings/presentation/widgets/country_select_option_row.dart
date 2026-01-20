@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:aster/shared/shared.dart';
+
 import 'package:country_flags/country_flags.dart';
 import 'package:haptic_feedback/haptic_feedback.dart';
+
+import 'package:aster/shared/shared.dart';
 
 /// Widget representing a single country option in the country selection list
 ///

@@ -1,6 +1,8 @@
-import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
+
 import 'package:ming_cute_icons/ming_cute_icons.dart';
+
+import 'package:aster/shared/shared.dart';
 
 /// Toast variant types
 enum ToastVariant { success, failure, warning }
