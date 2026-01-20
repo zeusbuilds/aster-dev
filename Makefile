@@ -1,9 +1,10 @@
-.PHONY: shell bootstrap clean build watch run test help
+.PHONY: shell bootstrap clean build watch run test fvm-setup help
 
 # Default target
 help:
 	@echo "Available commands:"
 	@echo "  make shell     - Enter Nix development environment"
+	@echo "  make fvm-setup - Install/use Flutter via FVM for this project"
 	@echo "  make bootstrap - Initial project setup (clean, pub get, build_runner)"
 	@echo "  make clean     - Clean Flutter build artifacts"
 	@echo "  make build     - Run build_runner to generate code"
@@ -19,32 +20,40 @@ shell:
 # Initial project setup
 bootstrap: clean
 	@echo "Setting up project..."
-	flutter pub get
+	fvm flutter pub get
 	@echo "Running build_runner..."
-	flutter pub run build_runner build --delete-conflicting-outputs
+	fvm flutter pub run build_runner build --delete-conflicting-outputs
 	@echo "Setup complete!"
 
 # Clean Flutter build artifacts
 clean:
 	@echo "Cleaning Flutter build..."
-	flutter clean
+	fvm flutter clean
 
 # Run build_runner to generate code
 build:
 	@echo "Running build_runner..."
-	flutter pub run build_runner build --delete-conflicting-outputs
+	fvm flutter pub run build_runner build --delete-conflicting-outputs
 
 # Run build_runner in watch mode
 watch:
 	@echo "Running build_runner in watch mode..."
-	flutter pub run build_runner watch --delete-conflicting-outputs
+	fvm flutter pub run build_runner watch --delete-conflicting-outputs
 
 # Run Flutter app
 run:
 	@echo "Running Flutter app..."
-	flutter run
+	fvm flutter run
 
 # Run Flutter tests
 test:
 	@echo "Running Flutter tests..."
-	flutter test
+	fvm flutter test
+
+# One-time FVM setup for this project
+fvm-setup:
+	@echo "Setting up Flutter via FVM for this project..."
+	@echo "Using version from .fvm/fvm_config.json (if present) or default configured in FVM."
+	fvm install
+	fvm use
+	@echo "FVM setup complete. You can now run 'make bootstrap' and 'make run'."

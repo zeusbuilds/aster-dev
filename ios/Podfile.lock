@@ -52,15 +52,15 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/shared_preferences_foundation/darwin"
 
 SPEC CHECKSUMS:
-  connectivity_plus: cb623214f4e1f6ef8fe7403d580fdad517d2f7dd
+  connectivity_plus: 2a701ffec2c0ae28a48cf7540e279787e77c447d
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
-  flutter_secure_storage: 1ed9476fba7e7a782b22888f956cce43e2c62f13
-  gdk_flutter: 79088ddba7ec4ef9c32b6c33576e0ddb2714cf53
-  haptic_feedback: 1f22d7ad3abb43bb814aa42fdf548dc6d9e8245a
+  flutter_secure_storage: d33dac7ae2ea08509be337e775f6b59f1ff45f12
+  gdk_flutter: 2e2ae7c7281fab602adacbb797ac2ec7ea084c37
+  haptic_feedback: a366a27ec760f0e865651605b95de8a9bb04ef01
   ObjectBox: bf3d4b51075d52868422d5d1f2f2141b1d630d30
-  objectbox_flutter_libs: e912f15beff5699f1e184dbd2ff6aa5657464e73
-  path_provider_foundation: bb55f6dbba17d0dccd6737fe6f7f34fbd0376880
-  shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
+  objectbox_flutter_libs: 2f30755c12b0fe104d75445c3ba879e3072eda54
+  path_provider_foundation: 0b743cbb62d8e47eab856f09262bb8c1ddcfe6ba
+  shared_preferences_foundation: 5086985c1d43c5ba4d5e69a4e8083a389e2909e6
 
 PODFILE CHECKSUM: 3c63482e143d1b91d2d2560aee9fb04ecc74ac7e
 

@@ -1,6 +1,7 @@
 import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:haptic_feedback/haptic_feedback.dart';
 
 /// Bottom sheet for selecting an asset
 class AssetSelectorSheet extends StatelessWidget {
@@ -37,7 +38,9 @@ class AssetSelectorSheet extends StatelessWidget {
         assets: assets,
         selectedAssetName: selectedAssetName,
         onAssetSelected: (asset) {
-          Navigator.of(context).pop(asset);
+          Future.delayed(const Duration(milliseconds: 250), () {
+            Navigator.of(context).pop(asset);
+          });
         },
       ),
     );
@@ -142,8 +145,15 @@ class _AssetItem extends StatelessWidget {
     final textTheme = context.textTheme;
 
     return GestureDetector(
+      onTapDown: (_) async {
+        final canVibrate = await Haptics.canVibrate();
+        if (canVibrate) {
+          await Haptics.vibrate(HapticsType.light);
+        }
+      },
       onTap: onTap,
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
         padding: EdgeInsets.symmetric(vertical: spacing.spacing4),
         color: isSelected ? colors.brand1.withValues(alpha: 0.5) : colors.fill1,
         child: Row(
