@@ -53,11 +53,16 @@ make bootstrap
         ```bash
         brew install direnv
         ```
-     2. Add the direnv hook to your shell (e.g. `~/.zshrc`):
-        ```bash
-        eval "$(direnv hook zsh)"
-        ```
-     3. In the project root (only once):
+     2. Add the direnv hook to your shell config:
+        - **If you use zsh** (default on recent macOS, add to `~/.zshrc`):
+          ```zsh
+          eval "$(direnv hook zsh)"
+          ```
+        - **If you use bash** (add to `~/.bashrc` or `~/.bash_profile`):
+          ```bash
+          eval "$(direnv hook bash)"
+          ```
+     3. Open a **new terminal**, then in the project root (only once):
         ```bash
         direnv allow
         ```
