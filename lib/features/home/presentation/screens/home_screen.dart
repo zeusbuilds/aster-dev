@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gdk_flutter/gdk_flutter.dart';
@@ -121,38 +122,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       }
     });
 
-    return Scaffold(
-      backgroundColor: colors.fill1,
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              SizedBox(
-                height: MediaQuery.of(context).size.height * 0.4,
-                width: double.infinity,
-                child: ClipRect(
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      const MeshGradientBackground(),
-                      Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          SizedBox(height: MediaQuery.of(context).padding.top),
-                          const HomeHeader(),
-                          const PriceCard(),
-                          SizedBox(height: context.spacing.spacing16),
-                          const HomeActionButtons(),
-                        ],
-                      ),
-                    ],
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      // Set status bar to light (white icons) for home screen
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light, // White icons for Android
+        statusBarBrightness: Brightness.dark, // Dark background for iOS
+      ),
+      child: Scaffold(
+        backgroundColor: colors.fill1,
+        body: Stack(
+          children: [
+            Column(
+              children: [
+                SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.4,
+                  width: double.infinity,
+                  child: ClipRect(
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        const MeshGradientBackground(),
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              height: MediaQuery.of(context).padding.top,
+                            ),
+                            const HomeHeader(),
+                            const PriceCard(),
+                            SizedBox(height: context.spacing.spacing16),
+                            const HomeActionButtons(),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              AssetsSection(balance: _balance),
-            ],
-          ),
-        ],
+                AssetsSection(balance: _balance),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

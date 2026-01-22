@@ -14,6 +14,7 @@ import 'package:aster/features/swap/presentation/screens/swap_screen.dart';
 import 'package:aster/features/transaction/presentation/screens/transaction_list_screen.dart';
 import 'package:aster/features/wallet/presentation/pages/wallet_selection_screen.dart';
 import '../../features/authentication/presentation/pages/pages.dart';
+import '../screens/splash_screen.dart';
 import 'route_names.dart';
 import 'route_paths.dart';
 
@@ -125,15 +126,6 @@ class RouteConfig {
 }
 
 // Placeholder screens - these will be implemented in features
-class SplashScreen extends StatelessWidget {
-  const SplashScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: Text('Splash Screen')));
-  }
-}
-
 class OnboardingScreen extends StatelessWidget {
   const OnboardingScreen({super.key});
 

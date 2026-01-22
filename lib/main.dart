@@ -62,18 +62,57 @@ void main() async {
 /// Sets up MaterialApp with routing, theming, and Riverpod provider scope.
 ///
 /// This is the root widget of the application.
-class Aster extends ConsumerWidget {
+class Aster extends ConsumerStatefulWidget {
   const Aster({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<Aster> createState() => _AsterState();
+}
+
+class _AsterState extends ConsumerState<Aster> with WidgetsBindingObserver {
+  AppLifecycleState? _lifecycleState;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    setState(() {
+      _lifecycleState = state;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final router = ref.watch(appRouterProvider);
+    final showSplashOverlay =
+        _lifecycleState == AppLifecycleState.paused ||
+        _lifecycleState == AppLifecycleState.inactive;
+
     return MaterialApp.router(
       title: AppConstants.appName,
       theme: AppTheme.light(),
       darkTheme: AppTheme.light(),
       themeMode: ThemeMode.light,
-      routerConfig: ref.watch(appRouterProvider),
+      routerConfig: router,
       debugShowCheckedModeBanner: false,
+      builder: (context, child) {
+        return Stack(
+          children: [
+            if (child != null) child,
+            if (showSplashOverlay) const Positioned.fill(child: SplashScreen()),
+          ],
+        );
+      },
     );
   }
 }
