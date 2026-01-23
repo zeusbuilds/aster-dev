@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:aster/features/home/presentation/screens/home_screen.dart';
 import 'package:aster/features/market/presentation/screens/market_screen.dart';
 import 'package:aster/features/receive/presentation/screens/screens.dart';
+import 'package:aster/features/scan/presentation/screens/screens.dart';
 import 'package:aster/features/send/presentation/screens/screens.dart';
 import 'package:aster/features/settings/presentation/screens/country_selection_screen.dart';
 import 'package:aster/features/settings/presentation/screens/currency_selection_screen.dart';
@@ -97,6 +98,11 @@ class RouteConfig {
         path: RoutePaths.transactionList,
         name: RouteNames.transactionList,
         builder: (context, state) => const TransactionListScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.scan,
+        name: RouteNames.scan,
+        builder: (context, state) => const ScanScreen(),
       ),
       GoRoute(
         path: RoutePaths.settings,

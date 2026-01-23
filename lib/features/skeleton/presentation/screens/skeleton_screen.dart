@@ -1,4 +1,4 @@
-import 'package:aster/shared/screens/splash_screen.dart';
+import 'package:aster/features/scan/presentation/screens/scan_screen.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,7 +22,7 @@ class SkeletonScreen extends ConsumerWidget {
     final screens = <Widget>[
       const HomeScreen(),
       // const Center(child: Text('Card Screen')),
-      SplashScreen(),
+      const ScanScreen(),
       const MarketScreen(),
       const SettingsScreen(),
     ];

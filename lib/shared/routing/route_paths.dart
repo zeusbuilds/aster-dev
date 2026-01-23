@@ -20,6 +20,7 @@ class RoutePaths {
   static const String market = '/market';
   static const String transactionList = '/transactions';
   static const String settings = '/settings';
+  static const String scan = '/scan';
   static const String walletSelection = 'wallet-selection';
   static const String countrySelection = 'country-selection';
   static const String currencySelection = 'currency-selection';

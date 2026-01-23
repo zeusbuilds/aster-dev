@@ -20,6 +20,7 @@ class RouteNames {
   static const String market = 'market';
   static const String transactionList = 'transactionList';
   static const String settings = 'settings';
+  static const String scan = 'scan';
   static const String walletSelection = 'walletSelection';
   static const String countrySelection = 'countrySelection';
   static const String currencySelection = 'currencySelection';
