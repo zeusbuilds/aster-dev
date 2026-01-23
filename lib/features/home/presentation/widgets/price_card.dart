@@ -69,7 +69,7 @@ class _PriceCardState extends State<PriceCard> {
 
   /// Formats price as currency string (e.g., "$100,000")
   String _formatPrice(double? price) {
-    if (price == null) return 'Loading...';
+    if (price == null) return '';
     final formatter = NumberFormat('#,##0');
     return '\$${formatter.format(price)}';
   }

@@ -26,6 +26,9 @@ class AssetRow extends StatelessWidget {
   /// Color of the asset icon
   final Color iconColor;
 
+  /// Whether to show skeleton loading for balances
+  final bool isLoading;
+
   const AssetRow({
     super.key,
     required this.name,
@@ -34,6 +37,7 @@ class AssetRow extends StatelessWidget {
     required this.assetBalance,
     required this.icon,
     this.iconColor = Colors.white,
+    this.isLoading = false,
   });
 
   @override
@@ -69,14 +73,17 @@ class AssetRow extends StatelessWidget {
                         ),
                       ),
                     ),
-                    Text(
-                      fiatBalance,
-                      style: textTheme.bodyLarge
-                          ?.copyWith(
-                            fontWeight: FontWeight.w500,
-                            color: colors.text1,
-                          )
-                          .toNumeric(context),
+                    AppSkeletonizer(
+                      enabled: isLoading,
+                      child: Text(
+                        fiatBalance,
+                        style: textTheme.bodyLarge
+                            ?.copyWith(
+                              fontWeight: FontWeight.w500,
+                              color: colors.text1,
+                            )
+                            .toNumeric(context),
+                      ),
                     ),
                   ],
                 ),
@@ -93,12 +100,15 @@ class AssetRow extends StatelessWidget {
                         ),
                       ),
                     ),
-                    RichText(
-                      text: TextSpan(
-                        children: _buildBalanceSpans(
-                          context,
-                          assetBalance,
-                          textTheme.bodySmall,
+                    AppSkeletonizer(
+                      enabled: isLoading,
+                      child: RichText(
+                        text: TextSpan(
+                          children: _buildBalanceSpans(
+                            context,
+                            assetBalance,
+                            textTheme.bodySmall,
+                          ),
                         ),
                       ),
                     ),

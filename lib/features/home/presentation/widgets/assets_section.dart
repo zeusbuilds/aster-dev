@@ -46,10 +46,22 @@ class AssetsSection extends StatelessWidget {
           ),
           SizedBox(height: spacing.spacing16),
           if (balance == null || balance!.amounts.isEmpty)
-            CustomLoader(
-              colorVariant: LoaderColorVariant.primary,
-              size: LoaderSize.medium,
-            )
+            ...List.generate(2, (index) {
+              return Column(
+                children: [
+                  AssetRow(
+                    name: index == 0 ? 'LBTC' : 'USDt',
+                    denomination: 'sats',
+                    fiatBalance: '\$0.00',
+                    assetBalance: '0 sats',
+                    icon: UniconsLine.bitcoin,
+                    iconColor: index == 0 ? Colors.orange : Colors.teal,
+                    isLoading: true,
+                  ),
+                  if (index < 1) SizedBox(height: spacing.spacing16),
+                ],
+              );
+            })
           else
             ...balance!.amounts.entries.map((entry) {
               final assetKey = entry.key.toString();
