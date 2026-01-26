@@ -20,6 +20,7 @@ class MarketScreen extends StatelessWidget {
     final tiles = [
       MarketTile(
         label: 'Buy',
+        subtitle: 'Load wallet',
         icon: RemixIcons.shopping_bag_3_line,
         onTap: () {
           // TODO: Navigate to buy screen
@@ -27,6 +28,7 @@ class MarketScreen extends StatelessWidget {
       ),
       MarketTile(
         label: 'Sell',
+        subtitle: 'Unload wallet',
         icon: RemixIcons.shopping_cart_line,
         onTap: () {
           // TODO: Navigate to sell screen
@@ -34,6 +36,7 @@ class MarketScreen extends StatelessWidget {
       ),
       MarketTile(
         label: 'Swap',
+        subtitle: 'Exchange assets',
         icon: RemixIcons.token_swap_line,
         onTap: () {
           context.push(RoutePaths.swap);
@@ -41,6 +44,7 @@ class MarketScreen extends StatelessWidget {
       ),
       MarketTile(
         label: 'Lend',
+        subtitle: 'Earn interest',
         icon: RemixIcons.bank_line,
         onTap: () {
           // TODO: Navigate to lend screen
@@ -48,6 +52,7 @@ class MarketScreen extends StatelessWidget {
       ),
       MarketTile(
         label: 'Send',
+        subtitle: 'Send bitcoin',
         icon: RemixIcons.arrow_right_up_line,
         onTap: () {
           context.push(RoutePaths.sendAddress);
@@ -55,6 +60,7 @@ class MarketScreen extends StatelessWidget {
       ),
       MarketTile(
         label: 'Receive',
+        subtitle: 'Receive bitcoin',
         icon: RemixIcons.arrow_right_down_line,
         onTap: () {
           context.push(RoutePaths.receive);
@@ -65,36 +71,17 @@ class MarketScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: colors.fill1,
       appBar: const CustomAppBar(title: 'Market'),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final padding = spacing.spacing20 * 2;
-          final crossAxisSpacing = 16.0;
-          final availableWidth =
-              constraints.maxWidth - padding - crossAxisSpacing;
-          final tileWidth = availableWidth / 2;
-          // Calculate aspect ratio accounting for: square squircle + spacing + text height
-          // Approximate text height is ~20px, spacing is 8px
-          final textHeight = 20.0;
-          final spacingHeight = spacing.spacing8;
-          final totalHeight = tileWidth + spacingHeight + textHeight;
-          final childAspectRatio = tileWidth / totalHeight;
-
-          return GridView.builder(
-            padding: EdgeInsets.only(
-              left: spacing.spacing20,
-              right: spacing.spacing20,
-              bottom: spacing.bottomSafeHeight + spacing.spacing44,
-            ),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: crossAxisSpacing,
-              mainAxisSpacing: 24,
-              childAspectRatio: childAspectRatio,
-            ),
-            itemCount: tiles.length,
-            itemBuilder: (context, index) {
-              return tiles[index];
-            },
+      body: ListView.builder(
+        padding: EdgeInsets.only(
+          left: spacing.spacing20,
+          right: spacing.spacing20,
+          bottom: spacing.bottomSafeHeight + spacing.spacing44,
+        ),
+        itemCount: tiles.length,
+        itemBuilder: (context, index) {
+          return Padding(
+            padding: EdgeInsets.only(bottom: spacing.spacing12),
+            child: tiles[index],
           );
         },
       ),

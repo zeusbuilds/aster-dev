@@ -157,7 +157,11 @@ class _AssetItem extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         padding: EdgeInsets.symmetric(vertical: spacing.spacing4),
-        color: isSelected ? colors.brand1.withValues(alpha: 0.5) : colors.fill1,
+        decoration: BoxDecoration(
+          color: isSelected
+              ? colors.brand1.withValues(alpha: 0.5)
+              : colors.fill1,
+        ),
         child: Row(
           children: [
             SizedBox(width: spacing.spacing8),
