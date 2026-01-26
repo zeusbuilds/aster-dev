@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-import 'package:aster/features/home/presentation/widgets/widgets.dart';
+import 'package:aster/features/home/data/models/chart_data_item.dart';
 
 /// Service to fetch Bitcoin price data from CoinGecko API
 class BitcoinPriceService {

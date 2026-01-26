@@ -1,3 +1,4 @@
+import 'package:aster/features/home/data/models/chart_data_item.dart';
 import 'package:flutter/material.dart';
 
 import 'package:intl/intl.dart';
@@ -5,7 +6,7 @@ import 'package:remixicon/remixicon.dart';
 import 'package:unicons/unicons.dart';
 
 import 'package:aster/features/home/data/data.dart';
-import 'package:aster/features/home/presentation/widgets/widgets.dart';
+import 'package:aster/features/home/presentation/widgets/candle_chart.dart';
 import 'package:aster/shared/shared.dart';
 
 /// Widget displaying Bitcoin price information with chart
@@ -22,7 +23,6 @@ class _PriceCardState extends State<PriceCard> {
   List<ChartDataItem>? _chartData;
   double? _currentPrice;
   double? _priceChange;
-  bool _isLoading = true;
   bool _hasFetched = false; // Track if we've already fetched data
 
   @override
@@ -35,10 +35,6 @@ class _PriceCardState extends State<PriceCard> {
     // Only fetch once
     if (_hasFetched) return;
 
-    setState(() {
-      _isLoading = true;
-    });
-
     try {
       // Import the service
       final chartData = await BitcoinPriceService.fetchTodayPriceData();
@@ -50,7 +46,6 @@ class _PriceCardState extends State<PriceCard> {
           _chartData = chartData;
           _currentPrice = currentPrice;
           _priceChange = priceChange;
-          _isLoading = false;
           _hasFetched = true; // Mark as fetched
         });
       }
@@ -59,7 +54,6 @@ class _PriceCardState extends State<PriceCard> {
       print('Error loading price data: $e');
       if (mounted) {
         setState(() {
-          _isLoading = false;
           _hasFetched =
               true; // Mark as fetched even on error to prevent retries
         });
@@ -96,7 +90,6 @@ class _PriceCardState extends State<PriceCard> {
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
-            // textBaseline: TextBaseline.alphabetic,
             children: [
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -135,52 +128,41 @@ class _PriceCardState extends State<PriceCard> {
                   ),
                 ],
               ),
-              if (_priceChange != null) ...[
-                // SizedBox(height: spacing.spacing2),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Icon(
-                      (_priceChange ?? 0) >= 0
-                          ? RemixIcons.arrow_up_line
-                          : RemixIcons.arrow_down_line,
-                      size: spacing.spacing14,
-                      color: (_priceChange ?? 0) >= 0
-                          ? colors.success6
-                          : colors.danger6,
-                    ),
-                    SizedBox(width: spacing.spacing2),
-                    Text(
-                      _formatPriceChange(_priceChange),
-                      style: textTheme.labelLarge
-                          ?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: (_priceChange ?? 0) >= 0
-                                ? colors.success6
-                                : colors.danger6,
-                          )
-                          .toNumeric(context),
-                    ),
-                  ],
-                ),
-              ],
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  _priceChange == null
+                      ? SizedBox(height: spacing.spacing14)
+                      : Icon(
+                          (_priceChange ?? 0) >= 0
+                              ? RemixIcons.arrow_up_line
+                              : RemixIcons.arrow_down_line,
+                          size: spacing.spacing14,
+                          color: (_priceChange ?? 0) >= 0
+                              ? colors.success6
+                              : colors.danger6,
+                        ),
+                  SizedBox(width: spacing.spacing2),
+                  Text(
+                    _formatPriceChange(_priceChange),
+                    style: textTheme.labelLarge
+                        ?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: (_priceChange ?? 0) >= 0
+                              ? colors.success6
+                              : colors.danger6,
+                        )
+                        .toNumeric(context),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
-        _isLoading
-            ? SizedBox(
-                height: spacing.spacing80,
-                child: Center(
-                  child: CustomLoader(
-                    colorVariant: LoaderColorVariant.primary,
-                    size: LoaderSize.medium,
-                  ),
-                ),
-              )
-            : PriceChart(
-                data: _chartData ?? [],
-                isSkeleton: _chartData == null || _chartData!.isEmpty,
-              ),
+        CandleChart(
+          data: _chartData ?? [],
+          isSkeleton: _chartData == null || _chartData!.isEmpty,
+        ),
       ],
     );
   }
