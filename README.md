@@ -12,6 +12,7 @@ For development setup instructions, see [DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ```bash
 make shell
+make fvm-setup
 make bootstrap
 make run
 ```
