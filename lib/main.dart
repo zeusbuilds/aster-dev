@@ -1,12 +1,12 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gdk_flutter/gdk_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'core/bootstrap/app_loader.dart';
 import 'core/core.dart';
 import 'shared/shared.dart';
 
@@ -33,28 +33,38 @@ Future<void> _initializeGdk() async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await _initializeGdk();
+  // Run ASAP so we can show the startup animation while bootstrapping.
+  runApp(
+    AppLoader(
+      child: const Aster(),
+      initialize: () async {
+        await _initializeGdk();
 
-  // Initialize database
-  final databaseService = DatabaseServiceImpl();
-  await databaseService.init();
+        // Initialize database
+        final databaseService = DatabaseServiceImpl();
+        await databaseService.init();
 
-  final sharedPreferences = await SharedPreferences.getInstance();
+        final sharedPreferences = await SharedPreferences.getInstance();
 
-  // Create a temporary ProviderContainer for initial setup
-  final container = ProviderContainer(
-    overrides: [
-      sharedPreferencesProvider.overrideWith((ref) => sharedPreferences),
-      databaseServiceProvider.overrideWith((ref) => databaseService),
-    ],
+        // Create a ProviderContainer for app runtime.
+        final container = ProviderContainer(
+          overrides: [
+            sharedPreferencesProvider.overrideWith(
+              (ref) => sharedPreferences,
+            ),
+            databaseServiceProvider.overrideWith((ref) => databaseService),
+          ],
+        );
+
+        // Run migration before the app starts reading wallet state.
+        final walletRepository = container.read(walletRepositoryProvider);
+        final migrationService = WalletMigrationService(walletRepository);
+        await migrationService.migrateIfNeeded();
+
+        return container;
+      },
+    ),
   );
-
-  // Initialize and run migration service
-  final walletRepository = container.read(walletRepositoryProvider);
-  final migrationService = WalletMigrationService(walletRepository);
-  await migrationService.migrateIfNeeded();
-
-  runApp(UncontrolledProviderScope(container: container, child: const Aster()));
 }
 
 /// Main application widget

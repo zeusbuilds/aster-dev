@@ -29,13 +29,10 @@ class HomeHeader extends ConsumerWidget {
         children: [
           Align(
             alignment: Alignment.centerLeft,
-            child: GestureDetector(
-              onTap: () => context.pushNamed(RouteNames.scan),
-              child: SvgPicture.asset(
-                'assets/brand/aster-logo.svg',
-                width: spacing.spacing44,
-                colorFilter: ColorFilter.mode(colors.text5, BlendMode.srcIn),
-              ),
+            child: SvgPicture.asset(
+              'assets/brand/aster-logo.svg',
+              width: spacing.spacing44,
+              colorFilter: ColorFilter.mode(colors.text5, BlendMode.srcIn),
             ),
           ),
           const Spacer(),
