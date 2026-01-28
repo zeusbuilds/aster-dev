@@ -66,7 +66,11 @@ class _AppLoaderState extends State<AppLoader>
     // Ensure the app underneath has been laid out, then play the reveal.
     SchedulerBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        _controller.forward().ignore();
+        Future<void>.delayed(const Duration(milliseconds: 100), () {
+          if (mounted) {
+            _controller.forward().ignore();
+          }
+        });
       }
     });
   }

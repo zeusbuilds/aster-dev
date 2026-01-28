@@ -38,7 +38,7 @@ void main() async {
     AppLoader(
       child: const Aster(),
       initialize: () async {
-        _initializeGdk();
+        await _initializeGdk();
 
         // Initialize database
         final databaseService = DatabaseServiceImpl();
