@@ -1,17 +1,15 @@
 {
   "images" : [
     {
-      "filename" : "aster-logo-black.svg",
+      "filename" : "aster-logo.svg",
       "idiom" : "universal",
       "scale" : "1x"
     },
     {
-      "filename" : "aster-logo-black 1.svg",
       "idiom" : "universal",
       "scale" : "2x"
     },
     {
-      "filename" : "aster-logo-black 2.svg",
       "idiom" : "universal",
       "scale" : "3x"
     }

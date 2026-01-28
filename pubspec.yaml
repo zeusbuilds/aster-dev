@@ -74,6 +74,7 @@ dependencies:
   pretty_qr_code: ^3.5.0
   rename_app: ^1.6.5
   skeletonizer: ^2.1.2
+  flutter_native_splash: ^2.4.7
 
 
 dev_dependencies:

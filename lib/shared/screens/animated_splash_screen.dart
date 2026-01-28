@@ -25,6 +25,8 @@ const _linesLengthEnd = 1080;
 const _linesGapStart = 720;
 const _linesGapEnd = 1160;
 
+const _logoWidthFactor = 0.4;
+
 const _rotationCurve = Curves.easeOutCubic;
 const _expansionCurve = Curves.easeOutCubic;
 const _splitCurve = Curves.easeInOutCubic;
@@ -343,9 +345,14 @@ class _LogoPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final w = size.width;
 
-    final horizontalHalfWidth = w * 0.25;
-    final diagonalHalfExtent = w / (6 * math.sqrt2);
-    final thickness = w * 0.5 * (35 / 705);
+    final logoFullWidth = w * _logoWidthFactor;
+    final horizontalHalfWidth = logoFullWidth / 2;
+
+    const diagToHorizRatio = 470 / 705;
+    final diagonalLength = logoFullWidth * diagToHorizRatio;
+
+    const thicknessToHorizRatio = 35 / 705;
+    final thickness = logoFullWidth * thicknessToHorizRatio;
 
     final center = Offset(size.width / 2, size.height / 2);
     final halfWidth =
@@ -374,7 +381,6 @@ class _LogoPainter extends CustomPainter {
       final fillPaint = Paint()
         ..color = color
         ..style = PaintingStyle.fill;
-      final diagonalLength = 2 * diagonalHalfExtent * math.sqrt2;
       final diagonalRect = Rect.fromCenter(
         center: Offset.zero,
         width: diagonalLength,

@@ -11,11 +11,7 @@ import 'package:aster/shared/shared.dart';
 /// Once initialization is complete, the animation plays and reveals the app
 /// underneath; the splash overlay is removed when the animation completes.
 class AppLoader extends StatefulWidget {
-  const AppLoader({
-    super.key,
-    required this.initialize,
-    required this.child,
-  });
+  const AppLoader({super.key, required this.initialize, required this.child});
 
   /// Callback that performs all app bootstrapping and returns a ready
   /// [ProviderContainer].
@@ -114,4 +110,3 @@ class _AppLoaderState extends State<AppLoader>
     );
   }
 }
-

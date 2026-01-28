@@ -49,9 +49,7 @@ void main() async {
         // Create a ProviderContainer for app runtime.
         final container = ProviderContainer(
           overrides: [
-            sharedPreferencesProvider.overrideWith(
-              (ref) => sharedPreferences,
-            ),
+            sharedPreferencesProvider.overrideWith((ref) => sharedPreferences),
             databaseServiceProvider.overrideWith((ref) => databaseService),
           ],
         );
