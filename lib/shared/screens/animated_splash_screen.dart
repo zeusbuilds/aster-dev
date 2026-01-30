@@ -25,6 +25,9 @@ const _linesLengthEnd = 1080;
 const _linesGapStart = 720;
 const _linesGapEnd = 1160;
 
+/// Drives lines past the screen edge so they exit off-screen (1.0 = at edge).
+const _linesGapMax = 1.3;
+
 const _logoWidth = 160;
 
 const _rotationCurve = Curves.easeOutCubic;
@@ -83,17 +86,18 @@ class _BackgroundState extends State<_Background> {
       )
       .animate(widget.controller);
 
-  late final Animation<double> _linesGap = Tween<double>(begin: 0, end: 1)
-      .chain(
-        CurveTween(
-          curve: const Interval(
-            _linesGapStart / _animationDuration,
-            _linesGapEnd / _animationDuration,
-            curve: _revealMoveCurve,
-          ),
-        ),
-      )
-      .animate(widget.controller);
+  late final Animation<double> _linesGap =
+      Tween<double>(begin: 0, end: _linesGapMax)
+          .chain(
+            CurveTween(
+              curve: const Interval(
+                _linesGapStart / _animationDuration,
+                _linesGapEnd / _animationDuration,
+                curve: _revealMoveCurve,
+              ),
+            ),
+          )
+          .animate(widget.controller);
 
   @override
   Widget build(BuildContext context) {
@@ -221,7 +225,7 @@ class _ForegroundState extends State<_Foreground> {
       )
       .animate(widget.controller);
 
-  late final _linesGap = Tween<double>(begin: 0, end: 1)
+  late final _linesGap = Tween<double>(begin: 0, end: _linesGapMax)
       .chain(
         CurveTween(
           curve: const Interval(
