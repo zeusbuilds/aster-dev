@@ -42,6 +42,7 @@ class FillColorsLight {
   static const Color fill3 = Color(0xFFE5E6EB); // 深/灰底悬浮
   static const Color fill4 = Color(0xFFC9CDD4); // 重/特殊场景
   static const Color fill5 = Color(0xFF4E5969); // 强调/图标/特殊场景
+  static const Color fill6 = Color(0xFF000000); // 背景
 }
 
 /// Fill Colors - Dark Mode
@@ -52,6 +53,7 @@ class FillColorsDark {
   static const Color fill3 = Color(0xFF373B42); // Surface variant
   static const Color fill4 = Color(0xFF4E5969); // Heavy fill
   static const Color fill5 = Color(0xFF86909C); // Emphasis fill
+  static const Color fill6 = Color(0xFFFFFFFF); // 背景
 }
 
 /// Text Colors - Light Mode
