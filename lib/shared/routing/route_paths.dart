@@ -4,14 +4,10 @@ class RoutePaths {
 
   // Splash & Auth
   static const String splash = '/';
-  static const String login = '/login';
-  static const String verify = '/verify';
-  static const String onboarding = '/onboarding';
 
   // Main
   static const String skeleton = '/skeleton';
   static const String home = '/home';
-  static const String wallet = '/wallet';
   static const String send = '/send';
   static const String sendAddress = '/send/address';
   static const String receive = '/receive';

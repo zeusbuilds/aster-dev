@@ -6,7 +6,6 @@ class RouteGuards {
 
   /// Routes that require authentication
   static const _protectedRoutes = [
-    RoutePaths.wallet,
     RoutePaths.send,
     RoutePaths.receive,
     RoutePaths.settings,
@@ -14,7 +13,6 @@ class RouteGuards {
 
   /// Routes that require onboarding completion
   static const _onboardingRequiredRoutes = [
-    RoutePaths.wallet,
     RoutePaths.send,
     RoutePaths.receive,
   ];
@@ -29,4 +27,3 @@ class RouteGuards {
     return _onboardingRequiredRoutes.contains(location);
   }
 }
-

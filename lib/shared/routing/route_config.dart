@@ -14,7 +14,6 @@ import 'package:aster/features/skeleton/presentation/screens/skeleton_screen.dar
 import 'package:aster/features/swap/presentation/screens/swap_screen.dart';
 import 'package:aster/features/transaction/presentation/screens/transaction_list_screen.dart';
 import 'package:aster/features/wallet/presentation/pages/wallet_selection_screen.dart';
-import '../../features/authentication/presentation/pages/pages.dart';
 import '../screens/splash_screen.dart';
 import 'route_names.dart';
 import 'route_paths.dart';
@@ -32,24 +31,6 @@ class RouteConfig {
         builder: (context, state) => const SplashScreen(),
       ),
       GoRoute(
-        path: RoutePaths.login,
-        name: RouteNames.login,
-        builder: (context, state) => const LoginScreen(),
-      ),
-      GoRoute(
-        path: RoutePaths.verify,
-        name: RouteNames.verify,
-        builder: (context, state) {
-          final email = state.extra as String?;
-          return VerifyScreen(email: email);
-        },
-      ),
-      GoRoute(
-        path: RoutePaths.onboarding,
-        name: RouteNames.onboarding,
-        builder: (context, state) => const OnboardingScreen(),
-      ),
-      GoRoute(
         path: RoutePaths.skeleton,
         name: RouteNames.skeleton,
         builder: (context, state) => const SkeletonScreen(),
@@ -58,11 +39,6 @@ class RouteConfig {
         path: RoutePaths.home,
         name: RouteNames.home,
         builder: (context, state) => const HomeScreen(),
-      ),
-      GoRoute(
-        path: RoutePaths.wallet,
-        name: RouteNames.wallet,
-        builder: (context, state) => const WalletScreen(),
       ),
       GoRoute(
         path: RoutePaths.send,
@@ -128,24 +104,5 @@ class RouteConfig {
       ),
       // GDK Test Screen (for development/testing)
     ];
-  }
-}
-
-// Placeholder screens - these will be implemented in features
-class OnboardingScreen extends StatelessWidget {
-  const OnboardingScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: Text('Onboarding Screen')));
-  }
-}
-
-class WalletScreen extends StatelessWidget {
-  const WalletScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: Text('Wallet Screen')));
   }
 }
