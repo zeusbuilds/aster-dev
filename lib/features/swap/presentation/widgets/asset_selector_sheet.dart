@@ -41,7 +41,9 @@ class AssetSelectorSheet extends StatelessWidget {
         selectedAssetName: selectedAssetName,
         onAssetSelected: (asset) {
           Future.delayed(const Duration(milliseconds: 250), () {
-            Navigator.of(context).pop(asset);
+            if (context.mounted) {
+              Navigator.of(context).pop(asset);
+            }
           });
         },
       ),

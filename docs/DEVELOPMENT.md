@@ -149,13 +149,13 @@ make bootstrap
 
 This project uses [Nix Flakes](https://nixos.wiki/wiki/Flakes) to provide a reproducible development environment for core tooling. The environment includes:
 
-- Flutter 3.35.7
-- Dart SDK 3.9.2
+- Flutter 3.38.9
+- Dart SDK 3.10.x
 - Android SDK with build tools
 - Java JDK 21
 - CocoaPods (macOS only)
 
-Flutter itself is managed via [FVM](https://fvm.app/) and **pinned per project** using the `.fvmrc` file (currently `flutterSdkVersion: 3.35.7`). This keeps the Flutter version consistent across all developers without relying on the Nix store.
+Flutter itself is managed via [FVM](https://fvm.app/) and **pinned per project** using the `.fvmrc` file (currently `flutterSdkVersion: 3.38.9`). This keeps the Flutter version consistent across all developers without relying on the Nix store.
 
 ## Resources
 
