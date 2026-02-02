@@ -82,6 +82,39 @@ make bootstrap
    flutter run   # after FVM is set up, inside `make shell`
    ```
 
+## Linting and Code Style
+
+Formatting and static analysis run **on every commit** (via a git hook) and **on every push/PR** (via CI).
+
+### One-time: install git hooks
+
+From the project root:
+
+```bash
+./scripts/install-git-hooks.sh
+```
+
+After this, each `git commit` will:
+
+1. Run `dart format .` (reformat code).
+2. If any file was changed by format, the commit is aborted. Run `git add -u && git commit` again to include the formatted code.
+3. Run `flutter analyze`. If there are errors or warnings, the commit is aborted.
+
+### Manual commands
+
+- `make format`  - Format Dart code
+- `make analyze` - Run static analysis
+- `make lint`    - Format and analyze (same as pre-commit)
+
+### CI (GitHub Actions)
+
+On push to `main` and on pull requests, the **Dart** workflow runs:
+
+- `dart format --set-exit-if-changed .` (fails if code is unformatted)
+- `flutter analyze` (fails on errors/warnings)
+
+Fix failures locally with `make format` and/or address analyzer issues, then commit and push again.
+
 ## Available Commands
 
 - `make shell`      - Enter Nix development environment
@@ -92,6 +125,9 @@ make bootstrap
 - `make watch`      - Run build_runner in watch mode
 - `make run`        - Run Flutter app
 - `make test`       - Run Flutter tests
+- `make format`     - Format Dart code
+- `make analyze`    - Run static analysis
+- `make lint`       - Format and analyze (run before commit)
 - `make help`       - Show all available commands
 
 ## Troubleshooting

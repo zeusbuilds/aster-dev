@@ -1,4 +1,4 @@
-.PHONY: shell bootstrap clean build watch run test fvm-setup help
+.PHONY: shell bootstrap clean build watch run test format analyze lint fvm-setup help
 
 # Default target
 help:
@@ -11,6 +11,9 @@ help:
 	@echo "  make watch     - Run build_runner in watch mode"
 	@echo "  make run       - Run Flutter app"
 	@echo "  make test      - Run Flutter tests"
+	@echo "  make format    - Format Dart code"
+	@echo "  make analyze   - Run static analysis"
+	@echo "  make lint     - Format and analyze (run before commit)"
 
 # Enter Nix development environment
 shell:
@@ -49,6 +52,19 @@ run:
 test:
 	@echo "Running Flutter tests..."
 	fvm flutter test
+
+# Format Dart code
+format:
+	@echo "Formatting Dart code..."
+	fvm dart format .
+
+# Run static analysis
+analyze:
+	@echo "Running static analysis..."
+	fvm flutter analyze
+
+# Format and analyze (for pre-commit / CI)
+lint: format analyze
 
 # One-time FVM setup for this project
 fvm-setup:

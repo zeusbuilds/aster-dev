@@ -63,4 +63,3 @@ class Formatters {
     return 'Just now';
   }
 }
-

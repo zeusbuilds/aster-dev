@@ -15,12 +15,12 @@ class WalletIdGenerator {
     final bytes = utf8.encode(seedPhrase.trim().toLowerCase());
     final hash = sha256.convert(bytes);
     final hashString = hash.toString();
-    
+
     // First 8 characters
     final firstPart = hashString.substring(0, 8).toUpperCase();
     // Last 8 characters
     final lastPart = hashString.substring(hashString.length - 8).toUpperCase();
-    
+
     return '$firstPart $lastPart';
   }
 

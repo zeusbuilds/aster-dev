@@ -32,4 +32,3 @@ extension StringExtensions on String {
     ).hasMatch(this);
   }
 }
-

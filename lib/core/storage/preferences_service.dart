@@ -105,4 +105,3 @@ class PreferencesServiceImpl implements PreferencesService {
   @override
   Future<bool> containsKey(String key) async => _prefs.containsKey(key);
 }
-
