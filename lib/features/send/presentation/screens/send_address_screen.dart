@@ -9,8 +9,28 @@ import 'package:aster/shared/shared.dart';
 /// Screen for entering recipient address when sending Bitcoin
 ///
 /// Displays address input field with QR code scanner option
-class SendAddressScreen extends StatelessWidget {
+class SendAddressScreen extends StatefulWidget {
   const SendAddressScreen({super.key});
+
+  @override
+  State<SendAddressScreen> createState() => _SendAddressScreenState();
+}
+
+class _SendAddressScreenState extends State<SendAddressScreen> {
+  final TextEditingController _addressController = TextEditingController();
+
+  @override
+  void dispose() {
+    _addressController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _openScan(BuildContext context) async {
+    final result = await context.push<String?>(RoutePaths.scan);
+    if (result != null && mounted) {
+      _addressController.text = result;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +43,7 @@ class SendAddressScreen extends StatelessWidget {
           leadingIcon: true,
           centerTitle: false,
           action: IconButton(
-            onPressed: () {},
+            onPressed: () => _openScan(context),
             icon: Icon(
               MingCuteIcons.mgc_scan_line,
               size: context.spacing.spacing20,
@@ -35,7 +55,10 @@ class SendAddressScreen extends StatelessWidget {
           padding: EdgeInsets.symmetric(horizontal: context.spacing.spacing20),
           child: Column(
             children: [
-              SendAddressCard(asset: AssetModel.bitcoin),
+              SendAddressCard(
+                asset: AssetModel.bitcoin,
+                controller: _addressController,
+              ),
               const Spacer(),
               CustomButton(
                 text: 'Continue',

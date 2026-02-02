@@ -32,6 +32,10 @@
 	<string>Launch Screen</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Aster needs camera access to scan QR codes and barcodes for addresses.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Aster needs photo library access to scan QR codes from images.</string>
 	<key>UIStatusBarHidden</key>
 	<false/>
 	<key>UISupportedInterfaceOrientations</key>

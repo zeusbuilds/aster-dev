@@ -7,22 +7,37 @@ import 'package:aster/shared/shared.dart';
 
 /// Card widget for entering recipient address
 ///
-/// Displays address input field with paste/clear functionality
+/// Displays address input field with paste/clear functionality.
+/// Optionally accepts [controller] from parent (e.g. to set address from scan result).
 class SendAddressCard extends StatefulWidget {
   /// Asset model for the send operation
   final AssetModel asset;
-  const SendAddressCard({super.key, required this.asset});
+
+  /// Optional controller; if provided, parent owns it and can set text (e.g. from scan).
+  final TextEditingController? controller;
+
+  const SendAddressCard({super.key, required this.asset, this.controller});
 
   @override
   State<SendAddressCard> createState() => _SendAddressCardState();
 }
 
 class _SendAddressCardState extends State<SendAddressCard> {
-  final TextEditingController _addressController = TextEditingController();
+  TextEditingController? _internalController;
+  TextEditingController get _addressController =>
+      widget.controller ?? _internalController!;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.controller == null) {
+      _internalController = TextEditingController();
+    }
+  }
 
   @override
   void dispose() {
-    _addressController.dispose();
+    _internalController?.dispose();
     super.dispose();
   }
 

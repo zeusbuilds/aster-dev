@@ -4,10 +4,10 @@ import 'package:aster/shared/shared.dart';
 
 /// Individual control button for scan frame
 class ScanControlButton extends StatelessWidget {
-  final IconData icon;
+  final Widget child;
   final VoidCallback? onTap;
 
-  const ScanControlButton({super.key, required this.icon, this.onTap});
+  const ScanControlButton({super.key, required this.child, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -17,9 +17,10 @@ class ScanControlButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: EdgeInsets.all(spacing.spacing8),
-        decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.black),
-        child: Icon(icon, color: colors.text5, size: spacing.spacing16),
+        width: spacing.spacing26,
+        height: spacing.spacing26,
+        decoration: BoxDecoration(shape: BoxShape.circle, color: colors.fill6),
+        child: Center(child: child),
       ),
     );
   }

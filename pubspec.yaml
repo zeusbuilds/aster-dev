@@ -57,6 +57,11 @@ dependencies:
   remixicon: ^1.4.1
   unicons: ^3.0.0
 
+  # Camera & barcode scanning
+  camera: ^0.11.0+2
+  google_mlkit_barcode_scanning: ^0.14.0
+  image_picker: ^1.0.7
+
   # Core
   circle_flags: ^5.0.1
   country_flags: ^4.1.1

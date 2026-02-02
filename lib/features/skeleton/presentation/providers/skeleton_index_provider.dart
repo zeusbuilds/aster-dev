@@ -2,6 +2,9 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'skeleton_index_provider.g.dart';
 
+/// Index of the Scan tab in the skeleton bottom nav (0=Home, 1=Scan, 2=Market, 3=Settings).
+const int skeletonScanTabIndex = 1;
+
 /// Provider for managing the current bottom navigation index
 ///
 /// Tracks which screen is currently active in the skeleton navigation
