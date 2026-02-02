@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
@@ -81,6 +82,10 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
   Widget build(BuildContext context) {
     final skeletonIndex = ref.watch(skeletonIndexProvider);
     final isScanTabActive = skeletonIndex == skeletonScanTabIndex;
+    // When opened via push (e.g. from send address app bar), current route is /scan.
+    final isPushedScanRoute =
+        GoRouterState.of(context).matchedLocation == RoutePaths.scan;
+    final shouldShowCamera = isScanTabActive || isPushedScanRoute;
     final scanState = ref.watch(scanViewModelProvider);
     final viewModel = ref.read(scanViewModelProvider.notifier);
 
@@ -112,82 +117,89 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
 
     final cutoutRect = Rect.fromLTWH(frameLeft, frameTop, frameSize, frameSize);
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          return Stack(
-            children: [
-              Positioned.fill(
-                child: isScanTabActive
-                    ? ScanCameraWidget(
-                        cutoutRect: cutoutRect,
-                        screenSize: screenSize,
-                        flashOn: scanState.flashOn,
-                        zoomFactor: _zoomFactors.isNotEmpty
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: shouldShowCamera
+                      ? ScanCameraWidget(
+                          cutoutRect: cutoutRect,
+                          screenSize: screenSize,
+                          flashOn: scanState.flashOn,
+                          zoomFactor: _zoomFactors.isNotEmpty
+                              ? _zoomFactors[_currentZoomIndex]
+                              : 1.0,
+                          onScanned: (value) {
+                            context.pop(value);
+                          },
+                          onPermissionDenied: () {
+                            viewModel.setPermissionDenied(true);
+                          },
+                          onError: (message) {
+                            viewModel.setError(message);
+                          },
+                          onCameraReady: (minZoom, maxZoom) {
+                            if (mounted) {
+                              setState(() {
+                                _zoomFactors = _buildZoomFactors(
+                                  minZoom,
+                                  maxZoom,
+                                );
+                                _currentZoomIndex = 0;
+                              });
+                            }
+                          },
+                        )
+                      : SizedBox.shrink(),
+                ),
+                Positioned.fill(child: ScanBackground(cutoutRect: cutoutRect)),
+                Column(
+                  children: [
+                    SizedBox(height: spacing.topSafeHeightDynamicRaw),
+                    const ScanWalletHeader(
+                      walletName: 'Wallet 1',
+                      walletId: 'HD8H90 PX0S',
+                    ),
+                    SizedBox(height: spacing.spacing32),
+                    ScanFrame(
+                      zoomDisplayText: _formatZoomFactor(
+                        _zoomFactors.isNotEmpty
                             ? _zoomFactors[_currentZoomIndex]
                             : 1.0,
-                        onScanned: (value) {
-                          context.pop(value);
-                        },
-                        onPermissionDenied: () {
-                          viewModel.setPermissionDenied(true);
-                        },
-                        onError: (message) {
-                          viewModel.setError(message);
-                        },
-                        onCameraReady: (minZoom, maxZoom) {
-                          if (mounted) {
-                            setState(() {
-                              _zoomFactors = _buildZoomFactors(
-                                minZoom,
-                                maxZoom,
-                              );
-                              _currentZoomIndex = 0;
-                            });
-                          }
-                        },
-                      )
-                    : SizedBox.shrink(),
-              ),
-              Positioned.fill(child: ScanBackground(cutoutRect: cutoutRect)),
-              Column(
-                children: [
-                  SizedBox(height: spacing.topSafeHeightDynamicRaw),
-                  const ScanWalletHeader(
-                    walletName: 'Wallet 1',
-                    walletId: 'HD8H90 PX0S',
-                  ),
-                  SizedBox(height: spacing.spacing32),
-                  ScanFrame(
-                    zoomDisplayText: _formatZoomFactor(
-                      _zoomFactors.isNotEmpty
-                          ? _zoomFactors[_currentZoomIndex]
-                          : 1.0,
+                      ),
+                      onFlashTap: () => viewModel.toggleFlash(),
+                      onZoomTap: () {
+                        if (_zoomFactors.isEmpty) return;
+                        setState(() {
+                          _currentZoomIndex =
+                              (_currentZoomIndex + 1) % _zoomFactors.length;
+                        });
+                      },
+                      onGalleryTap: () => _pickImageAndScan(context),
                     ),
-                    onFlashTap: () => viewModel.toggleFlash(),
-                    onZoomTap: () {
-                      if (_zoomFactors.isEmpty) return;
-                      setState(() {
-                        _currentZoomIndex =
-                            (_currentZoomIndex + 1) % _zoomFactors.length;
-                      });
-                    },
-                    onGalleryTap: () => _pickImageAndScan(context),
-                  ),
-                  const Spacer(),
-                  ScanEnterAddressButton(onTap: () => context.pop()),
-                  SizedBox(
-                    height:
-                        spacing.bottomSafeHeight +
-                        spacing.spacing44 +
-                        spacing.spacing24,
-                  ),
-                ],
-              ),
-            ],
-          );
-        },
+                    const Spacer(),
+                    ScanEnterAddressButton(onTap: () => context.pop()),
+                    SizedBox(
+                      height:
+                          spacing.bottomSafeHeight +
+                          spacing.spacing44 +
+                          spacing.spacing24,
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
