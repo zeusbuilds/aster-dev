@@ -86,6 +86,8 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+
+  # Import operations
   import_sorter: ^4.6.0
   import_path_converter: ^1.0.0
 
