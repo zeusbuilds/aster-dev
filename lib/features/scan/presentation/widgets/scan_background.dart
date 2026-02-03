@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:aster/shared/shared.dart';
-
+import '../../../../shared/shared.dart';
 import 'scan_overlay_painter.dart';
 
 /// Background widget for scan screen with gradient overlay with cutout.

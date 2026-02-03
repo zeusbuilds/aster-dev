@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:aster/shared/shared.dart';
+import '../../shared/shared.dart';
 
 /// Shows the animated startup splash while bootstrapping app dependencies.
 ///

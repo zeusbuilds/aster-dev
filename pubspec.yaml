@@ -87,6 +87,7 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^5.0.0
   import_sorter: ^4.6.0
+  import_path_converter: ^1.0.0
 
   # Code Generation
   build_runner: ^2.4.6
@@ -108,3 +109,10 @@ flutter:
     - assets/brand/
     - assets/texture/
     - assets/data/
+
+import_path_converter:
+  relative: true
+
+import_sorter:
+  emojis: false
+  comments: false

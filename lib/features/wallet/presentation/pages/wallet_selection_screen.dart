@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:aster/features/wallet/presentation/view_model/viewmodels.dart';
-import 'package:aster/features/wallet/presentation/widgets/widgets.dart';
-import 'package:aster/shared/shared.dart';
+import '../../../../shared/shared.dart';
+import '../view_model/viewmodels.dart';
+import '../widgets/widgets.dart';
 
 /// Screen for selecting and switching between available wallets
 ///

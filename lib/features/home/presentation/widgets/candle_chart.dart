@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 
 import 'package:collection/collection.dart';
 
-import 'package:aster/features/home/data/models/chart_data_item.dart';
-import 'package:aster/shared/shared.dart';
+import '../../../../shared/shared.dart';
+import '../../data/models/chart_data_item.dart';
 
 const _kCandleCount = 24;
 const _kLoadingAnimationDuration = Duration(milliseconds: 1500);

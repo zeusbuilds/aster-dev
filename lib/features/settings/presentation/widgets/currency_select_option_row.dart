@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:circle_flags/circle_flags.dart';
 import 'package:haptic_feedback/haptic_feedback.dart';
 
-import 'package:aster/shared/shared.dart';
+import '../../../../shared/shared.dart';
 
 /// Widget representing a single currency option in the currency selection list
 ///

@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'package:custom_numeric_pad/custom_numpad_package.dart';
 
-import 'package:aster/features/send/presentation/widgets/widgets.dart';
-import 'package:aster/shared/shared.dart';
+import '../../../../shared/shared.dart';
+import '../widgets/widgets.dart';
 
 /// Screen for sending Bitcoin
 ///

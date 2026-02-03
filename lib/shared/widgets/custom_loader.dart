@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
-import 'package:aster/shared/shared.dart';
+import '../shared.dart';
 
 /// Loader color variant
 enum LoaderColorVariant {

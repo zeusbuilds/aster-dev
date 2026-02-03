@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:google_fonts/google_fonts.dart';
 
-import 'package:aster/shared/shared.dart';
+import '../shared.dart';
 
 /// Typography system using design tokens
 ///

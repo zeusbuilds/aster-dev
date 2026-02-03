@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
 import 'package:image_picker/image_picker.dart';
 
-import 'package:aster/features/skeleton/presentation/providers/skeleton_index_provider.dart';
-import 'package:aster/shared/shared.dart';
-import 'package:aster/features/scan/presentation/view_model/view_model.dart';
-import 'package:aster/features/scan/presentation/widgets/widgets.dart';
+import '../../../../shared/shared.dart';
+import '../../../skeleton/presentation/providers/skeleton_index_provider.dart';
+import '../view_model/view_model.dart';
+import '../widgets/widgets.dart';
 
 /// Scan screen with full-screen camera and QR/barcode scanning frame.
 class ScanScreen extends ConsumerStatefulWidget {

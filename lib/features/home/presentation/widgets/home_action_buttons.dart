@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:remixicon/remixicon.dart';
 
-import 'package:aster/shared/shared.dart';
+import '../../../../shared/shared.dart';
 
 /// Row of action buttons for Send, Receive, and Swap operations
 ///

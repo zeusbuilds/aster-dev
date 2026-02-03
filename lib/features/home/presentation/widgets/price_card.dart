@@ -1,13 +1,13 @@
-import 'package:aster/features/home/data/models/chart_data_item.dart';
 import 'package:flutter/material.dart';
 
 import 'package:intl/intl.dart';
 import 'package:remixicon/remixicon.dart';
 import 'package:unicons/unicons.dart';
 
-import 'package:aster/features/home/data/data.dart';
-import 'package:aster/features/home/presentation/widgets/candle_chart.dart';
-import 'package:aster/shared/shared.dart';
+import '../../../../shared/shared.dart';
+import '../../data/data.dart';
+import '../../data/models/chart_data_item.dart';
+import 'candle_chart.dart';
 
 /// Widget displaying Bitcoin price information with chart
 ///

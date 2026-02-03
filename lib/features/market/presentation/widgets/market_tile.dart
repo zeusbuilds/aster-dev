@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:aster/shared/shared.dart';
+import '../../../../shared/shared.dart';
 
 /// Market tile widget displaying text on left and SVG on right
 ///

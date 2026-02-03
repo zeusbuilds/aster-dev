@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:skeletonizer/skeletonizer.dart';
 
-import 'package:aster/shared/shared.dart';
+import '../shared.dart';
 
 /// A reusable skeleton loader widget with app-specific styling
 ///

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:aster/shared/shared.dart';
+import '../../../../shared/shared.dart';
 
 /// Wallet header displaying avatar, name, and ID
 class ScanWalletHeader extends StatelessWidget {

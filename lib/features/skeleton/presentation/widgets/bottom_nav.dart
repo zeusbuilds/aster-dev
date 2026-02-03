@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:haptic_feedback/haptic_feedback.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
 
-import 'package:aster/shared/shared.dart';
+import '../../../../shared/shared.dart';
 import '../providers/providers.dart';
 
 /// Bottom navigation bar with animated selection indicator

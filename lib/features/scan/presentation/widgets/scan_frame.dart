@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:aster/shared/shared.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
 
-import 'package:aster/features/scan/presentation/view_model/view_model.dart';
+import '../../../../shared/shared.dart';
+import '../view_model/view_model.dart';
 import 'scan_control_button.dart';
 
 /// QR code scanning frame with control buttons (gallery, flash, zoom).

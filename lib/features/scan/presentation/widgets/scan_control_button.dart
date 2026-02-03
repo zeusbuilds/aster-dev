@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:aster/shared/shared.dart';
+import '../../../../shared/shared.dart';
 
 /// Individual control button for scan frame
 class ScanControlButton extends StatelessWidget {

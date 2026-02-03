@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
-import 'package:aster/shared/shared.dart';
 import 'package:remixicon/remixicon.dart';
+
+import '../../../../shared/shared.dart';
 
 /// Button to enter address manually
 class ScanEnterAddressButton extends StatelessWidget {

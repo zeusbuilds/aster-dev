@@ -5,9 +5,9 @@ import 'package:flutter_svg/svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
 
-import 'package:aster/features/settings/presentation/widgets/widgets.dart';
-import 'package:aster/features/wallet/presentation/view_model/viewmodels.dart';
-import 'package:aster/shared/shared.dart';
+import '../../../../shared/shared.dart';
+import '../../../wallet/presentation/view_model/viewmodels.dart';
+import '../widgets/widgets.dart';
 
 /// Settings screen displaying wallet, app, and support options
 ///

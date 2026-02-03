@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 
-import 'package:aster/features/settings/presentation/widgets/widgets.dart';
-import 'package:aster/shared/shared.dart';
+import '../../../../shared/shared.dart';
+import '../../../settings/presentation/widgets/widgets.dart';
 
 /// Screen for receiving Bitcoin
 ///

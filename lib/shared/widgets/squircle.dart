@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:aster/shared/shared.dart';
+import '../shared.dart';
 
 /// Widget that applies a squircle (rounded superellipse) shape to its child
 ///

@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 
 import 'package:flutter_svg/flutter_svg.dart';
 
-import 'package:aster/shared/shared.dart';
+import '../../../../shared/shared.dart';
 
 /// Card widget for entering recipient address
 ///

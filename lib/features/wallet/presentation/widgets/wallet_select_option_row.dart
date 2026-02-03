@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:haptic_feedback/haptic_feedback.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
 
-import 'package:aster/shared/shared.dart';
+import '../../../../shared/shared.dart';
 import '../../data/models/models.dart';
 
 /// Widget representing a single wallet option in the wallet selection list

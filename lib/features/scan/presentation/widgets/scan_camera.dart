@@ -1,10 +1,11 @@
 import 'dart:async';
 
-import 'package:aster/shared/shared.dart';
-import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
-import 'package:aster/features/scan/data/data.dart';
+import 'package:camera/camera.dart';
+
+import '../../../../shared/shared.dart';
+import '../../data/data.dart';
 
 /// Fallback preview dimensions when [CameraController.value.previewSize] is null (VGA).
 const double _kCameraPreviewFallbackWidth = 480;

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:country_flags/country_flags.dart';
 import 'package:unicons/unicons.dart';
 
-import 'package:aster/shared/shared.dart';
+import '../../../../shared/shared.dart';
 
 /// Card widget displaying receive amount information
 ///
