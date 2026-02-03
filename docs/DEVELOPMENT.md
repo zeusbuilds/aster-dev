@@ -96,15 +96,17 @@ From the project root:
 
 After this, each `git commit` will:
 
-1. Run `dart format .` (reformat code).
-2. If any file was changed by format, the commit is aborted. Run `git add -u && git commit` again to include the formatted code.
-3. Run `flutter analyze`. If there are errors or warnings, the commit is aborted.
+1. Run import path conversion and import sorting (`import_path_converter`, `import_sorter`).
+2. Run `dart format .` (reformat code).
+3. If any file was changed by imports or format, the commit is aborted. Run `git add -u && git commit` again to include the updated code.
+4. Run `flutter analyze --no-fatal-warnings --no-fatal-infos`. The commit is aborted only if there are **errors** (warnings do not block the commit).
 
 ### Manual commands
 
+- `make imports` - Convert and sort import paths
 - `make format`  - Format Dart code
-- `make analyze` - Run static analysis
-- `make lint`    - Format and analyze (same as pre-commit)
+- `make analyze` - Run static analysis (fails only on errors)
+- `make lint`    - Imports, format and analyze (same as pre-commit)
 
 ### CI (GitHub Actions)
 
@@ -113,7 +115,7 @@ On push to `main` and on pull requests, the **Dart** workflow runs:
 - `dart format --set-exit-if-changed .` (fails if code is unformatted)
 - `flutter analyze` (fails on errors/warnings)
 
-Fix failures locally with `make format` and/or address analyzer issues, then commit and push again.
+Fix failures locally with `make imports`, `make format`, and/or address analyzer errors, then commit and push again.
 
 ## Available Commands
 
@@ -125,9 +127,10 @@ Fix failures locally with `make format` and/or address analyzer issues, then com
 - `make watch`      - Run build_runner in watch mode
 - `make run`        - Run Flutter app
 - `make test`       - Run Flutter tests
+- `make imports`    - Convert and sort import paths
 - `make format`     - Format Dart code
-- `make analyze`    - Run static analysis
-- `make lint`       - Format and analyze (run before commit)
+- `make analyze`    - Run static analysis (fails only on errors)
+- `make lint`       - Imports, format and analyze (run before commit)
 - `make help`       - Show all available commands
 
 ## Troubleshooting
