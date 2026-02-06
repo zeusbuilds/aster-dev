@@ -15,6 +15,7 @@ class CurrencySelectionScreen extends StatefulWidget {
 }
 
 class _CurrencySelectionScreenState extends State<CurrencySelectionScreen> {
+  final ScrollController _scrollController = ScrollController();
   List<CurrencyModel> _currencies = [];
   bool _isLoading = true;
   String? _error;
@@ -40,6 +41,12 @@ class _CurrencySelectionScreenState extends State<CurrencySelectionScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   void _onCurrencySelected(CurrencyModel currency) {
@@ -75,26 +82,31 @@ class _CurrencySelectionScreenState extends State<CurrencySelectionScreen> {
                 ],
               ),
             )
-          : ListView.separated(
-              padding: EdgeInsets.only(bottom: spacing.bottomSafeHeightRaw),
-              itemCount: _currencies.length,
-              separatorBuilder: (context, index) => Divider(
-                color: colors.fill2,
-                height: 1,
-                thickness: 1,
-                indent: spacing.spacing20,
-              ),
-              itemBuilder: (context, index) {
-                final currency = _currencies[index];
+          : Scrollbar(
+              controller: _scrollController,
+              thumbVisibility: false,
+              child: ListView.separated(
+                controller: _scrollController,
+                padding: EdgeInsets.only(bottom: spacing.bottomSafeHeightRaw),
+                itemCount: _currencies.length,
+                separatorBuilder: (context, index) => Divider(
+                  color: colors.fill2,
+                  height: 1,
+                  thickness: 1,
+                  indent: spacing.spacing20,
+                ),
+                itemBuilder: (context, index) {
+                  final currency = _currencies[index];
 
-                return CurrencySelectOptionRow(
-                  currency: currency,
-                  selected: _selectedCurrencyCode == currency.code ? 0 : -1,
-                  onTap: () {
-                    _onCurrencySelected(currency);
-                  },
-                );
-              },
+                  return CurrencySelectOptionRow(
+                    currency: currency,
+                    selected: _selectedCurrencyCode == currency.code ? 0 : -1,
+                    onTap: () {
+                      _onCurrencySelected(currency);
+                    },
+                  );
+                },
+              ),
             ),
     );
   }

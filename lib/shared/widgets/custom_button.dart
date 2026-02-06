@@ -4,6 +4,7 @@ import 'package:haptic_feedback/haptic_feedback.dart';
 
 import '../shared.dart';
 
+// TODO: fix button variant colors and also match grid loader variant colors
 /// Button variant types
 enum ButtonVariant {
   /// Primary button - filled with primary color
@@ -172,14 +173,7 @@ class _CustomButtonState extends State<CustomButton> {
               borderWidth: borderWidth,
               color: backgroundColor,
               child: widget.loading
-                  ? Center(
-                      child: CustomLoader(
-                        colorVariant: LoaderColorVariant.custom,
-                        customColor: foregroundColor,
-                        size: isCompact ? LoaderSize.small : LoaderSize.medium,
-                        strokeWidth: isCompact ? 1.5 : 2.0,
-                      ),
-                    )
+                  ? Center(child: GridLoader())
                   : Row(
                       mainAxisSize: isCompact
                           ? MainAxisSize.min

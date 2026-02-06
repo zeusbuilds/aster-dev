@@ -14,6 +14,7 @@ class CountrySelectionScreen extends StatefulWidget {
 }
 
 class _CountrySelectionScreenState extends State<CountrySelectionScreen> {
+  final ScrollController _scrollController = ScrollController();
   List<CountryModel> _countries = [];
   bool _isLoading = true;
   String? _error;
@@ -39,6 +40,12 @@ class _CountrySelectionScreenState extends State<CountrySelectionScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   void _onCountrySelected(CountryModel country) {
@@ -74,26 +81,36 @@ class _CountrySelectionScreenState extends State<CountrySelectionScreen> {
                 ],
               ),
             )
-          : ListView.separated(
-              padding: EdgeInsets.only(bottom: spacing.bottomSafeHeightRaw),
-              itemCount: _countries.length,
-              separatorBuilder: (context, index) => Divider(
-                color: colors.fill2,
-                height: 1,
-                thickness: 1,
-                indent: spacing.spacing20,
+          : ScrollbarTheme(
+              data: ScrollbarThemeData(
+                thumbColor: WidgetStateProperty.all(colors.brand6),
               ),
-              itemBuilder: (context, index) {
-                final country = _countries[index];
+              child: Scrollbar(
+                controller: _scrollController,
+                thumbVisibility: false,
+                child: ListView.separated(
+                  controller: _scrollController,
+                  padding: EdgeInsets.only(bottom: spacing.bottomSafeHeightRaw),
+                  itemCount: _countries.length,
+                  separatorBuilder: (context, index) => Divider(
+                    color: colors.fill2,
+                    height: 1,
+                    thickness: 1,
+                    indent: spacing.spacing20,
+                  ),
+                  itemBuilder: (context, index) {
+                    final country = _countries[index];
 
-                return CountrySelectOptionRow(
-                  country: country,
-                  selected: int.parse(_selectedCountryCode ?? '0'),
-                  onTap: () {
-                    _onCountrySelected(country);
+                    return CountrySelectOptionRow(
+                      country: country,
+                      selected: int.parse(_selectedCountryCode ?? '0'),
+                      onTap: () {
+                        _onCountrySelected(country);
+                      },
+                    );
                   },
-                );
-              },
+                ),
+              ),
             ),
     );
   }
