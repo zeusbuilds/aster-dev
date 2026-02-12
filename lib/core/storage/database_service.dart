@@ -4,29 +4,19 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../objectbox.g.dart';
 
-/// Service for database operations using ObjectBox
-abstract class DatabaseService {
-  /// Get the ObjectBox Store instance
-  Store get store;
-
-  /// Initialize the database
-  Future<void> init();
-
-  /// Close the database
-  Future<void> close();
-
-  /// Get a box for a specific entity type
-  Box<T> box<T>();
-}
-
-/// Implementation of DatabaseService using ObjectBox
-class DatabaseServiceImpl implements DatabaseService {
-  DatabaseServiceImpl();
+/// Service for database operations using ObjectBox.
+///
+/// Manages the lifecycle of the underlying `Store` and provides typed boxes
+/// for entities.
+class DatabaseService {
+  DatabaseService();
 
   Store? _store;
   String? _directory;
 
-  @override
+  /// Returns the ObjectBox [Store] instance.
+  ///
+  /// Throws a [StateError] if [init] has not been called yet.
   Store get store {
     if (_store == null) {
       throw StateError('Database not initialized. Call init() first.');
@@ -34,12 +24,15 @@ class DatabaseServiceImpl implements DatabaseService {
     return _store!;
   }
 
-  @override
+  /// Returns a typed ObjectBox [Box] for the given entity type [T].
   Box<T> box<T>() {
     return store.box<T>();
   }
 
-  @override
+  /// Initializes the ObjectBox store and creates the backing directory if
+  /// needed.
+  ///
+  /// Calling this method multiple times is safe; subsequent calls are no-ops.
   Future<void> init() async {
     if (_store != null) {
       return;
@@ -57,7 +50,10 @@ class DatabaseServiceImpl implements DatabaseService {
     _store = await openStore(directory: _directory!);
   }
 
-  @override
+  /// Closes the underlying ObjectBox store and releases resources.
+  ///
+  /// After calling this, [store] and [box] must not be used until [init] is
+  /// called again.
   Future<void> close() async {
     _store?.close();
     _store = null;

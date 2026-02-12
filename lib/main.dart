@@ -42,7 +42,7 @@ void main() async {
         await _initializeGdk();
 
         // Initialize database
-        final databaseService = DatabaseServiceImpl();
+        final databaseService = DatabaseService();
         await databaseService.init();
 
         final sharedPreferences = await SharedPreferences.getInstance();

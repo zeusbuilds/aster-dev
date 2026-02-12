@@ -23,7 +23,7 @@ Connectivity connectivity(Ref ref) {
 /// Provides NetworkInfo implementation for network connectivity checks
 @riverpod
 NetworkInfo networkInfo(Ref ref) {
-  return NetworkInfoImpl(ref.read(connectivityProvider));
+  return NetworkInfo(ref.read(connectivityProvider));
 }
 
 /// Provides ChopperClient configured with interceptors for API calls
@@ -47,7 +47,7 @@ Future<SharedPreferences> sharedPreferences(Ref ref) async {
 /// Provides SecureStorageService implementation for encrypted storage
 @riverpod
 SecureStorageService secureStorageService(Ref ref) {
-  return SecureStorageServiceImpl();
+  return SecureStorageService();
 }
 
 /// Provides PreferencesService implementation for app preferences
@@ -57,7 +57,7 @@ SecureStorageService secureStorageService(Ref ref) {
 PreferencesService preferencesService(Ref ref) {
   final prefsAsync = ref.watch(sharedPreferencesProvider);
   return prefsAsync.when(
-    data: (prefs) => PreferencesServiceImpl(prefs),
+    data: (prefs) => PreferencesService(prefs),
     loading: () => throw StateError('SharedPreferences not initialized'),
     error: (error, stack) =>
         throw StateError('Failed to initialize SharedPreferences: $error'),
@@ -67,7 +67,7 @@ PreferencesService preferencesService(Ref ref) {
 /// Provides DatabaseService implementation using ObjectBox
 @riverpod
 DatabaseService databaseService(Ref ref) {
-  return DatabaseServiceImpl();
+  return DatabaseService();
 }
 
 // Wallet providers
@@ -78,7 +78,7 @@ DatabaseService databaseService(Ref ref) {
 /// and [preferencesServiceProvider]
 @riverpod
 WalletRepository walletRepository(Ref ref) {
-  return WalletRepositoryImpl(
+  return WalletRepository(
     databaseService: ref.read(databaseServiceProvider),
     secureStorageService: ref.read(secureStorageServiceProvider),
     preferencesService: ref.read(preferencesServiceProvider),
