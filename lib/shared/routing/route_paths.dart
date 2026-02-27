@@ -4,6 +4,7 @@ class RoutePaths {
 
   // Splash & Auth
   static const String splash = '/';
+  static const String onboardingWelcome = '/onboarding-welcome';
 
   // Main
   static const String skeleton = '/skeleton';

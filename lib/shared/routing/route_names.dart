@@ -4,6 +4,7 @@ class RouteNames {
 
   // Splash & Auth
   static const String splash = 'splash';
+  static const String onboardingWelcome = 'onboardingWelcome';
 
   // Main
   static const String skeleton = 'skeleton';
