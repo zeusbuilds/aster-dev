@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'route_config.dart';
-import 'route_guards.dart';
 import 'route_paths.dart';
 
 part 'app_router.g.dart';

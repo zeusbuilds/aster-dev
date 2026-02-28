@@ -34,16 +34,16 @@ class _OnboardingContent extends StatelessWidget {
 
     return Padding(
       padding: EdgeInsets.symmetric(
-        horizontal: spacing.spacing36,
+        horizontal: spacing.spacing24,
         vertical: spacing.spacing24,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const OnboardingWelcomeHeader(),
-          SizedBox(height: spacing.spacing24),
+          SizedBox(height: spacing.spacing40),
           const OnboardingWelcomeIconGrid(),
-          SizedBox(height: spacing.spacing24),
+          SizedBox(height: spacing.spacing36),
           Text(
             'Built on\norchestration, not\nguesswork.',
             style: textTheme.displaySmall?.copyWith(
