@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../shared/shared.dart';
 import '../widgets/onboarding_welcome_header.dart';
@@ -48,7 +49,7 @@ class _OnboardingContent extends StatelessWidget {
             'Built on\norchestration, not\nguesswork.',
             style: textTheme.displaySmall?.copyWith(
               color: colors.text5,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
               height: 1.1,
             ),
           ),
@@ -76,9 +77,7 @@ class _OnboardingContent extends StatelessWidget {
               SizedBox(height: spacing.spacing12),
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: () {
-                  // TODO: Import wallet flow.
-                },
+                onTap: () => context.push(RoutePaths.onboardingImportWallet),
                 child: Padding(
                   padding: EdgeInsets.symmetric(vertical: spacing.spacing4),
                   child: Center(

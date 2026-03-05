@@ -2,6 +2,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/home/presentation/screens/home_screen.dart';
 import '../../features/market/presentation/screens/market_screen.dart';
+import '../../features/onboarding/presentation/screens/onboarding_import_wallet_screen.dart';
 import '../../features/onboarding/presentation/screens/onboarding_welcome_screen.dart';
 import '../../features/receive/presentation/screens/screens.dart';
 import '../../features/scan/presentation/screens/screens.dart';
@@ -33,6 +34,11 @@ class RouteConfig {
         path: RoutePaths.onboardingWelcome,
         name: RouteNames.onboardingWelcome,
         builder: (context, state) => const OnboardingWelcomeScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.onboardingImportWallet,
+        name: RouteNames.onboardingImportWallet,
+        builder: (context, state) => const OnboardingImportWalletScreen(),
       ),
       GoRoute(
         path: RoutePaths.skeleton,
