@@ -16,7 +16,7 @@ class HomeActionButtons extends StatelessWidget {
     final spacing = context.spacing;
 
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: spacing.spacing20),
+      padding: EdgeInsets.symmetric(horizontal: spacing.screenPadding),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
@@ -31,7 +31,7 @@ class HomeActionButtons extends StatelessWidget {
               },
             ),
           ),
-          SizedBox(width: spacing.spacing12),
+          SizedBox(width: spacing.md),
           Expanded(
             flex: 1,
             child: CustomButton.compact(
@@ -43,7 +43,7 @@ class HomeActionButtons extends StatelessWidget {
               },
             ),
           ),
-          SizedBox(width: spacing.spacing12),
+          SizedBox(width: spacing.md),
           Expanded(
             flex: 1,
             child: CustomButton.compact(

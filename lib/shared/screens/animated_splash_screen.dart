@@ -2,12 +2,14 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-const _foregroundColor = Color(0xFFFFFDFF);
+import '../shared.dart';
 
-// Background gradient (top → bottom).
-const _bgTop = Color(0xFF8BD6FF);
-const _bgMid = Color(0xFF001AFF);
-const _bgBottom = Color(0xFF000000);
+const _foregroundColor = AsterColors.surface;
+
+// Background gradient (top -> bottom).
+const _bgTop = AsterColors.blue200;
+const _bgMid = AsterColors.blueBase;
+const _bgBottom = AsterColors.black;
 
 const _animationDuration = 1250;
 

@@ -52,53 +52,50 @@ class AssetSelectorSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
     final spacing = context.spacing;
-    final radius = context.radius;
+    final radius = context.radii;
     final textTheme = context.textTheme;
     final maxHeight = MediaQuery.of(context).size.height * 0.7;
 
     return Container(
       constraints: BoxConstraints(maxHeight: maxHeight),
       decoration: BoxDecoration(
-        color: colors.fill1,
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(radius.radius24),
-        ),
+        color: context.colorScheme.surface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(radius.card)),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(height: spacing.spacing12),
+          SizedBox(height: spacing.md),
           // Handle bar
           Container(
             width: 56,
             height: 4,
             decoration: BoxDecoration(
-              color: colors.fill3,
-              borderRadius: BorderRadius.circular(radius.radius50),
+              color: context.colorScheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(radius.pill),
             ),
           ),
-          SizedBox(height: spacing.spacing16),
+          SizedBox(height: spacing.lg),
           // Title
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: spacing.spacing20),
+            padding: EdgeInsets.symmetric(horizontal: spacing.screenPadding),
             child: Text(
               'Select token',
               style: textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w600,
-                color: colors.text1,
+                color: context.colorScheme.onSurface,
               ),
             ),
           ),
-          SizedBox(height: spacing.spacing16),
+          SizedBox(height: spacing.lg),
           // Asset list
           Flexible(
             child: ListView.builder(
               shrinkWrap: true,
               itemCount: assets.length,
-              padding: EdgeInsets.only(bottom: spacing.bottomSafeHeightRaw),
+              padding: EdgeInsets.only(bottom: spacing.bottomSafeRaw(context)),
               itemBuilder: (context, index) {
                 final asset = assets[index];
                 final isSelected =
@@ -106,7 +103,7 @@ class AssetSelectorSheet extends StatelessWidget {
                     asset.unit == selectedAssetName;
 
                 return Padding(
-                  padding: EdgeInsets.only(bottom: spacing.spacing4),
+                  padding: EdgeInsets.only(bottom: spacing.xs),
                   child: _AssetItem(
                     asset: asset,
                     isSelected: isSelected,
@@ -143,9 +140,9 @@ class _AssetItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
+    final colors = context.appColors;
     final spacing = context.spacing;
-    final radius = context.radius;
+    final radius = context.radii;
     final textTheme = context.textTheme;
 
     return GestureDetector(
@@ -158,37 +155,39 @@ class _AssetItem extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding: EdgeInsets.symmetric(vertical: spacing.spacing4),
+        padding: EdgeInsets.symmetric(vertical: spacing.xs),
         decoration: BoxDecoration(
           color: isSelected
-              ? colors.brand1.withValues(alpha: 0.5)
-              : colors.fill1,
+              ? context.colorScheme.primaryContainer.withValues(alpha: 0.5)
+              : context.colorScheme.surface,
         ),
         child: Row(
           children: [
-            SizedBox(width: spacing.spacing8),
+            SizedBox(width: spacing.sm),
             // Selection indicator bar
             Container(
-              width: spacing.spacing4,
-              height: spacing.spacing64,
+              width: spacing.xs,
+              height: spacing.giant,
               decoration: BoxDecoration(
-                color: isSelected ? colors.brand6 : Colors.transparent,
-                borderRadius: BorderRadius.circular(radius.radius50),
+                color: isSelected
+                    ? context.colorScheme.primary
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(radius.pill),
               ),
             ),
-            SizedBox(width: spacing.spacing12),
+            SizedBox(width: spacing.md),
             // Icon
             SvgPicture.asset(
               asset.icon,
-              width: spacing.spacing40,
-              height: spacing.spacing40,
+              width: spacing.iconXl,
+              height: spacing.iconXl,
               errorBuilder: (context, error, stackTrace) => Icon(
                 Icons.circle,
-                size: spacing.spacing40,
+                size: spacing.iconXl,
                 color: Color(asset.color),
               ),
             ),
-            SizedBox(width: spacing.spacing8),
+            SizedBox(width: spacing.sm),
             // Name and subtitle
             Expanded(
               child: Column(
@@ -199,21 +198,21 @@ class _AssetItem extends StatelessWidget {
                     asset.token,
                     style: textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
-                      color: colors.text1,
+                      color: context.colorScheme.onSurface,
                     ),
                   ),
-                  SizedBox(height: spacing.spacing2),
+                  SizedBox(height: spacing.xxs),
                   Text(
                     asset.chain,
                     style: textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w500,
-                      color: colors.text3,
+                      color: colors.textTertiary,
                     ),
                   ),
                 ],
               ),
             ),
-            SizedBox(width: spacing.spacing12),
+            SizedBox(width: spacing.md),
             // Balance information
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -224,11 +223,11 @@ class _AssetItem extends StatelessWidget {
                   style: textTheme.titleMedium
                       ?.copyWith(
                         fontWeight: FontWeight.w600,
-                        color: colors.text1,
+                        color: context.colorScheme.onSurface,
                       )
                       .toNumeric(context),
                 ),
-                SizedBox(height: spacing.spacing2),
+                SizedBox(height: spacing.xxs),
                 RichText(
                   text: TextSpan(
                     children: [
@@ -237,7 +236,7 @@ class _AssetItem extends StatelessWidget {
                         style: textTheme.titleSmall
                             ?.copyWith(
                               fontWeight: FontWeight.w500,
-                              color: colors.text3,
+                              color: colors.textTertiary,
                             )
                             .toNumeric(context),
                       ),
@@ -245,7 +244,7 @@ class _AssetItem extends StatelessWidget {
                         text: ' sats',
                         style: textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w500,
-                          color: colors.text3,
+                          color: colors.textTertiary,
                         ),
                       ),
                     ],
@@ -253,7 +252,7 @@ class _AssetItem extends StatelessWidget {
                 ),
               ],
             ),
-            SizedBox(width: spacing.spacing20),
+            SizedBox(width: spacing.screenPadding),
           ],
         ),
       ),

@@ -11,12 +11,11 @@ class ScanBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
     final gradient = LinearGradient(
       colors: [
-        colors.fill6,
-        colors.fill6.withValues(alpha: 0.75),
-        colors.fill6.withValues(alpha: 0.65),
+        AsterColors.black,
+        AsterColors.black.withValues(alpha: 0.75),
+        AsterColors.black.withValues(alpha: 0.65),
       ],
       stops: const [0.25, 0.5, 1.0],
       begin: Alignment.bottomCenter,

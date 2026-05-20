@@ -59,14 +59,18 @@ class _CountrySelectionScreenState extends State<CountrySelectionScreen> {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
-    final colors = context.colors;
+    final colors = context.appColors;
     final textTheme = context.textTheme;
 
     return Scaffold(
-      backgroundColor: colors.fill1,
+      backgroundColor: context.colorScheme.surface,
       appBar: const CustomAppBar(title: 'Select Country', leadingIcon: true),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: colors.brand6))
+          ? Center(
+              child: CircularProgressIndicator(
+                color: context.colorScheme.primary,
+              ),
+            )
           : _error != null
           ? Center(
               child: Column(
@@ -74,29 +78,35 @@ class _CountrySelectionScreenState extends State<CountrySelectionScreen> {
                 children: [
                   Text(
                     'Error loading countries',
-                    style: textTheme.bodyMedium?.copyWith(color: colors.text2),
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: colors.textSecondary,
+                    ),
                   ),
-                  SizedBox(height: spacing.spacing16),
+                  SizedBox(height: spacing.lg),
                   CustomButton(text: 'Retry', onTap: _loadCountries),
                 ],
               ),
             )
           : ScrollbarTheme(
               data: ScrollbarThemeData(
-                thumbColor: WidgetStateProperty.all(colors.brand6),
+                thumbColor: WidgetStateProperty.all(
+                  context.colorScheme.primary,
+                ),
               ),
               child: Scrollbar(
                 controller: _scrollController,
                 thumbVisibility: false,
                 child: ListView.separated(
                   controller: _scrollController,
-                  padding: EdgeInsets.only(bottom: spacing.bottomSafeHeightRaw),
+                  padding: EdgeInsets.only(
+                    bottom: spacing.bottomSafeRaw(context),
+                  ),
                   itemCount: _countries.length,
                   separatorBuilder: (context, index) => Divider(
-                    color: colors.fill2,
+                    color: colors.surfaceSubtle,
                     height: 1,
                     thickness: 1,
-                    indent: spacing.spacing20,
+                    indent: spacing.screenPadding,
                   ),
                   itemBuilder: (context, index) {
                     final country = _countries[index];

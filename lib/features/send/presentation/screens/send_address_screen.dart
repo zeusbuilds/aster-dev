@@ -37,7 +37,7 @@ class _SendAddressScreenState extends State<SendAddressScreen> {
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-        backgroundColor: context.colors.fill1,
+        backgroundColor: context.colorScheme.surface,
         appBar: CustomAppBar(
           title: 'Send',
           leadingIcon: true,
@@ -46,13 +46,15 @@ class _SendAddressScreenState extends State<SendAddressScreen> {
             onPressed: () => _openScan(context),
             icon: Icon(
               MingCuteIcons.mgc_scan_line,
-              size: context.spacing.spacing20,
-              color: context.colors.text1,
+              size: context.spacing.screenPadding,
+              color: context.colorScheme.onSurface,
             ),
           ),
         ),
         body: Padding(
-          padding: EdgeInsets.symmetric(horizontal: context.spacing.spacing20),
+          padding: EdgeInsets.symmetric(
+            horizontal: context.spacing.screenPadding,
+          ),
           child: Column(
             children: [
               SendAddressCard(
@@ -66,7 +68,7 @@ class _SendAddressScreenState extends State<SendAddressScreen> {
                   context.pushNamed(RouteNames.send);
                 },
               ),
-              SizedBox(height: context.spacing.bottomSafeHeightDynamic),
+              SizedBox(height: context.spacing.bottomSafe(context)),
             ],
           ),
         ),

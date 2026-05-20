@@ -27,7 +27,6 @@ class CountrySelectOptionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
     final spacing = context.spacing;
     final textTheme = context.textTheme;
 
@@ -44,8 +43,8 @@ class CountrySelectOptionRow extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: EdgeInsets.symmetric(
-          horizontal: spacing.spacing20,
-          vertical: spacing.spacing16,
+          horizontal: spacing.screenPadding,
+          vertical: spacing.lg,
         ),
         child: Row(
           children: [
@@ -53,23 +52,23 @@ class CountrySelectOptionRow extends StatelessWidget {
               country.code,
               theme: ImageTheme(
                 shape: Circle(),
-                height: spacing.spacing28,
-                width: spacing.spacing28,
+                height: spacing.xxxl,
+                width: spacing.xxxl,
               ),
             ),
-            SizedBox(width: spacing.spacing16),
+            SizedBox(width: spacing.lg),
             Expanded(
               child: Text(
                 country.name,
                 style: textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w500,
-                  color: colors.text1,
+                  color: context.colorScheme.onSurface,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            SizedBox(width: spacing.spacing32),
+            SizedBox(width: spacing.xxxl),
             CustomRadio(
               option: 0,
               selected: selected,

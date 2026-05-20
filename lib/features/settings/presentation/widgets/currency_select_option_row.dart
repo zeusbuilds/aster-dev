@@ -27,7 +27,7 @@ class CurrencySelectOptionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
+    final colors = context.appColors;
     final spacing = context.spacing;
     final textTheme = context.textTheme;
 
@@ -44,8 +44,8 @@ class CurrencySelectOptionRow extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: EdgeInsets.symmetric(
-          horizontal: spacing.spacing20,
-          vertical: spacing.spacing16,
+          horizontal: spacing.screenPadding,
+          vertical: spacing.lg,
         ),
         child: Row(
           children: [
@@ -53,12 +53,12 @@ class CurrencySelectOptionRow extends StatelessWidget {
             //   currency.countryCode,
             //   theme: ImageTheme(
             //     shape: Circle(),
-            //     height: spacing.spacing28,
-            //     width: spacing.spacing28,
+            //     height: spacing.xxxl,
+            //     width: spacing.xxxl,
             //   ),
             // ),
-            CircleFlag(currency.countryCode, size: spacing.spacing28),
-            SizedBox(width: spacing.spacing16),
+            CircleFlag(currency.countryCode, size: spacing.xxxl),
+            SizedBox(width: spacing.lg),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -67,22 +67,24 @@ class CurrencySelectOptionRow extends StatelessWidget {
                     currency.name,
                     style: textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w500,
-                      color: colors.text1,
+                      color: context.colorScheme.onSurface,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  // SizedBox(height: spacing.spacing4),
+                  // SizedBox(height: spacing.xs),
                   Text(
                     '${currency.symbol} ${currency.code}',
-                    style: textTheme.bodySmall?.copyWith(color: colors.text2),
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colors.textSecondary,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
-            SizedBox(width: spacing.spacing32),
+            SizedBox(width: spacing.xxxl),
             CustomRadio(
               option: 0,
               selected: selected,

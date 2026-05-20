@@ -164,9 +164,9 @@ class _CandleChartState extends State<CandleChart>
       child: LayoutBuilder(
         builder: (context, constraints) {
           final spacing = context.spacing;
-          final radius = context.radius;
-          final candleSpacing = spacing.spacing2;
-          final borderRadius = radius.radius50;
+          final radius = context.radii;
+          final candleSpacing = spacing.xxs;
+          final borderRadius = radius.pill;
 
           final totalSpacing = candleSpacing * (_kCandleCount - 1);
           final calculatedCandleWidth =
@@ -220,8 +220,6 @@ class _CandleChartState extends State<CandleChart>
     double candleSpacing,
     double borderRadius,
   ) {
-    final colors = context.colors;
-
     return AnimatedBuilder(
       animation: _loadingController,
       builder: (context, _) {
@@ -238,7 +236,9 @@ class _CandleChartState extends State<CandleChart>
 
             final opacityFactor =
                 _kBaseOpacity + (_kOpacityAmplitude * sinValue);
-            final candleColor = colors.text5.withValues(alpha: opacityFactor);
+            final candleColor = AsterColors.white.withValues(
+              alpha: opacityFactor,
+            );
 
             final x = sidePadding + index * (candleWidth + candleSpacing);
 
@@ -270,8 +270,6 @@ class _CandleChartState extends State<CandleChart>
         _priceRange == null) {
       return const SizedBox();
     }
-
-    final colors = context.colors;
 
     return AnimatedBuilder(
       animation: _transitionController,
@@ -322,8 +320,12 @@ class _CandleChartState extends State<CandleChart>
             final currentCenterY =
                 startCenterY + (targetCenterY - startCenterY) * animationValue;
 
-            final startColor = colors.text5.withValues(alpha: startOpacity);
-            final targetColor = colors.text5.withValues(alpha: _kTargetOpacity);
+            final startColor = AsterColors.white.withValues(
+              alpha: startOpacity,
+            );
+            final targetColor = AsterColors.white.withValues(
+              alpha: _kTargetOpacity,
+            );
             final currentColor = Color.lerp(
               startColor,
               targetColor,
@@ -361,8 +363,6 @@ class _CandleChartState extends State<CandleChart>
       return const SizedBox();
     }
 
-    final colors = context.colors;
-
     return Stack(
       children: List.generate(_kCandleCount, (index) {
         if (index >= _candles!.length) {
@@ -392,7 +392,7 @@ class _CandleChartState extends State<CandleChart>
           width: candleWidth,
           height: actualBodyHeight,
           centerY: centerY,
-          color: colors.text5.withValues(alpha: _kTargetOpacity),
+          color: AsterColors.white.withValues(alpha: _kTargetOpacity),
           borderRadius: borderRadius,
         );
       }),

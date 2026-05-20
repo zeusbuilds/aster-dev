@@ -27,8 +27,8 @@ class OnboardingImportWalletWordGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
-    final colors = context.colors;
-    final radius = context.radius;
+    final colors = context.appColors;
+    final radius = context.radii;
     final textTheme = context.textTheme;
 
     return GridView.builder(
@@ -36,8 +36,8 @@ class OnboardingImportWalletWordGrid extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: columnCount,
-        mainAxisSpacing: spacing.spacing8,
-        crossAxisSpacing: spacing.spacing8,
+        mainAxisSpacing: spacing.sm,
+        crossAxisSpacing: spacing.sm,
         childAspectRatio: 4.5,
       ),
       itemCount: wordCount,
@@ -59,14 +59,14 @@ class OnboardingImportWalletWordGrid extends StatelessWidget {
 
         return Container(
           padding: EdgeInsets.symmetric(
-            horizontal: spacing.spacing12,
-            vertical: spacing.spacing6,
+            horizontal: spacing.md,
+            vertical: spacing.sm,
           ),
           decoration: BoxDecoration(
-            color: colors.fill1.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(radius.radius24),
+            color: context.colorScheme.surface.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(radius.card),
             border: Border.all(
-              color: colors.fill1.withValues(alpha: 0.1),
+              color: context.colorScheme.surface.withValues(alpha: 0.1),
               width: 0.6,
             ),
           ),
@@ -76,17 +76,17 @@ class OnboardingImportWalletWordGrid extends StatelessWidget {
               Text(
                 '$number',
                 style: textTheme.labelSmall?.copyWith(
-                  color: colors.text5.withValues(alpha: 0.7),
+                  color: AsterColors.white.withValues(alpha: 0.7),
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              SizedBox(width: spacing.spacing6),
+              SizedBox(width: spacing.sm),
               Expanded(
                 child: word != null
                     ? Text(
                         word,
                         style: textTheme.bodyMedium?.copyWith(
-                          color: colors.text5,
+                          color: AsterColors.white,
                           fontWeight: FontWeight.w500,
                         ),
                         overflow: TextOverflow.ellipsis,
@@ -98,8 +98,8 @@ class OnboardingImportWalletWordGrid extends StatelessWidget {
                   isValid
                       ? MingCuteIcons.mgc_check_fill
                       : MingCuteIcons.mgc_close_fill,
-                  size: spacing.spacing18,
-                  color: isValid ? colors.success6 : colors.danger6,
+                  size: spacing.xl,
+                  color: isValid ? colors.success : colors.danger,
                 ),
               ],
             ],

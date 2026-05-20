@@ -59,15 +59,13 @@ class _CenterTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final radius = context.radius;
+    final radius = context.radii;
     final spacing = context.spacing;
-    final colors = context.colors;
-
     return Container(
-      padding: EdgeInsets.all(spacing.spacing6),
+      padding: EdgeInsets.all(spacing.sm),
       decoration: BoxDecoration(
-        color: colors.fill1,
-        borderRadius: BorderRadius.circular(radius.radius4),
+        color: context.colorScheme.surface,
+        borderRadius: BorderRadius.circular(radius.xs),
       ),
       child: Center(child: SvgPicture.asset('assets/icons/tokens/usdc.svg')),
     );
@@ -81,10 +79,8 @@ class _BlurTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final radiusTokens = context.radius;
-    final colors = context.colors;
-
-    final radius = BorderRadius.circular(radiusTokens.radius4);
+    final radiusTokens = context.radii;
+    final radius = BorderRadius.circular(radiusTokens.xs);
     final hasBorder = (opacity - 0.05).abs() < 0.001;
 
     return ClipRRect(
@@ -94,10 +90,10 @@ class _BlurTile extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: radius,
-            color: colors.fill1.withValues(alpha: opacity),
+            color: context.colorScheme.surface.withValues(alpha: opacity),
             border: hasBorder
                 ? Border.all(
-                    color: colors.fill1.withValues(alpha: 0.1),
+                    color: context.colorScheme.surface.withValues(alpha: 0.1),
                     width: 0.6,
                   )
                 : null,

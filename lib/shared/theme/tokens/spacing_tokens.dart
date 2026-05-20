@@ -1,67 +1,130 @@
-import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:flutter/material.dart';
 
-part 'spacing_tokens.freezed.dart';
+@immutable
+class AsterSpacing extends ThemeExtension<AsterSpacing> {
+  const AsterSpacing({
+    this.xxs = 2,
+    this.xs = 4,
+    this.sm = 8,
+    this.md = 12,
+    this.lg = 16,
+    this.xl = 20,
+    this.xxl = 24,
+    this.xxxl = 32,
+    this.huge = 48,
+    this.giant = 64,
+    this.screenPadding = 20,
+    this.sectionGap = 24,
+    this.controlGap = 12,
+    this.iconXs = 18,
+    this.iconSm = 20,
+    this.iconMd = 24,
+    this.iconLg = 36,
+    this.iconXl = 44,
+    this.navOffset = 44,
+    this.heroInset = 160,
+  });
 
-/// Spacing tokens configuration
-@freezed
-class SpacingTokens with _$SpacingTokens {
-  const factory SpacingTokens({
-    @Default(2.0) double spacing2,
-    @Default(4.0) double spacing4,
-    @Default(6.0) double spacing6,
-    @Default(8.0) double spacing8,
-    @Default(10.0) double spacing10,
-    @Default(12.0) double spacing12,
-    @Default(14.0) double spacing14,
-    @Default(16.0) double spacing16,
-    @Default(18.0) double spacing18,
-    @Default(20.0) double spacing20,
-    @Default(22.0) double spacing22,
-    @Default(24.0) double spacing24,
-    @Default(26.0) double spacing26,
-    @Default(28.0) double spacing28,
-    @Default(30.0) double spacing30,
-    @Default(32.0) double spacing32,
-    @Default(34.0) double spacing34,
-    @Default(36.0) double spacing36,
-    @Default(38.0) double spacing38,
-    @Default(40.0) double spacing40,
-    @Default(42.0) double spacing42,
-    @Default(44.0) double spacing44,
-    @Default(46.0) double spacing46,
-    @Default(48.0) double spacing48,
-    @Default(50.0) double spacing50,
-    @Default(52.0) double spacing52,
-    @Default(54.0) double spacing54,
-    @Default(56.0) double spacing56,
-    @Default(58.0) double spacing58,
-    @Default(60.0) double spacing60,
-    @Default(62.0) double spacing62,
-    @Default(64.0) double spacing64,
-    @Default(66.0) double spacing66,
-    @Default(68.0) double spacing68,
-    @Default(70.0) double spacing70,
-    @Default(72.0) double spacing72,
-    @Default(74.0) double spacing74,
-    @Default(76.0) double spacing76,
-    @Default(78.0) double spacing78,
-    @Default(80.0) double spacing80,
-    @Default(82.0) double spacing82,
-    @Default(84.0) double spacing84,
-    @Default(86.0) double spacing86,
-    @Default(88.0) double spacing88,
-    @Default(90.0) double spacing90,
-    @Default(92.0) double spacing92,
-    @Default(94.0) double spacing94,
-    @Default(96.0) double spacing96,
-    @Default(160.0) double spacing160,
-    @Default(0.0) double bottomSafeHeightDynamicRaw,
-    @Default(0.0) double topSafeHeightDynamicRaw,
-    @Default(0.0) double bottomSafeHeightRaw,
-    @Default(0.0) double topSafeHeightRaw,
-    @Default(0.0) double bottomSafeHeightDynamic,
-    @Default(0.0) double topSafeHeightDynamic,
-    @Default(0.0) double bottomSafeHeight,
-    @Default(0.0) double topSafeHeight,
-  }) = _SpacingTokens;
+  final double xxs;
+  final double xs;
+  final double sm;
+  final double md;
+  final double lg;
+  final double xl;
+  final double xxl;
+  final double xxxl;
+  final double huge;
+  final double giant;
+  final double screenPadding;
+  final double sectionGap;
+  final double controlGap;
+  final double iconXs;
+  final double iconSm;
+  final double iconMd;
+  final double iconLg;
+  final double iconXl;
+  final double navOffset;
+  final double heroInset;
+
+  double topSafeRaw(BuildContext context) => MediaQuery.of(context).padding.top;
+  double bottomSafeRaw(BuildContext context) =>
+      MediaQuery.of(context).viewPadding.bottom;
+  double topSafe(BuildContext context) => topSafeRaw(context) + lg;
+  double bottomSafe(BuildContext context) => bottomSafeRaw(context) + lg;
+
+  @override
+  AsterSpacing copyWith({
+    double? xxs,
+    double? xs,
+    double? sm,
+    double? md,
+    double? lg,
+    double? xl,
+    double? xxl,
+    double? xxxl,
+    double? huge,
+    double? giant,
+    double? screenPadding,
+    double? sectionGap,
+    double? controlGap,
+    double? iconXs,
+    double? iconSm,
+    double? iconMd,
+    double? iconLg,
+    double? iconXl,
+    double? navOffset,
+    double? heroInset,
+  }) {
+    return AsterSpacing(
+      xxs: xxs ?? this.xxs,
+      xs: xs ?? this.xs,
+      sm: sm ?? this.sm,
+      md: md ?? this.md,
+      lg: lg ?? this.lg,
+      xl: xl ?? this.xl,
+      xxl: xxl ?? this.xxl,
+      xxxl: xxxl ?? this.xxxl,
+      huge: huge ?? this.huge,
+      giant: giant ?? this.giant,
+      screenPadding: screenPadding ?? this.screenPadding,
+      sectionGap: sectionGap ?? this.sectionGap,
+      controlGap: controlGap ?? this.controlGap,
+      iconXs: iconXs ?? this.iconXs,
+      iconSm: iconSm ?? this.iconSm,
+      iconMd: iconMd ?? this.iconMd,
+      iconLg: iconLg ?? this.iconLg,
+      iconXl: iconXl ?? this.iconXl,
+      navOffset: navOffset ?? this.navOffset,
+      heroInset: heroInset ?? this.heroInset,
+    );
+  }
+
+  @override
+  AsterSpacing lerp(ThemeExtension<AsterSpacing>? other, double t) {
+    if (other is! AsterSpacing) return this;
+    return AsterSpacing(
+      xxs: _lerp(xxs, other.xxs, t),
+      xs: _lerp(xs, other.xs, t),
+      sm: _lerp(sm, other.sm, t),
+      md: _lerp(md, other.md, t),
+      lg: _lerp(lg, other.lg, t),
+      xl: _lerp(xl, other.xl, t),
+      xxl: _lerp(xxl, other.xxl, t),
+      xxxl: _lerp(xxxl, other.xxxl, t),
+      huge: _lerp(huge, other.huge, t),
+      giant: _lerp(giant, other.giant, t),
+      screenPadding: _lerp(screenPadding, other.screenPadding, t),
+      sectionGap: _lerp(sectionGap, other.sectionGap, t),
+      controlGap: _lerp(controlGap, other.controlGap, t),
+      iconXs: _lerp(iconXs, other.iconXs, t),
+      iconSm: _lerp(iconSm, other.iconSm, t),
+      iconMd: _lerp(iconMd, other.iconMd, t),
+      iconLg: _lerp(iconLg, other.iconLg, t),
+      iconXl: _lerp(iconXl, other.iconXl, t),
+      navOffset: _lerp(navOffset, other.navOffset, t),
+      heroInset: _lerp(heroInset, other.heroInset, t),
+    );
+  }
+
+  static double _lerp(double a, double b, double t) => a + (b - a) * t;
 }

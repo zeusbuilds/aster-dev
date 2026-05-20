@@ -34,21 +34,21 @@ class SendCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
+    final colors = context.appColors;
     final spacing = context.spacing;
-    final radius = context.radius;
+    final radius = context.radii;
     final textTheme = context.textTheme;
 
     return Column(
       children: [
         Squircle(
           border: BorderRadius.only(
-            topLeft: Radius.circular(radius.radius24),
-            topRight: Radius.circular(radius.radius24),
+            topLeft: Radius.circular(radius.card),
+            topRight: Radius.circular(radius.card),
           ),
           padding: EdgeInsets.symmetric(
-            vertical: spacing.spacing16,
-            horizontal: spacing.spacing18,
+            vertical: spacing.lg,
+            horizontal: spacing.xl,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -61,32 +61,32 @@ class SendCard extends StatelessWidget {
                     style: textTheme.headlineSmall
                         ?.copyWith(
                           fontWeight: FontWeight.w700,
-                          color: colors.text1,
+                          color: context.colorScheme.onSurface,
                         )
                         .toNumeric(context),
                   ),
                   const Spacer(),
                   SvgPicture.asset(
                     asset.icon,
-                    width: spacing.spacing36,
-                    height: spacing.spacing36,
+                    width: spacing.iconLg,
+                    height: spacing.iconLg,
                     errorBuilder: (context, error, stackTrace) => Icon(
                       Icons.circle,
-                      size: spacing.spacing36,
+                      size: spacing.iconLg,
                       color: Color(asset.color),
                     ),
                   ),
-                  SizedBox(width: spacing.spacing8),
+                  SizedBox(width: spacing.sm),
                   Text(
                     asset.token,
                     style: textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
-                      color: colors.text1,
+                      color: context.colorScheme.onSurface,
                     ),
                   ),
                 ],
               ),
-              SizedBox(height: spacing.spacing4),
+              SizedBox(height: spacing.xs),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -95,7 +95,7 @@ class SendCard extends StatelessWidget {
                     style: textTheme.bodyMedium
                         ?.copyWith(
                           fontWeight: FontWeight.w600,
-                          color: colors.text3,
+                          color: colors.textTertiary,
                         )
                         .toNumeric(context),
                   ),
@@ -105,7 +105,7 @@ class SendCard extends StatelessWidget {
                       text: 'Bal: ',
                       style: textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.w600,
-                        color: colors.text3,
+                        color: colors.textTertiary,
                       ),
                       children: [
                         TextSpan(
@@ -113,7 +113,7 @@ class SendCard extends StatelessWidget {
                           style: textTheme.bodyMedium
                               ?.copyWith(
                                 fontWeight: FontWeight.w600,
-                                color: colors.text3,
+                                color: colors.textTertiary,
                               )
                               .toNumeric(context),
                         ),
@@ -126,49 +126,51 @@ class SendCard extends StatelessWidget {
           ),
         ),
         Squircle(
-          color: colors.fill2,
-          borderColor: colors.fill2,
+          color: colors.surfaceSubtle,
+          borderColor: colors.surfaceSubtle,
           border: BorderRadius.only(
-            bottomLeft: Radius.circular(radius.radius24),
-            bottomRight: Radius.circular(radius.radius24),
+            bottomLeft: Radius.circular(radius.card),
+            bottomRight: Radius.circular(radius.card),
           ),
           padding: EdgeInsets.symmetric(
-            vertical: spacing.spacing16,
-            horizontal: spacing.spacing18,
+            vertical: spacing.lg,
+            horizontal: spacing.xl,
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               SizedBox(
-                width: spacing.spacing24,
-                height: spacing.spacing24,
+                width: spacing.xxl,
+                height: spacing.xxl,
                 child: CountryFlag.fromCountryCode(
                   'US',
                   theme: const ImageTheme(shape: Circle()),
                 ),
               ),
-              SizedBox(width: spacing.spacing8),
+              SizedBox(width: spacing.sm),
               Text(
                 fiatCurrency,
                 style: textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: colors.text1,
+                  color: context.colorScheme.onSurface,
                 ),
               ),
               const Spacer(),
               Squircle(
                 padding: EdgeInsets.symmetric(
-                  horizontal: spacing.spacing12,
-                  vertical: spacing.spacing4,
+                  horizontal: spacing.md,
+                  vertical: spacing.xs,
                 ),
-                borderRadius: radius.radius8,
-                borderColor: colors.text1,
-                color: colors.text1,
+                borderRadius: radius.badge,
+                borderColor: context.colorScheme.onSurface,
+                color: context.colorScheme.onSurface,
                 child: Text(
                   'Send max',
                   style: textTheme.labelSmall?.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: colors.fill1, // Inverse color (background)
+                    color: context
+                        .colorScheme
+                        .surface, // Inverse color (background)
                   ),
                 ),
               ),

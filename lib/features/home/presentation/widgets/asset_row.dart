@@ -24,7 +24,7 @@ class AssetRow extends StatelessWidget {
   final IconData icon;
 
   /// Color of the asset icon
-  final Color iconColor;
+  final Color? iconColor;
 
   /// Whether to show skeleton loading for balances
   final bool isLoading;
@@ -36,13 +36,13 @@ class AssetRow extends StatelessWidget {
     required this.fiatBalance,
     required this.assetBalance,
     required this.icon,
-    this.iconColor = Colors.white,
+    this.iconColor,
     this.isLoading = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
+    final colors = context.appColors;
     final spacing = context.spacing;
     final textTheme = context.textTheme;
 
@@ -53,9 +53,13 @@ class AssetRow extends StatelessWidget {
       child: Row(
         children: [
           Center(
-            child: Icon(icon, color: iconColor, size: spacing.spacing40),
+            child: Icon(
+              icon,
+              color: iconColor ?? context.colorScheme.onSurface,
+              size: spacing.iconXl,
+            ),
           ),
-          SizedBox(width: spacing.spacing12),
+          SizedBox(width: spacing.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -69,7 +73,7 @@ class AssetRow extends StatelessWidget {
                         name,
                         style: textTheme.bodyLarge?.copyWith(
                           fontWeight: FontWeight.w600,
-                          color: colors.text1,
+                          color: context.colorScheme.onSurface,
                         ),
                       ),
                     ),
@@ -80,7 +84,7 @@ class AssetRow extends StatelessWidget {
                         style: textTheme.bodyLarge
                             ?.copyWith(
                               fontWeight: FontWeight.w500,
-                              color: colors.text1,
+                              color: context.colorScheme.onSurface,
                             )
                             .toNumeric(context),
                       ),
@@ -96,7 +100,7 @@ class AssetRow extends StatelessWidget {
                         denomination,
                         style: textTheme.bodySmall?.copyWith(
                           fontWeight: FontWeight.w500,
-                          color: colors.text3,
+                          color: colors.textTertiary,
                         ),
                       ),
                     ),
@@ -130,10 +134,10 @@ class AssetRow extends StatelessWidget {
     String balance,
     TextStyle? baseTextStyle,
   ) {
-    final colors = context.colors;
+    final colors = context.appColors;
     final baseStyle = baseTextStyle?.copyWith(
       fontWeight: FontWeight.w500,
-      color: colors.text3,
+      color: colors.textTertiary,
     );
 
     // Split at first space to separate numeric value from currency

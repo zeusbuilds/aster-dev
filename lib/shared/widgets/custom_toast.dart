@@ -41,36 +41,36 @@ class CustomToast extends StatelessWidget {
 
   /// Get icon color for the variant
   Color _getIconColor(BuildContext context) {
-    final colors = context.colors;
+    final colors = context.appColors;
     switch (variant) {
       case ToastVariant.success:
-        return colors.success6;
+        return colors.success;
       case ToastVariant.failure:
-        return colors.danger6;
+        return colors.danger;
       case ToastVariant.warning:
-        return colors.warning6;
+        return colors.warning;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
+    final colors = context.appColors;
     final spacing = context.spacing;
     final textTheme = context.textTheme;
 
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.symmetric(
-          horizontal: spacing.spacing24,
-          vertical: spacing.spacing16,
+          horizontal: spacing.xxl,
+          vertical: spacing.lg,
         ),
         child: Squircle(
-          color: colors.fill1,
+          color: context.colorScheme.surface,
           padding: EdgeInsets.symmetric(
-            horizontal: spacing.spacing16,
-            vertical: spacing.spacing16,
+            horizontal: spacing.lg,
+            vertical: spacing.lg,
           ),
-          shadows: [context.shadows.shadow2.first],
+          shadows: [context.shadows.raised.first],
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -78,9 +78,9 @@ class CustomToast extends StatelessWidget {
               Icon(
                 _getIcon(),
                 color: _getIconColor(context),
-                size: spacing.spacing24,
+                size: spacing.xxl,
               ),
-              SizedBox(width: spacing.spacing12),
+              SizedBox(width: spacing.md),
               // Title and message
               Expanded(
                 child: Column(
@@ -91,14 +91,14 @@ class CustomToast extends StatelessWidget {
                       title,
                       style: textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.w600,
-                        color: colors.text1,
+                        color: context.colorScheme.onSurface,
                       ),
                     ),
                     if (message != null && message!.isNotEmpty) ...[
                       Text(
                         message!,
                         style: textTheme.bodySmall?.copyWith(
-                          color: colors.text2,
+                          color: colors.textSecondary,
                         ),
                       ),
                     ],

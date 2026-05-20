@@ -26,25 +26,24 @@ class ScanFrame extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final flashOn = ref.watch(scanViewModelProvider).flashOn;
     final spacing = context.spacing;
-    final colors = context.colors;
-    final radius = context.radius;
+    final radius = context.radii;
     final textTheme = context.textTheme;
     final frameSize = MediaQuery.of(context).size.width * 0.7;
 
     return Container(
       width: frameSize,
       height: frameSize,
-      padding: EdgeInsets.only(bottom: spacing.spacing14),
+      padding: EdgeInsets.only(bottom: spacing.md),
       decoration: BoxDecoration(
-        border: Border.all(color: colors.text5, width: 0.5),
+        border: Border.all(color: AsterColors.white, width: 0.5),
       ),
       child: Align(
         alignment: Alignment.bottomCenter,
         child: Container(
-          padding: EdgeInsets.all(spacing.spacing4),
+          padding: EdgeInsets.all(spacing.xs),
           decoration: BoxDecoration(
-            color: colors.fill6.withValues(alpha: 0.4),
-            borderRadius: BorderRadius.circular(radius.radius50),
+            color: AsterColors.black.withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(radius.pill),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -53,28 +52,28 @@ class ScanFrame extends ConsumerWidget {
                 onTap: onGalleryTap ?? () {},
                 child: Icon(
                   MingCuteIcons.mgc_photo_album_line,
-                  color: colors.text5,
-                  size: spacing.spacing16,
+                  color: AsterColors.white,
+                  size: spacing.lg,
                 ),
               ),
-              SizedBox(width: spacing.spacing8),
+              SizedBox(width: spacing.sm),
               ScanControlButton(
                 onTap: onFlashTap ?? () {},
                 child: Icon(
                   flashOn
                       ? MingCuteIcons.mgc_flash_fill
                       : MingCuteIcons.mgc_flash_line,
-                  color: colors.text5,
-                  size: spacing.spacing16,
+                  color: AsterColors.white,
+                  size: spacing.lg,
                 ),
               ),
-              SizedBox(width: spacing.spacing8),
+              SizedBox(width: spacing.sm),
               ScanControlButton(
                 onTap: onZoomTap ?? () {},
                 child: Text(
                   zoomDisplayText,
                   style: textTheme.bodyMedium?.copyWith(
-                    color: colors.text5,
+                    color: AsterColors.white,
                     fontWeight: FontWeight.w600,
                   ),
                 ),

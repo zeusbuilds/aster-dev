@@ -3,8 +3,8 @@ import 'package:flutter/services.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../../shared/shared.dart';
 import '../../../skeleton/presentation/providers/skeleton_index_provider.dart';
@@ -24,7 +24,10 @@ const List<double> _kZoomOptions = [1.0, 2.0, 3.0];
 
 class _ScanScreenState extends ConsumerState<ScanScreen> {
   final _imagePicker = ImagePicker();
-  final _barcodeScanner = BarcodeScanner(formats: [BarcodeFormat.all]);
+  final _scannerController = MobileScannerController(
+    detectionSpeed: DetectionSpeed.normal,
+    detectionTimeoutMs: 250,
+  );
 
   /// Zoom factors: subset of [1x, 2x, 3x] within device min–max.
   List<double> _zoomFactors = [1.0];
@@ -51,10 +54,9 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     final xFile = await _imagePicker.pickImage(source: ImageSource.gallery);
     if (xFile == null || !mounted) return;
     try {
-      final inputImage = InputImage.fromFilePath(xFile.path);
-      final barcodes = await _barcodeScanner.processImage(inputImage);
+      final capture = await _scannerController.analyzeImage(xFile.path);
       if (!context.mounted) return;
-      for (final barcode in barcodes) {
+      for (final barcode in capture?.barcodes ?? <Barcode>[]) {
         final raw = barcode.rawValue;
         if (raw != null && raw.isNotEmpty) {
           context.pop(raw);
@@ -75,7 +77,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
 
   @override
   void dispose() {
-    _barcodeScanner.close();
+    _scannerController.dispose();
     super.dispose();
   }
 
@@ -105,14 +107,14 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     final screenSize = MediaQuery.sizeOf(context);
 
     final headerHeight =
-        spacing.spacing32 +
-        spacing.spacing64 +
-        spacing.spacing12 +
-        spacing.spacing14 +
-        spacing.spacing8 +
-        spacing.spacing12 +
-        spacing.spacing32;
-    final safeAreaTop = spacing.topSafeHeightDynamicRaw;
+        spacing.xxxl +
+        spacing.giant +
+        spacing.md +
+        spacing.md +
+        spacing.sm +
+        spacing.md +
+        spacing.xxxl;
+    final safeAreaTop = spacing.topSafeRaw(context);
     final frameTop = safeAreaTop + headerHeight;
     final frameLeft = (MediaQuery.sizeOf(context).width - frameSize) / 2;
 
@@ -120,12 +122,12 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
+        statusBarColor: AsterColors.transparent,
         statusBarIconBrightness: Brightness.light,
         statusBarBrightness: Brightness.dark,
       ),
       child: Scaffold(
-        backgroundColor: Colors.transparent,
+        backgroundColor: AsterColors.transparent,
         body: LayoutBuilder(
           builder: (context, constraints) {
             return Stack(
@@ -133,6 +135,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                 Positioned.fill(
                   child: shouldShowCamera
                       ? ScanCameraWidget(
+                          controller: _scannerController,
                           cutoutRect: cutoutRect,
                           screenSize: screenSize,
                           flashOn: scanState.flashOn,
@@ -165,12 +168,12 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                 Positioned.fill(child: ScanBackground(cutoutRect: cutoutRect)),
                 Column(
                   children: [
-                    SizedBox(height: spacing.topSafeHeightDynamicRaw),
+                    SizedBox(height: spacing.topSafeRaw(context)),
                     const ScanWalletHeader(
                       walletName: 'Wallet 1',
                       walletId: 'HD8H90 PX0S',
                     ),
-                    SizedBox(height: spacing.spacing32),
+                    SizedBox(height: spacing.xxxl),
                     ScanFrame(
                       zoomDisplayText: _formatZoomFactor(
                         _zoomFactors.isNotEmpty
@@ -191,9 +194,9 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                     ScanEnterAddressButton(onTap: () => context.pop()),
                     SizedBox(
                       height:
-                          spacing.bottomSafeHeight +
-                          spacing.spacing44 +
-                          spacing.spacing24,
+                          spacing.bottomSafe(context) +
+                          spacing.navOffset +
+                          spacing.xxl,
                     ),
                   ],
                 ),

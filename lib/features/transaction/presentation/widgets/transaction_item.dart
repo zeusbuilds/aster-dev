@@ -19,7 +19,7 @@ class TransactionItem extends StatelessWidget {
   final IconData icon;
 
   /// Color of the transaction icon
-  final Color iconColor;
+  final Color? iconColor;
 
   const TransactionItem({
     super.key,
@@ -27,27 +27,31 @@ class TransactionItem extends StatelessWidget {
     required this.amount,
     required this.time,
     required this.icon,
-    this.iconColor = Colors.blueGrey,
+    this.iconColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
+    final colors = context.appColors;
     final spacing = context.spacing;
     final textTheme = context.textTheme;
 
     return Row(
       children: [
         Container(
-          padding: EdgeInsets.all(spacing.spacing8),
+          padding: EdgeInsets.all(spacing.sm),
           decoration: BoxDecoration(
-            color: colors.fill2,
+            color: colors.surfaceSubtle,
             shape: BoxShape.circle,
-            border: Border.all(color: colors.border2, width: 1),
+            border: Border.all(color: colors.borderSubtle, width: 1),
           ),
-          child: Icon(icon, size: spacing.spacing20, color: iconColor),
+          child: Icon(
+            icon,
+            size: spacing.screenPadding,
+            color: iconColor ?? colors.textSecondary,
+          ),
         ),
-        SizedBox(width: spacing.spacing16),
+        SizedBox(width: spacing.lg),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -59,7 +63,7 @@ class TransactionItem extends StatelessWidget {
                       type,
                       style: textTheme.bodyLarge?.copyWith(
                         fontWeight: FontWeight.w500,
-                        color: colors.text1,
+                        color: context.colorScheme.onSurface,
                       ),
                     ),
                   ),
@@ -71,7 +75,7 @@ class TransactionItem extends StatelessWidget {
                           style: textTheme.bodyMedium
                               ?.copyWith(
                                 fontWeight: FontWeight.w600,
-                                color: colors.text1,
+                                color: context.colorScheme.onSurface,
                               )
                               .toNumeric(context),
                         ),
@@ -79,7 +83,7 @@ class TransactionItem extends StatelessWidget {
                           text: ' BTC',
                           style: textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w600,
-                            color: colors.text1,
+                            color: context.colorScheme.onSurface,
                           ),
                         ),
                       ],
@@ -87,7 +91,7 @@ class TransactionItem extends StatelessWidget {
                   ),
                 ],
               ),
-              SizedBox(height: spacing.spacing2),
+              SizedBox(height: spacing.xxs),
               RichText(
                 text: TextSpan(children: _buildTimeSpans(context, time)),
               ),
@@ -102,14 +106,14 @@ class TransactionItem extends StatelessWidget {
   ///
   /// Separates time digits from AM/PM for styling
   List<TextSpan> _buildTimeSpans(BuildContext context, String time) {
-    final colors = context.colors;
+    final colors = context.appColors;
     final textTheme = context.textTheme;
 
     // Split time into numeric part (e.g., "12:30") and period (e.g., "PM")
     final parts = time.split(' ');
     final baseStyle = textTheme.bodyMedium?.copyWith(
       fontWeight: FontWeight.w500,
-      color: colors.text3,
+      color: colors.textTertiary,
     );
 
     if (parts.length == 2) {

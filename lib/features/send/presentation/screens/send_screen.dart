@@ -14,7 +14,7 @@ class SendScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: context.colors.fill1,
+      backgroundColor: context.colorScheme.surface,
       appBar: CustomAppBar(
         title: 'Send',
         leadingIcon: true,
@@ -23,7 +23,9 @@ class SendScreen extends StatelessWidget {
       body: SafeArea(
         bottom: true,
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: context.spacing.spacing20),
+          padding: EdgeInsets.symmetric(
+            horizontal: context.spacing.screenPadding,
+          ),
           child: Column(
             children: [
               SendCard(
@@ -39,15 +41,15 @@ class SendScreen extends StatelessWidget {
                 buttonHeight: 60,
                 rowSpacing: 10,
                 columnSpacing: 10,
-                buttonColor: context.colors.fill2,
+                buttonColor: context.appColors.surfaceSubtle,
                 buttonTextStyle: context.textTheme.headlineSmall!
                     .copyWith(
                       fontWeight: FontWeight.w600,
-                      color: context.colors.text1,
+                      color: context.colorScheme.onSurface,
                     )
                     .toNumeric(context),
               ),
-              SizedBox(height: context.spacing.spacing18),
+              SizedBox(height: context.spacing.xl),
               CustomButton(text: 'Continue', onTap: () {}),
             ],
           ),

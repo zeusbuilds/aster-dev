@@ -38,7 +38,7 @@ class SettingsOptionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
+    final colors = context.appColors;
     final spacing = context.spacing;
     final textTheme = context.textTheme;
 
@@ -47,40 +47,44 @@ class SettingsOptionRow extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: EdgeInsets.symmetric(
-          horizontal: spacing.spacing20,
-          vertical: spacing.spacing16,
+          horizontal: spacing.screenPadding,
+          vertical: spacing.lg,
         ),
         child: Row(
           children: [
             if (prefixIcon != null) ...[
-              Icon(prefixIcon, size: spacing.spacing22, color: colors.text2),
-              SizedBox(width: spacing.spacing10),
+              Icon(
+                prefixIcon,
+                size: spacing.iconSm,
+                color: colors.textSecondary,
+              ),
+              SizedBox(width: spacing.md),
             ],
             Expanded(
               child: Text(
                 title,
                 style: textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w500,
-                  color: colors.text1,
+                  color: context.colorScheme.onSurface,
                 ),
                 maxLines: 1,
               ),
             ),
-            SizedBox(width: spacing.spacing16),
+            SizedBox(width: spacing.lg),
             if (details != null) ...[
               Text(
                 details!,
                 style: textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: colors.text1,
+                  color: context.colorScheme.onSurface,
                 ),
               ),
-              SizedBox(width: spacing.spacing8),
+              SizedBox(width: spacing.sm),
             ],
             Icon(
               suffixIcon ?? RemixIcons.arrow_right_s_line,
-              size: spacing.spacing18,
-              color: suffixIconColor ?? colors.text3,
+              size: spacing.xl,
+              color: suffixIconColor ?? colors.textTertiary,
             ),
           ],
         ),

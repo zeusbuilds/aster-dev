@@ -28,16 +28,15 @@ class MarketTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
     final spacing = context.spacing;
-    final radius = context.radius;
+    final radius = context.radii;
     final textTheme = context.textTheme;
     final shadows = context.shadows;
 
     return GestureDetector(
       onTap: onTap,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(radius.radius24),
+        borderRadius: BorderRadius.circular(radius.card),
         child: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -49,12 +48,12 @@ class MarketTile extends StatelessWidget {
           child: Stack(
             children: [
               Positioned(
-                top: -spacing.spacing10,
-                right: -spacing.spacing30,
+                top: -spacing.md,
+                right: -spacing.xxxl,
                 child: Container(
                   decoration: BoxDecoration(
                     boxShadow: shadowColor != null
-                        ? shadows.shadow20
+                        ? shadows.modal
                               .map(
                                 (s) => BoxShadow(
                                   color: shadowColor!,
@@ -64,17 +63,17 @@ class MarketTile extends StatelessWidget {
                                 ),
                               )
                               .toList()
-                        : shadows.shadow20,
+                        : shadows.modal,
                   ),
                   child: Image.asset(
                     'assets/texture/shape.png',
-                    width: spacing.spacing96 * 2,
-                    height: spacing.spacing96 * 2,
+                    width: spacing.giant * 2,
+                    height: spacing.giant * 2,
                   ),
                 ),
               ),
               Container(
-                padding: EdgeInsets.all(spacing.spacing16),
+                padding: EdgeInsets.all(spacing.lg),
                 child: Row(
                   children: [
                     Expanded(
@@ -86,27 +85,29 @@ class MarketTile extends StatelessWidget {
                             label,
                             style: textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.w500,
-                              color: colors.text5.withValues(alpha: 0.75),
+                              color: AsterColors.white.withValues(alpha: 0.75),
                             ),
                           ),
                           Text(
                             subtitle ?? '',
                             style: textTheme.titleLarge?.copyWith(
                               fontWeight: FontWeight.w600,
-                              color: colors.text5,
+                              color: AsterColors.white,
                             ),
                           ),
-                          SizedBox(height: spacing.spacing24),
+                          SizedBox(height: spacing.xxl),
                           if (tipText != null) ...[
                             Container(
                               padding: EdgeInsets.symmetric(
-                                horizontal: spacing.spacing4,
-                                vertical: spacing.spacing4,
+                                horizontal: spacing.xs,
+                                vertical: spacing.xs,
                               ),
                               decoration: BoxDecoration(
-                                color: colors.text5.withValues(alpha: 0.15),
+                                color: AsterColors.white.withValues(
+                                  alpha: 0.15,
+                                ),
                                 borderRadius: BorderRadius.circular(
-                                  radius.radius50,
+                                  radius.pill,
                                 ),
                               ),
                               child: Row(
@@ -115,25 +116,25 @@ class MarketTile extends StatelessWidget {
                                 children: [
                                   Container(
                                     decoration: BoxDecoration(
-                                      color: colors.text5.withValues(
+                                      color: AsterColors.white.withValues(
                                         alpha: 0.5,
                                       ),
                                       shape: BoxShape.circle,
                                     ),
-                                    width: spacing.spacing20,
-                                    height: spacing.spacing20,
+                                    width: spacing.screenPadding,
+                                    height: spacing.screenPadding,
                                   ),
-                                  SizedBox(width: spacing.spacing8),
+                                  SizedBox(width: spacing.sm),
                                   Text(
                                     tipText!,
                                     style: textTheme.bodyMedium?.copyWith(
-                                      color: colors.text5.withValues(
+                                      color: AsterColors.white.withValues(
                                         alpha: 0.75,
                                       ),
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
-                                  SizedBox(width: spacing.spacing10),
+                                  SizedBox(width: spacing.md),
                                 ],
                               ),
                             ),

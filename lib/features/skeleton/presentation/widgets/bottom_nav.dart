@@ -29,28 +29,22 @@ class _BottomNavState extends ConsumerState<BottomNav> {
   Widget build(BuildContext context) {
     final index = ref.watch(skeletonIndexProvider);
     final spacing = context.spacing;
-    final radius = context.radius;
+    final radius = context.radii;
+    final shadows = context.shadows;
 
     return Positioned(
       left: 0,
       right: 0,
-      bottom: spacing.spacing24,
+      bottom: spacing.xxl,
       child: Center(
         child: Container(
-          margin: EdgeInsets.symmetric(horizontal: spacing.spacing24),
+          margin: EdgeInsets.symmetric(horizontal: spacing.xxl),
           height: 56,
-          padding: EdgeInsets.symmetric(horizontal: spacing.spacing12),
+          padding: EdgeInsets.symmetric(horizontal: spacing.md),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(radius.radius30),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: 10,
-                spreadRadius: 0,
-                offset: const Offset(0, 4),
-              ),
-            ],
+            color: context.appColors.surfaceRaised,
+            borderRadius: BorderRadius.circular(radius.sheet),
+            boxShadow: shadows.raised,
           ),
           child: ClipRect(
             clipBehavior: Clip.none,
@@ -84,7 +78,7 @@ class _BottomNavState extends ConsumerState<BottomNav> {
                                 .setIndex(0);
                           },
                         ),
-                        SizedBox(width: spacing.spacing20),
+                        SizedBox(width: spacing.screenPadding),
                         _NavItem(
                           key: _itemKeys[1],
                           icon: index == 1
@@ -97,7 +91,7 @@ class _BottomNavState extends ConsumerState<BottomNav> {
                                 .setIndex(1);
                           },
                         ),
-                        SizedBox(width: spacing.spacing20),
+                        SizedBox(width: spacing.screenPadding),
                         _NavItem(
                           key: _itemKeys[2],
                           icon: index == 2
@@ -110,7 +104,7 @@ class _BottomNavState extends ConsumerState<BottomNav> {
                                 .setIndex(2);
                           },
                         ),
-                        SizedBox(width: spacing.spacing20),
+                        SizedBox(width: spacing.screenPadding),
                         _NavItem(
                           key: _itemKeys[3],
                           icon: index == 3
@@ -169,11 +163,15 @@ class _NavItem extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: Container(
         padding: EdgeInsets.symmetric(
-          horizontal: spacing.spacing12,
-          vertical: spacing.spacing12,
+          horizontal: spacing.md,
+          vertical: spacing.md,
         ),
         alignment: Alignment.center,
-        child: Icon(icon, color: Colors.black, size: spacing.spacing24),
+        child: Icon(
+          icon,
+          color: context.colorScheme.onSurface,
+          size: spacing.xxl,
+        ),
       ),
     );
   }
@@ -307,7 +305,9 @@ class _AnimatedCircleState extends State<_AnimatedCircle>
       return const SizedBox.shrink();
     }
 
-    final radius = context.radius;
+    final radius = context.radii;
+    final colors = context.appColors;
+    final shadows = context.shadows;
     const double pillWidth = 56;
     const double pillHeight = 40;
 
@@ -327,15 +327,9 @@ class _AnimatedCircleState extends State<_AnimatedCircle>
             width: pillWidth,
             height: pillHeight,
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(radius.radius50),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.15),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+              color: colors.surfaceRaised,
+              borderRadius: BorderRadius.circular(radius.pill),
+              boxShadow: shadows.raised,
             ),
           ),
         );

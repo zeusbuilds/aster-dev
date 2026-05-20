@@ -83,19 +83,18 @@ class _CustomButtonState extends State<CustomButton> {
   Widget build(BuildContext context) {
     final textTheme = context.textTheme;
     final spacing = context.spacing;
-    final radius = context.radius;
-    final colors = context.colors;
+    final radius = context.radii;
 
     // Size-specific configurations
     final isCompact = widget._isCompact;
     final height = isCompact ? 40.0 : 48.0;
-    final horizontalPadding = isCompact ? spacing.spacing16 : spacing.spacing24;
+    final horizontalPadding = isCompact ? spacing.lg : spacing.xxl;
     // Vertical padding: compact uses 12px, normal uses 12px (closest to original 14px)
     // This gives 24px content area for 48px button, which fits 16px text comfortably
-    final verticalPadding = isCompact ? spacing.spacing12 : spacing.spacing12;
-    final iconSize = isCompact ? spacing.spacing18 : spacing.spacing20;
-    final iconTextGap = isCompact ? spacing.spacing4 : spacing.spacing8;
-    final borderRadius = isCompact ? radius.radius24 : radius.radius18;
+    final verticalPadding = isCompact ? spacing.md : spacing.md;
+    final iconSize = isCompact ? spacing.xl : spacing.screenPadding;
+    final iconTextGap = isCompact ? spacing.xs : spacing.sm;
+    final borderRadius = isCompact ? radius.card : radius.button;
     final textStyle = isCompact
         ? textTheme.labelMedium?.copyWith(
             fontWeight: FontWeight.w500,
@@ -108,18 +107,18 @@ class _CustomButtonState extends State<CustomButton> {
 
     // Variant-specific colors
     final backgroundColor = widget.variant == ButtonVariant.primary
-        ? colors.brand6
+        ? context.colorScheme.primary
         : widget.variant == ButtonVariant.translucent
-        ? Colors.white.withValues(alpha: 0.8)
-        : colors.fill1;
+        ? AsterColors.white.withValues(alpha: 0.8)
+        : context.colorScheme.surface;
     final foregroundColor = widget.variant == ButtonVariant.primary
-        ? colors.text5
+        ? AsterColors.white
         : widget.variant == ButtonVariant.translucent
-        ? colors.text1
-        : colors.text1;
+        ? context.colorScheme.onSurface
+        : context.colorScheme.onSurface;
     final borderColor = widget.variant == ButtonVariant.secondary
-        ? colors.fill1
-        : Colors.transparent;
+        ? context.colorScheme.surface
+        : AsterColors.transparent;
     final borderWidth = widget.variant == ButtonVariant.secondary ? 1.0 : 0.0;
 
     // Disabled state (disabled if loading, not enabled, or no onTap)

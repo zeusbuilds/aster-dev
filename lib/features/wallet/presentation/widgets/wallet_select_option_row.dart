@@ -28,7 +28,7 @@ class WalletSelectOptionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
+    final colors = context.appColors;
     final spacing = context.spacing;
     final textTheme = context.textTheme;
 
@@ -45,8 +45,8 @@ class WalletSelectOptionRow extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: EdgeInsets.symmetric(
-          horizontal: spacing.spacing20,
-          vertical: spacing.spacing16,
+          horizontal: spacing.screenPadding,
+          vertical: spacing.lg,
         ),
         child: Row(
           children: [
@@ -57,32 +57,32 @@ class WalletSelectOptionRow extends StatelessWidget {
                 onTap?.call();
               },
             ),
-            SizedBox(width: spacing.spacing16),
+            SizedBox(width: spacing.lg),
             Expanded(
               child: Text(
                 wallet.name,
                 style: textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w500,
-                  color: colors.text1,
+                  color: context.colorScheme.onSurface,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            SizedBox(width: spacing.spacing32),
+            SizedBox(width: spacing.xxxl),
             Text(
               wallet.walletId,
               style: textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w600,
-                color: colors.text1,
+                color: context.colorScheme.onSurface,
               ),
               maxLines: 1,
             ),
-            SizedBox(width: spacing.spacing12),
+            SizedBox(width: spacing.md),
             Icon(
               MingCuteIcons.mgc_edit_2_line,
-              size: spacing.spacing18,
-              color: colors.text3,
+              size: spacing.xl,
+              color: colors.textTertiary,
             ),
           ],
         ),

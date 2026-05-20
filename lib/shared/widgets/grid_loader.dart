@@ -111,9 +111,10 @@ class _GridLoaderState extends State<GridLoader>
   @override
   Widget build(BuildContext context) {
     final baseColor = switch (widget.colorStyle) {
-      GridLoaderColorStyle.themePrimary => context.colors.brand6,
-      GridLoaderColorStyle.white => context.colors.fill1,
-      GridLoaderColorStyle.custom => widget.color ?? context.colors.brand6,
+      GridLoaderColorStyle.themePrimary => context.colorScheme.primary,
+      GridLoaderColorStyle.white => AsterColors.white,
+      GridLoaderColorStyle.custom =>
+        widget.color ?? context.colorScheme.primary,
     };
 
     final squareSize = widget.squareSize ?? _squareSizeFor(widget.size);

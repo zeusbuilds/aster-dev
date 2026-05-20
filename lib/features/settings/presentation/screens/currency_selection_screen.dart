@@ -60,14 +60,18 @@ class _CurrencySelectionScreenState extends State<CurrencySelectionScreen> {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
-    final colors = context.colors;
+    final colors = context.appColors;
     final textTheme = context.textTheme;
 
     return Scaffold(
-      backgroundColor: colors.fill1,
+      backgroundColor: context.colorScheme.surface,
       appBar: const CustomAppBar(title: 'Select Currency', leadingIcon: true),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: colors.brand6))
+          ? Center(
+              child: CircularProgressIndicator(
+                color: context.colorScheme.primary,
+              ),
+            )
           : _error != null
           ? Center(
               child: Column(
@@ -75,9 +79,11 @@ class _CurrencySelectionScreenState extends State<CurrencySelectionScreen> {
                 children: [
                   Text(
                     'Error loading currencies',
-                    style: textTheme.bodyMedium?.copyWith(color: colors.text2),
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: colors.textSecondary,
+                    ),
                   ),
-                  SizedBox(height: spacing.spacing16),
+                  SizedBox(height: spacing.lg),
                   CustomButton(text: 'Retry', onTap: _loadCurrencies),
                 ],
               ),
@@ -87,13 +93,15 @@ class _CurrencySelectionScreenState extends State<CurrencySelectionScreen> {
               thumbVisibility: false,
               child: ListView.separated(
                 controller: _scrollController,
-                padding: EdgeInsets.only(bottom: spacing.bottomSafeHeightRaw),
+                padding: EdgeInsets.only(
+                  bottom: spacing.bottomSafeRaw(context),
+                ),
                 itemCount: _currencies.length,
                 separatorBuilder: (context, index) => Divider(
-                  color: colors.fill2,
+                  color: colors.surfaceSubtle,
                   height: 1,
                   thickness: 1,
-                  indent: spacing.spacing20,
+                  indent: spacing.screenPadding,
                 ),
                 itemBuilder: (context, index) {
                   final currency = _currencies[index];

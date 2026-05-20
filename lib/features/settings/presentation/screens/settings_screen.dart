@@ -18,22 +18,22 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final spacing = context.spacing;
-    final colors = context.colors;
+    final colors = context.appColors;
     final textTheme = context.textTheme;
     final walletState = ref.watch(walletViewModelProvider);
     final activeWallet = walletState.activeWallet;
 
     return Scaffold(
-      backgroundColor: colors.fill1,
+      backgroundColor: context.colorScheme.surface,
       appBar: CustomAppBar(title: 'Settings'),
       body: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(horizontal: spacing.spacing20),
+        padding: EdgeInsets.symmetric(horizontal: spacing.screenPadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             /// Multiple wallets section
             Squircle(
-              padding: EdgeInsets.symmetric(vertical: spacing.spacing4),
+              padding: EdgeInsets.symmetric(vertical: spacing.xs),
               child: Column(
                 children: [
                   SettingsOptionRow(
@@ -45,20 +45,20 @@ class SettingsScreen extends ConsumerWidget {
                 ],
               ),
             ),
-            SizedBox(height: spacing.spacing24),
+            SizedBox(height: spacing.xxl),
 
             /// Wallet section
             Text(
               'Wallet',
               style: textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w600,
-                color: colors.text1,
+                color: context.colorScheme.onSurface,
                 letterSpacing: 0.2,
               ),
             ),
-            SizedBox(height: spacing.spacing12),
+            SizedBox(height: spacing.md),
             Squircle(
-              padding: EdgeInsets.symmetric(vertical: spacing.spacing4),
+              padding: EdgeInsets.symmetric(vertical: spacing.xs),
               child: Column(
                 children: [
                   SettingsOptionRow(
@@ -74,10 +74,10 @@ class SettingsScreen extends ConsumerWidget {
                     },
                   ),
                   Divider(
-                    color: colors.fill2,
+                    color: colors.surfaceSubtle,
                     height: 1,
                     thickness: 1,
-                    indent: spacing.spacing20,
+                    indent: spacing.screenPadding,
                   ),
                   SettingsOptionRow(
                     title: 'Manage assets',
@@ -91,10 +91,10 @@ class SettingsScreen extends ConsumerWidget {
                     },
                   ),
                   Divider(
-                    color: colors.fill2,
+                    color: colors.surfaceSubtle,
                     height: 1,
                     thickness: 1,
-                    indent: spacing.spacing20,
+                    indent: spacing.screenPadding,
                   ),
                   SettingsOptionRow(
                     title: 'Advanced',
@@ -110,20 +110,20 @@ class SettingsScreen extends ConsumerWidget {
                 ],
               ),
             ),
-            SizedBox(height: spacing.spacing24),
+            SizedBox(height: spacing.xxl),
 
             /// App settings section
             Text(
               'App',
               style: textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w600,
-                color: colors.text1,
+                color: context.colorScheme.onSurface,
                 letterSpacing: 0.2,
               ),
             ),
-            SizedBox(height: spacing.spacing12),
+            SizedBox(height: spacing.md),
             Squircle(
-              padding: EdgeInsets.symmetric(vertical: spacing.spacing4),
+              padding: EdgeInsets.symmetric(vertical: spacing.xs),
               child: Column(
                 children: [
                   // SettingsOptionRow(
@@ -132,10 +132,10 @@ class SettingsScreen extends ConsumerWidget {
                   //   prefixIcon: MingCuteIcons.mgc_moon_line,
                   // ),
                   // Divider(
-                  //   color: colors.fill2,
+                  //   color: colors.surfaceSubtle,
                   //   height: 1,
                   //   thickness: 1,
-                  //   indent: spacing.spacing20,
+                  //   indent: spacing.screenPadding,
                   // ),
                   SettingsOptionRow(
                     title: 'Currency',
@@ -145,10 +145,10 @@ class SettingsScreen extends ConsumerWidget {
                         context.pushNamed(RouteNames.currencySelection),
                   ),
                   Divider(
-                    color: colors.fill2,
+                    color: colors.surfaceSubtle,
                     height: 1,
                     thickness: 1,
-                    indent: spacing.spacing20,
+                    indent: spacing.screenPadding,
                   ),
                   SettingsOptionRow(
                     title: 'Language',
@@ -156,10 +156,10 @@ class SettingsScreen extends ConsumerWidget {
                     prefixIcon: MingCuteIcons.mgc_translate_2_line,
                   ),
                   Divider(
-                    color: colors.fill2,
+                    color: colors.surfaceSubtle,
                     height: 1,
                     thickness: 1,
-                    indent: spacing.spacing20,
+                    indent: spacing.screenPadding,
                   ),
                   SettingsOptionRow(
                     title: 'Region',
@@ -168,10 +168,10 @@ class SettingsScreen extends ConsumerWidget {
                     onTap: () => context.pushNamed(RouteNames.countrySelection),
                   ),
                   Divider(
-                    color: colors.fill2,
+                    color: colors.surfaceSubtle,
                     height: 1,
                     thickness: 1,
-                    indent: spacing.spacing20,
+                    indent: spacing.screenPadding,
                   ),
                   SettingsOptionRow(
                     title: 'Notifications',
@@ -181,20 +181,20 @@ class SettingsScreen extends ConsumerWidget {
                 ],
               ),
             ),
-            SizedBox(height: spacing.spacing24),
+            SizedBox(height: spacing.xxl),
 
             /// App settings section
             // Text(
             //   'Info',
             //   style: textTheme.bodyMedium?.copyWith(
             //     fontWeight: FontWeight.w600,
-            //     color: colors.text1,
+            //     color: context.colorScheme.onSurface,
             //     letterSpacing: 0.2,
             //   ),
             // ),
-            // SizedBox(height: spacing.spacing12),
+            // SizedBox(height: spacing.md),
             Squircle(
-              padding: EdgeInsets.symmetric(vertical: spacing.spacing4),
+              padding: EdgeInsets.symmetric(vertical: spacing.xs),
               child: Column(
                 children: [
                   SettingsOptionRow(
@@ -202,30 +202,30 @@ class SettingsScreen extends ConsumerWidget {
                     prefixIcon: MingCuteIcons.mgc_lifebuoy_line,
                   ),
                   Divider(
-                    color: colors.fill2,
+                    color: colors.surfaceSubtle,
                     height: 1,
                     thickness: 1,
-                    indent: spacing.spacing20,
+                    indent: spacing.screenPadding,
                   ),
                   SettingsOptionRow(
                     title: 'Terms of Service',
                     prefixIcon: MingCuteIcons.mgc_document_2_line,
                   ),
                   Divider(
-                    color: colors.fill2,
+                    color: colors.surfaceSubtle,
                     height: 1,
                     thickness: 1,
-                    indent: spacing.spacing20,
+                    indent: spacing.screenPadding,
                   ),
                   SettingsOptionRow(
                     title: 'Privacy Policy',
                     prefixIcon: MingCuteIcons.mgc_file_check_line,
                   ),
                   Divider(
-                    color: colors.fill2,
+                    color: colors.surfaceSubtle,
                     height: 1,
                     thickness: 1,
-                    indent: spacing.spacing20,
+                    indent: spacing.screenPadding,
                   ),
                   SettingsOptionRow(
                     title: 'Twitter',
@@ -233,10 +233,10 @@ class SettingsScreen extends ConsumerWidget {
                     onTap: () {},
                   ),
                   Divider(
-                    color: colors.fill2,
+                    color: colors.surfaceSubtle,
                     height: 1,
                     thickness: 1,
-                    indent: spacing.spacing20,
+                    indent: spacing.screenPadding,
                   ),
                   SettingsOptionRow(
                     title: 'Telegram',
@@ -244,10 +244,10 @@ class SettingsScreen extends ConsumerWidget {
                     onTap: () {},
                   ),
                   Divider(
-                    color: colors.fill2,
+                    color: colors.surfaceSubtle,
                     height: 1,
                     thickness: 1,
-                    indent: spacing.spacing20,
+                    indent: spacing.screenPadding,
                   ),
                   SettingsOptionRow(
                     title: 'Instagram',
@@ -257,24 +257,29 @@ class SettingsScreen extends ConsumerWidget {
                 ],
               ),
             ),
-            SizedBox(height: spacing.spacing32),
+            SizedBox(height: spacing.xxxl),
 
             /// Footer
             Center(
               child: SvgPicture.asset(
                 'assets/brand/aster-logo.svg',
-                width: spacing.spacing48,
-                colorFilter: ColorFilter.mode(colors.text1, BlendMode.srcIn),
+                width: spacing.huge,
+                colorFilter: ColorFilter.mode(
+                  context.colorScheme.onSurface,
+                  BlendMode.srcIn,
+                ),
               ),
             ),
-            SizedBox(height: spacing.spacing4),
+            SizedBox(height: spacing.xs),
             Center(
               child: Text(
                 'Aster • Version 1.0.0',
-                style: textTheme.bodySmall?.copyWith(color: colors.text3),
+                style: textTheme.bodySmall?.copyWith(
+                  color: colors.textTertiary,
+                ),
               ),
             ),
-            SizedBox(height: spacing.bottomSafeHeight + spacing.spacing44),
+            SizedBox(height: spacing.bottomSafe(context) + spacing.navOffset),
           ],
         ),
       ),

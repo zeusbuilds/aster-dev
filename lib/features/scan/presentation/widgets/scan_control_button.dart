@@ -12,14 +12,15 @@ class ScanControlButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
-    final colors = context.colors;
-
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: spacing.spacing26,
-        height: spacing.spacing26,
-        decoration: BoxDecoration(shape: BoxShape.circle, color: colors.fill6),
+        width: spacing.xxl,
+        height: spacing.xxl,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: AsterColors.black,
+        ),
         child: Center(child: child),
       ),
     );

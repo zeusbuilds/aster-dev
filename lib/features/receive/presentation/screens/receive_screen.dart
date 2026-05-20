@@ -23,12 +23,12 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
-    final colors = context.colors;
+    final colors = context.appColors;
     final textTheme = context.textTheme;
-    final radius = context.radius;
+    final radius = context.radii;
 
     return Scaffold(
-      backgroundColor: colors.fill1,
+      backgroundColor: context.colorScheme.surface,
       appBar: CustomAppBar(
         title: 'Receive Bitcoin',
         leadingIcon: true,
@@ -37,66 +37,68 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
       body: SafeArea(
         bottom: true,
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: spacing.spacing20),
+          padding: EdgeInsets.symmetric(horizontal: spacing.screenPadding),
           child: Column(
             children: [
               Squircle(
-                borderRadius: radius.radius28,
-                padding: EdgeInsets.all(spacing.spacing24),
+                borderRadius: radius.sheet,
+                padding: EdgeInsets.all(spacing.xxl),
                 child: Column(
                   children: [
                     Padding(
-                      padding: EdgeInsets.all(spacing.spacing24),
+                      padding: EdgeInsets.all(spacing.xxl),
                       child: PrettyQrView.data(
                         data: _address,
                         decoration: PrettyQrDecoration(
-                          shape: PrettyQrDotsSymbol(color: colors.text1),
+                          shape: PrettyQrDotsSymbol(
+                            color: context.colorScheme.onSurface,
+                          ),
                           image: PrettyQrDecorationImage(
                             image: const AssetImage(
                               'assets/icons/images/bitcoin.png',
                             ),
-                            padding: EdgeInsets.all(spacing.spacing16),
+                            padding: EdgeInsets.all(spacing.lg),
                           ),
                         ),
                       ),
                     ),
-                    SizedBox(height: spacing.spacing24),
+                    SizedBox(height: spacing.xxl),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Icon(
                           MingCuteIcons.mgc_copy_2_line,
-                          size: spacing.spacing20,
-                          color: colors.text1,
+                          size: spacing.screenPadding,
+                          color: context.colorScheme.onSurface,
                         ),
-                        SizedBox(width: spacing.spacing4),
+                        SizedBox(width: spacing.xs),
                         Expanded(
                           child: Text(
                             _address,
                             style: textTheme.bodySmall?.copyWith(
                               fontWeight: FontWeight.w500,
-                              color: colors.text1,
+                              color: context.colorScheme.onSurface,
                             ),
                             textAlign: TextAlign.center,
                           ),
                         ),
                       ],
                     ),
-                    SizedBox(height: spacing.spacing12),
+                    SizedBox(height: spacing.md),
                     Text(
                       'tap to copy',
                       style: textTheme.bodySmall?.copyWith(
                         fontWeight: FontWeight.w500,
-                        color: colors.text1,
+                        color: context.colorScheme.onSurface,
                       ),
                       textAlign: TextAlign.center,
                     ),
                   ],
                 ),
               ),
-              SizedBox(height: spacing.spacing24),
+              SizedBox(height: spacing.xxl),
               Squircle(
-                padding: EdgeInsets.symmetric(vertical: spacing.spacing4),
+                padding: EdgeInsets.symmetric(vertical: spacing.xs),
                 child: Column(
                   children: [
                     SettingsOptionRow(
@@ -104,30 +106,30 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                       prefixIcon: MingCuteIcons.mgc_edit_2_line,
                     ),
                     Divider(
-                      color: colors.fill2,
+                      color: colors.surfaceSubtle,
                       height: 1,
                       thickness: 1,
-                      indent: spacing.spacing20,
+                      indent: spacing.screenPadding,
                     ),
                     SettingsOptionRow(
                       title: 'Generate new address',
                       prefixIcon: MingCuteIcons.mgc_refresh_2_line,
                     ),
                     Divider(
-                      color: colors.fill2,
+                      color: colors.surfaceSubtle,
                       height: 1,
                       thickness: 1,
-                      indent: spacing.spacing20,
+                      indent: spacing.screenPadding,
                     ),
                     SettingsOptionRow(
                       title: 'Direct Peg In',
                       prefixIcon: MingCuteIcons.mgc_selector_vertical_line,
                     ),
                     Divider(
-                      color: colors.fill2,
+                      color: colors.surfaceSubtle,
                       height: 1,
                       thickness: 1,
-                      indent: spacing.spacing20,
+                      indent: spacing.screenPadding,
                     ),
                     SettingsOptionRow(
                       title: 'Share',

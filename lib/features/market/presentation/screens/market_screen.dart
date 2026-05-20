@@ -14,7 +14,7 @@ class MarketScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
+    final colors = context.appColors;
     final spacing = context.spacing;
 
     final tiles = [
@@ -22,8 +22,8 @@ class MarketScreen extends StatelessWidget {
         label: 'Buy',
         subtitle: 'Load wallet',
         icon: RemixIcons.shopping_bag_3_line,
-        gradientColors: [const Color(0xFFE89B6B), const Color(0xFFD47A4A)],
-        shadowColor: const Color(0x26D47A4A),
+        gradientColors: colors.marketBuyGradient,
+        shadowColor: colors.bitcoin.withValues(alpha: 0.16),
         tipText: 'From 0.1% fee',
         onTap: () {
           // TODO: Navigate to buy screen
@@ -33,8 +33,8 @@ class MarketScreen extends StatelessWidget {
         label: 'Sell',
         subtitle: 'Unload wallet',
         icon: RemixIcons.shopping_cart_line,
-        gradientColors: [const Color(0xFF6BA8E8), const Color(0xFF4A88C8)],
-        shadowColor: const Color(0x264A88C8),
+        gradientColors: colors.marketSellGradient,
+        shadowColor: colors.brandArtBright.withValues(alpha: 0.16),
         tipText: 'Instant payout',
         onTap: () {
           // TODO: Navigate to sell screen
@@ -44,10 +44,8 @@ class MarketScreen extends StatelessWidget {
         label: 'Swap',
         subtitle: 'Exchange assets',
         icon: RemixIcons.token_swap_line,
-        gradientColors: [
-          Color.fromARGB(255, 105, 105, 105),
-          Color.fromARGB(255, 105, 105, 105),
-        ],
+        gradientColors: colors.marketSwapGradient,
+        shadowColor: colors.overlay.withValues(alpha: 0.16),
         tipText: 'Best rate',
         onTap: () {
           context.push(RoutePaths.swap);
@@ -57,8 +55,8 @@ class MarketScreen extends StatelessWidget {
         label: 'Lend',
         subtitle: 'Earn interest',
         icon: RemixIcons.bank_line,
-        gradientColors: [const Color(0xFF7B8FA8), const Color(0xFF5A6B82)],
-        shadowColor: const Color(0x265A6B82),
+        gradientColors: colors.marketLendGradient,
+        shadowColor: colors.brandArtDeep.withValues(alpha: 0.16),
         tipText: '12.4% APY',
         onTap: () {
           // TODO: Navigate to lend screen
@@ -68,8 +66,8 @@ class MarketScreen extends StatelessWidget {
         label: 'Send',
         subtitle: 'Send bitcoin',
         icon: RemixIcons.arrow_right_up_line,
-        gradientColors: [const Color(0xFF9B7BB8), const Color(0xFF7A5A96)],
-        shadowColor: const Color(0x267A5A96),
+        gradientColors: colors.marketSendGradient,
+        shadowColor: colors.danger.withValues(alpha: 0.16),
         tipText: '~10 min confirmations',
         onTap: () {
           context.push(RoutePaths.sendAddress);
@@ -79,8 +77,8 @@ class MarketScreen extends StatelessWidget {
         label: 'Receive',
         subtitle: 'Receive bitcoin',
         icon: RemixIcons.arrow_right_down_line,
-        gradientColors: [const Color(0xFF5BB89A), const Color(0xFF3D9678)],
-        shadowColor: const Color(0x263D9678),
+        gradientColors: colors.marketReceiveGradient,
+        shadowColor: colors.success.withValues(alpha: 0.16),
         tipText: 'Free & instant',
         onTap: () {
           context.push(RoutePaths.receive);
@@ -89,18 +87,18 @@ class MarketScreen extends StatelessWidget {
     ];
 
     return Scaffold(
-      backgroundColor: colors.fill1,
+      backgroundColor: context.colorScheme.surface,
       appBar: const CustomAppBar(title: 'Market'),
       body: ListView.builder(
         padding: EdgeInsets.only(
-          left: spacing.spacing20,
-          right: spacing.spacing20,
-          bottom: spacing.bottomSafeHeight + spacing.spacing44,
+          left: spacing.screenPadding,
+          right: spacing.screenPadding,
+          bottom: spacing.bottomSafe(context) + spacing.navOffset,
         ),
         itemCount: tiles.length,
         itemBuilder: (context, index) {
           return Padding(
-            padding: EdgeInsets.only(bottom: spacing.spacing12),
+            padding: EdgeInsets.only(bottom: spacing.md),
             child: tiles[index],
           );
         },

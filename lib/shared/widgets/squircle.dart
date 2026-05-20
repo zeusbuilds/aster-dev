@@ -32,18 +32,16 @@ class Squircle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
-    final radius = context.radius;
+    final colors = context.appColors;
+    final radius = context.radii;
     final spacing = context.spacing;
-    final effectiveBorderColor = borderColor ?? colors.border2;
-    final effectiveColor = color ?? Colors.transparent;
+    final effectiveBorderColor = borderColor ?? colors.borderSubtle;
+    final effectiveColor = color ?? AsterColors.transparent;
     final effectiveBorderRadius =
         border ??
-        BorderRadius.circular(
-          borderRadius == 24 ? radius.radius24 : borderRadius,
-        );
+        BorderRadius.circular(borderRadius == 24 ? radius.card : borderRadius);
     final effectivePadding = padding == const EdgeInsets.all(8.0)
-        ? EdgeInsets.all(spacing.spacing8)
+        ? EdgeInsets.all(spacing.sm)
         : padding;
 
     return ClipRSuperellipse(

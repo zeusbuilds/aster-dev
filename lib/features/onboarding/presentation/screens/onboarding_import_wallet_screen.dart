@@ -97,7 +97,6 @@ class _ImportWalletContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
-    final colors = context.colors;
     final textTheme = context.textTheme;
 
     return Column(
@@ -106,34 +105,34 @@ class _ImportWalletContent extends StatelessWidget {
       children: [
         Padding(
           padding: EdgeInsets.fromLTRB(
-            spacing.spacing24,
-            spacing.spacing24,
-            spacing.spacing24,
+            spacing.xxl,
+            spacing.xxl,
+            spacing.xxl,
             0,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const OnboardingWelcomeHeader(),
-              SizedBox(height: spacing.spacing40),
+              SizedBox(height: spacing.iconXl),
               Text(
                 'Import with recovery phrase',
                 style: textTheme.displaySmall?.copyWith(
-                  color: colors.text5,
+                  color: AsterColors.white,
                   fontWeight: FontWeight.w600,
                   height: 1.1,
                 ),
               ),
-              SizedBox(height: spacing.spacing12),
+              SizedBox(height: spacing.md),
               Text(
                 'Enter your 12-word recovery phrase in order. '
                 'Each word goes in its own field.',
                 style: textTheme.bodyLarge?.copyWith(
-                  color: colors.text5.withValues(alpha: 0.9),
+                  color: AsterColors.white.withValues(alpha: 0.9),
                   height: 1.4,
                 ),
               ),
-              SizedBox(height: spacing.spacing36),
+              SizedBox(height: spacing.iconLg),
             ],
           ),
         ),
@@ -155,24 +154,24 @@ class _ImportWalletContent extends StatelessWidget {
             },
           ),
         ),
-        SizedBox(height: spacing.spacing16),
+        SizedBox(height: spacing.lg),
         Center(
           child: SmoothPageIndicator(
             controller: pageController,
             count: 3,
             effect: ExpandingDotsEffect(
-              activeDotColor: colors.text5,
-              dotColor: colors.text5.withValues(alpha: 0.35),
-              dotHeight: spacing.spacing6,
-              dotWidth: spacing.spacing6,
+              activeDotColor: AsterColors.white,
+              dotColor: AsterColors.white.withValues(alpha: 0.35),
+              dotHeight: spacing.sm,
+              dotWidth: spacing.sm,
               expansionFactor: 4,
-              spacing: spacing.spacing6,
+              spacing: spacing.sm,
             ),
           ),
         ),
-        SizedBox(height: spacing.spacing16),
+        SizedBox(height: spacing.lg),
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: spacing.spacing24),
+          padding: EdgeInsets.symmetric(horizontal: spacing.xxl),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -180,11 +179,11 @@ class _ImportWalletContent extends StatelessWidget {
                 child: Text(
                   'Never share your recovery phrase with anyone',
                   style: textTheme.bodyMedium?.copyWith(
-                    color: colors.text5.withValues(alpha: 0.7),
+                    color: AsterColors.white.withValues(alpha: 0.7),
                   ),
                 ),
               ),
-              SizedBox(height: spacing.spacing36),
+              SizedBox(height: spacing.iconLg),
               CustomButton(
                 text: 'Continue',
                 variant: ButtonVariant.translucent,
@@ -192,24 +191,24 @@ class _ImportWalletContent extends StatelessWidget {
                   // TODO: Import wallet flow.
                 },
               ),
-              SizedBox(height: spacing.spacing12),
+              SizedBox(height: spacing.md),
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => context.pop(),
                 child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: spacing.spacing4),
+                  padding: EdgeInsets.symmetric(vertical: spacing.xs),
                   child: Center(
                     child: Text(
                       'Back',
                       style: textTheme.bodyLarge?.copyWith(
-                        color: colors.text5.withValues(alpha: 0.9),
+                        color: AsterColors.white.withValues(alpha: 0.9),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
                 ),
               ),
-              SizedBox(height: spacing.spacing24),
+              SizedBox(height: spacing.xxl),
             ],
           ),
         ),

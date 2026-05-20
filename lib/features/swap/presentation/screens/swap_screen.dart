@@ -164,11 +164,11 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
-    final colors = context.colors;
+    final colors = context.appColors;
     final textTheme = context.textTheme;
 
     return Scaffold(
-      backgroundColor: colors.fill1,
+      backgroundColor: context.colorScheme.surface,
       appBar: CustomAppBar(
         title: 'Swap',
         leadingIcon: true,
@@ -184,14 +184,14 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
                   child: SingleChildScrollView(
                     child: Padding(
                       padding: EdgeInsets.symmetric(
-                        horizontal: spacing.spacing20,
+                        horizontal: spacing.screenPadding,
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.start,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           SwapCard(),
-                          SizedBox(height: spacing.spacing28),
+                          SizedBox(height: spacing.xxxl),
                           Column(
                             children: [
                               DetailRow(
@@ -200,7 +200,7 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
                                 value: '99.90%',
                               ),
                               if (_showDetails) ...[
-                                SizedBox(height: spacing.spacing12),
+                                SizedBox(height: spacing.md),
                                 ...List.generate(
                                   _detailRows.length,
                                   (index) => AnimatedBuilder(
@@ -231,7 +231,7 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
                                     },
                                     child: Padding(
                                       padding: EdgeInsets.only(
-                                        top: index > 0 ? spacing.spacing12 : 0,
+                                        top: index > 0 ? spacing.md : 0,
                                       ),
                                       child: DetailRow(
                                         title: _detailRows[index]['title']!,
@@ -243,14 +243,16 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
                               ],
                             ],
                           ),
-                          SizedBox(height: spacing.spacing18),
+                          SizedBox(height: spacing.xl),
                         ],
                       ),
                     ),
                   ),
                 ),
                 Padding(
-                  padding: EdgeInsets.symmetric(horizontal: spacing.spacing20),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: spacing.screenPadding,
+                  ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -268,23 +270,23 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
                                 key: const ValueKey('keyboard'),
                                 buttonWidth:
                                     (MediaQuery.of(context).size.width -
-                                        spacing.spacing20 * 2 -
+                                        spacing.screenPadding * 2 -
                                         80) /
                                     3,
                                 buttonHeight: 60,
-                                rowSpacing: spacing.spacing8,
-                                columnSpacing: spacing.spacing8,
-                                buttonColor: colors.fill2,
+                                rowSpacing: spacing.sm,
+                                columnSpacing: spacing.sm,
+                                buttonColor: colors.surfaceSubtle,
                                 buttonTextStyle: textTheme.headlineSmall!
                                     .copyWith(
                                       fontWeight: FontWeight.w600,
-                                      color: colors.text1,
+                                      color: context.colorScheme.onSurface,
                                     )
                                     .toNumeric(context),
                               )
                             : const SizedBox.shrink(key: ValueKey('empty')),
                       ),
-                      SizedBox(height: spacing.spacing18),
+                      SizedBox(height: spacing.xl),
                       CustomButton(text: 'Continue', onTap: _onContinueTap),
                       // Animated height for text space (text height ~20 + padding 12 = ~32)
                       AnimatedContainer(
@@ -303,15 +305,13 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
                                 child: GestureDetector(
                                   onTap: _onCancelTap,
                                   child: Padding(
-                                    padding: EdgeInsets.only(
-                                      top: spacing.spacing12,
-                                    ),
+                                    padding: EdgeInsets.only(top: spacing.md),
                                     child: Center(
                                       child: Text(
                                         'cancel',
                                         style: textTheme.bodyMedium?.copyWith(
                                           fontWeight: FontWeight.w500,
-                                          color: colors.text1,
+                                          color: context.colorScheme.onSurface,
                                         ),
                                       ),
                                     ),

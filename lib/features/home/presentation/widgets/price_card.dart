@@ -76,7 +76,7 @@ class _PriceCardState extends State<PriceCard> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
+    final colors = context.appColors;
     final spacing = context.spacing;
     final textTheme = context.textTheme;
 
@@ -85,8 +85,8 @@ class _PriceCardState extends State<PriceCard> {
       children: [
         Padding(
           padding: EdgeInsets.symmetric(
-            vertical: spacing.spacing16,
-            horizontal: spacing.spacing16,
+            vertical: spacing.lg,
+            horizontal: spacing.lg,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -97,21 +97,21 @@ class _PriceCardState extends State<PriceCard> {
                 children: [
                   Container(
                     decoration: BoxDecoration(
-                      color: colors.fill1,
+                      color: context.colorScheme.surface,
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
                       UniconsLine.bitcoin,
-                      size: spacing.spacing32,
-                      color: Colors.orange.withValues(alpha: 0.8),
+                      size: spacing.xxxl,
+                      color: colors.bitcoin.withValues(alpha: 0.8),
                     ),
                   ),
-                  SizedBox(width: spacing.spacing4),
+                  SizedBox(width: spacing.xs),
                   Text(
                     'Bitcoin Price',
                     style: textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w500,
-                      color: colors.text5,
+                      color: AsterColors.white,
                     ),
                   ),
                   const Spacer(),
@@ -120,7 +120,7 @@ class _PriceCardState extends State<PriceCard> {
                     style: textTheme.displayMedium
                         ?.copyWith(
                           fontWeight: FontWeight.w500,
-                          color: colors.text5,
+                          color: AsterColors.white,
                           fontSize: 40,
                           height: 0.85,
                         )
@@ -132,25 +132,25 @@ class _PriceCardState extends State<PriceCard> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   _priceChange == null
-                      ? SizedBox(height: spacing.spacing14)
+                      ? SizedBox(height: spacing.md)
                       : Icon(
                           (_priceChange ?? 0) >= 0
                               ? RemixIcons.arrow_up_line
                               : RemixIcons.arrow_down_line,
-                          size: spacing.spacing14,
+                          size: spacing.md,
                           color: (_priceChange ?? 0) >= 0
-                              ? colors.success6
-                              : colors.danger6,
+                              ? colors.success
+                              : colors.danger,
                         ),
-                  SizedBox(width: spacing.spacing2),
+                  SizedBox(width: spacing.xxs),
                   Text(
                     _formatPriceChange(_priceChange),
                     style: textTheme.labelLarge
                         ?.copyWith(
                           fontWeight: FontWeight.w600,
                           color: (_priceChange ?? 0) >= 0
-                              ? colors.success6
-                              : colors.danger6,
+                              ? colors.success
+                              : colors.danger,
                         )
                         .toNumeric(context),
                   ),

@@ -15,7 +15,7 @@ class WalletSelectionScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final colors = context.colors;
+    final colors = context.appColors;
     final spacing = context.spacing;
     final walletState = ref.watch(walletViewModelProvider);
     final viewModel = ref.read(walletViewModelProvider.notifier);
@@ -23,7 +23,7 @@ class WalletSelectionScreen extends ConsumerWidget {
     // Loading state
     if (walletState.isLoading) {
       return Scaffold(
-        backgroundColor: colors.fill1,
+        backgroundColor: context.colorScheme.surface,
         appBar: const CustomAppBar(title: 'Select Wallet', leadingIcon: true),
         body: const Center(child: CircularProgressIndicator()),
       );
@@ -32,23 +32,23 @@ class WalletSelectionScreen extends ConsumerWidget {
     // Error state
     if (walletState.errorMessage != null) {
       return Scaffold(
-        backgroundColor: colors.fill1,
+        backgroundColor: context.colorScheme.surface,
         appBar: const CustomAppBar(title: 'Select Wallet', leadingIcon: true),
         body: Center(child: Text('Error: ${walletState.errorMessage}')),
       );
     }
 
     return Scaffold(
-      backgroundColor: colors.fill1,
+      backgroundColor: context.colorScheme.surface,
       appBar: const CustomAppBar(title: 'Select Wallet', leadingIcon: true),
       body: ListView.separated(
-        padding: EdgeInsets.only(bottom: spacing.bottomSafeHeightRaw),
+        padding: EdgeInsets.only(bottom: spacing.bottomSafeRaw(context)),
         itemCount: walletState.wallets.length,
         separatorBuilder: (context, index) => Divider(
-          color: colors.fill2,
+          color: colors.surfaceSubtle,
           height: 1,
           thickness: 1,
-          indent: spacing.spacing20,
+          indent: spacing.screenPadding,
         ),
         itemBuilder: (context, index) {
           final wallet = walletState.wallets[index];

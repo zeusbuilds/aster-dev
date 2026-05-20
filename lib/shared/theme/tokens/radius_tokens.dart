@@ -1,35 +1,74 @@
-import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:flutter/material.dart';
 
-part 'radius_tokens.freezed.dart';
+@immutable
+class AsterRadii extends ThemeExtension<AsterRadii> {
+  const AsterRadii({
+    this.none = 0,
+    this.xs = 4,
+    this.sm = 8,
+    this.md = 12,
+    this.lg = 16,
+    this.xl = 20,
+    this.xxl = 24,
+    this.sheet = 28,
+    this.pill = 999,
+  });
 
-/// Shape tokens configuration
-@freezed
-class RadiusTokens with _$RadiusTokens {
-  const factory RadiusTokens({
-    @Default(2.0) double radius2,
-    @Default(4.0) double radius4,
-    @Default(6.0) double radius6,
-    @Default(8.0) double radius8,
-    @Default(10.0) double radius10,
-    @Default(12.0) double radius12,
-    @Default(14.0) double radius14,
-    @Default(16.0) double radius16,
-    @Default(18.0) double radius18,
-    @Default(20.0) double radius20,
-    @Default(22.0) double radius22,
-    @Default(24.0) double radius24,
-    @Default(26.0) double radius26,
-    @Default(28.0) double radius28,
-    @Default(30.0) double radius30,
-    @Default(32.0) double radius32,
-    @Default(34.0) double radius34,
-    @Default(36.0) double radius36,
-    @Default(38.0) double radius38,
-    @Default(40.0) double radius40,
-    @Default(42.0) double radius42,
-    @Default(44.0) double radius44,
-    @Default(46.0) double radius46,
-    @Default(48.0) double radius48,
-    @Default(50.0) double radius50,
-  }) = _RadiusTokens;
+  final double none;
+  final double xs;
+  final double sm;
+  final double md;
+  final double lg;
+  final double xl;
+  final double xxl;
+  final double sheet;
+  final double pill;
+
+  double get card => xxl;
+  double get button => 18;
+  double get input => md;
+  double get badge => sm;
+
+  @override
+  AsterRadii copyWith({
+    double? none,
+    double? xs,
+    double? sm,
+    double? md,
+    double? lg,
+    double? xl,
+    double? xxl,
+    double? sheet,
+    double? pill,
+  }) {
+    return AsterRadii(
+      none: none ?? this.none,
+      xs: xs ?? this.xs,
+      sm: sm ?? this.sm,
+      md: md ?? this.md,
+      lg: lg ?? this.lg,
+      xl: xl ?? this.xl,
+      xxl: xxl ?? this.xxl,
+      sheet: sheet ?? this.sheet,
+      pill: pill ?? this.pill,
+    );
+  }
+
+  @override
+  AsterRadii lerp(ThemeExtension<AsterRadii>? other, double t) {
+    if (other is! AsterRadii) return this;
+    return AsterRadii(
+      none: _lerp(none, other.none, t),
+      xs: _lerp(xs, other.xs, t),
+      sm: _lerp(sm, other.sm, t),
+      md: _lerp(md, other.md, t),
+      lg: _lerp(lg, other.lg, t),
+      xl: _lerp(xl, other.xl, t),
+      xxl: _lerp(xxl, other.xxl, t),
+      sheet: _lerp(sheet, other.sheet, t),
+      pill: _lerp(pill, other.pill, t),
+    );
+  }
+
+  static double _lerp(double a, double b, double t) => a + (b - a) * t;
 }

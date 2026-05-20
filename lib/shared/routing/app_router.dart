@@ -5,6 +5,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'route_config.dart';
 import 'route_paths.dart';
+import '../theme/theme.dart';
 
 part 'app_router.g.dart';
 
@@ -31,27 +32,34 @@ class ErrorScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final spacing = context.spacing;
+    final colors = context.appColors;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Error')),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 64, color: Colors.red),
-            const SizedBox(height: 16),
+            Icon(
+              Icons.error_outline,
+              size: spacing.giant,
+              color: colors.danger,
+            ),
+            SizedBox(height: spacing.lg),
             Text(
               'Route Error',
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             if (error != null) ...[
-              const SizedBox(height: 8),
+              SizedBox(height: spacing.sm),
               Text(
                 error.toString(),
                 style: Theme.of(context).textTheme.bodyMedium,
                 textAlign: TextAlign.center,
               ),
             ],
-            const SizedBox(height: 24),
+            SizedBox(height: spacing.xxl),
             ElevatedButton(
               onPressed: () => context.go(RoutePaths.splash),
               child: const Text('Go to Home'),

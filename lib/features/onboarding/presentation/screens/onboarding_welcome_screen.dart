@@ -30,36 +30,35 @@ class _OnboardingContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
-    final colors = context.colors;
     final textTheme = context.textTheme;
 
     return Padding(
       padding: EdgeInsets.symmetric(
-        horizontal: spacing.spacing24,
-        vertical: spacing.spacing24,
+        horizontal: spacing.xxl,
+        vertical: spacing.xxl,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const OnboardingWelcomeHeader(),
-          SizedBox(height: spacing.spacing40),
+          SizedBox(height: spacing.iconXl),
           const OnboardingWelcomeIconGrid(),
-          SizedBox(height: spacing.spacing36),
+          SizedBox(height: spacing.iconLg),
           Text(
             'Built on\norchestration, not\nguesswork.',
             style: textTheme.displaySmall?.copyWith(
-              color: colors.text5,
+              color: AsterColors.white,
               fontWeight: FontWeight.w600,
               height: 1.1,
             ),
           ),
-          SizedBox(height: spacing.spacing12),
+          SizedBox(height: spacing.md),
           Text(
             'Responses are compared, adjusted, and\n'
             'optimized to reduce noise and improve\n'
             'clarity.',
             style: textTheme.bodyLarge?.copyWith(
-              color: colors.text5.withValues(alpha: 0.9),
+              color: AsterColors.white.withValues(alpha: 0.9),
               height: 1.4,
             ),
           ),
@@ -74,17 +73,17 @@ class _OnboardingContent extends StatelessWidget {
                   // TODO: Create wallet flow.
                 },
               ),
-              SizedBox(height: spacing.spacing12),
+              SizedBox(height: spacing.md),
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => context.push(RoutePaths.onboardingImportWallet),
                 child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: spacing.spacing4),
+                  padding: EdgeInsets.symmetric(vertical: spacing.xs),
                   child: Center(
                     child: Text(
                       'Import Wallet',
                       style: textTheme.bodyLarge?.copyWith(
-                        color: colors.text5.withValues(alpha: 0.9),
+                        color: AsterColors.white.withValues(alpha: 0.9),
                         fontWeight: FontWeight.w600,
                       ),
                     ),

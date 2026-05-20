@@ -13,27 +13,27 @@ class TransactionListScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
+    final colors = context.appColors;
     final spacing = context.spacing;
     final textTheme = context.textTheme;
 
     return Scaffold(
-      backgroundColor: colors.fill1,
+      backgroundColor: context.colorScheme.surface,
       appBar: CustomAppBar(
         title: 'Bitcoin Transactions',
         leadingIcon: true,
         centerTitle: false,
       ),
       body: Padding(
-        padding: EdgeInsets.symmetric(horizontal: spacing.spacing20),
+        padding: EdgeInsets.symmetric(horizontal: spacing.screenPadding),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Squircle(
               padding: EdgeInsets.symmetric(
-                vertical: spacing.spacing16,
-                horizontal: spacing.spacing16,
+                vertical: spacing.lg,
+                horizontal: spacing.lg,
               ),
               child: Row(
                 children: [
@@ -44,7 +44,7 @@ class TransactionListScreen extends StatelessWidget {
                         'Balance',
                         style: textTheme.bodyLarge?.copyWith(
                           fontWeight: FontWeight.w500,
-                          color: colors.text3,
+                          color: colors.textTertiary,
                         ),
                       ),
                       RichText(
@@ -55,7 +55,7 @@ class TransactionListScreen extends StatelessWidget {
                               style: textTheme.bodyLarge
                                   ?.copyWith(
                                     fontWeight: FontWeight.w600,
-                                    color: colors.text1,
+                                    color: context.colorScheme.onSurface,
                                   )
                                   .toNumeric(context),
                             ),
@@ -63,7 +63,7 @@ class TransactionListScreen extends StatelessWidget {
                               text: ' BTC',
                               style: textTheme.bodyLarge?.copyWith(
                                 fontWeight: FontWeight.w600,
-                                color: colors.text1,
+                                color: context.colorScheme.onSurface,
                               ),
                             ),
                           ],
@@ -74,7 +74,7 @@ class TransactionListScreen extends StatelessWidget {
                         style: textTheme.bodyMedium
                             ?.copyWith(
                               fontWeight: FontWeight.w400,
-                              color: colors.text3,
+                              color: colors.textTertiary,
                             )
                             .toNumeric(context),
                       ),
@@ -83,64 +83,64 @@ class TransactionListScreen extends StatelessWidget {
                   const Spacer(),
                   Icon(
                     RemixIcons.bit_coin_fill,
-                    size: spacing.spacing44,
-                    color: Colors.orange,
+                    size: spacing.navOffset,
+                    color: colors.bitcoin,
                   ),
                 ],
               ),
             ),
-            SizedBox(height: spacing.spacing16),
+            SizedBox(height: spacing.lg),
             Text(
               'Today',
               style: textTheme.bodyLarge?.copyWith(
                 fontWeight: FontWeight.w500,
-                color: colors.text3,
+                color: colors.textTertiary,
               ),
             ),
-            SizedBox(height: spacing.spacing16),
+            SizedBox(height: spacing.lg),
             const TransactionItem(
               type: 'Sent',
               amount: '-100',
               time: '12:30 PM',
               icon: RemixIcons.arrow_right_up_line,
             ),
-            SizedBox(height: spacing.spacing16),
+            SizedBox(height: spacing.lg),
             const TransactionItem(
               type: 'Received',
               amount: '+100',
               time: '12:30 PM',
               icon: RemixIcons.arrow_right_down_line,
             ),
-            SizedBox(height: spacing.spacing16),
+            SizedBox(height: spacing.lg),
             const TransactionItem(
               type: 'Swap',
               amount: '100',
               time: '12:30 PM',
               icon: RemixIcons.exchange_line,
             ),
-            SizedBox(height: spacing.spacing16),
+            SizedBox(height: spacing.lg),
             Text(
               'Yesterday',
               style: textTheme.bodyLarge?.copyWith(
                 fontWeight: FontWeight.w500,
-                color: colors.text3,
+                color: colors.textTertiary,
               ),
             ),
-            SizedBox(height: spacing.spacing16),
+            SizedBox(height: spacing.lg),
             const TransactionItem(
               type: 'Sent',
               amount: '-100',
               time: '12:30 PM',
               icon: RemixIcons.arrow_right_up_line,
             ),
-            SizedBox(height: spacing.spacing16),
+            SizedBox(height: spacing.lg),
             const TransactionItem(
               type: 'Received',
               amount: '+100',
               time: '12:30 PM',
               icon: RemixIcons.arrow_right_down_line,
             ),
-            SizedBox(height: spacing.spacing16),
+            SizedBox(height: spacing.lg),
             const TransactionItem(
               type: 'Swap',
               amount: '100',

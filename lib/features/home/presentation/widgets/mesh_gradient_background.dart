@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 
 import 'package:mesh/mesh.dart';
 
+import '../../../../shared/shared.dart';
+
 /// Background widget with animated mesh gradient effect
 ///
 /// Creates a blue gradient mesh with blur and noise texture overlay
@@ -12,6 +14,8 @@ class MeshGradientBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -20,8 +24,8 @@ class MeshGradientBackground extends StatelessWidget {
           mesh: OMeshRect(
             width: 5,
             height: 7,
-            fallbackColor: const Color(0xff000000),
-            backgroundColor: const Color(0xff8BD0FF),
+            fallbackColor: colors.brandArtDark,
+            backgroundColor: colors.brandArtSoft,
             vertices: [
               (-0.06, 0.0).v,
               (0.24, 0.0).v,
@@ -65,55 +69,55 @@ class MeshGradientBackground extends StatelessWidget {
               (0.93, 1.0).v,
               (1.07, 1.0).v, // Row 7 - Bottom (100%) - Light Blue
             ],
-            colors: const [
+            colors: [
               // Row 1 - Top (0%) - Black
-              Color(0xff000000),
-              Color(0xff000000),
-              Color(0xff000000),
-              Color(0xff000000),
-              Color(0xff000000),
+              colors.brandArtDark,
+              colors.brandArtDark,
+              colors.brandArtDark,
+              colors.brandArtDark,
+              colors.brandArtDark,
 
               // Row 2 - 12% - Black
-              Color(0xff000000),
-              Color(0xff000000),
-              Color(0xff000000),
-              Color(0xff000000),
-              Color(0xff000000),
+              colors.brandArtDark,
+              colors.brandArtDark,
+              colors.brandArtDark,
+              colors.brandArtDark,
+              colors.brandArtDark,
 
               // Row 3 - 35% - Dark Blue
-              Color(0xff000C79),
-              Color(0xff000C79),
-              Color(0xff000C79),
-              Color(0xff000C79),
-              Color(0xff000C79),
+              colors.brandArtDeep,
+              colors.brandArtDeep,
+              colors.brandArtDeep,
+              colors.brandArtDeep,
+              colors.brandArtDeep,
 
               // Row 4 - 50% - Bright Blue
-              Color(0xff001AFF),
-              Color(0xff001AFF),
-              Color(0xff001AFF),
-              Color(0xff001AFF),
-              Color(0xff001AFF),
+              colors.brandArtMain,
+              colors.brandArtMain,
+              colors.brandArtMain,
+              colors.brandArtMain,
+              colors.brandArtMain,
 
               // Row 5 - 65% - Lighter Blue
-              Color(0xff007BFF),
-              Color(0xff007BFF),
-              Color(0xff007BFF),
-              Color(0xff007BFF),
-              Color(0xff007BFF),
+              colors.brandArtBright,
+              colors.brandArtBright,
+              colors.brandArtBright,
+              colors.brandArtBright,
+              colors.brandArtBright,
 
               // Row 6 - 88% - Light Blue
-              Color(0xff8BD0FF),
-              Color(0xff8BD0FF),
-              Color(0xff8BD0FF),
-              Color(0xff8BD0FF),
-              Color(0xff8BD0FF),
+              colors.brandArtSoft,
+              colors.brandArtSoft,
+              colors.brandArtSoft,
+              colors.brandArtSoft,
+              colors.brandArtSoft,
 
               // Row 7 - Bottom (100%) - Light Blue
-              Color(0xff8BD0FF),
-              Color(0xff8BD0FF),
-              Color(0xff8BD0FF),
-              Color(0xff8BD0FF),
-              Color(0xff8BD0FF),
+              colors.brandArtSoft,
+              colors.brandArtSoft,
+              colors.brandArtSoft,
+              colors.brandArtSoft,
+              colors.brandArtSoft,
             ],
           ),
         ),
@@ -122,7 +126,7 @@ class MeshGradientBackground extends StatelessWidget {
         BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 20.0, sigmaY: 20.0),
           child: Container(
-            color: Colors.transparent, // Required to apply filter
+            color: AsterColors.transparent, // Required to apply filter
           ),
         ),
 
@@ -133,7 +137,7 @@ class MeshGradientBackground extends StatelessWidget {
             child: Image.asset(
               'assets/texture/noise.jpg',
               fit: BoxFit.cover,
-              color: Colors.black.withValues(alpha: 0.5),
+              color: AsterColors.black.withValues(alpha: 0.5),
               colorBlendMode: BlendMode.overlay,
             ),
           ),

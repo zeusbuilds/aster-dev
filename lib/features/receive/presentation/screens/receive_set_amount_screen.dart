@@ -14,11 +14,11 @@ class ReceiveSetAmountScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
-    final colors = context.colors;
+    final colors = context.appColors;
     final textTheme = context.textTheme;
 
     return Scaffold(
-      backgroundColor: colors.fill1,
+      backgroundColor: context.colorScheme.surface,
       appBar: CustomAppBar(
         title: 'Receive',
         leadingIcon: true,
@@ -27,7 +27,7 @@ class ReceiveSetAmountScreen extends StatelessWidget {
       body: SafeArea(
         bottom: true,
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: spacing.spacing20),
+          padding: EdgeInsets.symmetric(horizontal: spacing.screenPadding),
           child: Column(
             children: [
               ReceiveCard(
@@ -41,25 +41,25 @@ class ReceiveSetAmountScreen extends StatelessWidget {
                 key: const ValueKey('send-keyboard'),
                 buttonWidth:
                     (MediaQuery.of(context).size.width -
-                        spacing.spacing20 * 2 -
+                        spacing.screenPadding * 2 -
                         80) /
                     3,
                 buttonHeight: 60,
-                rowSpacing: spacing.spacing8,
-                columnSpacing: spacing.spacing8,
-                buttonColor: colors.fill2,
+                rowSpacing: spacing.sm,
+                columnSpacing: spacing.sm,
+                buttonColor: colors.surfaceSubtle,
                 buttonTextStyle:
                     textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w600,
-                      color: colors.text1,
+                      color: context.colorScheme.onSurface,
                     ) ??
                     TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w600,
-                      color: colors.text1,
+                      color: context.colorScheme.onSurface,
                     ),
               ),
-              SizedBox(height: spacing.spacing18),
+              SizedBox(height: spacing.xl),
               CustomButton(text: 'Continue', onTap: () {}),
             ],
           ),

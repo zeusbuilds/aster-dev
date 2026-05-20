@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'package:flutter_svg/svg.dart';
 
+import '../shared.dart';
+
 /// Splash screen with gradient background and centered logo
 ///
 /// Displays the app logo in the center with a gradient background
@@ -10,13 +12,15 @@ class SplashScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFF8BD6FF), Color(0xFF001AFF), Color(0xFF000000)],
+            colors: colors.splashGradient,
             stops: [0.0, 0.5, 1.0],
           ),
         ),
@@ -24,7 +28,10 @@ class SplashScreen extends StatelessWidget {
           child: SvgPicture.asset(
             'assets/brand/aster-logo.svg',
             width: 160,
-            colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+            colorFilter: const ColorFilter.mode(
+              AsterColors.white,
+              BlendMode.srcIn,
+            ),
           ),
         ),
       ),

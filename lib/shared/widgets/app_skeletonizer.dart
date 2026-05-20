@@ -43,13 +43,13 @@ class AppSkeletonizer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
+    final colors = context.appColors;
 
     return Skeletonizer(
       enabled: enabled,
       effect: ShimmerEffect(
-        baseColor: baseColor ?? colors.fill2,
-        highlightColor: highlightColor ?? colors.fill1,
+        baseColor: baseColor ?? colors.surfaceSubtle,
+        highlightColor: highlightColor ?? context.colorScheme.surface,
         duration: duration,
       ),
       child: child,

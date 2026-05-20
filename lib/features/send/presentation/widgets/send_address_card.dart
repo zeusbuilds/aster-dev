@@ -43,21 +43,21 @@ class _SendAddressCardState extends State<SendAddressCard> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
+    final colors = context.appColors;
     final spacing = context.spacing;
-    final radius = context.radius;
+    final radius = context.radii;
     final textTheme = context.textTheme;
 
     return Column(
       children: [
         Squircle(
           border: BorderRadius.only(
-            topLeft: Radius.circular(radius.radius24),
-            topRight: Radius.circular(radius.radius24),
+            topLeft: Radius.circular(radius.card),
+            topRight: Radius.circular(radius.card),
           ),
           padding: EdgeInsets.symmetric(
-            vertical: spacing.spacing16,
-            horizontal: spacing.spacing18,
+            vertical: spacing.lg,
+            horizontal: spacing.xl,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -65,16 +65,22 @@ class _SendAddressCardState extends State<SendAddressCard> {
               Text(
                 'Recipient Address',
                 style: textTheme.bodyMedium
-                    ?.copyWith(fontWeight: FontWeight.w600, color: colors.text3)
+                    ?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: colors.textTertiary,
+                    )
                     .toNumeric(context),
               ),
-              SizedBox(height: spacing.spacing4),
+              SizedBox(height: spacing.xs),
               TextField(
                 controller: _addressController,
                 style: textTheme.bodyLarge
-                    ?.copyWith(fontWeight: FontWeight.w500, color: colors.text1)
+                    ?.copyWith(
+                      fontWeight: FontWeight.w500,
+                      color: context.colorScheme.onSurface,
+                    )
                     .toNumeric(context),
-                cursorColor: colors.brand6,
+                cursorColor: context.colorScheme.primary,
                 minLines: 2,
                 maxLines: 2,
                 decoration: InputDecoration(
@@ -82,7 +88,7 @@ class _SendAddressCardState extends State<SendAddressCard> {
                       'bc1p5d7rjq7g6rdk2yhzks9smlaqtedr4dekq08ge8ztwac72sfr9rusxg3297',
                   hintStyle: textTheme.bodyLarge?.copyWith(
                     fontWeight: FontWeight.w500,
-                    color: colors.text4,
+                    color: colors.textDisabled,
                   ),
                   filled: false,
                   border: InputBorder.none,
@@ -103,32 +109,32 @@ class _SendAddressCardState extends State<SendAddressCard> {
         ),
         Squircle(
           border: BorderRadius.only(
-            bottomLeft: Radius.circular(radius.radius24),
-            bottomRight: Radius.circular(radius.radius24),
+            bottomLeft: Radius.circular(radius.card),
+            bottomRight: Radius.circular(radius.card),
           ),
           padding: EdgeInsets.symmetric(
-            vertical: spacing.spacing16,
-            horizontal: spacing.spacing18,
+            vertical: spacing.lg,
+            horizontal: spacing.xl,
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               SvgPicture.asset(
                 widget.asset.icon,
-                height: spacing.spacing24,
-                width: spacing.spacing24,
+                height: spacing.xxl,
+                width: spacing.xxl,
                 errorBuilder: (context, error, stackTrace) => Icon(
                   Icons.circle,
-                  size: spacing.spacing24,
+                  size: spacing.xxl,
                   color: Color(widget.asset.color),
                 ),
               ),
-              SizedBox(width: spacing.spacing8),
+              SizedBox(width: spacing.sm),
               Text(
                 widget.asset.chain,
                 style: textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: colors.text1,
+                  color: context.colorScheme.onSurface,
                 ),
               ),
               const Spacer(),
@@ -150,17 +156,17 @@ class _SendAddressCardState extends State<SendAddressCard> {
                       },
                 child: Squircle(
                   padding: EdgeInsets.symmetric(
-                    horizontal: spacing.spacing12,
-                    vertical: spacing.spacing4,
+                    horizontal: spacing.md,
+                    vertical: spacing.xs,
                   ),
-                  borderRadius: radius.radius8,
-                  borderColor: colors.brand1,
-                  color: colors.brand1,
+                  borderRadius: radius.badge,
+                  borderColor: context.colorScheme.primaryContainer,
+                  color: context.colorScheme.primaryContainer,
                   child: Text(
                     _addressController.text.isNotEmpty ? 'clear' : 'paste',
                     style: textTheme.labelSmall?.copyWith(
                       fontWeight: FontWeight.w600,
-                      color: colors.brand6,
+                      color: context.colorScheme.primary,
                     ),
                   ),
                 ),

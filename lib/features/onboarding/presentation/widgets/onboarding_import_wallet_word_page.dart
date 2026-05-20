@@ -27,12 +27,12 @@ class OnboardingImportWalletWordPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
-    final colors = context.colors;
-    final radius = context.radius;
+    final colors = context.appColors;
+    final radius = context.radii;
     final textTheme = context.textTheme;
 
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: spacing.spacing24),
+      padding: EdgeInsets.symmetric(horizontal: spacing.xxl),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: List.generate(slotsPerPage, (i) {
@@ -48,18 +48,18 @@ class OnboardingImportWalletWordPage extends StatelessWidget {
 
           return Padding(
             padding: EdgeInsets.only(
-              bottom: i < slotsPerPage - 1 ? spacing.spacing12 : 0,
+              bottom: i < slotsPerPage - 1 ? spacing.md : 0,
             ),
             child: Container(
               padding: EdgeInsets.symmetric(
-                horizontal: spacing.spacing16,
-                vertical: spacing.spacing12,
+                horizontal: spacing.lg,
+                vertical: spacing.md,
               ),
               decoration: BoxDecoration(
-                color: colors.fill1.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(radius.radius24),
+                color: context.colorScheme.surface.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(radius.card),
                 border: Border.all(
-                  color: colors.fill1.withValues(alpha: 0.1),
+                  color: context.colorScheme.surface.withValues(alpha: 0.1),
                   width: 0.6,
                 ),
               ),
@@ -70,18 +70,18 @@ class OnboardingImportWalletWordPage extends StatelessWidget {
                     '$number.',
                     style: textTheme.bodyLarge
                         ?.copyWith(
-                          color: colors.text5.withValues(alpha: 0.75),
+                          color: AsterColors.white.withValues(alpha: 0.75),
                           fontWeight: FontWeight.w500,
                         )
                         .toNumeric(context),
                   ),
-                  SizedBox(width: spacing.spacing10),
+                  SizedBox(width: spacing.md),
                   Expanded(
                     child: word != null
                         ? Text(
                             word,
                             style: textTheme.bodyLarge?.copyWith(
-                              color: colors.text5,
+                              color: AsterColors.white,
                               fontWeight: FontWeight.w500,
                             ),
                             overflow: TextOverflow.ellipsis,
@@ -89,11 +89,11 @@ class OnboardingImportWalletWordPage extends StatelessWidget {
                         : const SizedBox.shrink(),
                   ),
                   if (isValid == false) ...[
-                    SizedBox(width: spacing.spacing12),
+                    SizedBox(width: spacing.md),
                     Icon(
                       MingCuteIcons.mgc_close_fill,
-                      size: spacing.spacing18,
-                      color: colors.danger5,
+                      size: spacing.xl,
+                      color: colors.danger,
                     ),
                   ],
                 ],

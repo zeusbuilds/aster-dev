@@ -11,21 +11,20 @@ class OnboardingWelcomeHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final spacing = context.spacing;
     final textTheme = context.textTheme;
-    final colors = context.colors;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.start,
       children: [
         SvgPicture.asset(
           'assets/brand/aster-logo.svg',
-          width: spacing.spacing36,
-          colorFilter: ColorFilter.mode(colors.text5, BlendMode.srcIn),
+          width: spacing.iconLg,
+          colorFilter: ColorFilter.mode(AsterColors.white, BlendMode.srcIn),
         ),
-        SizedBox(width: spacing.spacing8),
+        SizedBox(width: spacing.sm),
         Text(
           'Aster',
           style: textTheme.headlineSmall?.copyWith(
-            color: colors.text5,
+            color: AsterColors.white,
             fontWeight: FontWeight.w600,
           ),
         ),

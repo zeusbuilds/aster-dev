@@ -33,7 +33,7 @@ class DetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
+    final colors = context.appColors;
     final spacing = context.spacing;
     final textTheme = context.textTheme;
 
@@ -46,35 +46,35 @@ class DetailRow extends StatelessWidget {
             if (prefixIcon != null) ...[
               Icon(
                 prefixIcon,
-                size: spacing.spacing22,
-                color: prefixIconColor ?? colors.text3,
+                size: spacing.iconSm,
+                color: prefixIconColor ?? colors.textTertiary,
               ),
-              SizedBox(width: spacing.spacing8),
+              SizedBox(width: spacing.sm),
             ],
             Expanded(
               child: Text(
                 title,
                 style: textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w500,
-                  color: titleColor ?? colors.text3,
+                  color: titleColor ?? colors.textTertiary,
                 ),
               ),
             ),
             if (suffixIcon != null) ...[
-              SizedBox(width: spacing.spacing8),
+              SizedBox(width: spacing.sm),
               Icon(
                 suffixIcon,
-                size: spacing.spacing18,
-                color: suffixIconColor ?? colors.text3,
+                size: spacing.xl,
+                color: suffixIconColor ?? colors.textTertiary,
               ),
             ],
-            SizedBox(width: spacing.spacing8),
+            SizedBox(width: spacing.sm),
             Text(
               value,
               style: textTheme.bodyMedium
                   ?.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: valueColor ?? colors.text1,
+                    color: valueColor ?? context.colorScheme.onSurface,
                   )
                   .toNumeric(context),
             ),

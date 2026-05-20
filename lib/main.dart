@@ -1,35 +1,11 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:gdk_flutter/gdk_flutter.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/bootstrap/app_loader.dart';
 import 'core/core.dart';
 import 'shared/shared.dart';
-
-Future<void> _initializeGdk() async {
-  try {
-    String? dataDir;
-    String? torDir;
-
-    if (Platform.isIOS || Platform.isAndroid) {
-      final docDir = await getApplicationDocumentsDirectory();
-      dataDir = '${docDir.path}/gdk_data';
-      torDir = '${docDir.path}/gdk_tor';
-    }
-
-    await GDK.initialize(dataDir: dataDir, torDir: torDir, logLevel: 'info');
-  } catch (e, stackTrace) {
-    // ignore: avoid_print
-    print('GDK initialization error: $e');
-    // ignore: avoid_print
-    print(stackTrace);
-  }
-}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,8 +15,6 @@ void main() async {
     AppLoader(
       child: const Aster(),
       initialize: () async {
-        await _initializeGdk();
-
         // Initialize database
         final databaseService = DatabaseService();
         await databaseService.init();

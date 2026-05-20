@@ -39,25 +39,25 @@ class SwapPair extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
-    final colors = context.colors;
+    final colors = context.appColors;
     final textTheme = context.textTheme;
-    final radius = context.radius;
+    final radius = context.radii;
 
     return Squircle(
       padding: EdgeInsets.zero,
-      borderColor: Colors.transparent,
+      borderColor: AsterColors.transparent,
       border: from
           ? null
           : BorderRadius.only(
-              bottomLeft: Radius.circular(radius.radius24),
-              bottomRight: Radius.circular(radius.radius24),
+              bottomLeft: Radius.circular(radius.card),
+              bottomRight: Radius.circular(radius.card),
             ),
       child: Container(
         padding: EdgeInsets.symmetric(
-          vertical: spacing.spacing12,
-          horizontal: spacing.spacing16,
+          vertical: spacing.md,
+          horizontal: spacing.lg,
         ),
-        color: from ? Colors.transparent : colors.fill2,
+        color: from ? AsterColors.transparent : colors.surfaceSubtle,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -71,34 +71,34 @@ class SwapPair extends StatelessWidget {
                     style: textTheme.bodyMedium
                         ?.copyWith(
                           fontWeight: FontWeight.w600,
-                          color: colors.text3,
+                          color: colors.textTertiary,
                         )
                         .toNumeric(context),
                   ),
                   const Spacer(),
                   SvgPicture.asset(
                     asset.icon,
-                    width: spacing.spacing36,
-                    height: spacing.spacing36,
+                    width: spacing.iconLg,
+                    height: spacing.iconLg,
                     errorBuilder: (context, error, stackTrace) => Icon(
                       Icons.circle,
-                      size: spacing.spacing36,
+                      size: spacing.iconLg,
                       color: Color(asset.color),
                     ),
                   ),
-                  SizedBox(width: spacing.spacing8),
+                  SizedBox(width: spacing.sm),
                   Text(
                     asset.token,
                     style: textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
-                      color: colors.text1,
+                      color: context.colorScheme.onSurface,
                     ),
                   ),
-                  SizedBox(width: spacing.spacing4),
+                  SizedBox(width: spacing.xs),
                   Icon(
                     RemixIcons.arrow_right_s_line,
-                    size: spacing.spacing20,
-                    color: colors.text3,
+                    size: spacing.screenPadding,
+                    color: colors.textTertiary,
                   ),
                 ],
               ),
@@ -111,7 +111,7 @@ class SwapPair extends StatelessWidget {
                   style: textTheme.headlineSmall
                       ?.copyWith(
                         fontWeight: FontWeight.w700,
-                        color: colors.text1,
+                        color: context.colorScheme.onSurface,
                       )
                       .toNumeric(context),
                 ),
@@ -121,7 +121,7 @@ class SwapPair extends StatelessWidget {
                     text: 'Bal: ',
                     style: textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w600,
-                      color: colors.text3,
+                      color: colors.textTertiary,
                     ),
                     children: [
                       TextSpan(
@@ -129,7 +129,7 @@ class SwapPair extends StatelessWidget {
                         style: textTheme.bodyMedium
                             ?.copyWith(
                               fontWeight: FontWeight.w600,
-                              color: colors.text3,
+                              color: colors.textTertiary,
                             )
                             .toNumeric(context),
                       ),
@@ -137,20 +137,20 @@ class SwapPair extends StatelessWidget {
                   ),
                 ),
                 if (from) ...[
-                  SizedBox(width: spacing.spacing8),
+                  SizedBox(width: spacing.sm),
                   Squircle(
                     padding: EdgeInsets.symmetric(
-                      horizontal: spacing.spacing12,
-                      vertical: spacing.spacing4,
+                      horizontal: spacing.md,
+                      vertical: spacing.xs,
                     ),
-                    borderRadius: radius.radius8,
-                    borderColor: colors.fill2,
-                    color: colors.fill2,
+                    borderRadius: radius.badge,
+                    borderColor: colors.surfaceSubtle,
+                    color: colors.surfaceSubtle,
                     child: Text(
                       'Max',
                       style: textTheme.labelSmall?.copyWith(
                         fontWeight: FontWeight.w600,
-                        color: colors.text1,
+                        color: context.colorScheme.onSurface,
                       ),
                     ),
                   ),

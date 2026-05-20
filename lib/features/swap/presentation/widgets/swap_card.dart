@@ -43,16 +43,16 @@ class _SwapCardState extends State<SwapCard> {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
-    final colors = context.colors;
+    final colors = context.appColors;
 
     return Stack(
       alignment: Alignment.center,
       children: [
         Squircle(
-          color: colors.fill1,
-          borderColor: colors.fill2,
+          color: context.colorScheme.surface,
+          borderColor: colors.surfaceSubtle,
           borderRadius: 28,
-          padding: EdgeInsets.all(spacing.spacing4),
+          padding: EdgeInsets.all(spacing.xs),
           child: Column(
             children: [
               SwapPair(
@@ -75,16 +75,16 @@ class _SwapCardState extends State<SwapCard> {
           ),
         ),
         Container(
-          padding: EdgeInsets.all(spacing.spacing8),
+          padding: EdgeInsets.all(spacing.sm),
           decoration: BoxDecoration(
-            color: colors.fill2,
+            color: colors.surfaceSubtle,
             shape: BoxShape.circle,
-            border: Border.all(color: colors.fill1, width: 3),
+            border: Border.all(color: context.colorScheme.surface, width: 3),
           ),
           child: Icon(
             RemixIcons.arrow_down_line,
-            size: spacing.spacing22,
-            color: colors.text1,
+            size: spacing.iconSm,
+            color: context.colorScheme.onSurface,
           ),
         ),
       ],

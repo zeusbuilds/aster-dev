@@ -1,375 +1,148 @@
-# Typography System Usage Guide
+# Design System Usage Guide
 
-This guide shows you how to use the typography design tokens in your widgets.
+Aster uses Flutter `ThemeData` as the runtime design contract.
 
-## Available Typography Styles
+- Material surfaces, content colors, controls, and text styles come from `ColorScheme` and `TextTheme`.
+- App-specific product decisions come from compact `ThemeExtension`s.
+- Feature UI should use semantic roles, not primitive token names or raw hex values.
 
-### Material Design 3 Text Styles (via Theme)
-All Material Design 3 text styles are available through `Theme.of(context).textTheme`:
-
-- `displayLarge`, `displayMedium`, `displaySmall` - Hero sections
-- `headlineLarge`, `headlineMedium`, `headlineSmall` - Section headers
-- `titleLarge`, `titleMedium`, `titleSmall` - Card titles, subsection headers
-- `labelLarge`, `labelMedium`, `labelSmall` - UI element labels
-- `bodyLarge`, `bodyMedium`, `bodySmall` - Main content text
-
-These styles are built from design tokens and automatically use the correct font family, sizes, weights, line heights, and letter spacing.
-
-## Usage Examples
-
-### Method 1: Using Material TextTheme (Recommended for most cases)
-
-This is the simplest and most common way to use typography:
+## Access
 
 ```dart
-// In any widget with BuildContext
-Text(
-  'Hello World',
-  style: Theme.of(context).textTheme.headlineLarge,
-)
-
-// Or with color override
-Text(
-  'Hello World',
-  style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-    color: Colors.blue,
-  ),
-)
+final scheme = context.colorScheme;
+final app = context.appColors;
+final spacing = context.spacing;
+final radii = context.radii;
+final shadows = context.shadows;
 ```
 
-### Method 2: Using Direct Tokens (For custom combinations)
+## Colors
 
-When you need a custom style that doesn't match any Material Design 3 style:
-
-```dart
-import 'package:aster/shared/theme/typography.dart';
-import 'package:aster/shared/theme/theme_providers.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-class MyWidget extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final appTheme = ref.watch(appThemeProvider);
-    final typography = appTheme.typography;
-    final colorScheme = Theme.of(context).colorScheme;
-    
-    return Text(
-      'Custom Text',
-      style: TypographySystem.buildStyle(
-        tokens: typography,
-        fontSize: typography.size05, // 20px
-        fontWeight: typography.weightSemiBold,
-        lineHeight: typography.lineHeightNormal,
-        letterSpacing: typography.letterSpacingNormal,
-        color: colorScheme.onSurface,
-      ),
-    );
-  }
-}
-```
-
-## Common Use Cases
-
-### Asset Row (like in your AssetRow widget)
+Use Material roles for ordinary UI:
 
 ```dart
-class AssetRow extends ConsumerWidget {
-  final String name;
-  final String fiatBalance;
-  
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final appTheme = ref.watch(appThemeProvider);
-    final typography = appTheme.typography;
-    final colorScheme = Theme.of(context).colorScheme;
-    
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            name,
-            style: TypographySystem.buildStyle(
-              tokens: typography,
-              fontSize: typography.size03, // 16px
-              fontWeight: typography.weightSemiBold,
-              lineHeight: typography.lineHeightNormal,
-              letterSpacing: typography.letterSpacingNormal,
-              color: colorScheme.onSurface,
-            ),
-          ),
-        ),
-        Text(
-          fiatBalance,
-          style: TypographySystem.buildStyle(
-            tokens: typography,
-            fontSize: typography.size03, // 16px
-            fontWeight: typography.weightMedium,
-            lineHeight: typography.lineHeightNormal,
-            letterSpacing: typography.letterSpacingNormal,
-            color: colorScheme.onSurface,
-          ),
-        ),
-      ],
-    );
-  }
-}
-```
-
-### App Bar Title
-
-```dart
-AppBar(
-  title: Text(
-    'My App',
-    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-      fontSize: 18,
-      letterSpacing: 0.15,
+Container(
+  color: context.colorScheme.surface,
+  child: Text(
+    'Wallet',
+    style: context.textTheme.titleMedium?.copyWith(
+      color: context.colorScheme.onSurface,
     ),
   ),
-)
+);
 ```
 
-Or using tokens:
-
-```dart
-AppBar(
-  title: Consumer(
-    builder: (context, ref, _) {
-      final appTheme = ref.watch(appThemeProvider);
-      return Text(
-        'My App',
-        style: TypographySystem.buildStyle(
-          tokens: appTheme.typography,
-          fontSize: appTheme.typography.size04, // 18px
-          fontWeight: appTheme.typography.weightBold,
-          lineHeight: appTheme.typography.lineHeightNormal,
-          letterSpacing: appTheme.typography.letterSpacingNormal,
-          color: Theme.of(context).colorScheme.onSurface,
-        ),
-      );
-    },
-  ),
-)
-```
-
-### Button Text
-
-Buttons typically use the theme's button styles, but you can customize:
-
-```dart
-ElevatedButton(
-  onPressed: () {},
-  style: ElevatedButton.styleFrom(
-    textStyle: Theme.of(context).textTheme.labelLarge,
-  ),
-  child: Text('Click Me'),
-)
-```
-
-Or with custom styling:
-
-```dart
-ElevatedButton(
-  onPressed: () {},
-  child: Consumer(
-    builder: (context, ref, _) {
-      final appTheme = ref.watch(appThemeProvider);
-      return Text(
-        'Click Me',
-        style: TypographySystem.buildStyle(
-          tokens: appTheme.typography,
-          fontSize: appTheme.typography.size03, // 16px
-          fontWeight: appTheme.typography.weightSemiBold,
-          lineHeight: appTheme.typography.lineHeightNormal,
-          letterSpacing: appTheme.typography.letterSpacingWide,
-          color: Theme.of(context).colorScheme.onPrimary,
-        ),
-      );
-    },
-  ),
-)
-```
-
-### Card with Title and Body
-
-```dart
-Card(
-  child: Padding(
-    padding: EdgeInsets.all(16),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Card Title',
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        SizedBox(height: 8),
-        Text(
-          'Card body content goes here...',
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-      ],
-    ),
-  ),
-)
-```
-
-### Statistics/Numbers
-
-```dart
-Consumer(
-  builder: (context, ref, _) {
-    final appTheme = ref.watch(appThemeProvider);
-    return Text(
-      '\$1,234.56',
-      style: TypographySystem.buildStyle(
-        tokens: appTheme.typography,
-        fontSize: appTheme.typography.size09, // 32px
-        fontWeight: appTheme.typography.weightBold,
-        lineHeight: appTheme.typography.lineHeightTight,
-        letterSpacing: appTheme.typography.letterSpacingTight,
-        color: Theme.of(context).colorScheme.primary,
-      ),
-    );
-  },
-)
-```
-
-### Secondary Text / Metadata
+Use `AsterColors` roles for app-only meaning:
 
 ```dart
 Text(
-  'BTC',
-  style: TypographySystem.buildStyle(
-    tokens: appTheme.typography,
-    fontSize: appTheme.typography.size01, // 12px
-    fontWeight: appTheme.typography.weightMedium,
-    lineHeight: appTheme.typography.lineHeightNormal,
-    letterSpacing: appTheme.typography.letterSpacingNormal,
-    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+  '+2.4%',
+  style: context.textTheme.labelMedium?.copyWith(
+    color: context.appColors.chartPositive,
   ),
-)
+);
 ```
 
-Or using Material TextTheme:
+Do not use old primitive names in feature code:
+
+```dart
+// Avoid
+context.appColors.brandArtMain;
+context.spacing.xxl; // Only use when it is truly a component gap.
+
+// Prefer
+context.colorScheme.primary;
+context.spacing.screenPadding;
+```
+
+## Typography
+
+Text uses DM Sans through `TextTheme`. Numbers use Public Sans by calling `toNumeric(context)`.
 
 ```dart
 Text(
-  'BTC',
-  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-  ),
-)
+  amount,
+  style: context.textTheme.displaySmall?.toNumeric(context),
+);
 ```
 
-## Quick Reference: Available Tokens
+Prefer Material text roles:
 
-### Font Sizes
-- `size01` - 12px
-- `size02` - 14px
-- `size03` - 16px
-- `size04` - 18px
-- `size05` - 20px
-- `size06` - 22px
-- `size07` - 24px
-- `size08` - 28px
-- `size09` - 32px
-- `size10` - 36px
-- `size11` - 45px
-- `size12` - 57px
+- `display*` for large balances and hero prices.
+- `headline*` for page-level titles.
+- `title*` for cards and sections.
+- `body*` for normal copy.
+- `label*` for controls, nav, buttons, and metadata.
 
-### Font Weights
-- `weightThin` - 100
-- `weightExtraLight` - 200
-- `weightLight` - 300
-- `weightRegular` - 400
-- `weightMedium` - 500
-- `weightSemiBold` - 600
-- `weightBold` - 700
-- `weightExtraBold` - 800
-- `weightBlack` - 900
+Avoid feature-level `fontSize` unless the UI is intentionally bespoke.
 
-### Line Heights
-- `lineHeightTight` - 1.0
-- `lineHeightSnug` - 1.2
-- `lineHeightNormal` - 1.4
-- `lineHeightRelaxed` - 1.5
-- `lineHeightLoose` - 1.6
+## Spacing
 
-### Letter Spacing
-- `letterSpacingTight` - -0.025em
-- `letterSpacingNormal` - 0em
-- `letterSpacingWide` - 0.05em
-- `letterSpacingWider` - 0.1em
-- `letterSpacingWidest` - 0.15em
+Use the named scale:
 
-## Best Practices
-
-1. **Prefer Material TextTheme** for standard text (body, headlines, titles, labels)
-2. **Use TypographySystem.buildStyle()** only when you need a custom combination that doesn't match any Material style
-3. **Always use tokens** - never hardcode font sizes, weights, line heights, or letter spacing
-4. **Access colors from ColorScheme** for proper theming support
-5. **Use copyWith()** on Material text styles when you only need to change color or other properties
-
-## Material Design 3 Style Mapping
-
-Here's how Material styles map to common use cases:
-
-- **Hero sections**: `displayLarge`, `displayMedium`, `displaySmall`
-- **Page/section headers**: `headlineLarge`, `headlineMedium`, `headlineSmall`
-- **Card titles**: `titleLarge`
-- **Subsection headers**: `titleMedium`, `titleSmall`
-- **Button labels**: `labelLarge` (already configured in button themes)
-- **Form field labels**: `labelMedium`, `labelSmall`
-- **Main content**: `bodyLarge`, `bodyMedium`
-- **Secondary text**: `bodySmall`
-- **Captions/metadata**: `bodySmall` or `labelSmall`
-
-## Migration from Old Code
-
-### Before (hardcoded):
 ```dart
-Text(
-  'Asset Name',
-  style: GoogleFonts.dmSans(
-    fontSize: 16,
-    fontWeight: FontWeight.w600,
-    color: Colors.black,
-  ),
-)
+EdgeInsets.symmetric(
+  horizontal: context.spacing.screenPadding,
+  vertical: context.spacing.lg,
+);
 ```
 
-### After (using Material TextTheme - Recommended):
+Use semantic helpers for layout:
+
+- `screenPadding`
+- `sectionGap`
+- `controlGap`
+- `topSafe(context)`
+- `bottomSafe(context)`
+
+Do not add `spacing20`, `spacing46`, or other every-value APIs.
+
+## Radius
+
+Use component decisions:
+
 ```dart
-Text(
-  'Asset Name',
-  style: Theme.of(context).textTheme.titleMedium,
-)
+BorderRadius.circular(context.radii.card);
+BorderRadius.circular(context.radii.input);
+BorderRadius.circular(context.radii.pill);
 ```
 
-### After (using tokens - For custom styles):
+The radius scale is intentionally small. Real design systems expose decisions, not every possible pixel value.
+
+## Shadows
+
+Prefer surfaces and borders. Use shadows only when elevation is meaningful:
+
 ```dart
-Consumer(
-  builder: (context, ref, _) {
-    final appTheme = ref.watch(appThemeProvider);
-    return Text(
-      'Asset Name',
-      style: TypographySystem.buildStyle(
-        tokens: appTheme.typography,
-        fontSize: appTheme.typography.size03,
-        fontWeight: appTheme.typography.weightSemiBold,
-        lineHeight: appTheme.typography.lineHeightNormal,
-        letterSpacing: appTheme.typography.letterSpacingNormal,
-        color: Theme.of(context).colorScheme.onSurface,
-      ),
-    );
-  },
-)
+BoxDecoration(
+  color: context.appColors.surfaceRaised,
+  borderRadius: BorderRadius.circular(context.radii.card),
+  boxShadow: context.shadows.raised,
+);
 ```
 
-## Summary
+Available shadows are `none`, `raised`, `sheet`, and `modal`.
 
-- **Use `Theme.of(context).textTheme.*`** for 90% of your text styling needs
-- **Use `TypographySystem.buildStyle()`** only when you need custom combinations
-- **All styles are built from design tokens** ensuring consistency across the app
-- **Never hardcode typography values** - always use tokens
+## Migration Examples
+
+```dart
+// Before
+color: context.colors.fill1;
+borderRadius: BorderRadius.circular(context.radius.radius24);
+padding: EdgeInsets.all(context.spacing.spacing20);
+
+// After
+color: context.colorScheme.surface;
+borderRadius: BorderRadius.circular(context.radii.card);
+padding: EdgeInsets.all(context.spacing.screenPadding);
+```
+
+```dart
+// Before
+color: context.colors.brand6;
+
+// After
+color: context.colorScheme.primary;
+```
+
+Keep primitives inside the theme implementation. Product screens should read like intent.

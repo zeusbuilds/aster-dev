@@ -1,30 +1,34 @@
-// // This is a basic Flutter widget test.
-// //
-// // To perform an interaction with a widget in your test, use the WidgetTester
-// // utility in the flutter_test package. For example, you can send tap and scroll
-// // gestures. You can also use WidgetTester to find child widgets in the widget
-// // tree, read text, and verify that the values of widget properties are correct.
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
 
-// import 'package:flutter/material.dart';
-// import 'package:flutter_test/flutter_test.dart';
+import 'package:aster/shared/shared.dart';
 
-// import 'package:aster/main.dart';
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
 
-// void main() {
-//   testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-//     // Build our app and trigger a frame.
-//     await tester.pumpWidget(const MyApp());
+  test('light color tokens expose the semantic brand contract', () {
+    const colors = AsterColors.light;
 
-//     // Verify that our counter starts at 0.
-//     expect(find.text('0'), findsOneWidget);
-//     expect(find.text('1'), findsNothing);
+    expect(AsterColors.blueBase, const Color(0xFF165DFF));
+    expect(AsterColors.ink, const Color(0xFF1D2129));
+    expect(AsterColors.meshMain, const Color(0xFF001AFF));
+    expect(AsterColors.meshSoft, const Color(0xFF8BD0FF));
+    expect(colors.surfaceRaised, AsterColors.white);
+    expect(colors.chartPositive, colors.success);
+    expect(colors.chartNegative, colors.danger);
+    expect(colors.homeGradient, hasLength(5));
+  });
 
-//     // Tap the '+' icon and trigger a frame.
-//     await tester.tap(find.byIcon(Icons.add));
-//     await tester.pump();
+  test('core token decisions stay intentionally compact', () {
+    const spacing = AsterSpacing();
+    const radii = AsterRadii();
 
-//     // Verify that our counter has incremented.
-//     expect(find.text('0'), findsNothing);
-//     expect(find.text('1'), findsOneWidget);
-//   });
-// }
+    expect(spacing.screenPadding, 20);
+    expect(spacing.sectionGap, 24);
+    expect(spacing.controlGap, 12);
+
+    expect(radii.card, 24);
+    expect(radii.input, 12);
+    expect(radii.pill, 999);
+  });
+}
