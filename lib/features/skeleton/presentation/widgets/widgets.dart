@@ -1,2 +1,2 @@
-// Barrel export for skeleton widgets
+// Public skeleton widget API.
 export 'bottom_nav.dart';

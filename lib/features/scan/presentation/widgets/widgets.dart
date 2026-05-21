@@ -1,4 +1,4 @@
-// Barrel export for scan widgets
+// Public scan widget API.
 export 'scan_background.dart';
 export 'scan_camera.dart';
 export 'scan_control_button.dart';

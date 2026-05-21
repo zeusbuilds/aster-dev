@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-import '../theme/theme.dart';
+import '../theme/theme_context.dart';
 
 part 'asset_model.freezed.dart';
 part 'asset_model.g.dart';

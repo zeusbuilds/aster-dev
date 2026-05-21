@@ -1,4 +1,4 @@
-// Barrel export for home widgets
+// Public home widget API.
 export 'asset_row.dart';
 export 'assets_section.dart';
 export 'home_action_buttons.dart';

@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:remixicon/remixicon.dart';
 
 import '../../../../shared/shared.dart';
-import 'widgets.dart';
+import 'asset_selector_sheet.dart';
+import 'swap_pair.dart';
 
 /// Card widget displaying swap pair (from/to assets)
 ///

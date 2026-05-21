@@ -1,5 +1,5 @@
-// Barrel export for errors
+// Public error-handling API.
+export 'error_handler.dart';
 export 'exceptions.dart';
 export 'failures.dart';
-export 'error_handler.dart';
 export 'result_type.dart';

@@ -1,2 +1,2 @@
-// Barrel export for wallet data models
+// Public wallet data-model API.
 export 'wallet_model.dart';

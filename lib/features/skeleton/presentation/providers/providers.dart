@@ -1,2 +1,2 @@
-// Barrel export for skeleton providers
+// Public skeleton provider API.
 export 'skeleton_index_provider.dart';

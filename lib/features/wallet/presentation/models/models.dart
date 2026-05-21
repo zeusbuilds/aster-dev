@@ -1,2 +1,2 @@
-// Barrel export for wallet presentation models
+// Public wallet presentation-model API.
 export 'wallet_state.dart';

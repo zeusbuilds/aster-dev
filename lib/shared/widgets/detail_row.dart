@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../shared.dart';
+import '../theme/theme.dart';
 
 /// Reusable row widget for displaying key-value pairs with optional icons
 ///

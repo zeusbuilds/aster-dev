@@ -1,3 +1,3 @@
-// Barrel export for network
-export 'network_info.dart';
+// Public network API.
 export 'interceptors/interceptors.dart';
+export 'network_info.dart';

@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'package:google_fonts/google_fonts.dart';
 
-import '../shared.dart';
+import 'theme_context.dart';
+import 'tokens/typography_tokens.dart';
 
 class TypographySystem {
   TypographySystem._();

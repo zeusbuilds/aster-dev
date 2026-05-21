@@ -1,19 +1,16 @@
 import 'package:go_router/go_router.dart';
 
-import '../../features/home/presentation/screens/home_screen.dart';
-import '../../features/market/presentation/screens/market_screen.dart';
-import '../../features/onboarding/presentation/screens/onboarding_import_wallet_screen.dart';
-import '../../features/onboarding/presentation/screens/onboarding_welcome_screen.dart';
+import '../../features/home/presentation/screens/screens.dart';
+import '../../features/market/presentation/screens/screens.dart';
+import '../../features/onboarding/presentation/screens/screens.dart';
 import '../../features/receive/presentation/screens/screens.dart';
 import '../../features/scan/presentation/screens/screens.dart';
 import '../../features/send/presentation/screens/screens.dart';
-import '../../features/settings/presentation/screens/country_selection_screen.dart';
-import '../../features/settings/presentation/screens/currency_selection_screen.dart';
-import '../../features/settings/presentation/screens/settings_screen.dart';
-import '../../features/skeleton/presentation/screens/skeleton_screen.dart';
-import '../../features/swap/presentation/screens/swap_screen.dart';
-import '../../features/transaction/presentation/screens/transaction_list_screen.dart';
-import '../../features/wallet/presentation/pages/wallet_selection_screen.dart';
+import '../../features/settings/presentation/screens/screens.dart';
+import '../../features/skeleton/presentation/screens/screens.dart';
+import '../../features/swap/presentation/screens/screens.dart';
+import '../../features/transaction/presentation/screens/screens.dart';
+import '../../features/wallet/presentation/pages/pages.dart';
 import '../screens/splash_screen.dart';
 import 'route_names.dart';
 import 'route_paths.dart';
@@ -112,7 +109,6 @@ class RouteConfig {
           ),
         ],
       ),
-      // GDK Test Screen (for development/testing)
     ];
   }
 }

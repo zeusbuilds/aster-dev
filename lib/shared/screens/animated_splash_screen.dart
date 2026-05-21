@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../shared.dart';
+import '../theme/theme.dart';
 
 const _splashMotion = AsterMotion();
 final _animationDuration = _splashMotion.splashRevealDuration.inMilliseconds;

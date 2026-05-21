@@ -1,5 +1,5 @@
-// Barrel export for theme
+// Public theme API.
 export 'app_theme.dart';
 export 'theme_context.dart';
-export 'typography.dart';
 export 'tokens/tokens.dart';
+export 'typography.dart';

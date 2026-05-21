@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../shared.dart';
+import '../theme/theme.dart';
 
 const int kGridLoaderRows = 3;
 const int kGridLoaderCols = 3;

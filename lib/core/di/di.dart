@@ -1,3 +1,3 @@
-// Barrel export for dependency injection
-export 'providers.dart';
+// Public dependency-injection API.
 export 'modules/modules.dart';
+export 'providers.dart';

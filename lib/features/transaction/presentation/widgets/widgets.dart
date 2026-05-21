@@ -1,2 +1,2 @@
-// Barrel export for transaction widgets
+// Public transaction widget API.
 export 'transaction_item.dart';

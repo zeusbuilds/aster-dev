@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'package:ming_cute_icons/ming_cute_icons.dart';
 
-import '../shared.dart';
+import '../theme/theme.dart';
+import 'squircle.dart';
 
 /// Toast variant types
 enum ToastVariant { success, failure, warning }

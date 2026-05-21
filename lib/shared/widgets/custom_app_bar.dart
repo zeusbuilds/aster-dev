@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:remixicon/remixicon.dart';
 
-import '../shared.dart';
+import '../theme/theme.dart';
 
 /// Custom app bar widget with consistent styling
 ///

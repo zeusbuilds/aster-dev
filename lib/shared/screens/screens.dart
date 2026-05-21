@@ -1,3 +1,3 @@
-// Barrel export for shared screens
-export 'splash_screen.dart';
+// Public shared screen API.
 export 'animated_splash_screen.dart';
+export 'splash_screen.dart';

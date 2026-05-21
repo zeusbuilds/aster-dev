@@ -1,2 +1,2 @@
-// Barrel export for receive widgets
+// Public receive widget API.
 export 'receive_card.dart';

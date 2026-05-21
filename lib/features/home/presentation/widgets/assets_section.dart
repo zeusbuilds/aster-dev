@@ -4,7 +4,7 @@ import 'package:ming_cute_icons/ming_cute_icons.dart';
 import 'package:unicons/unicons.dart';
 
 import '../../../../shared/shared.dart';
-import 'widgets.dart';
+import 'asset_row.dart';
 
 /// Widget displaying the list of assets/balances for the wallet
 ///

@@ -1,3 +1,3 @@
-// Barrel export for send screens
-export 'send_screen.dart';
+// Public send screen API.
 export 'send_address_screen.dart';
+export 'send_screen.dart';

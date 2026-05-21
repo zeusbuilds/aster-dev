@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import 'package:haptic_feedback/haptic_feedback.dart';
 
-import '../shared.dart';
+import '../theme/theme.dart';
+import 'grid_loader.dart';
+import 'squircle.dart';
 
 /// Button variant types
 enum ButtonVariant {
@@ -12,7 +14,7 @@ enum ButtonVariant {
   /// Secondary button - outlined or filled with surface color
   secondary,
 
-  /// Outlined button - white/transparent background with blue border and black text/icon
+  /// Translucent button - glassy surface treatment over brand/art backgrounds
   translucent,
 }
 
@@ -94,7 +96,7 @@ class _CustomButtonState extends State<CustomButton> {
         ? metrics.compactButtonHeight
         : metrics.buttonHeight;
     final horizontalPadding = isCompact ? spacing.lg : spacing.xxl;
-    final verticalPadding = isCompact ? spacing.md : spacing.md;
+    final verticalPadding = spacing.md;
     final iconSize = isCompact ? spacing.xl : spacing.screenPadding;
     final iconTextGap = isCompact ? spacing.xs : spacing.sm;
     final borderRadius = isCompact ? radius.card : radius.button;

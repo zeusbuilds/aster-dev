@@ -1,4 +1,4 @@
-// Barrel export for theme tokens
+// Public design-token API.
 export 'color_tokens.dart';
 export 'component_metrics_tokens.dart';
 export 'effects_tokens.dart';

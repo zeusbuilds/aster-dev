@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:flutter_svg/svg.dart';
 
-import '../shared.dart';
+import '../theme/theme.dart';
 
 /// Splash screen with gradient background and centered logo
 ///
