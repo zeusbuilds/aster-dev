@@ -29,6 +29,9 @@ class MarketTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
+    final colors = context.appColors;
+    final effects = context.effects;
+    final metrics = context.metrics;
     final radius = context.radii;
     final textTheme = context.textTheme;
     final shadows = context.shadows;
@@ -54,21 +57,14 @@ class MarketTile extends StatelessWidget {
                   decoration: BoxDecoration(
                     boxShadow: shadowColor != null
                         ? shadows.modal
-                              .map(
-                                (s) => BoxShadow(
-                                  color: shadowColor!,
-                                  offset: s.offset,
-                                  blurRadius: s.blurRadius,
-                                  spreadRadius: s.spreadRadius,
-                                ),
-                              )
+                              .map((s) => s.copyWith(color: shadowColor!))
                               .toList()
                         : shadows.modal,
                   ),
                   child: Image.asset(
                     'assets/texture/shape.png',
-                    width: spacing.giant * 2,
-                    height: spacing.giant * 2,
+                    width: metrics.marketTextureSize,
+                    height: metrics.marketTextureSize,
                   ),
                 ),
               ),
@@ -85,14 +81,16 @@ class MarketTile extends StatelessWidget {
                             label,
                             style: textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.w500,
-                              color: AsterColors.white.withValues(alpha: 0.75),
+                              color: colors.onMarketTile.withValues(
+                                alpha: effects.marketContentMutedOpacity,
+                              ),
                             ),
                           ),
                           Text(
                             subtitle ?? '',
                             style: textTheme.titleLarge?.copyWith(
                               fontWeight: FontWeight.w600,
-                              color: AsterColors.white,
+                              color: colors.onMarketTile,
                             ),
                           ),
                           SizedBox(height: spacing.xxl),
@@ -103,8 +101,8 @@ class MarketTile extends StatelessWidget {
                                 vertical: spacing.xs,
                               ),
                               decoration: BoxDecoration(
-                                color: AsterColors.white.withValues(
-                                  alpha: 0.15,
+                                color: colors.onMarketTile.withValues(
+                                  alpha: effects.marketPillSurfaceOpacity,
                                 ),
                                 borderRadius: BorderRadius.circular(
                                   radius.pill,
@@ -116,20 +114,21 @@ class MarketTile extends StatelessWidget {
                                 children: [
                                   Container(
                                     decoration: BoxDecoration(
-                                      color: AsterColors.white.withValues(
-                                        alpha: 0.5,
+                                      color: colors.onMarketTile.withValues(
+                                        alpha: effects.marketPillDotOpacity,
                                       ),
                                       shape: BoxShape.circle,
                                     ),
-                                    width: spacing.screenPadding,
-                                    height: spacing.screenPadding,
+                                    width: metrics.marketBadgeDotSize,
+                                    height: metrics.marketBadgeDotSize,
                                   ),
                                   SizedBox(width: spacing.sm),
                                   Text(
                                     tipText!,
                                     style: textTheme.bodyMedium?.copyWith(
-                                      color: AsterColors.white.withValues(
-                                        alpha: 0.75,
+                                      color: colors.onMarketTile.withValues(
+                                        alpha:
+                                            effects.marketContentMutedOpacity,
                                       ),
                                       fontWeight: FontWeight.w600,
                                     ),

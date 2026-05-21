@@ -17,6 +17,7 @@ class ScanWalletHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final spacing = context.spacing;
     final colors = context.appColors;
+    final effects = context.effects;
     final textTheme = context.textTheme;
 
     return Column(
@@ -27,7 +28,9 @@ class ScanWalletHeader extends StatelessWidget {
           height: spacing.giant,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: context.colorScheme.surface.withValues(alpha: 0.25),
+            color: context.colorScheme.surface.withValues(
+              alpha: effects.scanAvatarSurfaceOpacity,
+            ),
           ),
         ),
         SizedBox(height: spacing.md),
@@ -35,18 +38,13 @@ class ScanWalletHeader extends StatelessWidget {
           walletName,
           style: textTheme.bodyMedium?.copyWith(
             fontWeight: FontWeight.w600,
-            color: AsterColors.white,
-            height: 1.0,
+            color: colors.onScan,
           ),
         ),
         SizedBox(height: spacing.sm),
         Text(
           walletId,
-          style: textTheme.bodySmall?.copyWith(
-            color: colors.textDisabled,
-            letterSpacing: 0.5,
-            height: 1.0,
-          ),
+          style: textTheme.bodySmall?.copyWith(color: colors.textDisabled),
         ),
       ],
     );

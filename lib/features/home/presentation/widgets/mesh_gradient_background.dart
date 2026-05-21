@@ -6,6 +6,9 @@ import 'package:mesh/mesh.dart';
 
 import '../../../../shared/shared.dart';
 
+const _meshColumns = 5;
+const _meshRows = 7;
+
 /// Background widget with animated mesh gradient effect
 ///
 /// Creates a blue gradient mesh with blur and noise texture overlay
@@ -15,6 +18,8 @@ class MeshGradientBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
+    final effects = context.effects;
+    final metrics = context.metrics;
 
     return Stack(
       fit: StackFit.expand,
@@ -22,8 +27,8 @@ class MeshGradientBackground extends StatelessWidget {
         // The Mesh Gradient (Background)
         OMeshGradient(
           mesh: OMeshRect(
-            width: 5,
-            height: 7,
+            width: _meshColumns,
+            height: _meshRows,
             fallbackColor: colors.brandArtDark,
             backgroundColor: colors.brandArtSoft,
             vertices: [
@@ -124,20 +129,25 @@ class MeshGradientBackground extends StatelessWidget {
 
         // Backdrop filter for blur effect
         BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20.0, sigmaY: 20.0),
+          filter: ImageFilter.blur(
+            sigmaX: metrics.brandMeshBlurSigma,
+            sigmaY: metrics.brandMeshBlurSigma,
+          ),
           child: Container(
-            color: AsterColors.transparent, // Required to apply filter
+            color: colors.transparentSurface, // Required to apply filter
           ),
         ),
 
         // Noise texture overlay
         Positioned.fill(
           child: Opacity(
-            opacity: 0.05,
+            opacity: effects.artNoiseOpacity,
             child: Image.asset(
               'assets/texture/noise.jpg',
               fit: BoxFit.cover,
-              color: AsterColors.black.withValues(alpha: 0.5),
+              color: colors.artNoiseTint.withValues(
+                alpha: effects.artNoiseTintOpacity,
+              ),
               colorBlendMode: BlendMode.overlay,
             ),
           ),

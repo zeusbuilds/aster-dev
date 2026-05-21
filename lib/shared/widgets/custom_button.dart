@@ -4,7 +4,6 @@ import 'package:haptic_feedback/haptic_feedback.dart';
 
 import '../shared.dart';
 
-// TODO: fix button variant colors and also match grid loader variant colors
 /// Button variant types
 enum ButtonVariant {
   /// Primary button - filled with primary color
@@ -84,47 +83,51 @@ class _CustomButtonState extends State<CustomButton> {
     final textTheme = context.textTheme;
     final spacing = context.spacing;
     final radius = context.radii;
+    final colors = context.appColors;
+    final metrics = context.metrics;
+    final motion = context.motion;
+    final effects = context.effects;
 
     // Size-specific configurations
     final isCompact = widget._isCompact;
-    final height = isCompact ? 40.0 : 48.0;
+    final height = isCompact
+        ? metrics.compactButtonHeight
+        : metrics.buttonHeight;
     final horizontalPadding = isCompact ? spacing.lg : spacing.xxl;
-    // Vertical padding: compact uses 12px, normal uses 12px (closest to original 14px)
-    // This gives 24px content area for 48px button, which fits 16px text comfortably
     final verticalPadding = isCompact ? spacing.md : spacing.md;
     final iconSize = isCompact ? spacing.xl : spacing.screenPadding;
     final iconTextGap = isCompact ? spacing.xs : spacing.sm;
     final borderRadius = isCompact ? radius.card : radius.button;
     final textStyle = isCompact
-        ? textTheme.labelMedium?.copyWith(
-            fontWeight: FontWeight.w500,
-            height: 1.0,
-          )
-        : textTheme.labelLarge?.copyWith(
-            fontWeight: FontWeight.w600,
-            height: 1.0,
-          );
+        ? textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w500)
+        : textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600);
 
     // Variant-specific colors
     final backgroundColor = widget.variant == ButtonVariant.primary
         ? context.colorScheme.primary
         : widget.variant == ButtonVariant.translucent
-        ? AsterColors.white.withValues(alpha: 0.8)
+        ? context.colorScheme.surface.withValues(
+            alpha: effects.translucentSurfaceOpacity,
+          )
         : context.colorScheme.surface;
     final foregroundColor = widget.variant == ButtonVariant.primary
-        ? AsterColors.white
+        ? context.colorScheme.onPrimary
         : widget.variant == ButtonVariant.translucent
         ? context.colorScheme.onSurface
         : context.colorScheme.onSurface;
     final borderColor = widget.variant == ButtonVariant.secondary
         ? context.colorScheme.surface
-        : AsterColors.transparent;
-    final borderWidth = widget.variant == ButtonVariant.secondary ? 1.0 : 0.0;
+        : colors.transparentSurface;
+    final borderWidth = widget.variant == ButtonVariant.secondary
+        ? spacing.dividerThickness
+        : spacing.none;
 
     // Disabled state (disabled if loading, not enabled, or no onTap)
     final isEnabled = !widget.loading && widget.enabled && widget.onTap != null;
     // Keep full opacity when loading, only fade when disabled (not loading)
-    final opacity = widget.loading ? 1.0 : (isEnabled ? 1.0 : 0.5);
+    final opacity = widget.loading
+        ? 1.0
+        : (isEnabled ? 1.0 : effects.disabledOpacity);
 
     return Opacity(
       opacity: opacity,
@@ -156,9 +159,9 @@ class _CustomButtonState extends State<CustomButton> {
               }
             : null,
         child: AnimatedScale(
-          scale: _isPressed ? 0.95 : 1.0,
-          duration: const Duration(milliseconds: 100),
-          curve: Curves.easeInOut,
+          scale: _isPressed ? motion.buttonPressedScale : 1.0,
+          duration: motion.buttonPressDuration,
+          curve: motion.fastEase,
           child: SizedBox(
             width: widget.width ?? (isCompact ? null : double.infinity),
             height: height,
@@ -172,7 +175,12 @@ class _CustomButtonState extends State<CustomButton> {
               borderWidth: borderWidth,
               color: backgroundColor,
               child: widget.loading
-                  ? Center(child: GridLoader())
+                  ? Center(
+                      child: GridLoader(
+                        colorStyle: GridLoaderColorStyle.custom,
+                        color: foregroundColor,
+                      ),
+                    )
                   : Row(
                       mainAxisSize: isCompact
                           ? MainAxisSize.min

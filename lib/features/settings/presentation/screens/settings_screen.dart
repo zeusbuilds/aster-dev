@@ -53,7 +53,6 @@ class SettingsScreen extends ConsumerWidget {
               style: textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w600,
                 color: context.colorScheme.onSurface,
-                letterSpacing: 0.2,
               ),
             ),
             SizedBox(height: spacing.md),
@@ -73,12 +72,7 @@ class SettingsScreen extends ConsumerWidget {
                       );
                     },
                   ),
-                  Divider(
-                    color: colors.surfaceSubtle,
-                    height: 1,
-                    thickness: 1,
-                    indent: spacing.screenPadding,
-                  ),
+                  const AsterDivider.inset(),
                   SettingsOptionRow(
                     title: 'Manage assets',
                     prefixIcon: MingCuteIcons.mgc_coin_2_line,
@@ -90,12 +84,7 @@ class SettingsScreen extends ConsumerWidget {
                       );
                     },
                   ),
-                  Divider(
-                    color: colors.surfaceSubtle,
-                    height: 1,
-                    thickness: 1,
-                    indent: spacing.screenPadding,
-                  ),
+                  const AsterDivider.inset(),
                   SettingsOptionRow(
                     title: 'Advanced',
                     prefixIcon: MingCuteIcons.mgc_tool_line,
@@ -118,7 +107,6 @@ class SettingsScreen extends ConsumerWidget {
               style: textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w600,
                 color: context.colorScheme.onSurface,
-                letterSpacing: 0.2,
               ),
             ),
             SizedBox(height: spacing.md),
@@ -126,17 +114,6 @@ class SettingsScreen extends ConsumerWidget {
               padding: EdgeInsets.symmetric(vertical: spacing.xs),
               child: Column(
                 children: [
-                  // SettingsOptionRow(
-                  //   title: 'Appearance',
-                  //   details: 'System',
-                  //   prefixIcon: MingCuteIcons.mgc_moon_line,
-                  // ),
-                  // Divider(
-                  //   color: colors.surfaceSubtle,
-                  //   height: 1,
-                  //   thickness: 1,
-                  //   indent: spacing.screenPadding,
-                  // ),
                   SettingsOptionRow(
                     title: 'Currency',
                     details: 'USD',
@@ -144,35 +121,20 @@ class SettingsScreen extends ConsumerWidget {
                     onTap: () =>
                         context.pushNamed(RouteNames.currencySelection),
                   ),
-                  Divider(
-                    color: colors.surfaceSubtle,
-                    height: 1,
-                    thickness: 1,
-                    indent: spacing.screenPadding,
-                  ),
+                  const AsterDivider.inset(),
                   SettingsOptionRow(
                     title: 'Language',
                     details: 'English',
                     prefixIcon: MingCuteIcons.mgc_translate_2_line,
                   ),
-                  Divider(
-                    color: colors.surfaceSubtle,
-                    height: 1,
-                    thickness: 1,
-                    indent: spacing.screenPadding,
-                  ),
+                  const AsterDivider.inset(),
                   SettingsOptionRow(
                     title: 'Region',
                     details: 'United States',
                     prefixIcon: MingCuteIcons.mgc_world_2_line,
                     onTap: () => context.pushNamed(RouteNames.countrySelection),
                   ),
-                  Divider(
-                    color: colors.surfaceSubtle,
-                    height: 1,
-                    thickness: 1,
-                    indent: spacing.screenPadding,
-                  ),
+                  const AsterDivider.inset(),
                   SettingsOptionRow(
                     title: 'Notifications',
                     details: 'Enabled',
@@ -184,15 +146,6 @@ class SettingsScreen extends ConsumerWidget {
             SizedBox(height: spacing.xxl),
 
             /// App settings section
-            // Text(
-            //   'Info',
-            //   style: textTheme.bodyMedium?.copyWith(
-            //     fontWeight: FontWeight.w600,
-            //     color: context.colorScheme.onSurface,
-            //     letterSpacing: 0.2,
-            //   ),
-            // ),
-            // SizedBox(height: spacing.md),
             Squircle(
               padding: EdgeInsets.symmetric(vertical: spacing.xs),
               child: Column(
@@ -201,54 +154,29 @@ class SettingsScreen extends ConsumerWidget {
                     title: 'Contact Support',
                     prefixIcon: MingCuteIcons.mgc_lifebuoy_line,
                   ),
-                  Divider(
-                    color: colors.surfaceSubtle,
-                    height: 1,
-                    thickness: 1,
-                    indent: spacing.screenPadding,
-                  ),
+                  const AsterDivider.inset(),
                   SettingsOptionRow(
                     title: 'Terms of Service',
                     prefixIcon: MingCuteIcons.mgc_document_2_line,
                   ),
-                  Divider(
-                    color: colors.surfaceSubtle,
-                    height: 1,
-                    thickness: 1,
-                    indent: spacing.screenPadding,
-                  ),
+                  const AsterDivider.inset(),
                   SettingsOptionRow(
                     title: 'Privacy Policy',
                     prefixIcon: MingCuteIcons.mgc_file_check_line,
                   ),
-                  Divider(
-                    color: colors.surfaceSubtle,
-                    height: 1,
-                    thickness: 1,
-                    indent: spacing.screenPadding,
-                  ),
+                  const AsterDivider.inset(),
                   SettingsOptionRow(
                     title: 'Twitter',
                     prefixIcon: MingCuteIcons.mgc_twitter_line,
                     onTap: () {},
                   ),
-                  Divider(
-                    color: colors.surfaceSubtle,
-                    height: 1,
-                    thickness: 1,
-                    indent: spacing.screenPadding,
-                  ),
+                  const AsterDivider.inset(),
                   SettingsOptionRow(
                     title: 'Telegram',
                     prefixIcon: MingCuteIcons.mgc_telegram_line,
                     onTap: () {},
                   ),
-                  Divider(
-                    color: colors.surfaceSubtle,
-                    height: 1,
-                    thickness: 1,
-                    indent: spacing.screenPadding,
-                  ),
+                  const AsterDivider.inset(),
                   SettingsOptionRow(
                     title: 'Instagram',
                     prefixIcon: MingCuteIcons.mgc_instagram_line,

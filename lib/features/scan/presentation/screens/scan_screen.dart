@@ -103,7 +103,10 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       }
     });
     final spacing = context.spacing;
-    final frameSize = MediaQuery.sizeOf(context).width * 0.7;
+    final colors = context.appColors;
+    final metrics = context.metrics;
+    final frameSize =
+        MediaQuery.sizeOf(context).width * metrics.scanFrameSizeFactor;
     final screenSize = MediaQuery.sizeOf(context);
 
     final headerHeight =
@@ -121,13 +124,13 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     final cutoutRect = Rect.fromLTWH(frameLeft, frameTop, frameSize, frameSize);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: AsterColors.transparent,
+      value: SystemUiOverlayStyle(
+        statusBarColor: colors.transparentSurface,
         statusBarIconBrightness: Brightness.light,
         statusBarBrightness: Brightness.dark,
       ),
       child: Scaffold(
-        backgroundColor: AsterColors.transparent,
+        backgroundColor: colors.transparentSurface,
         body: LayoutBuilder(
           builder: (context, constraints) {
             return Stack(

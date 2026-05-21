@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import '../theme/theme.dart';
+
 part 'asset_model.freezed.dart';
 part 'asset_model.g.dart';
 
@@ -12,7 +14,6 @@ class AssetModel with _$AssetModel {
     required String token,
     required String chain,
     required String icon,
-    required int color,
     required String unit,
   }) = _AssetModel;
 
@@ -25,7 +26,6 @@ class AssetModel with _$AssetModel {
     token: 'BTC',
     chain: 'Bitcoin',
     icon: 'assets/icons/tokens/btc.svg',
-    color: 0xFFFF9500, // Orange color for Bitcoin
     unit: 'sats',
   );
 
@@ -34,7 +34,6 @@ class AssetModel with _$AssetModel {
     token: 'LBTC',
     chain: 'Liquid',
     icon: 'assets/icons/tokens/lbtc.svg',
-    color: 0xFF00D4AA, // Teal color for Liquid
     unit: 'lsats',
   );
 
@@ -43,7 +42,6 @@ class AssetModel with _$AssetModel {
     token: 'USDT',
     chain: 'Tether',
     icon: 'assets/icons/tokens/usdt.svg',
-    color: 0xFF26A17B, // Green color for Tether
     unit: 'USDt',
   );
 
@@ -75,18 +73,13 @@ class AssetModel with _$AssetModel {
 
 /// Extension to add convenience methods to AssetModel
 extension AssetModelExtension on AssetModel {
-  /// Get color as Color object
-  Color get color => Color(this.color);
-
-  /// Get icon as string
-  String get icon => this.icon;
-
-  /// Get token name as string
-  String get token => this.token;
-
-  /// Get chain name as string
-  String get chain => this.chain;
-
-  /// Get unit as string
-  String get unit => this.unit;
+  Color themedColor(BuildContext context) {
+    final colors = context.appColors;
+    return switch (token.toUpperCase()) {
+      'BTC' => colors.bitcoin,
+      'LBTC' => colors.liquid,
+      'USDT' => colors.success,
+      _ => context.colorScheme.primary,
+    };
+  }
 }

@@ -41,10 +41,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final metrics = context.metrics;
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      // Set status bar to light (white icons) for home screen
-      value: const SystemUiOverlayStyle(
-        statusBarColor: AsterColors.transparent,
+      value: SystemUiOverlayStyle(
+        statusBarColor: colors.transparentSurface,
         statusBarIconBrightness: Brightness.light, // White icons for Android
         statusBarBrightness: Brightness.dark, // Dark background for iOS
       ),
@@ -55,7 +56,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             Column(
               children: [
                 SizedBox(
-                  height: MediaQuery.of(context).size.height * 0.4,
+                  height:
+                      MediaQuery.of(context).size.height *
+                      metrics.homeHeroHeightFactor,
                   width: double.infinity,
                   child: ClipRect(
                     child: Stack(

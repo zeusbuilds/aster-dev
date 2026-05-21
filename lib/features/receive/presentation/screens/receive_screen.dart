@@ -23,7 +23,6 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
-    final colors = context.appColors;
     final textTheme = context.textTheme;
     final radius = context.radii;
 
@@ -105,32 +104,17 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                       title: 'Set amount',
                       prefixIcon: MingCuteIcons.mgc_edit_2_line,
                     ),
-                    Divider(
-                      color: colors.surfaceSubtle,
-                      height: 1,
-                      thickness: 1,
-                      indent: spacing.screenPadding,
-                    ),
+                    const AsterDivider.inset(),
                     SettingsOptionRow(
                       title: 'Generate new address',
                       prefixIcon: MingCuteIcons.mgc_refresh_2_line,
                     ),
-                    Divider(
-                      color: colors.surfaceSubtle,
-                      height: 1,
-                      thickness: 1,
-                      indent: spacing.screenPadding,
-                    ),
+                    const AsterDivider.inset(),
                     SettingsOptionRow(
                       title: 'Direct Peg In',
                       prefixIcon: MingCuteIcons.mgc_selector_vertical_line,
                     ),
-                    Divider(
-                      color: colors.surfaceSubtle,
-                      height: 1,
-                      thickness: 1,
-                      indent: spacing.screenPadding,
-                    ),
+                    const AsterDivider.inset(),
                     SettingsOptionRow(
                       title: 'Share',
                       prefixIcon: MingCuteIcons.mgc_share_forward_line,

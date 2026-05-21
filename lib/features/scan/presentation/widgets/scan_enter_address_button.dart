@@ -13,6 +13,8 @@ class ScanEnterAddressButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
+    final colors = context.appColors;
+    final effects = context.effects;
     final textTheme = context.textTheme;
 
     return GestureDetector(
@@ -24,13 +26,17 @@ class ScanEnterAddressButton extends StatelessWidget {
           Text(
             'Enter address to send',
             style: textTheme.bodyMedium?.copyWith(
-              color: AsterColors.white.withValues(alpha: 0.75),
+              color: colors.onScan.withValues(
+                alpha: effects.brandContentMutedOpacity,
+              ),
             ),
           ),
           SizedBox(width: spacing.xxs),
           Icon(
             RemixIcons.arrow_right_s_line,
-            color: AsterColors.white.withValues(alpha: 0.75),
+            color: colors.onScan.withValues(
+              alpha: effects.brandContentMutedOpacity,
+            ),
             size: spacing.screenPadding,
           ),
         ],

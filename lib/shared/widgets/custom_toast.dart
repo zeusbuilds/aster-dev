@@ -117,10 +117,15 @@ class CustomToast extends StatelessWidget {
 class ToastHelper {
   static OverlayEntry? _currentOverlayEntry;
   static VoidCallback? _currentDismissCallback;
+  static Duration? _currentDismissDuration;
 
   /// Register a dismiss callback for the current toast (internal use)
-  static void registerDismissCallback(VoidCallback callback) {
+  static void registerDismissCallback(
+    VoidCallback callback,
+    Duration duration,
+  ) {
     _currentDismissCallback = callback;
+    _currentDismissDuration = duration;
   }
 
   /// Dismiss the current toast if one is showing
@@ -128,8 +133,9 @@ class ToastHelper {
     if (_currentDismissCallback != null) {
       _currentDismissCallback!();
       _currentDismissCallback = null;
-      // Wait for animation to complete
-      await Future.delayed(const Duration(milliseconds: 300));
+      await Future.delayed(
+        _currentDismissDuration ?? const AsterMotion().toastTransitionDuration,
+      );
     }
     if (_currentOverlayEntry != null) {
       _currentOverlayEntry!.remove();
@@ -153,7 +159,7 @@ class ToastHelper {
     required String title,
     String? message,
     required ToastVariant variant,
-    Duration duration = const Duration(seconds: 3),
+    Duration? duration,
   }) async {
     // Dismiss current toast if one is showing
     await _dismissCurrent();
@@ -161,29 +167,30 @@ class ToastHelper {
     // Check if context is still mounted after async operation
     if (!context.mounted) return;
 
+    final motion = context.motion;
+    final visibleDuration = duration ?? motion.toastVisibleDuration;
     final overlay = Overlay.of(context);
-    final overlayEntry = OverlayEntry(
+    late final OverlayEntry overlayEntry;
+    overlayEntry = OverlayEntry(
       builder: (context) => _ToastOverlay(
-        duration: duration,
+        duration: visibleDuration,
+        transitionDuration: motion.toastTransitionDuration,
+        curve: motion.toastCurve,
         onDismiss: () {
+          if (overlayEntry.mounted) {
+            overlayEntry.remove();
+          }
           _currentOverlayEntry = null;
           _currentDismissCallback = null;
+          _currentDismissDuration = null;
         },
         child: CustomToast(title: title, message: message, variant: variant),
       ),
     );
 
     _currentOverlayEntry = overlayEntry;
+    _currentDismissDuration = motion.toastTransitionDuration;
     overlay.insert(overlayEntry);
-
-    // Remove overlay entry after duration
-    Future.delayed(duration, () {
-      if (_currentOverlayEntry == overlayEntry) {
-        _currentOverlayEntry = null;
-        _currentDismissCallback = null;
-        overlayEntry.remove();
-      }
-    });
   }
 
   /// Show success toast
@@ -191,7 +198,7 @@ class ToastHelper {
     BuildContext context, {
     required String title,
     String? message,
-    Duration duration = const Duration(seconds: 3),
+    Duration? duration,
   }) {
     show(
       context,
@@ -207,7 +214,7 @@ class ToastHelper {
     BuildContext context, {
     required String title,
     String? message,
-    Duration duration = const Duration(seconds: 3),
+    Duration? duration,
   }) {
     show(
       context,
@@ -223,7 +230,7 @@ class ToastHelper {
     BuildContext context, {
     required String title,
     String? message,
-    Duration duration = const Duration(seconds: 3),
+    Duration? duration,
   }) {
     show(
       context,
@@ -239,11 +246,15 @@ class ToastHelper {
 class _ToastOverlay extends StatefulWidget {
   final Widget child;
   final Duration duration;
+  final Duration transitionDuration;
+  final Curve curve;
   final VoidCallback? onDismiss;
 
   const _ToastOverlay({
     required this.child,
     required this.duration,
+    required this.transitionDuration,
+    required this.curve,
     this.onDismiss,
   });
 
@@ -262,30 +273,33 @@ class _ToastOverlayState extends State<_ToastOverlay>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: widget.transitionDuration,
       vsync: this,
     );
 
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 1),
       end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+    ).animate(CurvedAnimation(parent: _controller, curve: widget.curve));
 
     _fadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+    ).animate(CurvedAnimation(parent: _controller, curve: widget.curve));
 
     // Register dismiss callback with ToastHelper
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ToastHelper.registerDismissCallback(_dismiss);
+      ToastHelper.registerDismissCallback(_dismiss, widget.transitionDuration);
     });
 
     // Start animation
     _controller.forward();
 
-    // Start reverse animation before removing
-    Future.delayed(widget.duration - const Duration(milliseconds: 300), () {
+    // Start reverse animation before removing.
+    final dismissDelay = widget.duration > widget.transitionDuration
+        ? widget.duration - widget.transitionDuration
+        : Duration.zero;
+    Future.delayed(dismissDelay, () {
       if (mounted && !_isDismissing) {
         _dismiss();
       }

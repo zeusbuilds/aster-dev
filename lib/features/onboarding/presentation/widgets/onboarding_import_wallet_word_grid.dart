@@ -28,6 +28,8 @@ class OnboardingImportWalletWordGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final spacing = context.spacing;
     final colors = context.appColors;
+    final effects = context.effects;
+    final metrics = context.metrics;
     final radius = context.radii;
     final textTheme = context.textTheme;
 
@@ -38,7 +40,7 @@ class OnboardingImportWalletWordGrid extends StatelessWidget {
         crossAxisCount: columnCount,
         mainAxisSpacing: spacing.sm,
         crossAxisSpacing: spacing.sm,
-        childAspectRatio: 4.5,
+        childAspectRatio: metrics.recoveryWordGridAspectRatio,
       ),
       itemCount: wordCount,
       itemBuilder: (context, index) {
@@ -63,11 +65,15 @@ class OnboardingImportWalletWordGrid extends StatelessWidget {
             vertical: spacing.sm,
           ),
           decoration: BoxDecoration(
-            color: context.colorScheme.surface.withValues(alpha: 0.15),
+            color: context.colorScheme.surface.withValues(
+              alpha: effects.brandGlassSurfaceOpacity,
+            ),
             borderRadius: BorderRadius.circular(radius.card),
             border: Border.all(
-              color: context.colorScheme.surface.withValues(alpha: 0.1),
-              width: 0.6,
+              color: context.colorScheme.surface.withValues(
+                alpha: effects.brandGlassBorderOpacity,
+              ),
+              width: spacing.hairline,
             ),
           ),
           alignment: Alignment.centerLeft,
@@ -76,7 +82,9 @@ class OnboardingImportWalletWordGrid extends StatelessWidget {
               Text(
                 '$number',
                 style: textTheme.labelSmall?.copyWith(
-                  color: AsterColors.white.withValues(alpha: 0.7),
+                  color: colors.onBrandArt.withValues(
+                    alpha: effects.brandContentSubtleOpacity,
+                  ),
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -86,7 +94,7 @@ class OnboardingImportWalletWordGrid extends StatelessWidget {
                     ? Text(
                         word,
                         style: textTheme.bodyMedium?.copyWith(
-                          color: AsterColors.white,
+                          color: colors.onBrandArt,
                           fontWeight: FontWeight.w500,
                         ),
                         overflow: TextOverflow.ellipsis,

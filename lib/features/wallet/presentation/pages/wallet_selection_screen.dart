@@ -15,8 +15,8 @@ class WalletSelectionScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final colors = context.appColors;
     final spacing = context.spacing;
+    final motion = context.motion;
     final walletState = ref.watch(walletViewModelProvider);
     final viewModel = ref.read(walletViewModelProvider.notifier);
 
@@ -44,12 +44,7 @@ class WalletSelectionScreen extends ConsumerWidget {
       body: ListView.separated(
         padding: EdgeInsets.only(bottom: spacing.bottomSafeRaw(context)),
         itemCount: walletState.wallets.length,
-        separatorBuilder: (context, index) => Divider(
-          color: colors.surfaceSubtle,
-          height: 1,
-          thickness: 1,
-          indent: spacing.screenPadding,
-        ),
+        separatorBuilder: (context, index) => const AsterDivider.inset(),
         itemBuilder: (context, index) {
           final wallet = walletState.wallets[index];
           final isSelected = walletState.activeWallet?.id == wallet.id;
@@ -60,7 +55,7 @@ class WalletSelectionScreen extends ConsumerWidget {
             onTap: () async {
               if (!isSelected) {
                 await viewModel.switchWallet(wallet.compactWalletId);
-                await Future.delayed(const Duration(milliseconds: 250));
+                await Future.delayed(motion.selectionCommitDelay);
                 if (!context.mounted) return;
                 context.pop();
               }

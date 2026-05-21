@@ -8,9 +8,6 @@ import '../../../../shared/shared.dart';
 import '../../data/models/chart_data_item.dart';
 
 const _kCandleCount = 24;
-const _kLoadingAnimationDuration = Duration(milliseconds: 1500);
-const _kTransitionDuration = Duration(milliseconds: 800);
-const _kPauseDuration = Duration(milliseconds: 50);
 const _kMinBodyHeight = 2.0;
 
 const _kBaseHeight = 0.8;
@@ -52,14 +49,15 @@ class _CandleChartState extends State<CandleChart>
   @override
   void initState() {
     super.initState();
+    const motion = AsterMotion();
     _loadingController = AnimationController(
       vsync: this,
-      duration: _kLoadingAnimationDuration,
+      duration: motion.chartLoadingCycleDuration,
     )..repeat();
 
     _transitionController = AnimationController(
       vsync: this,
-      duration: _kTransitionDuration,
+      duration: motion.chartTransitionDuration,
     );
 
     _loadingController.addListener(_checkAnimationProgress);
@@ -73,9 +71,18 @@ class _CandleChartState extends State<CandleChart>
     });
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final motion = context.motion;
+    _loadingController.duration = motion.chartLoadingCycleDuration;
+    _transitionController.duration = motion.chartTransitionDuration;
+  }
+
   void _checkAnimationProgress() {
     if (!_dataReady || _transitionTriggered) return;
 
+    final motion = context.motion;
     final progress = _loadingController.value;
     final currentIndex = (progress * _kCandleCount).floor() % _kCandleCount;
 
@@ -84,23 +91,30 @@ class _CandleChartState extends State<CandleChart>
 
       final remainingProgress = 1.0 - progress;
       final remainingTime =
-          remainingProgress * _kLoadingAnimationDuration.inMilliseconds;
+          remainingProgress * motion.chartLoadingCycleDuration.inMilliseconds;
 
-      Future.delayed(Duration(milliseconds: remainingTime.toInt() + 100), () {
-        if (mounted && _dataReady && _candles != null) {
-          _loadingController.stop();
-          _loadingAnimationProgress = _loadingController.value;
+      Future.delayed(
+        Duration(
+          milliseconds:
+              remainingTime.toInt() +
+              motion.chartTransitionSettleDelay.inMilliseconds,
+        ),
+        () {
+          if (mounted && _dataReady && _candles != null) {
+            _loadingController.stop();
+            _loadingAnimationProgress = _loadingController.value;
 
-          Future.delayed(_kPauseDuration, () {
-            if (mounted && _dataReady && _candles != null) {
-              setState(() {
-                _isTransitioning = true;
-              });
-              _transitionController.forward();
-            }
-          });
-        }
-      });
+            Future.delayed(motion.chartTransitionPauseDuration, () {
+              if (mounted && _dataReady && _candles != null) {
+                setState(() {
+                  _isTransitioning = true;
+                });
+                _transitionController.forward();
+              }
+            });
+          }
+        },
+      );
     }
   }
 
@@ -156,14 +170,14 @@ class _CandleChartState extends State<CandleChart>
 
   @override
   Widget build(BuildContext context) {
+    final spacing = context.spacing;
     final showLoading =
         widget.isSkeleton || (_shouldShowLoading && !_isTransitioning);
 
     return SizedBox(
-      height: 100,
+      height: spacing.chartHeight,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final spacing = context.spacing;
           final radius = context.radii;
           final candleSpacing = spacing.xxs;
           final borderRadius = radius.pill;
@@ -224,6 +238,7 @@ class _CandleChartState extends State<CandleChart>
       animation: _loadingController,
       builder: (context, _) {
         final progress = _loadingController.value;
+        final colors = context.appColors;
 
         return Stack(
           children: List.generate(_kCandleCount, (index) {
@@ -236,7 +251,7 @@ class _CandleChartState extends State<CandleChart>
 
             final opacityFactor =
                 _kBaseOpacity + (_kOpacityAmplitude * sinValue);
-            final candleColor = AsterColors.white.withValues(
+            final candleColor = colors.onBrandArt.withValues(
               alpha: opacityFactor,
             );
 
@@ -274,7 +289,8 @@ class _CandleChartState extends State<CandleChart>
     return AnimatedBuilder(
       animation: _transitionController,
       builder: (context, _) {
-        final animationValue = Curves.easeInOut.transform(
+        final colors = context.appColors;
+        final animationValue = context.motion.chartTransitionCurve.transform(
           _transitionController.value,
         );
 
@@ -320,10 +336,10 @@ class _CandleChartState extends State<CandleChart>
             final currentCenterY =
                 startCenterY + (targetCenterY - startCenterY) * animationValue;
 
-            final startColor = AsterColors.white.withValues(
+            final startColor = colors.onBrandArt.withValues(
               alpha: startOpacity,
             );
-            final targetColor = AsterColors.white.withValues(
+            final targetColor = colors.onBrandArt.withValues(
               alpha: _kTargetOpacity,
             );
             final currentColor = Color.lerp(
@@ -392,7 +408,9 @@ class _CandleChartState extends State<CandleChart>
           width: candleWidth,
           height: actualBodyHeight,
           centerY: centerY,
-          color: AsterColors.white.withValues(alpha: _kTargetOpacity),
+          color: context.appColors.onBrandArt.withValues(
+            alpha: _kTargetOpacity,
+          ),
           borderRadius: borderRadius,
         );
       }),

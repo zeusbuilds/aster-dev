@@ -26,23 +26,29 @@ class ScanFrame extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final flashOn = ref.watch(scanViewModelProvider).flashOn;
     final spacing = context.spacing;
+    final colors = context.appColors;
+    final effects = context.effects;
+    final metrics = context.metrics;
     final radius = context.radii;
     final textTheme = context.textTheme;
-    final frameSize = MediaQuery.of(context).size.width * 0.7;
+    final frameSize =
+        MediaQuery.of(context).size.width * metrics.scanFrameSizeFactor;
 
     return Container(
       width: frameSize,
       height: frameSize,
       padding: EdgeInsets.only(bottom: spacing.md),
       decoration: BoxDecoration(
-        border: Border.all(color: AsterColors.white, width: 0.5),
+        border: Border.all(color: colors.onScan, width: spacing.hairline),
       ),
       child: Align(
         alignment: Alignment.bottomCenter,
         child: Container(
           padding: EdgeInsets.all(spacing.xs),
           decoration: BoxDecoration(
-            color: AsterColors.black.withValues(alpha: 0.4),
+            color: colors.scanControlSurface.withValues(
+              alpha: effects.scanControlSurfaceOpacity,
+            ),
             borderRadius: BorderRadius.circular(radius.pill),
           ),
           child: Row(
@@ -52,7 +58,7 @@ class ScanFrame extends ConsumerWidget {
                 onTap: onGalleryTap ?? () {},
                 child: Icon(
                   MingCuteIcons.mgc_photo_album_line,
-                  color: AsterColors.white,
+                  color: colors.onScan,
                   size: spacing.lg,
                 ),
               ),
@@ -63,7 +69,7 @@ class ScanFrame extends ConsumerWidget {
                   flashOn
                       ? MingCuteIcons.mgc_flash_fill
                       : MingCuteIcons.mgc_flash_line,
-                  color: AsterColors.white,
+                  color: colors.onScan,
                   size: spacing.lg,
                 ),
               ),
@@ -73,7 +79,7 @@ class ScanFrame extends ConsumerWidget {
                 child: Text(
                   zoomDisplayText,
                   style: textTheme.bodyMedium?.copyWith(
-                    color: AsterColors.white,
+                    color: colors.onScan,
                     fontWeight: FontWeight.w600,
                   ),
                 ),

@@ -42,19 +42,18 @@ class ReceiveSetAmountScreen extends StatelessWidget {
                 buttonWidth:
                     (MediaQuery.of(context).size.width -
                         spacing.screenPadding * 2 -
-                        80) /
+                        spacing.keypadHorizontalReserve) /
                     3,
-                buttonHeight: 60,
-                rowSpacing: spacing.sm,
-                columnSpacing: spacing.sm,
+                buttonHeight: spacing.keypadButtonHeight,
+                rowSpacing: spacing.keypadGap,
+                columnSpacing: spacing.keypadGap,
                 buttonColor: colors.surfaceSubtle,
                 buttonTextStyle:
                     textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w600,
                       color: context.colorScheme.onSurface,
                     ) ??
-                    TextStyle(
-                      fontSize: 24,
+                    textTheme.titleLarge!.copyWith(
                       fontWeight: FontWeight.w600,
                       color: context.colorScheme.onSurface,
                     ),

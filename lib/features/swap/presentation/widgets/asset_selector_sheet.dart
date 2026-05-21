@@ -32,15 +32,17 @@ class AssetSelectorSheet extends StatelessWidget {
     required List<AssetModel> assets,
     String? selectedAssetName,
   }) {
+    final colors = context.appColors;
+    final motion = context.motion;
     return showModalBottomSheet<AssetModel>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: colors.transparentSurface,
       builder: (context) => AssetSelectorSheet(
         assets: assets,
         selectedAssetName: selectedAssetName,
         onAssetSelected: (asset) {
-          Future.delayed(const Duration(milliseconds: 250), () {
+          Future.delayed(motion.selectionCommitDelay, () {
             if (context.mounted) {
               Navigator.of(context).pop(asset);
             }
@@ -55,7 +57,8 @@ class AssetSelectorSheet extends StatelessWidget {
     final spacing = context.spacing;
     final radius = context.radii;
     final textTheme = context.textTheme;
-    final maxHeight = MediaQuery.of(context).size.height * 0.7;
+    final maxHeight =
+        MediaQuery.of(context).size.height * spacing.sheetMaxHeightFactor;
 
     return Container(
       constraints: BoxConstraints(maxHeight: maxHeight),
@@ -70,8 +73,8 @@ class AssetSelectorSheet extends StatelessWidget {
           SizedBox(height: spacing.md),
           // Handle bar
           Container(
-            width: 56,
-            height: 4,
+            width: spacing.sheetHandleWidth,
+            height: spacing.sheetHandleHeight,
             decoration: BoxDecoration(
               color: context.colorScheme.surfaceContainerHigh,
               borderRadius: BorderRadius.circular(radius.pill),
@@ -141,6 +144,8 @@ class _AssetItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
+    final effects = context.effects;
+    final motion = context.motion;
     final spacing = context.spacing;
     final radius = context.radii;
     final textTheme = context.textTheme;
@@ -154,11 +159,14 @@ class _AssetItem extends StatelessWidget {
       },
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
+        duration: motion.selectionTransitionDuration,
+        curve: motion.fastEase,
         padding: EdgeInsets.symmetric(vertical: spacing.xs),
         decoration: BoxDecoration(
           color: isSelected
-              ? context.colorScheme.primaryContainer.withValues(alpha: 0.5)
+              ? context.colorScheme.primaryContainer.withValues(
+                  alpha: effects.selectedContainerOpacity,
+                )
               : context.colorScheme.surface,
         ),
         child: Row(
@@ -171,7 +179,7 @@ class _AssetItem extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isSelected
                     ? context.colorScheme.primary
-                    : Colors.transparent,
+                    : colors.transparentSurface,
                 borderRadius: BorderRadius.circular(radius.pill),
               ),
             ),
@@ -184,7 +192,7 @@ class _AssetItem extends StatelessWidget {
               errorBuilder: (context, error, stackTrace) => Icon(
                 Icons.circle,
                 size: spacing.iconXl,
-                color: Color(asset.color),
+                color: asset.themedColor(context),
               ),
             ),
             SizedBox(width: spacing.sm),

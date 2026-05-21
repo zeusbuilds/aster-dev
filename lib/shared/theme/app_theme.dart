@@ -11,6 +11,9 @@ class AppTheme {
   static const _radii = AsterRadii();
   static const _shadows = AsterShadows();
   static const _typography = AsterTypography();
+  static const _metrics = AsterComponentMetrics();
+  static const _motion = AsterMotion();
+  static const _effects = AsterEffects();
 
   static ThemeData light() {
     final scheme = _colorScheme();
@@ -31,6 +34,9 @@ class AppTheme {
         _radii,
         _shadows,
         _typography,
+        _metrics,
+        _motion,
+        _effects,
       ],
       appBarTheme: AppBarTheme(
         backgroundColor: scheme.surface,
@@ -63,9 +69,15 @@ class AppTheme {
         ),
         border: _outlineBorder(_colors.borderSubtle),
         enabledBorder: _outlineBorder(_colors.borderSubtle),
-        focusedBorder: _outlineBorder(scheme.primary, width: 1.5),
+        focusedBorder: _outlineBorder(
+          scheme.primary,
+          width: _metrics.focusBorderWidth,
+        ),
         errorBorder: _outlineBorder(scheme.error),
-        focusedErrorBorder: _outlineBorder(scheme.error, width: 1.5),
+        focusedErrorBorder: _outlineBorder(
+          scheme.error,
+          width: _metrics.focusBorderWidth,
+        ),
         labelStyle: textTheme.bodyMedium?.copyWith(
           color: _colors.textSecondary,
         ),
@@ -176,7 +188,10 @@ class AppTheme {
               : AsterColors.transparent;
         }),
         checkColor: WidgetStateProperty.all(scheme.onPrimary),
-        side: BorderSide(color: _colors.borderSubtle, width: 1.5),
+        side: BorderSide(
+          color: _colors.borderSubtle,
+          width: _metrics.focusBorderWidth,
+        ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(_radii.xs),
         ),
@@ -192,14 +207,20 @@ class AppTheme {
         activeTrackColor: scheme.primary,
         inactiveTrackColor: _colors.surfaceSubtle,
         thumbColor: scheme.primary,
-        overlayColor: scheme.primary.withValues(alpha: 0.12),
+        overlayColor: scheme.primary.withValues(
+          alpha: _effects.primaryOverlayOpacity,
+        ),
         valueIndicatorColor: scheme.primary,
         valueIndicatorTextStyle: textTheme.labelSmall?.copyWith(
           color: scheme.onPrimary,
         ),
         trackShape: const RoundedRectSliderTrackShape(),
-        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
-        overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+        thumbShape: RoundSliderThumbShape(
+          enabledThumbRadius: _metrics.sliderThumbRadius,
+        ),
+        overlayShape: RoundSliderOverlayShape(
+          overlayRadius: _metrics.sliderOverlayRadius,
+        ),
       ),
       progressIndicatorTheme: ProgressIndicatorThemeData(
         color: scheme.primary,
@@ -302,10 +323,13 @@ class AppTheme {
     );
   }
 
-  static OutlineInputBorder _outlineBorder(Color color, {double width = 1}) {
+  static OutlineInputBorder _outlineBorder(Color color, {double? width}) {
     return OutlineInputBorder(
       borderRadius: BorderRadius.circular(_radii.input),
-      borderSide: BorderSide(color: color, width: width),
+      borderSide: BorderSide(
+        color: color,
+        width: width ?? _metrics.borderWidth,
+      ),
     );
   }
 

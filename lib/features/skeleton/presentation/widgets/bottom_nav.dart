@@ -39,7 +39,7 @@ class _BottomNavState extends ConsumerState<BottomNav> {
       child: Center(
         child: Container(
           margin: EdgeInsets.symmetric(horizontal: spacing.xxl),
-          height: 56,
+          height: spacing.bottomNavHeight,
           padding: EdgeInsets.symmetric(horizontal: spacing.md),
           decoration: BoxDecoration(
             color: context.appColors.surfaceRaised,
@@ -58,7 +58,7 @@ class _BottomNavState extends ConsumerState<BottomNav> {
                       selectedIndex: index,
                       itemKeys: _itemKeys,
                       containerWidth: constraints.maxWidth,
-                      containerHeight: 56,
+                      containerHeight: spacing.bottomNavHeight,
                     ),
                     // Icons in front
                     Row(
@@ -218,16 +218,27 @@ class _AnimatedCircleState extends State<_AnimatedCircle>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 150),
+      duration: const AsterMotion().navIndicatorDuration,
       vsync: this,
     );
     _animation = CurvedAnimation(
       parent: _controller,
-      curve: Curves.fastOutSlowIn,
+      curve: const AsterMotion().navIndicatorCurve,
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _updatePosition(isInitial: true);
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final motion = context.motion;
+    _controller.duration = motion.navIndicatorDuration;
+    _animation = CurvedAnimation(
+      parent: _controller,
+      curve: motion.navIndicatorCurve,
+    );
   }
 
   @override
@@ -308,8 +319,9 @@ class _AnimatedCircleState extends State<_AnimatedCircle>
     final radius = context.radii;
     final colors = context.appColors;
     final shadows = context.shadows;
-    const double pillWidth = 56;
-    const double pillHeight = 40;
+    final spacing = context.spacing;
+    final pillWidth = spacing.bottomNavIndicatorWidth;
+    final pillHeight = spacing.bottomNavIndicatorHeight;
 
     return AnimatedBuilder(
       animation: _animation,

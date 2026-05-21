@@ -13,6 +13,8 @@ class SendScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final spacing = context.spacing;
+
     return Scaffold(
       backgroundColor: context.colorScheme.surface,
       appBar: CustomAppBar(
@@ -23,9 +25,7 @@ class SendScreen extends StatelessWidget {
       body: SafeArea(
         bottom: true,
         child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: context.spacing.screenPadding,
-          ),
+          padding: EdgeInsets.symmetric(horizontal: spacing.screenPadding),
           child: Column(
             children: [
               SendCard(
@@ -37,10 +37,14 @@ class SendScreen extends StatelessWidget {
               const Spacer(),
               CustomNumPad(
                 key: const ValueKey('send-keyboard'),
-                buttonWidth: (MediaQuery.of(context).size.width - 40 - 80) / 3,
-                buttonHeight: 60,
-                rowSpacing: 10,
-                columnSpacing: 10,
+                buttonWidth:
+                    (MediaQuery.of(context).size.width -
+                        spacing.screenPadding * 2 -
+                        spacing.keypadHorizontalReserve) /
+                    3,
+                buttonHeight: spacing.keypadButtonHeight,
+                rowSpacing: spacing.keypadGap,
+                columnSpacing: spacing.keypadGap,
                 buttonColor: context.appColors.surfaceSubtle,
                 buttonTextStyle: context.textTheme.headlineSmall!
                     .copyWith(
@@ -49,7 +53,7 @@ class SendScreen extends StatelessWidget {
                     )
                     .toNumeric(context),
               ),
-              SizedBox(height: context.spacing.xl),
+              SizedBox(height: spacing.xl),
               CustomButton(text: 'Continue', onTap: () {}),
             ],
           ),

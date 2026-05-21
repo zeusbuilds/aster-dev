@@ -126,7 +126,7 @@ class _SendAddressCardState extends State<SendAddressCard> {
                 errorBuilder: (context, error, stackTrace) => Icon(
                   Icons.circle,
                   size: spacing.xxl,
-                  color: Color(widget.asset.color),
+                  color: widget.asset.themedColor(context),
                 ),
               ),
               SizedBox(width: spacing.sm),

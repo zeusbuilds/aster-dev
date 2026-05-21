@@ -15,6 +15,7 @@ class MarketScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
+    final effects = context.effects;
     final spacing = context.spacing;
 
     final tiles = [
@@ -23,7 +24,9 @@ class MarketScreen extends StatelessWidget {
         subtitle: 'Load wallet',
         icon: RemixIcons.shopping_bag_3_line,
         gradientColors: colors.marketBuyGradient,
-        shadowColor: colors.bitcoin.withValues(alpha: 0.16),
+        shadowColor: colors.bitcoin.withValues(
+          alpha: effects.marketShadowOpacity,
+        ),
         tipText: 'From 0.1% fee',
         onTap: () {
           // TODO: Navigate to buy screen
@@ -34,7 +37,9 @@ class MarketScreen extends StatelessWidget {
         subtitle: 'Unload wallet',
         icon: RemixIcons.shopping_cart_line,
         gradientColors: colors.marketSellGradient,
-        shadowColor: colors.brandArtBright.withValues(alpha: 0.16),
+        shadowColor: colors.brandArtBright.withValues(
+          alpha: effects.marketShadowOpacity,
+        ),
         tipText: 'Instant payout',
         onTap: () {
           // TODO: Navigate to sell screen
@@ -45,7 +50,9 @@ class MarketScreen extends StatelessWidget {
         subtitle: 'Exchange assets',
         icon: RemixIcons.token_swap_line,
         gradientColors: colors.marketSwapGradient,
-        shadowColor: colors.overlay.withValues(alpha: 0.16),
+        shadowColor: colors.overlay.withValues(
+          alpha: effects.marketShadowOpacity,
+        ),
         tipText: 'Best rate',
         onTap: () {
           context.push(RoutePaths.swap);
@@ -56,7 +63,9 @@ class MarketScreen extends StatelessWidget {
         subtitle: 'Earn interest',
         icon: RemixIcons.bank_line,
         gradientColors: colors.marketLendGradient,
-        shadowColor: colors.brandArtDeep.withValues(alpha: 0.16),
+        shadowColor: colors.brandArtDeep.withValues(
+          alpha: effects.marketShadowOpacity,
+        ),
         tipText: '12.4% APY',
         onTap: () {
           // TODO: Navigate to lend screen
@@ -67,7 +76,9 @@ class MarketScreen extends StatelessWidget {
         subtitle: 'Send bitcoin',
         icon: RemixIcons.arrow_right_up_line,
         gradientColors: colors.marketSendGradient,
-        shadowColor: colors.danger.withValues(alpha: 0.16),
+        shadowColor: colors.danger.withValues(
+          alpha: effects.marketShadowOpacity,
+        ),
         tipText: '~10 min confirmations',
         onTap: () {
           context.push(RoutePaths.sendAddress);
@@ -78,7 +89,9 @@ class MarketScreen extends StatelessWidget {
         subtitle: 'Receive bitcoin',
         icon: RemixIcons.arrow_right_down_line,
         gradientColors: colors.marketReceiveGradient,
-        shadowColor: colors.success.withValues(alpha: 0.16),
+        shadowColor: colors.success.withValues(
+          alpha: effects.marketShadowOpacity,
+        ),
         tipText: 'Free & instant',
         onTap: () {
           context.push(RoutePaths.receive);

@@ -16,4 +16,10 @@ extension ThemeContext on BuildContext {
       theme.extension<AsterShadows>() ?? const AsterShadows();
   AsterTypography get typography =>
       theme.extension<AsterTypography>() ?? const AsterTypography();
+  AsterComponentMetrics get metrics =>
+      theme.extension<AsterComponentMetrics>() ?? const AsterComponentMetrics();
+  AsterMotion get motion =>
+      theme.extension<AsterMotion>() ?? const AsterMotion();
+  AsterEffects get effects =>
+      theme.extension<AsterEffects>() ?? const AsterEffects();
 }

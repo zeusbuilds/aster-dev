@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shared/shared.dart';
 
+const _bootstrapMotion = AsterMotion();
+
 /// Shows the animated startup splash while bootstrapping app dependencies.
 ///
 /// Once initialization is complete, the animation plays and reveals the app
@@ -66,7 +68,7 @@ class _AppLoaderState extends State<AppLoader>
     // Ensure the app underneath has been laid out, then play the reveal.
     SchedulerBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        Future<void>.delayed(const Duration(milliseconds: 500), () {
+        Future<void>.delayed(_bootstrapMotion.bootstrapRevealDelay, () {
           if (mounted) {
             _controller.forward().ignore();
           }
@@ -77,9 +79,10 @@ class _AppLoaderState extends State<AppLoader>
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        systemNavigationBarColor: Colors.transparent,
+      value: SystemUiOverlayStyle(
+        systemNavigationBarColor: colors.transparentSurface,
         systemNavigationBarIconBrightness: Brightness.light,
       ),
       child: Directionality(

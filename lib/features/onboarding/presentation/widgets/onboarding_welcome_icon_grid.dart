@@ -19,6 +19,7 @@ class OnboardingWelcomeIconGrid extends StatelessWidget {
     const centerRow = 1;
     const centerCol = 3;
     const centerIndex = centerRow * cols + centerCol;
+    final metrics = context.metrics;
 
     // Per-tile opacities, row order: top → bottom, col order: left → right.
     const tileOpacities = <List<double>>[
@@ -32,10 +33,10 @@ class OnboardingWelcomeIconGrid extends StatelessWidget {
       aspectRatio: cols / rows,
       child: GridView.builder(
         physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: cols,
-          mainAxisSpacing: 6,
-          crossAxisSpacing: 6,
+          mainAxisSpacing: metrics.onboardingIconGridGap,
+          crossAxisSpacing: metrics.onboardingIconGridGap,
         ),
         itemCount: total,
         itemBuilder: (context, index) {
@@ -80,21 +81,28 @@ class _BlurTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final radiusTokens = context.radii;
+    final effects = context.effects;
+    final metrics = context.metrics;
     final radius = BorderRadius.circular(radiusTokens.xs);
     final hasBorder = (opacity - 0.05).abs() < 0.001;
 
     return ClipRRect(
       borderRadius: radius,
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        filter: ImageFilter.blur(
+          sigmaX: metrics.onboardingIconBlurSigma,
+          sigmaY: metrics.onboardingIconBlurSigma,
+        ),
         child: Container(
           decoration: BoxDecoration(
             borderRadius: radius,
             color: context.colorScheme.surface.withValues(alpha: opacity),
             border: hasBorder
                 ? Border.all(
-                    color: context.colorScheme.surface.withValues(alpha: 0.1),
-                    width: 0.6,
+                    color: context.colorScheme.surface.withValues(
+                      alpha: effects.brandGlassBorderOpacity,
+                    ),
+                    width: context.spacing.hairline,
                   )
                 : null,
           ),

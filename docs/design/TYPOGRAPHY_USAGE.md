@@ -14,6 +14,9 @@ final app = context.appColors;
 final spacing = context.spacing;
 final radii = context.radii;
 final shadows = context.shadows;
+final effects = context.effects;
+final motion = context.motion;
+final metrics = context.metrics;
 ```
 
 ## Colors
@@ -43,17 +46,21 @@ Text(
 );
 ```
 
-Do not use old primitive names in feature code:
+Do not use primitive or art-specific names for ordinary product UI:
 
 ```dart
 // Avoid
 context.appColors.brandArtMain;
-context.spacing.xxl; // Only use when it is truly a component gap.
+AsterColors.blueBase;
 
 // Prefer
 context.colorScheme.primary;
-context.spacing.screenPadding;
+context.appColors.chartPositive;
 ```
+
+Art-only roles such as `brandArtMain`, mesh colors, scan overlay colors, and
+market tile colors should stay inside the widgets that render that visual
+system.
 
 ## Typography
 
@@ -122,6 +129,62 @@ BoxDecoration(
 ```
 
 Available shadows are `none`, `raised`, `sheet`, and `modal`.
+
+## Effects
+
+Use `context.effects` for reusable visual treatments that are not colors:
+
+```dart
+Opacity(
+  opacity: context.effects.disabledOpacity,
+  child: child,
+);
+```
+
+Effects include disabled states, translucent surfaces, overlay opacity, market
+tile treatments, scan scrims, and brand-art glass/noise opacity. Do not create
+new `withValues(alpha: 0.12)` decisions in feature code. If an opacity has
+product meaning and appears more than once, add a semantic effect.
+
+Painter math may keep local computed opacity when the opacity is part of the
+drawing algorithm rather than a reusable design decision.
+
+## Motion
+
+Use `context.motion` for component timing, interaction feedback, and screen
+choreography:
+
+```dart
+AnimatedContainer(
+  duration: context.motion.selectionTransitionDuration,
+  curve: context.motion.fastEase,
+  child: child,
+);
+```
+
+Available motion roles cover button press feedback, selection commits, bottom
+nav movement, toast entrance/exit, skeleton/loading cycles, startup reveal,
+splash reveal timing, chart loading/transition timing, and the swap screen
+choreography. Do not add raw `Duration(milliseconds: 300)` or
+`Curves.easeOutCubic` to product UI. Custom painters may keep local geometry,
+phase offsets, and interpolation math, but reusable timing and curves should
+come from `context.motion` or `AsterMotion`.
+
+Keep choreography tokenized as semantic phases, not as generic ramps. Prefer
+names like `swapKeyboardTransitionDuration` over `duration300`.
+
+## Component Metrics
+
+Use `context.metrics` for component measurements that are not layout spacing:
+
+```dart
+SizedBox(height: context.metrics.buttonHeight);
+```
+
+Metrics include button heights, border widths, slider radii, chart/art ratios,
+scan frame ratios, market texture sizing, and swap animation distance. Use
+`context.spacing` for layout gaps and padding; use `context.metrics` when the
+number belongs to a component's physical shape or behavior.
 
 ## Migration Examples
 

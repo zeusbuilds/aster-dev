@@ -97,6 +97,8 @@ class _ImportWalletContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
+    final colors = context.appColors;
+    final effects = context.effects;
     final textTheme = context.textTheme;
 
     return Column(
@@ -118,9 +120,8 @@ class _ImportWalletContent extends StatelessWidget {
               Text(
                 'Import with recovery phrase',
                 style: textTheme.displaySmall?.copyWith(
-                  color: AsterColors.white,
+                  color: colors.onBrandArt,
                   fontWeight: FontWeight.w600,
-                  height: 1.1,
                 ),
               ),
               SizedBox(height: spacing.md),
@@ -128,8 +129,9 @@ class _ImportWalletContent extends StatelessWidget {
                 'Enter your 12-word recovery phrase in order. '
                 'Each word goes in its own field.',
                 style: textTheme.bodyLarge?.copyWith(
-                  color: AsterColors.white.withValues(alpha: 0.9),
-                  height: 1.4,
+                  color: colors.onBrandArt.withValues(
+                    alpha: effects.brandContentStrongOpacity,
+                  ),
                 ),
               ),
               SizedBox(height: spacing.iconLg),
@@ -160,8 +162,10 @@ class _ImportWalletContent extends StatelessWidget {
             controller: pageController,
             count: 3,
             effect: ExpandingDotsEffect(
-              activeDotColor: AsterColors.white,
-              dotColor: AsterColors.white.withValues(alpha: 0.35),
+              activeDotColor: colors.onBrandArt,
+              dotColor: colors.onBrandArt.withValues(
+                alpha: effects.brandIndicatorInactiveOpacity,
+              ),
               dotHeight: spacing.sm,
               dotWidth: spacing.sm,
               expansionFactor: 4,
@@ -179,7 +183,9 @@ class _ImportWalletContent extends StatelessWidget {
                 child: Text(
                   'Never share your recovery phrase with anyone',
                   style: textTheme.bodyMedium?.copyWith(
-                    color: AsterColors.white.withValues(alpha: 0.7),
+                    color: colors.onBrandArt.withValues(
+                      alpha: effects.brandContentSubtleOpacity,
+                    ),
                   ),
                 ),
               ),
@@ -201,7 +207,9 @@ class _ImportWalletContent extends StatelessWidget {
                     child: Text(
                       'Back',
                       style: textTheme.bodyLarge?.copyWith(
-                        color: AsterColors.white.withValues(alpha: 0.9),
+                        color: colors.onBrandArt.withValues(
+                          alpha: effects.brandContentStrongOpacity,
+                        ),
                         fontWeight: FontWeight.w600,
                       ),
                     ),

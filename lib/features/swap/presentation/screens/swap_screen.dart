@@ -37,47 +37,64 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    const motion = AsterMotion();
 
     // Details sequential animation
     _detailsAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 1200),
+      duration: motion.swapDetailsRevealDuration,
       vsync: this,
     );
 
     // Details fade-out animation (for cancel - all at once)
     _detailsFadeOutController = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: motion.swapDetailsDismissDuration,
       vsync: this,
     );
 
-    // Swap text fade-in animation (starts at 300ms, duration 400ms)
+    // Swap text fade-in animation follows the keyboard transition.
     _swapTextAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 400),
+      duration: motion.swapMessageTransitionDuration,
       vsync: this,
     );
 
-    // Details fade-out animation
+    _buildAnimations(motion);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final motion = context.motion;
+    _detailsAnimationController.duration = motion.swapDetailsRevealDuration;
+    _detailsFadeOutController.duration = motion.swapDetailsDismissDuration;
+    _swapTextAnimationController.duration =
+        motion.swapMessageTransitionDuration;
+    _buildAnimations(motion);
+  }
+
+  void _buildAnimations(AsterMotion motion) {
     _detailsFadeOutAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
-      CurvedAnimation(parent: _detailsFadeOutController, curve: Curves.easeIn),
+      CurvedAnimation(
+        parent: _detailsFadeOutController,
+        curve: motion.fadeOutCurve,
+      ),
     );
 
-    // Swap text fade animation
     _swapTextFadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _swapTextAnimationController,
-        curve: Curves.easeIn,
+        curve: motion.fadeInCurve,
       ),
     );
 
     // Create staggered animations for each detail row
     _detailAnimations = List.generate(_detailRows.length, (index) {
-      final delay = index * 0.15; // 150ms delay between each
+      final delay = index * motion.swapDetailStaggerStep;
       final start = delay.clamp(0.0, 1.0);
-      final end = (delay + 0.85).clamp(0.0, 1.0);
+      final end = (delay + motion.swapDetailRevealWindow).clamp(0.0, 1.0);
       return Tween<double>(begin: 0.0, end: 1.0).animate(
         CurvedAnimation(
           parent: _detailsAnimationController,
-          curve: Interval(start, end, curve: Curves.easeOutCubic),
+          curve: Interval(start, end, curve: motion.choreographyCurve),
         ),
       );
     });
@@ -95,19 +112,21 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
   ///
   /// Hides keyboard, shows swap details with staggered animation, and displays cancel option
   void _onContinueTap() {
+    if (!_showKeyboard) return;
+
+    final motion = context.motion;
+
     // Dismiss keyboard with fade
     FocusScope.of(context).unfocus();
 
     // Phase 1: Remove keyboard from widget tree (AnimatedSwitcher will fade it out)
-    // Duration: 0-300ms
     setState(() {
       _showKeyboard = false;
     });
 
     // Phase 2: Swap text becomes visible (takes space, but opacity 0)
     // This triggers AnimatedSize to grow the Column, smoothly moving button up
-    // Duration: 300ms-700ms (400ms for AnimatedSize)
-    Future.delayed(const Duration(milliseconds: 300), () {
+    Future.delayed(motion.swapKeyboardTransitionDuration, () {
       if (mounted) {
         // Text is already in tree, AnimatedSize will grow Column
         // Then fade in the text
@@ -116,8 +135,7 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
     });
 
     // Phase 3: Show details with animation after keyboard fade completes
-    // Duration: 300ms-1500ms
-    Future.delayed(const Duration(milliseconds: 300), () {
+    Future.delayed(motion.swapKeyboardTransitionDuration, () {
       if (mounted) {
         // Reset animations to start fresh
         _detailsAnimationController.reset();
@@ -134,6 +152,10 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
   ///
   /// Fades out details, hides cancel text, and shows keyboard again
   void _onCancelTap() {
+    if (_showKeyboard) return;
+
+    final motion = context.motion;
+
     // Phase 1: Fade out all detail rows at once
     _detailsFadeOutController.forward().then((_) {
       if (mounted) {
@@ -147,7 +169,7 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
     });
 
     // Phase 2: Fade out cancel text (start slightly after details start fading)
-    Future.delayed(const Duration(milliseconds: 100), () {
+    Future.delayed(motion.swapCancelStaggerDelay, () {
       if (mounted) {
         _swapTextAnimationController.reverse().then((_) {
           if (mounted) {
@@ -166,6 +188,8 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
     final spacing = context.spacing;
     final colors = context.appColors;
     final textTheme = context.textTheme;
+    final metrics = context.metrics;
+    final motion = context.motion;
 
     return Scaffold(
       backgroundColor: context.colorScheme.surface,
@@ -220,7 +244,7 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
                                       return Transform.translate(
                                         offset: Offset(
                                           (1 - _detailAnimations[index].value) *
-                                              50,
+                                              metrics.swapDetailSlideDistance,
                                           0,
                                         ),
                                         child: Opacity(
@@ -257,7 +281,9 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 300),
+                        duration: motion.swapKeyboardTransitionDuration,
+                        switchInCurve: motion.fadeInCurve,
+                        switchOutCurve: motion.fadeOutCurve,
                         transitionBuilder:
                             (Widget child, Animation<double> animation) {
                               return FadeTransition(
@@ -271,11 +297,11 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
                                 buttonWidth:
                                     (MediaQuery.of(context).size.width -
                                         spacing.screenPadding * 2 -
-                                        80) /
+                                        spacing.keypadHorizontalReserve) /
                                     3,
-                                buttonHeight: 60,
-                                rowSpacing: spacing.sm,
-                                columnSpacing: spacing.sm,
+                                buttonHeight: spacing.keypadButtonHeight,
+                                rowSpacing: spacing.keypadGap,
+                                columnSpacing: spacing.keypadGap,
                                 buttonColor: colors.surfaceSubtle,
                                 buttonTextStyle: textTheme.headlineSmall!
                                     .copyWith(
@@ -288,11 +314,13 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
                       ),
                       SizedBox(height: spacing.xl),
                       CustomButton(text: 'Continue', onTap: _onContinueTap),
-                      // Animated height for text space (text height ~20 + padding 12 = ~32)
+                      // Reserve the cancel action space while its label fades.
                       AnimatedContainer(
-                        duration: const Duration(milliseconds: 400),
-                        curve: Curves.easeOutCubic,
-                        height: !_showKeyboard ? 32 : 0,
+                        duration: motion.swapMessageTransitionDuration,
+                        curve: motion.choreographyCurve,
+                        height: !_showKeyboard
+                            ? spacing.collapsedMessageHeight
+                            : 0,
                         child: !_showKeyboard
                             ? AnimatedBuilder(
                                 animation: _swapTextFadeAnimation,

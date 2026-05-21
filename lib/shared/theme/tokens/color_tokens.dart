@@ -27,6 +27,13 @@ class AsterColors extends ThemeExtension<AsterColors> {
     required this.liquid,
     required this.chartPositive,
     required this.chartNegative,
+    required this.onBrandArt,
+    required this.transparentSurface,
+    required this.artNoiseTint,
+    required this.scanOverlayBase,
+    required this.scanControlSurface,
+    required this.onScan,
+    required this.onMarketTile,
     required this.brandArtDark,
     required this.brandArtDeep,
     required this.brandArtMain,
@@ -81,6 +88,13 @@ class AsterColors extends ThemeExtension<AsterColors> {
   final Color liquid;
   final Color chartPositive;
   final Color chartNegative;
+  final Color onBrandArt;
+  final Color transparentSurface;
+  final Color artNoiseTint;
+  final Color scanOverlayBase;
+  final Color scanControlSurface;
+  final Color onScan;
+  final Color onMarketTile;
   final Color brandArtDark;
   final Color brandArtDeep;
   final Color brandArtMain;
@@ -116,6 +130,13 @@ class AsterColors extends ThemeExtension<AsterColors> {
     liquid: Color(0xFF14A38B),
     chartPositive: Color(0xFF00B42A),
     chartNegative: Color(0xFFF53F3F),
+    onBrandArt: white,
+    transparentSurface: transparent,
+    artNoiseTint: black,
+    scanOverlayBase: black,
+    scanControlSurface: black,
+    onScan: white,
+    onMarketTile: white,
     brandArtDark: black,
     brandArtDeep: meshDeep,
     brandArtMain: meshMain,
@@ -153,6 +174,13 @@ class AsterColors extends ThemeExtension<AsterColors> {
     Color? liquid,
     Color? chartPositive,
     Color? chartNegative,
+    Color? onBrandArt,
+    Color? transparentSurface,
+    Color? artNoiseTint,
+    Color? scanOverlayBase,
+    Color? scanControlSurface,
+    Color? onScan,
+    Color? onMarketTile,
     Color? brandArtDark,
     Color? brandArtDeep,
     Color? brandArtMain,
@@ -188,6 +216,13 @@ class AsterColors extends ThemeExtension<AsterColors> {
       liquid: liquid ?? this.liquid,
       chartPositive: chartPositive ?? this.chartPositive,
       chartNegative: chartNegative ?? this.chartNegative,
+      onBrandArt: onBrandArt ?? this.onBrandArt,
+      transparentSurface: transparentSurface ?? this.transparentSurface,
+      artNoiseTint: artNoiseTint ?? this.artNoiseTint,
+      scanOverlayBase: scanOverlayBase ?? this.scanOverlayBase,
+      scanControlSurface: scanControlSurface ?? this.scanControlSurface,
+      onScan: onScan ?? this.onScan,
+      onMarketTile: onMarketTile ?? this.onMarketTile,
       brandArtDark: brandArtDark ?? this.brandArtDark,
       brandArtDeep: brandArtDeep ?? this.brandArtDeep,
       brandArtMain: brandArtMain ?? this.brandArtMain,
@@ -237,6 +272,21 @@ class AsterColors extends ThemeExtension<AsterColors> {
       liquid: Color.lerp(liquid, other.liquid, t)!,
       chartPositive: Color.lerp(chartPositive, other.chartPositive, t)!,
       chartNegative: Color.lerp(chartNegative, other.chartNegative, t)!,
+      onBrandArt: Color.lerp(onBrandArt, other.onBrandArt, t)!,
+      transparentSurface: Color.lerp(
+        transparentSurface,
+        other.transparentSurface,
+        t,
+      )!,
+      artNoiseTint: Color.lerp(artNoiseTint, other.artNoiseTint, t)!,
+      scanOverlayBase: Color.lerp(scanOverlayBase, other.scanOverlayBase, t)!,
+      scanControlSurface: Color.lerp(
+        scanControlSurface,
+        other.scanControlSurface,
+        t,
+      )!,
+      onScan: Color.lerp(onScan, other.onScan, t)!,
+      onMarketTile: Color.lerp(onMarketTile, other.onMarketTile, t)!,
       brandArtDark: Color.lerp(brandArtDark, other.brandArtDark, t)!,
       brandArtDeep: Color.lerp(brandArtDeep, other.brandArtDeep, t)!,
       brandArtMain: Color.lerp(brandArtMain, other.brandArtMain, t)!,

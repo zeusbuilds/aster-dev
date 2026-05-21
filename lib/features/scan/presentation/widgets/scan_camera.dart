@@ -88,15 +88,16 @@ class _ScanCameraWidgetState extends State<ScanCameraWidget>
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     if (_errorMessage != null) {
-      return ColoredBox(color: AsterColors.black);
+      return ColoredBox(color: colors.scanOverlayBase);
     }
 
     return MobileScanner(
       controller: widget.controller,
       fit: BoxFit.cover,
       scanWindow: widget.cutoutRect,
-      placeholderBuilder: (_) => ColoredBox(color: AsterColors.black),
+      placeholderBuilder: (_) => ColoredBox(color: colors.scanOverlayBase),
       errorBuilder: (context, error) {
         if (error.errorCode == MobileScannerErrorCode.permissionDenied) {
           widget.onPermissionDenied();
@@ -105,7 +106,7 @@ class _ScanCameraWidgetState extends State<ScanCameraWidget>
           _errorMessage = message;
           widget.onError(message);
         }
-        return ColoredBox(color: AsterColors.black);
+        return ColoredBox(color: colors.scanOverlayBase);
       },
       onDetect: (capture) {
         if (!_hasReportedCameraReady) {

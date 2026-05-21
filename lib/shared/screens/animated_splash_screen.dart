@@ -4,14 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../shared.dart';
 
-const _foregroundColor = AsterColors.surface;
-
-// Background gradient (top -> bottom).
-const _bgTop = AsterColors.blue200;
-const _bgMid = AsterColors.blueBase;
-const _bgBottom = AsterColors.black;
-
-const _animationDuration = 1250;
+const _splashMotion = AsterMotion();
+final _animationDuration = _splashMotion.splashRevealDuration.inMilliseconds;
 
 const _rotationStart = 0;
 const _rotationEnd = 240;
@@ -32,14 +26,7 @@ const _linesGapMax = 1.3;
 
 const _logoWidth = 160;
 
-const _rotationCurve = Curves.easeOutCubic;
-const _expansionCurve = Curves.easeOutCubic;
-const _splitCurve = Curves.easeInOutCubic;
-const _revealGrowCurve = Curves.easeOutCubic;
-const _revealMoveCurve = Curves.easeInOutCubic;
-
 /// Animated splash screen used during app startup.
-
 class AnimatedSplashScreen extends StatelessWidget {
   const AnimatedSplashScreen({required this.controller, super.key});
 
@@ -48,7 +35,7 @@ class AnimatedSplashScreen extends StatelessWidget {
   static AnimationController createController(TickerProvider vsync) {
     return AnimationController(
       vsync: vsync,
-      duration: const Duration(milliseconds: _animationDuration),
+      duration: _splashMotion.splashRevealDuration,
     );
   }
 
@@ -79,10 +66,10 @@ class _BackgroundState extends State<_Background> {
   late final Animation<double> _linesLength = Tween<double>(begin: 0, end: 1)
       .chain(
         CurveTween(
-          curve: const Interval(
+          curve: Interval(
             _linesLengthStart / _animationDuration,
             _linesLengthEnd / _animationDuration,
-            curve: _revealGrowCurve,
+            curve: _splashMotion.choreographyCurve,
           ),
         ),
       )
@@ -92,10 +79,10 @@ class _BackgroundState extends State<_Background> {
       Tween<double>(begin: 0, end: _linesGapMax)
           .chain(
             CurveTween(
-              curve: const Interval(
+              curve: Interval(
                 _linesGapStart / _animationDuration,
                 _linesGapEnd / _animationDuration,
-                curve: _revealMoveCurve,
+                curve: _splashMotion.splashRevealMoveCurve,
               ),
             ),
           )
@@ -103,10 +90,12 @@ class _BackgroundState extends State<_Background> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return CustomPaint(
       painter: _BackgroundPainter(
         linesLength: _linesLength,
         linesGap: _linesGap,
+        colors: colors.splashGradient,
       ),
       child: const SizedBox.expand(),
     );
@@ -114,11 +103,15 @@ class _BackgroundState extends State<_Background> {
 }
 
 class _BackgroundPainter extends CustomPainter {
-  _BackgroundPainter({required this.linesLength, required this.linesGap})
-    : super(repaint: Listenable.merge([linesLength, linesGap]));
+  _BackgroundPainter({
+    required this.linesLength,
+    required this.linesGap,
+    required this.colors,
+  }) : super(repaint: Listenable.merge([linesLength, linesGap]));
 
   final Animation<double> linesLength;
   final Animation<double> linesGap;
+  final List<Color> colors;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -126,11 +119,11 @@ class _BackgroundPainter extends CustomPainter {
     canvas.saveLayer(rect, Paint());
 
     final gradientPaint = Paint()
-      ..shader = const LinearGradient(
+      ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [_bgTop, _bgMid, _bgBottom],
-        stops: [0, 0.5, 1],
+        colors: colors,
+        stops: const [0, 0.5, 1],
       ).createShader(rect);
     canvas.drawRect(rect, gradientPaint);
 
@@ -165,7 +158,8 @@ class _BackgroundPainter extends CustomPainter {
   @override
   bool shouldRepaint(_BackgroundPainter oldDelegate) {
     return linesLength != oldDelegate.linesLength ||
-        linesGap != oldDelegate.linesGap;
+        linesGap != oldDelegate.linesGap ||
+        colors != oldDelegate.colors;
   }
 }
 
@@ -182,10 +176,10 @@ class _ForegroundState extends State<_Foreground> {
   late final _rotation = Tween<double>(begin: 0, end: 1)
       .chain(
         CurveTween(
-          curve: const Interval(
+          curve: Interval(
             _rotationStart / _animationDuration,
             _rotationEnd / _animationDuration,
-            curve: _rotationCurve,
+            curve: _splashMotion.choreographyCurve,
           ),
         ),
       )
@@ -194,10 +188,10 @@ class _ForegroundState extends State<_Foreground> {
   late final _expansion = Tween<double>(begin: 0, end: 1)
       .chain(
         CurveTween(
-          curve: const Interval(
+          curve: Interval(
             _expansionStart / _animationDuration,
             _expansionEnd / _animationDuration,
-            curve: _expansionCurve,
+            curve: _splashMotion.choreographyCurve,
           ),
         ),
       )
@@ -206,10 +200,10 @@ class _ForegroundState extends State<_Foreground> {
   late final _split = Tween<double>(begin: 0, end: 1)
       .chain(
         CurveTween(
-          curve: const Interval(
+          curve: Interval(
             _splitStart / _animationDuration,
             _splitEnd / _animationDuration,
-            curve: _splitCurve,
+            curve: _splashMotion.splashSplitCurve,
           ),
         ),
       )
@@ -218,10 +212,10 @@ class _ForegroundState extends State<_Foreground> {
   late final _linesLength = Tween<double>(begin: 0, end: 1)
       .chain(
         CurveTween(
-          curve: const Interval(
+          curve: Interval(
             _linesLengthStart / _animationDuration,
             _linesLengthEnd / _animationDuration,
-            curve: _revealGrowCurve,
+            curve: _splashMotion.choreographyCurve,
           ),
         ),
       )
@@ -230,24 +224,18 @@ class _ForegroundState extends State<_Foreground> {
   late final _linesGap = Tween<double>(begin: 0, end: _linesGapMax)
       .chain(
         CurveTween(
-          curve: const Interval(
+          curve: Interval(
             _linesGapStart / _animationDuration,
             _linesGapEnd / _animationDuration,
-            curve: _revealMoveCurve,
+            curve: _splashMotion.splashRevealMoveCurve,
           ),
         ),
       )
       .animate(widget.controller);
 
-  late final _logoPainter = _LogoPainter(
-    color: _foregroundColor,
-    rotation: _rotation,
-    expansion: _expansion,
-    linesLength: _linesLength,
-  );
-
   @override
   Widget build(BuildContext context) {
+    final foregroundColor = context.appColors.onBrandArt;
     return CustomMultiChildLayout(
       delegate: _ForegroundLayoutDelegate(
         split: _split,
@@ -257,15 +245,22 @@ class _ForegroundState extends State<_Foreground> {
       children: [
         LayoutId(
           id: _ForegroundPart.logo,
-          child: CustomPaint(painter: _logoPainter),
+          child: CustomPaint(
+            painter: _LogoPainter(
+              color: foregroundColor,
+              rotation: _rotation,
+              expansion: _expansion,
+              linesLength: _linesLength,
+            ),
+          ),
         ),
         LayoutId(
           id: _ForegroundPart.topLine,
-          child: const ColoredBox(color: _foregroundColor),
+          child: ColoredBox(color: foregroundColor),
         ),
         LayoutId(
           id: _ForegroundPart.bottomLine,
-          child: const ColoredBox(color: _foregroundColor),
+          child: ColoredBox(color: foregroundColor),
         ),
       ],
     );
@@ -293,14 +288,8 @@ class _ForegroundLayoutDelegate extends MultiChildLayoutDelegate {
     positionChild(_ForegroundPart.logo, Offset.zero);
 
     if (linesLength.value == 0) {
-      layoutChild(
-        _ForegroundPart.topLine,
-        const BoxConstraints.tightFor(width: 0, height: 0),
-      );
-      layoutChild(
-        _ForegroundPart.bottomLine,
-        const BoxConstraints.tightFor(width: 0, height: 0),
-      );
+      layoutChild(_ForegroundPart.topLine, BoxConstraints.tight(Size.zero));
+      layoutChild(_ForegroundPart.bottomLine, BoxConstraints.tight(Size.zero));
       return;
     }
 

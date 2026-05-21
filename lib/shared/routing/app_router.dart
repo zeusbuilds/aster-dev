@@ -47,15 +47,12 @@ class ErrorScreen extends StatelessWidget {
               color: colors.danger,
             ),
             SizedBox(height: spacing.lg),
-            Text(
-              'Route Error',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
+            Text('Route Error', style: context.textTheme.headlineSmall),
             if (error != null) ...[
               SizedBox(height: spacing.sm),
               Text(
                 error.toString(),
-                style: Theme.of(context).textTheme.bodyMedium,
+                style: context.textTheme.bodyMedium,
                 textAlign: TextAlign.center,
               ),
             ],

@@ -8,25 +8,25 @@ import '../shared.dart';
 /// colors, gradients, shadows, and borders. Commonly used for cards and containers.
 class Squircle extends StatelessWidget {
   final Widget child;
-  final double borderRadius;
+  final double? borderRadius;
   final Color? borderColor;
   final double borderWidth;
   final Color? color;
   final Gradient? gradient;
   final List<BoxShadow> shadows;
-  final EdgeInsets padding;
+  final EdgeInsets? padding;
   final BorderRadius? border;
 
   const Squircle({
     super.key,
     required this.child,
-    this.borderRadius = 24,
+    this.borderRadius,
     this.borderColor,
     this.borderWidth = 1,
     this.color,
     this.gradient,
     this.shadows = const [],
-    this.padding = const EdgeInsets.all(8.0),
+    this.padding,
     this.border,
   });
 
@@ -36,13 +36,10 @@ class Squircle extends StatelessWidget {
     final radius = context.radii;
     final spacing = context.spacing;
     final effectiveBorderColor = borderColor ?? colors.borderSubtle;
-    final effectiveColor = color ?? AsterColors.transparent;
+    final effectiveColor = color ?? colors.transparentSurface;
     final effectiveBorderRadius =
-        border ??
-        BorderRadius.circular(borderRadius == 24 ? radius.card : borderRadius);
-    final effectivePadding = padding == const EdgeInsets.all(8.0)
-        ? EdgeInsets.all(spacing.sm)
-        : padding;
+        border ?? BorderRadius.circular(borderRadius ?? radius.card);
+    final effectivePadding = padding ?? EdgeInsets.all(spacing.sm);
 
     return ClipRSuperellipse(
       borderRadius: effectiveBorderRadius,

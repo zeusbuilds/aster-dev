@@ -23,8 +23,8 @@ class AppSkeletonizer extends StatelessWidget {
   /// The child widget to skeletonize
   final Widget child;
 
-  /// Duration of the shimmer animation
-  final Duration duration;
+  /// Optional override for the shimmer animation duration.
+  final Duration? duration;
 
   /// Base color of the shimmer effect
   final Color? baseColor;
@@ -36,7 +36,7 @@ class AppSkeletonizer extends StatelessWidget {
     super.key,
     required this.enabled,
     required this.child,
-    this.duration = const Duration(milliseconds: 1200),
+    this.duration,
     this.baseColor,
     this.highlightColor,
   });
@@ -44,13 +44,14 @@ class AppSkeletonizer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
+    final motion = context.motion;
 
     return Skeletonizer(
       enabled: enabled,
       effect: ShimmerEffect(
         baseColor: baseColor ?? colors.surfaceSubtle,
         highlightColor: highlightColor ?? context.colorScheme.surface,
-        duration: duration,
+        duration: duration ?? motion.skeletonShimmerDuration,
       ),
       child: child,
     );

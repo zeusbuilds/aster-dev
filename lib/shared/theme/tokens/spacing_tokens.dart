@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 @immutable
 class AsterSpacing extends ThemeExtension<AsterSpacing> {
   const AsterSpacing({
+    this.none = 0,
     this.xxs = 2,
     this.xs = 4,
     this.sm = 8,
@@ -23,8 +24,23 @@ class AsterSpacing extends ThemeExtension<AsterSpacing> {
     this.iconXl = 44,
     this.navOffset = 44,
     this.heroInset = 160,
+    this.keypadButtonHeight = 60,
+    this.keypadGap = 10,
+    this.keypadHorizontalReserve = 80,
+    this.bottomNavHeight = 56,
+    this.bottomNavIndicatorWidth = 56,
+    this.bottomNavIndicatorHeight = 40,
+    this.sheetHandleWidth = 56,
+    this.sheetHandleHeight = 4,
+    this.sheetMaxHeightFactor = 0.7,
+    this.dividerThickness = 1,
+    this.hairline = 0.5,
+    this.focusRing = 3,
+    this.collapsedMessageHeight = 32,
+    this.chartHeight = 100,
   });
 
+  final double none;
   final double xxs;
   final double xs;
   final double sm;
@@ -45,6 +61,20 @@ class AsterSpacing extends ThemeExtension<AsterSpacing> {
   final double iconXl;
   final double navOffset;
   final double heroInset;
+  final double keypadButtonHeight;
+  final double keypadGap;
+  final double keypadHorizontalReserve;
+  final double bottomNavHeight;
+  final double bottomNavIndicatorWidth;
+  final double bottomNavIndicatorHeight;
+  final double sheetHandleWidth;
+  final double sheetHandleHeight;
+  final double sheetMaxHeightFactor;
+  final double dividerThickness;
+  final double hairline;
+  final double focusRing;
+  final double collapsedMessageHeight;
+  final double chartHeight;
 
   double topSafeRaw(BuildContext context) => MediaQuery.of(context).padding.top;
   double bottomSafeRaw(BuildContext context) =>
@@ -54,6 +84,7 @@ class AsterSpacing extends ThemeExtension<AsterSpacing> {
 
   @override
   AsterSpacing copyWith({
+    double? none,
     double? xxs,
     double? xs,
     double? sm,
@@ -74,8 +105,23 @@ class AsterSpacing extends ThemeExtension<AsterSpacing> {
     double? iconXl,
     double? navOffset,
     double? heroInset,
+    double? keypadButtonHeight,
+    double? keypadGap,
+    double? keypadHorizontalReserve,
+    double? bottomNavHeight,
+    double? bottomNavIndicatorWidth,
+    double? bottomNavIndicatorHeight,
+    double? sheetHandleWidth,
+    double? sheetHandleHeight,
+    double? sheetMaxHeightFactor,
+    double? dividerThickness,
+    double? hairline,
+    double? focusRing,
+    double? collapsedMessageHeight,
+    double? chartHeight,
   }) {
     return AsterSpacing(
+      none: none ?? this.none,
       xxs: xxs ?? this.xxs,
       xs: xs ?? this.xs,
       sm: sm ?? this.sm,
@@ -96,6 +142,24 @@ class AsterSpacing extends ThemeExtension<AsterSpacing> {
       iconXl: iconXl ?? this.iconXl,
       navOffset: navOffset ?? this.navOffset,
       heroInset: heroInset ?? this.heroInset,
+      keypadButtonHeight: keypadButtonHeight ?? this.keypadButtonHeight,
+      keypadGap: keypadGap ?? this.keypadGap,
+      keypadHorizontalReserve:
+          keypadHorizontalReserve ?? this.keypadHorizontalReserve,
+      bottomNavHeight: bottomNavHeight ?? this.bottomNavHeight,
+      bottomNavIndicatorWidth:
+          bottomNavIndicatorWidth ?? this.bottomNavIndicatorWidth,
+      bottomNavIndicatorHeight:
+          bottomNavIndicatorHeight ?? this.bottomNavIndicatorHeight,
+      sheetHandleWidth: sheetHandleWidth ?? this.sheetHandleWidth,
+      sheetHandleHeight: sheetHandleHeight ?? this.sheetHandleHeight,
+      sheetMaxHeightFactor: sheetMaxHeightFactor ?? this.sheetMaxHeightFactor,
+      dividerThickness: dividerThickness ?? this.dividerThickness,
+      hairline: hairline ?? this.hairline,
+      focusRing: focusRing ?? this.focusRing,
+      collapsedMessageHeight:
+          collapsedMessageHeight ?? this.collapsedMessageHeight,
+      chartHeight: chartHeight ?? this.chartHeight,
     );
   }
 
@@ -103,6 +167,7 @@ class AsterSpacing extends ThemeExtension<AsterSpacing> {
   AsterSpacing lerp(ThemeExtension<AsterSpacing>? other, double t) {
     if (other is! AsterSpacing) return this;
     return AsterSpacing(
+      none: _lerp(none, other.none, t),
       xxs: _lerp(xxs, other.xxs, t),
       xs: _lerp(xs, other.xs, t),
       sm: _lerp(sm, other.sm, t),
@@ -123,6 +188,44 @@ class AsterSpacing extends ThemeExtension<AsterSpacing> {
       iconXl: _lerp(iconXl, other.iconXl, t),
       navOffset: _lerp(navOffset, other.navOffset, t),
       heroInset: _lerp(heroInset, other.heroInset, t),
+      keypadButtonHeight: _lerp(
+        keypadButtonHeight,
+        other.keypadButtonHeight,
+        t,
+      ),
+      keypadGap: _lerp(keypadGap, other.keypadGap, t),
+      keypadHorizontalReserve: _lerp(
+        keypadHorizontalReserve,
+        other.keypadHorizontalReserve,
+        t,
+      ),
+      bottomNavHeight: _lerp(bottomNavHeight, other.bottomNavHeight, t),
+      bottomNavIndicatorWidth: _lerp(
+        bottomNavIndicatorWidth,
+        other.bottomNavIndicatorWidth,
+        t,
+      ),
+      bottomNavIndicatorHeight: _lerp(
+        bottomNavIndicatorHeight,
+        other.bottomNavIndicatorHeight,
+        t,
+      ),
+      sheetHandleWidth: _lerp(sheetHandleWidth, other.sheetHandleWidth, t),
+      sheetHandleHeight: _lerp(sheetHandleHeight, other.sheetHandleHeight, t),
+      sheetMaxHeightFactor: _lerp(
+        sheetMaxHeightFactor,
+        other.sheetMaxHeightFactor,
+        t,
+      ),
+      dividerThickness: _lerp(dividerThickness, other.dividerThickness, t),
+      hairline: _lerp(hairline, other.hairline, t),
+      focusRing: _lerp(focusRing, other.focusRing, t),
+      collapsedMessageHeight: _lerp(
+        collapsedMessageHeight,
+        other.collapsedMessageHeight,
+        t,
+      ),
+      chartHeight: _lerp(chartHeight, other.chartHeight, t),
     );
   }
 

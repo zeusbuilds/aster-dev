@@ -13,6 +13,7 @@ class SplashScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
+    final spacing = context.spacing;
 
     return Scaffold(
       body: Container(
@@ -27,11 +28,8 @@ class SplashScreen extends StatelessWidget {
         child: Center(
           child: SvgPicture.asset(
             'assets/brand/aster-logo.svg',
-            width: 160,
-            colorFilter: const ColorFilter.mode(
-              AsterColors.white,
-              BlendMode.srcIn,
-            ),
+            width: spacing.heroInset,
+            colorFilter: ColorFilter.mode(colors.onBrandArt, BlendMode.srcIn),
           ),
         ),
       ),

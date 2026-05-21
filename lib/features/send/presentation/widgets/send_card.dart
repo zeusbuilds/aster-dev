@@ -73,7 +73,7 @@ class SendCard extends StatelessWidget {
                     errorBuilder: (context, error, stackTrace) => Icon(
                       Icons.circle,
                       size: spacing.iconLg,
-                      color: Color(asset.color),
+                      color: asset.themedColor(context),
                     ),
                   ),
                   SizedBox(width: spacing.sm),

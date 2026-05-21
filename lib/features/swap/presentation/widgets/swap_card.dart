@@ -44,6 +44,7 @@ class _SwapCardState extends State<SwapCard> {
   Widget build(BuildContext context) {
     final spacing = context.spacing;
     final colors = context.appColors;
+    final radius = context.radii;
 
     return Stack(
       alignment: Alignment.center,
@@ -51,7 +52,7 @@ class _SwapCardState extends State<SwapCard> {
         Squircle(
           color: context.colorScheme.surface,
           borderColor: colors.surfaceSubtle,
-          borderRadius: 28,
+          borderRadius: radius.sheet,
           padding: EdgeInsets.all(spacing.xs),
           child: Column(
             children: [
@@ -79,7 +80,10 @@ class _SwapCardState extends State<SwapCard> {
           decoration: BoxDecoration(
             color: colors.surfaceSubtle,
             shape: BoxShape.circle,
-            border: Border.all(color: context.colorScheme.surface, width: 3),
+            border: Border.all(
+              color: context.colorScheme.surface,
+              width: spacing.focusRing,
+            ),
           ),
           child: Icon(
             RemixIcons.arrow_down_line,

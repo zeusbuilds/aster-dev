@@ -45,7 +45,7 @@ class SwapPair extends StatelessWidget {
 
     return Squircle(
       padding: EdgeInsets.zero,
-      borderColor: AsterColors.transparent,
+      borderColor: colors.transparentSurface,
       border: from
           ? null
           : BorderRadius.only(
@@ -57,7 +57,7 @@ class SwapPair extends StatelessWidget {
           vertical: spacing.md,
           horizontal: spacing.lg,
         ),
-        color: from ? AsterColors.transparent : colors.surfaceSubtle,
+        color: from ? colors.transparentSurface : colors.surfaceSubtle,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -83,7 +83,7 @@ class SwapPair extends StatelessWidget {
                     errorBuilder: (context, error, stackTrace) => Icon(
                       Icons.circle,
                       size: spacing.iconLg,
-                      color: Color(asset.color),
+                      color: asset.themedColor(context),
                     ),
                   ),
                   SizedBox(width: spacing.sm),

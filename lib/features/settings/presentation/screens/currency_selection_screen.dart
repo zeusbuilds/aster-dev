@@ -97,12 +97,8 @@ class _CurrencySelectionScreenState extends State<CurrencySelectionScreen> {
                   bottom: spacing.bottomSafeRaw(context),
                 ),
                 itemCount: _currencies.length,
-                separatorBuilder: (context, index) => Divider(
-                  color: colors.surfaceSubtle,
-                  height: 1,
-                  thickness: 1,
-                  indent: spacing.screenPadding,
-                ),
+                separatorBuilder: (context, index) =>
+                    const AsterDivider.inset(),
                 itemBuilder: (context, index) {
                   final currency = _currencies[index];
 

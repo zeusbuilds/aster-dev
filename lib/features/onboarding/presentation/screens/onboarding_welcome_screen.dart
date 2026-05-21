@@ -30,6 +30,8 @@ class _OnboardingContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
+    final colors = context.appColors;
+    final effects = context.effects;
     final textTheme = context.textTheme;
 
     return Padding(
@@ -47,9 +49,8 @@ class _OnboardingContent extends StatelessWidget {
           Text(
             'Built on\norchestration, not\nguesswork.',
             style: textTheme.displaySmall?.copyWith(
-              color: AsterColors.white,
+              color: colors.onBrandArt,
               fontWeight: FontWeight.w600,
-              height: 1.1,
             ),
           ),
           SizedBox(height: spacing.md),
@@ -58,8 +59,9 @@ class _OnboardingContent extends StatelessWidget {
             'optimized to reduce noise and improve\n'
             'clarity.',
             style: textTheme.bodyLarge?.copyWith(
-              color: AsterColors.white.withValues(alpha: 0.9),
-              height: 1.4,
+              color: colors.onBrandArt.withValues(
+                alpha: effects.brandContentStrongOpacity,
+              ),
             ),
           ),
           const Spacer(),
@@ -83,7 +85,9 @@ class _OnboardingContent extends StatelessWidget {
                     child: Text(
                       'Import Wallet',
                       style: textTheme.bodyLarge?.copyWith(
-                        color: AsterColors.white.withValues(alpha: 0.9),
+                        color: colors.onBrandArt.withValues(
+                          alpha: effects.brandContentStrongOpacity,
+                        ),
                         fontWeight: FontWeight.w600,
                       ),
                     ),

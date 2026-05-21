@@ -102,12 +102,8 @@ class _CountrySelectionScreenState extends State<CountrySelectionScreen> {
                     bottom: spacing.bottomSafeRaw(context),
                   ),
                   itemCount: _countries.length,
-                  separatorBuilder: (context, index) => Divider(
-                    color: colors.surfaceSubtle,
-                    height: 1,
-                    thickness: 1,
-                    indent: spacing.screenPadding,
-                  ),
+                  separatorBuilder: (context, index) =>
+                      const AsterDivider.inset(),
                   itemBuilder: (context, index) {
                     final country = _countries[index];
 

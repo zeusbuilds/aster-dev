@@ -17,6 +17,7 @@ class HomeHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final spacing = context.spacing;
+    final colors = context.appColors;
     final textTheme = context.textTheme;
     final walletState = ref.watch(walletViewModelProvider);
     final activeWallet = walletState.activeWallet;
@@ -34,7 +35,7 @@ class HomeHeader extends ConsumerWidget {
                 'assets/brand/aster-logo.svg',
                 width: spacing.navOffset,
                 colorFilter: ColorFilter.mode(
-                  AsterColors.white,
+                  colors.onBrandArt,
                   BlendMode.srcIn,
                 ),
               ),
@@ -50,14 +51,14 @@ class HomeHeader extends ConsumerWidget {
                   activeWallet?.name ?? 'Main Wallet',
                   style: textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: AsterColors.white,
+                    color: colors.onBrandArt,
                   ),
                 ),
                 SizedBox(width: spacing.xs),
                 Icon(
                   MingCuteIcons.mgc_wallet_3_line,
                   size: spacing.xxl,
-                  color: AsterColors.white,
+                  color: colors.onBrandArt,
                 ),
               ],
             ),

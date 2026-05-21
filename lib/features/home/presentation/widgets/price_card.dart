@@ -77,6 +77,7 @@ class _PriceCardState extends State<PriceCard> {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
+    final effects = context.effects;
     final spacing = context.spacing;
     final textTheme = context.textTheme;
 
@@ -103,7 +104,9 @@ class _PriceCardState extends State<PriceCard> {
                     child: Icon(
                       UniconsLine.bitcoin,
                       size: spacing.xxxl,
-                      color: colors.bitcoin.withValues(alpha: 0.8),
+                      color: colors.bitcoin.withValues(
+                        alpha: effects.bitcoinIconOpacity,
+                      ),
                     ),
                   ),
                   SizedBox(width: spacing.xs),
@@ -111,18 +114,16 @@ class _PriceCardState extends State<PriceCard> {
                     'Bitcoin Price',
                     style: textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w500,
-                      color: AsterColors.white,
+                      color: colors.onBrandArt,
                     ),
                   ),
                   const Spacer(),
                   Text(
                     _formatPrice(_currentPrice),
-                    style: textTheme.displayMedium
+                    style: textTheme.displaySmall
                         ?.copyWith(
                           fontWeight: FontWeight.w500,
-                          color: AsterColors.white,
-                          fontSize: 40,
-                          height: 0.85,
+                          color: colors.onBrandArt,
                         )
                         .toNumeric(context),
                   ),

@@ -43,7 +43,10 @@ class TransactionItem extends StatelessWidget {
           decoration: BoxDecoration(
             color: colors.surfaceSubtle,
             shape: BoxShape.circle,
-            border: Border.all(color: colors.borderSubtle, width: 1),
+            border: Border.all(
+              color: colors.borderSubtle,
+              width: spacing.dividerThickness,
+            ),
           ),
           child: Icon(
             icon,

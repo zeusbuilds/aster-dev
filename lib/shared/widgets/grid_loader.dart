@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../shared.dart';
 
-const Duration kGridLoaderCycleDuration = Duration(milliseconds: 1200);
 const int kGridLoaderRows = 3;
 const int kGridLoaderCols = 3;
 
@@ -89,14 +88,26 @@ class _GridLoaderState extends State<GridLoader>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: widget.cycleDuration ?? kGridLoaderCycleDuration,
+      duration:
+          widget.cycleDuration ?? const AsterMotion().loadingCycleDuration,
     )..repeat();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final duration =
+        widget.cycleDuration ?? context.motion.loadingCycleDuration;
+    if (_controller.duration != duration) {
+      _controller.duration = duration;
+    }
   }
 
   @override
   void didUpdateWidget(GridLoader oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final duration = widget.cycleDuration ?? kGridLoaderCycleDuration;
+    final duration =
+        widget.cycleDuration ?? context.motion.loadingCycleDuration;
     if (_controller.duration != duration) {
       _controller.duration = duration;
     }
@@ -112,7 +123,7 @@ class _GridLoaderState extends State<GridLoader>
   Widget build(BuildContext context) {
     final baseColor = switch (widget.colorStyle) {
       GridLoaderColorStyle.themePrimary => context.colorScheme.primary,
-      GridLoaderColorStyle.white => AsterColors.white,
+      GridLoaderColorStyle.white => context.appColors.onBrandArt,
       GridLoaderColorStyle.custom =>
         widget.color ?? context.colorScheme.primary,
     };
