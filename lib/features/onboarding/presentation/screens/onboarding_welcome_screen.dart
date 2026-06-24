@@ -47,7 +47,7 @@ class _OnboardingContent extends StatelessWidget {
           const OnboardingWelcomeIconGrid(),
           SizedBox(height: spacing.iconLg),
           Text(
-            'Built on\norchestration, not\nguesswork.',
+            'Built for\nUSDT on Bitcoin',
             style: textTheme.displaySmall?.copyWith(
               color: colors.onBrandArt,
               fontWeight: FontWeight.w600,
