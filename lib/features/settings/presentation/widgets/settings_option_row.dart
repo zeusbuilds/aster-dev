@@ -40,53 +40,39 @@ class SettingsOptionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final spacing = context.spacing;
-    final textTheme = context.textTheme;
+    final icons = context.icons;
+    final type = context.type;
 
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: spacing.screenPadding,
-          vertical: spacing.lg,
-        ),
-        child: Row(
-          children: [
-            if (prefixIcon != null) ...[
+    return Semantics(
+      button: onTap != null,
+      label: details == null ? title : '$title, $details',
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: spacing.screenPadding,
+            vertical: spacing.lg,
+          ),
+          child: Row(
+            children: [
+              if (prefixIcon != null) ...[
+                Icon(prefixIcon, size: icons.sm, color: colors.textSecondary),
+                SizedBox(width: spacing.md),
+              ],
+              Expanded(child: Text(title, style: type.rowTitle, maxLines: 1)),
+              SizedBox(width: spacing.lg),
+              if (details != null) ...[
+                Text(details!, style: type.rowValue),
+                SizedBox(width: spacing.sm),
+              ],
               Icon(
-                prefixIcon,
-                size: spacing.iconSm,
-                color: colors.textSecondary,
+                suffixIcon ?? RemixIcons.arrow_right_s_line,
+                size: icons.sm,
+                color: suffixIconColor ?? colors.textTertiary,
               ),
-              SizedBox(width: spacing.md),
             ],
-            Expanded(
-              child: Text(
-                title,
-                style: textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w500,
-                  color: context.colorScheme.onSurface,
-                ),
-                maxLines: 1,
-              ),
-            ),
-            SizedBox(width: spacing.lg),
-            if (details != null) ...[
-              Text(
-                details!,
-                style: textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: context.colorScheme.onSurface,
-                ),
-              ),
-              SizedBox(width: spacing.sm),
-            ],
-            Icon(
-              suffixIcon ?? RemixIcons.arrow_right_s_line,
-              size: spacing.xl,
-              color: suffixIconColor ?? colors.textTertiary,
-            ),
-          ],
+          ),
         ),
       ),
     );

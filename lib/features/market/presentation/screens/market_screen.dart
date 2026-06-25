@@ -17,13 +17,15 @@ class MarketScreen extends StatelessWidget {
     final colors = context.appColors;
     final effects = context.effects;
     final spacing = context.spacing;
+    final metrics = context.metrics;
+    final gradients = context.gradients;
 
     final tiles = [
       MarketTile(
         label: 'Buy',
         subtitle: 'Load wallet',
         icon: RemixIcons.shopping_bag_3_line,
-        gradientColors: colors.marketBuyGradient,
+        gradient: gradients.marketBuy,
         shadowColor: colors.bitcoin.withValues(
           alpha: effects.marketShadowOpacity,
         ),
@@ -36,7 +38,7 @@ class MarketScreen extends StatelessWidget {
         label: 'Sell',
         subtitle: 'Unload wallet',
         icon: RemixIcons.shopping_cart_line,
-        gradientColors: colors.marketSellGradient,
+        gradient: gradients.marketSell,
         shadowColor: colors.brandArtBright.withValues(
           alpha: effects.marketShadowOpacity,
         ),
@@ -49,7 +51,7 @@ class MarketScreen extends StatelessWidget {
         label: 'Swap',
         subtitle: 'Exchange assets',
         icon: RemixIcons.token_swap_line,
-        gradientColors: colors.marketSwapGradient,
+        gradient: gradients.marketSwap,
         shadowColor: colors.overlay.withValues(
           alpha: effects.marketShadowOpacity,
         ),
@@ -62,7 +64,7 @@ class MarketScreen extends StatelessWidget {
         label: 'Lend',
         subtitle: 'Earn interest',
         icon: RemixIcons.bank_line,
-        gradientColors: colors.marketLendGradient,
+        gradient: gradients.marketLend,
         shadowColor: colors.brandArtDeep.withValues(
           alpha: effects.marketShadowOpacity,
         ),
@@ -75,7 +77,7 @@ class MarketScreen extends StatelessWidget {
         label: 'Send',
         subtitle: 'Send bitcoin',
         icon: RemixIcons.arrow_right_up_line,
-        gradientColors: colors.marketSendGradient,
+        gradient: gradients.marketSend,
         shadowColor: colors.danger.withValues(
           alpha: effects.marketShadowOpacity,
         ),
@@ -88,7 +90,7 @@ class MarketScreen extends StatelessWidget {
         label: 'Receive',
         subtitle: 'Receive bitcoin',
         icon: RemixIcons.arrow_right_down_line,
-        gradientColors: colors.marketReceiveGradient,
+        gradient: gradients.marketReceive,
         shadowColor: colors.success.withValues(
           alpha: effects.marketShadowOpacity,
         ),
@@ -106,7 +108,7 @@ class MarketScreen extends StatelessWidget {
         padding: EdgeInsets.only(
           left: spacing.screenPadding,
           right: spacing.screenPadding,
-          bottom: spacing.bottomSafe(context) + spacing.navOffset,
+          bottom: spacing.bottomSafe(context) + metrics.floatingNavClearance,
         ),
         itemCount: tiles.length,
         itemBuilder: (context, index) {

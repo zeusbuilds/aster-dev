@@ -36,8 +36,10 @@ class ReceiveCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final spacing = context.spacing;
     final colors = context.appColors;
-    final textTheme = context.textTheme;
     final radius = context.radii;
+    final icons = context.icons;
+    final type = context.type;
+    final metrics = context.metrics;
 
     return Column(
       children: [
@@ -56,62 +58,31 @@ class ReceiveCard extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Text(
-                    amount,
-                    style: textTheme.headlineSmall
-                        ?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: context.colorScheme.onSurface,
-                        )
-                        .toNumeric(context),
-                  ),
+                  NumericText(amount, style: type.amountLarge),
                   const Spacer(),
                   Icon(
                     UniconsLine.bitcoin,
-                    size: spacing.iconLg,
+                    size: icons.lg,
                     color: colors.bitcoin,
                   ),
                   SizedBox(width: spacing.sm),
-                  Text(
-                    asset,
-                    style: textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: context.colorScheme.onSurface,
-                    ),
-                  ),
+                  Text(asset, style: type.title),
                 ],
               ),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Text(
+                  NumericText(
                     marketPrice,
-                    style: textTheme.bodyMedium
-                        ?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: colors.textTertiary,
-                        )
-                        .toNumeric(context),
+                    style: type.rowMetaStrong.copyWith(
+                      color: colors.textTertiary,
+                    ),
                   ),
                   const Spacer(),
-                  Text.rich(
-                    TextSpan(
-                      text: 'Bal: ',
-                      style: textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: colors.textTertiary,
-                      ),
-                      children: [
-                        TextSpan(
-                          text: balance,
-                          style: textTheme.bodyMedium
-                              ?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: colors.textTertiary,
-                              )
-                              .toNumeric(context),
-                        ),
-                      ],
+                  AmountText(
+                    'Bal: $balance',
+                    style: type.rowMetaStrong.copyWith(
+                      color: colors.textTertiary,
                     ),
                   ),
                 ],
@@ -134,21 +105,15 @@ class ReceiveCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               SizedBox(
-                width: spacing.xxl,
-                height: spacing.xxl,
+                width: metrics.compactFlagSize,
+                height: metrics.compactFlagSize,
                 child: CountryFlag.fromCountryCode(
                   'US',
                   theme: const ImageTheme(shape: Circle()),
                 ),
               ),
               SizedBox(width: spacing.sm),
-              Text(
-                fiatCurrency,
-                style: textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: context.colorScheme.onSurface,
-                ),
-              ),
+              Text(fiatCurrency, style: type.rowTitleStrong),
               const Spacer(),
               Squircle(
                 padding: EdgeInsets.symmetric(
@@ -160,8 +125,7 @@ class ReceiveCard extends StatelessWidget {
                 color: context.colorScheme.onSurface,
                 child: Text(
                   'Send max',
-                  style: textTheme.labelSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
+                  style: type.badgeLabel.copyWith(
                     color: context.colorScheme.surface,
                   ),
                 ),

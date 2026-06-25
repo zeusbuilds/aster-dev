@@ -11,16 +11,15 @@ class OnboardingWelcomeIconGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const rows = 4;
-    const cols = 7;
-    const total = rows * cols;
+    final art = context.art;
+    final rows = art.onboardingIconRows;
+    final cols = art.onboardingIconColumns;
+    final total = rows * cols;
 
     // Center highlight tile (3rd from left, 2nd row).
     const centerRow = 1;
     const centerCol = 3;
-    const centerIndex = centerRow * cols + centerCol;
-    final metrics = context.metrics;
-
+    final centerIndex = centerRow * cols + centerCol;
     // Per-tile opacities, row order: top → bottom, col order: left → right.
     const tileOpacities = <List<double>>[
       [0.30, 0.05, 0.30, 0.30, 0.30, 0.30, 0.05],
@@ -35,8 +34,8 @@ class OnboardingWelcomeIconGrid extends StatelessWidget {
         physics: const NeverScrollableScrollPhysics(),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: cols,
-          mainAxisSpacing: metrics.onboardingIconGridGap,
-          crossAxisSpacing: metrics.onboardingIconGridGap,
+          mainAxisSpacing: art.onboardingIconGridGap,
+          crossAxisSpacing: art.onboardingIconGridGap,
         ),
         itemCount: total,
         itemBuilder: (context, index) {
@@ -62,12 +61,14 @@ class _CenterTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final radius = context.radii;
     final spacing = context.spacing;
-    return Container(
+    final colors = context.appColors;
+
+    return Squircle(
       padding: EdgeInsets.all(spacing.sm),
-      decoration: BoxDecoration(
-        color: context.colorScheme.surface,
-        borderRadius: BorderRadius.circular(radius.xs),
-      ),
+      borderRadius: radius.xs,
+      borderColor: colors.transparentSurface,
+      borderWidth: 0,
+      color: context.colorScheme.surface,
       child: Center(child: SvgPicture.asset('assets/icons/tokens/usdc.svg')),
     );
   }
@@ -80,34 +81,28 @@ class _BlurTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final radiusTokens = context.radii;
+    final radius = context.radii;
+    final colors = context.appColors;
     final effects = context.effects;
-    final metrics = context.metrics;
-    final radius = BorderRadius.circular(radiusTokens.xs);
+    final art = context.art;
+    final strokes = context.strokes;
     final hasBorder = (opacity - 0.05).abs() < 0.001;
 
-    return ClipRRect(
-      borderRadius: radius,
-      child: BackdropFilter(
-        filter: ImageFilter.blur(
-          sigmaX: metrics.onboardingIconBlurSigma,
-          sigmaY: metrics.onboardingIconBlurSigma,
-        ),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: radius,
-            color: context.colorScheme.surface.withValues(alpha: opacity),
-            border: hasBorder
-                ? Border.all(
-                    color: context.colorScheme.surface.withValues(
-                      alpha: effects.brandGlassBorderOpacity,
-                    ),
-                    width: context.spacing.hairline,
-                  )
-                : null,
-          ),
-        ),
+    return Squircle(
+      borderRadius: radius.xs,
+      borderColor: hasBorder
+          ? context.colorScheme.surface.withValues(
+              alpha: effects.brandGlassBorderOpacity,
+            )
+          : colors.transparentSurface,
+      borderWidth: hasBorder ? strokes.hairline : 0,
+      color: context.colorScheme.surface.withValues(alpha: opacity),
+      padding: EdgeInsets.zero,
+      backdropFilter: ImageFilter.blur(
+        sigmaX: art.onboardingIconBlurSigma,
+        sigmaY: art.onboardingIconBlurSigma,
       ),
+      child: const SizedBox.expand(),
     );
   }
 }

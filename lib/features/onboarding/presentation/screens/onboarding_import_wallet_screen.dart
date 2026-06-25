@@ -99,7 +99,7 @@ class _ImportWalletContent extends StatelessWidget {
     final spacing = context.spacing;
     final colors = context.appColors;
     final effects = context.effects;
-    final textTheme = context.textTheme;
+    final type = context.type;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -116,25 +116,19 @@ class _ImportWalletContent extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const OnboardingWelcomeHeader(),
-              SizedBox(height: spacing.iconXl),
-              Text(
-                'Import with recovery phrase',
-                style: textTheme.displaySmall?.copyWith(
-                  color: colors.onBrandArt,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              SizedBox(height: spacing.huge),
+              Text('Import with recovery phrase', style: type.brandHero),
               SizedBox(height: spacing.md),
               Text(
                 'Enter your 12-word recovery phrase in order. '
                 'Each word goes in its own field.',
-                style: textTheme.bodyLarge?.copyWith(
+                style: type.brandBody.copyWith(
                   color: colors.onBrandArt.withValues(
                     alpha: effects.brandContentStrongOpacity,
                   ),
                 ),
               ),
-              SizedBox(height: spacing.iconLg),
+              SizedBox(height: spacing.xxxl),
             ],
           ),
         ),
@@ -182,14 +176,14 @@ class _ImportWalletContent extends StatelessWidget {
               Center(
                 child: Text(
                   'Never share your recovery phrase with anyone',
-                  style: textTheme.bodyMedium?.copyWith(
+                  style: type.brandBody.copyWith(
                     color: colors.onBrandArt.withValues(
                       alpha: effects.brandContentSubtleOpacity,
                     ),
                   ),
                 ),
               ),
-              SizedBox(height: spacing.iconLg),
+              SizedBox(height: spacing.xxxl),
               CustomButton(
                 text: 'Continue',
                 variant: ButtonVariant.translucent,
@@ -198,21 +192,15 @@ class _ImportWalletContent extends StatelessWidget {
                 },
               ),
               SizedBox(height: spacing.md),
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => context.pop(),
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: spacing.xs),
-                  child: Center(
-                    child: Text(
-                      'Back',
-                      style: textTheme.bodyLarge?.copyWith(
-                        color: colors.onBrandArt.withValues(
-                          alpha: effects.brandContentStrongOpacity,
-                        ),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+              Semantics(
+                button: true,
+                label: 'Back',
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => context.pop(),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: spacing.xs),
+                    child: Center(child: Text('Back', style: type.brandAction)),
                   ),
                 ),
               ),

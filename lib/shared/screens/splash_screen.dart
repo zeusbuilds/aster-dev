@@ -13,22 +13,18 @@ class SplashScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final spacing = context.spacing;
+    final gradients = context.gradients;
+    final metrics = context.metrics;
 
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: colors.splashGradient,
-            stops: [0.0, 0.5, 1.0],
-          ),
+          gradient: gradients.splashBackdrop.toLinearGradient(),
         ),
         child: Center(
           child: SvgPicture.asset(
             'assets/brand/aster-logo.svg',
-            width: spacing.heroInset,
+            width: metrics.splashLogoWidth,
             colorFilter: ColorFilter.mode(colors.onBrandArt, BlendMode.srcIn),
           ),
         ),

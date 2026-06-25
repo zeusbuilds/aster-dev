@@ -1,10 +1,8 @@
 # Design System Usage Guide
 
-Aster uses Flutter `ThemeData` as the runtime design contract.
-
-- Material surfaces, content colors, controls, and text styles come from `ColorScheme` and `TextTheme`.
-- App-specific product decisions come from compact `ThemeExtension`s.
-- Feature UI should use semantic roles, not primitive token names or raw hex values.
+Aster uses Flutter `ThemeData` as the runtime design contract. Feature UI should
+read like product intent: Material roles for standard Flutter surfaces, and
+Aster semantic extensions for app-specific decisions.
 
 ## Access
 
@@ -17,142 +15,130 @@ final shadows = context.shadows;
 final effects = context.effects;
 final motion = context.motion;
 final metrics = context.metrics;
+final icons = context.icons;
+final strokes = context.strokes;
+final state = context.stateLayers;
+final gradients = context.gradients;
+final art = context.art;
+final type = context.type;
 ```
 
 ## Colors
 
-Use Material roles for ordinary UI:
+Use `ColorScheme` for Material meaning:
 
 ```dart
 Container(
   color: context.colorScheme.surface,
-  child: Text(
-    'Wallet',
-    style: context.textTheme.titleMedium?.copyWith(
-      color: context.colorScheme.onSurface,
-    ),
-  ),
+  child: Text('Wallet', style: context.type.title),
 );
 ```
 
-Use `AsterColors` roles for app-only meaning:
+Use `AsterColors` only for app-specific meaning:
 
 ```dart
-Text(
+AmountText(
   '+2.4%',
-  style: context.textTheme.labelMedium?.copyWith(
+  style: context.type.rowValue.copyWith(
     color: context.appColors.chartPositive,
   ),
 );
 ```
 
-Do not use primitive or art-specific names for ordinary product UI:
-
-```dart
-// Avoid
-context.appColors.brandArtMain;
-AsterColors.blueBase;
-
-// Prefer
-context.colorScheme.primary;
-context.appColors.chartPositive;
-```
-
-Art-only roles such as `brandArtMain`, mesh colors, scan overlay colors, and
-market tile colors should stay inside the widgets that render that visual
-system.
+Primitive colors are private to the theme implementation. Do not expose or use
+names like `blueBase`, `white`, `black`, `transparent`, `fill1`, or `brand6` in
+feature UI. Brand-art colors such as `brandArtMain` belong only in widgets that
+render that art system.
 
 ## Typography
 
-Text uses DM Sans through `TextTheme`. Numbers use Public Sans by calling `toNumeric(context)`.
+Material `TextTheme` defines the scale. `AsterTypeRoles` defines product roles
+and emphasis so widgets do not locally choose weights.
 
 ```dart
-Text(
-  amount,
-  style: context.textTheme.displaySmall?.toNumeric(context),
-);
+Text('Recent activity', style: context.type.sectionTitle);
+Text('Recipient address', style: context.type.addressLabel);
+Text('Aster • Version 1.0.0', style: context.type.versionLabel);
 ```
 
-Prefer Material text roles:
+Use `NumericText` for fully numeric strings and `AmountText` for mixed values
+where only the numeric chunks should use Public Sans:
 
-- `display*` for large balances and hero prices.
-- `headline*` for page-level titles.
-- `title*` for cards and sections.
-- `body*` for normal copy.
-- `label*` for controls, nav, buttons, and metadata.
+```dart
+NumericText(amount, style: context.type.amountLarge);
+AmountText('7 sats/vbyte', style: context.type.rowValue);
+```
 
-Avoid feature-level `fontSize` unless the UI is intentionally bespoke.
+Avoid feature-level `fontSize`, `fontWeight`, `letterSpacing`, and raw
+`TextStyle` creation. Add or tune a semantic type role when the product needs a
+repeatable typographic decision.
+
+Common support roles include `toastMessage`, `supportingMeta`, `errorMessage`,
+`versionLabel`, `scanCta`, and `scanWalletId`. Use these instead of reaching
+back into `context.textTheme` for captions, error states, and secondary labels.
 
 ## Spacing
 
-Use the named scale:
+`AsterSpacing` is only layout distance: gaps, padding, screen insets, and safe
+area helpers.
 
 ```dart
-EdgeInsets.symmetric(
-  horizontal: context.spacing.screenPadding,
-  vertical: context.spacing.lg,
-);
-```
-
-Use semantic helpers for layout:
-
-- `screenPadding`
-- `sectionGap`
-- `controlGap`
-- `topSafe(context)`
-- `bottomSafe(context)`
-
-Do not add `spacing20`, `spacing46`, or other every-value APIs.
-
-## Radius
-
-Use component decisions:
-
-```dart
-BorderRadius.circular(context.radii.card);
-BorderRadius.circular(context.radii.input);
-BorderRadius.circular(context.radii.pill);
-```
-
-The radius scale is intentionally small. Real design systems expose decisions, not every possible pixel value.
-
-## Shadows
-
-Prefer surfaces and borders. Use shadows only when elevation is meaningful:
-
-```dart
-BoxDecoration(
-  color: context.appColors.surfaceRaised,
-  borderRadius: BorderRadius.circular(context.radii.card),
-  boxShadow: context.shadows.raised,
-);
-```
-
-Available shadows are `none`, `raised`, `sheet`, and `modal`.
-
-## Effects
-
-Use `context.effects` for reusable visual treatments that are not colors:
-
-```dart
-Opacity(
-  opacity: context.effects.disabledOpacity,
+Padding(
+  padding: EdgeInsets.symmetric(
+    horizontal: context.spacing.screenPadding,
+    vertical: context.spacing.lg,
+  ),
   child: child,
 );
 ```
 
-Effects include disabled states, translucent surfaces, overlay opacity, market
-tile treatments, scan scrims, and brand-art glass/noise opacity. Do not create
-new `withValues(alpha: 0.12)` decisions in feature code. If an opacity has
-product meaning and appears more than once, add a semantic effect.
+Do not put icon sizes, button heights, stroke widths, chart heights, sheet
+handles, or nav dimensions in spacing.
 
-Painter math may keep local computed opacity when the opacity is part of the
-drawing algorithm rather than a reusable design decision.
+## Geometry
+
+Use the dedicated token family for the kind of geometry being expressed:
+
+```dart
+Icon(icon, size: context.icons.md);
+SizedBox(height: context.metrics.buttonHeight);
+Divider(thickness: context.strokes.divider);
+BorderRadius.circular(context.radii.card);
+```
+
+- `context.icons`: icon glyph sizes.
+- `context.strokes`: divider, border, focus, and hairline widths.
+- `context.metrics`: component dimensions, ratios, and fixed control geometry.
+- `context.radii`: corner decisions.
+- `context.spacing`: layout gaps and padding only.
+
+Examples of component metrics include flag sizes, wallet avatar size, brand mark
+size, selection indicators, keypad sizing, sheet handles, and minimum touch
+targets. Use `context.icons.xxs` for tiny trend arrows rather than borrowing a
+spacing value.
+
+Interactive controls should maintain at least `context.metrics.minTouchTarget`
+as their hit area even when the visual is intentionally compact.
+
+## State And Effects
+
+State-layer opacity belongs in `context.stateLayers`:
+
+```dart
+Opacity(
+  opacity: context.stateLayers.disabled,
+  child: child,
+);
+```
+
+Visual treatments that are not interaction states belong in `context.effects`:
+brand glass, scan scrims, art noise, market tile treatment, and similar
+authored effects. Do not add generic `opacity10` style ramps; add a semantic
+role only when the value is a repeatable design decision.
 
 ## Motion
 
-Use `context.motion` for component timing, interaction feedback, and screen
-choreography:
+Use `context.motion` for reusable component timing and screen choreography:
 
 ```dart
 AnimatedContainer(
@@ -162,29 +148,23 @@ AnimatedContainer(
 );
 ```
 
-Available motion roles cover button press feedback, selection commits, bottom
-nav movement, toast entrance/exit, skeleton/loading cycles, startup reveal,
-splash reveal timing, chart loading/transition timing, and the swap screen
-choreography. Do not add raw `Duration(milliseconds: 300)` or
-`Curves.easeOutCubic` to product UI. Custom painters may keep local geometry,
-phase offsets, and interpolation math, but reusable timing and curves should
-come from `context.motion` or `AsterMotion`.
+Prefer semantic motion names such as `swapKeyboardTransitionDuration` over
+generic duration names. Painter phase math and one-off art timelines may stay
+local when they are part of the drawing algorithm.
 
-Keep choreography tokenized as semantic phases, not as generic ramps. Prefer
-names like `swapKeyboardTransitionDuration` over `duration300`.
+## Gradients And Art
 
-## Component Metrics
-
-Use `context.metrics` for component measurements that are not layout spacing:
+Use `context.gradients` for authored gradient recipes and `context.art` for
+brand-art composition metrics. Do not hand-roll reusable gradient lists in
+feature UI.
 
 ```dart
-SizedBox(height: context.metrics.buttonHeight);
+DecoratedBox(
+  decoration: BoxDecoration(
+    gradient: context.gradients.splashBackdrop.toLinearGradient(),
+  ),
+);
 ```
-
-Metrics include button heights, border widths, slider radii, chart/art ratios,
-scan frame ratios, market texture sizing, and swap animation distance. Use
-`context.spacing` for layout gaps and padding; use `context.metrics` when the
-number belongs to a component's physical shape or behavior.
 
 ## Migration Examples
 
@@ -202,10 +182,11 @@ padding: EdgeInsets.all(context.spacing.screenPadding);
 
 ```dart
 // Before
-color: context.colors.brand6;
+Text(value, style: style.toNumeric(context));
 
 // After
-color: context.colorScheme.primary;
+AmountText(value, style: context.type.rowValue);
 ```
 
-Keep primitives inside the theme implementation. Product screens should read like intent.
+Keep primitives inside the theme implementation. Product screens should express
+what the UI means, not how many pixels or alpha points it happens to use today.

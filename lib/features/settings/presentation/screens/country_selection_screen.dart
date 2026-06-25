@@ -59,8 +59,7 @@ class _CountrySelectionScreenState extends State<CountrySelectionScreen> {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
-    final colors = context.appColors;
-    final textTheme = context.textTheme;
+    final type = context.type;
 
     return Scaffold(
       backgroundColor: context.colorScheme.surface,
@@ -76,12 +75,7 @@ class _CountrySelectionScreenState extends State<CountrySelectionScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    'Error loading countries',
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: colors.textSecondary,
-                    ),
-                  ),
+                  Text('Error loading countries', style: type.errorMessage),
                   SizedBox(height: spacing.lg),
                   CustomButton(text: 'Retry', onTap: _loadCountries),
                 ],
@@ -109,7 +103,7 @@ class _CountrySelectionScreenState extends State<CountrySelectionScreen> {
 
                     return CountrySelectOptionRow(
                       country: country,
-                      selected: int.parse(_selectedCountryCode ?? '0'),
+                      selected: _selectedCountryCode == country.code,
                       onTap: () {
                         _onCountrySelected(country);
                       },

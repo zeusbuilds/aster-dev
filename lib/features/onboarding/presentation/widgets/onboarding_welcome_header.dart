@@ -9,25 +9,21 @@ class OnboardingWelcomeHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final spacing = context.spacing;
     final colors = context.appColors;
-    final textTheme = context.textTheme;
+    final icons = context.icons;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.start,
       children: [
         SvgPicture.asset(
           'assets/brand/aster-logo.svg',
-          width: spacing.iconLg,
+          width: icons.lg,
           colorFilter: ColorFilter.mode(colors.onBrandArt, BlendMode.srcIn),
         ),
-        SizedBox(width: spacing.sm),
+        SizedBox(width: context.spacing.sm),
         Text(
           'Aster',
-          style: textTheme.headlineSmall?.copyWith(
-            color: colors.onBrandArt,
-            fontWeight: FontWeight.w600,
-          ),
+          style: context.type.brandHero.copyWith(color: colors.onBrandArt),
         ),
       ],
     );

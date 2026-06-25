@@ -30,61 +30,57 @@ class WalletSelectOptionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final spacing = context.spacing;
-    final textTheme = context.textTheme;
+    final icons = context.icons;
+    final type = context.type;
 
-    return GestureDetector(
-      onTapDown: onTap != null
-          ? (_) async {
-              final canVibrate = await Haptics.canVibrate();
-              if (canVibrate) {
-                await Haptics.vibrate(HapticsType.selection);
+    return Semantics(
+      button: onTap != null,
+      selected: selected == wallet.id,
+      label: '${wallet.name}, ${wallet.walletId}',
+      child: GestureDetector(
+        onTapDown: onTap != null
+            ? (_) async {
+                final canVibrate = await Haptics.canVibrate();
+                if (canVibrate) {
+                  await Haptics.vibrate(HapticsType.selection);
+                }
               }
-            }
-          : null,
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: spacing.screenPadding,
-          vertical: spacing.lg,
-        ),
-        child: Row(
-          children: [
-            CustomRadio(
-              option: wallet.id,
-              selected: selected,
-              onChanged: (value) {
-                onTap?.call();
-              },
-            ),
-            SizedBox(width: spacing.lg),
-            Expanded(
-              child: Text(
-                wallet.name,
-                style: textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w500,
-                  color: context.colorScheme.onSurface,
+            : null,
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: spacing.screenPadding,
+            vertical: spacing.lg,
+          ),
+          child: Row(
+            children: [
+              CustomRadio(
+                option: wallet.id,
+                selected: selected,
+                onChanged: (value) {
+                  onTap?.call();
+                },
+              ),
+              SizedBox(width: spacing.lg),
+              Expanded(
+                child: Text(
+                  wallet.name,
+                  style: type.rowTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
-            ),
-            SizedBox(width: spacing.xxxl),
-            Text(
-              wallet.walletId,
-              style: textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: context.colorScheme.onSurface,
+              SizedBox(width: spacing.xxxl),
+              Text(wallet.walletId, style: type.rowValue, maxLines: 1),
+              SizedBox(width: spacing.md),
+              Icon(
+                MingCuteIcons.mgc_edit_2_line,
+                size: icons.sm,
+                color: colors.textTertiary,
               ),
-              maxLines: 1,
-            ),
-            SizedBox(width: spacing.md),
-            Icon(
-              MingCuteIcons.mgc_edit_2_line,
-              size: spacing.xl,
-              color: colors.textTertiary,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

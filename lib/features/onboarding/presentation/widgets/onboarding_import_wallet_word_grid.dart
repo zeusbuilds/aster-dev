@@ -31,7 +31,9 @@ class OnboardingImportWalletWordGrid extends StatelessWidget {
     final effects = context.effects;
     final metrics = context.metrics;
     final radius = context.radii;
-    final textTheme = context.textTheme;
+    final strokes = context.strokes;
+    final type = context.type;
+    final icons = context.icons;
 
     return GridView.builder(
       shrinkWrap: true,
@@ -59,58 +61,54 @@ class OnboardingImportWalletWordGrid extends StatelessWidget {
             ? validationResults![index]!
             : null;
 
-        return Container(
+        return Squircle(
           padding: EdgeInsets.symmetric(
             horizontal: spacing.md,
             vertical: spacing.sm,
           ),
-          decoration: BoxDecoration(
-            color: context.colorScheme.surface.withValues(
-              alpha: effects.brandGlassSurfaceOpacity,
-            ),
-            borderRadius: BorderRadius.circular(radius.card),
-            border: Border.all(
-              color: context.colorScheme.surface.withValues(
-                alpha: effects.brandGlassBorderOpacity,
-              ),
-              width: spacing.hairline,
-            ),
+          borderRadius: radius.card,
+          color: context.colorScheme.surface.withValues(
+            alpha: effects.brandGlassSurfaceOpacity,
           ),
-          alignment: Alignment.centerLeft,
-          child: Row(
-            children: [
-              Text(
-                '$number',
-                style: textTheme.labelSmall?.copyWith(
-                  color: colors.onBrandArt.withValues(
-                    alpha: effects.brandContentSubtleOpacity,
+          borderColor: context.colorScheme.surface.withValues(
+            alpha: effects.brandGlassBorderOpacity,
+          ),
+          borderWidth: strokes.hairline,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Row(
+              children: [
+                Text(
+                  '$number',
+                  style: type.amountSmall.copyWith(
+                    color: colors.onBrandArt.withValues(
+                      alpha: effects.brandContentSubtleOpacity,
+                    ),
                   ),
-                  fontWeight: FontWeight.w500,
                 ),
-              ),
-              SizedBox(width: spacing.sm),
-              Expanded(
-                child: word != null
-                    ? Text(
-                        word,
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: colors.onBrandArt,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      )
-                    : const SizedBox.shrink(),
-              ),
-              if (isValid != null) ...[
-                Icon(
-                  isValid
-                      ? MingCuteIcons.mgc_check_fill
-                      : MingCuteIcons.mgc_close_fill,
-                  size: spacing.xl,
-                  color: isValid ? colors.success : colors.danger,
+                SizedBox(width: spacing.sm),
+                Expanded(
+                  child: word != null
+                      ? Text(
+                          word,
+                          style: type.rowTitle.copyWith(
+                            color: colors.onBrandArt,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        )
+                      : const SizedBox.shrink(),
                 ),
+                if (isValid != null) ...[
+                  Icon(
+                    isValid
+                        ? MingCuteIcons.mgc_check_fill
+                        : MingCuteIcons.mgc_close_fill,
+                    size: icons.sm,
+                    color: isValid ? colors.success : colors.danger,
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         );
       },

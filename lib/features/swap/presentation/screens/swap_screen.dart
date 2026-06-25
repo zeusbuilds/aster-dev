@@ -187,7 +187,6 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final spacing = context.spacing;
     final colors = context.appColors;
-    final textTheme = context.textTheme;
     final metrics = context.metrics;
     final motion = context.motion;
 
@@ -297,17 +296,13 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
                                 buttonWidth:
                                     (MediaQuery.of(context).size.width -
                                         spacing.screenPadding * 2 -
-                                        spacing.keypadHorizontalReserve) /
+                                        metrics.keypadHorizontalReserve) /
                                     3,
-                                buttonHeight: spacing.keypadButtonHeight,
-                                rowSpacing: spacing.keypadGap,
-                                columnSpacing: spacing.keypadGap,
+                                buttonHeight: metrics.keypadButtonHeight,
+                                rowSpacing: metrics.keypadGap,
+                                columnSpacing: metrics.keypadGap,
                                 buttonColor: colors.surfaceSubtle,
-                                buttonTextStyle: textTheme.headlineSmall!
-                                    .copyWith(
-                                      fontWeight: FontWeight.w600,
-                                      color: context.colorScheme.onSurface,
-                                    )
+                                buttonTextStyle: context.type.keypadNumber
                                     .toNumeric(context),
                               )
                             : const SizedBox.shrink(key: ValueKey('empty')),
@@ -319,7 +314,7 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
                         duration: motion.swapMessageTransitionDuration,
                         curve: motion.choreographyCurve,
                         height: !_showKeyboard
-                            ? spacing.collapsedMessageHeight
+                            ? metrics.collapsedMessageHeight
                             : 0,
                         child: !_showKeyboard
                             ? AnimatedBuilder(
@@ -330,16 +325,18 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
                                     child: child,
                                   );
                                 },
-                                child: GestureDetector(
-                                  onTap: _onCancelTap,
-                                  child: Padding(
-                                    padding: EdgeInsets.only(top: spacing.md),
-                                    child: Center(
-                                      child: Text(
-                                        'cancel',
-                                        style: textTheme.bodyMedium?.copyWith(
-                                          fontWeight: FontWeight.w500,
-                                          color: context.colorScheme.onSurface,
+                                child: Semantics(
+                                  button: true,
+                                  label: 'Cancel swap',
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onTap: _onCancelTap,
+                                    child: Padding(
+                                      padding: EdgeInsets.only(top: spacing.md),
+                                      child: Center(
+                                        child: Text(
+                                          'cancel',
+                                          style: context.type.rowTitle,
                                         ),
                                       ),
                                     ),

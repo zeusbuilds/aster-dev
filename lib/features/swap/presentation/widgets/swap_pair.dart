@@ -40,8 +40,9 @@ class SwapPair extends StatelessWidget {
   Widget build(BuildContext context) {
     final spacing = context.spacing;
     final colors = context.appColors;
-    final textTheme = context.textTheme;
     final radius = context.radii;
+    final icons = context.icons;
+    final type = context.type;
 
     return Squircle(
       padding: EdgeInsets.zero,
@@ -61,79 +62,53 @@ class SwapPair extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            GestureDetector(
-              onTap: onAssetTap,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Text(
-                    marketPrice,
-                    style: textTheme.bodyMedium
-                        ?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: colors.textTertiary,
-                        )
-                        .toNumeric(context),
-                  ),
-                  const Spacer(),
-                  SvgPicture.asset(
-                    asset.icon,
-                    width: spacing.iconLg,
-                    height: spacing.iconLg,
-                    errorBuilder: (context, error, stackTrace) => Icon(
-                      Icons.circle,
-                      size: spacing.iconLg,
-                      color: asset.themedColor(context),
+            Semantics(
+              button: onAssetTap != null,
+              label: 'Select ${asset.token}',
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onAssetTap,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    NumericText(
+                      marketPrice,
+                      style: type.rowMetaStrong.copyWith(
+                        color: colors.textTertiary,
+                      ),
                     ),
-                  ),
-                  SizedBox(width: spacing.sm),
-                  Text(
-                    asset.token,
-                    style: textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: context.colorScheme.onSurface,
+                    const Spacer(),
+                    SvgPicture.asset(
+                      asset.icon,
+                      width: icons.lg,
+                      height: icons.lg,
+                      errorBuilder: (context, error, stackTrace) => Icon(
+                        Icons.circle,
+                        size: icons.lg,
+                        color: AssetDisplay.colorOf(context, asset),
+                      ),
                     ),
-                  ),
-                  SizedBox(width: spacing.xs),
-                  Icon(
-                    RemixIcons.arrow_right_s_line,
-                    size: spacing.screenPadding,
-                    color: colors.textTertiary,
-                  ),
-                ],
+                    SizedBox(width: spacing.sm),
+                    Text(asset.token, style: type.title),
+                    SizedBox(width: spacing.xs),
+                    Icon(
+                      RemixIcons.arrow_right_s_line,
+                      size: icons.sm,
+                      color: colors.textTertiary,
+                    ),
+                  ],
+                ),
               ),
             ),
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Text(
-                  amount,
-                  style: textTheme.headlineSmall
-                      ?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: context.colorScheme.onSurface,
-                      )
-                      .toNumeric(context),
-                ),
+                NumericText(amount, style: type.amountLarge),
                 const Spacer(),
-                Text.rich(
-                  TextSpan(
-                    text: 'Bal: ',
-                    style: textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: colors.textTertiary,
-                    ),
-                    children: [
-                      TextSpan(
-                        text: balance,
-                        style: textTheme.bodyMedium
-                            ?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: colors.textTertiary,
-                            )
-                            .toNumeric(context),
-                      ),
-                    ],
+                AmountText(
+                  'Bal: $balance',
+                  style: type.rowMetaStrong.copyWith(
+                    color: colors.textTertiary,
                   ),
                 ),
                 if (from) ...[
@@ -146,13 +121,7 @@ class SwapPair extends StatelessWidget {
                     borderRadius: radius.badge,
                     borderColor: colors.surfaceSubtle,
                     color: colors.surfaceSubtle,
-                    child: Text(
-                      'Max',
-                      style: textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: context.colorScheme.onSurface,
-                      ),
-                    ),
+                    child: Text('Max', style: type.badgeLabel),
                   ),
                 ],
               ],

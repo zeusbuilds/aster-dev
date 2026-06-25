@@ -60,8 +60,7 @@ class _CurrencySelectionScreenState extends State<CurrencySelectionScreen> {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
-    final colors = context.appColors;
-    final textTheme = context.textTheme;
+    final type = context.type;
 
     return Scaffold(
       backgroundColor: context.colorScheme.surface,
@@ -77,12 +76,7 @@ class _CurrencySelectionScreenState extends State<CurrencySelectionScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    'Error loading currencies',
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: colors.textSecondary,
-                    ),
-                  ),
+                  Text('Error loading currencies', style: type.errorMessage),
                   SizedBox(height: spacing.lg),
                   CustomButton(text: 'Retry', onTap: _loadCurrencies),
                 ],

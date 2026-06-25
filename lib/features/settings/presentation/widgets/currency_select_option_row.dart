@@ -27,72 +27,63 @@ class CurrencySelectOptionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.appColors;
     final spacing = context.spacing;
-    final textTheme = context.textTheme;
+    final metrics = context.metrics;
+    final type = context.type;
 
-    return GestureDetector(
-      onTapDown: onTap != null
-          ? (_) async {
-              final canVibrate = await Haptics.canVibrate();
-              if (canVibrate) {
-                await Haptics.vibrate(HapticsType.selection);
+    return Semantics(
+      button: onTap != null,
+      selected: selected == 0,
+      label: '${currency.name}, ${currency.symbol} ${currency.code}',
+      child: GestureDetector(
+        onTapDown: onTap != null
+            ? (_) async {
+                final canVibrate = await Haptics.canVibrate();
+                if (canVibrate) {
+                  await Haptics.vibrate(HapticsType.selection);
+                }
               }
-            }
-          : null,
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: spacing.screenPadding,
-          vertical: spacing.lg,
-        ),
-        child: Row(
-          children: [
-            // CountryFlag.fromCountryCode(
-            //   currency.countryCode,
-            //   theme: ImageTheme(
-            //     shape: Circle(),
-            //     height: spacing.xxxl,
-            //     width: spacing.xxxl,
-            //   ),
-            // ),
-            CircleFlag(currency.countryCode, size: spacing.xxxl),
-            SizedBox(width: spacing.lg),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    currency.name,
-                    style: textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w500,
-                      color: context.colorScheme.onSurface,
+            : null,
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: spacing.screenPadding,
+            vertical: spacing.lg,
+          ),
+          child: Row(
+            children: [
+              CircleFlag(currency.countryCode, size: metrics.flagSize),
+              SizedBox(width: spacing.lg),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      currency.name,
+                      style: type.rowTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  // SizedBox(height: spacing.xs),
-                  Text(
-                    '${currency.symbol} ${currency.code}',
-                    style: textTheme.bodySmall?.copyWith(
-                      color: colors.textSecondary,
+                    Text(
+                      '${currency.symbol} ${currency.code}',
+                      style: type.supportingMeta,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            SizedBox(width: spacing.xxxl),
-            CustomRadio(
-              option: 0,
-              selected: selected,
-              onChanged: (value) {
-                onTap?.call();
-              },
-            ),
-          ],
+              SizedBox(width: spacing.xxxl),
+              CustomRadio(
+                option: 0,
+                selected: selected,
+                onChanged: (value) {
+                  onTap?.call();
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );

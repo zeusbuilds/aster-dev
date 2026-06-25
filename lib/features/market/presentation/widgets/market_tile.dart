@@ -12,7 +12,7 @@ class MarketTile extends StatelessWidget {
   final String? tipText;
   final IconData icon;
   final VoidCallback? onTap;
-  final List<Color> gradientColors;
+  final AsterGradientSpec gradient;
   final Color? shadowColor;
 
   const MarketTile({
@@ -22,7 +22,7 @@ class MarketTile extends StatelessWidget {
     this.tipText,
     required this.icon,
     this.onTap,
-    required this.gradientColors,
+    required this.gradient,
     this.shadowColor,
   });
 
@@ -33,21 +33,21 @@ class MarketTile extends StatelessWidget {
     final effects = context.effects;
     final metrics = context.metrics;
     final radius = context.radii;
-    final textTheme = context.textTheme;
     final shadows = context.shadows;
+    final type = context.type;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(radius.card),
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: gradientColors,
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
+    return Semantics(
+      button: onTap != null,
+      label: [label, subtitle, tipText].whereType<String>().join(', '),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Squircle(
+          borderRadius: radius.card,
+          borderColor: colors.transparentSurface,
+          borderWidth: 0,
+          gradient: gradient.toLinearGradient(),
+          padding: EdgeInsets.zero,
           child: Stack(
             children: [
               Positioned(
@@ -77,36 +77,20 @@ class MarketTile extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            label,
-                            style: textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w500,
-                              color: colors.onMarketTile.withValues(
-                                alpha: effects.marketContentMutedOpacity,
-                              ),
-                            ),
-                          ),
-                          Text(
-                            subtitle ?? '',
-                            style: textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: colors.onMarketTile,
-                            ),
-                          ),
+                          Text(label, style: type.marketLabel),
+                          Text(subtitle ?? '', style: type.marketTitle),
                           SizedBox(height: spacing.xxl),
                           if (tipText != null) ...[
-                            Container(
+                            Squircle(
                               padding: EdgeInsets.symmetric(
                                 horizontal: spacing.xs,
                                 vertical: spacing.xs,
                               ),
-                              decoration: BoxDecoration(
-                                color: colors.onMarketTile.withValues(
-                                  alpha: effects.marketPillSurfaceOpacity,
-                                ),
-                                borderRadius: BorderRadius.circular(
-                                  radius.pill,
-                                ),
+                              borderRadius: radius.pill,
+                              borderColor: colors.transparentSurface,
+                              borderWidth: 0,
+                              color: colors.onMarketTile.withValues(
+                                alpha: effects.marketPillSurfaceOpacity,
                               ),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -125,12 +109,11 @@ class MarketTile extends StatelessWidget {
                                   SizedBox(width: spacing.sm),
                                   Text(
                                     tipText!,
-                                    style: textTheme.bodyMedium?.copyWith(
+                                    style: type.marketTip.copyWith(
                                       color: colors.onMarketTile.withValues(
                                         alpha:
                                             effects.marketContentMutedOpacity,
                                       ),
-                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                   SizedBox(width: spacing.md),

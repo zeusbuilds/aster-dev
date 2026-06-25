@@ -30,9 +30,7 @@ class _OnboardingContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
-    final colors = context.appColors;
-    final effects = context.effects;
-    final textTheme = context.textTheme;
+    final type = context.type;
 
     return Padding(
       padding: EdgeInsets.symmetric(
@@ -43,26 +41,16 @@ class _OnboardingContent extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const OnboardingWelcomeHeader(),
-          SizedBox(height: spacing.iconXl),
+          SizedBox(height: spacing.huge),
           const OnboardingWelcomeIconGrid(),
-          SizedBox(height: spacing.iconLg),
-          Text(
-            'Built for\nUSDT on Bitcoin',
-            style: textTheme.displaySmall?.copyWith(
-              color: colors.onBrandArt,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          SizedBox(height: spacing.xxxl),
+          Text('Built for\nUSDT on Bitcoin', style: type.brandHero),
           SizedBox(height: spacing.md),
           Text(
             'Responses are compared, adjusted, and\n'
             'optimized to reduce noise and improve\n'
             'clarity.',
-            style: textTheme.bodyLarge?.copyWith(
-              color: colors.onBrandArt.withValues(
-                alpha: effects.brandContentStrongOpacity,
-              ),
-            ),
+            style: type.brandBody,
           ),
           const Spacer(),
           Column(
@@ -76,20 +64,16 @@ class _OnboardingContent extends StatelessWidget {
                 },
               ),
               SizedBox(height: spacing.md),
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => context.push(RoutePaths.onboardingImportWallet),
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: spacing.xs),
-                  child: Center(
-                    child: Text(
-                      'Import Wallet',
-                      style: textTheme.bodyLarge?.copyWith(
-                        color: colors.onBrandArt.withValues(
-                          alpha: effects.brandContentStrongOpacity,
-                        ),
-                        fontWeight: FontWeight.w600,
-                      ),
+              Semantics(
+                button: true,
+                label: 'Import Wallet',
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => context.push(RoutePaths.onboardingImportWallet),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: spacing.xs),
+                    child: Center(
+                      child: Text('Import Wallet', style: type.brandAction),
                     ),
                   ),
                 ),

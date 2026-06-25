@@ -37,7 +37,9 @@ class SendCard extends StatelessWidget {
     final colors = context.appColors;
     final spacing = context.spacing;
     final radius = context.radii;
-    final textTheme = context.textTheme;
+    final icons = context.icons;
+    final type = context.type;
+    final metrics = context.metrics;
 
     return Column(
       children: [
@@ -56,68 +58,37 @@ class SendCard extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Text(
-                    amount,
-                    style: textTheme.headlineSmall
-                        ?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: context.colorScheme.onSurface,
-                        )
-                        .toNumeric(context),
-                  ),
+                  NumericText(amount, style: type.amountLarge),
                   const Spacer(),
                   SvgPicture.asset(
                     asset.icon,
-                    width: spacing.iconLg,
-                    height: spacing.iconLg,
+                    width: icons.lg,
+                    height: icons.lg,
                     errorBuilder: (context, error, stackTrace) => Icon(
                       Icons.circle,
-                      size: spacing.iconLg,
-                      color: asset.themedColor(context),
+                      size: icons.lg,
+                      color: AssetDisplay.colorOf(context, asset),
                     ),
                   ),
                   SizedBox(width: spacing.sm),
-                  Text(
-                    asset.token,
-                    style: textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: context.colorScheme.onSurface,
-                    ),
-                  ),
+                  Text(asset.token, style: type.title),
                 ],
               ),
               SizedBox(height: spacing.xs),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Text(
+                  NumericText(
                     marketPrice,
-                    style: textTheme.bodyMedium
-                        ?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: colors.textTertiary,
-                        )
-                        .toNumeric(context),
+                    style: type.rowMetaStrong.copyWith(
+                      color: colors.textTertiary,
+                    ),
                   ),
                   const Spacer(),
-                  Text.rich(
-                    TextSpan(
-                      text: 'Bal: ',
-                      style: textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: colors.textTertiary,
-                      ),
-                      children: [
-                        TextSpan(
-                          text: balance,
-                          style: textTheme.bodyMedium
-                              ?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: colors.textTertiary,
-                              )
-                              .toNumeric(context),
-                        ),
-                      ],
+                  AmountText(
+                    'Bal: $balance',
+                    style: type.rowMetaStrong.copyWith(
+                      color: colors.textTertiary,
                     ),
                   ),
                 ],
@@ -140,21 +111,15 @@ class SendCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               SizedBox(
-                width: spacing.xxl,
-                height: spacing.xxl,
+                width: metrics.compactFlagSize,
+                height: metrics.compactFlagSize,
                 child: CountryFlag.fromCountryCode(
                   'US',
                   theme: const ImageTheme(shape: Circle()),
                 ),
               ),
               SizedBox(width: spacing.sm),
-              Text(
-                fiatCurrency,
-                style: textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: context.colorScheme.onSurface,
-                ),
-              ),
+              Text(fiatCurrency, style: type.rowTitleStrong),
               const Spacer(),
               Squircle(
                 padding: EdgeInsets.symmetric(
@@ -166,8 +131,7 @@ class SendCard extends StatelessWidget {
                 color: context.colorScheme.onSurface,
                 child: Text(
                   'Send max',
-                  style: textTheme.labelSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
+                  style: type.badgeLabel.copyWith(
                     color: context
                         .colorScheme
                         .surface, // Inverse color (background)

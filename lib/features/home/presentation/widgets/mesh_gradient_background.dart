@@ -6,9 +6,6 @@ import 'package:mesh/mesh.dart';
 
 import '../../../../shared/shared.dart';
 
-const _meshColumns = 5;
-const _meshRows = 7;
-
 /// Background widget with animated mesh gradient effect
 ///
 /// Creates a blue gradient mesh with blur and noise texture overlay
@@ -19,7 +16,7 @@ class MeshGradientBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final effects = context.effects;
-    final metrics = context.metrics;
+    final art = context.art;
 
     return Stack(
       fit: StackFit.expand,
@@ -27,8 +24,8 @@ class MeshGradientBackground extends StatelessWidget {
         // The Mesh Gradient (Background)
         OMeshGradient(
           mesh: OMeshRect(
-            width: _meshColumns,
-            height: _meshRows,
+            width: art.homeMeshColumns,
+            height: art.homeMeshRows,
             fallbackColor: colors.brandArtDark,
             backgroundColor: colors.brandArtSoft,
             vertices: [
@@ -130,8 +127,8 @@ class MeshGradientBackground extends StatelessWidget {
         // Backdrop filter for blur effect
         BackdropFilter(
           filter: ImageFilter.blur(
-            sigmaX: metrics.brandMeshBlurSigma,
-            sigmaY: metrics.brandMeshBlurSigma,
+            sigmaX: art.brandMeshBlurSigma,
+            sigmaY: art.brandMeshBlurSigma,
           ),
           child: Container(
             color: colors.transparentSurface, // Required to apply filter

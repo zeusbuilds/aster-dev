@@ -56,9 +56,10 @@ class AssetSelectorSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final spacing = context.spacing;
     final radius = context.radii;
-    final textTheme = context.textTheme;
+    final metrics = context.metrics;
+    final type = context.type;
     final maxHeight =
-        MediaQuery.of(context).size.height * spacing.sheetMaxHeightFactor;
+        MediaQuery.of(context).size.height * metrics.sheetMaxHeightFactor;
 
     return Container(
       constraints: BoxConstraints(maxHeight: maxHeight),
@@ -73,8 +74,8 @@ class AssetSelectorSheet extends StatelessWidget {
           SizedBox(height: spacing.md),
           // Handle bar
           Container(
-            width: spacing.sheetHandleWidth,
-            height: spacing.sheetHandleHeight,
+            width: metrics.sheetHandleWidth,
+            height: metrics.sheetHandleHeight,
             decoration: BoxDecoration(
               color: context.colorScheme.surfaceContainerHigh,
               borderRadius: BorderRadius.circular(radius.pill),
@@ -84,13 +85,7 @@ class AssetSelectorSheet extends StatelessWidget {
           // Title
           Padding(
             padding: EdgeInsets.symmetric(horizontal: spacing.screenPadding),
-            child: Text(
-              'Select token',
-              style: textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: context.colorScheme.onSurface,
-              ),
-            ),
+            child: Text('Select token', style: type.title),
           ),
           SizedBox(height: spacing.lg),
           // Asset list
@@ -144,124 +139,97 @@ class _AssetItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final effects = context.effects;
     final motion = context.motion;
     final spacing = context.spacing;
     final radius = context.radii;
-    final textTheme = context.textTheme;
+    final icons = context.icons;
+    final metrics = context.metrics;
+    final stateLayers = context.stateLayers;
+    final type = context.type;
 
-    return GestureDetector(
-      onTapDown: (_) async {
-        final canVibrate = await Haptics.canVibrate();
-        if (canVibrate) {
-          await Haptics.vibrate(HapticsType.light);
-        }
-      },
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: motion.selectionTransitionDuration,
-        curve: motion.fastEase,
-        padding: EdgeInsets.symmetric(vertical: spacing.xs),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? context.colorScheme.primaryContainer.withValues(
-                  alpha: effects.selectedContainerOpacity,
-                )
-              : context.colorScheme.surface,
-        ),
-        child: Row(
-          children: [
-            SizedBox(width: spacing.sm),
-            // Selection indicator bar
-            Container(
-              width: spacing.xs,
-              height: spacing.giant,
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? context.colorScheme.primary
-                    : colors.transparentSurface,
-                borderRadius: BorderRadius.circular(radius.pill),
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: '${asset.token}, ${asset.chain}',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) async {
+          final canVibrate = await Haptics.canVibrate();
+          if (canVibrate) {
+            await Haptics.vibrate(HapticsType.light);
+          }
+        },
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: motion.selectionTransitionDuration,
+          curve: motion.fastEase,
+          padding: EdgeInsets.symmetric(vertical: spacing.xs),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? context.colorScheme.primaryContainer.withValues(
+                    alpha: stateLayers.selectedContainer,
+                  )
+                : context.colorScheme.surface,
+          ),
+          child: Row(
+            children: [
+              SizedBox(width: spacing.sm),
+              // Selection indicator bar
+              Container(
+                width: metrics.selectionIndicatorWidth,
+                height: metrics.selectionIndicatorHeight,
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? context.colorScheme.primary
+                      : colors.transparentSurface,
+                  borderRadius: BorderRadius.circular(radius.pill),
+                ),
               ),
-            ),
-            SizedBox(width: spacing.md),
-            // Icon
-            SvgPicture.asset(
-              asset.icon,
-              width: spacing.iconXl,
-              height: spacing.iconXl,
-              errorBuilder: (context, error, stackTrace) => Icon(
-                Icons.circle,
-                size: spacing.iconXl,
-                color: asset.themedColor(context),
+              SizedBox(width: spacing.md),
+              // Icon
+              SvgPicture.asset(
+                asset.icon,
+                width: icons.xl,
+                height: icons.xl,
+                errorBuilder: (context, error, stackTrace) => Icon(
+                  Icons.circle,
+                  size: icons.xl,
+                  color: AssetDisplay.colorOf(context, asset),
+                ),
               ),
-            ),
-            SizedBox(width: spacing.sm),
-            // Name and subtitle
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              SizedBox(width: spacing.sm),
+              // Name and subtitle
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(asset.token, style: type.title),
+                    SizedBox(height: spacing.xxs),
+                    Text(
+                      asset.chain,
+                      style: type.rowMeta.copyWith(color: colors.textTertiary),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(width: spacing.md),
+              // Balance information
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    asset.token,
-                    style: textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: context.colorScheme.onSurface,
-                    ),
-                  ),
+                  NumericText('\$0.0', style: type.rowValue),
                   SizedBox(height: spacing.xxs),
-                  Text(
-                    asset.chain,
-                    style: textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w500,
-                      color: colors.textTertiary,
-                    ),
+                  AmountText(
+                    '0 sats',
+                    style: type.rowMeta.copyWith(color: colors.textTertiary),
                   ),
                 ],
               ),
-            ),
-            SizedBox(width: spacing.md),
-            // Balance information
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '\$0.0',
-                  style: textTheme.titleMedium
-                      ?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: context.colorScheme.onSurface,
-                      )
-                      .toNumeric(context),
-                ),
-                SizedBox(height: spacing.xxs),
-                RichText(
-                  text: TextSpan(
-                    children: [
-                      TextSpan(
-                        text: '0',
-                        style: textTheme.titleSmall
-                            ?.copyWith(
-                              fontWeight: FontWeight.w500,
-                              color: colors.textTertiary,
-                            )
-                            .toNumeric(context),
-                      ),
-                      TextSpan(
-                        text: ' sats',
-                        style: textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w500,
-                          color: colors.textTertiary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(width: spacing.screenPadding),
-          ],
+              SizedBox(width: spacing.screenPadding),
+            ],
+          ),
         ),
       ),
     );

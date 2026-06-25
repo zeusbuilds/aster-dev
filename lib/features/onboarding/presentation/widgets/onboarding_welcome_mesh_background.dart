@@ -5,9 +5,6 @@ import 'package:mesh/mesh.dart';
 
 import '../../../../shared/shared.dart';
 
-const _meshColumns = 5;
-const _meshRows = 7;
-
 /// Blue mesh gradient background used on the onboarding welcome screen.
 class OnboardingWelcomeMeshBackground extends StatelessWidget {
   const OnboardingWelcomeMeshBackground({super.key});
@@ -16,15 +13,15 @@ class OnboardingWelcomeMeshBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final effects = context.effects;
-    final metrics = context.metrics;
+    final art = context.art;
 
     return Stack(
       fit: StackFit.expand,
       children: [
         OMeshGradient(
           mesh: OMeshRect(
-            width: _meshColumns,
-            height: _meshRows,
+            width: art.onboardingMeshColumns,
+            height: art.onboardingMeshRows,
             fallbackColor: colors.brandArtDark,
             backgroundColor: colors.brandArtDeep,
             vertices: [
@@ -119,8 +116,8 @@ class OnboardingWelcomeMeshBackground extends StatelessWidget {
         ),
         BackdropFilter(
           filter: ImageFilter.blur(
-            sigmaX: metrics.brandMeshBlurSigma,
-            sigmaY: metrics.brandMeshBlurSigma,
+            sigmaX: art.brandMeshBlurSigma,
+            sigmaY: art.brandMeshBlurSigma,
           ),
           child: Container(color: colors.transparentSurface),
         ),

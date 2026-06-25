@@ -6,23 +6,42 @@ import '../../../../shared/shared.dart';
 class ScanControlButton extends StatelessWidget {
   final Widget child;
   final VoidCallback? onTap;
+  final String semanticLabel;
 
-  const ScanControlButton({super.key, required this.child, this.onTap});
+  const ScanControlButton({
+    super.key,
+    required this.child,
+    required this.semanticLabel,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final spacing = context.spacing;
     final colors = context.appColors;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: spacing.xxl,
-        height: spacing.xxl,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: colors.scanControlSurface,
+    final icons = context.icons;
+    final metrics = context.metrics;
+    return Semantics(
+      button: true,
+      enabled: onTap != null,
+      label: semanticLabel,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: SizedBox(
+          width: metrics.minTouchTarget,
+          height: metrics.minTouchTarget,
+          child: Center(
+            child: Container(
+              width: icons.md,
+              height: icons.md,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: colors.scanControlSurface,
+              ),
+              child: Center(child: child),
+            ),
+          ),
         ),
-        child: Center(child: child),
       ),
     );
   }

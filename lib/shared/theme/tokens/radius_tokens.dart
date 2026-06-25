@@ -12,6 +12,12 @@ class AsterRadii extends ThemeExtension<AsterRadii> {
     this.xxl = 24,
     this.sheet = 28,
     this.pill = 999,
+    this.card = 24,
+    this.button = 18,
+    this.input = 12,
+    this.badge = 8,
+    this.iconButton = 12,
+    this.control = 16,
   });
 
   final double none;
@@ -23,11 +29,12 @@ class AsterRadii extends ThemeExtension<AsterRadii> {
   final double xxl;
   final double sheet;
   final double pill;
-
-  double get card => xxl;
-  double get button => 18;
-  double get input => md;
-  double get badge => sm;
+  final double card;
+  final double button;
+  final double input;
+  final double badge;
+  final double iconButton;
+  final double control;
 
   @override
   AsterRadii copyWith({
@@ -40,6 +47,12 @@ class AsterRadii extends ThemeExtension<AsterRadii> {
     double? xxl,
     double? sheet,
     double? pill,
+    double? card,
+    double? button,
+    double? input,
+    double? badge,
+    double? iconButton,
+    double? control,
   }) {
     return AsterRadii(
       none: none ?? this.none,
@@ -51,6 +64,12 @@ class AsterRadii extends ThemeExtension<AsterRadii> {
       xxl: xxl ?? this.xxl,
       sheet: sheet ?? this.sheet,
       pill: pill ?? this.pill,
+      card: card ?? this.card,
+      button: button ?? this.button,
+      input: input ?? this.input,
+      badge: badge ?? this.badge,
+      iconButton: iconButton ?? this.iconButton,
+      control: control ?? this.control,
     );
   }
 
@@ -67,6 +86,12 @@ class AsterRadii extends ThemeExtension<AsterRadii> {
       xxl: _lerp(xxl, other.xxl, t),
       sheet: _lerp(sheet, other.sheet, t),
       pill: _lerp(pill, other.pill, t),
+      card: _lerp(card, other.card, t),
+      button: _lerp(button, other.button, t),
+      input: _lerp(input, other.input, t),
+      badge: _lerp(badge, other.badge, t),
+      iconButton: _lerp(iconButton, other.iconButton, t),
+      control: _lerp(control, other.control, t),
     );
   }
 

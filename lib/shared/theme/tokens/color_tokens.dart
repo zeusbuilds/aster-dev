@@ -1,5 +1,40 @@
 import 'package:flutter/material.dart';
 
+class _AsterPalette {
+  const _AsterPalette._();
+
+  static const ink = Color(0xFF1D2129);
+  static const blueBase = Color(0xFF165DFF);
+  static const blue900 = Color(0xFF0E42D2);
+  static const blue800 = Color(0xFF4080FF);
+  static const blue600 = Color(0xFF6AA1FF);
+  static const blue500 = Color(0xFF94BFFF);
+  static const blue300 = Color(0xFFBEDAFF);
+  static const blue200 = Color(0xFFE8F3FF);
+  static const surface = Color(0xFFFFFFFF);
+  static const white = Color(0xFFFFFFFF);
+  static const black = Color(0xFF000000);
+  static const transparent = Color(0x00000000);
+  static const neutral50 = Color(0xFFF7F8FA);
+  static const neutral100 = Color(0xFFF2F3F5);
+  static const neutral200 = Color(0xFFE5E6EB);
+  static const neutral300 = Color(0xFFC9CDD4);
+  static const neutral500 = Color(0xFF86909C);
+  static const neutral700 = Color(0xFF4E5969);
+  static const meshDeep = Color(0xFF000C79);
+  static const meshMain = Color(0xFF001AFF);
+  static const meshBright = Color(0xFF007BFF);
+  static const meshSoft = Color(0xFF8BD0FF);
+  static const success = Color(0xFF00B42A);
+  static const successContainer = Color(0xFFE8F8E5);
+  static const warning = Color(0xFFFF7D00);
+  static const warningContainer = Color(0xFFFFF7E8);
+  static const danger = Color(0xFFF53F3F);
+  static const dangerContainer = Color(0xFFFFECE8);
+  static const bitcoin = Color(0xFFF7931A);
+  static const liquid = Color(0xFF14A38B);
+}
+
 /// App-specific color roles that are not covered by Material [ColorScheme].
 ///
 /// Material components should use [ColorScheme]. Product UI that needs
@@ -39,34 +74,7 @@ class AsterColors extends ThemeExtension<AsterColors> {
     required this.brandArtMain,
     required this.brandArtBright,
     required this.brandArtSoft,
-    required this.marketBuyGradient,
-    required this.marketSellGradient,
-    required this.marketSwapGradient,
-    required this.marketLendGradient,
-    required this.marketSendGradient,
-    required this.marketReceiveGradient,
-    required this.homeGradient,
-    required this.splashGradient,
   });
-
-  static const ink = Color(0xFF1D2129);
-  static const blueBase = Color(0xFF165DFF);
-  static const blue900 = Color(0xFF0E42D2);
-  static const blue800 = Color(0xFF4080FF);
-  static const blue600 = Color(0xFF6AA1FF);
-  static const blue500 = Color(0xFF94BFFF);
-  static const blue300 = Color(0xFFBEDAFF);
-  static const blue200 = Color(0xFFE8F3FF);
-  static const blue100 = Color(0xFFE8F3FF);
-  static const surface = Color(0xFFFFFFFF);
-  static const white = Color(0xFFFFFFFF);
-  static const black = Color(0xFF000000);
-  static const transparent = Color(0x00000000);
-  static const meshDeep = Color(0xFF000C79);
-  static const meshMain = Color(0xFF001AFF);
-  static const meshBright = Color(0xFF007BFF);
-  static const meshSoft = Color(0xFF8BD0FF);
-  static const splashTop = Color(0xFF8BD6FF);
 
   final Color textSecondary;
   final Color textTertiary;
@@ -100,57 +108,77 @@ class AsterColors extends ThemeExtension<AsterColors> {
   final Color brandArtMain;
   final Color brandArtBright;
   final Color brandArtSoft;
-  final List<Color> marketBuyGradient;
-  final List<Color> marketSellGradient;
-  final List<Color> marketSwapGradient;
-  final List<Color> marketLendGradient;
-  final List<Color> marketSendGradient;
-  final List<Color> marketReceiveGradient;
-  final List<Color> homeGradient;
-  final List<Color> splashGradient;
 
   static const light = AsterColors(
-    textSecondary: Color(0xFF4E5969),
-    textTertiary: Color(0xFF86909C),
-    textDisabled: Color(0xFFC9CDD4),
-    surfaceRaised: white,
-    surfaceSubtle: Color(0xFFF2F3F5),
-    borderSubtle: Color(0xFFE5E6EB),
+    textSecondary: _AsterPalette.neutral700,
+    textTertiary: _AsterPalette.neutral500,
+    textDisabled: _AsterPalette.neutral300,
+    surfaceRaised: _AsterPalette.white,
+    surfaceSubtle: _AsterPalette.neutral100,
+    borderSubtle: _AsterPalette.neutral200,
     overlay: Color(0x991D2129),
-    success: Color(0xFF00B42A),
-    onSuccess: white,
-    successContainer: Color(0xFFE8F8E5),
-    warning: Color(0xFFFF7D00),
-    onWarning: ink,
-    warningContainer: Color(0xFFFFF7E8),
-    danger: Color(0xFFF53F3F),
-    onDanger: white,
-    dangerContainer: Color(0xFFFFECE8),
-    bitcoin: Color(0xFFF7931A),
-    liquid: Color(0xFF14A38B),
-    chartPositive: Color(0xFF00B42A),
-    chartNegative: Color(0xFFF53F3F),
-    onBrandArt: white,
-    transparentSurface: transparent,
-    artNoiseTint: black,
-    scanOverlayBase: black,
-    scanControlSurface: black,
-    onScan: white,
-    onMarketTile: white,
-    brandArtDark: black,
-    brandArtDeep: meshDeep,
-    brandArtMain: meshMain,
-    brandArtBright: meshBright,
-    brandArtSoft: meshSoft,
-    marketBuyGradient: [Color(0xFFE89B6B), Color(0xFFD47A4A)],
-    marketSellGradient: [Color(0xFF6BA8E8), Color(0xFF4A88C8)],
-    marketSwapGradient: [Color(0xFF696969), Color(0xFF696969)],
-    marketLendGradient: [Color(0xFF7B8FA8), Color(0xFF5A6B82)],
-    marketSendGradient: [Color(0xFF9B7BB8), Color(0xFF7A5A96)],
-    marketReceiveGradient: [Color(0xFF5BB89A), Color(0xFF3D9678)],
-    homeGradient: [black, meshDeep, meshMain, meshBright, meshSoft],
-    splashGradient: [splashTop, meshMain, black],
+    success: _AsterPalette.success,
+    onSuccess: _AsterPalette.white,
+    successContainer: _AsterPalette.successContainer,
+    warning: _AsterPalette.warning,
+    onWarning: _AsterPalette.ink,
+    warningContainer: _AsterPalette.warningContainer,
+    danger: _AsterPalette.danger,
+    onDanger: _AsterPalette.white,
+    dangerContainer: _AsterPalette.dangerContainer,
+    bitcoin: _AsterPalette.bitcoin,
+    liquid: _AsterPalette.liquid,
+    chartPositive: _AsterPalette.success,
+    chartNegative: _AsterPalette.danger,
+    onBrandArt: _AsterPalette.white,
+    transparentSurface: _AsterPalette.transparent,
+    artNoiseTint: _AsterPalette.black,
+    scanOverlayBase: _AsterPalette.black,
+    scanControlSurface: _AsterPalette.black,
+    onScan: _AsterPalette.white,
+    onMarketTile: _AsterPalette.white,
+    brandArtDark: _AsterPalette.black,
+    brandArtDeep: _AsterPalette.meshDeep,
+    brandArtMain: _AsterPalette.meshMain,
+    brandArtBright: _AsterPalette.meshBright,
+    brandArtSoft: _AsterPalette.meshSoft,
   );
+
+  static ColorScheme lightColorScheme() {
+    return const ColorScheme.light(
+      primary: _AsterPalette.blueBase,
+      onPrimary: _AsterPalette.white,
+      primaryContainer: _AsterPalette.blue200,
+      onPrimaryContainer: _AsterPalette.blue900,
+      secondary: _AsterPalette.blue600,
+      onSecondary: _AsterPalette.white,
+      secondaryContainer: _AsterPalette.blue300,
+      onSecondaryContainer: _AsterPalette.blue900,
+      tertiary: _AsterPalette.blue800,
+      onTertiary: _AsterPalette.white,
+      tertiaryContainer: _AsterPalette.blue500,
+      onTertiaryContainer: _AsterPalette.blue900,
+      error: _AsterPalette.danger,
+      onError: _AsterPalette.white,
+      errorContainer: _AsterPalette.dangerContainer,
+      onErrorContainer: _AsterPalette.ink,
+      surface: _AsterPalette.surface,
+      onSurface: _AsterPalette.ink,
+      surfaceContainerLowest: _AsterPalette.white,
+      surfaceContainerLow: _AsterPalette.neutral50,
+      surfaceContainer: _AsterPalette.neutral100,
+      surfaceContainerHigh: _AsterPalette.neutral200,
+      surfaceContainerHighest: _AsterPalette.neutral300,
+      onSurfaceVariant: _AsterPalette.neutral500,
+      outline: _AsterPalette.neutral200,
+      outlineVariant: _AsterPalette.neutral100,
+      inverseSurface: _AsterPalette.ink,
+      onInverseSurface: _AsterPalette.white,
+      inversePrimary: _AsterPalette.blue600,
+      shadow: _AsterPalette.ink,
+      scrim: _AsterPalette.ink,
+    );
+  }
 
   @override
   AsterColors copyWith({
@@ -186,14 +214,6 @@ class AsterColors extends ThemeExtension<AsterColors> {
     Color? brandArtMain,
     Color? brandArtBright,
     Color? brandArtSoft,
-    List<Color>? marketBuyGradient,
-    List<Color>? marketSellGradient,
-    List<Color>? marketSwapGradient,
-    List<Color>? marketLendGradient,
-    List<Color>? marketSendGradient,
-    List<Color>? marketReceiveGradient,
-    List<Color>? homeGradient,
-    List<Color>? splashGradient,
   }) {
     return AsterColors(
       textSecondary: textSecondary ?? this.textSecondary,
@@ -228,15 +248,6 @@ class AsterColors extends ThemeExtension<AsterColors> {
       brandArtMain: brandArtMain ?? this.brandArtMain,
       brandArtBright: brandArtBright ?? this.brandArtBright,
       brandArtSoft: brandArtSoft ?? this.brandArtSoft,
-      marketBuyGradient: marketBuyGradient ?? this.marketBuyGradient,
-      marketSellGradient: marketSellGradient ?? this.marketSellGradient,
-      marketSwapGradient: marketSwapGradient ?? this.marketSwapGradient,
-      marketLendGradient: marketLendGradient ?? this.marketLendGradient,
-      marketSendGradient: marketSendGradient ?? this.marketSendGradient,
-      marketReceiveGradient:
-          marketReceiveGradient ?? this.marketReceiveGradient,
-      homeGradient: homeGradient ?? this.homeGradient,
-      splashGradient: splashGradient ?? this.splashGradient,
     );
   }
 
@@ -292,43 +303,6 @@ class AsterColors extends ThemeExtension<AsterColors> {
       brandArtMain: Color.lerp(brandArtMain, other.brandArtMain, t)!,
       brandArtBright: Color.lerp(brandArtBright, other.brandArtBright, t)!,
       brandArtSoft: Color.lerp(brandArtSoft, other.brandArtSoft, t)!,
-      marketBuyGradient: _lerpColorList(
-        marketBuyGradient,
-        other.marketBuyGradient,
-        t,
-      ),
-      marketSellGradient: _lerpColorList(
-        marketSellGradient,
-        other.marketSellGradient,
-        t,
-      ),
-      marketSwapGradient: _lerpColorList(
-        marketSwapGradient,
-        other.marketSwapGradient,
-        t,
-      ),
-      marketLendGradient: _lerpColorList(
-        marketLendGradient,
-        other.marketLendGradient,
-        t,
-      ),
-      marketSendGradient: _lerpColorList(
-        marketSendGradient,
-        other.marketSendGradient,
-        t,
-      ),
-      marketReceiveGradient: _lerpColorList(
-        marketReceiveGradient,
-        other.marketReceiveGradient,
-        t,
-      ),
-      homeGradient: _lerpColorList(homeGradient, other.homeGradient, t),
-      splashGradient: _lerpColorList(splashGradient, other.splashGradient, t),
     );
-  }
-
-  static List<Color> _lerpColorList(List<Color> a, List<Color> b, double t) {
-    final length = a.length < b.length ? a.length : b.length;
-    return List<Color>.generate(length, (i) => Color.lerp(a[i], b[i], t)!);
   }
 }

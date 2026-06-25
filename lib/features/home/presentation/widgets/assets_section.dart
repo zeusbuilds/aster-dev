@@ -16,7 +16,7 @@ class AssetsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final spacing = context.spacing;
-    final textTheme = context.textTheme;
+    final icons = context.icons;
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: spacing.screenPadding),
@@ -25,17 +25,11 @@ class AssetsSection extends StatelessWidget {
           SizedBox(height: spacing.screenPadding),
           Row(
             children: [
-              Text(
-                'Assets',
-                style: textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: context.colorScheme.onSurface,
-                ),
-              ),
+              Text('Assets', style: context.type.sectionTitle),
               const Spacer(),
               Icon(
                 MingCuteIcons.mgc_eye_2_line,
-                size: spacing.xl,
+                size: icons.sm,
                 color: colors.textSecondary,
               ),
             ],

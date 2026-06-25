@@ -31,33 +31,38 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
-    final textTheme = context.textTheme;
+    final icons = context.icons;
+    final metrics = context.metrics;
 
     return AppBar(
       backgroundColor: context.colorScheme.surface,
       elevation: 0,
       centerTitle: centerTitle,
-      title: Text(
-        title,
-        style: textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.w600,
-          color: context.colorScheme.onSurface,
-        ),
-      ),
+      title: Text(title, style: context.type.appBarTitle),
       leading: leadingIcon
-          ? GestureDetector(
+          ? Semantics(
+              button: true,
+              label: 'Back',
               onTap: () => context.pop(),
-              child: Padding(
-                padding: EdgeInsets.only(left: spacing.screenPadding),
-                child: Icon(
-                  leadingIconData ?? RemixIcons.arrow_left_s_line,
-                  size: spacing.screenPadding,
-                  color: context.colorScheme.onSurface,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => context.pop(),
+                child: SizedBox(
+                  width: metrics.minTouchTarget,
+                  height: metrics.minTouchTarget,
+                  child: Padding(
+                    padding: EdgeInsets.only(left: spacing.screenPadding),
+                    child: Icon(
+                      leadingIconData ?? RemixIcons.arrow_left_s_line,
+                      size: icons.sm,
+                      color: context.colorScheme.onSurface,
+                    ),
+                  ),
                 ),
               ),
             )
           : null,
-      leadingWidth: spacing.iconXl,
+      leadingWidth: metrics.appBarLeadingWidth,
       actions: action != null ? [action!] : null,
     );
   }

@@ -30,7 +30,9 @@ class OnboardingImportWalletWordPage extends StatelessWidget {
     final colors = context.appColors;
     final effects = context.effects;
     final radius = context.radii;
-    final textTheme = context.textTheme;
+    final strokes = context.strokes;
+    final type = context.type;
+    final icons = context.icons;
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: spacing.xxl),
@@ -51,59 +53,55 @@ class OnboardingImportWalletWordPage extends StatelessWidget {
             padding: EdgeInsets.only(
               bottom: i < slotsPerPage - 1 ? spacing.md : 0,
             ),
-            child: Container(
+            child: Squircle(
               padding: EdgeInsets.symmetric(
                 horizontal: spacing.lg,
                 vertical: spacing.md,
               ),
-              decoration: BoxDecoration(
-                color: context.colorScheme.surface.withValues(
-                  alpha: effects.brandGlassSurfaceOpacity,
-                ),
-                borderRadius: BorderRadius.circular(radius.card),
-                border: Border.all(
-                  color: context.colorScheme.surface.withValues(
-                    alpha: effects.brandGlassBorderOpacity,
-                  ),
-                  width: spacing.hairline,
-                ),
+              borderRadius: radius.card,
+              color: context.colorScheme.surface.withValues(
+                alpha: effects.brandGlassSurfaceOpacity,
               ),
-              alignment: Alignment.centerLeft,
-              child: Row(
-                children: [
-                  Text(
-                    '$number.',
-                    style: textTheme.bodyLarge
-                        ?.copyWith(
-                          color: colors.onBrandArt.withValues(
-                            alpha: effects.brandContentMutedOpacity,
-                          ),
-                          fontWeight: FontWeight.w500,
-                        )
-                        .toNumeric(context),
-                  ),
-                  SizedBox(width: spacing.md),
-                  Expanded(
-                    child: word != null
-                        ? Text(
-                            word,
-                            style: textTheme.bodyLarge?.copyWith(
-                              color: colors.onBrandArt,
-                              fontWeight: FontWeight.w500,
+              borderColor: context.colorScheme.surface.withValues(
+                alpha: effects.brandGlassBorderOpacity,
+              ),
+              borderWidth: strokes.hairline,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  children: [
+                    Text(
+                      '$number.',
+                      style: type.assetValue
+                          .copyWith(
+                            color: colors.onBrandArt.withValues(
+                              alpha: effects.brandContentMutedOpacity,
                             ),
-                            overflow: TextOverflow.ellipsis,
                           )
-                        : const SizedBox.shrink(),
-                  ),
-                  if (isValid == false) ...[
-                    SizedBox(width: spacing.md),
-                    Icon(
-                      MingCuteIcons.mgc_close_fill,
-                      size: spacing.xl,
-                      color: colors.danger,
+                          .toNumeric(context),
                     ),
+                    SizedBox(width: spacing.md),
+                    Expanded(
+                      child: word != null
+                          ? Text(
+                              word,
+                              style: type.assetValue.copyWith(
+                                color: colors.onBrandArt,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            )
+                          : const SizedBox.shrink(),
+                    ),
+                    if (isValid == false) ...[
+                      SizedBox(width: spacing.md),
+                      Icon(
+                        MingCuteIcons.mgc_close_fill,
+                        size: icons.sm,
+                        color: colors.danger,
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           );

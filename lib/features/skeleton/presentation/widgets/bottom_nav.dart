@@ -31,6 +31,7 @@ class _BottomNavState extends ConsumerState<BottomNav> {
     final spacing = context.spacing;
     final radius = context.radii;
     final shadows = context.shadows;
+    final metrics = context.metrics;
 
     return Positioned(
       left: 0,
@@ -39,7 +40,7 @@ class _BottomNavState extends ConsumerState<BottomNav> {
       child: Center(
         child: Container(
           margin: EdgeInsets.symmetric(horizontal: spacing.xxl),
-          height: spacing.bottomNavHeight,
+          height: metrics.bottomNavHeight,
           padding: EdgeInsets.symmetric(horizontal: spacing.md),
           decoration: BoxDecoration(
             color: context.appColors.surfaceRaised,
@@ -58,7 +59,7 @@ class _BottomNavState extends ConsumerState<BottomNav> {
                       selectedIndex: index,
                       itemKeys: _itemKeys,
                       containerWidth: constraints.maxWidth,
-                      containerHeight: spacing.bottomNavHeight,
+                      containerHeight: metrics.bottomNavHeight,
                     ),
                     // Icons in front
                     Row(
@@ -68,6 +69,7 @@ class _BottomNavState extends ConsumerState<BottomNav> {
                       children: [
                         _NavItem(
                           key: _itemKeys[0],
+                          label: 'Home',
                           icon: index == 0
                               ? MingCuteIcons.mgc_home_4_fill
                               : MingCuteIcons.mgc_home_4_line,
@@ -81,6 +83,7 @@ class _BottomNavState extends ConsumerState<BottomNav> {
                         SizedBox(width: spacing.screenPadding),
                         _NavItem(
                           key: _itemKeys[1],
+                          label: 'Cards',
                           icon: index == 1
                               ? MingCuteIcons.mgc_bank_card_fill
                               : MingCuteIcons.mgc_bank_card_line,
@@ -94,6 +97,7 @@ class _BottomNavState extends ConsumerState<BottomNav> {
                         SizedBox(width: spacing.screenPadding),
                         _NavItem(
                           key: _itemKeys[2],
+                          label: 'Market',
                           icon: index == 2
                               ? MingCuteIcons.mgc_copper_coin_fill
                               : MingCuteIcons.mgc_copper_coin_line,
@@ -107,6 +111,7 @@ class _BottomNavState extends ConsumerState<BottomNav> {
                         SizedBox(width: spacing.screenPadding),
                         _NavItem(
                           key: _itemKeys[3],
+                          label: 'Settings',
                           icon: index == 3
                               ? MingCuteIcons.mgc_settings_5_fill
                               : MingCuteIcons.mgc_settings_5_line,
@@ -132,6 +137,9 @@ class _BottomNavState extends ConsumerState<BottomNav> {
 
 /// Individual navigation item in the bottom nav bar
 class _NavItem extends StatelessWidget {
+  /// Accessibility label for the item
+  final String label;
+
   /// Icon to display
   final IconData icon;
 
@@ -143,6 +151,7 @@ class _NavItem extends StatelessWidget {
 
   const _NavItem({
     super.key,
+    required this.label,
     required this.icon,
     required this.isSelected,
     required this.onTap,
@@ -151,26 +160,32 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
+    final icons = context.icons;
 
-    return GestureDetector(
-      onTapDown: (_) async {
-        final canVibrate = await Haptics.canVibrate();
-        if (canVibrate) {
-          await Haptics.vibrate(HapticsType.selection);
-        }
-      },
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: spacing.md,
-          vertical: spacing.md,
-        ),
-        alignment: Alignment.center,
-        child: Icon(
-          icon,
-          color: context.colorScheme.onSurface,
-          size: spacing.xxl,
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: label,
+      child: GestureDetector(
+        onTapDown: (_) async {
+          final canVibrate = await Haptics.canVibrate();
+          if (canVibrate) {
+            await Haptics.vibrate(HapticsType.selection);
+          }
+        },
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: spacing.md,
+            vertical: spacing.md,
+          ),
+          alignment: Alignment.center,
+          child: Icon(
+            icon,
+            color: context.colorScheme.onSurface,
+            size: icons.md,
+          ),
         ),
       ),
     );
@@ -319,9 +334,9 @@ class _AnimatedCircleState extends State<_AnimatedCircle>
     final radius = context.radii;
     final colors = context.appColors;
     final shadows = context.shadows;
-    final spacing = context.spacing;
-    final pillWidth = spacing.bottomNavIndicatorWidth;
-    final pillHeight = spacing.bottomNavIndicatorHeight;
+    final metrics = context.metrics;
+    final pillWidth = metrics.bottomNavIndicatorWidth;
+    final pillHeight = metrics.bottomNavIndicatorHeight;
 
     return AnimatedBuilder(
       animation: _animation,

@@ -23,7 +23,7 @@ class CustomRadio extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final spacing = context.spacing;
+    final radii = context.radii;
 
     return EasyRadio<int>(
       value: option,
@@ -34,8 +34,8 @@ class CustomRadio extends StatelessWidget {
       inactiveBorderColor: context.colorScheme.surfaceContainerHigh,
       inactiveFillColor: context.colorScheme.surface,
       dotColor: context.colorScheme.surface,
-      dotRadius: spacing.sm,
-      radius: spacing.sm,
+      dotRadius: radii.sm,
+      radius: radii.sm,
       animateFillColor: true,
       toggleable: true,
       dotStyle: const DotStyle.check(),

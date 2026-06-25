@@ -34,7 +34,9 @@ class TransactionItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final spacing = context.spacing;
-    final textTheme = context.textTheme;
+    final icons = context.icons;
+    final strokes = context.strokes;
+    final textRoles = context.type;
 
     return Row(
       children: [
@@ -45,12 +47,12 @@ class TransactionItem extends StatelessWidget {
             shape: BoxShape.circle,
             border: Border.all(
               color: colors.borderSubtle,
-              width: spacing.dividerThickness,
+              width: strokes.divider,
             ),
           ),
           child: Icon(
             icon,
-            size: spacing.screenPadding,
+            size: icons.sm,
             color: iconColor ?? colors.textSecondary,
           ),
         ),
@@ -61,79 +63,19 @@ class TransactionItem extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Expanded(
-                    child: Text(
-                      type,
-                      style: textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w500,
-                        color: context.colorScheme.onSurface,
-                      ),
-                    ),
-                  ),
-                  RichText(
-                    text: TextSpan(
-                      children: [
-                        TextSpan(
-                          text: amount,
-                          style: textTheme.bodyMedium
-                              ?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: context.colorScheme.onSurface,
-                              )
-                              .toNumeric(context),
-                        ),
-                        TextSpan(
-                          text: ' BTC',
-                          style: textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: context.colorScheme.onSurface,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  Expanded(child: Text(type, style: context.type.rowTitle)),
+                  AmountText('$amount BTC', style: textRoles.amountInline),
                 ],
               ),
               SizedBox(height: spacing.xxs),
-              RichText(
-                text: TextSpan(children: _buildTimeSpans(context, time)),
+              AmountText(
+                time,
+                style: textRoles.rowMeta.copyWith(color: colors.textTertiary),
               ),
             ],
           ),
         ),
       ],
     );
-  }
-
-  /// Builds text spans for time display with proper numeric formatting
-  ///
-  /// Separates time digits from AM/PM for styling
-  List<TextSpan> _buildTimeSpans(BuildContext context, String time) {
-    final colors = context.appColors;
-    final textTheme = context.textTheme;
-
-    // Split time into numeric part (e.g., "12:30") and period (e.g., "PM")
-    final parts = time.split(' ');
-    final baseStyle = textTheme.bodyMedium?.copyWith(
-      fontWeight: FontWeight.w500,
-      color: colors.textTertiary,
-    );
-
-    if (parts.length == 2) {
-      // Has AM/PM
-      return [
-        TextSpan(
-          text: parts[0], // Time digits
-          style: baseStyle?.toNumeric(context),
-        ),
-        TextSpan(
-          text: ' ${parts[1]}', // AM/PM
-          style: baseStyle,
-        ),
-      ];
-    } else {
-      // No AM/PM, just numeric
-      return [TextSpan(text: time, style: baseStyle?.toNumeric(context))];
-    }
   }
 }

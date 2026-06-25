@@ -171,11 +171,12 @@ class _CandleChartState extends State<CandleChart>
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
+    final metrics = context.metrics;
     final showLoading =
         widget.isSkeleton || (_shouldShowLoading && !_isTransitioning);
 
     return SizedBox(
-      height: spacing.chartHeight,
+      height: metrics.chartHeight,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final radius = context.radii;

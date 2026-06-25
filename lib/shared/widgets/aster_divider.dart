@@ -12,12 +12,13 @@ class AsterDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
+    final strokes = context.strokes;
     final resolvedIndent = inset ? spacing.screenPadding : spacing.none;
 
     return Divider(
-      color: context.appColors.surfaceSubtle,
-      height: spacing.dividerThickness,
-      thickness: spacing.dividerThickness,
+      color: context.appColors.borderSubtle,
+      height: strokes.divider,
+      thickness: strokes.divider,
       indent: resolvedIndent,
     );
   }

@@ -1,8 +1,4 @@
-import 'package:flutter/material.dart';
-
 import 'package:freezed_annotation/freezed_annotation.dart';
-
-import '../theme/theme_context.dart';
 
 part 'asset_model.freezed.dart';
 part 'asset_model.g.dart';
@@ -68,18 +64,5 @@ class AssetModel with _$AssetModel {
     } catch (_) {
       return null;
     }
-  }
-}
-
-/// Extension to add convenience methods to AssetModel
-extension AssetModelExtension on AssetModel {
-  Color themedColor(BuildContext context) {
-    final colors = context.appColors;
-    return switch (token.toUpperCase()) {
-      'BTC' => colors.bitcoin,
-      'LBTC' => colors.liquid,
-      'USDT' => colors.success,
-      _ => context.colorScheme.primary,
-    };
   }
 }

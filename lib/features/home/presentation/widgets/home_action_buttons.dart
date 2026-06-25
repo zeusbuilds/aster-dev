@@ -24,6 +24,7 @@ class HomeActionButtons extends StatelessWidget {
             flex: 1,
             child: CustomButton.compact(
               text: 'Send',
+              width: double.infinity,
               suffixIcon: RemixIcons.arrow_right_up_line,
               variant: ButtonVariant.translucent,
               onTap: () {
@@ -36,6 +37,7 @@ class HomeActionButtons extends StatelessWidget {
             flex: 1,
             child: CustomButton.compact(
               text: 'Receive',
+              width: double.infinity,
               suffixIcon: RemixIcons.arrow_right_down_line,
               variant: ButtonVariant.translucent,
               onTap: () {
@@ -48,6 +50,7 @@ class HomeActionButtons extends StatelessWidget {
             flex: 1,
             child: CustomButton.compact(
               text: 'Swap',
+              width: double.infinity,
               suffixIcon: RemixIcons.token_swap_line,
               variant: ButtonVariant.translucent,
               onTap: () {

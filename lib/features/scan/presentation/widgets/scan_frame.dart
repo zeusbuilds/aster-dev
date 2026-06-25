@@ -30,7 +30,8 @@ class ScanFrame extends ConsumerWidget {
     final effects = context.effects;
     final metrics = context.metrics;
     final radius = context.radii;
-    final textTheme = context.textTheme;
+    final icons = context.icons;
+    final strokes = context.strokes;
     final frameSize =
         MediaQuery.of(context).size.width * metrics.scanFrameSizeFactor;
 
@@ -39,7 +40,7 @@ class ScanFrame extends ConsumerWidget {
       height: frameSize,
       padding: EdgeInsets.only(bottom: spacing.md),
       decoration: BoxDecoration(
-        border: Border.all(color: colors.onScan, width: spacing.hairline),
+        border: Border.all(color: colors.onScan, width: strokes.hairline),
       ),
       child: Align(
         alignment: Alignment.bottomCenter,
@@ -55,34 +56,31 @@ class ScanFrame extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               ScanControlButton(
+                semanticLabel: 'Open gallery',
                 onTap: onGalleryTap ?? () {},
                 child: Icon(
                   MingCuteIcons.mgc_photo_album_line,
                   color: colors.onScan,
-                  size: spacing.lg,
+                  size: icons.xs,
                 ),
               ),
               SizedBox(width: spacing.sm),
               ScanControlButton(
+                semanticLabel: flashOn ? 'Turn flash off' : 'Turn flash on',
                 onTap: onFlashTap ?? () {},
                 child: Icon(
                   flashOn
                       ? MingCuteIcons.mgc_flash_fill
                       : MingCuteIcons.mgc_flash_line,
                   color: colors.onScan,
-                  size: spacing.lg,
+                  size: icons.xs,
                 ),
               ),
               SizedBox(width: spacing.sm),
               ScanControlButton(
+                semanticLabel: 'Change zoom',
                 onTap: onZoomTap ?? () {},
-                child: Text(
-                  zoomDisplayText,
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: colors.onScan,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                child: Text(zoomDisplayText, style: context.type.scanControl),
               ),
             ],
           ),

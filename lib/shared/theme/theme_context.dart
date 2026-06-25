@@ -22,4 +22,15 @@ extension ThemeContext on BuildContext {
       theme.extension<AsterMotion>() ?? const AsterMotion();
   AsterEffects get effects =>
       theme.extension<AsterEffects>() ?? const AsterEffects();
+  AsterIconography get icons =>
+      theme.extension<AsterIconography>() ?? const AsterIconography();
+  AsterStrokes get strokes =>
+      theme.extension<AsterStrokes>() ?? const AsterStrokes();
+  AsterStateLayers get stateLayers =>
+      theme.extension<AsterStateLayers>() ?? const AsterStateLayers();
+  AsterGradients get gradients =>
+      theme.extension<AsterGradients>() ?? AsterGradients.light;
+  AsterArt get art => theme.extension<AsterArt>() ?? const AsterArt();
+  AsterTypeRoles get type =>
+      theme.extension<AsterTypeRoles>() ?? AsterTypeRoles.fallback;
 }

@@ -23,8 +23,9 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
-    final textTheme = context.textTheme;
     final radius = context.radii;
+    final icons = context.icons;
+    final type = context.type;
 
     return Scaffold(
       backgroundColor: context.colorScheme.surface,
@@ -67,17 +68,14 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                       children: [
                         Icon(
                           MingCuteIcons.mgc_copy_2_line,
-                          size: spacing.screenPadding,
+                          size: icons.sm,
                           color: context.colorScheme.onSurface,
                         ),
                         SizedBox(width: spacing.xs),
                         Expanded(
                           child: Text(
                             _address,
-                            style: textTheme.bodySmall?.copyWith(
-                              fontWeight: FontWeight.w500,
-                              color: context.colorScheme.onSurface,
-                            ),
+                            style: type.addressSmall,
                             textAlign: TextAlign.center,
                           ),
                         ),
@@ -86,10 +84,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                     SizedBox(height: spacing.md),
                     Text(
                       'tap to copy',
-                      style: textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w500,
-                        color: context.colorScheme.onSurface,
-                      ),
+                      style: type.addressSmall,
                       textAlign: TextAlign.center,
                     ),
                   ],

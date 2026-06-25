@@ -79,7 +79,8 @@ class _PriceCardState extends State<PriceCard> {
     final colors = context.appColors;
     final effects = context.effects;
     final spacing = context.spacing;
-    final textTheme = context.textTheme;
+    final icons = context.icons;
+    final type = context.type;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -103,29 +104,18 @@ class _PriceCardState extends State<PriceCard> {
                     ),
                     child: Icon(
                       UniconsLine.bitcoin,
-                      size: spacing.xxxl,
+                      size: icons.md,
                       color: colors.bitcoin.withValues(
                         alpha: effects.bitcoinIconOpacity,
                       ),
                     ),
                   ),
                   SizedBox(width: spacing.xs),
-                  Text(
-                    'Bitcoin Price',
-                    style: textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w500,
-                      color: colors.onBrandArt,
-                    ),
-                  ),
+                  Text('Bitcoin Price', style: type.brandTitle),
                   const Spacer(),
-                  Text(
+                  NumericText(
                     _formatPrice(_currentPrice),
-                    style: textTheme.displaySmall
-                        ?.copyWith(
-                          fontWeight: FontWeight.w500,
-                          color: colors.onBrandArt,
-                        )
-                        .toNumeric(context),
+                    style: type.brandAmount,
                   ),
                 ],
               ),
@@ -138,7 +128,7 @@ class _PriceCardState extends State<PriceCard> {
                           (_priceChange ?? 0) >= 0
                               ? RemixIcons.arrow_up_line
                               : RemixIcons.arrow_down_line,
-                          size: spacing.md,
+                          size: icons.xxs,
                           color: (_priceChange ?? 0) >= 0
                               ? colors.success
                               : colors.danger,
@@ -146,9 +136,8 @@ class _PriceCardState extends State<PriceCard> {
                   SizedBox(width: spacing.xxs),
                   Text(
                     _formatPriceChange(_priceChange),
-                    style: textTheme.labelLarge
-                        ?.copyWith(
-                          fontWeight: FontWeight.w600,
+                    style: type.brandMetric
+                        .copyWith(
                           color: (_priceChange ?? 0) >= 0
                               ? colors.success
                               : colors.danger,

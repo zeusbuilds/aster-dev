@@ -55,9 +55,9 @@ class CustomToast extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.appColors;
     final spacing = context.spacing;
-    final textTheme = context.textTheme;
+    final type = context.type;
+    final icons = context.icons;
 
     return SafeArea(
       child: Padding(
@@ -76,11 +76,7 @@ class CustomToast extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // Icon
-              Icon(
-                _getIcon(),
-                color: _getIconColor(context),
-                size: spacing.xxl,
-              ),
+              Icon(_getIcon(), color: _getIconColor(context), size: icons.md),
               SizedBox(width: spacing.md),
               // Title and message
               Expanded(
@@ -88,20 +84,9 @@ class CustomToast extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      title,
-                      style: textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: context.colorScheme.onSurface,
-                      ),
-                    ),
+                    Text(title, style: type.toastTitle),
                     if (message != null && message!.isNotEmpty) ...[
-                      Text(
-                        message!,
-                        style: textTheme.bodySmall?.copyWith(
-                          color: colors.textSecondary,
-                        ),
-                      ),
+                      Text(message!, style: type.toastMessage),
                     ],
                   ],
                 ),

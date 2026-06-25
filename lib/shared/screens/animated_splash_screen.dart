@@ -90,12 +90,12 @@ class _BackgroundState extends State<_Background> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.appColors;
+    final gradients = context.gradients;
     return CustomPaint(
       painter: _BackgroundPainter(
         linesLength: _linesLength,
         linesGap: _linesGap,
-        colors: colors.splashGradient,
+        gradient: gradients.splashBackdrop,
       ),
       child: const SizedBox.expand(),
     );
@@ -106,12 +106,12 @@ class _BackgroundPainter extends CustomPainter {
   _BackgroundPainter({
     required this.linesLength,
     required this.linesGap,
-    required this.colors,
+    required this.gradient,
   }) : super(repaint: Listenable.merge([linesLength, linesGap]));
 
   final Animation<double> linesLength;
   final Animation<double> linesGap;
-  final List<Color> colors;
+  final AsterGradientSpec gradient;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -119,12 +119,7 @@ class _BackgroundPainter extends CustomPainter {
     canvas.saveLayer(rect, Paint());
 
     final gradientPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: colors,
-        stops: const [0, 0.5, 1],
-      ).createShader(rect);
+      ..shader = gradient.toLinearGradient().createShader(rect);
     canvas.drawRect(rect, gradientPaint);
 
     if (linesLength.value > 0) {
@@ -159,7 +154,7 @@ class _BackgroundPainter extends CustomPainter {
   bool shouldRepaint(_BackgroundPainter oldDelegate) {
     return linesLength != oldDelegate.linesLength ||
         linesGap != oldDelegate.linesGap ||
-        colors != oldDelegate.colors;
+        gradient != oldDelegate.gradient;
   }
 }
 

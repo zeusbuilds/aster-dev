@@ -18,7 +18,7 @@ class HomeHeader extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final spacing = context.spacing;
     final colors = context.appColors;
-    final textTheme = context.textTheme;
+    final icons = context.icons;
     final walletState = ref.watch(walletViewModelProvider);
     final activeWallet = walletState.activeWallet;
 
@@ -27,40 +27,49 @@ class HomeHeader extends ConsumerWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.start,
         children: [
-          GestureDetector(
-            onTap: () => context.pushNamed(RouteNames.onboardingWelcome),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: SvgPicture.asset(
-                'assets/brand/aster-logo.svg',
-                width: spacing.navOffset,
-                colorFilter: ColorFilter.mode(
-                  colors.onBrandArt,
-                  BlendMode.srcIn,
+          Semantics(
+            button: true,
+            label: 'Open onboarding',
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => context.pushNamed(RouteNames.onboardingWelcome),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: SvgPicture.asset(
+                  'assets/brand/aster-logo.svg',
+                  width: icons.xl,
+                  colorFilter: ColorFilter.mode(
+                    colors.onBrandArt,
+                    BlendMode.srcIn,
+                  ),
                 ),
               ),
             ),
           ),
           const Spacer(),
-          GestureDetector(
-            onTap: () => context.pushNamed(RouteNames.walletSelection),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  activeWallet?.name ?? 'Main Wallet',
-                  style: textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
+          Semantics(
+            button: true,
+            label: 'Select wallet, ${activeWallet?.name ?? 'Main Wallet'}',
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => context.pushNamed(RouteNames.walletSelection),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    activeWallet?.name ?? 'Main Wallet',
+                    style: context.type.brandAction.copyWith(
+                      color: colors.onBrandArt,
+                    ),
+                  ),
+                  SizedBox(width: spacing.xs),
+                  Icon(
+                    MingCuteIcons.mgc_wallet_3_line,
+                    size: icons.md,
                     color: colors.onBrandArt,
                   ),
-                ),
-                SizedBox(width: spacing.xs),
-                Icon(
-                  MingCuteIcons.mgc_wallet_3_line,
-                  size: spacing.xxl,
-                  color: colors.onBrandArt,
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],

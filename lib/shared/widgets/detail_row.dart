@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/theme.dart';
+import 'amount_text.dart';
 
 /// Reusable row widget for displaying key-value pairs with optional icons
 ///
@@ -35,50 +36,52 @@ class DetailRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final spacing = context.spacing;
-    final textTheme = context.textTheme;
+    final icons = context.icons;
+    final type = context.type;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Padding(
-        padding: padding,
-        child: Row(
-          children: [
-            if (prefixIcon != null) ...[
-              Icon(
-                prefixIcon,
-                size: spacing.iconSm,
-                color: prefixIconColor ?? colors.textTertiary,
-              ),
-              SizedBox(width: spacing.sm),
-            ],
-            Expanded(
-              child: Text(
-                title,
-                style: textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w500,
-                  color: titleColor ?? colors.textTertiary,
+    return Semantics(
+      button: onTap != null,
+      label: value.isEmpty ? title : '$title, $value',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Padding(
+          padding: padding,
+          child: Row(
+            children: [
+              if (prefixIcon != null) ...[
+                Icon(
+                  prefixIcon,
+                  size: icons.sm,
+                  color: prefixIconColor ?? colors.textTertiary,
+                ),
+                SizedBox(width: spacing.sm),
+              ],
+              Expanded(
+                child: Text(
+                  title,
+                  style: type.rowMeta.copyWith(
+                    color: titleColor ?? colors.textTertiary,
+                  ),
                 ),
               ),
-            ),
-            if (suffixIcon != null) ...[
+              if (suffixIcon != null) ...[
+                SizedBox(width: spacing.sm),
+                Icon(
+                  suffixIcon,
+                  size: icons.sm,
+                  color: suffixIconColor ?? colors.textTertiary,
+                ),
+              ],
               SizedBox(width: spacing.sm),
-              Icon(
-                suffixIcon,
-                size: spacing.xl,
-                color: suffixIconColor ?? colors.textTertiary,
+              AmountText(
+                value,
+                style: type.rowValue.copyWith(
+                  color: valueColor ?? context.colorScheme.onSurface,
+                ),
               ),
             ],
-            SizedBox(width: spacing.sm),
-            Text(
-              value,
-              style: textTheme.bodyMedium
-                  ?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: valueColor ?? context.colorScheme.onSurface,
-                  )
-                  .toNumeric(context),
-            ),
-          ],
+          ),
         ),
       ),
     );

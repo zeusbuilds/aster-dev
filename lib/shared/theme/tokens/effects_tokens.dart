@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 
-/// Reusable visual effects that are not colors, spacing, or motion.
+/// Reusable visual effects that are not colors, spacing, motion, or state
+/// layers.
 @immutable
 class AsterEffects extends ThemeExtension<AsterEffects> {
   const AsterEffects({
-    this.disabledOpacity = 0.5,
-    this.translucentSurfaceOpacity = 0.8,
     this.brandContentStrongOpacity = 0.9,
     this.brandContentMutedOpacity = 0.75,
     this.brandContentSubtleOpacity = 0.7,
@@ -21,14 +20,10 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
     this.marketContentMutedOpacity = 0.75,
     this.marketPillSurfaceOpacity = 0.15,
     this.marketPillDotOpacity = 0.5,
-    this.selectedContainerOpacity = 0.5,
-    this.primaryOverlayOpacity = 0.12,
     this.artNoiseOpacity = 0.05,
     this.artNoiseTintOpacity = 0.5,
   });
 
-  final double disabledOpacity;
-  final double translucentSurfaceOpacity;
   final double brandContentStrongOpacity;
   final double brandContentMutedOpacity;
   final double brandContentSubtleOpacity;
@@ -44,15 +39,11 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
   final double marketContentMutedOpacity;
   final double marketPillSurfaceOpacity;
   final double marketPillDotOpacity;
-  final double selectedContainerOpacity;
-  final double primaryOverlayOpacity;
   final double artNoiseOpacity;
   final double artNoiseTintOpacity;
 
   @override
   AsterEffects copyWith({
-    double? disabledOpacity,
-    double? translucentSurfaceOpacity,
     double? brandContentStrongOpacity,
     double? brandContentMutedOpacity,
     double? brandContentSubtleOpacity,
@@ -68,15 +59,10 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
     double? marketContentMutedOpacity,
     double? marketPillSurfaceOpacity,
     double? marketPillDotOpacity,
-    double? selectedContainerOpacity,
-    double? primaryOverlayOpacity,
     double? artNoiseOpacity,
     double? artNoiseTintOpacity,
   }) {
     return AsterEffects(
-      disabledOpacity: disabledOpacity ?? this.disabledOpacity,
-      translucentSurfaceOpacity:
-          translucentSurfaceOpacity ?? this.translucentSurfaceOpacity,
       brandContentStrongOpacity:
           brandContentStrongOpacity ?? this.brandContentStrongOpacity,
       brandContentMutedOpacity:
@@ -104,10 +90,6 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
       marketPillSurfaceOpacity:
           marketPillSurfaceOpacity ?? this.marketPillSurfaceOpacity,
       marketPillDotOpacity: marketPillDotOpacity ?? this.marketPillDotOpacity,
-      selectedContainerOpacity:
-          selectedContainerOpacity ?? this.selectedContainerOpacity,
-      primaryOverlayOpacity:
-          primaryOverlayOpacity ?? this.primaryOverlayOpacity,
       artNoiseOpacity: artNoiseOpacity ?? this.artNoiseOpacity,
       artNoiseTintOpacity: artNoiseTintOpacity ?? this.artNoiseTintOpacity,
     );
@@ -117,12 +99,6 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
   AsterEffects lerp(ThemeExtension<AsterEffects>? other, double t) {
     if (other is! AsterEffects) return this;
     return AsterEffects(
-      disabledOpacity: _lerp(disabledOpacity, other.disabledOpacity, t),
-      translucentSurfaceOpacity: _lerp(
-        translucentSurfaceOpacity,
-        other.translucentSurfaceOpacity,
-        t,
-      ),
       brandContentStrongOpacity: _lerp(
         brandContentStrongOpacity,
         other.brandContentStrongOpacity,
@@ -196,16 +172,6 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
       marketPillDotOpacity: _lerp(
         marketPillDotOpacity,
         other.marketPillDotOpacity,
-        t,
-      ),
-      selectedContainerOpacity: _lerp(
-        selectedContainerOpacity,
-        other.selectedContainerOpacity,
-        t,
-      ),
-      primaryOverlayOpacity: _lerp(
-        primaryOverlayOpacity,
-        other.primaryOverlayOpacity,
         t,
       ),
       artNoiseOpacity: _lerp(artNoiseOpacity, other.artNoiseOpacity, t),

@@ -198,7 +198,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                     SizedBox(
                       height:
                           spacing.bottomSafe(context) +
-                          spacing.navOffset +
+                          metrics.floatingNavClearance +
                           spacing.xxl,
                     ),
                   ],

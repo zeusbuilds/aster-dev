@@ -44,116 +44,78 @@ class AssetRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final spacing = context.spacing;
-    final textTheme = context.textTheme;
+    final icons = context.icons;
+    final type = context.type;
+    final metrics = context.metrics;
 
-    return GestureDetector(
-      onTap: () {
-        context.push(RoutePaths.transactionList);
-      },
-      child: Row(
-        children: [
-          Center(
-            child: Icon(
-              icon,
-              color: iconColor ?? context.colorScheme.onSurface,
-              size: spacing.iconXl,
-            ),
-          ),
-          SizedBox(width: spacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        name,
-                        style: textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: context.colorScheme.onSurface,
-                        ),
-                      ),
-                    ),
-                    AppSkeletonizer(
-                      enabled: isLoading,
-                      child: Text(
-                        fiatBalance,
-                        style: textTheme.bodyLarge
-                            ?.copyWith(
-                              fontWeight: FontWeight.w500,
-                              color: context.colorScheme.onSurface,
-                            )
-                            .toNumeric(context),
-                      ),
-                    ),
-                  ],
+    return Semantics(
+      button: true,
+      label: '$name, $fiatBalance, $assetBalance',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          context.push(RoutePaths.transactionList);
+        },
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: metrics.minTouchTarget),
+          child: Row(
+            children: [
+              Center(
+                child: Icon(
+                  icon,
+                  color: iconColor ?? context.colorScheme.onSurface,
+                  size: icons.xl,
                 ),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  textBaseline: TextBaseline.alphabetic,
+              ),
+              SizedBox(width: spacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Text(
-                        denomination,
-                        style: textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.w500,
-                          color: colors.textTertiary,
-                        ),
-                      ),
-                    ),
-                    AppSkeletonizer(
-                      enabled: isLoading,
-                      child: RichText(
-                        text: TextSpan(
-                          children: _buildBalanceSpans(
-                            context,
-                            assetBalance,
-                            textTheme.bodySmall,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Expanded(child: Text(name, style: type.assetTitle)),
+                        AppSkeletonizer(
+                          enabled: isLoading,
+                          child: NumericText(
+                            fiatBalance,
+                            style: type.assetValue,
                           ),
                         ),
-                      ),
+                      ],
+                    ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            denomination,
+                            style: type.assetMeta.copyWith(
+                              color: colors.textTertiary,
+                            ),
+                          ),
+                        ),
+                        AppSkeletonizer(
+                          enabled: isLoading,
+                          child: AmountText(
+                            assetBalance,
+                            style: type.assetMeta.copyWith(
+                              color: colors.textTertiary,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
-  }
-
-  /// Builds text spans for balance display with proper numeric formatting
-  ///
-  /// Separates numeric value from currency unit for styling
-  List<TextSpan> _buildBalanceSpans(
-    BuildContext context,
-    String balance,
-    TextStyle? baseTextStyle,
-  ) {
-    final colors = context.appColors;
-    final baseStyle = baseTextStyle?.copyWith(
-      fontWeight: FontWeight.w500,
-      color: colors.textTertiary,
-    );
-
-    // Split at first space to separate numeric value from currency
-    final parts = balance.split(' ');
-
-    if (parts.length >= 2) {
-      final numericPart = parts[0];
-      final currencyPart = parts.sublist(1).join(' ');
-
-      return [
-        TextSpan(text: numericPart, style: baseStyle?.toNumeric(context)),
-        TextSpan(text: ' $currencyPart', style: baseStyle),
-      ];
-    } else {
-      // No space found, treat entire string as numeric
-      return [TextSpan(text: balance, style: baseStyle?.toNumeric(context))];
-    }
   }
 }

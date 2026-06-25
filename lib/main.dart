@@ -84,7 +84,6 @@ class _AsterState extends ConsumerState<Aster> with WidgetsBindingObserver {
     return MaterialApp.router(
       title: AppConstants.appName,
       theme: AppTheme.light(),
-      darkTheme: AppTheme.light(),
       themeMode: ThemeMode.light,
       routerConfig: router,
       debugShowCheckedModeBanner: false,

@@ -46,7 +46,8 @@ class _SendAddressCardState extends State<SendAddressCard> {
     final colors = context.appColors;
     final spacing = context.spacing;
     final radius = context.radii;
-    final textTheme = context.textTheme;
+    final type = context.type;
+    final icons = context.icons;
 
     return Column(
       children: [
@@ -64,32 +65,19 @@ class _SendAddressCardState extends State<SendAddressCard> {
             children: [
               Text(
                 'Recipient Address',
-                style: textTheme.bodyMedium
-                    ?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: colors.textTertiary,
-                    )
-                    .toNumeric(context),
+                style: type.addressLabel.copyWith(color: colors.textTertiary),
               ),
               SizedBox(height: spacing.xs),
               TextField(
                 controller: _addressController,
-                style: textTheme.bodyLarge
-                    ?.copyWith(
-                      fontWeight: FontWeight.w500,
-                      color: context.colorScheme.onSurface,
-                    )
-                    .toNumeric(context),
+                style: type.address,
                 cursorColor: context.colorScheme.primary,
                 minLines: 2,
                 maxLines: 2,
                 decoration: InputDecoration(
                   hintText:
                       'bc1p5d7rjq7g6rdk2yhzks9smlaqtedr4dekq08ge8ztwac72sfr9rusxg3297',
-                  hintStyle: textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w500,
-                    color: colors.textDisabled,
-                  ),
+                  hintStyle: type.addressHint,
                   filled: false,
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
@@ -121,52 +109,52 @@ class _SendAddressCardState extends State<SendAddressCard> {
             children: [
               SvgPicture.asset(
                 widget.asset.icon,
-                height: spacing.xxl,
-                width: spacing.xxl,
+                height: icons.md,
+                width: icons.md,
                 errorBuilder: (context, error, stackTrace) => Icon(
                   Icons.circle,
-                  size: spacing.xxl,
-                  color: widget.asset.themedColor(context),
+                  size: icons.md,
+                  color: AssetDisplay.colorOf(context, widget.asset),
                 ),
               ),
               SizedBox(width: spacing.sm),
-              Text(
-                widget.asset.chain,
-                style: textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: context.colorScheme.onSurface,
-                ),
-              ),
+              Text(widget.asset.chain, style: type.rowTitleStrong),
               const Spacer(),
-              GestureDetector(
-                onTap: _addressController.text.isNotEmpty
-                    ? () {
-                        setState(() {
-                          _addressController.clear();
-                        });
-                      }
-                    : () {
-                        Clipboard.getData('text/plain').then((value) {
-                          if (value != null && value.text != null) {
-                            setState(() {
-                              _addressController.text = value.text!;
-                            });
-                          }
-                        });
-                      },
-                child: Squircle(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: spacing.md,
-                    vertical: spacing.xs,
-                  ),
-                  borderRadius: radius.badge,
-                  borderColor: context.colorScheme.primaryContainer,
-                  color: context.colorScheme.primaryContainer,
-                  child: Text(
-                    _addressController.text.isNotEmpty ? 'clear' : 'paste',
-                    style: textTheme.labelSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: context.colorScheme.primary,
+              Semantics(
+                button: true,
+                label: _addressController.text.isNotEmpty
+                    ? 'Clear address'
+                    : 'Paste address',
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _addressController.text.isNotEmpty
+                      ? () {
+                          setState(() {
+                            _addressController.clear();
+                          });
+                        }
+                      : () {
+                          Clipboard.getData('text/plain').then((value) {
+                            if (value != null && value.text != null) {
+                              setState(() {
+                                _addressController.text = value.text!;
+                              });
+                            }
+                          });
+                        },
+                  child: Squircle(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: spacing.md,
+                      vertical: spacing.xs,
+                    ),
+                    borderRadius: radius.badge,
+                    borderColor: context.colorScheme.primaryContainer,
+                    color: context.colorScheme.primaryContainer,
+                    child: Text(
+                      _addressController.text.isNotEmpty ? 'clear' : 'paste',
+                      style: type.badgeLabel.copyWith(
+                        color: context.colorScheme.primary,
+                      ),
                     ),
                   ),
                 ),

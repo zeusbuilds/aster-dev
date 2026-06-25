@@ -15,7 +15,8 @@ class TransactionListScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final spacing = context.spacing;
-    final textTheme = context.textTheme;
+    final icons = context.icons;
+    final type = context.type;
 
     return Scaffold(
       backgroundColor: context.colorScheme.surface,
@@ -42,48 +43,23 @@ class TransactionListScreen extends StatelessWidget {
                     children: [
                       Text(
                         'Balance',
-                        style: textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.w500,
+                        style: type.rowMeta.copyWith(
                           color: colors.textTertiary,
                         ),
                       ),
-                      RichText(
-                        text: TextSpan(
-                          children: [
-                            TextSpan(
-                              text: '0.00001',
-                              style: textTheme.bodyLarge
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                    color: context.colorScheme.onSurface,
-                                  )
-                                  .toNumeric(context),
-                            ),
-                            TextSpan(
-                              text: ' BTC',
-                              style: textTheme.bodyLarge?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: context.colorScheme.onSurface,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Text(
+                      AmountText('0.00001 BTC', style: type.bodyStrong),
+                      NumericText(
                         '\$100,000',
-                        style: textTheme.bodyMedium
-                            ?.copyWith(
-                              fontWeight: FontWeight.w400,
-                              color: colors.textTertiary,
-                            )
-                            .toNumeric(context),
+                        style: type.rowMeta.copyWith(
+                          color: colors.textTertiary,
+                        ),
                       ),
                     ],
                   ),
                   const Spacer(),
                   Icon(
                     RemixIcons.bit_coin_fill,
-                    size: spacing.navOffset,
+                    size: icons.xl,
                     color: colors.bitcoin,
                   ),
                 ],
@@ -92,10 +68,7 @@ class TransactionListScreen extends StatelessWidget {
             SizedBox(height: spacing.lg),
             Text(
               'Today',
-              style: textTheme.bodyLarge?.copyWith(
-                fontWeight: FontWeight.w500,
-                color: colors.textTertiary,
-              ),
+              style: type.rowMeta.copyWith(color: colors.textTertiary),
             ),
             SizedBox(height: spacing.lg),
             const TransactionItem(
@@ -121,10 +94,7 @@ class TransactionListScreen extends StatelessWidget {
             SizedBox(height: spacing.lg),
             Text(
               'Yesterday',
-              style: textTheme.bodyLarge?.copyWith(
-                fontWeight: FontWeight.w500,
-                color: colors.textTertiary,
-              ),
+              style: type.rowMeta.copyWith(color: colors.textTertiary),
             ),
             SizedBox(height: spacing.lg),
             const TransactionItem(

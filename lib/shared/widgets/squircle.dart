@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 
 import '../theme/theme.dart';
@@ -16,6 +18,7 @@ class Squircle extends StatelessWidget {
   final List<BoxShadow> shadows;
   final EdgeInsets? padding;
   final BorderRadius? border;
+  final ImageFilter? backdropFilter;
 
   const Squircle({
     super.key,
@@ -28,6 +31,7 @@ class Squircle extends StatelessWidget {
     this.shadows = const [],
     this.padding,
     this.border,
+    this.backdropFilter,
   });
 
   @override
@@ -41,20 +45,24 @@ class Squircle extends StatelessWidget {
         border ?? BorderRadius.circular(borderRadius ?? radius.card);
     final effectivePadding = padding ?? EdgeInsets.all(spacing.sm);
 
+    final content = DecoratedBox(
+      decoration: ShapeDecoration(
+        color: gradient == null ? effectiveColor : null,
+        gradient: gradient,
+        shape: RoundedSuperellipseBorder(
+          borderRadius: effectiveBorderRadius,
+          side: BorderSide(color: effectiveBorderColor, width: borderWidth),
+        ),
+        shadows: shadows,
+      ),
+      child: Padding(padding: effectivePadding, child: child),
+    );
+
     return ClipRSuperellipse(
       borderRadius: effectiveBorderRadius,
-      child: DecoratedBox(
-        decoration: ShapeDecoration(
-          color: gradient == null ? effectiveColor : null,
-          gradient: gradient,
-          shape: RoundedSuperellipseBorder(
-            borderRadius: effectiveBorderRadius,
-            side: BorderSide(color: effectiveBorderColor, width: borderWidth),
-          ),
-          shadows: shadows,
-        ),
-        child: Padding(padding: effectivePadding, child: child),
-      ),
+      child: backdropFilter == null
+          ? content
+          : BackdropFilter(filter: backdropFilter!, child: content),
     );
   }
 }

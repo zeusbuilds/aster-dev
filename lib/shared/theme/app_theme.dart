@@ -14,11 +14,22 @@ class AppTheme {
   static const _metrics = AsterComponentMetrics();
   static const _motion = AsterMotion();
   static const _effects = AsterEffects();
+  static const _icons = AsterIconography();
+  static const _strokes = AsterStrokes();
+  static const _stateLayers = AsterStateLayers();
+  static const _gradients = AsterGradients.light;
+  static const _art = AsterArt();
 
   static ThemeData light() {
-    final scheme = _colorScheme();
+    final scheme = AsterColors.lightColorScheme();
     final textTheme = TypographySystem.buildTextTheme(
       onSurface: scheme.onSurface,
+    );
+    final typeRoles = AsterTypeRoles.fromTheme(
+      textTheme: textTheme,
+      colorScheme: scheme,
+      colors: _colors,
+      effects: _effects,
     );
 
     return ThemeData(
@@ -28,7 +39,7 @@ class AppTheme {
       scaffoldBackgroundColor: scheme.surface,
       textTheme: textTheme,
       primaryTextTheme: textTheme,
-      extensions: const <ThemeExtension<dynamic>>[
+      extensions: <ThemeExtension<dynamic>>[
         _colors,
         _spacing,
         _radii,
@@ -37,23 +48,24 @@ class AppTheme {
         _metrics,
         _motion,
         _effects,
+        _icons,
+        _strokes,
+        _stateLayers,
+        _gradients,
+        _art,
+        typeRoles,
       ],
       appBarTheme: AppBarTheme(
         backgroundColor: scheme.surface,
         foregroundColor: scheme.onSurface,
         elevation: 0,
-        surfaceTintColor: AsterColors.transparent,
-        iconTheme: IconThemeData(
-          color: scheme.onSurface,
-          size: _spacing.iconMd,
-        ),
-        titleTextStyle: textTheme.titleMedium?.copyWith(
-          color: scheme.onSurface,
-        ),
+        surfaceTintColor: _colors.transparentSurface,
+        iconTheme: IconThemeData(color: scheme.onSurface, size: _icons.md),
+        titleTextStyle: typeRoles.appBarTitle,
       ),
       cardTheme: CardThemeData(
         color: _colors.surfaceRaised,
-        surfaceTintColor: AsterColors.transparent,
+        surfaceTintColor: _colors.transparentSurface,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(_radii.card),
@@ -71,12 +83,12 @@ class AppTheme {
         enabledBorder: _outlineBorder(_colors.borderSubtle),
         focusedBorder: _outlineBorder(
           scheme.primary,
-          width: _metrics.focusBorderWidth,
+          width: _strokes.focusBorder,
         ),
         errorBorder: _outlineBorder(scheme.error),
         focusedErrorBorder: _outlineBorder(
           scheme.error,
-          width: _metrics.focusBorderWidth,
+          width: _strokes.focusBorder,
         ),
         labelStyle: textTheme.bodyMedium?.copyWith(
           color: _colors.textSecondary,
@@ -87,14 +99,14 @@ class AppTheme {
         style: _buttonStyle(
           background: scheme.primary,
           foreground: scheme.onPrimary,
-          textTheme: textTheme,
+          textStyle: typeRoles.buttonLabel,
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: _buttonStyle(
-          background: AsterColors.transparent,
+          background: _colors.transparentSurface,
           foreground: scheme.onSurface,
-          textTheme: textTheme,
+          textStyle: typeRoles.buttonLabel,
           side: BorderSide(color: _colors.borderSubtle),
         ),
       ),
@@ -108,14 +120,14 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(_radii.button),
           ),
-          textStyle: textTheme.labelLarge,
+          textStyle: typeRoles.buttonLabel,
         ),
       ),
-      iconTheme: IconThemeData(color: scheme.onSurface, size: _spacing.iconMd),
+      iconTheme: IconThemeData(color: scheme.onSurface, size: _icons.md),
       dividerTheme: DividerThemeData(
         color: _colors.borderSubtle,
-        thickness: 1,
-        space: 1,
+        thickness: _strokes.divider,
+        space: _strokes.divider,
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: _colors.surfaceRaised,
@@ -128,7 +140,7 @@ class AppTheme {
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: _colors.surfaceRaised,
-        surfaceTintColor: AsterColors.transparent,
+        surfaceTintColor: _colors.transparentSurface,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(_radii.card),
@@ -141,7 +153,7 @@ class AppTheme {
         ),
       ),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: AsterColors.ink,
+        backgroundColor: scheme.inverseSurface,
         contentTextStyle: textTheme.bodyMedium?.copyWith(
           color: scheme.onInverseSurface,
         ),
@@ -185,12 +197,12 @@ class AppTheme {
         fillColor: WidgetStateProperty.resolveWith((states) {
           return states.contains(WidgetState.selected)
               ? scheme.primary
-              : AsterColors.transparent;
+              : _colors.transparentSurface;
         }),
         checkColor: WidgetStateProperty.all(scheme.onPrimary),
         side: BorderSide(
           color: _colors.borderSubtle,
-          width: _metrics.focusBorderWidth,
+          width: _strokes.focusBorder,
         ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(_radii.xs),
@@ -208,7 +220,7 @@ class AppTheme {
         inactiveTrackColor: _colors.surfaceSubtle,
         thumbColor: scheme.primary,
         overlayColor: scheme.primary.withValues(
-          alpha: _effects.primaryOverlayOpacity,
+          alpha: _stateLayers.primaryOverlay,
         ),
         valueIndicatorColor: scheme.primary,
         valueIndicatorTextStyle: textTheme.labelSmall?.copyWith(
@@ -228,7 +240,7 @@ class AppTheme {
         circularTrackColor: _colors.surfaceSubtle,
       ),
       listTileTheme: ListTileThemeData(
-        tileColor: AsterColors.transparent,
+        tileColor: _colors.transparentSurface,
         selectedTileColor: _colors.surfaceSubtle,
         iconColor: _colors.textSecondary,
         textColor: scheme.onSurface,
@@ -242,12 +254,12 @@ class AppTheme {
       ),
       drawerTheme: DrawerThemeData(
         backgroundColor: scheme.surface,
-        surfaceTintColor: AsterColors.transparent,
+        surfaceTintColor: _colors.transparentSurface,
         elevation: 0,
       ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: _colors.surfaceRaised,
-        surfaceTintColor: AsterColors.transparent,
+        surfaceTintColor: _colors.transparentSurface,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(
@@ -265,18 +277,20 @@ class AppTheme {
       ),
       tooltipTheme: TooltipThemeData(
         decoration: BoxDecoration(
-          color: AsterColors.ink,
+          color: scheme.inverseSurface,
           borderRadius: BorderRadius.circular(_radii.badge),
         ),
-        textStyle: textTheme.labelSmall?.copyWith(color: AsterColors.white),
+        textStyle: textTheme.labelSmall?.copyWith(
+          color: scheme.onInverseSurface,
+        ),
         padding: EdgeInsets.symmetric(
           horizontal: _spacing.md,
           vertical: _spacing.sm,
         ),
       ),
       expansionTileTheme: ExpansionTileThemeData(
-        backgroundColor: AsterColors.transparent,
-        collapsedBackgroundColor: AsterColors.transparent,
+        backgroundColor: _colors.transparentSurface,
+        collapsedBackgroundColor: _colors.transparentSurface,
         textColor: scheme.onSurface,
         iconColor: _colors.textSecondary,
         collapsedTextColor: _colors.textSecondary,
@@ -285,65 +299,24 @@ class AppTheme {
     );
   }
 
-  static ThemeData dark() => light();
-
-  static ColorScheme _colorScheme() {
-    return const ColorScheme.light(
-      primary: AsterColors.blueBase,
-      onPrimary: AsterColors.white,
-      primaryContainer: AsterColors.blue200,
-      onPrimaryContainer: AsterColors.blue900,
-      secondary: AsterColors.blue600,
-      onSecondary: AsterColors.white,
-      secondaryContainer: AsterColors.blue300,
-      onSecondaryContainer: AsterColors.blue900,
-      tertiary: AsterColors.blue800,
-      onTertiary: AsterColors.white,
-      tertiaryContainer: AsterColors.blue500,
-      onTertiaryContainer: AsterColors.blue900,
-      error: Color(0xFFF53F3F),
-      onError: AsterColors.white,
-      errorContainer: Color(0xFFFFECE8),
-      onErrorContainer: AsterColors.ink,
-      surface: AsterColors.surface,
-      onSurface: AsterColors.ink,
-      surfaceContainerLowest: AsterColors.white,
-      surfaceContainerLow: Color(0xFFF7F8FA),
-      surfaceContainer: Color(0xFFF2F3F5),
-      surfaceContainerHigh: Color(0xFFE5E6EB),
-      surfaceContainerHighest: Color(0xFFC9CDD4),
-      onSurfaceVariant: Color(0xFF86909C),
-      outline: Color(0xFFE5E6EB),
-      outlineVariant: Color(0xFFF2F3F5),
-      inverseSurface: AsterColors.ink,
-      onInverseSurface: AsterColors.white,
-      inversePrimary: AsterColors.blue600,
-      shadow: AsterColors.ink,
-      scrim: AsterColors.ink,
-    );
-  }
-
   static OutlineInputBorder _outlineBorder(Color color, {double? width}) {
     return OutlineInputBorder(
       borderRadius: BorderRadius.circular(_radii.input),
-      borderSide: BorderSide(
-        color: color,
-        width: width ?? _metrics.borderWidth,
-      ),
+      borderSide: BorderSide(color: color, width: width ?? _strokes.border),
     );
   }
 
   static ButtonStyle _buttonStyle({
     required Color background,
     required Color foreground,
-    required TextTheme textTheme,
+    required TextStyle textStyle,
     BorderSide? side,
   }) {
     return ElevatedButton.styleFrom(
       backgroundColor: background,
       foregroundColor: foreground,
       elevation: 0,
-      shadowColor: AsterColors.transparent,
+      shadowColor: _colors.transparentSurface,
       padding: EdgeInsets.symmetric(
         horizontal: _spacing.xxl,
         vertical: _spacing.md,
@@ -352,7 +325,7 @@ class AppTheme {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(_radii.button),
       ),
-      textStyle: textTheme.labelLarge,
+      textStyle: textStyle,
     );
   }
 }

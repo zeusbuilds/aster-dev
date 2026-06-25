@@ -18,8 +18,8 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final spacing = context.spacing;
-    final colors = context.appColors;
-    final textTheme = context.textTheme;
+    final metrics = context.metrics;
+    final type = context.type;
     final walletState = ref.watch(walletViewModelProvider);
     final activeWallet = walletState.activeWallet;
 
@@ -48,13 +48,7 @@ class SettingsScreen extends ConsumerWidget {
             SizedBox(height: spacing.xxl),
 
             /// Wallet section
-            Text(
-              'Wallet',
-              style: textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: context.colorScheme.onSurface,
-              ),
-            ),
+            Text('Wallet', style: type.sectionLabel),
             SizedBox(height: spacing.md),
             Squircle(
               padding: EdgeInsets.symmetric(vertical: spacing.xs),
@@ -102,13 +96,7 @@ class SettingsScreen extends ConsumerWidget {
             SizedBox(height: spacing.xxl),
 
             /// App settings section
-            Text(
-              'App',
-              style: textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: context.colorScheme.onSurface,
-              ),
-            ),
+            Text('App', style: type.sectionLabel),
             SizedBox(height: spacing.md),
             Squircle(
               padding: EdgeInsets.symmetric(vertical: spacing.xs),
@@ -191,7 +179,7 @@ class SettingsScreen extends ConsumerWidget {
             Center(
               child: SvgPicture.asset(
                 'assets/brand/aster-logo.svg',
-                width: spacing.huge,
+                width: metrics.brandMarkSize,
                 colorFilter: ColorFilter.mode(
                   context.colorScheme.onSurface,
                   BlendMode.srcIn,
@@ -200,14 +188,12 @@ class SettingsScreen extends ConsumerWidget {
             ),
             SizedBox(height: spacing.xs),
             Center(
-              child: Text(
-                'Aster • Version 1.0.0',
-                style: textTheme.bodySmall?.copyWith(
-                  color: colors.textTertiary,
-                ),
-              ),
+              child: Text('Aster • Version 1.0.0', style: type.versionLabel),
             ),
-            SizedBox(height: spacing.bottomSafe(context) + spacing.navOffset),
+            SizedBox(
+              height:
+                  spacing.bottomSafe(context) + metrics.floatingNavClearance,
+            ),
           ],
         ),
       ),

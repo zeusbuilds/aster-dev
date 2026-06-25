@@ -14,6 +14,7 @@ class SendScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
+    final metrics = context.metrics;
 
     return Scaffold(
       backgroundColor: context.colorScheme.surface,
@@ -40,18 +41,13 @@ class SendScreen extends StatelessWidget {
                 buttonWidth:
                     (MediaQuery.of(context).size.width -
                         spacing.screenPadding * 2 -
-                        spacing.keypadHorizontalReserve) /
+                        metrics.keypadHorizontalReserve) /
                     3,
-                buttonHeight: spacing.keypadButtonHeight,
-                rowSpacing: spacing.keypadGap,
-                columnSpacing: spacing.keypadGap,
+                buttonHeight: metrics.keypadButtonHeight,
+                rowSpacing: metrics.keypadGap,
+                columnSpacing: metrics.keypadGap,
                 buttonColor: context.appColors.surfaceSubtle,
-                buttonTextStyle: context.textTheme.headlineSmall!
-                    .copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: context.colorScheme.onSurface,
-                    )
-                    .toNumeric(context),
+                buttonTextStyle: context.type.keypadNumber.toNumeric(context),
               ),
               SizedBox(height: spacing.xl),
               CustomButton(text: 'Continue', onTap: () {}),

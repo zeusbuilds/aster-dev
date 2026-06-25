@@ -46,6 +46,8 @@ class _SwapCardState extends State<SwapCard> {
     final spacing = context.spacing;
     final colors = context.appColors;
     final radius = context.radii;
+    final icons = context.icons;
+    final strokes = context.strokes;
 
     return Stack(
       alignment: Alignment.center,
@@ -83,12 +85,12 @@ class _SwapCardState extends State<SwapCard> {
             shape: BoxShape.circle,
             border: Border.all(
               color: context.colorScheme.surface,
-              width: spacing.focusRing,
+              width: strokes.focusRing,
             ),
           ),
           child: Icon(
             RemixIcons.arrow_down_line,
-            size: spacing.iconSm,
+            size: icons.sm,
             color: context.colorScheme.onSurface,
           ),
         ),

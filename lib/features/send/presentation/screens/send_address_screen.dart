@@ -34,6 +34,8 @@ class _SendAddressScreenState extends State<SendAddressScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final icons = context.icons;
+
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
@@ -46,7 +48,7 @@ class _SendAddressScreenState extends State<SendAddressScreen> {
             onPressed: () => _openScan(context),
             icon: Icon(
               MingCuteIcons.mgc_scan_line,
-              size: context.spacing.screenPadding,
+              size: icons.sm,
               color: context.colorScheme.onSurface,
             ),
           ),

@@ -15,8 +15,8 @@ class CountrySelectOptionRow extends StatelessWidget {
   /// Callback when the row is tapped
   final VoidCallback? onTap;
 
-  /// Code of the currently selected country (CountryModel.code)
-  final int selected;
+  /// Whether this country is currently selected
+  final bool selected;
 
   const CountrySelectOptionRow({
     super.key,
@@ -28,55 +28,58 @@ class CountrySelectOptionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
-    final textTheme = context.textTheme;
+    final type = context.type;
+    final metrics = context.metrics;
 
-    return GestureDetector(
-      onTapDown: onTap != null
-          ? (_) async {
-              final canVibrate = await Haptics.canVibrate();
-              if (canVibrate) {
-                await Haptics.vibrate(HapticsType.selection);
+    return Semantics(
+      button: onTap != null,
+      selected: selected,
+      label: country.name,
+      child: GestureDetector(
+        onTapDown: onTap != null
+            ? (_) async {
+                final canVibrate = await Haptics.canVibrate();
+                if (canVibrate) {
+                  await Haptics.vibrate(HapticsType.selection);
+                }
               }
-            }
-          : null,
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: spacing.screenPadding,
-          vertical: spacing.lg,
-        ),
-        child: Row(
-          children: [
-            CountryFlag.fromCountryCode(
-              country.code,
-              theme: ImageTheme(
-                shape: Circle(),
-                height: spacing.xxxl,
-                width: spacing.xxxl,
-              ),
-            ),
-            SizedBox(width: spacing.lg),
-            Expanded(
-              child: Text(
-                country.name,
-                style: textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w500,
-                  color: context.colorScheme.onSurface,
+            : null,
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: spacing.screenPadding,
+            vertical: spacing.lg,
+          ),
+          child: Row(
+            children: [
+              CountryFlag.fromCountryCode(
+                country.code,
+                theme: ImageTheme(
+                  shape: Circle(),
+                  height: metrics.flagSize,
+                  width: metrics.flagSize,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
-            ),
-            SizedBox(width: spacing.xxxl),
-            CustomRadio(
-              option: 0,
-              selected: selected,
-              onChanged: (value) {
-                onTap?.call();
-              },
-            ),
-          ],
+              SizedBox(width: spacing.lg),
+              Expanded(
+                child: Text(
+                  country.name,
+                  style: type.rowTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              SizedBox(width: spacing.xxxl),
+              CustomRadio(
+                option: 1,
+                selected: selected ? 1 : 0,
+                onChanged: (value) {
+                  onTap?.call();
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
