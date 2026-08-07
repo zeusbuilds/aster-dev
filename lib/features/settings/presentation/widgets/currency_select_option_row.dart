@@ -1,6 +1,5 @@
-import 'package:flutter/material.dart';
-
 import 'package:circle_flags/circle_flags.dart';
+import 'package:flutter/material.dart';
 import 'package:haptic_feedback/haptic_feedback.dart';
 
 import '../../../../shared/shared.dart';

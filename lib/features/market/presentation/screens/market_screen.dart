@@ -56,9 +56,7 @@ class MarketScreen extends StatelessWidget {
           alpha: effects.marketShadowOpacity,
         ),
         tipText: 'Best rate',
-        onTap: () {
-          context.push(RoutePaths.swap);
-        },
+        onTap: () async => context.push(RoutePaths.swap),
       ),
       MarketTile(
         label: 'Lend',
@@ -82,9 +80,7 @@ class MarketScreen extends StatelessWidget {
           alpha: effects.marketShadowOpacity,
         ),
         tipText: '~10 min confirmations',
-        onTap: () {
-          context.push(RoutePaths.sendAddress);
-        },
+        onTap: () async => context.push(RoutePaths.sendAddress),
       ),
       MarketTile(
         label: 'Receive',
@@ -95,9 +91,7 @@ class MarketScreen extends StatelessWidget {
           alpha: effects.marketShadowOpacity,
         ),
         tipText: 'Free & instant',
-        onTap: () {
-          context.push(RoutePaths.receive);
-        },
+        onTap: () async => context.push(RoutePaths.receive),
       ),
     ];
 

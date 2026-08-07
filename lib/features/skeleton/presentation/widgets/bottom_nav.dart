@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -314,7 +316,7 @@ class _AnimatedCircleState extends State<_AnimatedCircle>
         _targetPositionX = centerX;
         _currentPositionY = _targetPositionY;
         _targetPositionY = centerY;
-        _controller.forward(from: 0.0);
+        unawaited(_controller.forward(from: 0.0));
       }
     });
   }

@@ -53,9 +53,7 @@ class AssetRow extends StatelessWidget {
       label: '$name, $fiatBalance, $assetBalance',
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () {
-          context.push(RoutePaths.transactionList);
-        },
+        onTap: () async => context.push(RoutePaths.transactionList),
         child: ConstrainedBox(
           constraints: BoxConstraints(minHeight: metrics.minTouchTarget),
           child: Row(

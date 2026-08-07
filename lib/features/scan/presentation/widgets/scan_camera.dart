@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -59,24 +61,28 @@ class _ScanCameraWidgetState extends State<ScanCameraWidget>
       if (torchIsOn != enabled) {
         await widget.controller.toggleTorch();
       }
-    } catch (_) {}
+    } on Exception {
+      if (mounted) widget.onError('The flashlight is unavailable.');
+    }
   }
 
   Future<void> _setZoomFactor(double factor) async {
     try {
       final normalizedZoom = ((factor - 1.0) / 2.0).clamp(0.0, 1.0);
       await widget.controller.setZoomScale(normalizedZoom);
-    } catch (_) {}
+    } on Exception {
+      if (mounted) widget.onError('Camera zoom is unavailable.');
+    }
   }
 
   @override
   void didUpdateWidget(ScanCameraWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.flashOn != widget.flashOn) {
-      _setTorch(widget.flashOn);
+      unawaited(_setTorch(widget.flashOn));
     }
     if (oldWidget.zoomFactor != widget.zoomFactor) {
-      _setZoomFactor(widget.zoomFactor);
+      unawaited(_setZoomFactor(widget.zoomFactor));
     }
   }
 

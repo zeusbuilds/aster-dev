@@ -46,13 +46,6 @@ class StorageKeys {
   /// Key for storing active wallet ID
   static const String activeWalletId = 'active_wallet_id';
 
-  /// Prefix for wallet seed storage keys
-  static const String walletSeedPrefix = 'wallet_seed_';
-
-  /// Generates a storage key for a wallet seed phrase
-  ///
-  /// [walletId] - The wallet ID to generate the key for
-  ///
-  /// Returns the storage key in format: 'wallet_seed_{walletId}'
-  static String walletSeedKey(String walletId) => '$walletSeedPrefix$walletId';
+  /// Versioned, non-secret wallet profile registry.
+  static const String walletRegistry = 'wallet_registry_v1';
 }

@@ -15,24 +15,14 @@ void main() async {
     AppLoader(
       child: const Aster(),
       initialize: () async {
-        // Initialize database
-        final databaseService = DatabaseService();
-        await databaseService.init();
-
         final sharedPreferences = await SharedPreferences.getInstance();
 
         // Create a ProviderContainer for app runtime.
         final container = ProviderContainer(
           overrides: [
             sharedPreferencesProvider.overrideWith((ref) => sharedPreferences),
-            databaseServiceProvider.overrideWith((ref) => databaseService),
           ],
         );
-
-        // Run migration before the app starts reading wallet state.
-        final walletRepository = container.read(walletRepositoryProvider);
-        final migrationService = WalletMigrationService(walletRepository);
-        await migrationService.migrateIfNeeded();
 
         return container;
       },
@@ -90,7 +80,7 @@ class _AsterState extends ConsumerState<Aster> with WidgetsBindingObserver {
       builder: (context, child) {
         return Stack(
           children: [
-            if (child != null) child,
+            ?child,
             if (showSplashOverlay) const Positioned.fill(child: SplashScreen()),
           ],
         );

@@ -21,7 +21,10 @@ class SettingsScreen extends ConsumerWidget {
     final metrics = context.metrics;
     final type = context.type;
     final walletState = ref.watch(walletViewModelProvider);
-    final activeWallet = walletState.activeWallet;
+    final activeWallet = switch (walletState) {
+      AsyncData(:final value) => value.activeWallet,
+      _ => null,
+    };
 
     return Scaffold(
       backgroundColor: context.colorScheme.surface,
@@ -38,7 +41,7 @@ class SettingsScreen extends ConsumerWidget {
                 children: [
                   SettingsOptionRow(
                     title: activeWallet?.name ?? 'Main',
-                    details: activeWallet?.walletId ?? '1F29 1127',
+                    details: activeWallet?.displayId,
                     prefixIcon: MingCuteIcons.mgc_wallet_3_line,
                     onTap: () => context.pushNamed(RouteNames.walletSelection),
                   ),

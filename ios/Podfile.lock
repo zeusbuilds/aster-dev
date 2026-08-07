@@ -1,86 +1,22 @@
 PODS:
-  - connectivity_plus (0.0.1):
-    - Flutter
   - Flutter (1.0.0)
-  - flutter_native_splash (2.4.3):
+  - rgb_sdk_flutter (0.1.0):
     - Flutter
-  - flutter_secure_storage (6.0.0):
-    - Flutter
-  - haptic_feedback (0.5.1):
-    - Flutter
-  - image_picker_ios (0.0.1):
-    - Flutter
-  - integration_test (0.0.1):
-    - Flutter
-  - mobile_scanner (7.0.0):
-    - Flutter
-    - FlutterMacOS
-  - ObjectBox (4.1.0)
-  - objectbox_flutter_libs (0.0.1):
-    - Flutter
-    - ObjectBox (= 4.1.0)
-  - path_provider_foundation (0.0.1):
-    - Flutter
-    - FlutterMacOS
-  - shared_preferences_foundation (0.0.1):
-    - Flutter
-    - FlutterMacOS
 
 DEPENDENCIES:
-  - connectivity_plus (from `.symlinks/plugins/connectivity_plus/ios`)
   - Flutter (from `Flutter`)
-  - flutter_native_splash (from `.symlinks/plugins/flutter_native_splash/ios`)
-  - flutter_secure_storage (from `.symlinks/plugins/flutter_secure_storage/ios`)
-  - haptic_feedback (from `.symlinks/plugins/haptic_feedback/ios`)
-  - image_picker_ios (from `.symlinks/plugins/image_picker_ios/ios`)
-  - integration_test (from `.symlinks/plugins/integration_test/ios`)
-  - mobile_scanner (from `.symlinks/plugins/mobile_scanner/darwin`)
-  - objectbox_flutter_libs (from `.symlinks/plugins/objectbox_flutter_libs/ios`)
-  - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
-  - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
-
-SPEC REPOS:
-  trunk:
-    - ObjectBox
+  - rgb_sdk_flutter (from `.symlinks/plugins/rgb_sdk_flutter/ios`)
 
 EXTERNAL SOURCES:
-  connectivity_plus:
-    :path: ".symlinks/plugins/connectivity_plus/ios"
   Flutter:
     :path: Flutter
-  flutter_native_splash:
-    :path: ".symlinks/plugins/flutter_native_splash/ios"
-  flutter_secure_storage:
-    :path: ".symlinks/plugins/flutter_secure_storage/ios"
-  haptic_feedback:
-    :path: ".symlinks/plugins/haptic_feedback/ios"
-  image_picker_ios:
-    :path: ".symlinks/plugins/image_picker_ios/ios"
-  integration_test:
-    :path: ".symlinks/plugins/integration_test/ios"
-  mobile_scanner:
-    :path: ".symlinks/plugins/mobile_scanner/darwin"
-  objectbox_flutter_libs:
-    :path: ".symlinks/plugins/objectbox_flutter_libs/ios"
-  path_provider_foundation:
-    :path: ".symlinks/plugins/path_provider_foundation/darwin"
-  shared_preferences_foundation:
-    :path: ".symlinks/plugins/shared_preferences_foundation/darwin"
+  rgb_sdk_flutter:
+    :path: ".symlinks/plugins/rgb_sdk_flutter/ios"
 
 SPEC CHECKSUMS:
-  connectivity_plus: cb623214f4e1f6ef8fe7403d580fdad517d2f7dd
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
-  flutter_native_splash: c32d145d68aeda5502d5f543ee38c192065986cf
-  flutter_secure_storage: 1ed9476fba7e7a782b22888f956cce43e2c62f13
-  haptic_feedback: 1f22d7ad3abb43bb814aa42fdf548dc6d9e8245a
-  image_picker_ios: e0ece4aa2a75771a7de3fa735d26d90817041326
-  integration_test: 4a889634ef21a45d28d50d622cf412dc6d9f586e
-  mobile_scanner: 9157936403f5a0644ca3779a38ff8404c5434a93
-  ObjectBox: bf3d4b51075d52868422d5d1f2f2141b1d630d30
-  objectbox_flutter_libs: e912f15beff5699f1e184dbd2ff6aa5657464e73
-  path_provider_foundation: bb55f6dbba17d0dccd6737fe6f7f34fbd0376880
-  shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
+  rgb_sdk_flutter: c5e5a368bf8425acdd8f399bf51ca88774daccf5
 
-PODFILE CHECKSUM: 9580a49fa2c095d51100c20f258df867100b916b
+PODFILE CHECKSUM: f3183e344f38e7e8fbd18ec32021462f9094bdbd
 
 COCOAPODS: 1.16.2

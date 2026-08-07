@@ -1,6 +1,5 @@
-import 'package:flutter/material.dart';
-
 import 'package:easy_radio/easy_radio.dart';
+import 'package:flutter/material.dart';
 
 import '../theme/theme.dart';
 
@@ -9,10 +8,10 @@ import '../theme/theme.dart';
 /// Provides a radio button with theme-aware colors and animations.
 ///
 /// Supports selection state management through [option] and [selected] values.
-class CustomRadio extends StatelessWidget {
-  final int option;
-  final int selected;
-  final void Function(int?) onChanged;
+class CustomRadio<T> extends StatelessWidget {
+  final T option;
+  final T? selected;
+  final ValueChanged<T?> onChanged;
 
   const CustomRadio({
     super.key,
@@ -25,7 +24,7 @@ class CustomRadio extends StatelessWidget {
   Widget build(BuildContext context) {
     final radii = context.radii;
 
-    return EasyRadio<int>(
+    return EasyRadio<T>(
       value: option,
       groupValue: selected,
       onChanged: onChanged,

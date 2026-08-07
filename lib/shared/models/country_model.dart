@@ -2,19 +2,19 @@ import 'dart:convert';
 
 import 'package:flutter/services.dart';
 
-import 'package:freezed_annotation/freezed_annotation.dart';
-
-part 'country_model.freezed.dart';
-part 'country_model.g.dart';
-
 /// Country model representing a country with its ISO 3166-1 alpha-2 code
-@freezed
-class CountryModel with _$CountryModel {
-  const factory CountryModel({required String name, required String code}) =
-      _CountryModel;
+class CountryModel {
+  const CountryModel({required this.name, required this.code});
 
-  factory CountryModel.fromJson(Map<String, dynamic> json) =>
-      _$CountryModelFromJson(json);
+  factory CountryModel.fromJson(Map<String, Object?> json) {
+    return CountryModel(
+      name: json['name']! as String,
+      code: json['code']! as String,
+    );
+  }
+
+  final String name;
+  final String code;
 
   // Cache for loaded countries
   static List<CountryModel>? _cachedCountries;
@@ -29,11 +29,13 @@ class CountryModel with _$CountryModel {
       final String jsonString = await rootBundle.loadString(
         'assets/data/countries.json',
       );
-      final List<dynamic> jsonList = json.decode(jsonString) as List<dynamic>;
+      final jsonList = json.decode(jsonString) as List<Object?>;
 
-      _cachedCountries = jsonList
-          .map((json) => CountryModel.fromJson(json as Map<String, dynamic>))
-          .toList();
+      _cachedCountries = List.unmodifiable(
+        jsonList.map(
+          (item) => CountryModel.fromJson(item! as Map<String, Object?>),
+        ),
+      );
       return _cachedCountries!;
     } catch (e) {
       throw Exception('Failed to load countries: $e');
@@ -68,4 +70,11 @@ class CountryModel with _$CountryModel {
     sorted.sort((a, b) => a.name.compareTo(b.name));
     return sorted;
   }
+
+  @override
+  bool operator ==(Object other) =>
+      other is CountryModel && other.name == name && other.code == code;
+
+  @override
+  int get hashCode => Object.hash(name, code);
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -90,7 +91,8 @@ class _GridLoaderState extends State<GridLoader>
       vsync: this,
       duration:
           widget.cycleDuration ?? const AsterMotion().loadingCycleDuration,
-    )..repeat();
+    );
+    unawaited(_controller.repeat());
   }
 
   @override

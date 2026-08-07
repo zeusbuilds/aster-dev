@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'package:google_fonts/google_fonts.dart';
-
 import 'theme_context.dart';
 import 'tokens/typography_tokens.dart';
 
@@ -11,7 +9,11 @@ class TypographySystem {
   static const _typography = AsterTypography();
 
   static TextTheme buildTextTheme({required Color onSurface}) {
-    final base = GoogleFonts.dmSansTextTheme(ThemeData.light().textTheme);
+    final base = ThemeData.light().textTheme.apply(
+      fontFamily: _typography.fontFamilyPrimary,
+      bodyColor: onSurface,
+      displayColor: onSurface,
+    );
 
     TextStyle style(
       double size,
@@ -19,7 +21,8 @@ class TypographySystem {
       double height, {
       Color? color,
     }) {
-      return GoogleFonts.dmSans(
+      return TextStyle(
+        fontFamily: _typography.fontFamilyPrimary,
         fontSize: size,
         fontWeight: weight,
         height: height,
@@ -52,9 +55,9 @@ class TypographySystem {
 
 extension NumericTextStyle on TextStyle {
   TextStyle toNumeric(BuildContext context) {
-    return GoogleFonts.getFont(
-      context.typography.fontFamilyNumeric,
-      textStyle: this,
+    return copyWith(
+      fontFamily: context.typography.fontFamilyNumeric,
+      letterSpacing: 0,
     );
   }
 }

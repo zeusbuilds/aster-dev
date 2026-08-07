@@ -1,25 +1,32 @@
-import 'package:freezed_annotation/freezed_annotation.dart';
-
 import '../../data/models/wallet_model.dart';
 
-part 'wallet_state.freezed.dart';
+/// Immutable wallet-profile presentation state.
+class WalletState {
+  const WalletState({
+    this.wallets = const [],
+    this.activeWallet,
+    this.switchingWalletId,
+  });
 
-/// State model for wallet management
-///
-/// Contains the list of wallets, active wallet, loading state, and error messages
-@freezed
-class WalletState with _$WalletState {
-  const factory WalletState({
-    /// Whether wallets are currently being loaded
-    @Default(false) bool isLoading,
+  final List<WalletProfile> wallets;
+  final WalletProfile? activeWallet;
+  final String? switchingWalletId;
 
-    /// List of all available wallets
-    @Default([]) List<WalletModel> wallets,
-
-    /// Currently active/selected wallet
-    WalletModel? activeWallet,
-
-    /// Error message if any operation failed
-    String? errorMessage,
-  }) = _WalletState;
+  WalletState copyWith({
+    List<WalletProfile>? wallets,
+    Object? activeWallet = _unset,
+    Object? switchingWalletId = _unset,
+  }) {
+    return WalletState(
+      wallets: wallets == null ? this.wallets : List.unmodifiable(wallets),
+      activeWallet: identical(activeWallet, _unset)
+          ? this.activeWallet
+          : activeWallet as WalletProfile?,
+      switchingWalletId: identical(switchingWalletId, _unset)
+          ? this.switchingWalletId
+          : switchingWalletId as String?,
+    );
+  }
 }
+
+const _unset = Object();

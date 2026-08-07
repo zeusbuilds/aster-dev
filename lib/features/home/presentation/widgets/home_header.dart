@@ -20,7 +20,10 @@ class HomeHeader extends ConsumerWidget {
     final colors = context.appColors;
     final icons = context.icons;
     final walletState = ref.watch(walletViewModelProvider);
-    final activeWallet = walletState.activeWallet;
+    final activeWallet = switch (walletState) {
+      AsyncData(:final value) => value.activeWallet,
+      _ => null,
+    };
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: spacing.screenPadding),

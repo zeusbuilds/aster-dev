@@ -20,49 +20,67 @@ class WalletSelectionScreen extends ConsumerWidget {
     final walletState = ref.watch(walletViewModelProvider);
     final viewModel = ref.read(walletViewModelProvider.notifier);
 
-    // Loading state
-    if (walletState.isLoading) {
-      return Scaffold(
-        backgroundColor: context.colorScheme.surface,
-        appBar: const CustomAppBar(title: 'Select Wallet', leadingIcon: true),
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
+    return walletState.when(
+      loading: () => const _WalletSelectionScaffold(
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, stackTrace) => _WalletSelectionScaffold(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: spacing.screenPadding),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Wallets could not be loaded.',
+                style: context.type.rowTitle,
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: spacing.lg),
+              CustomButton(text: 'Retry', onTap: viewModel.reload),
+            ],
+          ),
+        ),
+      ),
+      data: (data) => _WalletSelectionScaffold(
+        child: ListView.separated(
+          padding: EdgeInsets.only(bottom: spacing.bottomSafeRaw(context)),
+          itemCount: data.wallets.length,
+          separatorBuilder: (context, index) => const AsterDivider.inset(),
+          itemBuilder: (context, index) {
+            final wallet = data.wallets[index];
+            final isSelected = data.activeWallet?.id == wallet.id;
+            final isSwitching = data.switchingWalletId != null;
 
-    // Error state
-    if (walletState.errorMessage != null) {
-      return Scaffold(
-        backgroundColor: context.colorScheme.surface,
-        appBar: const CustomAppBar(title: 'Select Wallet', leadingIcon: true),
-        body: Center(child: Text('Error: ${walletState.errorMessage}')),
-      );
-    }
+            return WalletSelectOptionRow(
+              wallet: wallet,
+              selected: data.activeWallet?.id,
+              onTap: isSelected || isSwitching
+                  ? null
+                  : () async {
+                      await viewModel.switchWallet(wallet.id);
+                      await Future<void>.delayed(motion.selectionCommitDelay);
+                      if (!context.mounted) return;
+                      context.pop();
+                    },
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
 
+class _WalletSelectionScaffold extends StatelessWidget {
+  const _WalletSelectionScaffold({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.colorScheme.surface,
       appBar: const CustomAppBar(title: 'Select Wallet', leadingIcon: true),
-      body: ListView.separated(
-        padding: EdgeInsets.only(bottom: spacing.bottomSafeRaw(context)),
-        itemCount: walletState.wallets.length,
-        separatorBuilder: (context, index) => const AsterDivider.inset(),
-        itemBuilder: (context, index) {
-          final wallet = walletState.wallets[index];
-          final isSelected = walletState.activeWallet?.id == wallet.id;
-
-          return WalletSelectOptionRow(
-            wallet: wallet,
-            selected: walletState.activeWallet?.id ?? -1,
-            onTap: () async {
-              if (!isSelected) {
-                await viewModel.switchWallet(wallet.compactWalletId);
-                await Future.delayed(motion.selectionCommitDelay);
-                if (!context.mounted) return;
-                context.pop();
-              }
-            },
-          );
-        },
-      ),
+      body: child,
     );
   }
 }

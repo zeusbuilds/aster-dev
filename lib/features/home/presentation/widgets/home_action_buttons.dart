@@ -27,9 +27,7 @@ class HomeActionButtons extends StatelessWidget {
               width: double.infinity,
               suffixIcon: RemixIcons.arrow_right_up_line,
               variant: ButtonVariant.translucent,
-              onTap: () {
-                context.push(RoutePaths.sendAddress);
-              },
+              onTap: () async => context.push(RoutePaths.sendAddress),
             ),
           ),
           SizedBox(width: spacing.md),
@@ -40,9 +38,7 @@ class HomeActionButtons extends StatelessWidget {
               width: double.infinity,
               suffixIcon: RemixIcons.arrow_right_down_line,
               variant: ButtonVariant.translucent,
-              onTap: () {
-                context.push(RoutePaths.receive);
-              },
+              onTap: () async => context.push(RoutePaths.receive),
             ),
           ),
           SizedBox(width: spacing.md),
@@ -53,9 +49,7 @@ class HomeActionButtons extends StatelessWidget {
               width: double.infinity,
               suffixIcon: RemixIcons.token_swap_line,
               variant: ButtonVariant.translucent,
-              onTap: () {
-                context.push(RoutePaths.swap);
-              },
+              onTap: () async => context.push(RoutePaths.swap),
             ),
           ),
         ],

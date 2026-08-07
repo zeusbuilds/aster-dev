@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -77,7 +79,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
 
   @override
   void dispose() {
-    _scannerController.dispose();
+    unawaited(_scannerController.dispose());
     super.dispose();
   }
 

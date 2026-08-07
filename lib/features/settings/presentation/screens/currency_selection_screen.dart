@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../../shared/shared.dart';
@@ -24,20 +26,22 @@ class _CurrencySelectionScreenState extends State<CurrencySelectionScreen> {
   @override
   void initState() {
     super.initState();
-    _loadCurrencies();
+    unawaited(_loadCurrencies());
     // TODO: Load selected currency from storage
   }
 
   Future<void> _loadCurrencies() async {
     try {
       final currencies = await CurrencyModel.getAllSorted();
+      if (!mounted) return;
       setState(() {
         _currencies = currencies;
         _isLoading = false;
       });
-    } catch (e) {
+    } on Exception catch (error) {
+      if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = error.runtimeType.toString();
         _isLoading = false;
       });
     }

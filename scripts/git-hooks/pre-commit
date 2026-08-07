@@ -1,25 +1,12 @@
 #!/bin/sh
-# Pre-commit: format Dart code and run static analysis.
+# Pre-commit: regenerate ignored outputs, then run repository quality gates.
 # Run from repo root. Install with: ./scripts/install-git-hooks.sh
 
 set -e
 cd "$(git rev-parse --show-toplevel)"
 
-echo "[pre-commit] Converting and sorting imports..."
-make imports
+echo "[pre-commit] Running quality gates..."
+make lint
 
-echo "[pre-commit] Formatting Dart code..."
-make format
-
-# Abort if imports or format changed files so the commit includes updated code
-if ! git diff --quiet; then
-  echo "[pre-commit] Some files were updated. Stage and commit again:"
-  echo "  git add -u && git commit"
-  exit 1
-fi
-
-echo "[pre-commit] Running static analysis..."
-make analyze
-
-echo "[pre-commit] Format and analyze OK."
+echo "[pre-commit] Quality gates passed."
 exit 0

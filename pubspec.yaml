@@ -1,13 +1,13 @@
 name: aster
-description: Aster - Bitcoin & Layer 2 Wallet
+description: UTEXO Bitcoin, RGB, and Lightning wallet
 
 publish_to: "none"
 
 version: 1.0.0+1
 
 environment:
-  sdk: ">=3.9.0 <4.0.0"
-  flutter: ">=3.22.0 <4.0.0"
+  sdk: ">=3.12.2 <4.0.0"
+  flutter: ">=3.44.9"
 
 dependencies:
   flutter:
@@ -16,91 +16,70 @@ dependencies:
     sdk: flutter
 
   # State Management
-  flutter_riverpod: ^2.4.0
-  riverpod_annotation: ^2.1.1
+  # Flutter 3.44.9 pins meta/test_api below the Riverpod 3.4 toolchain's
+  # requirements. This is the newest compatible stable Riverpod release set.
+  flutter_riverpod: 3.3.2
+  riverpod_annotation: 4.0.3
 
   # Networking
-  chopper: ^7.4.0
-  connectivity_plus: ^6.1.2
-  http: ^1.5.0
+  connectivity_plus: ^7.3.1
+  http: ^1.6.0
+
+  # Wallet SDK. Keep this immutable; see docs/architecture/SDK_INTEGRATION.md.
+  rgb_sdk_flutter:
+    git:
+      url: https://github.com/UTEXO-Protocol/flutter-sdk.git
+      ref: 3dd82e23d80bb4bb6a2d2526c6c6741ac1ea1236
 
   # Storage
-  flutter_secure_storage: ^9.0.0
-  objectbox: ^4.1.0
-  objectbox_flutter_libs: ^4.1.0
-  path_provider: ^2.1.1
-  shared_preferences: ^2.2.0
-
-  # Crypto utilities for wallet ID generation
-  crypto: ^3.0.3
+  # 11.0.0 requires Android compile SDK 37, ahead of Flutter 3.44.9's SDK 36.
+  flutter_secure_storage: 10.3.1
+  shared_preferences: ^2.5.5
 
   # Routing
-  go_router: ^14.2.7
-
-  # Code Generation
-  freezed_annotation: ^2.4.1
-  json_annotation: ^4.9.0
+  go_router: ^17.4.0
 
   # Utilities
-  async: ^2.11.0
-  collection: ^1.17.1
+  collection: ^1.19.1
   dartz: ^0.10.1
-  intl: any
-  nanoid: ^1.0.0
-
-  # Theming
-  google_fonts: ^6.3.3
+  # Flutter 3.44.9 pins intl 0.20.2 through flutter_localizations.
+  intl: ^0.20.2
 
   # Icons
-  cupertino_icons: ^1.0.8
-  fl_chart: ^1.1.1
-  remixicon: ^1.4.1
+  remixicon: ^4.9.3
   unicons: ^3.0.0
 
   # Camera & barcode scanning
-  image_picker: ^1.0.7
-  mobile_scanner: ^7.2.0
+  image_picker: ^1.2.3
+  mobile_scanner: ^7.4.0
 
   # Core
   circle_flags: ^5.0.1
-  country_flags: ^4.1.1
-  crypto_icons: ^1.0.0
+  country_flags: ^4.1.2
   custom_numeric_pad: ^0.0.5
   easy_radio: ^0.0.3
-  flag: ^7.0.2
-  flutter_svg: ^2.2.3
-  haptic_feedback: ^0.6.4+2
+  flutter_svg: ^2.3.0
+  haptic_feedback: ^0.6.5
   mesh: ^0.5.0
-  mesh_gradient: ^1.3.8
-  ming_cute_icons: ^0.0.7
-  pretty_qr_code: ^3.5.0
+  ming_cute_icons: ^0.0.8
+  pretty_qr_code: ^3.6.0
   smooth_page_indicator: ^2.0.1
-  rename_app: ^1.6.5
-  skeletonizer: ^2.1.2
-  flutter_native_splash: ^2.4.7
+  skeletonizer: ^2.1.3
 
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^5.0.0
-
-  # Import operations
-  import_sorter: ^4.6.0
-  import_path_converter: ^1.0.0
+  flutter_lints: ^6.0.0
 
   # Code Generation
-  build_runner: ^2.4.6
-  chopper_generator: ^7.4.0
-  freezed: ^2.4.6
-  json_serializable: ^6.7.1
-  objectbox_generator: ^4.1.0
-  riverpod_generator: ^2.1.1
+  build_runner: 2.15.1
+  riverpod_generator: 4.0.4
 
   # Testing
   integration_test:
     sdk: flutter
-  mocktail: ^1.0.2
+  mocktail: ^1.0.5
 
 flutter:
   uses-material-design: true
@@ -112,9 +91,14 @@ flutter:
     - assets/texture/
     - assets/data/
 
-import_path_converter:
-  relative: true
-
-import_sorter:
-  emojis: false
-  comments: false
+  fonts:
+    - family: DM Sans
+      fonts:
+        - asset: assets/fonts/DMSans-Variable.ttf
+        - asset: assets/fonts/DMSans-Italic-Variable.ttf
+          style: italic
+    - family: Public Sans
+      fonts:
+        - asset: assets/fonts/PublicSans-Variable.ttf
+        - asset: assets/fonts/PublicSans-Italic-Variable.ttf
+          style: italic

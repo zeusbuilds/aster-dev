@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:ming_cute_icons/ming_cute_icons.dart';
@@ -119,7 +121,7 @@ class ToastHelper {
     if (_currentDismissCallback != null) {
       _currentDismissCallback!();
       _currentDismissCallback = null;
-      await Future.delayed(
+      await Future<void>.delayed(
         _currentDismissDuration ?? const AsterMotion().toastTransitionDuration,
       );
     }
@@ -186,12 +188,14 @@ class ToastHelper {
     String? message,
     Duration? duration,
   }) {
-    show(
-      context,
-      title: title,
-      message: message,
-      variant: ToastVariant.success,
-      duration: duration,
+    unawaited(
+      show(
+        context,
+        title: title,
+        message: message,
+        variant: ToastVariant.success,
+        duration: duration,
+      ),
     );
   }
 
@@ -202,12 +206,14 @@ class ToastHelper {
     String? message,
     Duration? duration,
   }) {
-    show(
-      context,
-      title: title,
-      message: message,
-      variant: ToastVariant.failure,
-      duration: duration,
+    unawaited(
+      show(
+        context,
+        title: title,
+        message: message,
+        variant: ToastVariant.failure,
+        duration: duration,
+      ),
     );
   }
 
@@ -218,12 +224,14 @@ class ToastHelper {
     String? message,
     Duration? duration,
   }) {
-    show(
-      context,
-      title: title,
-      message: message,
-      variant: ToastVariant.warning,
-      duration: duration,
+    unawaited(
+      show(
+        context,
+        title: title,
+        message: message,
+        variant: ToastVariant.warning,
+        duration: duration,
+      ),
     );
   }
 }
@@ -254,6 +262,7 @@ class _ToastOverlayState extends State<_ToastOverlay>
   late Animation<Offset> _slideAnimation;
   late Animation<double> _fadeAnimation;
   bool _isDismissing = false;
+  Timer? _dismissTimer;
 
   @override
   void initState() {
@@ -275,35 +284,37 @@ class _ToastOverlayState extends State<_ToastOverlay>
 
     // Register dismiss callback with ToastHelper
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ToastHelper.registerDismissCallback(_dismiss, widget.transitionDuration);
+      ToastHelper.registerDismissCallback(
+        () => unawaited(_dismiss()),
+        widget.transitionDuration,
+      );
     });
 
     // Start animation
-    _controller.forward();
+    unawaited(_controller.forward());
 
     // Start reverse animation before removing.
     final dismissDelay = widget.duration > widget.transitionDuration
         ? widget.duration - widget.transitionDuration
         : Duration.zero;
-    Future.delayed(dismissDelay, () {
+    _dismissTimer = Timer(dismissDelay, () {
       if (mounted && !_isDismissing) {
-        _dismiss();
+        unawaited(_dismiss());
       }
     });
   }
 
-  void _dismiss() {
+  Future<void> _dismiss() async {
     if (_isDismissing || !mounted) return;
     _isDismissing = true;
-    _controller.reverse().then((_) {
-      if (mounted) {
-        widget.onDismiss?.call();
-      }
-    });
+    _dismissTimer?.cancel();
+    await _controller.reverse();
+    if (mounted) widget.onDismiss?.call();
   }
 
   @override
   void dispose() {
+    _dismissTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }

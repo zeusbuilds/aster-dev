@@ -11,13 +11,13 @@ import '../../data/models/models.dart';
 /// Shows wallet name, ID, and selection indicator
 class WalletSelectOptionRow extends StatelessWidget {
   /// The wallet model to display
-  final WalletModel wallet;
+  final WalletProfile wallet;
 
   /// Callback when the row is tapped
   final VoidCallback? onTap;
 
-  /// ID of the currently selected wallet (WalletModel.id)
-  final int selected;
+  /// ID of the currently selected wallet.
+  final String? selected;
 
   const WalletSelectOptionRow({
     super.key,
@@ -36,7 +36,7 @@ class WalletSelectOptionRow extends StatelessWidget {
     return Semantics(
       button: onTap != null,
       selected: selected == wallet.id,
-      label: '${wallet.name}, ${wallet.walletId}',
+      label: '${wallet.name}, ${wallet.displayId}',
       child: GestureDetector(
         onTapDown: onTap != null
             ? (_) async {
@@ -72,7 +72,7 @@ class WalletSelectOptionRow extends StatelessWidget {
                 ),
               ),
               SizedBox(width: spacing.xxxl),
-              Text(wallet.walletId, style: type.rowValue, maxLines: 1),
+              Text(wallet.displayId, style: type.rowValue, maxLines: 1),
               SizedBox(width: spacing.md),
               Icon(
                 MingCuteIcons.mgc_edit_2_line,

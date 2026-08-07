@@ -9,7 +9,7 @@ import '../../../../shared/shared.dart';
 class AssetSelectorSheet extends StatelessWidget {
   final List<AssetModel> assets;
   final String? selectedAssetName;
-  final Function(AssetModel) onAssetSelected;
+  final ValueChanged<AssetModel> onAssetSelected;
 
   const AssetSelectorSheet({
     super.key,
@@ -41,12 +41,11 @@ class AssetSelectorSheet extends StatelessWidget {
       builder: (context) => AssetSelectorSheet(
         assets: assets,
         selectedAssetName: selectedAssetName,
-        onAssetSelected: (asset) {
-          Future.delayed(motion.selectionCommitDelay, () {
-            if (context.mounted) {
-              Navigator.of(context).pop(asset);
-            }
-          });
+        onAssetSelected: (asset) async {
+          await Future<void>.delayed(motion.selectionCommitDelay);
+          if (context.mounted) {
+            Navigator.of(context).pop(asset);
+          }
         },
       ),
     );

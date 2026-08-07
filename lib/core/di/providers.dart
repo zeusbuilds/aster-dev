@@ -1,13 +1,10 @@
-import 'package:chopper/chopper.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../features/wallet/data/repository/repository.dart';
 import '../network/network_info.dart';
 import '../storage/storage.dart';
-import 'modules/network_module.dart';
 
 part 'providers.g.dart';
 
@@ -26,22 +23,11 @@ NetworkInfo networkInfo(Ref ref) {
   return NetworkInfo(ref.read(connectivityProvider));
 }
 
-/// Provides ChopperClient configured with interceptors for API calls
-///
-/// Set [enableLogging] to true for debugging HTTP requests/responses
-@riverpod
-ChopperClient chopperClient(Ref ref) {
-  return NetworkModule.getChopperClient(
-    ref,
-    enableLogging: false, // Set to true for debugging
-  );
-}
-
 // Storage providers
 /// Provides SharedPreferences instance for persistent key-value storage
 @riverpod
 Future<SharedPreferences> sharedPreferences(Ref ref) async {
-  return await SharedPreferences.getInstance();
+  return SharedPreferences.getInstance();
 }
 
 /// Provides SecureStorageService implementation for encrypted storage
@@ -50,37 +36,19 @@ SecureStorageService secureStorageService(Ref ref) {
   return SecureStorageService();
 }
 
-/// Provides PreferencesService implementation for app preferences
-///
-/// Depends on [sharedPreferencesProvider] being initialized
 @riverpod
-PreferencesService preferencesService(Ref ref) {
-  final prefsAsync = ref.watch(sharedPreferencesProvider);
-  return prefsAsync.when(
-    data: (prefs) => PreferencesService(prefs),
-    loading: () => throw StateError('SharedPreferences not initialized'),
-    error: (error, stack) =>
-        throw StateError('Failed to initialize SharedPreferences: $error'),
-  );
-}
-
-/// Provides DatabaseService implementation using ObjectBox
-@riverpod
-DatabaseService databaseService(Ref ref) {
-  return DatabaseService();
+Future<PreferencesService> preferencesService(Ref ref) async {
+  final preferences = await ref.watch(sharedPreferencesProvider.future);
+  return PreferencesService(preferences);
 }
 
 // Wallet providers
 /// Provides WalletRepository implementation for wallet operations
 ///
-/// Depends on [databaseServiceProvider], [secureStorageServiceProvider],
-///
-/// and [preferencesServiceProvider]
+/// Wallet profiles contain display metadata only. Native wallet state and seed
+/// material are owned by the SDK lifecycle layer.
 @riverpod
-WalletRepository walletRepository(Ref ref) {
-  return WalletRepository(
-    databaseService: ref.read(databaseServiceProvider),
-    secureStorageService: ref.read(secureStorageServiceProvider),
-    preferencesService: ref.read(preferencesServiceProvider),
-  );
+Future<WalletRepository> walletRepository(Ref ref) async {
+  final preferences = await ref.watch(preferencesServiceProvider.future);
+  return WalletRepository(preferences);
 }

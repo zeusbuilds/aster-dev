@@ -2,23 +2,28 @@ import 'dart:convert';
 
 import 'package:flutter/services.dart';
 
-import 'package:freezed_annotation/freezed_annotation.dart';
-
-part 'currency_model.freezed.dart';
-part 'currency_model.g.dart';
-
 /// Currency model representing a currency with its ISO 4217 code
-@freezed
-class CurrencyModel with _$CurrencyModel {
-  const factory CurrencyModel({
-    required String name,
-    required String symbol,
-    required String code,
-    required String countryCode,
-  }) = _CurrencyModel;
+class CurrencyModel {
+  const CurrencyModel({
+    required this.name,
+    required this.symbol,
+    required this.code,
+    required this.countryCode,
+  });
 
-  factory CurrencyModel.fromJson(Map<String, dynamic> json) =>
-      _$CurrencyModelFromJson(json);
+  factory CurrencyModel.fromJson(Map<String, Object?> json) {
+    return CurrencyModel(
+      name: json['name']! as String,
+      symbol: json['symbol']! as String,
+      code: json['code']! as String,
+      countryCode: json['countryCode']! as String,
+    );
+  }
+
+  final String name;
+  final String symbol;
+  final String code;
+  final String countryCode;
 
   // Cache for loaded currencies
   static List<CurrencyModel>? _cachedCurrencies;
@@ -33,11 +38,13 @@ class CurrencyModel with _$CurrencyModel {
       final String jsonString = await rootBundle.loadString(
         'assets/data/currencies.json',
       );
-      final List<dynamic> jsonList = json.decode(jsonString) as List<dynamic>;
+      final jsonList = json.decode(jsonString) as List<Object?>;
 
-      _cachedCurrencies = jsonList
-          .map((json) => CurrencyModel.fromJson(json as Map<String, dynamic>))
-          .toList();
+      _cachedCurrencies = List.unmodifiable(
+        jsonList.map(
+          (item) => CurrencyModel.fromJson(item! as Map<String, Object?>),
+        ),
+      );
       return _cachedCurrencies!;
     } catch (e) {
       throw Exception('Failed to load currencies: $e');
@@ -72,4 +79,16 @@ class CurrencyModel with _$CurrencyModel {
     sorted.sort((a, b) => a.name.compareTo(b.name));
     return sorted;
   }
+
+  @override
+  bool operator ==(Object other) {
+    return other is CurrencyModel &&
+        other.name == name &&
+        other.symbol == symbol &&
+        other.code == code &&
+        other.countryCode == countryCode;
+  }
+
+  @override
+  int get hashCode => Object.hash(name, symbol, code, countryCode);
 }

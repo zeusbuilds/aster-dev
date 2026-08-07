@@ -1,19 +1,29 @@
-import 'package:freezed_annotation/freezed_annotation.dart';
-
-part 'scan_state.freezed.dart';
-
 /// State for the scan screen (flash, permission, error).
 /// Zoom is driven by device lens range in [ScanScreen] (zoom factors from camera min/max).
-@freezed
-class ScanState with _$ScanState {
-  const factory ScanState({
-    /// Whether the torch/flash is on.
-    @Default(false) bool flashOn,
+class ScanState {
+  const ScanState({
+    this.flashOn = false,
+    this.permissionDenied = false,
+    this.errorMessage,
+  });
 
-    /// Whether camera permission was denied.
-    @Default(false) bool permissionDenied,
+  final bool flashOn;
+  final bool permissionDenied;
+  final String? errorMessage;
 
-    /// Error message to show (e.g. init failure, no camera).
-    String? errorMessage,
-  }) = _ScanState;
+  ScanState copyWith({
+    bool? flashOn,
+    bool? permissionDenied,
+    Object? errorMessage = _unset,
+  }) {
+    return ScanState(
+      flashOn: flashOn ?? this.flashOn,
+      permissionDenied: permissionDenied ?? this.permissionDenied,
+      errorMessage: identical(errorMessage, _unset)
+          ? this.errorMessage
+          : errorMessage as String?,
+    );
+  }
 }
+
+const _unset = Object();

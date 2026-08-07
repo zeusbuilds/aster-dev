@@ -1,87 +1,65 @@
-import 'package:objectbox/objectbox.dart';
+import 'package:flutter/foundation.dart';
 
-import '../../../../core/core.dart';
-
-/// Wallet data model for ObjectBox persistence
+/// Non-secret metadata used to identify a wallet inside the app.
 ///
-/// Represents a wallet with its ID, name, timestamps, and active status.
-///
-/// The wallet ID is deterministically generated from a seed phrase.
-@Entity()
-class WalletModel {
-  @Id()
-  int id = 0;
-
-  /// Deterministic wallet ID derived from seed phrase
-  ///
-  /// Format: "1F29A3B4 C5D6E7F8" (display format)
-  String walletId;
-
-  /// Compact wallet ID (no spaces) for storage and queries
-  @Index()
-  String compactWalletId;
-
-  /// Display name (currently derived from seed phrase)
-  String name;
-
-  /// Creation timestamp
-  @Property(type: PropertyType.date)
-  DateTime createdAt;
-
-  /// Last update timestamp
-  @Property(type: PropertyType.date)
-  DateTime updatedAt;
-
-  /// Whether this wallet is currently active
-  bool isActive;
-
-  WalletModel({
-    this.id = 0,
-    required this.walletId,
-    required this.compactWalletId,
+/// Native wallet state, credentials, and mnemonic material never belong in
+/// this model. [id] is an opaque app identifier supplied when the SDK wallet
+/// is registered; it must not be derived from seed material.
+@immutable
+class WalletProfile {
+  const WalletProfile({
+    required this.id,
     required this.name,
     required this.createdAt,
     required this.updatedAt,
     this.isActive = false,
   });
 
-  /// Factory constructor to create from seed phrase
-  factory WalletModel.fromSeedPhrase(String seedPhrase) {
-    final now = DateTime.now();
-    final compactId = WalletIdGenerator.generateCompactWalletId(seedPhrase);
-    final displayId = WalletIdGenerator.generateWalletId(seedPhrase);
-    final name = WalletIdGenerator.generateWalletName(seedPhrase);
-
-    return WalletModel(
-      walletId: displayId,
-      compactWalletId: compactId,
-      name: name,
-      createdAt: now,
-      updatedAt: now,
-      isActive: false,
+  factory WalletProfile.fromJson(Map<String, Object?> json) {
+    return WalletProfile(
+      id: json['id']! as String,
+      name: json['name']! as String,
+      createdAt: DateTime.parse(json['createdAt']! as String).toUtc(),
+      updatedAt: DateTime.parse(json['updatedAt']! as String).toUtc(),
+      isActive: json['isActive'] as bool? ?? false,
     );
   }
 
-  /// Creates a copy of this wallet model with updated fields
-  ///
-  /// All parameters are optional - only provided fields will be updated
-  ///
-  /// Returns a new WalletModel instance with the updated values
-  WalletModel copyWith({
-    int? id,
-    String? walletId,
-    String? compactWalletId,
-    String? name,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-    bool? isActive,
-  }) {
-    return WalletModel(
-      id: id ?? this.id,
-      walletId: walletId ?? this.walletId,
-      compactWalletId: compactWalletId ?? this.compactWalletId,
+  /// Opaque identifier that is unrelated to mnemonic or key material.
+  final String id;
+
+  /// User-facing wallet name.
+  final String name;
+
+  /// UTC creation time.
+  final DateTime createdAt;
+
+  /// UTC time of the latest profile change.
+  final DateTime updatedAt;
+
+  /// Whether this is the selected wallet in the persisted registry snapshot.
+  final bool isActive;
+
+  /// A compact identifier suitable for display, never for authentication.
+  String get displayId {
+    final normalized = id.replaceAll('-', '').toUpperCase();
+    if (normalized.length <= 12) return normalized;
+    return '${normalized.substring(0, 6)} ${normalized.substring(normalized.length - 6)}';
+  }
+
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'name': name,
+    'createdAt': createdAt.toUtc().toIso8601String(),
+    'updatedAt': updatedAt.toUtc().toIso8601String(),
+    'isActive': isActive,
+  };
+
+  WalletProfile copyWith({String? name, DateTime? updatedAt, bool? isActive}) {
+    return WalletProfile(
+      id: id,
       name: name ?? this.name,
-      createdAt: createdAt ?? this.createdAt,
+      createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isActive: isActive ?? this.isActive,
     );

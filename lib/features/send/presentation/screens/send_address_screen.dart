@@ -45,7 +45,7 @@ class _SendAddressScreenState extends State<SendAddressScreen> {
           leadingIcon: true,
           centerTitle: false,
           action: IconButton(
-            onPressed: () => _openScan(context),
+            onPressed: () async => _openScan(context),
             icon: Icon(
               MingCuteIcons.mgc_scan_line,
               size: icons.sm,
@@ -66,9 +66,7 @@ class _SendAddressScreenState extends State<SendAddressScreen> {
               const Spacer(),
               CustomButton(
                 text: 'Continue',
-                onTap: () {
-                  context.pushNamed(RouteNames.send);
-                },
+                onTap: () async => context.pushNamed(RouteNames.send),
               ),
               SizedBox(height: context.spacing.bottomSafe(context)),
             ],

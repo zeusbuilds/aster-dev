@@ -13,7 +13,7 @@ class PreferencesService {
 
   /// Stores a string [value] for the given [key].
   Future<void> setString(String key, String value) async =>
-      await _prefs.setString(key, value);
+      _prefs.setString(key, value);
 
   /// Retrieves a boolean value for the given [key].
   ///
@@ -22,7 +22,7 @@ class PreferencesService {
 
   /// Stores a boolean [value] for the given [key].
   Future<void> setBool(String key, bool value) async =>
-      await _prefs.setBool(key, value);
+      _prefs.setBool(key, value);
 
   /// Retrieves an integer value for the given [key].
   ///
@@ -30,8 +30,7 @@ class PreferencesService {
   Future<int?> getInt(String key) async => _prefs.getInt(key);
 
   /// Stores an integer [value] for the given [key].
-  Future<void> setInt(String key, int value) async =>
-      await _prefs.setInt(key, value);
+  Future<void> setInt(String key, int value) async => _prefs.setInt(key, value);
 
   /// Retrieves a double value for the given [key].
   ///
@@ -40,7 +39,7 @@ class PreferencesService {
 
   /// Stores a double [value] for the given [key].
   Future<void> setDouble(String key, double value) async =>
-      await _prefs.setDouble(key, value);
+      _prefs.setDouble(key, value);
 
   /// Retrieves a list of strings for the given [key].
   ///
@@ -50,13 +49,13 @@ class PreferencesService {
 
   /// Stores a list of strings [value] for the given [key].
   Future<void> setStringList(String key, List<String> value) async =>
-      await _prefs.setStringList(key, value);
+      _prefs.setStringList(key, value);
 
   /// Removes the value associated with the given [key].
-  Future<void> remove(String key) async => await _prefs.remove(key);
+  Future<void> remove(String key) async => _prefs.remove(key);
 
   /// Clears all stored preferences.
-  Future<void> clear() async => await _prefs.clear();
+  Future<void> clear() async => _prefs.clear();
 
   /// Returns `true` if the given [key] exists in preferences.
   Future<bool> containsKey(String key) async => _prefs.containsKey(key);

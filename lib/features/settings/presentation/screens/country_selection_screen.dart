@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../../shared/shared.dart';
@@ -23,20 +25,22 @@ class _CountrySelectionScreenState extends State<CountrySelectionScreen> {
   @override
   void initState() {
     super.initState();
-    _loadCountries();
+    unawaited(_loadCountries());
     // TODO: Load selected country from storage
   }
 
   Future<void> _loadCountries() async {
     try {
       final countries = await CountryModel.getAllSorted();
+      if (!mounted) return;
       setState(() {
         _countries = countries;
         _isLoading = false;
       });
-    } catch (e) {
+    } on Exception catch (error) {
+      if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = error.runtimeType.toString();
         _isLoading = false;
       });
     }

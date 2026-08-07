@@ -1,6 +1,6 @@
 # Development Setup
 
-This guide will help you set up the Aster development environment.
+This guide explains how to set up the UTEXO wallet development environment.
 
 ## First-Time Setup
 
@@ -94,28 +94,31 @@ From the project root:
 ./scripts/install-git-hooks.sh
 ```
 
-After this, each `git commit` will:
-
-1. Run import path conversion and import sorting (`import_path_converter`, `import_sorter`).
-2. Run `dart format .` (reformat code).
-3. If any file was changed by imports or format, the commit is aborted. Run `git add -u && git commit` again to include the updated code.
-4. Run `flutter analyze --no-fatal-warnings --no-fatal-infos`. The commit is aborted only if there are **errors** (warnings do not block the commit).
+After this, each `git commit` regenerates ignored generated sources, verifies
+formatting without mutating files, runs analysis with every diagnostic fatal,
+and verifies the production tracker inventory.
 
 ### Manual commands
 
-- `make imports` - Convert and sort import paths
-- `make format`  - Format Dart code
-- `make analyze` - Run static analysis (fails only on errors)
-- `make lint`    - Imports, format and analyze (same as pre-commit)
+- `make format` - Format Dart code
+- `make format-check` - Verify formatting without changing files
+- `make analyze` - Run static analysis with warnings and infos fatal
+- `make verify-generated` - Regenerate ignored generated Dart sources
+- `make verify` - Verify repository invariants and tracker inventory
+- `make lint` - Run all non-mutating pre-commit quality gates
 
 ### CI (GitHub Actions)
 
 On push to `main` and on pull requests, the **Dart** workflow runs:
 
-- `dart format --set-exit-if-changed .` (fails if code is unformatted)
-- `flutter analyze` (fails on errors/warnings)
+- `dart format --output=none --set-exit-if-changed .`
+- `dart run build_runner build`
+- `flutter analyze --fatal-warnings --fatal-infos`
+- `flutter test`
+- `dart run tool/verify_production_tracker.dart`
 
-Fix failures locally with `make imports`, `make format`, and/or address analyzer errors, then commit and push again.
+Fix failures locally with `make format`, `make lint`, and `make test`, then
+commit and push again.
 
 ## Available Commands
 
@@ -127,10 +130,12 @@ Fix failures locally with `make imports`, `make format`, and/or address analyzer
 - `make watch`      - Run build_runner in watch mode
 - `make run`        - Run Flutter app
 - `make test`       - Run Flutter tests
-- `make imports`    - Convert and sort import paths
 - `make format`     - Format Dart code
-- `make analyze`    - Run static analysis (fails only on errors)
-- `make lint`       - Imports, format and analyze (run before commit)
+- `make format-check` - Verify formatting without changing files
+- `make analyze`    - Run static analysis with all diagnostics fatal
+- `make verify-generated` - Regenerate ignored generated Dart sources
+- `make verify`     - Verify repository invariants
+- `make lint`       - Run all pre-commit quality gates
 - `make help`       - Show all available commands
 
 ## Troubleshooting
@@ -152,13 +157,22 @@ make bootstrap
 
 This project uses [Nix Flakes](https://nixos.wiki/wiki/Flakes) to provide a reproducible development environment for core tooling. The environment includes:
 
-- Flutter 3.38.9
-- Dart SDK 3.10.x
+- Flutter 3.44.9
+- Dart SDK 3.12.2
 - Android SDK with build tools
 - Java JDK 21
 - CocoaPods (macOS only)
 
-Flutter itself is managed via [FVM](https://fvm.app/) and **pinned per project** using the `.fvmrc` file (currently `flutterSdkVersion: 3.38.9`). This keeps the Flutter version consistent across all developers without relying on the Nix store.
+Flutter itself is managed via [FVM](https://fvm.app/) and pinned per project
+using `.fvmrc` (`flutterSdkVersion: 3.44.9`). This keeps the Flutter version
+consistent across developers without relying on the Nix store.
+
+## Local SDK Development
+
+The committed dependency always points to the immutable public UTEXO SDK
+commit. For temporary SDK development only, see
+`docs/architecture/SDK_INTEGRATION.md`. Never commit a path dependency or a
+`dependency_overrides` entry.
 
 ## Resources
 

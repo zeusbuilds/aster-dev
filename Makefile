@@ -1,4 +1,4 @@
-.PHONY: shell bootstrap clean build watch run test imports format analyze lint fvm-setup help
+.PHONY: shell bootstrap clean build watch run test format format-check analyze verify verify-generated lint fvm-setup help
 
 # Default target
 help:
@@ -11,10 +11,12 @@ help:
 	@echo "  make watch     - Run build_runner in watch mode"
 	@echo "  make run       - Run Flutter app"
 	@echo "  make test      - Run Flutter tests"
-	@echo "  make imports   - Convert and sort import paths"
 	@echo "  make format    - Format Dart code"
+	@echo "  make format-check - Verify Dart formatting without changing files"
 	@echo "  make analyze   - Run static analysis"
-	@echo "  make lint      - Imports, format and analyze (run before commit)"
+	@echo "  make verify    - Verify generated code and tracker inventory"
+	@echo "  make verify-generated - Regenerate ignored generated sources"
+	@echo "  make lint      - Run all non-mutating quality checks"
 
 # Enter Nix development environment
 shell:
@@ -26,7 +28,7 @@ bootstrap: clean
 	@echo "Setting up project..."
 	fvm flutter pub get
 	@echo "Running build_runner..."
-	fvm flutter pub run build_runner build --delete-conflicting-outputs
+	fvm dart run build_runner build
 	@echo "Setup complete!"
 
 # Clean Flutter build artifacts
@@ -37,12 +39,12 @@ clean:
 # Run build_runner to generate code
 build:
 	@echo "Running build_runner..."
-	fvm flutter pub run build_runner build --delete-conflicting-outputs
+	fvm dart run build_runner build
 
 # Run build_runner in watch mode
 watch:
 	@echo "Running build_runner in watch mode..."
-	fvm flutter pub run build_runner watch --delete-conflicting-outputs
+	fvm dart run build_runner watch
 
 # Run Flutter app
 run:
@@ -54,25 +56,33 @@ test:
 	@echo "Running Flutter tests..."
 	fvm flutter test
 
-# Convert and sort import paths
-imports:
-	@echo "Converting import paths..."
-	fvm flutter pub run import_path_converter:main
-	@echo "Sorting imports..."
-	fvm flutter pub run import_sorter:main
-
 # Format Dart code
 format:
 	@echo "Formatting Dart code..."
 	fvm dart format .
 
-# Run static analysis (fail only on errors, not warnings)
+# Verify formatting without mutating the worktree.
+format-check:
+	@echo "Checking Dart formatting..."
+	fvm dart format --output=none --set-exit-if-changed .
+
+# Run static analysis with all diagnostics fatal.
 analyze:
 	@echo "Running static analysis..."
-	fvm flutter analyze --no-fatal-warnings --no-fatal-infos
+	fvm flutter analyze --fatal-warnings --fatal-infos
 
-# Imports, format and analyze (for pre-commit / CI)
-lint: imports format analyze
+# Verify repository invariants that are not covered by the analyzer.
+verify:
+	@echo "Verifying production tracker inventory..."
+	fvm dart run tool/verify_production_tracker.dart
+
+# Generated Dart sources are intentionally ignored and recreated from source.
+verify-generated:
+	@echo "Verifying generated Dart sources..."
+	fvm dart run build_runner build
+
+# Quality checks suitable for pre-commit and CI.
+lint: format-check verify-generated analyze verify
 
 # One-time FVM setup for this project
 fvm-setup:

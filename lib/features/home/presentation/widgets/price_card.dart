@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:intl/intl.dart';
@@ -23,42 +25,52 @@ class _PriceCardState extends State<PriceCard> {
   List<ChartDataItem>? _chartData;
   double? _currentPrice;
   double? _priceChange;
-  bool _hasFetched = false; // Track if we've already fetched data
+  bool _hasFetched = false;
+  bool _loadFailed = false;
 
   @override
   void initState() {
     super.initState();
-    _fetchPriceData();
+    unawaited(_fetchPriceData());
   }
 
   Future<void> _fetchPriceData() async {
     // Only fetch once
     if (_hasFetched) return;
+    _hasFetched = true;
 
     try {
-      // Import the service
       final chartData = await BitcoinPriceService.fetchTodayPriceData();
       final currentPrice = await BitcoinPriceService.fetchCurrentPrice();
       final priceChange = BitcoinPriceService.calculatePriceChange(chartData);
+      final loadFailed = chartData.isEmpty || currentPrice == null;
 
       if (mounted) {
         setState(() {
           _chartData = chartData;
           _currentPrice = currentPrice;
           _priceChange = priceChange;
-          _hasFetched = true; // Mark as fetched
+          _loadFailed = loadFailed;
         });
       }
-    } catch (e) {
-      // ignore: avoid_print
-      print('Error loading price data: $e');
+    } on Exception {
       if (mounted) {
         setState(() {
-          _hasFetched =
-              true; // Mark as fetched even on error to prevent retries
+          _loadFailed = true;
         });
       }
     }
+  }
+
+  Future<void> _retry() async {
+    setState(() {
+      _hasFetched = false;
+      _loadFailed = false;
+      _chartData = null;
+      _currentPrice = null;
+      _priceChange = null;
+    });
+    await _fetchPriceData();
   }
 
   /// Formats price as currency string (e.g., "$100,000")
@@ -149,10 +161,22 @@ class _PriceCardState extends State<PriceCard> {
             ],
           ),
         ),
-        CandleChart(
-          data: _chartData ?? [],
-          isSkeleton: _chartData == null || _chartData!.isEmpty,
-        ),
+        if (_loadFailed)
+          Padding(
+            padding: EdgeInsets.all(spacing.lg),
+            child: Column(
+              children: [
+                Text('Price data unavailable', style: type.brandMetric),
+                SizedBox(height: spacing.md),
+                CustomButton.compact(text: 'Retry', onTap: _retry),
+              ],
+            ),
+          )
+        else
+          CandleChart(
+            data: _chartData ?? [],
+            isSkeleton: _chartData == null || _chartData!.isEmpty,
+          ),
       ],
     );
   }

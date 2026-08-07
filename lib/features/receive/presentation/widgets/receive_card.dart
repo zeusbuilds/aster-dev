@@ -1,6 +1,5 @@
-import 'package:flutter/material.dart';
-
 import 'package:country_flags/country_flags.dart';
+import 'package:flutter/material.dart';
 import 'package:unicons/unicons.dart';
 
 import '../../../../shared/shared.dart';

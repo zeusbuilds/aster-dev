@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
-
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../theme/theme.dart';
 import 'route_config.dart';
 import 'route_paths.dart';
-import '../theme/theme.dart';
 
 part 'app_router.g.dart';
 
 /// App router provider
 @riverpod
-GoRouter appRouter(AppRouterRef ref) {
+GoRouter appRouter(Ref ref) {
   return GoRouter(
     initialLocation: RoutePaths.skeleton,
     routes: RouteConfig.getRoutes(),

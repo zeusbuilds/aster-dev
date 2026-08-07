@@ -1,8 +1,8 @@
+import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
-
 import 'package:collection/collection.dart';
+import 'package:flutter/material.dart';
 
 import '../../../../shared/shared.dart';
 import '../../data/models/chart_data_item.dart';
@@ -45,6 +45,8 @@ class _CandleChartState extends State<CandleChart>
   double? _minPrice;
   double? _maxPrice;
   double? _priceRange;
+  Timer? _transitionDelayTimer;
+  Timer? _transitionPauseTimer;
 
   @override
   void initState() {
@@ -53,7 +55,8 @@ class _CandleChartState extends State<CandleChart>
     _loadingController = AnimationController(
       vsync: this,
       duration: motion.chartLoadingCycleDuration,
-    )..repeat();
+    );
+    unawaited(_loadingController.repeat());
 
     _transitionController = AnimationController(
       vsync: this,
@@ -93,7 +96,8 @@ class _CandleChartState extends State<CandleChart>
       final remainingTime =
           remainingProgress * motion.chartLoadingCycleDuration.inMilliseconds;
 
-      Future.delayed(
+      _transitionDelayTimer?.cancel();
+      _transitionDelayTimer = Timer(
         Duration(
           milliseconds:
               remainingTime.toInt() +
@@ -104,14 +108,18 @@ class _CandleChartState extends State<CandleChart>
             _loadingController.stop();
             _loadingAnimationProgress = _loadingController.value;
 
-            Future.delayed(motion.chartTransitionPauseDuration, () {
-              if (mounted && _dataReady && _candles != null) {
-                setState(() {
-                  _isTransitioning = true;
-                });
-                _transitionController.forward();
-              }
-            });
+            _transitionPauseTimer?.cancel();
+            _transitionPauseTimer = Timer(
+              motion.chartTransitionPauseDuration,
+              () {
+                if (mounted && _dataReady && _candles != null) {
+                  setState(() {
+                    _isTransitioning = true;
+                  });
+                  unawaited(_transitionController.forward());
+                }
+              },
+            );
           }
         },
       );
@@ -123,6 +131,7 @@ class _CandleChartState extends State<CandleChart>
     super.didUpdateWidget(oldWidget);
 
     if (oldWidget.isSkeleton && !widget.isSkeleton) {
+      _cancelPendingTransition();
       _prepareChartData();
       _dataReady = true;
       _transitionTriggered = false;
@@ -131,6 +140,7 @@ class _CandleChartState extends State<CandleChart>
       _loadingAnimationProgress = null;
       _transitionController.reset();
     } else if (widget.isSkeleton) {
+      _cancelPendingTransition();
       _dataReady = false;
       _transitionTriggered = false;
       _shouldShowLoading = true;
@@ -162,10 +172,18 @@ class _CandleChartState extends State<CandleChart>
 
   @override
   void dispose() {
+    _cancelPendingTransition();
     _loadingController.removeListener(_checkAnimationProgress);
     _loadingController.dispose();
     _transitionController.dispose();
     super.dispose();
+  }
+
+  void _cancelPendingTransition() {
+    _transitionDelayTimer?.cancel();
+    _transitionDelayTimer = null;
+    _transitionPauseTimer?.cancel();
+    _transitionPauseTimer = null;
   }
 
   @override

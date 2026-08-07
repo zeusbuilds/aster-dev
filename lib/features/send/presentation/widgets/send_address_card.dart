@@ -133,13 +133,11 @@ class _SendAddressCardState extends State<SendAddressCard> {
                             _addressController.clear();
                           });
                         }
-                      : () {
-                          Clipboard.getData('text/plain').then((value) {
-                            if (value != null && value.text != null) {
-                              setState(() {
-                                _addressController.text = value.text!;
-                              });
-                            }
+                      : () async {
+                          final value = await Clipboard.getData('text/plain');
+                          if (!mounted || value?.text == null) return;
+                          setState(() {
+                            _addressController.text = value!.text!;
                           });
                         },
                   child: Squircle(

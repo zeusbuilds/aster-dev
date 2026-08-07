@@ -1,6 +1,7 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
 import 'package:custom_numeric_pad/custom_numpad_package.dart';
+import 'package:flutter/material.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
 
 import '../../../../shared/shared.dart';
@@ -25,6 +26,8 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
   late Animation<double> _swapTextFadeAnimation;
   bool _showDetails = false;
   bool _showKeyboard = true;
+  Timer? _continueTimer;
+  Timer? _cancelTimer;
 
   final List<Map<String, String>> _detailRows = [
     {'title': 'SideSwap service fee', 'value': '\$0.0001'},
@@ -102,6 +105,8 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _continueTimer?.cancel();
+    _cancelTimer?.cancel();
     _detailsAnimationController.dispose();
     _detailsFadeOutController.dispose();
     _swapTextAnimationController.dispose();
@@ -113,6 +118,7 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
   /// Hides keyboard, shows swap details with staggered animation, and displays cancel option
   void _onContinueTap() {
     if (!_showKeyboard) return;
+    _cancelTimer?.cancel();
 
     final motion = context.motion;
 
@@ -126,24 +132,16 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
 
     // Phase 2: Swap text becomes visible (takes space, but opacity 0)
     // This triggers AnimatedSize to grow the Column, smoothly moving button up
-    Future.delayed(motion.swapKeyboardTransitionDuration, () {
+    _continueTimer?.cancel();
+    _continueTimer = Timer(motion.swapKeyboardTransitionDuration, () {
       if (mounted) {
-        // Text is already in tree, AnimatedSize will grow Column
-        // Then fade in the text
-        _swapTextAnimationController.forward();
-      }
-    });
-
-    // Phase 3: Show details with animation after keyboard fade completes
-    Future.delayed(motion.swapKeyboardTransitionDuration, () {
-      if (mounted) {
-        // Reset animations to start fresh
+        unawaited(_swapTextAnimationController.forward());
         _detailsAnimationController.reset();
         _detailsFadeOutController.reset();
         setState(() {
           _showDetails = true;
         });
-        _detailsAnimationController.forward();
+        unawaited(_detailsAnimationController.forward());
       }
     });
   }
@@ -157,29 +155,33 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
     final motion = context.motion;
 
     // Phase 1: Fade out all detail rows at once
-    _detailsFadeOutController.forward().then((_) {
-      if (mounted) {
-        setState(() {
-          _showDetails = false;
-        });
-        // Reset both animation controllers for next time
-        _detailsAnimationController.reset();
-        _detailsFadeOutController.reset();
-      }
-    });
+    _continueTimer?.cancel();
+    unawaited(_hideDetails());
 
     // Phase 2: Fade out cancel text (start slightly after details start fading)
-    Future.delayed(motion.swapCancelStaggerDelay, () {
+    _cancelTimer?.cancel();
+    _cancelTimer = Timer(motion.swapCancelStaggerDelay, () {
       if (mounted) {
-        _swapTextAnimationController.reverse().then((_) {
-          if (mounted) {
-            // Phase 3: Show keyboard again
-            setState(() {
-              _showKeyboard = true;
-            });
-          }
-        });
+        unawaited(_restoreKeyboard());
       }
+    });
+  }
+
+  Future<void> _hideDetails() async {
+    await _detailsFadeOutController.forward();
+    if (!mounted) return;
+    setState(() {
+      _showDetails = false;
+    });
+    _detailsAnimationController.reset();
+    _detailsFadeOutController.reset();
+  }
+
+  Future<void> _restoreKeyboard() async {
+    await _swapTextAnimationController.reverse();
+    if (!mounted) return;
+    setState(() {
+      _showKeyboard = true;
     });
   }
 
