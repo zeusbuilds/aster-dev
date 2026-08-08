@@ -22,4 +22,7 @@ class RouteNames {
   static const String walletSelection = 'walletSelection';
   static const String countrySelection = 'countrySelection';
   static const String currencySelection = 'currencySelection';
+  static const String bitcoinUnitSelection = 'bitcoinUnitSelection';
+  static const String advancedSettings = 'advancedSettings';
+  static const String networkConfiguration = 'networkConfiguration';
 }

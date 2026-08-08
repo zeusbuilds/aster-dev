@@ -1,16 +1,15 @@
-import 'dart:async';
-
 import 'package:circle_flags/circle_flags.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../shared/shared.dart';
+import '../../domain/models/models.dart';
 
 /// Widget representing a single currency option in the currency selection list
 ///
 /// Shows currency flag, name, symbol, code, and selection indicator
 class CurrencySelectOptionRow extends StatelessWidget {
   /// The currency model to display
-  final CurrencyModel currency;
+  final FiatCurrency currency;
 
   /// Callback when the row is tapped
   final VoidCallback? onTap;
@@ -32,11 +31,6 @@ class CurrencySelectOptionRow extends StatelessWidget {
     final type = context.type;
     final effectiveOnTap = selected ? null : onTap;
 
-    void select() {
-      unawaited(context.haptics.trigger(HapticIntent.selection));
-      effectiveOnTap?.call();
-    }
-
     return Semantics(
       button: true,
       enabled: effectiveOnTap != null,
@@ -46,7 +40,7 @@ class CurrencySelectOptionRow extends StatelessWidget {
       child: Material(
         color: context.appColors.transparentSurface,
         child: InkWell(
-          onTap: effectiveOnTap == null ? null : select,
+          onTap: effectiveOnTap,
           child: Padding(
             padding: EdgeInsets.symmetric(
               horizontal: spacing.screenPadding,

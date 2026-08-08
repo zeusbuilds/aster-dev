@@ -1,122 +1,150 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../core/errors/errors.dart';
 import '../../../../shared/shared.dart';
+import '../../domain/models/models.dart';
+import '../models/models.dart';
+import '../view_model/view_models.dart';
 import '../widgets/widgets.dart';
 
-/// Screen for selecting a country
-///
-/// Displays a scrollable list of countries with flags and names
-class CountrySelectionScreen extends StatefulWidget {
+/// Persists the region used for localization and regional defaults.
+class CountrySelectionScreen extends ConsumerWidget {
   const CountrySelectionScreen({super.key});
 
   @override
-  State<CountrySelectionScreen> createState() => _CountrySelectionScreenState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsViewModelProvider);
+    return Scaffold(
+      backgroundColor: context.colorScheme.surface,
+      appBar: const CustomAppBar(title: 'Select Region', leadingIcon: true),
+      body: settings.when(
+        skipLoadingOnRefresh: false,
+        data: (state) => _RegionList(state: state),
+        loading: () => const _RegionLoading(),
+        error: (error, _) => _RegionLoadFailure(
+          message: FailureMapper.from(error, StackTrace.current).userMessage,
+          onRetry: () => ref.read(settingsViewModelProvider.notifier).retry(),
+        ),
+      ),
+    );
+  }
 }
 
-class _CountrySelectionScreenState extends State<CountrySelectionScreen> {
-  final ScrollController _scrollController = ScrollController();
-  List<CountryModel> _countries = [];
-  bool _isLoading = true;
-  String? _error;
-  String? _selectedCountryCode;
+class _RegionList extends ConsumerWidget {
+  const _RegionList({required this.state});
+
+  final SettingsState state;
 
   @override
-  void initState() {
-    super.initState();
-    unawaited(_loadCountries());
-    // TODO: Load selected country from storage
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selectedCode = state.snapshot.preferences.regionCode;
+    final saving = state.operation == SettingsOperation.region;
+    return Stack(
+      children: [
+        SafeArea(
+          top: false,
+          minimum: EdgeInsets.only(bottom: context.spacing.lg),
+          child: ListView.separated(
+            itemCount: state.snapshot.regions.length,
+            separatorBuilder: (context, index) => const AsterDivider.inset(),
+            itemBuilder: (context, index) {
+              final region = state.snapshot.regions[index];
+              return CountrySelectOptionRow(
+                country: region,
+                selected: selectedCode == region.code,
+                onTap: saving
+                    ? null
+                    : () => unawaited(_selectRegion(context, ref, region.code)),
+              );
+            },
+          ),
+        ),
+        if (saving)
+          Semantics(
+            liveRegion: true,
+            label: 'Saving preference',
+            child: LinearProgressIndicator(),
+          ),
+      ],
+    );
   }
 
-  Future<void> _loadCountries() async {
-    try {
-      final countries = await CountryModel.getAllSorted();
-      if (!mounted) return;
-      setState(() {
-        _countries = countries;
-        _isLoading = false;
-      });
-    } on Exception catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _error = error.runtimeType.toString();
-        _isLoading = false;
-      });
+  Future<void> _selectRegion(
+    BuildContext context,
+    WidgetRef ref,
+    String code,
+  ) async {
+    final saved = await ref
+        .read(settingsViewModelProvider.notifier)
+        .selectRegion(code);
+    if (!context.mounted) return;
+    if (saved) {
+      unawaited(context.haptics.trigger(HapticIntent.selection));
+      context.pop();
+      return;
+    }
+    unawaited(context.haptics.trigger(HapticIntent.error));
+    final failure = ref.read(settingsViewModelProvider).value?.operationFailure;
+    if (failure != null) {
+      context.toasts.show(
+        title: 'Region not saved',
+        message: failure.userMessage,
+        variant: ToastVariant.failure,
+      );
     }
   }
+}
 
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  void _onCountrySelected(CountryModel country) {
-    setState(() {
-      _selectedCountryCode = country.code;
-    });
-    // TODO: Save selected country and navigate back
-    Navigator.of(context).pop(country);
-  }
+class _RegionLoading extends StatelessWidget {
+  const _RegionLoading();
 
   @override
   Widget build(BuildContext context) {
-    final spacing = context.spacing;
-    final type = context.type;
+    return AppSkeletonizer(
+      enabled: true,
+      child: ListView.separated(
+        itemCount: 8,
+        separatorBuilder: (context, index) => const AsterDivider.inset(),
+        itemBuilder: (context, index) => CountrySelectOptionRow(
+          country: Region(name: 'Loading region', code: 'US'),
+          selected: false,
+        ),
+      ),
+    );
+  }
+}
 
-    return Scaffold(
-      backgroundColor: context.colorScheme.surface,
-      appBar: const CustomAppBar(title: 'Select Country', leadingIcon: true),
-      body: _isLoading
-          ? Center(
-              child: CircularProgressIndicator(
-                color: context.colorScheme.primary,
-              ),
-            )
-          : _error != null
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('Error loading countries', style: type.errorMessage),
-                  SizedBox(height: spacing.lg),
-                  CustomButton(text: 'Retry', onTap: _loadCountries),
-                ],
-              ),
-            )
-          : ScrollbarTheme(
-              data: ScrollbarThemeData(
-                thumbColor: WidgetStateProperty.all(
-                  context.colorScheme.primary,
-                ),
-              ),
-              child: SafeArea(
-                top: false,
-                minimum: EdgeInsets.only(bottom: spacing.lg),
-                child: Scrollbar(
-                  controller: _scrollController,
-                  thumbVisibility: false,
-                  child: ListView.separated(
-                    controller: _scrollController,
-                    itemCount: _countries.length,
-                    separatorBuilder: (context, index) =>
-                        const AsterDivider.inset(),
-                    itemBuilder: (context, index) {
-                      final country = _countries[index];
+class _RegionLoadFailure extends StatelessWidget {
+  const _RegionLoadFailure({required this.message, required this.onRetry});
 
-                      return CountrySelectOptionRow(
-                        country: country,
-                        selected: _selectedCountryCode == country.code,
-                        onTap: () {
-                          _onCountrySelected(country);
-                        },
-                      );
-                    },
-                  ),
-                ),
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Center(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.all(context.spacing.screenPadding),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                message,
+                style: context.type.errorMessage,
+                textAlign: TextAlign.center,
               ),
-            ),
+              SizedBox(height: context.spacing.xxl),
+              CustomButton(text: 'Retry', onTap: onRetry),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

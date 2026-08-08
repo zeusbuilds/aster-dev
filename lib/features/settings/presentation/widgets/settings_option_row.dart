@@ -75,7 +75,14 @@ class SettingsOptionRow extends StatelessWidget {
               Expanded(child: Text(title, style: type.rowTitle, maxLines: 1)),
               SizedBox(width: spacing.lg),
               if (details != null) ...[
-                Text(details!, style: type.rowValue),
+                Flexible(
+                  child: Text(
+                    details!,
+                    style: type.rowValue,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
                 SizedBox(width: spacing.sm),
               ],
               Icon(

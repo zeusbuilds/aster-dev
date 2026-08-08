@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../features/settings/data/repository/repository.dart';
 import '../../features/wallet/data/repository/repository.dart';
 import '../../features/wallet/data/runtime/runtime.dart';
 import '../../features/wallet/data/storage/storage.dart';
@@ -13,6 +15,9 @@ import '../network/network.dart';
 import '../storage/storage.dart';
 
 part 'providers.g.dart';
+
+@riverpod
+AssetBundle appAssetBundle(Ref ref) => rootBundle;
 
 @riverpod
 Future<SharedPreferences> sharedPreferences(Ref ref) {
@@ -28,6 +33,12 @@ SecureKeyValueStore secureStorageService(Ref ref) {
 Future<PreferencesService> preferencesService(Ref ref) async {
   final preferences = await ref.watch(sharedPreferencesProvider.future);
   return PreferencesService(preferences);
+}
+
+@riverpod
+Future<SettingsRepository> settingsRepository(Ref ref) async {
+  final preferences = await ref.watch(preferencesServiceProvider.future);
+  return SettingsRepository(preferences, ref.watch(appAssetBundleProvider));
 }
 
 @Riverpod(keepAlive: true)

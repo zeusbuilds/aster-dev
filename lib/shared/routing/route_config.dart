@@ -107,6 +107,23 @@ class RouteConfig {
             name: RouteNames.currencySelection,
             builder: (context, state) => const CurrencySelectionScreen(),
           ),
+          GoRoute(
+            path: RoutePaths.bitcoinUnitSelection,
+            name: RouteNames.bitcoinUnitSelection,
+            builder: (context, state) => const BitcoinUnitSelectionScreen(),
+          ),
+          GoRoute(
+            path: RoutePaths.advancedSettings,
+            name: RouteNames.advancedSettings,
+            builder: (context, state) => const AdvancedSettingsScreen(),
+            routes: [
+              GoRoute(
+                path: RoutePaths.networkConfiguration,
+                name: RouteNames.networkConfiguration,
+                builder: (context, state) => const NetworkConfigurationScreen(),
+              ),
+            ],
+          ),
         ],
       ),
     ];

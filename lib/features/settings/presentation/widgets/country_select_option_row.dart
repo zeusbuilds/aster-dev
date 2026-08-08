@@ -1,16 +1,15 @@
-import 'dart:async';
-
-import 'package:country_flags/country_flags.dart';
+import 'package:circle_flags/circle_flags.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../shared/shared.dart';
+import '../../domain/models/models.dart';
 
 /// Widget representing a single country option in the country selection list
 ///
 /// Shows country flag, name, and selection indicator
 class CountrySelectOptionRow extends StatelessWidget {
   /// The country model to display
-  final CountryModel country;
+  final Region country;
 
   /// Callback when the row is tapped
   final VoidCallback? onTap;
@@ -32,11 +31,6 @@ class CountrySelectOptionRow extends StatelessWidget {
     final metrics = context.metrics;
     final effectiveOnTap = selected ? null : onTap;
 
-    void select() {
-      unawaited(context.haptics.trigger(HapticIntent.selection));
-      effectiveOnTap?.call();
-    }
-
     return Semantics(
       button: true,
       enabled: effectiveOnTap != null,
@@ -46,7 +40,7 @@ class CountrySelectOptionRow extends StatelessWidget {
       child: Material(
         color: context.appColors.transparentSurface,
         child: InkWell(
-          onTap: effectiveOnTap == null ? null : select,
+          onTap: effectiveOnTap,
           child: Padding(
             padding: EdgeInsets.symmetric(
               horizontal: spacing.screenPadding,
@@ -54,14 +48,7 @@ class CountrySelectOptionRow extends StatelessWidget {
             ),
             child: Row(
               children: [
-                CountryFlag.fromCountryCode(
-                  country.code,
-                  theme: ImageTheme(
-                    shape: Circle(),
-                    height: metrics.flagSize,
-                    width: metrics.flagSize,
-                  ),
-                ),
+                CircleFlag(country.code, size: metrics.flagSize),
                 SizedBox(width: spacing.lg),
                 Expanded(
                   child: Text(

@@ -1,0 +1,34 @@
+import 'package:flutter/foundation.dart';
+
+import 'app_preferences.dart';
+import 'fiat_currency.dart';
+import 'region.dart';
+
+/// Atomic settings read model containing preferences and validated catalogs.
+@immutable
+final class SettingsSnapshot {
+  SettingsSnapshot({
+    required this.preferences,
+    required List<FiatCurrency> currencies,
+    required List<Region> regions,
+  }) : currencies = List<FiatCurrency>.unmodifiable(currencies),
+       regions = List<Region>.unmodifiable(regions);
+
+  final AppPreferences preferences;
+  final List<FiatCurrency> currencies;
+  final List<Region> regions;
+
+  FiatCurrency get selectedCurrency =>
+      currencies.singleWhere((item) => item.code == preferences.currencyCode);
+
+  Region get selectedRegion =>
+      regions.singleWhere((item) => item.code == preferences.regionCode);
+
+  SettingsSnapshot copyWith({AppPreferences? preferences}) {
+    return SettingsSnapshot(
+      preferences: preferences ?? this.preferences,
+      currencies: currencies,
+      regions: regions,
+    );
+  }
+}

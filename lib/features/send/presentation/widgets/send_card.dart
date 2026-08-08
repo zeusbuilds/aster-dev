@@ -1,4 +1,4 @@
-import 'package:country_flags/country_flags.dart';
+import 'package:circle_flags/circle_flags.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -109,14 +109,7 @@ class SendCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              SizedBox(
-                width: metrics.compactFlagSize,
-                height: metrics.compactFlagSize,
-                child: CountryFlag.fromCountryCode(
-                  'US',
-                  theme: const ImageTheme(shape: Circle()),
-                ),
-              ),
+              CircleFlag('US', size: metrics.compactFlagSize),
               SizedBox(width: spacing.sm),
               Text(fiatCurrency, style: type.rowTitleStrong),
               const Spacer(),

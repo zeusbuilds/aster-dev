@@ -22,4 +22,7 @@ class RoutePaths {
   static const String walletSelection = 'wallet-selection';
   static const String countrySelection = 'country-selection';
   static const String currencySelection = 'currency-selection';
+  static const String bitcoinUnitSelection = 'bitcoin-unit-selection';
+  static const String advancedSettings = 'advanced';
+  static const String networkConfiguration = 'network-configuration';
 }
