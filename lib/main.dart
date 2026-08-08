@@ -1,8 +1,12 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'core/bootstrap/app_bootstrap.dart';
 import 'core/bootstrap/app_loader.dart';
 import 'core/core.dart';
 import 'shared/shared.dart';
@@ -16,15 +20,7 @@ void main() async {
       child: const Aster(),
       initialize: () async {
         final sharedPreferences = await SharedPreferences.getInstance();
-
-        // Create a ProviderContainer for app runtime.
-        final container = ProviderContainer(
-          overrides: [
-            sharedPreferencesProvider.overrideWith((ref) => sharedPreferences),
-          ],
-        );
-
-        return container;
+        return bootstrapApplication(sharedPreferences);
       },
     ),
   );
@@ -44,6 +40,7 @@ class Aster extends ConsumerStatefulWidget {
 
 class _AsterState extends ConsumerState<Aster> with WidgetsBindingObserver {
   AppLifecycleState? _lifecycleState;
+  Future<void> _lifecycleTail = Future<void>.value();
 
   @override
   void initState() {
@@ -59,15 +56,40 @@ class _AsterState extends ConsumerState<Aster> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _lifecycleTail = _lifecycleTail.then((_) => _applyWalletLifecycle(state));
+    unawaited(_lifecycleTail);
     setState(() {
       _lifecycleState = state;
     });
+  }
+
+  Future<void> _applyWalletLifecycle(AppLifecycleState state) async {
+    try {
+      final repository = await ref.read(walletRepositoryProvider.future);
+      final result = switch (state) {
+        AppLifecycleState.resumed => await repository.resume(),
+        AppLifecycleState.hidden ||
+        AppLifecycleState.paused => await repository.suspend(),
+        AppLifecycleState.detached => await repository.dispose(),
+        AppLifecycleState.inactive => const AppResult<void>.success(null),
+      };
+      if (result case AppFailureResult<void>(:final failure)) {
+        if (kDebugMode) {
+          debugPrint(
+            'Wallet lifecycle failed: ${failure.code} (${failure.kind.name})',
+          );
+        }
+      }
+    } catch (_) {
+      if (kDebugMode) debugPrint('Wallet lifecycle provider failed.');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final router = ref.watch(appRouterProvider);
     final showSplashOverlay =
+        _lifecycleState == AppLifecycleState.hidden ||
         _lifecycleState == AppLifecycleState.paused ||
         _lifecycleState == AppLifecycleState.inactive;
 

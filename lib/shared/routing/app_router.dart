@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../theme/theme.dart';
+import '../widgets/custom_button.dart';
 import 'route_config.dart';
 import 'route_paths.dart';
 
@@ -11,23 +12,23 @@ part 'app_router.g.dart';
 /// App router provider
 @riverpod
 GoRouter appRouter(Ref ref) {
-  return GoRouter(
+  final router = GoRouter(
     initialLocation: RoutePaths.skeleton,
     routes: RouteConfig.getRoutes(),
     redirect: (context, state) {
       // Auth and onboarding guards will be implemented when auth feature is added
       return null;
     },
-    errorBuilder: (context, state) => ErrorScreen(error: state.error),
-    debugLogDiagnostics: true,
+    errorBuilder: (context, state) => const ErrorScreen(),
+    debugLogDiagnostics: false,
   );
+  ref.onDispose(router.dispose);
+  return router;
 }
 
 /// Error screen for route errors
 class ErrorScreen extends StatelessWidget {
-  const ErrorScreen({super.key, this.error});
-
-  final Exception? error;
+  const ErrorScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -42,23 +43,24 @@ class ErrorScreen extends StatelessWidget {
           children: [
             Icon(
               Icons.error_outline,
-              size: spacing.giant,
+              size: context.icons.xl,
               color: colors.danger,
             ),
             SizedBox(height: spacing.lg),
             Text('Route Error', style: context.textTheme.headlineSmall),
-            if (error != null) ...[
-              SizedBox(height: spacing.sm),
-              Text(
-                error.toString(),
-                style: context.textTheme.bodyMedium,
-                textAlign: TextAlign.center,
-              ),
-            ],
+            SizedBox(height: spacing.sm),
+            Text(
+              'This page is unavailable.',
+              style: context.textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
             SizedBox(height: spacing.xxl),
-            ElevatedButton(
-              onPressed: () => context.go(RoutePaths.splash),
-              child: const Text('Go to Home'),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: spacing.screenPadding),
+              child: CustomButton(
+                text: 'Go to Home',
+                onTap: () => context.go(RoutePaths.skeleton),
+              ),
             ),
           ],
         ),

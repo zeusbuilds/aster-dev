@@ -1,5 +1,4 @@
 // Public error-handling API.
-export 'error_handler.dart';
-export 'exceptions.dart';
-export 'failures.dart';
-export 'result_type.dart';
+export 'app_failure.dart';
+export 'app_result.dart';
+export 'failure_mapper.dart';

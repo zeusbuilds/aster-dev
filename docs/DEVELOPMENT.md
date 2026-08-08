@@ -174,6 +174,21 @@ commit. For temporary SDK development only, see
 `docs/architecture/SDK_INTEGRATION.md`. Never commit a path dependency or a
 `dependency_overrides` entry.
 
+## Wallet Service Configuration
+
+The default build is regtest and cannot become mainnet accidentally. Optional
+non-secret endpoint overrides are documented in
+`docs/architecture/SDK_INTEGRATION.md`. Never pass LSP, VSS, Bitcoin RPC, or
+other credentials with `--dart-define`, because compile-time values are part of
+the application binary.
+
+An unrelated Compose project named `rgb-lightning-node-perf-lab` owns host
+ports `18443`, `50001`, and `3000` and persistent external data. App development
+must not stop, reset, recreate, inspect, or reuse that project or its data. Any
+app-owned regtest environment must use a distinct Compose project, distinct
+bind mounts, and different published ports. Do not run that project's
+`regtest.sh`.
+
 ## Resources
 
 - [Flutter Documentation](https://docs.flutter.dev/)

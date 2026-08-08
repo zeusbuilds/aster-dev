@@ -57,7 +57,8 @@ class WalletSelectionScreen extends ConsumerWidget {
               onTap: isSelected || isSwitching
                   ? null
                   : () async {
-                      await viewModel.switchWallet(wallet.id);
+                      final switched = await viewModel.switchWallet(wallet.id);
+                      if (!switched) return;
                       await Future<void>.delayed(motion.selectionCommitDelay);
                       if (!context.mounted) return;
                       context.pop();

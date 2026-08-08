@@ -22,7 +22,6 @@ dependencies:
   riverpod_annotation: 4.0.3
 
   # Networking
-  connectivity_plus: ^7.3.1
   http: ^1.6.0
 
   # Wallet SDK. Keep this immutable; see docs/architecture/SDK_INTEGRATION.md.
@@ -34,6 +33,7 @@ dependencies:
   # Storage
   # 11.0.0 requires Android compile SDK 37, ahead of Flutter 3.44.9's SDK 36.
   flutter_secure_storage: 10.3.1
+  path_provider: ^2.1.5
   shared_preferences: ^2.5.5
 
   # Routing
@@ -41,11 +41,14 @@ dependencies:
 
   # Utilities
   collection: ^1.19.1
-  dartz: ^0.10.1
+  crypto: ^3.0.7
   # Flutter 3.44.9 pins intl 0.20.2 through flutter_localizations.
   intl: ^0.20.2
 
   # Icons
+  # Flutter's Cupertino framework paths require this font during release
+  # icon tree-shaking even though feature code uses the app icon libraries.
+  cupertino_icons: ^1.0.9
   remixicon: ^4.9.3
   unicons: ^3.0.0
 
@@ -65,7 +68,6 @@ dependencies:
   pretty_qr_code: ^3.6.0
   smooth_page_indicator: ^2.0.1
   skeletonizer: ^2.1.3
-
 
 dev_dependencies:
   flutter_test:

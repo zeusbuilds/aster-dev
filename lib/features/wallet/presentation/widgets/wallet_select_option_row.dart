@@ -4,7 +4,7 @@ import 'package:haptic_feedback/haptic_feedback.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
 
 import '../../../../shared/shared.dart';
-import '../../data/models/models.dart';
+import '../../domain/models/models.dart';
 
 /// Widget representing a single wallet option in the wallet selection list
 ///

@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'dart:developer' as developer;
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -5,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shared/shared.dart';
+import '../errors/errors.dart';
 
 const _bootstrapMotion = AsterMotion();
 
@@ -31,11 +36,14 @@ class _AppLoaderState extends State<AppLoader>
     with SingleTickerProviderStateMixin {
   final _isSplashScreenVisible = ValueNotifier(true);
   final _container = ValueNotifier<ProviderContainer?>(null);
+  final _failure = ValueNotifier<AppFailure?>(null);
+  final _isRetrying = ValueNotifier(false);
 
   late final AnimationController _controller =
       AnimatedSplashScreen.createController(this);
 
   Future<void>? _loader;
+  Timer? _revealTimer;
 
   @override
   void initState() {
@@ -54,6 +62,9 @@ class _AppLoaderState extends State<AppLoader>
   @override
   void dispose() {
     _isSplashScreenVisible.dispose();
+    _failure.dispose();
+    _isRetrying.dispose();
+    _revealTimer?.cancel();
     _container.value?.dispose();
     _container.dispose();
     _controller.dispose();
@@ -61,20 +72,46 @@ class _AppLoaderState extends State<AppLoader>
   }
 
   Future<void> _load() async {
-    final container = await widget.initialize();
-
-    _container.value = container;
-
-    // Ensure the app underneath has been laid out, then play the reveal.
-    SchedulerBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        Future<void>.delayed(_bootstrapMotion.bootstrapRevealDelay, () {
-          if (mounted) {
-            _controller.forward().ignore();
-          }
-        });
+    _failure.value = null;
+    _isRetrying.value = true;
+    try {
+      final container = await widget.initialize();
+      if (!mounted) {
+        container.dispose();
+        return;
       }
-    });
+      _container.value = container;
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _revealTimer?.cancel();
+        _revealTimer = Timer(_bootstrapMotion.bootstrapRevealDelay, () {
+          if (mounted) _controller.forward().ignore();
+        });
+      });
+    } catch (error, stackTrace) {
+      if (!mounted) return;
+      final failure = FailureMapper.from(
+        error,
+        stackTrace,
+        fallbackCode: 'app_bootstrap_failed',
+      );
+      if (kDebugMode) {
+        developer.log(
+          'Bootstrap failed: ${failure.code} (${failure.kind.name})',
+          name: 'utexo.bootstrap',
+        );
+      }
+      _failure.value = failure;
+    } finally {
+      if (mounted) _isRetrying.value = false;
+    }
+  }
+
+  void _retry() {
+    if (_isRetrying.value || _failure.value?.retryable != true) return;
+    _controller.reset();
+    _isSplashScreenVisible.value = true;
+    _loader = _load();
   }
 
   @override
@@ -103,16 +140,97 @@ class _AppLoaderState extends State<AppLoader>
                 );
               },
             ),
-            ValueListenableBuilder<bool>(
-              valueListenable: _isSplashScreenVisible,
-              builder: (context, isVisible, splash) {
-                if (!isVisible) return const SizedBox.shrink();
-                return splash!;
+            ValueListenableBuilder<AppFailure?>(
+              valueListenable: _failure,
+              builder: (context, failure, _) {
+                if (failure != null) {
+                  return _BootstrapFailureView(
+                    failure: failure,
+                    retrying: _isRetrying,
+                    onRetry: _retry,
+                  );
+                }
+                return ValueListenableBuilder<bool>(
+                  valueListenable: _isSplashScreenVisible,
+                  builder: (context, isVisible, splash) {
+                    if (!isVisible) return const SizedBox.shrink();
+                    return splash!;
+                  },
+                  child: AnimatedSplashScreen(controller: _controller),
+                );
               },
-              child: AnimatedSplashScreen(controller: _controller),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _BootstrapFailureView extends StatelessWidget {
+  const _BootstrapFailureView({
+    required this.failure,
+    required this.retrying,
+    required this.onRetry,
+  });
+
+  final AppFailure failure;
+  final ValueListenable<bool> retrying;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Theme(
+      data: AppTheme.light(),
+      child: Builder(
+        builder: (context) {
+          final themedSpacing = context.spacing;
+          return Material(
+            color: context.colorScheme.surface,
+            child: SafeArea(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.all(themedSpacing.screenPadding),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.lock_outline,
+                        size: context.icons.xl,
+                        color: context.appColors.danger,
+                      ),
+                      SizedBox(height: themedSpacing.lg),
+                      Text(
+                        'Wallet could not be opened',
+                        style: context.type.title,
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: themedSpacing.sm),
+                      Text(
+                        failure.userMessage,
+                        style: context.textTheme.bodyMedium,
+                        textAlign: TextAlign.center,
+                      ),
+                      if (failure.retryable) ...[
+                        SizedBox(height: themedSpacing.xxl),
+                        ValueListenableBuilder<bool>(
+                          valueListenable: retrying,
+                          builder: (context, loading, _) {
+                            return CustomButton(
+                              text: 'Retry',
+                              loading: loading,
+                              onTap: loading ? null : onRetry,
+                            );
+                          },
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

@@ -1,0 +1,177 @@
+import 'package:flutter/foundation.dart';
+
+import '../errors/app_failure.dart';
+
+/// Bitcoin chain environment, independent from asset and payment rail.
+enum BlockchainEnvironment {
+  mainnet,
+  signet,
+  regtest;
+
+  static BlockchainEnvironment parse(String value) {
+    return switch (value.trim().toLowerCase()) {
+      'mainnet' || 'bitcoin' => BlockchainEnvironment.mainnet,
+      'signet' || 'utexo' => BlockchainEnvironment.signet,
+      'regtest' => BlockchainEnvironment.regtest,
+      _ => throw const AppConfigurationException(),
+    };
+  }
+}
+
+/// Public, non-secret service configuration supplied to the wallet runtime.
+@immutable
+final class WalletServiceConfiguration {
+  const WalletServiceConfiguration({
+    required this.environment,
+    required this.sdkNetwork,
+    this.indexerUrl,
+    this.rgbTransportProxy,
+    this.lspBaseUrl,
+    this.vssUrl,
+  });
+
+  /// Reads compile-time configuration without embedding credentials.
+  ///
+  /// Regtest is deliberately the default so an unconfigured build cannot
+  /// become a funds-bearing mainnet wallet by accident.
+  factory WalletServiceConfiguration.fromEnvironment() {
+    const networkValue = String.fromEnvironment(
+      'UTEXO_NETWORK',
+      defaultValue: 'regtest',
+    );
+    if (networkValue != networkValue.trim()) {
+      throw const AppConfigurationException();
+    }
+    final environment = BlockchainEnvironment.parse(networkValue);
+    return WalletServiceConfiguration(
+      environment: environment,
+      sdkNetwork: environment == BlockchainEnvironment.signet
+          ? 'utexo'
+          : environment.name,
+      indexerUrl: _optionalEnvironment('UTEXO_INDEXER_URL'),
+      rgbTransportProxy: _optionalEnvironment('UTEXO_RGB_PROXY_URL'),
+      lspBaseUrl: _optionalEnvironment('UTEXO_LSP_URL'),
+      vssUrl: _optionalEnvironment('UTEXO_VSS_URL'),
+    );
+  }
+
+  final BlockchainEnvironment environment;
+
+  /// Stable SDK network carrier. UTEXO-hosted signet uses the SDK's `utexo`
+  /// service profile while the product-facing chain remains signet.
+  final String sdkNetwork;
+  final String? indexerUrl;
+  final String? rgbTransportProxy;
+  final String? lspBaseUrl;
+  final String? vssUrl;
+
+  /// Whether the validated VSS endpoint is an HTTP development endpoint.
+  ///
+  /// The SDK defaults to rejecting HTTP VSS. This opt-in is derived only after
+  /// the app's regtest/loopback policy has accepted the endpoint.
+  bool get allowsInsecureLocalVss {
+    final value = vssUrl;
+    if (value == null || environment != BlockchainEnvironment.regtest) {
+      return false;
+    }
+    final uri = Uri.parse(value);
+    return uri.scheme.toLowerCase() == 'http' &&
+        (_isLoopback(uri.host) || uri.host == '10.0.2.2');
+  }
+
+  /// Validates URL policy before any native wallet is created.
+  void validate() {
+    final expectedSdkNetwork = environment == BlockchainEnvironment.signet
+        ? 'utexo'
+        : environment.name;
+    if (sdkNetwork != expectedSdkNetwork) {
+      throw const AppConfigurationException();
+    }
+    _validateEndpoint(indexerUrl, _EndpointKind.indexer, environment);
+    _validateEndpoint(
+      rgbTransportProxy,
+      _EndpointKind.rgbTransport,
+      environment,
+    );
+    _validateEndpoint(lspBaseUrl, _EndpointKind.webService, environment);
+    _validateEndpoint(vssUrl, _EndpointKind.webService, environment);
+  }
+
+  static void _validateEndpoint(
+    String? raw,
+    _EndpointKind kind,
+    BlockchainEnvironment environment,
+  ) {
+    if (raw == null) return;
+    if (raw != raw.trim() || raw.isEmpty || raw.contains(RegExp(r'\s'))) {
+      throw const AppConfigurationException();
+    }
+    final hasExplicitScheme = raw.contains('://');
+    if (!hasExplicitScheme && kind != _EndpointKind.indexer) {
+      throw const AppConfigurationException();
+    }
+    final uri = Uri.tryParse(hasExplicitScheme ? raw : 'tcp://$raw');
+    if (uri == null ||
+        uri.host.isEmpty ||
+        uri.userInfo.isNotEmpty ||
+        uri.query.isNotEmpty ||
+        uri.fragment.isNotEmpty) {
+      throw const AppConfigurationException();
+    }
+    final developmentHost =
+        environment == BlockchainEnvironment.regtest &&
+        (_isLoopback(uri.host) || uri.host == '10.0.2.2');
+    if (developmentHost &&
+        uri.hasPort &&
+        _protectedDevelopmentPorts.contains(uri.port)) {
+      throw const AppConfigurationException();
+    }
+    final allowed = switch (kind) {
+      _EndpointKind.indexer =>
+        developmentHost
+            ? const {'http', 'https', 'tcp', 'ssl'}
+            : const {'https', 'ssl'},
+      _EndpointKind.rgbTransport =>
+        developmentHost
+            ? const {'http', 'https', 'rpc', 'rpcs'}
+            : const {'https', 'rpcs'},
+      _EndpointKind.webService =>
+        developmentHost ? const {'http', 'https'} : const {'https'},
+    };
+    if (!allowed.contains(uri.scheme.toLowerCase())) {
+      throw const AppConfigurationException();
+    }
+    if (uri.hasPort && (uri.port < 1 || uri.port > 65535)) {
+      throw const AppConfigurationException();
+    }
+    if (const {'tcp', 'ssl'}.contains(uri.scheme.toLowerCase()) &&
+        !uri.hasPort) {
+      throw const AppConfigurationException();
+    }
+  }
+
+  static bool _isLoopback(String host) {
+    final normalized = host.toLowerCase();
+    return normalized == 'localhost' ||
+        normalized == '127.0.0.1' ||
+        normalized == '::1';
+  }
+
+  /// Ports owned by the unrelated `rgb-lightning-node-perf-lab` project.
+  static const _protectedDevelopmentPorts = {18443, 50001, 3000};
+}
+
+enum _EndpointKind { indexer, rgbTransport, webService }
+
+String? _optionalEnvironment(String name) {
+  final value = switch (name) {
+    'UTEXO_INDEXER_URL' => const String.fromEnvironment('UTEXO_INDEXER_URL'),
+    'UTEXO_RGB_PROXY_URL' => const String.fromEnvironment(
+      'UTEXO_RGB_PROXY_URL',
+    ),
+    'UTEXO_LSP_URL' => const String.fromEnvironment('UTEXO_LSP_URL'),
+    'UTEXO_VSS_URL' => const String.fromEnvironment('UTEXO_VSS_URL'),
+    _ => '',
+  };
+  return value.isEmpty ? null : value;
+}

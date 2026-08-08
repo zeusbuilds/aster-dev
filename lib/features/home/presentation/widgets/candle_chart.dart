@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:collection/collection.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 
 import '../../../../shared/shared.dart';
@@ -72,6 +73,10 @@ class _CandleChartState extends State<CandleChart>
         });
       }
     });
+    if (!widget.isSkeleton) {
+      _prepareChartData();
+      _dataReady = _candles != null;
+    }
   }
 
   @override
@@ -130,15 +135,19 @@ class _CandleChartState extends State<CandleChart>
   void didUpdateWidget(CandleChart oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (oldWidget.isSkeleton && !widget.isSkeleton) {
+    if (!widget.isSkeleton &&
+        (oldWidget.isSkeleton || !listEquals(oldWidget.data, widget.data))) {
       _cancelPendingTransition();
       _prepareChartData();
-      _dataReady = true;
+      _dataReady = _candles != null;
       _transitionTriggered = false;
       _shouldShowLoading = true;
       _isTransitioning = false;
       _loadingAnimationProgress = null;
       _transitionController.reset();
+      if (!_loadingController.isAnimating) {
+        unawaited(_loadingController.repeat());
+      }
     } else if (widget.isSkeleton) {
       _cancelPendingTransition();
       _dataReady = false;
@@ -148,6 +157,12 @@ class _CandleChartState extends State<CandleChart>
       _loadingAnimationProgress = null;
       _transitionController.reset();
       _candles = null;
+      _minPrice = null;
+      _maxPrice = null;
+      _priceRange = null;
+      if (!_loadingController.isAnimating) {
+        unawaited(_loadingController.repeat());
+      }
     }
   }
 
@@ -155,6 +170,9 @@ class _CandleChartState extends State<CandleChart>
     final items = widget.data ?? [];
     if (items.isEmpty) {
       _candles = null;
+      _minPrice = null;
+      _maxPrice = null;
+      _priceRange = null;
       return;
     }
 
@@ -167,7 +185,7 @@ class _CandleChartState extends State<CandleChart>
     _maxPrice = prices.max;
     _priceRange = _maxPrice! - _minPrice!;
 
-    _candles = _generateCandlesFromPrices(last24Items);
+    _candles = _generatePriceBars(last24Items);
   }
 
   @override
@@ -442,31 +460,17 @@ class _CandleChartState extends State<CandleChart>
     return height - (normalized * height);
   }
 
-  List<CandleData> _generateCandlesFromPrices(List<ChartDataItem> items) {
-    final candles = <CandleData>[];
+  List<CandleData> _generatePriceBars(List<ChartDataItem> items) {
+    final bars = <CandleData>[];
 
     for (int i = 0; i < items.length; i++) {
       final price = items[i].y;
       final prevPrice = i > 0 ? items[i - 1].y : price;
 
-      final variation = price * 0.02;
-      final high = price + variation * 0.6;
-      final low = price - variation * 0.6;
-      final open = prevPrice;
-      final close = price;
-
-      candles.add(
-        CandleData(
-          x: items[i].x,
-          open: open,
-          high: high,
-          low: low,
-          close: close,
-        ),
-      );
+      bars.add(CandleData(open: prevPrice, close: price));
     }
 
-    return candles;
+    return bars;
   }
 }
 
@@ -505,17 +509,8 @@ class _CandleWidget extends StatelessWidget {
 }
 
 class CandleData {
-  const CandleData({
-    required this.x,
-    required this.open,
-    required this.high,
-    required this.low,
-    required this.close,
-  });
+  const CandleData({required this.open, required this.close});
 
-  final double x;
   final double open;
-  final double high;
-  final double low;
   final double close;
 }

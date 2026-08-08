@@ -1,4 +1,5 @@
 // Public core API.
+export 'config/config.dart';
 export 'constants/constants.dart';
 export 'di/di.dart';
 export 'errors/errors.dart';

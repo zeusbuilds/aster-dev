@@ -2,16 +2,6 @@
 class StorageKeys {
   StorageKeys._();
 
-  // Auth
-  /// Key for storing access token in secure storage
-  static const String accessToken = 'access_token';
-
-  /// Key for storing refresh token in secure storage
-  static const String refreshToken = 'refresh_token';
-
-  /// Key for storing user ID in preferences
-  static const String userId = 'user_id';
-
   // Preferences
   /// Key for storing theme preference
   static const String theme = 'theme';
@@ -43,9 +33,18 @@ class StorageKeys {
   static const String featureFlags = 'feature_flags';
 
   // Wallet storage keys
-  /// Key for storing active wallet ID
-  static const String activeWalletId = 'active_wallet_id';
+  /// Unreleased pre-ownership registry retained only for recovery detection.
+  static const String legacyWalletRegistryV2 = 'utexo_wallet_registry_v2';
 
-  /// Versioned, non-secret wallet profile registry.
-  static const String walletRegistry = 'wallet_registry_v1';
+  /// Metadata-only registry used before native wallet ownership existed.
+  ///
+  /// It is detected but never deleted or promoted because it has no matching
+  /// native credential contract and therefore cannot be migrated safely.
+  static const String legacyWalletRegistryV1 = 'wallet_registry_v1';
+
+  /// Prefix for one ownership-bound encrypted credential record per wallet.
+  static const String walletSecretPrefix = 'utexo_wallet_secret_v2.';
+
+  /// Unowned credential prefix retained only for recovery detection.
+  static const String legacyWalletSecretPrefix = 'utexo_wallet_secret_v1.';
 }

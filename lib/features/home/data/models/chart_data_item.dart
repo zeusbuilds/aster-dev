@@ -9,4 +9,11 @@ class ChartDataItem {
   final double y;
 
   const ChartDataItem(this.x, this.y);
+
+  @override
+  bool operator ==(Object other) =>
+      other is ChartDataItem && other.x == x && other.y == y;
+
+  @override
+  int get hashCode => Object.hash(x, y);
 }

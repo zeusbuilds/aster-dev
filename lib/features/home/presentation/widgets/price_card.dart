@@ -1,7 +1,6 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:remixicon/remixicon.dart';
 import 'package:unicons/unicons.dart';
@@ -9,85 +8,24 @@ import 'package:unicons/unicons.dart';
 import '../../../../shared/shared.dart';
 import '../../data/data.dart';
 import '../../data/models/chart_data_item.dart';
+import '../view_model/view_models.dart';
 import 'candle_chart.dart';
 
-/// Widget displaying Bitcoin price information with chart
-///
-/// Shows current price, price change percentage, and 24-hour price chart
-class PriceCard extends StatefulWidget {
+/// Bitcoin market card backed by injected repository state.
+class PriceCard extends ConsumerWidget {
   const PriceCard({super.key});
 
   @override
-  State<PriceCard> createState() => _PriceCardState();
-}
-
-class _PriceCardState extends State<PriceCard> {
-  List<ChartDataItem>? _chartData;
-  double? _currentPrice;
-  double? _priceChange;
-  bool _hasFetched = false;
-  bool _loadFailed = false;
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_fetchPriceData());
-  }
-
-  Future<void> _fetchPriceData() async {
-    // Only fetch once
-    if (_hasFetched) return;
-    _hasFetched = true;
-
-    try {
-      final chartData = await BitcoinPriceService.fetchTodayPriceData();
-      final currentPrice = await BitcoinPriceService.fetchCurrentPrice();
-      final priceChange = BitcoinPriceService.calculatePriceChange(chartData);
-      final loadFailed = chartData.isEmpty || currentPrice == null;
-
-      if (mounted) {
-        setState(() {
-          _chartData = chartData;
-          _currentPrice = currentPrice;
-          _priceChange = priceChange;
-          _loadFailed = loadFailed;
-        });
-      }
-    } on Exception {
-      if (mounted) {
-        setState(() {
-          _loadFailed = true;
-        });
-      }
-    }
-  }
-
-  Future<void> _retry() async {
-    setState(() {
-      _hasFetched = false;
-      _loadFailed = false;
-      _chartData = null;
-      _currentPrice = null;
-      _priceChange = null;
-    });
-    await _fetchPriceData();
-  }
-
-  /// Formats price as currency string (e.g., "$100,000")
-  String _formatPrice(double? price) {
-    if (price == null) return '';
-    final formatter = NumberFormat('#,##0');
-    return '\$${formatter.format(price)}';
-  }
-
-  /// Formats price change percentage (e.g., "5.2%")
-  String _formatPriceChange(double? change) {
-    if (change == null) return '';
-    return '${change.abs().toStringAsFixed(1)}%';
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final market = ref.watch(bitcoinMarketViewModelProvider);
+    final snapshot = market.value;
+    final chartData = snapshot?.history.indexed
+        .map(
+          (entry) =>
+              ChartDataItem(entry.$1.toDouble(), entry.$2.usdCents.toDouble()),
+        )
+        .toList(growable: false);
+    final change = snapshot?.changeBasisPoints;
     final colors = context.appColors;
     final effects = context.effects;
     final spacing = context.spacing;
@@ -109,7 +47,7 @@ class _PriceCardState extends State<PriceCard> {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 textBaseline: TextBaseline.alphabetic,
                 children: [
-                  Container(
+                  DecoratedBox(
                     decoration: BoxDecoration(
                       color: context.colorScheme.surface,
                       shape: BoxShape.circle,
@@ -126,7 +64,7 @@ class _PriceCardState extends State<PriceCard> {
                   Text('Bitcoin Price', style: type.brandTitle),
                   const Spacer(),
                   NumericText(
-                    _formatPrice(_currentPrice),
+                    _formatUsd(snapshot?.currentUsdCents),
                     style: type.brandAmount,
                   ),
                 ],
@@ -134,23 +72,22 @@ class _PriceCardState extends State<PriceCard> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  _priceChange == null
-                      ? SizedBox(height: spacing.md)
-                      : Icon(
-                          (_priceChange ?? 0) >= 0
-                              ? RemixIcons.arrow_up_line
-                              : RemixIcons.arrow_down_line,
-                          size: icons.xxs,
-                          color: (_priceChange ?? 0) >= 0
-                              ? colors.success
-                              : colors.danger,
-                        ),
+                  if (change != null)
+                    Icon(
+                      change >= 0
+                          ? RemixIcons.arrow_up_line
+                          : RemixIcons.arrow_down_line,
+                      size: icons.xxs,
+                      color: change >= 0 ? colors.success : colors.danger,
+                    )
+                  else
+                    SizedBox(height: spacing.md),
                   SizedBox(width: spacing.xxs),
                   Text(
-                    _formatPriceChange(_priceChange),
+                    _formatBasisPoints(change),
                     style: type.brandMetric
                         .copyWith(
-                          color: (_priceChange ?? 0) >= 0
+                          color: (change ?? 0) >= 0
                               ? colors.success
                               : colors.danger,
                         )
@@ -161,86 +98,61 @@ class _PriceCardState extends State<PriceCard> {
             ],
           ),
         ),
-        if (_loadFailed)
-          Padding(
-            padding: EdgeInsets.all(spacing.lg),
-            child: Column(
-              children: [
-                Text('Price data unavailable', style: type.brandMetric),
-                SizedBox(height: spacing.md),
-                CustomButton.compact(text: 'Retry', onTap: _retry),
-              ],
-            ),
-          )
-        else
-          CandleChart(
-            data: _chartData ?? [],
-            isSkeleton: _chartData == null || _chartData!.isEmpty,
+        switch (market) {
+          AsyncLoading<BitcoinMarketSnapshot>() => const CandleChart(
+            data: null,
+            isSkeleton: true,
           ),
+          AsyncError<BitcoinMarketSnapshot>() => _MarketUnavailable(
+            message: 'Price data unavailable',
+            onRetry: () =>
+                ref.read(bitcoinMarketViewModelProvider.notifier).retry(),
+          ),
+          AsyncData<BitcoinMarketSnapshot>() when chartData?.isEmpty ?? true =>
+            _MarketUnavailable(
+              message: '24-hour chart unavailable',
+              onRetry: () =>
+                  ref.read(bitcoinMarketViewModelProvider.notifier).retry(),
+            ),
+          AsyncData<BitcoinMarketSnapshot>() => CandleChart(
+            data: chartData,
+            isSkeleton: false,
+          ),
+        },
       ],
     );
   }
+
+  static String _formatUsd(int? cents) {
+    if (cents == null) return '';
+    return '\$${NumberFormat('#,##0').format(cents ~/ 100)}';
+  }
+
+  static String _formatBasisPoints(int? basisPoints) {
+    if (basisPoints == null) return '';
+    final absolute = basisPoints.abs();
+    return '${absolute ~/ 100}.${(absolute % 100) ~/ 10}%';
+  }
 }
 
-/// Custom painter for drawing grid lines with fade effects
-///
-/// Used for chart background decoration
-class GridPainter extends CustomPainter {
-  /// Color of the grid lines
-  final Color color;
+class _MarketUnavailable extends StatelessWidget {
+  const _MarketUnavailable({required this.message, required this.onRetry});
 
-  /// Size of each grid cell
-  final double gridSize;
-
-  /// Height of fade effect at top and bottom
-  final double fadeHeight;
-
-  GridPainter({
-    required this.color,
-    this.gridSize = 10.0,
-    this.fadeHeight = 40.0,
-  });
-
-  /// Calculates opacity for grid lines based on vertical position
-  ///
-  /// Creates fade effect at top and bottom edges
-  double _getOpacity(double y, double height) {
-    if (y < fadeHeight) {
-      // Fade from top
-      return (y / fadeHeight) * 0.1;
-    } else if (y > height - fadeHeight) {
-      // Fade from bottom
-      return ((height - y) / fadeHeight) * 0.1;
-    } else {
-      // Full opacity in middle
-      return 0.1;
-    }
-  }
+  final String message;
+  final VoidCallback onRetry;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final basePaint = Paint()
-      ..color = color
-      ..strokeWidth = 0.5;
-
-    // Draw vertical lines
-    for (double x = 0; x < size.width; x += gridSize) {
-      // For vertical lines, use average opacity
-      final avgOpacity = (size.height / 2 < fadeHeight)
-          ? (size.height / 2 / fadeHeight) * 0.1
-          : 0.1;
-      final paint = basePaint..color = color.withValues(alpha: avgOpacity);
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
-    }
-
-    // Draw horizontal lines with position-based opacity
-    for (double y = 0; y < size.height; y += gridSize) {
-      final opacity = _getOpacity(y, size.height);
-      final paint = basePaint..color = color.withValues(alpha: opacity);
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
+  Widget build(BuildContext context) {
+    final spacing = context.spacing;
+    return Padding(
+      padding: EdgeInsets.all(spacing.lg),
+      child: Column(
+        children: [
+          Text(message, style: context.type.brandMetric),
+          SizedBox(height: spacing.md),
+          CustomButton.compact(text: 'Retry', onTap: onRetry),
+        ],
+      ),
+    );
   }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
