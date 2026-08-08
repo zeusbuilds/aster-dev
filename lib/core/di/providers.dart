@@ -6,12 +6,14 @@ import 'package:path_provider/path_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../features/onboarding/data/repository/repository.dart';
 import '../../features/settings/data/repository/repository.dart';
 import '../../features/wallet/data/repository/repository.dart';
 import '../../features/wallet/data/runtime/runtime.dart';
 import '../../features/wallet/data/storage/storage.dart';
 import '../config/config.dart';
 import '../network/network.dart';
+import '../platform/platform.dart';
 import '../storage/storage.dart';
 
 part 'providers.g.dart';
@@ -39,6 +41,18 @@ Future<PreferencesService> preferencesService(Ref ref) async {
 Future<SettingsRepository> settingsRepository(Ref ref) async {
   final preferences = await ref.watch(preferencesServiceProvider.future);
   return SettingsRepository(preferences, ref.watch(appAssetBundleProvider));
+}
+
+@riverpod
+Bip39WordListRepository bip39WordListRepository(Ref ref) {
+  return Bip39WordListRepository(ref.watch(appAssetBundleProvider));
+}
+
+@Riverpod(keepAlive: true)
+SensitiveClipboardService sensitiveClipboardService(Ref ref) {
+  final service = PlatformSensitiveClipboardService();
+  ref.onDispose(() => unawaited(service.dispose()));
+  return service;
 }
 
 @Riverpod(keepAlive: true)

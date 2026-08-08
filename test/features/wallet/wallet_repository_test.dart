@@ -15,6 +15,9 @@ void main() {
   const secondWalletId = '22222222222222222222222222222222';
   const storageToken = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
   const secondStorageToken = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+  const mnemonic =
+      'abandon abandon abandon abandon abandon abandon abandon abandon '
+      'abandon abandon abandon about';
   const services = WalletServiceConfiguration(
     environment: BlockchainEnvironment.regtest,
     sdkNetwork: 'regtest',
@@ -84,6 +87,77 @@ void main() {
     },
   );
 
+  test('normalizes and validates an imported recovery phrase', () async {
+    final keyGenerator = FakeWalletKeyGenerator();
+    final runtime = WalletRuntime(
+      FakeWalletEngineFactory(const []),
+      FakeWalletDirectoryManager(),
+      WalletSecretStore(MemorySecureStore()),
+      services,
+    );
+    addTearDown(runtime.dispose);
+    final repository = WalletRepository(
+      _FailingRegistrationStore(),
+      runtime,
+      keyGenerator,
+      FakeWalletIdentityGenerator(walletId: walletId),
+      services,
+      const SuccessfulLegacyWalletSeedPreflight(),
+    );
+
+    final result = await repository.validateMnemonic(
+      '  ABANDON abandon abandon abandon abandon abandon abandon '
+      'abandon abandon abandon abandon ABOUT  ',
+    );
+
+    expect(result, isA<AppSuccess<void>>());
+    expect(keyGenerator.validatedMnemonics, [mnemonic]);
+  });
+
+  test('rejects malformed or checksum-invalid imported phrases', () async {
+    final keyGenerator = FakeWalletKeyGenerator();
+    final runtime = WalletRuntime(
+      FakeWalletEngineFactory(const []),
+      FakeWalletDirectoryManager(),
+      WalletSecretStore(MemorySecureStore()),
+      services,
+    );
+    addTearDown(runtime.dispose);
+    final repository = WalletRepository(
+      _FailingRegistrationStore(),
+      runtime,
+      keyGenerator,
+      FakeWalletIdentityGenerator(walletId: walletId),
+      services,
+      const SuccessfulLegacyWalletSeedPreflight(),
+    );
+
+    final malformed = await repository.validateMnemonic('too short');
+    expect(malformed, isA<AppFailureResult<void>>());
+    expect(
+      (malformed as AppFailureResult<void>).failure.code,
+      'wallet_mnemonic_invalid',
+    );
+    expect(keyGenerator.validatedMnemonics, isEmpty);
+
+    keyGenerator.validationError = const AppFailureException(
+      AppFailure(
+        code: 'native_phrase_invalid',
+        kind: AppFailureKind.validation,
+        userMessage: 'Not rendered.',
+        retryable: false,
+      ),
+    );
+    final checksum = await repository.validateMnemonic(
+      List.filled(12, 'abandon').join(' '),
+    );
+    expect(checksum, isA<AppFailureResult<void>>());
+    expect(
+      (checksum as AppFailureResult<void>).failure.code,
+      'wallet_mnemonic_invalid',
+    );
+  });
+
   test('commits metadata only after native provisioning succeeds', () async {
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
@@ -110,14 +184,17 @@ void main() {
     );
 
     final result = await repository.createFromMnemonic(
-      mnemonic: '  MNEMONIC   WORDS  ',
+      mnemonic:
+          '  ABANDON abandon abandon abandon abandon abandon abandon '
+          'abandon abandon abandon abandon ABOUT  ',
       name: '  Main Wallet  ',
     );
 
-    final profile = (result as AppSuccess<WalletProfile>).value;
+    final committed = (result as AppSuccess<WalletRegistry>).value;
+    final profile = committed.activeProfile!;
     expect(profile.name, 'Main Wallet');
     expect(profile.state, WalletProfileState.ready);
-    expect(engine.initializedMnemonic, 'mnemonic words');
+    expect(engine.initializedMnemonic, mnemonic);
     final registry =
         (await profileStore.read() as AppSuccess<WalletRegistry>).value;
     expect(registry.activeWalletId, walletId);
@@ -145,11 +222,11 @@ void main() {
     );
 
     final result = await repository.createFromMnemonic(
-      mnemonic: 'mnemonic words',
+      mnemonic: mnemonic,
       name: 'Main Wallet',
     );
 
-    expect(result, isA<AppFailureResult<WalletProfile>>());
+    expect(result, isA<AppFailureResult<WalletRegistry>>());
     expect(rawSecrets.values, isEmpty);
     expect(directories.removed, [walletId]);
   });
@@ -178,13 +255,13 @@ void main() {
       );
 
       final result = await repository.createFromMnemonic(
-        mnemonic: 'mnemonic words',
+        mnemonic: mnemonic,
         name: 'Main Wallet',
       );
 
-      expect(result, isA<AppFailureResult<WalletProfile>>());
+      expect(result, isA<AppFailureResult<WalletRegistry>>());
       expect(
-        (result as AppFailureResult<WalletProfile>).failure.outcomeUnknown,
+        (result as AppFailureResult<WalletRegistry>).failure.outcomeUnknown,
         isTrue,
       );
       expect(rawSecrets.values, hasLength(1));
@@ -226,15 +303,15 @@ void main() {
     addTearDown(repository.dispose);
 
     final result = await repository.createFromMnemonic(
-      mnemonic: 'mnemonic words',
+      mnemonic: mnemonic,
       name: 'Main Wallet',
     );
     final staged =
         (await profileStore.read() as AppSuccess<WalletRegistry>).value;
 
-    expect(result, isA<AppFailureResult<WalletProfile>>());
+    expect(result, isA<AppFailureResult<WalletRegistry>>());
     expect(
-      (result as AppFailureResult<WalletProfile>).failure.outcomeUnknown,
+      (result as AppFailureResult<WalletRegistry>).failure.outcomeUnknown,
       isTrue,
     );
     expect(staged.provisioningProfiles, hasLength(1));
@@ -297,13 +374,13 @@ void main() {
     );
 
     final result = await repository.createFromMnemonic(
-      mnemonic: 'mnemonic words',
+      mnemonic: mnemonic,
       name: 'New Wallet',
     );
 
-    expect(result, isA<AppFailureResult<WalletProfile>>());
+    expect(result, isA<AppFailureResult<WalletRegistry>>());
     expect(
-      (result as AppFailureResult<WalletProfile>).failure.code,
+      (result as AppFailureResult<WalletRegistry>).failure.code,
       'wallet_id_collision',
     );
     expect(directories.created, isEmpty);
@@ -414,7 +491,7 @@ void main() {
         walletId,
         const WalletSecret(
           databasePassword: 'password',
-          mnemonic: 'mnemonic words',
+          mnemonic: mnemonic,
           storageToken: storageToken,
         ),
       );
@@ -530,10 +607,10 @@ void main() {
       );
       expect(
         await repository.createFromMnemonic(
-          mnemonic: 'mnemonic words',
+          mnemonic: mnemonic,
           name: 'Main Wallet',
         ),
-        isA<AppSuccess<WalletProfile>>(),
+        isA<AppSuccess<WalletRegistry>>(),
       );
       active.shutdownError = StateError('injected shutdown failure');
 

@@ -99,6 +99,12 @@ final class WalletRepository {
     return _enqueueOperation(_generateMnemonicUnsafe);
   }
 
+  /// Validates a normalized 12-word phrase through the SDK's BIP39 checksum
+  /// implementation. Per-word UI feedback does not replace this authority.
+  Future<AppResult<void>> validateMnemonic(String mnemonic) {
+    return _enqueueOperation(() => _validateMnemonicUnsafe(mnemonic));
+  }
+
   Future<AppResult<String>> _generateMnemonicUnsafe() async {
     final String generated;
     try {
@@ -107,11 +113,7 @@ final class WalletRepository {
       return AppResult.failure(FailureMapper.from(error, stackTrace));
     }
 
-    final normalized = generated
-        .trim()
-        .toLowerCase()
-        .split(RegExp(r'\s+'))
-        .join(' ');
+    final normalized = _normalizeMnemonic(generated);
     try {
       if (normalized.split(' ').length != 12) {
         throw const FormatException(
@@ -134,9 +136,26 @@ final class WalletRepository {
     }
   }
 
+  Future<AppResult<void>> _validateMnemonicUnsafe(String mnemonic) async {
+    final normalized = _normalizeMnemonic(mnemonic);
+    if (normalized.isEmpty || normalized.split(' ').length != 12) {
+      return AppResult.failure(_invalidMnemonicFailure());
+    }
+    try {
+      await _keyGenerator.validateMnemonic(normalized);
+      return const AppResult.success(null);
+    } catch (error, stackTrace) {
+      final mapped = FailureMapper.from(error, stackTrace);
+      if (mapped.kind == AppFailureKind.validation) {
+        return AppResult.failure(_invalidMnemonicFailure(cause: mapped));
+      }
+      return AppResult.failure(mapped);
+    }
+  }
+
   /// Creates or restores a native wallet from an already user-confirmed
   /// mnemonic and atomically registers its non-secret profile.
-  Future<AppResult<WalletProfile>> createFromMnemonic({
+  Future<AppResult<WalletRegistry>> createFromMnemonic({
     required String mnemonic,
     required String name,
   }) {
@@ -145,15 +164,11 @@ final class WalletRepository {
     );
   }
 
-  Future<AppResult<WalletProfile>> _createFromMnemonicUnsafe({
+  Future<AppResult<WalletRegistry>> _createFromMnemonicUnsafe({
     required String mnemonic,
     required String name,
   }) async {
-    final normalizedMnemonic = mnemonic
-        .trim()
-        .toLowerCase()
-        .split(RegExp(r'\s+'))
-        .join(' ');
+    final normalizedMnemonic = _normalizeMnemonic(mnemonic);
     final normalizedName = name.trim();
     if (!WalletProfile.isValidName(normalizedName)) {
       return AppResult.failure(
@@ -165,10 +180,9 @@ final class WalletRepository {
         ),
       );
     }
-    try {
-      await _keyGenerator.validateMnemonic(normalizedMnemonic);
-    } catch (error, stackTrace) {
-      return AppResult.failure(FailureMapper.from(error, stackTrace));
+    final validation = await _validateMnemonicUnsafe(normalizedMnemonic);
+    if (validation case AppFailureResult<void>(:final failure)) {
+      return AppResult.failure(failure);
     }
 
     final beforeResult = await _profiles.read();
@@ -257,10 +271,7 @@ final class WalletRepository {
 
     final registration = await _profiles.commitProvision(profile.id);
     if (registration case AppSuccess<WalletRegistry>(:final value)) {
-      final committed = value.profiles
-          .where((item) => item.id == profile.id)
-          .single;
-      return AppResult.success(committed);
+      return AppResult.success(value);
     }
     final registrationFailure =
         (registration as AppFailureResult<WalletRegistry>).failure;
@@ -453,6 +464,19 @@ final class WalletRepository {
     AppSuccess<T>() => false,
     AppFailureResult<T>(:final failure) => failure.outcomeUnknown,
   };
+
+  static String _normalizeMnemonic(String mnemonic) =>
+      mnemonic.trim().toLowerCase().split(RegExp(r'\s+')).join(' ');
+
+  static AppFailure _invalidMnemonicFailure({Object? cause}) {
+    return AppFailure(
+      code: 'wallet_mnemonic_invalid',
+      kind: AppFailureKind.validation,
+      userMessage: 'The recovery phrase checksum is not valid.',
+      retryable: false,
+      cause: cause,
+    );
+  }
 
   static DateTime _utcNow() => DateTime.now().toUtc();
 }
