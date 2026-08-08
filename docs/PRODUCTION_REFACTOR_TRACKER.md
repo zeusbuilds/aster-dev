@@ -11,7 +11,7 @@ verified on the exact candidate commit.
 - Baseline date: 2026-08-08 (Asia/Kolkata)
 - Target product: UTEXO Bitcoin, RGB USDT, and Lightning wallet
 - SDK target: `rgb_sdk_flutter` at `3dd82e23d80bb4bb6a2d2526c6c6741ac1ea1236`
-- Current phase: Phase 3, design system and shared UX
+- Current phase: Phase 4, onboarding and settings
 - Release status: not eligible for funds-bearing release
 
 Statuses are `unreviewed`, `reviewed-clean`, `fixing`, `verified`, `blocked`,
@@ -46,11 +46,11 @@ and relevant tests/builds have passed on the recorded commit.
 | DEC-015 | verified | Do not wrap native SDK calls in an app-side timeout that releases the serialization queue while native work may still be running. | The pinned SDK owns typed native timeout/quarantine behavior. The app adds bounded network timeouts around app-owned HTTP only; runtime ordering tests pass at `1b3273a`. |
 | DEC-016 | verified | Protect wallet files with foreground-only iOS data protection and exclude them from backup; disable Android cloud backup and device transfer. | Native bridge and real platform tests prove the file policy; the exact Android release manifest proves backup/transfer exclusion at `1b3273a`. |
 | DEC-017 | verified | Reject the pre-existing protected regtest host ports from app configuration. | Configuration tests at `1b3273a` reject `18443`, `50001`, and `3000` on loopback and Android emulator host aliases. No protected stack resource was inspected or mutated. |
-| DEC-018 | fixing | Preserve the established shape language: true stadium geometry for pills, rounded superellipses for cards/tiles/fields/sheets, and circles only for circular affordances. | ThemeData, shared controls, and feature surfaces must share this policy; no palette or font values change. |
-| DEC-019 | fixing | Runtime window insets are layout environment, not spacing tokens. | Move `padding`, `viewPadding`, and `viewInsets` access to a typed window-insets API; use `SafeArea` for ordinary roots and explicit persistent/keyboard insets only where composition requires them. |
-| DEC-020 | fixing | Route all tactile feedback through one injectable semantic haptic service. | Capability probing is shared/cached; library failures are swallowed; disabled/loading/cancelled interactions emit nothing; result haptics occur only after confirmed outcomes. |
-| DEC-021 | fixing | Present transient messages through one bounded FIFO toast queue with deduplication and an app-root host. | Remove static overlay ownership and SnackBar divergence; support success/failure/warning/info, accessible dismissal, safe text, and reduced motion. |
-| DEC-022 | fixing | Resolve animation durations through one reduced-motion policy and mute offscreen feature tickers. | `MediaQuery.disableAnimations`/platform accessibility must collapse decorative transitions while retaining final state and truthful loading status. |
+| DEC-018 | verified | Preserve the established shape language: true stadium geometry for pills, rounded superellipses for cards/tiles/fields/sheets, and circles only for circular affordances. | ThemeData, shared controls, feature surfaces, shape tests, and the approved golden share this policy without changing palette or font values. |
+| DEC-019 | verified | Runtime window insets are layout environment, not spacing tokens. | Typed `AsterWindowInsets` owns `padding`, `viewPadding`, and `viewInsets`; composition tests prove safe, system, and keyboard spaces remain distinct. |
+| DEC-020 | verified | Route all tactile feedback through one injectable semantic haptic service. | Capability probing is shared/cached, failures cannot block actions, disabled/loading controls emit nothing, and direct plugin use is restricted to the adapter. |
+| DEC-021 | verified | Present transient messages through one bounded FIFO toast queue with deduplication and an app-root host. | The bounded injectable controller supports success/failure/warning/info, accessible dismissal, safe text, deterministic advancement, and reduced motion. |
+| DEC-022 | verified | Resolve animation durations through one reduced-motion policy and mute offscreen feature tickers. | Decorative loops settle when motion is disabled; navigation/toast/component transitions use effective durations; inactive tabs disable tickers and interaction. |
 
 ## Baseline Evidence
 
@@ -105,6 +105,25 @@ Baseline screenshots are stored in `docs/release/evidence/baseline/`.
 | Tracker inventory | Pass | 295 non-generated repository files; inventory validator and staged diff checks pass. |
 | Delivery | Blocked | Push of `1b3273a` to the configured Zeus origin failed with GitHub `Repository not found`; GIT-001 remains open and no remote/global identity was changed. |
 
+## Phase 3 Evidence
+
+| Check | Result | Exact evidence |
+| --- | --- | --- |
+| Implementation commits | Recorded | `98b7a40` (`Normalize presentation systems and interaction feedback`) and `3f1215b` (`Enforce accessible presentation contrast and goldens`). |
+| Palette and fonts | Pass | Existing color values are unchanged. Bundled DM Sans remains the UI family and Public Sans is applied only to numeric spans; symbols, units, labels, addresses, and asset names remain DM Sans. |
+| Generation | Pass | `fvm dart run build_runner build` processed 212 inputs; an immediate second run skipped all 212 and wrote zero outputs. |
+| Format and analysis | Pass | The Phase 3 candidate passes repository-wide Dart formatting and `fvm flutter analyze --fatal-warnings --fatal-infos` with zero diagnostics. |
+| Host tests | Pass | `fvm flutter test --coverage`; 153 tests pass, including shape, numeric typography, haptic failure isolation, bounded toast ordering/deduplication, reduced motion, hidden-tab ticker suppression, keyboard activation, navigation geometry, golden, touch-target, label, and contrast checks. |
+| Coverage | Partial, tracked | 2,897 of 7,341 instrumented Dart lines, 39.46%. Presentation infrastructure is covered materially; feature end-to-end, onboarding, payment flows, and measured performance remain TEST-001. |
+| Golden and accessibility | Pass | `test/goldens/presentation_components.png` was rendered with bundled app and icon fonts and visually inspected. Flutter's Android tap-target, labeled-target, and text-contrast guidelines pass. A discovered 3.24:1 tertiary-copy misuse was corrected without changing palette values. |
+| Dart documentation | Pass | Fresh isolated `dart doc` output contains 190 public libraries with zero warnings and zero errors. |
+| iOS simulator build | Pass with tracked SDK warning | Clean `fvm flutter build ios --simulator --debug`; Runner executable is 123,808 bytes, SHA-256 `177baf78ac956c10a20b9c3ff89e591787613165e7a39fadccfda57f0d729704`. The immutable SDK's CocoaPods-only integration remains SDK-002. |
+| iOS install and launch | Pass with newly tracked product blocker | XcodeBuildMCP built, installed, and launched on iPhone Air / iOS 26.5 as process 2997. Existing simulator data correctly failed closed at legacy-wallet detection, but the screen provides no recovery action; STORE-008 records that Phase 4 blocker. |
+| Android release build | Pass with tracked constraints | Clean arm64 release APK is 247,705,546 bytes, SHA-256 `a9e4054078ed8b769916345834ac4110432ea27f2df1a251069de312146d85c7`. Debug signing remains PLAT-001 and built-in Kotlin migration remains PLAT-002. |
+| Policy searches | Pass for Phase 3 scope | Direct haptic plugin use exists only in its adapter; feature/shared UI has no raw `Color`/`Colors`, typography-size/weight overrides, `SnackBar`, `ScaffoldMessenger`, `OverlayEntry`, rounded-rectangle shape, or `ClipRRect` leakage. Remaining scan plugin ownership is independently tracked as ARCH-004. |
+| Tracker inventory | Pass | 312 non-generated repository files after Phase 3, including presentation-system docs and golden evidence; inventory sync and verifier pass. |
+| Delivery | Blocked | Pushes of `98b7a40` and `3f1215b` to the configured Zeus origin failed with GitHub `Repository not found`; no remote or global Git identity was changed. |
+
 ## Phase Plan
 
 | Phase | Scope | Status | Exit evidence |
@@ -112,8 +131,8 @@ Baseline screenshots are stored in `docs/release/evidence/baseline/`.
 | 0 | Inventory, baseline, tracker, decisions, and audit tooling | verified | Inventory validator, baseline evidence, all files classified. |
 | 1 | Flutter/Dart pin, dependency resolution, analysis, generation, fonts, CI, and platform baseline | verified | Clean format/analyze/test/doc plus iOS and Android compile. |
 | 2 | Domain architecture, SDK lifecycle, repositories, models, error/result policy, networking, storage, and security | verified | Unit/contract/fault tests, real platform storage tests, and both platform builds pass at `1b3273a`. |
-| 3 | Design system and shared UX systems | fixing | Token audit, accessibility/widget/golden tests, reduced-motion behavior. |
-| 4 | Onboarding and settings | unreviewed | Create/import/restart/unit/advanced end-to-end evidence. |
+| 3 | Design system and shared UX systems | verified | Semantic shape/inset/haptic/toast/motion systems, strict analysis, 153 host tests, approved golden/accessibility gates, and both platform builds pass at `3f1215b`. |
+| 4 | Onboarding and settings | fixing | Create/import/restart/unit/advanced end-to-end evidence. |
 | 5 | Home, send, receive, swap, activity, and transaction details | unreviewed | Truthful four-rail flows and integration/widget evidence. |
 | 6 | Documentation, performance, memory, platform hardening, and release evidence | unreviewed | Exact-candidate release report with measurements and constraints. |
 | 7 | Independent file-by-file closeout | unreviewed | Zero unreviewed files and zero untracked non-accepted findings. |
@@ -130,7 +149,7 @@ Baseline screenshots are stored in `docs/release/evidence/baseline/`.
 | LIFE-001 | P0 | Lifecycle | verified | No single serialized owner existed for native wallet init, unlock, sync, reinit, shutdown, and destroy. | Source inventory and fault-path review | `1b3273a` | One injectable `WalletRuntime` serializes every native lifecycle and operation path; concurrency, reinit, rollback, disposal, and retry tests pass. |
 | SEC-001 | P0 | Logging | verified | The unused HTTP logging interceptor could emit request/response bodies and sensitive native/network material. | `lib/core/network/interceptors/logging_interceptor.dart` | `8e97370` | Dead Chopper/interceptor surface and dependencies removed; repository search and fatal analysis pass. A production logging policy is still required in Phase 2. |
 | PLAT-001 | P0 | Platform identity | blocked | Android/iOS use `com.example` identifiers and Android release uses debug signing. | Platform build files; DEC-006 | - | - |
-| TEST-001 | P0 | Testing | fixing | Baseline had only two token assertions and no behavioral, platform, integration, accessibility, golden, lifecycle, or performance coverage. | Baseline and Phase 2 test runs | `1b3273a` | 137 host tests pass with 34.64% line coverage plus two real tests on each platform. UI, accessibility, golden, end-to-end, and measured performance coverage remains open. |
+| TEST-001 | P0 | Testing | fixing | Baseline had only two token assertions and no behavioral, platform, integration, accessibility, golden, lifecycle, or performance coverage. | Baseline through Phase 3 test runs | `1b3273a`, `3f1215b` | 153 host tests pass with 39.46% line coverage plus real storage tests on each platform and presentation golden/accessibility gates. Feature end-to-end and measured performance coverage remains open. |
 | BUILD-001 | P1 | Android | verified | Baseline Android build could not download Gradle and therefore did not compile. | Baseline `flutter build apk --debug` timeout | `8e97370` | Exact current-candidate x86_64 debug APK packages successfully; artifact hash is recorded above. |
 | DOC-001 | P1 | Documentation | unreviewed | Architecture and setup material describe Aster/GDK/Boltz/Liquid-era concepts instead of the target UTEXO SDK architecture. | `README.md`, `docs/architecture/` | - | - |
 | DOC-002 | P2 | API docs | verified | `dart doc` emitted two unresolved `[enableLogging]` references. | Baseline dartdoc output | `8e97370` | `dart doc --validate-links` completes with zero warnings and zero errors. |
@@ -140,8 +159,8 @@ Baseline screenshots are stored in `docs/release/evidence/baseline/`.
 | FLAG-001 | P2 | Assets/dependencies | unreviewed | `circle_flags`, `country_flags`, and `flag` coexist despite one required flag implementation. | `pubspec.yaml` and settings/send imports | - | - |
 | FONT-001 | P1 | Determinism | verified | UI typography relied on `google_fonts` rather than bundled exact DM Sans and Public Sans assets. | Theme source and `pubspec.yaml` | `8e97370` | Exact variable fonts and OFL licenses are bundled with recorded provenance/checksums; iOS and Android builds pass offline font registration. |
 | NET-001 | P1 | Reliability | verified | The network layer lacked a uniform timeout, idempotent retry/backoff, failure taxonomy, and safe observability policy. | `lib/core/network/`; transport fault tests | `1b3273a` | Abortable GET-only retries run under one monotonic budget with bounded backoff/jitter, `Retry-After`, body limits, and redacted typed failures; all fault tests pass. |
-| UX-001 | P1 | Shared UX | fixing | Haptics are called directly from widgets with repeated capability probes and no semantic/testable policy owner. | Six direct plugin call sites plus `CustomButton`; DEC-020 | - | Implement the semantic service, migrate every call site, and add capability/failure/intent tests. |
-| UX-002 | P1 | Shared UX | fixing | Toasts are not owned by a queued/deduplicated service and scan uses `SnackBar`; settings uses fake success/failure demonstrations. | Toast/SnackBar search; DEC-021 | - | Replace with bounded queued presentation; fake outcomes must become truthful info/unavailable states or be removed. |
+| UX-001 | P1 | Shared UX | verified | Haptics were called directly from widgets with repeated capability probes and no semantic/testable policy owner. | Direct plugin call-site audit; DEC-020 | `98b7a40` | One injectable semantic service owns cached capability and failure isolation; all app consumers use intents and adapter fault tests pass. |
+| UX-002 | P1 | Shared UX | verified | Toasts lacked queued/deduplicated ownership, scan used `SnackBar`, and settings exposed fake result demonstrations. | Toast/SnackBar/overlay search; DEC-021 | `98b7a40` | One bounded FIFO controller and app-root host own accessible result presentation; direct alternatives and fake settings demonstrations are removed; queue tests pass. |
 | ACCESS-001 | P1 | Accessibility | unreviewed | Baseline semantics include empty/duplicated labels and omit editable mnemonic fields. | Xcode runtime accessibility snapshots | - | - |
 | ROUTE-001 | P1 | Routing | unreviewed | Current routes do not model asset/rail flow state or transaction details by stable ID. | Routing source inventory | - | - |
 | HOME-001 | P1 | Home | unreviewed | The visibility control is not wired or persisted; asset rows do not represent BTC/RGB aggregate balances from real data. | Baseline Home and source | - | - |
@@ -149,18 +168,18 @@ Baseline screenshots are stored in `docs/release/evidence/baseline/`.
 | SWAP-001 | P1 | Swap | unreviewed | Swap assets do not match the target domain and execution must be made explicitly unavailable without simulating success. | Swap source; CON-002 | - | - |
 | TX-001 | P1 | Activity | unreviewed | There is no normalized cross-rail activity model or transaction-details route/screen. | Transaction source inventory | - | - |
 | SETTINGS-001 | P1 | Settings | unreviewed | Bitcoin unit and required advanced wallet/network settings are absent or placeholders. | Baseline Settings and source | - | - |
-| SAFE-001 | P2 | Layout | fixing | Safe-area helpers live in spacing, mix `padding` and `viewPadding` behind ambiguous `Raw` names, and several forms/sheets manually pad where `SafeArea` should own keyboard-aware behavior. | Insets and SafeArea call-site audit; DEC-019 | - | Introduce typed window insets, migrate every helper call, prevent double padding, and test keyboard-open/closed semantics. |
+| SAFE-001 | P2 | Layout | verified | Safe-area helpers lived in spacing and mixed `padding`, `viewPadding`, and keyboard obstruction behind ambiguous names. | Insets and SafeArea call-site audit; DEC-019 | `98b7a40` | Typed window insets own safe/system/keyboard spaces, spacing is purely spatial, consumers avoid double padding, and composition tests pass. |
 | PERF-001 | P1 | Performance | unreviewed | No measured launch, frame, memory, leak, rebuild, cache, or SDK-handle baseline exists. | Test/tooling inventory | - | - |
 | SEC-002 | P0 | Seed security | verified | Two hardcoded 12-word mnemonics were compiled into the app, printed around migration activity, and written to secure storage at startup. | `lib/core/utils/wallet_migration_service.dart`; `lib/main.dart` | `8e97370` | Migration and startup writes removed; repository search contains no mnemonic fixture or logging path. |
 | SEC-003 | P0 | Seed privacy | verified | Legacy wallet identity and display name were deterministically derived directly from mnemonic text, creating a stable seed fingerprint outside the SDK lifecycle. | `wallet_id_generator.dart`; legacy `wallet_model.dart` | `8e97370` | Seed-derived generator removed; replacement `WalletProfile` accepts only an opaque post-SDK wallet ID and non-secret metadata. |
-| GIT-001 | P1 | Delivery | blocked | Repository-local Zeus commits succeed, but the active host credential is not authorized for origin and GitHub returns `Repository not found`. | Pushes of `163a3cf`, `8e97370`, and `1b3273a` | - | Restore project-scoped Zeus access; do not change global identity or remote. |
+| GIT-001 | P1 | Delivery | blocked | Repository-local Zeus commits succeed, but the active host credential is not authorized for origin and GitHub returns `Repository not found`. | Pushes through `98b7a40` and `3f1215b` | - | Restore project-scoped Zeus access; do not change global identity or remote. |
 | BUILD-002 | P1 | Code generation | verified | The original Riverpod 2.4 generator used analyzer 6.4, which only understood Dart 3.4 while the app now uses Dart 3.12. | Baseline Phase 1 build-runner warning | `8e97370` | Riverpod 3.3.2 / generator 4.0.4 resolves analyzer 12.1; generation completes without a language-version warning. |
 | ARCH-001 | P1 | Networking/DI | verified | Unused Chopper clients, duplicate interceptors, and no-op DI modules exposed stale APIs and an unsafe body logger. | Consumer search found definitions only | `8e97370` | Removed the dead Chopper surface and dependency; fatal analyzer is clean. |
 | PLAT-002 | P2 | Android toolchain | blocked | Flutter 3.44 warns that the app and `haptic_feedback`, `mobile_scanner`, and `rgb_sdk_flutter` apply the legacy Kotlin Gradle plugin, which a future Flutter release will reject. | Exact Android build output | - | App migration requires Flutter 3.47+; plugin owners must also publish built-in Kotlin support. Current AGP 9.0.1/Kotlin 2.3.20 build passes with Flutter-generated compatibility flags. |
 | SDK-002 | P2 | iOS packaging | blocked | The pinned `rgb_sdk_flutter` revision does not support Swift Package Manager, which Flutter warns will become mandatory in a future release. | Exact iOS simulator build output | - | CocoaPods integration passes now; resolve in a future immutable SDK revision before Flutter removes fallback support. |
 | TOOL-001 | P2 | Build environment | verified | Host disk exhaustion interrupted the first exact Android APK packaging attempt after compilation. | `:app:packageDebug` `No space left on device` | - | Removed only disposable caches and local build output; identical candidate build passed without touching protected regtest, simulator/emulator, source, or user data. |
 | TOOL-002 | P3 | iOS simulator | blocked | iOS 26.5 logs duplicate `UIAccessibilityLoaderWebShared` implementations from its WebCore and WebKit accessibility bundles during launch. | Exact Phase 1 runtime log for process 45978 | - | This originates inside the Apple simulator runtime, not the app bundle. Recheck on a future simulator runtime and physical device; no app exception accompanied it. |
-| SEC-004 | P0 | Error privacy | fixing | Route errors and generic HTTP/exception handling could expose raw exception strings or response bodies to users and diagnostics. | `app_router.dart`; removed `error_handler.dart`; failure tests; `scan_camera.dart` | - | Phase 2 route, transport, SDK, storage, and bootstrap paths expose stable redacted messages/codes only. Scanner UI still renders `error.toString()` and must be normalized in the Phase 3/5 UI audit before this finding can close. |
+| SEC-004 | P0 | Error privacy | verified | Route errors and generic HTTP/exception handling could expose raw exception strings or response bodies to users and diagnostics. | `app_router.dart`; removed `error_handler.dart`; failure tests; scanner presentation audit | `1b3273a`, `98b7a40` | Route, transport, SDK, storage, bootstrap, and scanner presentation expose stable redacted messages/codes only; strict searches and failure tests pass. |
 | LIFE-002 | P0 | Bootstrap | verified | App initialization had no typed failure state or recovery path; an exception could leave a blank app under an indefinitely visible splash. | `app_loader.dart::_load`; widget retry test | `1b3273a` | Startup has explicit typed failure/retry UI, unknown-outcome protection, timer cancellation, and deterministic container/runtime cleanup; widget and fault tests pass. |
 | ARCH-002 | P1 | MVVM boundary | verified | `PriceCard` called a static HTTP service directly and owned request state, violating View -> ViewModel -> Repository/service flow and preventing injection. | Removed `bitcoin_price_service.dart`; repository tests | `1b3273a` | An injected repository and generated AsyncNotifier own the request; the widget renders truthful loading/unavailable/retry states and tests pass. |
 | WALLET-001 | P0 | Wallet metadata | verified | The temporary SharedPreferences wallet registry used unsynchronized read-modify-write operations and did not integrate corruption recovery or native lifecycle transactions. | `wallet_repository.dart`; storage/repository fault tests | `1b3273a` | A serialized v3 journal and staged provisioning transaction handle corruption, uncertain commits, rollback, and startup reconciliation; fault matrix passes. |
@@ -196,17 +215,19 @@ Baseline screenshots are stored in `docs/release/evidence/baseline/`.
 | PLAT-005 | P1 | Android compilation | verified | The first native policy implementation called unavailable `android.system.Os.rmdir`, breaking Kotlin compilation. | Android integration build failure and corrected bridge | `1b3273a` | Cleanup verifies an empty owned directory and uses checked `File.delete()` with bounded error mapping; Android integration and release builds pass. |
 | TOOL-003 | P2 | Physical iOS evidence | blocked | The app built and installed on a connected iPhone, but Flutter could not attach to the VM service over the wireless/local-network path. | Device `00008130-000A552C3EBA001C` run log | - | This does not invalidate simulator/native test evidence, but physical iOS runtime, haptic, performance, and memory evidence remains required in Phase 6. |
 | DOC-004 | P1 | Documentation gate | fixing | Reusing the ignored default `doc/api` output retained obsolete pages and produced 217 false stale-file warnings. | First Phase 2 dartdoc run versus fresh-output rerun | - | A fresh isolated output produced 178 libraries with zero warnings/errors. Phase 6 must make that clean-output behavior part of the repeatable release command and CI/documentation contract. |
-| DS-001 | P1 | Shape system | fixing | Material theme components and several shared/feature surfaces use `RoundedRectangleBorder`, `BoxDecoration`, or `ClipRRect` where the product contract requires a squircle; pill controls are not modeled separately. | `app_theme.dart`; bottom nav; bottom sheets; button audit | - | Introduce one explicit squircle-versus-pill component policy and migrate every audited surface without changing color values. |
-| DS-002 | P1 | Numeric typography | fixing | `NumericText` applies Public Sans to the entire string and numeric chunking includes `$` and `%`, so symbols/units can receive the numeric font. A null style also fails to apply Public Sans at all. | `amount_text.dart`; all numeric call sites | - | Both helpers must style only digit/separator/sign spans from the resolved inherited style; currency symbols, units, labels, and asset names remain DM Sans. |
-| DS-003 | P1 | Theme integrity | fixing | `ThemeContext` silently constructs fallback extensions when the app theme is incomplete, masking missing token registration and creating inconsistent component output. | `theme_context.dart`; bootstrap theme ownership | - | Ensure every app/bootstrap surface is under `AppTheme.light()` and fail fast when a required extension is absent. |
-| DS-004 | P2 | Component recipes | fixing | Loader and chart visual recipes still expose or embed reusable sizes, alpha values, and transition geometry outside their owning metric/effect/art systems. | `grid_loader.dart`; `candle_chart.dart`; splash art | - | Move repeatable component/art decisions to semantic metric/effect/art tokens; retain only mathematical interpolation local to painters. |
-| MOTION-001 | P1 | Reduced motion | fixing | Looping loaders, shimmer, chart choreography, splash, button scale, nav motion, toast motion, and swap choreography ignore the platform's disable-animation preference. | Animation-controller and implicit-animation audit | - | Add one effective-duration/reduced-motion policy; decorative loops stop on a stable frame and state transitions complete without timers when motion is disabled. |
-| MOTION-002 | P1 | Offscreen work | fixing | `IndexedStack` keeps feature screens mounted without explicitly muting their tickers, allowing hidden charts/animations to consume resources. | `skeleton_screen.dart`; ticker audit | - | Wrap each tab in active-state `TickerMode` and verify hidden screens cannot animate or receive interaction. |
-| ACCESS-002 | P1 | Interactive controls | fixing | Shared tap surfaces rely on `GestureDetector`, omit keyboard/focus behavior, can duplicate semantics, and do not consistently expose loading/dismiss state. | `custom_button.dart`; app bar; bottom nav; toast; selection rows | - | Normalize focus/keyboard/touch targets/semantics and add widget/accessibility tests. |
-| UX-003 | P1 | Button behavior | fixing | `CustomButton` fires haptics on pointer-down before an accepted tap, probes capability per press, and has no semantic commit/navigation intent. | `custom_button.dart`; haptic call sites | - | Trigger one semantic haptic only for an accepted enabled action; loading remains size-stable, blocks duplicates, and is announced. |
-| UX-004 | P2 | Selection choreography | fixing | Wallet and asset selection insert a fixed post-success delay before navigation, even under reduced motion, and can leave context-owned timers outside a single choreography policy. | wallet selection; asset selector sheet | - | Resolve or remove commit delay through the motion policy and navigate only after actual selection success. |
+| DS-001 | P1 | Shape system | verified | Material theme components and several shared/feature surfaces used rounded rectangles where the product contract requires squircles, while pills were not modeled separately. | Theme, surface, bottom-sheet, navigation, and control audit | `98b7a40` | Theme and controls use rounded superellipses or true stadiums by semantic role; type assertions and golden review pass with unchanged palette values. |
+| DS-002 | P1 | Numeric typography | verified | `NumericText` applied Public Sans to entire mixed strings and included symbols/units in numeric chunks. | `amount_text.dart`; all numeric call sites | `98b7a40` | Numeric-span parsing tests and golden inspection prove only digits, signs, and numeric separators use Public Sans; surrounding copy inherits DM Sans. |
+| DS-003 | P1 | Theme integrity | verified | `ThemeContext` silently constructed fallback extensions when the app theme was incomplete. | `theme_context.dart`; bootstrap theme ownership | `98b7a40` | Every app/bootstrap surface is themed and missing required extensions fail fast under explicit widget tests. |
+| DS-004 | P2 | Component recipes | verified | Loader, chart, and splash visual recipes exposed reusable geometry and effects outside owning semantic systems. | Component metrics, effects, art, loader, chart, and splash audit | `98b7a40` | Reusable geometry/effects live in semantic extensions; local painters retain only derived interpolation. Golden, reduced-motion, and update tests pass. |
+| MOTION-001 | P1 | Reduced motion | verified | Looping loaders, shimmer, chart choreography, splash, button scale, navigation, toast, and swap choreography ignored the platform's disable-animation preference. | Animation-controller and implicit-animation audit | `98b7a40` | One motion policy resolves effective duration; decorative loops stop in a stable state and transitions complete safely when motion is disabled. |
+| MOTION-002 | P1 | Offscreen work | verified | `IndexedStack` kept feature screens mounted without explicitly muting hidden tickers or interaction. | `skeleton_screen.dart`; ticker and semantics tests | `98b7a40` | Inactive tabs use `TickerMode`, `IgnorePointer`, and excluded semantics; hidden screens remain mounted without animation or input work. |
+| ACCESS-002 | P1 | Interactive controls | verified | Shared tap surfaces relied on `GestureDetector`, omitted keyboard/focus behavior, and inconsistently exposed loading/dismiss state. | Shared controls, app bar, navigation, toast, selection rows | `98b7a40`, `3f1215b` | Controls have keyboard activation, focus, semantic state, minimum targets, stable loading geometry, and passing accessibility guidelines. Onboarding-specific semantics remain ACCESS-001. |
+| ACCESS-003 | P1 | Text contrast | verified | Tertiary text at 3.24:1 was used for meaningful 12-14 pt copy and placeholders on white. | Contrast guideline failure and audited role consumers | `3f1215b` | Meaningful secondary copy now uses the existing higher-contrast semantic role; tertiary remains decorative/icon-only. Palette values are unchanged and contrast tests pass. |
+| UX-003 | P1 | Button behavior | verified | `CustomButton` fired haptics on pointer-down before an accepted tap, probed capability per press, and lacked deterministic loading semantics. | `custom_button.dart`; haptic service tests | `98b7a40` | One semantic haptic occurs only after an accepted enabled action; disabled/loading controls emit nothing, block duplicates, remain size-stable, and announce progress. |
+| UX-004 | P2 | Selection choreography | verified | Wallet and asset selection inserted a fixed post-success delay before navigation and ignored reduced motion. | Wallet selection; asset selector sheet | `98b7a40` | Commit delay resolves through the motion policy and navigation occurs only after confirmed selection success; reduced motion removes decorative delay. |
 | ARCH-004 | P1 | Plugin boundary | unreviewed | Scan presentation constructs `ImagePicker` and `MobileScannerController` directly, contrary to the View -> ViewModel -> repository/service boundary. | scan screen/widget import audit | - | Move plugin ownership behind an injectable scanner/media service during the scan/send integration phase; do not hide the gap in Phase 3. |
-| NAV-001 | P1 | Bottom navigation | fixing | The second bottom-nav item is announced as “Cards” with a card icon while it opens Scan, and the floating nav ignores the persistent bottom hardware inset. | `bottom_nav.dart`; `skeleton_index_provider.dart` | - | Use the correct Scan label/icon, semantic selection haptic, squircle surface, and explicit bottom-system-inset geometry. |
+| NAV-001 | P1 | Bottom navigation | verified | The second bottom-nav item was announced as “Cards” while opening Scan, and the floating nav ignored the persistent bottom hardware inset. | `bottom_nav.dart`; `skeleton_index_provider.dart` | `98b7a40` | Scan label/icon, selection state/haptic, equal stable slots, centered indicator, squircle surface, and persistent bottom inset pass widget regression tests. |
+| STORE-008 | P0 | Legacy recovery UX | fixing | Fail-closed legacy-wallet detection presents an explanatory terminal state with no recovery, import, reset, or support action, leaving an existing user unable to proceed. | Exact `3f1215b` iPhone Air launch with pre-refactor simulator data | - | Phase 4 must provide an explicit non-destructive recovery route and keep destructive reset unavailable unless ownership and user confirmation are proven. |
 
 ## Generated Artifact Validation
 
@@ -280,17 +301,17 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `assets/texture/shape.png` | Asset | unreviewed | - | - | - |
 | `devtools_options.yaml` | Project configuration | unreviewed | - | - | - |
 | `docs/DEVELOPMENT.md` | Documentation | verified | DOC-003, CONFIG-003 | Commands, toolchain, SDK override, compile-time service configuration, and protected-regtest isolation match executable policy | `1b3273a` |
-| `docs/PRODUCTION_REFACTOR_TRACKER.md` | Documentation | verified | - | Inventory validator, Phase 1/2 evidence reconciliation, and Markdown review | `1b3273a` |
+| `docs/PRODUCTION_REFACTOR_TRACKER.md` | Documentation | verified | STORE-008, TEST-001, GIT-001 | Inventory, Phase 1-3 evidence, newly discovered blockers, and status claims reconciled to executable evidence | `1b3273a`, `3f1215b` |
 | `docs/architecture/ARCHITECTURE_GOOGLE_STYLE.md` | Documentation | unreviewed | - | - | - |
 | `docs/architecture/ARCHITECTURE_SUMMARY.md` | Documentation | unreviewed | - | - | - |
 | `docs/architecture/BARREL_EXPORTS.md` | Documentation | unreviewed | - | - | - |
 | `docs/architecture/NETWORK_RELIABILITY.md` | Documentation | verified | NET-001, NET-002, NET-003, LIFE-004 | Retry, timeout, cancellation, reachability, mutation, and native-timeout ownership match implementation/tests | `1b3273a` |
 | `docs/architecture/SDK_INTEGRATION.md` | Documentation | verified | SDK-001, DOC-003, LIFE-001, CONFIG-003 | Immutable pin, local override, runtime ownership, adapter boundary, lifecycle, and isolated regtest policy match implementation | `1b3273a` |
-| `docs/design/DESIGN_SYSTEM_NORMALIZATION_TRACKER.md` | Documentation | unreviewed | - | - | - |
+| `docs/design/DESIGN_SYSTEM_NORMALIZATION_TRACKER.md` | Documentation | verified | DS-001, DS-002, DS-003, DS-004, ACCESS-003 | Truthful semantic-token contract replaces the stale zero-issue claim and matches audited implementation/tests | `98b7a40`, `3f1215b` |
 | `docs/design/DOCSTRING_PATTERNS.md` | Documentation | unreviewed | - | - | - |
-| `docs/design/HAPTIC_FEEDBACK.md` | Documentation | unreviewed | - | - | - |
-| `docs/design/PRESENTATION_SYSTEMS.md` | Documentation | unreviewed | - | - | - |
-| `docs/design/TYPOGRAPHY_USAGE.md` | Documentation | unreviewed | - | - | - |
+| `docs/design/HAPTIC_FEEDBACK.md` | Documentation | verified | UX-001, UX-003 | Semantic intent matrix, no-op rules, ownership, failure isolation, and testing match the implemented service | `98b7a40` |
+| `docs/design/PRESENTATION_SYSTEMS.md` | Documentation | verified | UX-001, UX-002, SAFE-001, MOTION-001 | Haptic, toast, inset, loading, and reduced-motion contracts match implementation and tests | `98b7a40` |
+| `docs/design/TYPOGRAPHY_USAGE.md` | Documentation | verified | DS-002, ACCESS-003 | DM Sans/Public Sans span ownership and semantic contrast guidance match tested behavior | `3f1215b` |
 | `docs/release/evidence/baseline/ios-home-bbbc315.jpg` | Documentation | reviewed-clean | HOME-001, DATA-001 | Captured from exact baseline commit on iPhone Air | `163a3cf` |
 | `docs/release/evidence/baseline/ios-import-bbbc315.jpg` | Documentation | reviewed-clean | ONB-001, ACCESS-001 | Captured from exact baseline commit on iPhone Air | `163a3cf` |
 | `docs/release/evidence/baseline/ios-receive-bbbc315.jpg` | Documentation | reviewed-clean | RECV-001 | Captured from exact baseline commit on iPhone Air | `163a3cf` |
@@ -386,13 +407,13 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `lib/features/receive/presentation/screens/screens.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/receive/presentation/widgets/receive_card.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/receive/presentation/widgets/widgets.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/scan/presentation/screens/scan_screen.dart` | Dart source | unreviewed | - | - | - |
+| `lib/features/scan/presentation/screens/scan_screen.dart` | Dart source | fixing | ARCH-004, SEC-004 | User-visible failures are redacted and feedback is semantic; plugin/service ownership remains Phase 5 | `98b7a40` |
 | `lib/features/scan/presentation/screens/screens.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/scan/presentation/view_model/scan_state.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/scan/presentation/view_model/scan_view_model.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/scan/presentation/view_model/view_model.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/scan/presentation/widgets/scan_background.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/scan/presentation/widgets/scan_camera.dart` | Dart source | unreviewed | - | - | - |
+| `lib/features/scan/presentation/widgets/scan_camera.dart` | Dart source | fixing | ARCH-004, SEC-004 | Raw exception rendering removed; direct scanner-plugin controller ownership remains Phase 5 | `98b7a40` |
 | `lib/features/scan/presentation/widgets/scan_control_button.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/scan/presentation/widgets/scan_enter_address_button.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/scan/presentation/widgets/scan_frame.dart` | Dart source | unreviewed | - | - | - |
@@ -416,8 +437,8 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `lib/features/skeleton/presentation/providers/providers.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/skeleton/presentation/providers/skeleton_index_provider.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/skeleton/presentation/screens/screens.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/skeleton/presentation/screens/skeleton_screen.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/skeleton/presentation/widgets/bottom_nav.dart` | Dart source | unreviewed | - | - | - |
+| `lib/features/skeleton/presentation/screens/skeleton_screen.dart` | Dart source | verified | MOTION-002, NAV-001 | Hidden tabs retain state while tickers, semantics, and pointer input are disabled; widget tests pass | `98b7a40` |
+| `lib/features/skeleton/presentation/widgets/bottom_nav.dart` | Dart source | verified | NAV-001, ACCESS-002 | Correct destinations, stable equal slots, centered indicator, semantics, haptics, shape, and bottom inset pass tests | `98b7a40` |
 | `lib/features/skeleton/presentation/widgets/widgets.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/swap/presentation/screens/screens.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/swap/presentation/screens/swap_screen.dart` | Dart source | unreviewed | - | - | - |
@@ -453,69 +474,69 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `lib/features/wallet/presentation/models/models.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/wallet/presentation/models/wallet_state.dart` | Dart source | verified | SDK-001, DEC-012 | Immutable operation-specific state carries domain profiles and typed operation failure; equality reviewed/tested | `1b3273a` |
 | `lib/features/wallet/presentation/pages/pages.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/wallet/presentation/pages/wallet_selection_screen.dart` | Dart source | verified | LIFE-003 | Selection navigates only after confirmed transactional switch; duplicate/selected interactions remain disabled | `1b3273a` |
+| `lib/features/wallet/presentation/pages/wallet_selection_screen.dart` | Dart source | verified | LIFE-003, UX-004, MOTION-001 | Selection navigates only after confirmed transactional switch; duplicate/selected interactions remain disabled and choreography respects reduced motion | `1b3273a`, `98b7a40` |
 | `lib/features/wallet/presentation/view_model/viewmodels.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/wallet/presentation/view_model/wallet_viewmodel.dart` | Dart source | verified | SDK-001, DEC-012, LIFE-003 | Generated AsyncNotifier exposes repository-backed load/switch state, suppresses overlap, and maps typed failures; tests pass | `1b3273a` |
 | `lib/features/wallet/presentation/widgets/wallet_select_option_row.dart` | Dart source | verified | ARCH-003 | Widget consumes domain profile rather than persistence model; strict analysis passes | `1b3273a` |
 | `lib/features/wallet/presentation/widgets/widgets.dart` | Dart source | unreviewed | - | - | - |
-| `lib/main.dart` | Dart source | verified | SEC-002, LIFE-001, LIFE-003, LIFE-005 | One bootstrapped container and serialized lifecycle tail own repository resume/suspend/dispose with redacted debug diagnostics | `1b3273a` |
-| `lib/shared/feedback/feedback.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/feedback/feedback_scope.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/feedback/haptic_feedback_service.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/feedback/toast_controller.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/feedback/toast_host.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/feedback/toast_message.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/layout/layout.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/layout/window_insets.dart` | Dart source | unreviewed | - | - | - |
+| `lib/main.dart` | Dart source | verified | SEC-002, LIFE-001, LIFE-003, LIFE-005, UX-002 | One bootstrapped container and serialized lifecycle tail own repository resume/suspend/dispose; app-root feedback host is scoped without global mutable state | `1b3273a`, `98b7a40` |
+| `lib/shared/feedback/feedback.dart` | Dart source | verified | UX-001, UX-002 | Boundary barrel exports only semantic feedback contracts and scope | `98b7a40` |
+| `lib/shared/feedback/feedback_scope.dart` | Dart source | verified | UX-001, UX-002 | Inherited injectable service scope has deterministic ownership and lookup | `98b7a40` |
+| `lib/shared/feedback/haptic_feedback_service.dart` | Dart source | verified | UX-001, UX-003 | Semantic adapter caches support, serializes safe dispatch, and swallows plugin failure without blocking actions; tests pass | `98b7a40` |
+| `lib/shared/feedback/toast_controller.dart` | Dart source | verified | UX-002 | Bounded FIFO queue, duplicate coalescing, dismissal, and disposal contracts pass deterministic tests | `98b7a40` |
+| `lib/shared/feedback/toast_host.dart` | Dart source | verified | UX-002, MOTION-001, SAFE-001 | App-root host serializes display, supports reduced motion, keyboard insets, accessible dismissal, and lifecycle-safe timers | `98b7a40` |
+| `lib/shared/feedback/toast_message.dart` | Dart source | verified | UX-002 | Immutable semantic message identity/severity contract reviewed and tested | `98b7a40` |
+| `lib/shared/layout/layout.dart` | Dart source | verified | SAFE-001 | Boundary barrel exports only typed runtime layout environment | `98b7a40` |
+| `lib/shared/layout/window_insets.dart` | Dart source | verified | SAFE-001 | Safe, persistent-system, and keyboard inset semantics are distinct and widget-tested | `98b7a40` |
 | `lib/shared/models/asset_model.dart` | Dart source | fixing | DOMAIN-001 | Existing model reviewed; typed asset/rail/environment replacement remains Phase 2 | - |
 | `lib/shared/models/country_model.dart` | Dart source | unreviewed | - | - | - |
 | `lib/shared/models/currency_model.dart` | Dart source | unreviewed | - | - | - |
 | `lib/shared/models/models.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/motion/motion.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/motion/motion_policy.dart` | Dart source | unreviewed | - | - | - |
+| `lib/shared/motion/motion.dart` | Dart source | verified | MOTION-001 | Boundary barrel exports only the effective animation policy | `98b7a40` |
+| `lib/shared/motion/motion_policy.dart` | Dart source | verified | MOTION-001 | Platform/view accessibility settings resolve deterministic effective durations and stable disabled-motion behavior | `98b7a40` |
 | `lib/shared/routing/app_router.dart` | Dart source | fixing | ROUTE-001, SEC-004 | Raw route diagnostics removed and router disposal added; feature route modeling/guards remain Phase 5 | `1b3273a` |
 | `lib/shared/routing/route_config.dart` | Dart source | unreviewed | - | - | - |
 | `lib/shared/routing/route_guards.dart` | Dart source | unreviewed | - | - | - |
 | `lib/shared/routing/route_names.dart` | Dart source | unreviewed | - | - | - |
 | `lib/shared/routing/route_paths.dart` | Dart source | unreviewed | - | - | - |
 | `lib/shared/routing/routing.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/screens/animated_splash_screen.dart` | Dart source | unreviewed | - | - | - |
+| `lib/shared/screens/animated_splash_screen.dart` | Dart source | verified | DS-004, MOTION-001 | Art geometry and phase timing use semantic tokens; cancellation/disposal and reduced-motion terminal state are reviewed/tested | `98b7a40` |
 | `lib/shared/screens/screens.dart` | Dart source | unreviewed | - | - | - |
 | `lib/shared/screens/splash_screen.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/shared.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/theme/app_theme.dart` | Dart source | unreviewed | - | - | - |
+| `lib/shared/shared.dart` | Dart source | verified | DS-001, UX-001, UX-002, SAFE-001, MOTION-001 | Shared boundary exports reviewed presentation-system APIs without implementation cycles | `98b7a40` |
+| `lib/shared/theme/app_theme.dart` | Dart source | verified | DS-001, DS-003, ACCESS-003 | Material components share semantic colors, contrast-safe type, squircles/capsules, and registered extensions; tests/golden/builds pass | `3f1215b` |
 | `lib/shared/theme/theme.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/theme/theme_context.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/theme/tokens/art_tokens.dart` | Dart source | unreviewed | - | - | - |
+| `lib/shared/theme/theme_context.dart` | Dart source | verified | DS-003 | Required extensions fail fast rather than constructing silent fallback token sets; tests pass | `98b7a40` |
+| `lib/shared/theme/tokens/art_tokens.dart` | Dart source | verified | DS-004 | Reusable splash/brand art geometry is semantic, immutable, copyable, and lerpable | `98b7a40` |
 | `lib/shared/theme/tokens/color_tokens.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/theme/tokens/component_metrics_tokens.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/theme/tokens/effects_tokens.dart` | Dart source | unreviewed | - | - | - |
+| `lib/shared/theme/tokens/component_metrics_tokens.dart` | Dart source | verified | DS-004 | Loader, chart, navigation, control, sheet, and touch-target recipes are separated from spacing | `98b7a40` |
+| `lib/shared/theme/tokens/effects_tokens.dart` | Dart source | verified | DS-004 | Semantic visual effects replace reusable local opacity/effect constants in audited components | `98b7a40` |
 | `lib/shared/theme/tokens/gradient_tokens.dart` | Dart source | unreviewed | - | - | - |
 | `lib/shared/theme/tokens/iconography_tokens.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/theme/tokens/motion_tokens.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/theme/tokens/radius_tokens.dart` | Dart source | unreviewed | - | - | - |
+| `lib/shared/theme/tokens/motion_tokens.dart` | Dart source | verified | MOTION-001 | Semantic durations/curves and normalized splash phase intervals are immutable and tested through policy consumers | `98b7a40` |
+| `lib/shared/theme/tokens/radius_tokens.dart` | Dart source | verified | DS-001 | Semantic radii include true capsule ownership while squircle geometry is carried by shape APIs | `98b7a40` |
 | `lib/shared/theme/tokens/shadow_tokens.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/theme/tokens/spacing_tokens.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/theme/tokens/state_layer_tokens.dart` | Dart source | unreviewed | - | - | - |
+| `lib/shared/theme/tokens/spacing_tokens.dart` | Dart source | verified | SAFE-001, DS-004 | Scale contains spatial decisions only; runtime insets and component geometry were removed to owning systems | `98b7a40` |
+| `lib/shared/theme/tokens/state_layer_tokens.dart` | Dart source | verified | DS-004, ACCESS-002 | Disabled/pressed/selected/focus semantic effects are centralized and consumed by shared controls | `98b7a40` |
 | `lib/shared/theme/tokens/stroke_tokens.dart` | Dart source | unreviewed | - | - | - |
 | `lib/shared/theme/tokens/tokens.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/theme/tokens/type_role_tokens.dart` | Dart source | unreviewed | - | - | - |
+| `lib/shared/theme/tokens/type_role_tokens.dart` | Dart source | verified | DS-002, ACCESS-003 | Semantic roles own weight/size/contrast decisions while mixed numeric helpers preserve family boundaries | `3f1215b` |
 | `lib/shared/theme/tokens/typography_tokens.dart` | Dart source | verified | FONT-001 | Local DM Sans/Public Sans role contract reviewed and theme interpolation passes | `8e97370` |
 | `lib/shared/theme/typography.dart` | Dart source | verified | FONT-001 | Runtime font download removed; exact local families and numeric helper build on both platforms | `8e97370` |
-| `lib/shared/widgets/amount_text.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/widgets/app_skeletonizer.dart` | Dart source | unreviewed | - | - | - |
+| `lib/shared/widgets/amount_text.dart` | Dart source | verified | DS-002 | Integer/mixed amount rendering assigns Public Sans only to numeric spans and inherits semantic UI styling elsewhere; tests pass | `98b7a40` |
+| `lib/shared/widgets/app_skeletonizer.dart` | Dart source | verified | MOTION-001 | Shimmer respects reduced motion and preserves truthful loading geometry | `98b7a40` |
 | `lib/shared/widgets/asset_display.dart` | Dart source | unreviewed | - | - | - |
 | `lib/shared/widgets/aster_divider.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/widgets/aster_icon_button.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/widgets/aster_pill.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/widgets/custom_app_bar.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/widgets/custom_button.dart` | Dart source | unreviewed | - | - | - |
+| `lib/shared/widgets/aster_icon_button.dart` | Dart source | verified | ACCESS-002, UX-001 | Semantic labels, focus, target size, state layers, and haptic intent are centralized | `98b7a40` |
+| `lib/shared/widgets/aster_pill.dart` | Dart source | verified | DS-001 | True stadium geometry is encapsulated for pill-only surfaces | `98b7a40` |
+| `lib/shared/widgets/custom_app_bar.dart` | Dart source | verified | ACCESS-002 | Back action uses shared labeled keyboard-operable icon control with semantic haptic | `98b7a40` |
+| `lib/shared/widgets/custom_button.dart` | Dart source | verified | DS-001, ACCESS-002, UX-003, MOTION-001 | Shape, semantics, keyboard/focus, loading stability, duplicate suppression, haptics, and reduced motion pass tests/golden | `98b7a40`, `3f1215b` |
 | `lib/shared/widgets/custom_radio.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/widgets/custom_toast.dart` | Dart source | fixing | UX-002 | Timer/controller disposal corrected; global helper still requires queued injectable service in Phase 3 | `8e97370` |
-| `lib/shared/widgets/detail_row.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/widgets/grid_loader.dart` | Dart source | unreviewed | - | - | - |
+| `lib/shared/widgets/custom_toast.dart` | Dart source | verified | UX-002, ACCESS-002, MOTION-001 | Declarative semantic toast surface has no global overlay ownership and exposes accessible state/dismissal; tests pass | `98b7a40` |
+| `lib/shared/widgets/detail_row.dart` | Dart source | verified | DS-002, ACCESS-003 | Mixed values use numeric spans without restyling units/labels; meaningful metadata meets semantic contrast | `3f1215b` |
+| `lib/shared/widgets/grid_loader.dart` | Dart source | verified | DS-004, MOTION-001 | Geometry/effects are token-owned; ticker lifecycle and stable reduced-motion frame pass tests | `98b7a40` |
 | `lib/shared/widgets/squircle.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/widgets/widgets.dart` | Dart source | unreviewed | - | - | - |
+| `lib/shared/widgets/widgets.dart` | Dart source | verified | DS-001, DS-002, ACCESS-002 | Shared widget boundary exports reviewed public components without private/generated implementation leakage | `98b7a40` |
 | `pubspec.yaml` | Project configuration | verified | BASE-001, SDK-001, DEP-001, DEP-002, DEP-003, DEP-004, FONT-001, FLAG-001 | Immutable SDK pin, compatible constraints, Cupertino font, removed reachability dependency, and assets reviewed; external/transitional findings remain tracked | `1b3273a` |
 | `scripts/git-hooks/pre-commit` | Tooling | verified | BUILD-002 | Non-mutating quality gate executes successfully | `8e97370` |
 | `scripts/install-git-hooks.sh` | Tooling | unreviewed | - | - | - |
@@ -534,12 +555,12 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `test/features/wallet/wallet_runtime_test.dart` | Test | verified | LIFE-001, LIFE-004, SEC-006, STORE-004 | Runtime ordering, rollback, quarantine, reinit, cleanup, audit, and disposal matrix passes | `1b3273a` |
 | `test/features/wallet/wallet_storage_test.dart` | Test | verified | SEC-005, STORE-001, STORE-002, STORE-003, STORE-005, STORE-006, STORE-007 | Credential, journal, corruption, ownership, legacy, collision, and timestamp matrix passes | `1b3273a` |
 | `test/features/wallet/wallet_viewmodel_test.dart` | Test | verified | DEC-012, LIFE-003 | Initial loading overlap suppression passes | `1b3273a` |
-| `test/goldens/presentation_components.png` | Test | unreviewed | - | - | - |
-| `test/goldens/presentation_components_golden_test.dart` | Test | unreviewed | - | - | - |
-| `test/shared/feedback_system_test.dart` | Test | unreviewed | - | - | - |
-| `test/shared/presentation_system_test.dart` | Test | unreviewed | - | - | - |
+| `test/goldens/presentation_components.png` | Test | verified | DS-001, DS-002, ACCESS-003 | 390x844 approved rendering was generated with bundled UI, numeric, and package icon fonts and visually inspected | `3f1215b` |
+| `test/goldens/presentation_components_golden_test.dart` | Test | verified | DS-001, DS-002, ACCESS-002, ACCESS-003 | Golden plus Android target-size, labeled-target, and contrast guidelines pass | `3f1215b` |
+| `test/shared/feedback_system_test.dart` | Test | verified | UX-001, UX-002, UX-003 | Haptic support caching/failure isolation and bounded toast ordering/deduplication/disposal matrix passes | `98b7a40` |
+| `test/shared/presentation_system_test.dart` | Test | verified | DS-001, DS-002, DS-003, MOTION-001, NAV-001, SAFE-001 | Theme failure, inset semantics, numeric spans, shape types, button behavior, reduced motion, navigation geometry, and toast host tests pass | `98b7a40` |
 | `test/support/wallet_fakes.dart` | Test | verified | TEST-001 | Deterministic fault-injection fakes are test-only, injectable, and cannot enter release code | `1b3273a` |
-| `test/widget_test.dart` | Test | fixing | TEST-001 | Existing assertions pass on new toolchain; meaningful test expansion remains open | `8e97370` |
+| `test/widget_test.dart` | Test | verified | TEST-001, MOTION-002 | Root presentation wiring and hidden-tab ticker/semantics behavior pass; broader feature coverage remains tracked independently | `98b7a40` |
 | `test_driver/integration_test.dart` | Project configuration | verified | TEST-002 | Standard integration-test driver compiled and executed on both platforms | `1b3273a` |
 | `tool/verify_production_tracker.dart` | Tooling | verified | - | Format, sync, clean verification pass, and diff check | `163a3cf` |
 <!-- FILE_INVENTORY_END -->
