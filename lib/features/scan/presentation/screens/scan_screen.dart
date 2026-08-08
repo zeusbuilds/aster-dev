@@ -61,18 +61,24 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       for (final barcode in capture?.barcodes ?? <Barcode>[]) {
         final raw = barcode.rawValue;
         if (raw != null && raw.isNotEmpty) {
+          unawaited(context.haptics.trigger(HapticIntent.lightImpact));
           context.pop(raw);
           return;
         }
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('No barcode found')));
+      context.toasts.show(
+        title: 'No code found',
+        message: 'Choose another image and try again.',
+        variant: ToastVariant.warning,
+      );
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Failed to scan image')));
+        unawaited(context.haptics.trigger(HapticIntent.error));
+        context.toasts.show(
+          title: 'Image could not be scanned',
+          message: 'Choose another image and try again.',
+          variant: ToastVariant.failure,
+        );
       }
     }
   }
@@ -119,7 +125,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
         spacing.sm +
         spacing.md +
         spacing.xxxl;
-    final safeAreaTop = spacing.topSafeRaw(context);
+    final safeAreaTop = context.windowInsets.topSystem;
     final frameTop = safeAreaTop + headerHeight;
     final frameLeft = (MediaQuery.sizeOf(context).width - frameSize) / 2;
 
@@ -148,13 +154,35 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                               ? _zoomFactors[_currentZoomIndex]
                               : 1.0,
                           onScanned: (value) {
+                            unawaited(
+                              context.haptics.trigger(HapticIntent.lightImpact),
+                            );
                             context.pop(value);
                           },
                           onPermissionDenied: () {
+                            if (scanState.permissionDenied) return;
                             viewModel.setPermissionDenied(true);
+                            unawaited(
+                              context.haptics.trigger(HapticIntent.warning),
+                            );
+                            context.toasts.show(
+                              title: 'Camera access is required',
+                              message:
+                                  'Allow camera access in system settings.',
+                              variant: ToastVariant.warning,
+                            );
                           },
                           onError: (message) {
+                            if (scanState.errorMessage == message) return;
                             viewModel.setError(message);
+                            unawaited(
+                              context.haptics.trigger(HapticIntent.error),
+                            );
+                            context.toasts.show(
+                              title: 'Camera unavailable',
+                              message: message,
+                              variant: ToastVariant.failure,
+                            );
                           },
                           onCameraReady: (minZoom, maxZoom) {
                             if (mounted) {
@@ -173,7 +201,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                 Positioned.fill(child: ScanBackground(cutoutRect: cutoutRect)),
                 Column(
                   children: [
-                    SizedBox(height: spacing.topSafeRaw(context)),
+                    SizedBox(height: context.windowInsets.topSystem),
                     const ScanWalletHeader(
                       walletName: 'Wallet 1',
                       walletId: 'HD8H90 PX0S',
@@ -199,7 +227,8 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                     ScanEnterAddressButton(onTap: () => context.pop()),
                     SizedBox(
                       height:
-                          spacing.bottomSafe(context) +
+                          context.windowInsets.bottomSystem +
+                          spacing.lg +
                           metrics.floatingNavClearance +
                           spacing.xxl,
                     ),

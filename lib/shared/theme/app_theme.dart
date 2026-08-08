@@ -67,7 +67,7 @@ class AppTheme {
         color: _colors.surfaceRaised,
         surfaceTintColor: _colors.transparentSurface,
         elevation: 0,
-        shape: RoundedRectangleBorder(
+        shape: RoundedSuperellipseBorder(
           borderRadius: BorderRadius.circular(_radii.card),
           side: BorderSide(color: _colors.borderSubtle),
         ),
@@ -117,7 +117,7 @@ class AppTheme {
             horizontal: _spacing.lg,
             vertical: _spacing.md,
           ),
-          shape: RoundedRectangleBorder(
+          shape: RoundedSuperellipseBorder(
             borderRadius: BorderRadius.circular(_radii.button),
           ),
           textStyle: typeRoles.buttonLabel,
@@ -142,7 +142,7 @@ class AppTheme {
         backgroundColor: _colors.surfaceRaised,
         surfaceTintColor: _colors.transparentSurface,
         elevation: 0,
-        shape: RoundedRectangleBorder(
+        shape: RoundedSuperellipseBorder(
           borderRadius: BorderRadius.circular(_radii.card),
         ),
         titleTextStyle: textTheme.headlineSmall?.copyWith(
@@ -157,7 +157,7 @@ class AppTheme {
         contentTextStyle: textTheme.bodyMedium?.copyWith(
           color: scheme.onInverseSurface,
         ),
-        shape: RoundedRectangleBorder(
+        shape: RoundedSuperellipseBorder(
           borderRadius: BorderRadius.circular(_radii.md),
         ),
         behavior: SnackBarBehavior.floating,
@@ -177,7 +177,7 @@ class AppTheme {
           color: scheme.onPrimaryContainer,
         ),
         brightness: Brightness.light,
-        shape: RoundedRectangleBorder(
+        shape: RoundedSuperellipseBorder(
           borderRadius: BorderRadius.circular(_radii.badge),
         ),
       ),
@@ -204,7 +204,7 @@ class AppTheme {
           color: _colors.borderSubtle,
           width: _strokes.focusBorder,
         ),
-        shape: RoundedRectangleBorder(
+        shape: RoundedSuperellipseBorder(
           borderRadius: BorderRadius.circular(_radii.xs),
         ),
       ),
@@ -248,7 +248,7 @@ class AppTheme {
           horizontal: _spacing.lg,
           vertical: _spacing.sm,
         ),
-        shape: RoundedRectangleBorder(
+        shape: RoundedSuperellipseBorder(
           borderRadius: BorderRadius.circular(_radii.input),
         ),
       ),
@@ -261,7 +261,7 @@ class AppTheme {
         backgroundColor: _colors.surfaceRaised,
         surfaceTintColor: _colors.transparentSurface,
         elevation: 0,
-        shape: RoundedRectangleBorder(
+        shape: RoundedSuperellipseBorder(
           borderRadius: BorderRadius.vertical(
             top: Radius.circular(_radii.sheet),
           ),
@@ -271,14 +271,16 @@ class AppTheme {
         backgroundColor: scheme.primary,
         foregroundColor: scheme.onPrimary,
         elevation: 0,
-        shape: RoundedRectangleBorder(
+        shape: RoundedSuperellipseBorder(
           borderRadius: BorderRadius.circular(_radii.lg),
         ),
       ),
       tooltipTheme: TooltipThemeData(
-        decoration: BoxDecoration(
+        decoration: ShapeDecoration(
           color: scheme.inverseSurface,
-          borderRadius: BorderRadius.circular(_radii.badge),
+          shape: RoundedSuperellipseBorder(
+            borderRadius: BorderRadius.circular(_radii.badge),
+          ),
         ),
         textStyle: textTheme.labelSmall?.copyWith(
           color: scheme.onInverseSurface,
@@ -299,10 +301,12 @@ class AppTheme {
     );
   }
 
-  static OutlineInputBorder _outlineBorder(Color color, {double? width}) {
-    return OutlineInputBorder(
-      borderRadius: BorderRadius.circular(_radii.input),
+  static ShapedInputBorder _outlineBorder(Color color, {double? width}) {
+    return ShapedInputBorder(
       borderSide: BorderSide(color: color, width: width ?? _strokes.border),
+      shape: RoundedSuperellipseBorder(
+        borderRadius: BorderRadius.circular(_radii.input),
+      ),
     );
   }
 
@@ -322,7 +326,7 @@ class AppTheme {
         vertical: _spacing.md,
       ),
       side: side,
-      shape: RoundedRectangleBorder(
+      shape: RoundedSuperellipseBorder(
         borderRadius: BorderRadius.circular(_radii.button),
       ),
       textStyle: textStyle,

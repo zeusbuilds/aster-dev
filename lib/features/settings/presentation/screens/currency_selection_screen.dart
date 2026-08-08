@@ -86,28 +86,29 @@ class _CurrencySelectionScreenState extends State<CurrencySelectionScreen> {
                 ],
               ),
             )
-          : Scrollbar(
-              controller: _scrollController,
-              thumbVisibility: false,
-              child: ListView.separated(
+          : SafeArea(
+              top: false,
+              minimum: EdgeInsets.only(bottom: spacing.lg),
+              child: Scrollbar(
                 controller: _scrollController,
-                padding: EdgeInsets.only(
-                  bottom: spacing.bottomSafeRaw(context),
-                ),
-                itemCount: _currencies.length,
-                separatorBuilder: (context, index) =>
-                    const AsterDivider.inset(),
-                itemBuilder: (context, index) {
-                  final currency = _currencies[index];
+                thumbVisibility: false,
+                child: ListView.separated(
+                  controller: _scrollController,
+                  itemCount: _currencies.length,
+                  separatorBuilder: (context, index) =>
+                      const AsterDivider.inset(),
+                  itemBuilder: (context, index) {
+                    final currency = _currencies[index];
 
-                  return CurrencySelectOptionRow(
-                    currency: currency,
-                    selected: _selectedCurrencyCode == currency.code ? 0 : -1,
-                    onTap: () {
-                      _onCurrencySelected(currency);
-                    },
-                  );
-                },
+                    return CurrencySelectOptionRow(
+                      currency: currency,
+                      selected: _selectedCurrencyCode == currency.code,
+                      onTap: () {
+                        _onCurrencySelected(currency);
+                      },
+                    );
+                  },
+                ),
               ),
             ),
     );

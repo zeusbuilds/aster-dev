@@ -11,7 +11,6 @@ class AsterRadii extends ThemeExtension<AsterRadii> {
     this.xl = 20,
     this.xxl = 24,
     this.sheet = 28,
-    this.pill = 999,
     this.card = 24,
     this.button = 18,
     this.input = 12,
@@ -28,7 +27,6 @@ class AsterRadii extends ThemeExtension<AsterRadii> {
   final double xl;
   final double xxl;
   final double sheet;
-  final double pill;
   final double card;
   final double button;
   final double input;
@@ -46,7 +44,6 @@ class AsterRadii extends ThemeExtension<AsterRadii> {
     double? xl,
     double? xxl,
     double? sheet,
-    double? pill,
     double? card,
     double? button,
     double? input,
@@ -63,7 +60,6 @@ class AsterRadii extends ThemeExtension<AsterRadii> {
       xl: xl ?? this.xl,
       xxl: xxl ?? this.xxl,
       sheet: sheet ?? this.sheet,
-      pill: pill ?? this.pill,
       card: card ?? this.card,
       button: button ?? this.button,
       input: input ?? this.input,
@@ -85,7 +81,6 @@ class AsterRadii extends ThemeExtension<AsterRadii> {
       xl: _lerp(xl, other.xl, t),
       xxl: _lerp(xxl, other.xxl, t),
       sheet: _lerp(sheet, other.sheet, t),
-      pill: _lerp(pill, other.pill, t),
       card: _lerp(card, other.card, t),
       button: _lerp(button, other.button, t),
       input: _lerp(input, other.input, t),

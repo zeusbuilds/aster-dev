@@ -11,12 +11,18 @@ class AsterStateLayers extends ThemeExtension<AsterStateLayers> {
     this.translucentSurface = 0.8,
     this.selectedContainer = 0.5,
     this.primaryOverlay = 0.12,
+    this.hoverOverlay = 0.08,
+    this.focusOverlay = 0.12,
+    this.pressedOverlay = 0.12,
   });
 
   final double disabled;
   final double translucentSurface;
   final double selectedContainer;
   final double primaryOverlay;
+  final double hoverOverlay;
+  final double focusOverlay;
+  final double pressedOverlay;
 
   @override
   AsterStateLayers copyWith({
@@ -24,12 +30,18 @@ class AsterStateLayers extends ThemeExtension<AsterStateLayers> {
     double? translucentSurface,
     double? selectedContainer,
     double? primaryOverlay,
+    double? hoverOverlay,
+    double? focusOverlay,
+    double? pressedOverlay,
   }) {
     return AsterStateLayers(
       disabled: disabled ?? this.disabled,
       translucentSurface: translucentSurface ?? this.translucentSurface,
       selectedContainer: selectedContainer ?? this.selectedContainer,
       primaryOverlay: primaryOverlay ?? this.primaryOverlay,
+      hoverOverlay: hoverOverlay ?? this.hoverOverlay,
+      focusOverlay: focusOverlay ?? this.focusOverlay,
+      pressedOverlay: pressedOverlay ?? this.pressedOverlay,
     );
   }
 
@@ -45,6 +57,9 @@ class AsterStateLayers extends ThemeExtension<AsterStateLayers> {
       ),
       selectedContainer: _lerp(selectedContainer, other.selectedContainer, t),
       primaryOverlay: _lerp(primaryOverlay, other.primaryOverlay, t),
+      hoverOverlay: _lerp(hoverOverlay, other.hoverOverlay, t),
+      focusOverlay: _lerp(focusOverlay, other.focusOverlay, t),
+      pressedOverlay: _lerp(pressedOverlay, other.pressedOverlay, t),
     );
   }
 

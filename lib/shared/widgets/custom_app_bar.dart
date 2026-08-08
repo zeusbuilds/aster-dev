@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:remixicon/remixicon.dart';
 
 import '../theme/theme.dart';
+import 'aster_icon_button.dart';
 
 /// Custom app bar widget with consistent styling
 ///
@@ -30,7 +31,6 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
-    final spacing = context.spacing;
     final icons = context.icons;
     final metrics = context.metrics;
 
@@ -40,26 +40,11 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
       centerTitle: centerTitle,
       title: Text(title, style: context.type.appBarTitle),
       leading: leadingIcon
-          ? Semantics(
-              button: true,
-              label: 'Back',
-              onTap: () => context.pop(),
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => context.pop(),
-                child: SizedBox(
-                  width: metrics.minTouchTarget,
-                  height: metrics.minTouchTarget,
-                  child: Padding(
-                    padding: EdgeInsets.only(left: spacing.screenPadding),
-                    child: Icon(
-                      leadingIconData ?? RemixIcons.arrow_left_s_line,
-                      size: icons.sm,
-                      color: context.colorScheme.onSurface,
-                    ),
-                  ),
-                ),
-              ),
+          ? AsterIconButton(
+              icon: leadingIconData ?? RemixIcons.arrow_left_s_line,
+              tooltip: 'Back',
+              onPressed: context.pop,
+              iconSize: icons.sm,
             )
           : null,
       leadingWidth: metrics.appBarLeadingWidth,

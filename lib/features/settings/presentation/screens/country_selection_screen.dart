@@ -91,28 +91,29 @@ class _CountrySelectionScreenState extends State<CountrySelectionScreen> {
                   context.colorScheme.primary,
                 ),
               ),
-              child: Scrollbar(
-                controller: _scrollController,
-                thumbVisibility: false,
-                child: ListView.separated(
+              child: SafeArea(
+                top: false,
+                minimum: EdgeInsets.only(bottom: spacing.lg),
+                child: Scrollbar(
                   controller: _scrollController,
-                  padding: EdgeInsets.only(
-                    bottom: spacing.bottomSafeRaw(context),
-                  ),
-                  itemCount: _countries.length,
-                  separatorBuilder: (context, index) =>
-                      const AsterDivider.inset(),
-                  itemBuilder: (context, index) {
-                    final country = _countries[index];
+                  thumbVisibility: false,
+                  child: ListView.separated(
+                    controller: _scrollController,
+                    itemCount: _countries.length,
+                    separatorBuilder: (context, index) =>
+                        const AsterDivider.inset(),
+                    itemBuilder: (context, index) {
+                      final country = _countries[index];
 
-                    return CountrySelectOptionRow(
-                      country: country,
-                      selected: _selectedCountryCode == country.code,
-                      onTap: () {
-                        _onCountrySelected(country);
-                      },
-                    );
-                  },
+                      return CountrySelectOptionRow(
+                        country: country,
+                        selected: _selectedCountryCode == country.code,
+                        onTap: () {
+                          _onCountrySelected(country);
+                        },
+                      );
+                    },
+                  ),
                 ),
               ),
             ),

@@ -41,7 +41,7 @@ class ScanCameraWidget extends StatefulWidget {
 
 class _ScanCameraWidgetState extends State<ScanCameraWidget>
     with WidgetsBindingObserver {
-  String? _errorMessage;
+  bool _hasCameraError = false;
   bool _hasReportedCameraReady = false;
 
   @override
@@ -95,7 +95,7 @@ class _ScanCameraWidgetState extends State<ScanCameraWidget>
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    if (_errorMessage != null) {
+    if (_hasCameraError) {
       return ColoredBox(color: colors.scanOverlayBase);
     }
 
@@ -108,9 +108,8 @@ class _ScanCameraWidgetState extends State<ScanCameraWidget>
         if (error.errorCode == MobileScannerErrorCode.permissionDenied) {
           widget.onPermissionDenied();
         } else {
-          final message = error.errorDetails?.message ?? error.toString();
-          _errorMessage = message;
-          widget.onError(message);
+          _hasCameraError = true;
+          widget.onError('The camera could not be started.');
         }
         return ColoredBox(color: colors.scanOverlayBase);
       },
@@ -127,8 +126,7 @@ class _ScanCameraWidgetState extends State<ScanCameraWidget>
         }
       },
       onDetectError: (error, stackTrace) {
-        final message = error.toString();
-        widget.onError(message);
+        widget.onError('The camera could not read that code.');
       },
     );
   }

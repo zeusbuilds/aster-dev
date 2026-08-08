@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:remixicon/remixicon.dart';
@@ -17,32 +19,43 @@ class ScanEnterAddressButton extends StatelessWidget {
     final effects = context.effects;
     final icons = context.icons;
 
+    void activate() {
+      unawaited(context.haptics.trigger(HapticIntent.lightImpact));
+      onTap();
+    }
+
     return Semantics(
       button: true,
       label: 'Enter address to send',
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              'Enter address to send',
-              style: context.type.scanCta.copyWith(
-                color: colors.onScan.withValues(
-                  alpha: effects.brandContentMutedOpacity,
+      excludeSemantics: true,
+      child: Material(
+        color: colors.transparentSurface,
+        child: InkWell(
+          onTap: activate,
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: spacing.md),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Enter address to send',
+                  style: context.type.scanCta.copyWith(
+                    color: colors.onScan.withValues(
+                      alpha: effects.brandContentMutedOpacity,
+                    ),
+                  ),
                 ),
-              ),
+                SizedBox(width: spacing.xxs),
+                Icon(
+                  RemixIcons.arrow_right_s_line,
+                  color: colors.onScan.withValues(
+                    alpha: effects.brandContentMutedOpacity,
+                  ),
+                  size: icons.sm,
+                ),
+              ],
             ),
-            SizedBox(width: spacing.xxs),
-            Icon(
-              RemixIcons.arrow_right_s_line,
-              color: colors.onScan.withValues(
-                alpha: effects.brandContentMutedOpacity,
-              ),
-              size: icons.sm,
-            ),
-          ],
+          ),
         ),
       ),
     );

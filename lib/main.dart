@@ -88,6 +88,8 @@ class _AsterState extends ConsumerState<Aster> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final router = ref.watch(appRouterProvider);
+    final haptics = ref.watch(hapticFeedbackServiceProvider);
+    final toasts = ref.watch(toastControllerProvider.notifier);
     final showSplashOverlay =
         _lifecycleState == AppLifecycleState.hidden ||
         _lifecycleState == AppLifecycleState.paused ||
@@ -100,11 +102,18 @@ class _AsterState extends ConsumerState<Aster> with WidgetsBindingObserver {
       routerConfig: router,
       debugShowCheckedModeBanner: false,
       builder: (context, child) {
-        return Stack(
-          children: [
-            ?child,
-            if (showSplashOverlay) const Positioned.fill(child: SplashScreen()),
-          ],
+        return AsterFeedbackScope(
+          haptics: haptics,
+          toasts: toasts,
+          child: ToastHost(
+            child: Stack(
+              children: [
+                ?child,
+                if (showSplashOverlay)
+                  const Positioned.fill(child: SplashScreen()),
+              ],
+            ),
+          ),
         );
       },
     );

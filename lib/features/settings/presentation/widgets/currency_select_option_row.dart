@@ -1,6 +1,7 @@
+import 'dart:async';
+
 import 'package:circle_flags/circle_flags.dart';
 import 'package:flutter/material.dart';
-import 'package:haptic_feedback/haptic_feedback.dart';
 
 import '../../../../shared/shared.dart';
 
@@ -14,8 +15,8 @@ class CurrencySelectOptionRow extends StatelessWidget {
   /// Callback when the row is tapped
   final VoidCallback? onTap;
 
-  /// Selection state (-1 for unselected, 0 for selected)
-  final int selected;
+  /// Whether this currency is currently selected.
+  final bool selected;
 
   const CurrencySelectOptionRow({
     super.key,
@@ -29,59 +30,63 @@ class CurrencySelectOptionRow extends StatelessWidget {
     final spacing = context.spacing;
     final metrics = context.metrics;
     final type = context.type;
+    final effectiveOnTap = selected ? null : onTap;
+
+    void select() {
+      unawaited(context.haptics.trigger(HapticIntent.selection));
+      effectiveOnTap?.call();
+    }
 
     return Semantics(
-      button: onTap != null,
-      selected: selected == 0,
+      button: true,
+      enabled: effectiveOnTap != null,
+      selected: selected,
       label: '${currency.name}, ${currency.symbol} ${currency.code}',
-      child: GestureDetector(
-        onTapDown: onTap != null
-            ? (_) async {
-                final canVibrate = await Haptics.canVibrate();
-                if (canVibrate) {
-                  await Haptics.vibrate(HapticsType.selection);
-                }
-              }
-            : null,
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: spacing.screenPadding,
-            vertical: spacing.lg,
-          ),
-          child: Row(
-            children: [
-              CircleFlag(currency.countryCode, size: metrics.flagSize),
-              SizedBox(width: spacing.lg),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      currency.name,
-                      style: type.rowTitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      '${currency.symbol} ${currency.code}',
-                      style: type.supportingMeta,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+      excludeSemantics: true,
+      child: Material(
+        color: context.appColors.transparentSurface,
+        child: InkWell(
+          onTap: effectiveOnTap == null ? null : select,
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: spacing.screenPadding,
+              vertical: spacing.lg,
+            ),
+            child: Row(
+              children: [
+                CircleFlag(currency.countryCode, size: metrics.flagSize),
+                SizedBox(width: spacing.lg),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        currency.name,
+                        style: type.rowTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        '${currency.symbol} ${currency.code}',
+                        style: type.supportingMeta,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              SizedBox(width: spacing.xxxl),
-              CustomRadio(
-                option: 0,
-                selected: selected,
-                onChanged: (value) {
-                  onTap?.call();
-                },
-              ),
-            ],
+                SizedBox(width: spacing.xxxl),
+                ExcludeSemantics(
+                  child: IgnorePointer(
+                    child: CustomRadio(
+                      option: true,
+                      selected: selected,
+                      onChanged: (_) {},
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

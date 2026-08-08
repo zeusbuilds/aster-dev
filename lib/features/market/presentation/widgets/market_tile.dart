@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../../shared/shared.dart';
@@ -36,98 +38,104 @@ class MarketTile extends StatelessWidget {
     final shadows = context.shadows;
     final type = context.type;
 
+    void activate() {
+      unawaited(context.haptics.trigger(HapticIntent.lightImpact));
+      onTap?.call();
+    }
+
     return Semantics(
-      button: onTap != null,
+      button: true,
+      enabled: onTap != null,
       label: [label, subtitle, tipText].whereType<String>().join(', '),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Squircle(
-          borderRadius: radius.card,
-          borderColor: colors.transparentSurface,
-          borderWidth: 0,
-          gradient: gradient.toLinearGradient(),
-          padding: EdgeInsets.zero,
-          child: Stack(
-            children: [
-              Positioned(
-                top: -spacing.md,
-                right: -spacing.xxxl,
-                child: Container(
-                  decoration: BoxDecoration(
-                    boxShadow: shadowColor != null
-                        ? shadows.modal
-                              .map((s) => s.copyWith(color: shadowColor!))
-                              .toList()
-                        : shadows.modal,
-                  ),
-                  child: Image.asset(
-                    'assets/texture/shape.png',
-                    width: metrics.marketTextureSize,
-                    height: metrics.marketTextureSize,
-                  ),
-                ),
-              ),
-              Container(
-                padding: EdgeInsets.all(spacing.lg),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(label, style: type.marketLabel),
-                          Text(subtitle ?? '', style: type.marketTitle),
-                          SizedBox(height: spacing.xxl),
-                          if (tipText != null) ...[
-                            Squircle(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: spacing.xs,
-                                vertical: spacing.xs,
-                              ),
-                              borderRadius: radius.pill,
-                              borderColor: colors.transparentSurface,
-                              borderWidth: 0,
-                              color: colors.onMarketTile.withValues(
-                                alpha: effects.marketPillSurfaceOpacity,
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      color: colors.onMarketTile.withValues(
-                                        alpha: effects.marketPillDotOpacity,
-                                      ),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    width: metrics.marketBadgeDotSize,
-                                    height: metrics.marketBadgeDotSize,
-                                  ),
-                                  SizedBox(width: spacing.sm),
-                                  Text(
-                                    tipText!,
-                                    style: type.marketTip.copyWith(
-                                      color: colors.onMarketTile.withValues(
-                                        alpha:
-                                            effects.marketContentMutedOpacity,
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(width: spacing.md),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
+      excludeSemantics: true,
+      child: Squircle(
+        borderRadius: radius.card,
+        borderColor: colors.transparentSurface,
+        borderWidth: 0,
+        gradient: gradient.toLinearGradient(),
+        padding: EdgeInsets.zero,
+        child: Material(
+          color: colors.transparentSurface,
+          child: InkWell(
+            onTap: onTap == null ? null : activate,
+            child: Stack(
+              children: [
+                Positioned(
+                  top: -spacing.md,
+                  right: -spacing.xxxl,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      boxShadow: shadowColor != null
+                          ? shadows.modal
+                                .map((s) => s.copyWith(color: shadowColor!))
+                                .toList()
+                          : shadows.modal,
                     ),
-                  ],
+                    child: Image.asset(
+                      'assets/texture/shape.png',
+                      width: metrics.marketTextureSize,
+                      height: metrics.marketTextureSize,
+                    ),
+                  ),
                 ),
-              ),
-            ],
+                Container(
+                  padding: EdgeInsets.all(spacing.lg),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(label, style: type.marketLabel),
+                            Text(subtitle ?? '', style: type.marketTitle),
+                            SizedBox(height: spacing.xxl),
+                            if (tipText != null) ...[
+                              AsterPill(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: spacing.xs,
+                                  vertical: spacing.xs,
+                                ),
+                                color: colors.onMarketTile.withValues(
+                                  alpha: effects.marketPillSurfaceOpacity,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        color: colors.onMarketTile.withValues(
+                                          alpha: effects.marketPillDotOpacity,
+                                        ),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      width: metrics.marketBadgeDotSize,
+                                      height: metrics.marketBadgeDotSize,
+                                    ),
+                                    SizedBox(width: spacing.sm),
+                                    Text(
+                                      tipText!,
+                                      style: type.marketTip.copyWith(
+                                        color: colors.onMarketTile.withValues(
+                                          alpha:
+                                              effects.marketContentMutedOpacity,
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(width: spacing.md),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

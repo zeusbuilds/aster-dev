@@ -13,7 +13,7 @@ class HomeScreen extends StatelessWidget {
     final colors = context.appColors;
     final metrics = context.metrics;
     final screenHeight = MediaQuery.sizeOf(context).height;
-    final topPadding = MediaQuery.paddingOf(context).top;
+    final topPadding = context.windowInsets.topSystem;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(

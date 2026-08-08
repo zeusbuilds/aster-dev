@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:skeletonizer/skeletonizer.dart';
 
+import '../motion/motion.dart';
 import '../theme/theme.dart';
 
 /// A reusable skeleton loader widget with app-specific styling
@@ -45,14 +46,17 @@ class AppSkeletonizer extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final motion = context.motion;
+    final effectiveBaseColor = baseColor ?? colors.surfaceSubtle;
 
     return Skeletonizer(
       enabled: enabled,
-      effect: ShimmerEffect(
-        baseColor: baseColor ?? colors.surfaceSubtle,
-        highlightColor: highlightColor ?? context.colorScheme.surface,
-        duration: duration ?? motion.skeletonShimmerDuration,
-      ),
+      effect: context.motionPolicy.reduceMotion
+          ? SolidColorEffect(color: effectiveBaseColor)
+          : ShimmerEffect(
+              baseColor: effectiveBaseColor,
+              highlightColor: highlightColor ?? context.colorScheme.surface,
+              duration: duration ?? motion.skeletonShimmerDuration,
+            ),
       child: child,
     );
   }

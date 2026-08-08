@@ -3,26 +3,23 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../motion/motion.dart';
 import '../theme/theme.dart';
 
-const int kGridLoaderRows = 3;
-const int kGridLoaderCols = 3;
-
-/// Opacity range for the breathing grid effect.
-const double kBreathingMinOpacity = 0.35;
-const double kBreathingMaxOpacity = 1.0;
+const int _gridLoaderRows = 3;
+const int _gridLoaderColumns = 3;
 
 /// Size presets for the 3×3 grid loader.
 enum GridLoaderSize { small, medium, large }
 
-double _squareSizeFor(GridLoaderSize size) {
+double _squareSizeFor(GridLoaderSize size, AsterComponentMetrics metrics) {
   switch (size) {
     case GridLoaderSize.small:
-      return 8.0; // 3 * 8 = 24px grid
+      return metrics.gridLoaderSmallCell;
     case GridLoaderSize.medium:
-      return 10.0; // 30px grid
+      return metrics.gridLoaderMediumCell;
     case GridLoaderSize.large:
-      return 12.0; // 36px grid
+      return metrics.gridLoaderLargeCell;
   }
 }
 
@@ -57,12 +54,6 @@ class GridLoader extends StatefulWidget {
   final GridLoaderColorStyle colorStyle;
   final GridLoaderSize size;
 
-  /// Override square size, if you want custom sizing.
-  final double? squareSize;
-
-  /// Override animation cycle duration.
-  final Duration? cycleDuration;
-
   /// Custom color when [colorStyle] is [GridLoaderColorStyle.custom].
   final Color? color;
 
@@ -71,8 +62,6 @@ class GridLoader extends StatefulWidget {
     this.style = GridLoaderStyle.breathingGrid,
     this.colorStyle = GridLoaderColorStyle.white,
     this.size = GridLoaderSize.small,
-    this.squareSize,
-    this.cycleDuration,
     this.color,
   });
 
@@ -87,31 +76,33 @@ class _GridLoaderState extends State<GridLoader>
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration:
-          widget.cycleDuration ?? const AsterMotion().loadingCycleDuration,
-    );
-    unawaited(_controller.repeat());
+    _controller = AnimationController(vsync: this);
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final duration =
-        widget.cycleDuration ?? context.motion.loadingCycleDuration;
-    if (_controller.duration != duration) {
-      _controller.duration = duration;
-    }
+    _synchronizeAnimation();
   }
 
   @override
   void didUpdateWidget(GridLoader oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final duration =
-        widget.cycleDuration ?? context.motion.loadingCycleDuration;
-    if (_controller.duration != duration) {
-      _controller.duration = duration;
+    _synchronizeAnimation();
+  }
+
+  void _synchronizeAnimation() {
+    final duration = context.motion.loadingCycleDuration;
+    final durationChanged = _controller.duration != duration;
+    _controller.duration = duration;
+    if (context.motionPolicy.reduceMotion || duration <= Duration.zero) {
+      _controller.stop();
+      _controller.value = context.motion.settledLoopProgress;
+      return;
+    }
+    if (durationChanged || !_controller.isAnimating) {
+      _controller.stop();
+      unawaited(_controller.repeat(period: duration));
     }
   }
 
@@ -130,9 +121,10 @@ class _GridLoaderState extends State<GridLoader>
         widget.color ?? context.colorScheme.primary,
     };
 
-    final squareSize = widget.squareSize ?? _squareSizeFor(widget.size);
-    final gridWidth = kGridLoaderCols * squareSize;
-    final gridHeight = kGridLoaderRows * squareSize;
+    final squareSize = _squareSizeFor(widget.size, context.metrics);
+    final gridWidth = _gridLoaderColumns * squareSize;
+    final gridHeight = _gridLoaderRows * squareSize;
+    final effects = context.effects;
 
     return SizedBox(
       width: gridWidth,
@@ -147,6 +139,12 @@ class _GridLoaderState extends State<GridLoader>
               style: widget.style,
               squareSize: squareSize,
               color: baseColor,
+              breathingMinimumOpacity: effects.loaderBreathingMinimumOpacity,
+              breathingMaximumOpacity: effects.loaderBreathingMaximumOpacity,
+              trailStrongOpacity: effects.loaderTrailStrongOpacity,
+              trailMediumOpacity: effects.loaderTrailMediumOpacity,
+              trailWeakOpacity: effects.loaderTrailWeakOpacity,
+              plusTrailWeakOpacity: effects.loaderPlusTrailWeakOpacity,
             ),
           );
         },
@@ -166,7 +164,7 @@ const List<List<int>> _clockwiseOrder = [
 int _clockwiseIndex(int row, int col) => _clockwiseOrder[row][col];
 
 double _phaseBreathing(int row, int col) {
-  final index = row * kGridLoaderCols + col;
+  final index = row * _gridLoaderColumns + col;
   // Small offset per cell so they don’t all pulse in sync.
   return index * 0.08;
 }
@@ -179,11 +177,10 @@ const List<List<int>> _plusPath = [
   [1, 0], // left
 ];
 
-double _breathingOpacity(double t) {
+double _breathingOpacity(double t, double minimum, double maximum) {
   final x = math.sin(t * 2 * math.pi);
   final normalized = (x + 1) / 2; // 0..1
-  return kBreathingMinOpacity +
-      (kBreathingMaxOpacity - kBreathingMinOpacity) * normalized;
+  return minimum + (maximum - minimum) * normalized;
 }
 
 class _GridLoaderPainter extends CustomPainter {
@@ -191,25 +188,41 @@ class _GridLoaderPainter extends CustomPainter {
   final GridLoaderStyle style;
   final double squareSize;
   final Color color;
+  final double breathingMinimumOpacity;
+  final double breathingMaximumOpacity;
+  final double trailStrongOpacity;
+  final double trailMediumOpacity;
+  final double trailWeakOpacity;
+  final double plusTrailWeakOpacity;
 
   _GridLoaderPainter({
     required this.progress,
     required this.style,
     required this.squareSize,
     required this.color,
+    required this.breathingMinimumOpacity,
+    required this.breathingMaximumOpacity,
+    required this.trailStrongOpacity,
+    required this.trailMediumOpacity,
+    required this.trailWeakOpacity,
+    required this.plusTrailWeakOpacity,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    for (int row = 0; row < kGridLoaderRows; row++) {
-      for (int col = 0; col < kGridLoaderCols; col++) {
+    for (int row = 0; row < _gridLoaderRows; row++) {
+      for (int col = 0; col < _gridLoaderColumns; col++) {
         double opacity;
 
         switch (style) {
           case GridLoaderStyle.breathingGrid:
             final phase = _phaseBreathing(row, col);
             final t = (progress + phase) % 1.0;
-            opacity = _breathingOpacity(t);
+            opacity = _breathingOpacity(
+              t,
+              breathingMinimumOpacity,
+              breathingMaximumOpacity,
+            );
             break;
 
           case GridLoaderStyle.borderLoop:
@@ -226,11 +239,11 @@ class _GridLoaderPainter extends CustomPainter {
               if (backDist < 1.0) {
                 opacity = 1.0;
               } else if (backDist < 2.0) {
-                opacity = 0.8;
+                opacity = trailStrongOpacity;
               } else if (backDist < 3.0) {
-                opacity = 0.55;
+                opacity = trailMediumOpacity;
               } else if (backDist < 4.0) {
-                opacity = 0.3;
+                opacity = trailWeakOpacity;
               } else {
                 opacity = 0.0;
               }
@@ -260,9 +273,9 @@ class _GridLoaderPainter extends CustomPainter {
               if (backDist < 1.0) {
                 opacity = 1.0;
               } else if (backDist < 2.0) {
-                opacity = 0.8;
+                opacity = trailStrongOpacity;
               } else if (backDist < 3.0) {
-                opacity = 0.5;
+                opacity = plusTrailWeakOpacity;
               } else {
                 opacity = 0.0;
               }
@@ -289,6 +302,12 @@ class _GridLoaderPainter extends CustomPainter {
     return oldDelegate.progress != progress ||
         oldDelegate.style != style ||
         oldDelegate.squareSize != squareSize ||
-        oldDelegate.color != color;
+        oldDelegate.color != color ||
+        oldDelegate.breathingMinimumOpacity != breathingMinimumOpacity ||
+        oldDelegate.breathingMaximumOpacity != breathingMaximumOpacity ||
+        oldDelegate.trailStrongOpacity != trailStrongOpacity ||
+        oldDelegate.trailMediumOpacity != trailMediumOpacity ||
+        oldDelegate.trailWeakOpacity != trailWeakOpacity ||
+        oldDelegate.plusTrailWeakOpacity != plusTrailWeakOpacity;
   }
 }

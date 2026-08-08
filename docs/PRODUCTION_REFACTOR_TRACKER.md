@@ -46,6 +46,11 @@ and relevant tests/builds have passed on the recorded commit.
 | DEC-015 | verified | Do not wrap native SDK calls in an app-side timeout that releases the serialization queue while native work may still be running. | The pinned SDK owns typed native timeout/quarantine behavior. The app adds bounded network timeouts around app-owned HTTP only; runtime ordering tests pass at `1b3273a`. |
 | DEC-016 | verified | Protect wallet files with foreground-only iOS data protection and exclude them from backup; disable Android cloud backup and device transfer. | Native bridge and real platform tests prove the file policy; the exact Android release manifest proves backup/transfer exclusion at `1b3273a`. |
 | DEC-017 | verified | Reject the pre-existing protected regtest host ports from app configuration. | Configuration tests at `1b3273a` reject `18443`, `50001`, and `3000` on loopback and Android emulator host aliases. No protected stack resource was inspected or mutated. |
+| DEC-018 | fixing | Preserve the established shape language: true stadium geometry for pills, rounded superellipses for cards/tiles/fields/sheets, and circles only for circular affordances. | ThemeData, shared controls, and feature surfaces must share this policy; no palette or font values change. |
+| DEC-019 | fixing | Runtime window insets are layout environment, not spacing tokens. | Move `padding`, `viewPadding`, and `viewInsets` access to a typed window-insets API; use `SafeArea` for ordinary roots and explicit persistent/keyboard insets only where composition requires them. |
+| DEC-020 | fixing | Route all tactile feedback through one injectable semantic haptic service. | Capability probing is shared/cached; library failures are swallowed; disabled/loading/cancelled interactions emit nothing; result haptics occur only after confirmed outcomes. |
+| DEC-021 | fixing | Present transient messages through one bounded FIFO toast queue with deduplication and an app-root host. | Remove static overlay ownership and SnackBar divergence; support success/failure/warning/info, accessible dismissal, safe text, and reduced motion. |
+| DEC-022 | fixing | Resolve animation durations through one reduced-motion policy and mute offscreen feature tickers. | `MediaQuery.disableAnimations`/platform accessibility must collapse decorative transitions while retaining final state and truthful loading status. |
 
 ## Baseline Evidence
 
@@ -135,8 +140,8 @@ Baseline screenshots are stored in `docs/release/evidence/baseline/`.
 | FLAG-001 | P2 | Assets/dependencies | unreviewed | `circle_flags`, `country_flags`, and `flag` coexist despite one required flag implementation. | `pubspec.yaml` and settings/send imports | - | - |
 | FONT-001 | P1 | Determinism | verified | UI typography relied on `google_fonts` rather than bundled exact DM Sans and Public Sans assets. | Theme source and `pubspec.yaml` | `8e97370` | Exact variable fonts and OFL licenses are bundled with recorded provenance/checksums; iOS and Android builds pass offline font registration. |
 | NET-001 | P1 | Reliability | verified | The network layer lacked a uniform timeout, idempotent retry/backoff, failure taxonomy, and safe observability policy. | `lib/core/network/`; transport fault tests | `1b3273a` | Abortable GET-only retries run under one monotonic budget with bounded backoff/jitter, `Retry-After`, body limits, and redacted typed failures; all fault tests pass. |
-| UX-001 | P1 | Shared UX | unreviewed | Haptics are called directly from widgets with repeated capability probes and no semantic/testable policy owner. | Haptic import/call search | - | - |
-| UX-002 | P1 | Shared UX | unreviewed | Toasts are not owned by a queued/deduplicated service and at least one flow still uses `SnackBar`. | Toast/SnackBar search | - | - |
+| UX-001 | P1 | Shared UX | fixing | Haptics are called directly from widgets with repeated capability probes and no semantic/testable policy owner. | Six direct plugin call sites plus `CustomButton`; DEC-020 | - | Implement the semantic service, migrate every call site, and add capability/failure/intent tests. |
+| UX-002 | P1 | Shared UX | fixing | Toasts are not owned by a queued/deduplicated service and scan uses `SnackBar`; settings uses fake success/failure demonstrations. | Toast/SnackBar search; DEC-021 | - | Replace with bounded queued presentation; fake outcomes must become truthful info/unavailable states or be removed. |
 | ACCESS-001 | P1 | Accessibility | unreviewed | Baseline semantics include empty/duplicated labels and omit editable mnemonic fields. | Xcode runtime accessibility snapshots | - | - |
 | ROUTE-001 | P1 | Routing | unreviewed | Current routes do not model asset/rail flow state or transaction details by stable ID. | Routing source inventory | - | - |
 | HOME-001 | P1 | Home | unreviewed | The visibility control is not wired or persisted; asset rows do not represent BTC/RGB aggregate balances from real data. | Baseline Home and source | - | - |
@@ -144,7 +149,7 @@ Baseline screenshots are stored in `docs/release/evidence/baseline/`.
 | SWAP-001 | P1 | Swap | unreviewed | Swap assets do not match the target domain and execution must be made explicitly unavailable without simulating success. | Swap source; CON-002 | - | - |
 | TX-001 | P1 | Activity | unreviewed | There is no normalized cross-rail activity model or transaction-details route/screen. | Transaction source inventory | - | - |
 | SETTINGS-001 | P1 | Settings | unreviewed | Bitcoin unit and required advanced wallet/network settings are absent or placeholders. | Baseline Settings and source | - | - |
-| SAFE-001 | P2 | Layout | unreviewed | Safe-area helpers and call sites have not been validated against `padding`, `viewPadding`, keyboard `viewInsets`, and double inset behavior. | Design tokens and UI source | - | - |
+| SAFE-001 | P2 | Layout | fixing | Safe-area helpers live in spacing, mix `padding` and `viewPadding` behind ambiguous `Raw` names, and several forms/sheets manually pad where `SafeArea` should own keyboard-aware behavior. | Insets and SafeArea call-site audit; DEC-019 | - | Introduce typed window insets, migrate every helper call, prevent double padding, and test keyboard-open/closed semantics. |
 | PERF-001 | P1 | Performance | unreviewed | No measured launch, frame, memory, leak, rebuild, cache, or SDK-handle baseline exists. | Test/tooling inventory | - | - |
 | SEC-002 | P0 | Seed security | verified | Two hardcoded 12-word mnemonics were compiled into the app, printed around migration activity, and written to secure storage at startup. | `lib/core/utils/wallet_migration_service.dart`; `lib/main.dart` | `8e97370` | Migration and startup writes removed; repository search contains no mnemonic fixture or logging path. |
 | SEC-003 | P0 | Seed privacy | verified | Legacy wallet identity and display name were deterministically derived directly from mnemonic text, creating a stable seed fingerprint outside the SDK lifecycle. | `wallet_id_generator.dart`; legacy `wallet_model.dart` | `8e97370` | Seed-derived generator removed; replacement `WalletProfile` accepts only an opaque post-SDK wallet ID and non-secret metadata. |
@@ -191,6 +196,17 @@ Baseline screenshots are stored in `docs/release/evidence/baseline/`.
 | PLAT-005 | P1 | Android compilation | verified | The first native policy implementation called unavailable `android.system.Os.rmdir`, breaking Kotlin compilation. | Android integration build failure and corrected bridge | `1b3273a` | Cleanup verifies an empty owned directory and uses checked `File.delete()` with bounded error mapping; Android integration and release builds pass. |
 | TOOL-003 | P2 | Physical iOS evidence | blocked | The app built and installed on a connected iPhone, but Flutter could not attach to the VM service over the wireless/local-network path. | Device `00008130-000A552C3EBA001C` run log | - | This does not invalidate simulator/native test evidence, but physical iOS runtime, haptic, performance, and memory evidence remains required in Phase 6. |
 | DOC-004 | P1 | Documentation gate | fixing | Reusing the ignored default `doc/api` output retained obsolete pages and produced 217 false stale-file warnings. | First Phase 2 dartdoc run versus fresh-output rerun | - | A fresh isolated output produced 178 libraries with zero warnings/errors. Phase 6 must make that clean-output behavior part of the repeatable release command and CI/documentation contract. |
+| DS-001 | P1 | Shape system | fixing | Material theme components and several shared/feature surfaces use `RoundedRectangleBorder`, `BoxDecoration`, or `ClipRRect` where the product contract requires a squircle; pill controls are not modeled separately. | `app_theme.dart`; bottom nav; bottom sheets; button audit | - | Introduce one explicit squircle-versus-pill component policy and migrate every audited surface without changing color values. |
+| DS-002 | P1 | Numeric typography | fixing | `NumericText` applies Public Sans to the entire string and numeric chunking includes `$` and `%`, so symbols/units can receive the numeric font. A null style also fails to apply Public Sans at all. | `amount_text.dart`; all numeric call sites | - | Both helpers must style only digit/separator/sign spans from the resolved inherited style; currency symbols, units, labels, and asset names remain DM Sans. |
+| DS-003 | P1 | Theme integrity | fixing | `ThemeContext` silently constructs fallback extensions when the app theme is incomplete, masking missing token registration and creating inconsistent component output. | `theme_context.dart`; bootstrap theme ownership | - | Ensure every app/bootstrap surface is under `AppTheme.light()` and fail fast when a required extension is absent. |
+| DS-004 | P2 | Component recipes | fixing | Loader and chart visual recipes still expose or embed reusable sizes, alpha values, and transition geometry outside their owning metric/effect/art systems. | `grid_loader.dart`; `candle_chart.dart`; splash art | - | Move repeatable component/art decisions to semantic metric/effect/art tokens; retain only mathematical interpolation local to painters. |
+| MOTION-001 | P1 | Reduced motion | fixing | Looping loaders, shimmer, chart choreography, splash, button scale, nav motion, toast motion, and swap choreography ignore the platform's disable-animation preference. | Animation-controller and implicit-animation audit | - | Add one effective-duration/reduced-motion policy; decorative loops stop on a stable frame and state transitions complete without timers when motion is disabled. |
+| MOTION-002 | P1 | Offscreen work | fixing | `IndexedStack` keeps feature screens mounted without explicitly muting their tickers, allowing hidden charts/animations to consume resources. | `skeleton_screen.dart`; ticker audit | - | Wrap each tab in active-state `TickerMode` and verify hidden screens cannot animate or receive interaction. |
+| ACCESS-002 | P1 | Interactive controls | fixing | Shared tap surfaces rely on `GestureDetector`, omit keyboard/focus behavior, can duplicate semantics, and do not consistently expose loading/dismiss state. | `custom_button.dart`; app bar; bottom nav; toast; selection rows | - | Normalize focus/keyboard/touch targets/semantics and add widget/accessibility tests. |
+| UX-003 | P1 | Button behavior | fixing | `CustomButton` fires haptics on pointer-down before an accepted tap, probes capability per press, and has no semantic commit/navigation intent. | `custom_button.dart`; haptic call sites | - | Trigger one semantic haptic only for an accepted enabled action; loading remains size-stable, blocks duplicates, and is announced. |
+| UX-004 | P2 | Selection choreography | fixing | Wallet and asset selection insert a fixed post-success delay before navigation, even under reduced motion, and can leave context-owned timers outside a single choreography policy. | wallet selection; asset selector sheet | - | Resolve or remove commit delay through the motion policy and navigate only after actual selection success. |
+| ARCH-004 | P1 | Plugin boundary | unreviewed | Scan presentation constructs `ImagePicker` and `MobileScannerController` directly, contrary to the View -> ViewModel -> repository/service boundary. | scan screen/widget import audit | - | Move plugin ownership behind an injectable scanner/media service during the scan/send integration phase; do not hide the gap in Phase 3. |
+| NAV-001 | P1 | Bottom navigation | fixing | The second bottom-nav item is announced as “Cards” with a card icon while it opens Scan, and the floating nav ignores the persistent bottom hardware inset. | `bottom_nav.dart`; `skeleton_index_provider.dart` | - | Use the correct Scan label/icon, semantic selection haptic, squircle surface, and explicit bottom-system-inset geometry. |
 
 ## Generated Artifact Validation
 
@@ -273,6 +289,7 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `docs/design/DESIGN_SYSTEM_NORMALIZATION_TRACKER.md` | Documentation | unreviewed | - | - | - |
 | `docs/design/DOCSTRING_PATTERNS.md` | Documentation | unreviewed | - | - | - |
 | `docs/design/HAPTIC_FEEDBACK.md` | Documentation | unreviewed | - | - | - |
+| `docs/design/PRESENTATION_SYSTEMS.md` | Documentation | unreviewed | - | - | - |
 | `docs/design/TYPOGRAPHY_USAGE.md` | Documentation | unreviewed | - | - | - |
 | `docs/release/evidence/baseline/ios-home-bbbc315.jpg` | Documentation | reviewed-clean | HOME-001, DATA-001 | Captured from exact baseline commit on iPhone Air | `163a3cf` |
 | `docs/release/evidence/baseline/ios-import-bbbc315.jpg` | Documentation | reviewed-clean | ONB-001, ACCESS-001 | Captured from exact baseline commit on iPhone Air | `163a3cf` |
@@ -442,10 +459,20 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `lib/features/wallet/presentation/widgets/wallet_select_option_row.dart` | Dart source | verified | ARCH-003 | Widget consumes domain profile rather than persistence model; strict analysis passes | `1b3273a` |
 | `lib/features/wallet/presentation/widgets/widgets.dart` | Dart source | unreviewed | - | - | - |
 | `lib/main.dart` | Dart source | verified | SEC-002, LIFE-001, LIFE-003, LIFE-005 | One bootstrapped container and serialized lifecycle tail own repository resume/suspend/dispose with redacted debug diagnostics | `1b3273a` |
+| `lib/shared/feedback/feedback.dart` | Dart source | unreviewed | - | - | - |
+| `lib/shared/feedback/feedback_scope.dart` | Dart source | unreviewed | - | - | - |
+| `lib/shared/feedback/haptic_feedback_service.dart` | Dart source | unreviewed | - | - | - |
+| `lib/shared/feedback/toast_controller.dart` | Dart source | unreviewed | - | - | - |
+| `lib/shared/feedback/toast_host.dart` | Dart source | unreviewed | - | - | - |
+| `lib/shared/feedback/toast_message.dart` | Dart source | unreviewed | - | - | - |
+| `lib/shared/layout/layout.dart` | Dart source | unreviewed | - | - | - |
+| `lib/shared/layout/window_insets.dart` | Dart source | unreviewed | - | - | - |
 | `lib/shared/models/asset_model.dart` | Dart source | fixing | DOMAIN-001 | Existing model reviewed; typed asset/rail/environment replacement remains Phase 2 | - |
 | `lib/shared/models/country_model.dart` | Dart source | unreviewed | - | - | - |
 | `lib/shared/models/currency_model.dart` | Dart source | unreviewed | - | - | - |
 | `lib/shared/models/models.dart` | Dart source | unreviewed | - | - | - |
+| `lib/shared/motion/motion.dart` | Dart source | unreviewed | - | - | - |
+| `lib/shared/motion/motion_policy.dart` | Dart source | unreviewed | - | - | - |
 | `lib/shared/routing/app_router.dart` | Dart source | fixing | ROUTE-001, SEC-004 | Raw route diagnostics removed and router disposal added; feature route modeling/guards remain Phase 5 | `1b3273a` |
 | `lib/shared/routing/route_config.dart` | Dart source | unreviewed | - | - | - |
 | `lib/shared/routing/route_guards.dart` | Dart source | unreviewed | - | - | - |
@@ -479,6 +506,8 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `lib/shared/widgets/app_skeletonizer.dart` | Dart source | unreviewed | - | - | - |
 | `lib/shared/widgets/asset_display.dart` | Dart source | unreviewed | - | - | - |
 | `lib/shared/widgets/aster_divider.dart` | Dart source | unreviewed | - | - | - |
+| `lib/shared/widgets/aster_icon_button.dart` | Dart source | unreviewed | - | - | - |
+| `lib/shared/widgets/aster_pill.dart` | Dart source | unreviewed | - | - | - |
 | `lib/shared/widgets/custom_app_bar.dart` | Dart source | unreviewed | - | - | - |
 | `lib/shared/widgets/custom_button.dart` | Dart source | unreviewed | - | - | - |
 | `lib/shared/widgets/custom_radio.dart` | Dart source | unreviewed | - | - | - |
@@ -505,6 +534,8 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `test/features/wallet/wallet_runtime_test.dart` | Test | verified | LIFE-001, LIFE-004, SEC-006, STORE-004 | Runtime ordering, rollback, quarantine, reinit, cleanup, audit, and disposal matrix passes | `1b3273a` |
 | `test/features/wallet/wallet_storage_test.dart` | Test | verified | SEC-005, STORE-001, STORE-002, STORE-003, STORE-005, STORE-006, STORE-007 | Credential, journal, corruption, ownership, legacy, collision, and timestamp matrix passes | `1b3273a` |
 | `test/features/wallet/wallet_viewmodel_test.dart` | Test | verified | DEC-012, LIFE-003 | Initial loading overlap suppression passes | `1b3273a` |
+| `test/shared/feedback_system_test.dart` | Test | unreviewed | - | - | - |
+| `test/shared/presentation_system_test.dart` | Test | unreviewed | - | - | - |
 | `test/support/wallet_fakes.dart` | Test | verified | TEST-001 | Deterministic fault-injection fakes are test-only, injectable, and cannot enter release code | `1b3273a` |
 | `test/widget_test.dart` | Test | fixing | TEST-001 | Existing assertions pass on new toolchain; meaningful test expansion remains open | `8e97370` |
 | `test_driver/integration_test.dart` | Project configuration | verified | TEST-002 | Standard integration-test driver compiled and executed on both platforms | `1b3273a` |

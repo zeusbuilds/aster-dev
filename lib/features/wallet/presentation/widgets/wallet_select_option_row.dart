@@ -1,6 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
-import 'package:haptic_feedback/haptic_feedback.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
 
 import '../../../../shared/shared.dart';
@@ -16,8 +17,8 @@ class WalletSelectOptionRow extends StatelessWidget {
   /// Callback when the row is tapped
   final VoidCallback? onTap;
 
-  /// ID of the currently selected wallet.
-  final String? selected;
+  /// Whether this wallet is currently selected.
+  final bool selected;
 
   const WalletSelectOptionRow({
     super.key,
@@ -33,53 +34,56 @@ class WalletSelectOptionRow extends StatelessWidget {
     final icons = context.icons;
     final type = context.type;
 
+    void select() {
+      unawaited(context.haptics.trigger(HapticIntent.selection));
+      onTap?.call();
+    }
+
     return Semantics(
-      button: onTap != null,
-      selected: selected == wallet.id,
+      button: true,
+      enabled: onTap != null,
+      selected: selected,
       label: '${wallet.name}, ${wallet.displayId}',
-      child: GestureDetector(
-        onTapDown: onTap != null
-            ? (_) async {
-                final canVibrate = await Haptics.canVibrate();
-                if (canVibrate) {
-                  await Haptics.vibrate(HapticsType.selection);
-                }
-              }
-            : null,
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: spacing.screenPadding,
-            vertical: spacing.lg,
-          ),
-          child: Row(
-            children: [
-              CustomRadio(
-                option: wallet.id,
-                selected: selected,
-                onChanged: (value) {
-                  onTap?.call();
-                },
-              ),
-              SizedBox(width: spacing.lg),
-              Expanded(
-                child: Text(
-                  wallet.name,
-                  style: type.rowTitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+      excludeSemantics: true,
+      child: Material(
+        color: colors.transparentSurface,
+        child: InkWell(
+          onTap: onTap == null ? null : select,
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: spacing.screenPadding,
+              vertical: spacing.lg,
+            ),
+            child: Row(
+              children: [
+                ExcludeSemantics(
+                  child: IgnorePointer(
+                    child: CustomRadio(
+                      option: true,
+                      selected: selected,
+                      onChanged: (_) {},
+                    ),
+                  ),
                 ),
-              ),
-              SizedBox(width: spacing.xxxl),
-              Text(wallet.displayId, style: type.rowValue, maxLines: 1),
-              SizedBox(width: spacing.md),
-              Icon(
-                MingCuteIcons.mgc_edit_2_line,
-                size: icons.sm,
-                color: colors.textTertiary,
-              ),
-            ],
+                SizedBox(width: spacing.lg),
+                Expanded(
+                  child: Text(
+                    wallet.name,
+                    style: type.rowTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                SizedBox(width: spacing.xxxl),
+                Text(wallet.displayId, style: type.rowValue, maxLines: 1),
+                SizedBox(width: spacing.md),
+                Icon(
+                  MingCuteIcons.mgc_edit_2_line,
+                  size: icons.sm,
+                  color: colors.textTertiary,
+                ),
+              ],
+            ),
           ),
         ),
       ),

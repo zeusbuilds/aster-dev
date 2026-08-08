@@ -1,7 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:haptic_feedback/haptic_feedback.dart';
 
 import '../../../../shared/shared.dart';
 
@@ -33,7 +34,6 @@ class AssetSelectorSheet extends StatelessWidget {
     String? selectedAssetName,
   }) {
     final colors = context.appColors;
-    final motion = context.motion;
     return showModalBottomSheet<AssetModel>(
       context: context,
       isScrollControlled: true,
@@ -41,11 +41,8 @@ class AssetSelectorSheet extends StatelessWidget {
       builder: (context) => AssetSelectorSheet(
         assets: assets,
         selectedAssetName: selectedAssetName,
-        onAssetSelected: (asset) async {
-          await Future<void>.delayed(motion.selectionCommitDelay);
-          if (context.mounted) {
-            Navigator.of(context).pop(asset);
-          }
+        onAssetSelected: (asset) {
+          Navigator.of(context).pop(asset);
         },
       ),
     );
@@ -60,57 +57,65 @@ class AssetSelectorSheet extends StatelessWidget {
     final maxHeight =
         MediaQuery.of(context).size.height * metrics.sheetMaxHeightFactor;
 
-    return Container(
+    return ConstrainedBox(
       constraints: BoxConstraints(maxHeight: maxHeight),
-      decoration: BoxDecoration(
+      child: Squircle(
         color: context.colorScheme.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(radius.card)),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(height: spacing.md),
-          // Handle bar
-          Container(
-            width: metrics.sheetHandleWidth,
-            height: metrics.sheetHandleHeight,
-            decoration: BoxDecoration(
-              color: context.colorScheme.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(radius.pill),
-            ),
-          ),
-          SizedBox(height: spacing.lg),
-          // Title
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: spacing.screenPadding),
-            child: Text('Select token', style: type.title),
-          ),
-          SizedBox(height: spacing.lg),
-          // Asset list
-          Flexible(
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: assets.length,
-              padding: EdgeInsets.only(bottom: spacing.bottomSafeRaw(context)),
-              itemBuilder: (context, index) {
-                final asset = assets[index];
-                final isSelected =
-                    asset.token == selectedAssetName ||
-                    asset.unit == selectedAssetName;
+        border: BorderRadius.vertical(top: Radius.circular(radius.sheet)),
+        borderColor: context.appColors.transparentSurface,
+        borderWidth: 0,
+        padding: EdgeInsets.zero,
+        child: SafeArea(
+          top: false,
+          minimum: EdgeInsets.only(bottom: spacing.lg),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(height: spacing.md),
+              // Handle bar
+              SizedBox(
+                width: metrics.sheetHandleWidth,
+                height: metrics.sheetHandleHeight,
+                child: AsterPill(
+                  color: context.colorScheme.surfaceContainerHigh,
+                  child: const SizedBox.expand(),
+                ),
+              ),
+              SizedBox(height: spacing.lg),
+              // Title
+              Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: spacing.screenPadding,
+                ),
+                child: Text('Select token', style: type.title),
+              ),
+              SizedBox(height: spacing.lg),
+              // Asset list
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: assets.length,
+                  itemBuilder: (context, index) {
+                    final asset = assets[index];
+                    final isSelected =
+                        asset.token == selectedAssetName ||
+                        asset.unit == selectedAssetName;
 
-                return Padding(
-                  padding: EdgeInsets.only(bottom: spacing.xs),
-                  child: _AssetItem(
-                    asset: asset,
-                    isSelected: isSelected,
-                    onTap: () => onAssetSelected(asset),
-                  ),
-                );
-              },
-            ),
+                    return Padding(
+                      padding: EdgeInsets.only(bottom: spacing.xs),
+                      child: _AssetItem(
+                        asset: asset,
+                        isSelected: isSelected,
+                        onTap: () => onAssetSelected(asset),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -140,27 +145,29 @@ class _AssetItem extends StatelessWidget {
     final colors = context.appColors;
     final motion = context.motion;
     final spacing = context.spacing;
-    final radius = context.radii;
     final icons = context.icons;
     final metrics = context.metrics;
     final stateLayers = context.stateLayers;
     final type = context.type;
+    final effectiveOnTap = isSelected ? null : onTap;
+
+    void select() {
+      unawaited(context.haptics.trigger(HapticIntent.selection));
+      effectiveOnTap?.call();
+    }
 
     return Semantics(
       button: true,
+      enabled: effectiveOnTap != null,
       selected: isSelected,
       label: '${asset.token}, ${asset.chain}',
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapDown: (_) async {
-          final canVibrate = await Haptics.canVibrate();
-          if (canVibrate) {
-            await Haptics.vibrate(HapticsType.light);
-          }
-        },
-        onTap: onTap,
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: effectiveOnTap == null ? null : select,
         child: AnimatedContainer(
-          duration: motion.selectionTransitionDuration,
+          duration: context.motionPolicy.duration(
+            motion.selectionTransitionDuration,
+          ),
           curve: motion.fastEase,
           padding: EdgeInsets.symmetric(vertical: spacing.xs),
           decoration: BoxDecoration(
@@ -174,14 +181,14 @@ class _AssetItem extends StatelessWidget {
             children: [
               SizedBox(width: spacing.sm),
               // Selection indicator bar
-              Container(
+              SizedBox(
                 width: metrics.selectionIndicatorWidth,
                 height: metrics.selectionIndicatorHeight,
-                decoration: BoxDecoration(
+                child: AsterPill(
                   color: isSelected
                       ? context.colorScheme.primary
                       : colors.transparentSurface,
-                  borderRadius: BorderRadius.circular(radius.pill),
+                  child: const SizedBox.expand(),
                 ),
               ),
               SizedBox(width: spacing.md),

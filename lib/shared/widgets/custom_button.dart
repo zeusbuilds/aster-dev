@@ -1,53 +1,18 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
-import 'package:haptic_feedback/haptic_feedback.dart';
-
+import '../feedback/feedback.dart';
+import '../motion/motion.dart';
 import '../theme/theme.dart';
 import 'grid_loader.dart';
-import 'squircle.dart';
 
-/// Button variant types
-enum ButtonVariant {
-  /// Primary button - filled with primary color
-  primary,
+/// Visual variants supported by [CustomButton].
+enum ButtonVariant { primary, secondary, translucent }
 
-  /// Secondary button - outlined or filled with surface color
-  secondary,
-
-  /// Translucent button - glassy surface treatment over brand/art backgrounds
-  translucent,
-}
-
-/// Professional button widget with consistent spacing, typography, and styling
+/// App button with stable loading geometry, keyboard support, and semantic
+/// haptics.
 class CustomButton extends StatefulWidget {
-  /// Button text label
-  final String text;
-
-  /// Optional icon before the text
-  final IconData? prefixIcon;
-
-  /// Optional icon after the text
-  final IconData? suffixIcon;
-
-  /// Callback when button is tapped
-  final VoidCallback? onTap;
-
-  /// Button variant (primary or secondary)
-  final ButtonVariant variant;
-
-  /// Whether the button is enabled
-  final bool enabled;
-
-  /// Whether the button is in loading state
-  final bool loading;
-
-  /// Optional custom width
-  final double? width;
-
-  /// Whether this is a compact button
-  final bool _isCompact;
-
-  /// Normal size button constructor
   const CustomButton({
     super.key,
     required this.text,
@@ -58,9 +23,11 @@ class CustomButton extends StatefulWidget {
     this.enabled = true,
     this.loading = false,
     this.width,
+    this.hapticIntent = HapticIntent.lightImpact,
   }) : _isCompact = false;
 
-  /// Compact size button constructor
+  /// Compact buttons are true capsules. They retain the minimum touch target
+  /// while presenting a shorter visual control.
   const CustomButton.compact({
     super.key,
     required this.text,
@@ -71,7 +38,19 @@ class CustomButton extends StatefulWidget {
     this.enabled = true,
     this.loading = false,
     this.width,
+    this.hapticIntent = HapticIntent.lightImpact,
   }) : _isCompact = true;
+
+  final String text;
+  final IconData? prefixIcon;
+  final IconData? suffixIcon;
+  final VoidCallback? onTap;
+  final ButtonVariant variant;
+  final bool enabled;
+  final bool loading;
+  final double? width;
+  final HapticIntent hapticIntent;
+  final bool _isCompact;
 
   @override
   State<CustomButton> createState() => _CustomButtonState();
@@ -80,158 +59,161 @@ class CustomButton extends StatefulWidget {
 class _CustomButtonState extends State<CustomButton> {
   bool _isPressed = false;
 
+  void _handleHighlight(bool highlighted) {
+    if (_isPressed == highlighted) return;
+    setState(() => _isPressed = highlighted);
+  }
+
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
-    final radius = context.radii;
     final colors = context.appColors;
     final metrics = context.metrics;
     final motion = context.motion;
-    final icons = context.icons;
-    final strokes = context.strokes;
     final stateLayers = context.stateLayers;
-    final type = context.type;
-
-    // Size-specific configurations
     final isCompact = widget._isCompact;
-    final height = isCompact
+    final visualHeight = isCompact
         ? metrics.compactButtonHeight
         : metrics.buttonHeight;
-    final tapTargetHeight = height < metrics.minTouchTarget
+    final tapTargetHeight = visualHeight < metrics.minTouchTarget
         ? metrics.minTouchTarget
-        : height;
+        : visualHeight;
     final buttonWidth = widget.width ?? (isCompact ? null : double.infinity);
-    final horizontalPadding = isCompact ? spacing.lg : spacing.xxl;
-    final verticalPadding = spacing.md;
-    final iconSize = icons.sm;
-    final iconTextGap = isCompact ? spacing.xs : spacing.sm;
-    final borderRadius = radius.button;
-    final textStyle = isCompact ? type.compactButtonLabel : type.buttonLabel;
-
-    // Variant-specific colors
-    final backgroundColor = widget.variant == ButtonVariant.primary
-        ? context.colorScheme.primary
-        : widget.variant == ButtonVariant.translucent
-        ? context.colorScheme.surface.withValues(
-            alpha: stateLayers.translucentSurface,
-          )
-        : context.colorScheme.surface;
     final foregroundColor = widget.variant == ButtonVariant.primary
         ? context.colorScheme.onPrimary
-        : widget.variant == ButtonVariant.translucent
-        ? context.colorScheme.onSurface
         : context.colorScheme.onSurface;
-    final borderColor = widget.variant == ButtonVariant.secondary
-        ? colors.borderSubtle
-        : colors.transparentSurface;
-    final borderWidth = widget.variant == ButtonVariant.secondary
-        ? strokes.border
-        : spacing.none;
-
-    // Disabled state (disabled if loading, not enabled, or no onTap)
+    final backgroundColor = switch (widget.variant) {
+      ButtonVariant.primary => context.colorScheme.primary,
+      ButtonVariant.secondary => context.colorScheme.surface,
+      ButtonVariant.translucent => context.colorScheme.surface.withValues(
+        alpha: stateLayers.translucentSurface,
+      ),
+    };
+    final side = widget.variant == ButtonVariant.secondary
+        ? BorderSide(color: colors.borderSubtle, width: context.strokes.border)
+        : BorderSide.none;
+    final OutlinedBorder shape = isCompact
+        ? StadiumBorder(side: side)
+        : RoundedSuperellipseBorder(
+            borderRadius: BorderRadius.circular(context.radii.button),
+            side: side,
+          );
     final isEnabled = !widget.loading && widget.enabled && widget.onTap != null;
-    // Keep full opacity when loading, only fade when disabled (not loading)
-    final opacity = widget.loading
-        ? 1.0
-        : (isEnabled ? 1.0 : stateLayers.disabled);
+    final opacity = widget.loading || isEnabled ? 1.0 : stateLayers.disabled;
+    final effectiveDuration = context.motionPolicy.duration(
+      motion.buttonPressDuration,
+    );
+
+    void activate() {
+      unawaited(context.haptics.trigger(widget.hapticIntent));
+      widget.onTap?.call();
+    }
 
     return Semantics(
       button: true,
       enabled: isEnabled,
       label: widget.text,
+      value: widget.loading ? 'Loading' : null,
+      liveRegion: widget.loading,
+      excludeSemantics: true,
       child: Opacity(
         opacity: opacity,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapDown: isEnabled
-              ? (_) async {
-                  setState(() {
-                    _isPressed = true;
-                  });
-                  final canVibrate = await Haptics.canVibrate();
-                  if (canVibrate) {
-                    await Haptics.vibrate(HapticsType.light);
-                  }
-                }
-              : null,
-          onTapUp: isEnabled
-              ? (_) {
-                  setState(() {
-                    _isPressed = false;
-                  });
-                  widget.onTap?.call();
-                }
-              : null,
-          onTapCancel: isEnabled
-              ? () {
-                  setState(() {
-                    _isPressed = false;
-                  });
-                }
-              : null,
-          child: SizedBox(
-            width: buttonWidth,
-            height: tapTargetHeight,
-            child: Center(
-              child: AnimatedScale(
-                scale: _isPressed ? motion.buttonPressedScale : 1.0,
-                duration: motion.buttonPressDuration,
-                curve: motion.fastEase,
-                child: SizedBox(
-                  width: buttonWidth,
-                  height: height,
-                  child: Squircle(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: horizontalPadding,
-                      vertical: verticalPadding,
-                    ),
-                    borderRadius: borderRadius,
-                    borderColor: borderColor,
-                    borderWidth: borderWidth,
-                    color: backgroundColor,
-                    child: widget.loading
-                        ? Center(
-                            child: GridLoader(
-                              colorStyle: GridLoaderColorStyle.custom,
-                              color: foregroundColor,
-                            ),
-                          )
-                        : Row(
-                            mainAxisSize: isCompact
-                                ? MainAxisSize.min
-                                : MainAxisSize.max,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              if (widget.prefixIcon != null) ...[
-                                Icon(
-                                  widget.prefixIcon,
-                                  size: iconSize,
-                                  color: foregroundColor,
-                                ),
-                                SizedBox(width: iconTextGap),
-                              ],
-                              Flexible(
-                                child: Text(
-                                  widget.text,
-                                  style: textStyle.copyWith(
-                                    color: foregroundColor,
+        child: SizedBox(
+          width: buttonWidth,
+          height: tapTargetHeight,
+          child: Center(
+            child: AnimatedScale(
+              scale: _isPressed ? motion.buttonPressedScale : 1,
+              duration: effectiveDuration,
+              curve: motion.fastEase,
+              child: SizedBox(
+                width: buttonWidth,
+                height: visualHeight,
+                child: Material(
+                  color: backgroundColor,
+                  shape: shape,
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: isEnabled ? activate : null,
+                    onHighlightChanged: isEnabled ? _handleHighlight : null,
+                    customBorder: shape,
+                    overlayColor: WidgetStateProperty.resolveWith((states) {
+                      if (states.contains(WidgetState.pressed)) {
+                        return foregroundColor.withValues(
+                          alpha: stateLayers.pressedOverlay,
+                        );
+                      }
+                      if (states.contains(WidgetState.focused)) {
+                        return foregroundColor.withValues(
+                          alpha: stateLayers.focusOverlay,
+                        );
+                      }
+                      if (states.contains(WidgetState.hovered)) {
+                        return foregroundColor.withValues(
+                          alpha: stateLayers.hoverOverlay,
+                        );
+                      }
+                      return colors.transparentSurface;
+                    }),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isCompact ? spacing.lg : spacing.xxl,
+                      ),
+                      child: Center(
+                        child: widget.loading
+                            ? GridLoader(
+                                colorStyle: GridLoaderColorStyle.custom,
+                                color: foregroundColor,
+                              )
+                            : Row(
+                                mainAxisSize: isCompact
+                                    ? MainAxisSize.min
+                                    : MainAxisSize.max,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  if (widget.prefixIcon case final icon?) ...[
+                                    Icon(
+                                      icon,
+                                      size: context.icons.sm,
+                                      color: foregroundColor,
+                                    ),
+                                    SizedBox(
+                                      width: isCompact
+                                          ? spacing.xs
+                                          : spacing.sm,
+                                    ),
+                                  ],
+                                  Flexible(
+                                    child: Text(
+                                      widget.text,
+                                      style:
+                                          (isCompact
+                                                  ? context
+                                                        .type
+                                                        .compactButtonLabel
+                                                  : context.type.buttonLabel)
+                                              .copyWith(color: foregroundColor),
+                                      textAlign: TextAlign.center,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
-                                  textAlign: TextAlign.center,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                                  if (widget.suffixIcon case final icon?) ...[
+                                    SizedBox(
+                                      width: isCompact
+                                          ? spacing.xs
+                                          : spacing.sm,
+                                    ),
+                                    Icon(
+                                      icon,
+                                      size: context.icons.sm,
+                                      color: foregroundColor,
+                                    ),
+                                  ],
+                                ],
                               ),
-                              if (widget.suffixIcon != null) ...[
-                                SizedBox(width: iconTextGap),
-                                Icon(
-                                  widget.suffixIcon,
-                                  size: iconSize,
-                                  color: foregroundColor,
-                                ),
-                              ],
-                            ],
-                          ),
+                      ),
+                    ),
                   ),
                 ),
               ),

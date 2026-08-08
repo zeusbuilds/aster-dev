@@ -1,333 +1,111 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import 'package:ming_cute_icons/ming_cute_icons.dart';
 
+import '../feedback/toast_message.dart';
 import '../theme/theme.dart';
+import 'aster_icon_button.dart';
 import 'squircle.dart';
 
-/// Toast variant types
-enum ToastVariant { success, failure, warning }
-
-/// Custom toast widget that appears from the bottom of the screen
-///
-/// Supports three variants: success, failure, and warning
+/// Accessible visual presentation for one transient toast message.
 class CustomToast extends StatelessWidget {
-  /// Title text (required)
-  final String title;
-
-  /// Message text (optional)
-  final String? message;
-
-  /// Toast variant
-  final ToastVariant variant;
-
   const CustomToast({
     super.key,
     required this.title,
-    this.message,
     required this.variant,
+    required this.onDismiss,
+    this.message,
   });
 
-  /// Get icon for the variant
-  IconData _getIcon() {
-    switch (variant) {
-      case ToastVariant.success:
-        return MingCuteIcons.mgc_check_circle_fill;
-      case ToastVariant.failure:
-        return MingCuteIcons.mgc_close_circle_fill;
-      case ToastVariant.warning:
-        return MingCuteIcons.mgc_alert_fill;
-    }
-  }
+  final String title;
+  final String? message;
+  final ToastVariant variant;
+  final VoidCallback onDismiss;
 
-  /// Get icon color for the variant
-  Color _getIconColor(BuildContext context) {
-    final colors = context.appColors;
-    switch (variant) {
-      case ToastVariant.success:
-        return colors.success;
-      case ToastVariant.failure:
-        return colors.danger;
-      case ToastVariant.warning:
-        return colors.warning;
-    }
-  }
+  IconData get _icon => switch (variant) {
+    ToastVariant.success => MingCuteIcons.mgc_check_circle_fill,
+    ToastVariant.failure => MingCuteIcons.mgc_close_circle_fill,
+    ToastVariant.warning => MingCuteIcons.mgc_alert_fill,
+    ToastVariant.info => MingCuteIcons.mgc_information_fill,
+  };
+
+  String get _semanticKind => switch (variant) {
+    ToastVariant.success => 'Success',
+    ToastVariant.failure => 'Error',
+    ToastVariant.warning => 'Warning',
+    ToastVariant.info => 'Information',
+  };
+
+  Color _iconColor(BuildContext context) => switch (variant) {
+    ToastVariant.success => context.appColors.success,
+    ToastVariant.failure => context.appColors.danger,
+    ToastVariant.warning => context.appColors.warning,
+    ToastVariant.info => context.colorScheme.primary,
+  };
 
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
-    final type = context.type;
-    final icons = context.icons;
+    final semanticLabel = [
+      _semanticKind,
+      title,
+      if (message case final message? when message.isNotEmpty) message,
+    ].join('. ');
 
     return SafeArea(
+      top: false,
+      minimum: EdgeInsets.only(bottom: spacing.lg),
       child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: spacing.xxl,
-          vertical: spacing.lg,
-        ),
-        child: Squircle(
-          color: context.colorScheme.surface,
-          padding: EdgeInsets.symmetric(
-            horizontal: spacing.lg,
-            vertical: spacing.lg,
-          ),
-          shadows: [context.shadows.raised.first],
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Icon
-              Icon(_getIcon(), color: _getIconColor(context), size: icons.md),
-              SizedBox(width: spacing.md),
-              // Title and message
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(title, style: type.toastTitle),
-                    if (message != null && message!.isNotEmpty) ...[
-                      Text(message!, style: type.toastMessage),
-                    ],
-                  ],
+        padding: EdgeInsets.symmetric(horizontal: spacing.screenPadding),
+        child: Semantics(
+          container: true,
+          explicitChildNodes: true,
+          liveRegion: true,
+          label: semanticLabel,
+          child: Squircle(
+            color: context.colorScheme.surface,
+            padding: EdgeInsets.symmetric(
+              horizontal: spacing.lg,
+              vertical: spacing.md,
+            ),
+            shadows: context.shadows.raised,
+            child: Row(
+              children: [
+                ExcludeSemantics(
+                  child: Icon(
+                    _icon,
+                    color: _iconColor(context),
+                    size: context.icons.md,
+                  ),
                 ),
-              ),
-            ],
+                SizedBox(width: spacing.md),
+                Expanded(
+                  child: ExcludeSemantics(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(title, style: context.type.toastTitle),
+                        if (message case final message?
+                            when message.isNotEmpty) ...[
+                          SizedBox(height: spacing.xxs),
+                          Text(message, style: context.type.toastMessage),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                SizedBox(width: spacing.sm),
+                AsterIconButton(
+                  onPressed: onDismiss,
+                  tooltip: 'Dismiss',
+                  icon: MingCuteIcons.mgc_close_line,
+                  showTooltip: false,
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Helper class to show toast messages
-class ToastHelper {
-  static OverlayEntry? _currentOverlayEntry;
-  static VoidCallback? _currentDismissCallback;
-  static Duration? _currentDismissDuration;
-
-  /// Register a dismiss callback for the current toast (internal use)
-  static void registerDismissCallback(
-    VoidCallback callback,
-    Duration duration,
-  ) {
-    _currentDismissCallback = callback;
-    _currentDismissDuration = duration;
-  }
-
-  /// Dismiss the current toast if one is showing
-  static Future<void> _dismissCurrent() async {
-    if (_currentDismissCallback != null) {
-      _currentDismissCallback!();
-      _currentDismissCallback = null;
-      await Future<void>.delayed(
-        _currentDismissDuration ?? const AsterMotion().toastTransitionDuration,
-      );
-    }
-    if (_currentOverlayEntry != null) {
-      _currentOverlayEntry!.remove();
-      _currentOverlayEntry = null;
-    }
-  }
-
-  /// Show a toast message
-  ///
-  /// [context] - BuildContext to show the toast
-  ///
-  /// [title] - Title text (required)
-  ///
-  /// [message] - Message text (optional)
-  ///
-  /// [variant] - Toast variant (success, failure, warning)
-  ///
-  /// [duration] - How long the toast should be visible (default: 3 seconds)
-  static Future<void> show(
-    BuildContext context, {
-    required String title,
-    String? message,
-    required ToastVariant variant,
-    Duration? duration,
-  }) async {
-    // Dismiss current toast if one is showing
-    await _dismissCurrent();
-
-    // Check if context is still mounted after async operation
-    if (!context.mounted) return;
-
-    final motion = context.motion;
-    final visibleDuration = duration ?? motion.toastVisibleDuration;
-    final overlay = Overlay.of(context);
-    late final OverlayEntry overlayEntry;
-    overlayEntry = OverlayEntry(
-      builder: (context) => _ToastOverlay(
-        duration: visibleDuration,
-        transitionDuration: motion.toastTransitionDuration,
-        curve: motion.toastCurve,
-        onDismiss: () {
-          if (overlayEntry.mounted) {
-            overlayEntry.remove();
-          }
-          _currentOverlayEntry = null;
-          _currentDismissCallback = null;
-          _currentDismissDuration = null;
-        },
-        child: CustomToast(title: title, message: message, variant: variant),
-      ),
-    );
-
-    _currentOverlayEntry = overlayEntry;
-    _currentDismissDuration = motion.toastTransitionDuration;
-    overlay.insert(overlayEntry);
-  }
-
-  /// Show success toast
-  static void showSuccess(
-    BuildContext context, {
-    required String title,
-    String? message,
-    Duration? duration,
-  }) {
-    unawaited(
-      show(
-        context,
-        title: title,
-        message: message,
-        variant: ToastVariant.success,
-        duration: duration,
-      ),
-    );
-  }
-
-  /// Show failure toast
-  static void showFailure(
-    BuildContext context, {
-    required String title,
-    String? message,
-    Duration? duration,
-  }) {
-    unawaited(
-      show(
-        context,
-        title: title,
-        message: message,
-        variant: ToastVariant.failure,
-        duration: duration,
-      ),
-    );
-  }
-
-  /// Show warning toast
-  static void showWarning(
-    BuildContext context, {
-    required String title,
-    String? message,
-    Duration? duration,
-  }) {
-    unawaited(
-      show(
-        context,
-        title: title,
-        message: message,
-        variant: ToastVariant.warning,
-        duration: duration,
-      ),
-    );
-  }
-}
-
-/// Overlay widget that handles the slide animation from bottom
-class _ToastOverlay extends StatefulWidget {
-  final Widget child;
-  final Duration duration;
-  final Duration transitionDuration;
-  final Curve curve;
-  final VoidCallback? onDismiss;
-
-  const _ToastOverlay({
-    required this.child,
-    required this.duration,
-    required this.transitionDuration,
-    required this.curve,
-    this.onDismiss,
-  });
-
-  @override
-  State<_ToastOverlay> createState() => _ToastOverlayState();
-}
-
-class _ToastOverlayState extends State<_ToastOverlay>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<Offset> _slideAnimation;
-  late Animation<double> _fadeAnimation;
-  bool _isDismissing = false;
-  Timer? _dismissTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: widget.transitionDuration,
-      vsync: this,
-    );
-
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 1),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _controller, curve: widget.curve));
-
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(parent: _controller, curve: widget.curve));
-
-    // Register dismiss callback with ToastHelper
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ToastHelper.registerDismissCallback(
-        () => unawaited(_dismiss()),
-        widget.transitionDuration,
-      );
-    });
-
-    // Start animation
-    unawaited(_controller.forward());
-
-    // Start reverse animation before removing.
-    final dismissDelay = widget.duration > widget.transitionDuration
-        ? widget.duration - widget.transitionDuration
-        : Duration.zero;
-    _dismissTimer = Timer(dismissDelay, () {
-      if (mounted && !_isDismissing) {
-        unawaited(_dismiss());
-      }
-    });
-  }
-
-  Future<void> _dismiss() async {
-    if (_isDismissing || !mounted) return;
-    _isDismissing = true;
-    _dismissTimer?.cancel();
-    await _controller.reverse();
-    if (mounted) widget.onDismiss?.call();
-  }
-
-  @override
-  void dispose() {
-    _dismissTimer?.cancel();
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned(
-      left: 0,
-      right: 0,
-      bottom: 0,
-      child: SlideTransition(
-        position: _slideAnimation,
-        child: FadeTransition(opacity: _fadeAnimation, child: widget.child),
       ),
     );
   }

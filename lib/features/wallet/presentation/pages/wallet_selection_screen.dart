@@ -16,7 +16,6 @@ class WalletSelectionScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final spacing = context.spacing;
-    final motion = context.motion;
     final walletState = ref.watch(walletViewModelProvider);
     final viewModel = ref.read(walletViewModelProvider.notifier);
 
@@ -42,29 +41,33 @@ class WalletSelectionScreen extends ConsumerWidget {
         ),
       ),
       data: (data) => _WalletSelectionScaffold(
-        child: ListView.separated(
-          padding: EdgeInsets.only(bottom: spacing.bottomSafeRaw(context)),
-          itemCount: data.wallets.length,
-          separatorBuilder: (context, index) => const AsterDivider.inset(),
-          itemBuilder: (context, index) {
-            final wallet = data.wallets[index];
-            final isSelected = data.activeWallet?.id == wallet.id;
-            final isSwitching = data.switchingWalletId != null;
+        child: SafeArea(
+          top: false,
+          minimum: EdgeInsets.only(bottom: spacing.lg),
+          child: ListView.separated(
+            itemCount: data.wallets.length,
+            separatorBuilder: (context, index) => const AsterDivider.inset(),
+            itemBuilder: (context, index) {
+              final wallet = data.wallets[index];
+              final isSelected = data.activeWallet?.id == wallet.id;
+              final isSwitching = data.switchingWalletId != null;
 
-            return WalletSelectOptionRow(
-              wallet: wallet,
-              selected: data.activeWallet?.id,
-              onTap: isSelected || isSwitching
-                  ? null
-                  : () async {
-                      final switched = await viewModel.switchWallet(wallet.id);
-                      if (!switched) return;
-                      await Future<void>.delayed(motion.selectionCommitDelay);
-                      if (!context.mounted) return;
-                      context.pop();
-                    },
-            );
-          },
+              return WalletSelectOptionRow(
+                wallet: wallet,
+                selected: isSelected,
+                onTap: isSelected || isSwitching
+                    ? null
+                    : () async {
+                        final switched = await viewModel.switchWallet(
+                          wallet.id,
+                        );
+                        if (!switched) return;
+                        if (!context.mounted) return;
+                        context.pop();
+                      },
+              );
+            },
+          ),
         ),
       ),
     );

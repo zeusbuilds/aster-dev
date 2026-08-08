@@ -4,28 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../theme/theme.dart';
 
-const _splashMotion = AsterMotion();
-final _animationDuration = _splashMotion.splashRevealDuration.inMilliseconds;
-
-const _rotationStart = 0;
-const _rotationEnd = 240;
-
-const _expansionStart = 120;
-const _expansionEnd = 520;
-
-const _splitStart = 520;
-const _splitEnd = 700;
-
-const _linesLengthStart = 680;
-const _linesLengthEnd = 1080;
-const _linesGapStart = 720;
-const _linesGapEnd = 1160;
-
-/// Drives lines past the screen edge so they exit off-screen (1.0 = at edge).
-const _linesGapMax = 1.3;
-
-const _logoWidth = 160;
-
 /// Animated splash screen used during app startup.
 class AnimatedSplashScreen extends StatelessWidget {
   const AnimatedSplashScreen({required this.controller, super.key});
@@ -35,7 +13,7 @@ class AnimatedSplashScreen extends StatelessWidget {
   static AnimationController createController(TickerProvider vsync) {
     return AnimationController(
       vsync: vsync,
-      duration: _splashMotion.splashRevealDuration,
+      duration: const AsterMotion().splashRevealDuration,
     );
   }
 
@@ -63,30 +41,36 @@ class _Background extends StatefulWidget {
 }
 
 class _BackgroundState extends State<_Background> {
-  late final Animation<double> _linesLength = Tween<double>(begin: 0, end: 1)
-      .chain(
-        CurveTween(
-          curve: Interval(
-            _linesLengthStart / _animationDuration,
-            _linesLengthEnd / _animationDuration,
-            curve: _splashMotion.choreographyCurve,
-          ),
-        ),
-      )
-      .animate(widget.controller);
+  late Animation<double> _linesLength;
+  late Animation<double> _linesGap;
 
-  late final Animation<double> _linesGap =
-      Tween<double>(begin: 0, end: _linesGapMax)
-          .chain(
-            CurveTween(
-              curve: Interval(
-                _linesGapStart / _animationDuration,
-                _linesGapEnd / _animationDuration,
-                curve: _splashMotion.splashRevealMoveCurve,
-              ),
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final motion = context.motion;
+    _linesLength = Tween<double>(begin: 0, end: 1)
+        .chain(
+          CurveTween(
+            curve: Interval(
+              motion.splashLinesLengthStart,
+              motion.splashLinesLengthEnd,
+              curve: motion.choreographyCurve,
             ),
-          )
-          .animate(widget.controller);
+          ),
+        )
+        .animate(widget.controller);
+    _linesGap = Tween<double>(begin: 0, end: context.art.splashLineGapExtent)
+        .chain(
+          CurveTween(
+            curve: Interval(
+              motion.splashLinesGapStart,
+              motion.splashLinesGapEnd,
+              curve: motion.splashRevealMoveCurve,
+            ),
+          ),
+        )
+        .animate(widget.controller);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -96,6 +80,8 @@ class _BackgroundState extends State<_Background> {
         linesLength: _linesLength,
         linesGap: _linesGap,
         gradient: gradients.splashBackdrop,
+        initialLineHeight: context.art.splashLineInitialHeight,
+        maximumLineHeight: context.art.splashLineMaximumHeight,
       ),
       child: const SizedBox.expand(),
     );
@@ -107,11 +93,15 @@ class _BackgroundPainter extends CustomPainter {
     required this.linesLength,
     required this.linesGap,
     required this.gradient,
+    required this.initialLineHeight,
+    required this.maximumLineHeight,
   }) : super(repaint: Listenable.merge([linesLength, linesGap]));
 
   final Animation<double> linesLength;
   final Animation<double> linesGap;
   final AsterGradientSpec gradient;
+  final double initialLineHeight;
+  final double maximumLineHeight;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -123,13 +113,11 @@ class _BackgroundPainter extends CustomPainter {
     canvas.drawRect(rect, gradientPaint);
 
     if (linesLength.value > 0) {
-      const initialLineHeight = 8.5;
-      const maxLineHeight = 50.0;
       final centerY = size.height / 2;
 
       final lineHeight =
           initialLineHeight +
-          (maxLineHeight - initialLineHeight) * linesLength.value;
+          (maximumLineHeight - initialLineHeight) * linesLength.value;
 
       final topY = (centerY - lineHeight / 2) * (1 - linesGap.value);
       final bottomY =
@@ -154,7 +142,9 @@ class _BackgroundPainter extends CustomPainter {
   bool shouldRepaint(_BackgroundPainter oldDelegate) {
     return linesLength != oldDelegate.linesLength ||
         linesGap != oldDelegate.linesGap ||
-        gradient != oldDelegate.gradient;
+        gradient != oldDelegate.gradient ||
+        initialLineHeight != oldDelegate.initialLineHeight ||
+        maximumLineHeight != oldDelegate.maximumLineHeight;
   }
 }
 
@@ -168,74 +158,70 @@ class _Foreground extends StatefulWidget {
 }
 
 class _ForegroundState extends State<_Foreground> {
-  late final _rotation = Tween<double>(begin: 0, end: 1)
-      .chain(
-        CurveTween(
-          curve: Interval(
-            _rotationStart / _animationDuration,
-            _rotationEnd / _animationDuration,
-            curve: _splashMotion.choreographyCurve,
-          ),
-        ),
-      )
-      .animate(widget.controller);
+  late Animation<double> _rotation;
+  late Animation<double> _expansion;
+  late Animation<double> _split;
+  late Animation<double> _linesLength;
+  late Animation<double> _linesGap;
 
-  late final _expansion = Tween<double>(begin: 0, end: 1)
-      .chain(
-        CurveTween(
-          curve: Interval(
-            _expansionStart / _animationDuration,
-            _expansionEnd / _animationDuration,
-            curve: _splashMotion.choreographyCurve,
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final motion = context.motion;
+    _rotation = _phaseAnimation(
+      begin: motion.splashRotationStart,
+      end: motion.splashRotationEnd,
+      curve: motion.choreographyCurve,
+    );
+    _expansion = _phaseAnimation(
+      begin: motion.splashExpansionStart,
+      end: motion.splashExpansionEnd,
+      curve: motion.choreographyCurve,
+    );
+    _split = _phaseAnimation(
+      begin: motion.splashSplitStart,
+      end: motion.splashSplitEnd,
+      curve: motion.splashSplitCurve,
+    );
+    _linesLength = _phaseAnimation(
+      begin: motion.splashLinesLengthStart,
+      end: motion.splashLinesLengthEnd,
+      curve: motion.choreographyCurve,
+    );
+    _linesGap = Tween<double>(begin: 0, end: context.art.splashLineGapExtent)
+        .chain(
+          CurveTween(
+            curve: Interval(
+              motion.splashLinesGapStart,
+              motion.splashLinesGapEnd,
+              curve: motion.splashRevealMoveCurve,
+            ),
           ),
-        ),
-      )
-      .animate(widget.controller);
+        )
+        .animate(widget.controller);
+  }
 
-  late final _split = Tween<double>(begin: 0, end: 1)
-      .chain(
-        CurveTween(
-          curve: Interval(
-            _splitStart / _animationDuration,
-            _splitEnd / _animationDuration,
-            curve: _splashMotion.splashSplitCurve,
-          ),
-        ),
-      )
-      .animate(widget.controller);
-
-  late final _linesLength = Tween<double>(begin: 0, end: 1)
-      .chain(
-        CurveTween(
-          curve: Interval(
-            _linesLengthStart / _animationDuration,
-            _linesLengthEnd / _animationDuration,
-            curve: _splashMotion.choreographyCurve,
-          ),
-        ),
-      )
-      .animate(widget.controller);
-
-  late final _linesGap = Tween<double>(begin: 0, end: _linesGapMax)
-      .chain(
-        CurveTween(
-          curve: Interval(
-            _linesGapStart / _animationDuration,
-            _linesGapEnd / _animationDuration,
-            curve: _splashMotion.splashRevealMoveCurve,
-          ),
-        ),
-      )
-      .animate(widget.controller);
+  Animation<double> _phaseAnimation({
+    required double begin,
+    required double end,
+    required Curve curve,
+  }) {
+    return Tween<double>(begin: 0, end: 1)
+        .chain(CurveTween(curve: Interval(begin, end, curve: curve)))
+        .animate(widget.controller);
+  }
 
   @override
   Widget build(BuildContext context) {
     final foregroundColor = context.appColors.onBrandArt;
+    final art = context.art;
     return CustomMultiChildLayout(
       delegate: _ForegroundLayoutDelegate(
         split: _split,
         linesLength: _linesLength,
         linesGap: _linesGap,
+        initialLineHeight: art.splashLineInitialHeight,
+        maximumLineHeight: art.splashLineMaximumHeight,
       ),
       children: [
         LayoutId(
@@ -246,6 +232,11 @@ class _ForegroundState extends State<_Foreground> {
               rotation: _rotation,
               expansion: _expansion,
               linesLength: _linesLength,
+              logoWidth: context.metrics.splashLogoWidth,
+              diagonalRatio: art.splashLogoDiagonalRatio,
+              thicknessRatio: art.splashLogoThicknessRatio,
+              handoffProgress: art.splashLogoHandoffProgress,
+              diagonalExitProgress: art.splashLogoDiagonalExitProgress,
             ),
           ),
         ),
@@ -269,11 +260,15 @@ class _ForegroundLayoutDelegate extends MultiChildLayoutDelegate {
     required this.split,
     required this.linesLength,
     required this.linesGap,
+    required this.initialLineHeight,
+    required this.maximumLineHeight,
   }) : super(relayout: Listenable.merge([split, linesLength, linesGap]));
 
   final Animation<double> split;
   final Animation<double> linesLength;
   final Animation<double> linesGap;
+  final double initialLineHeight;
+  final double maximumLineHeight;
 
   @override
   void performLayout(Size size) {
@@ -288,14 +283,12 @@ class _ForegroundLayoutDelegate extends MultiChildLayoutDelegate {
       return;
     }
 
-    const initialLineHeight = 8.5;
-    const maxLineHeight = 50.0;
     final maxLineWidth = screenRect.width;
     final centerY = screenRect.center.dy;
 
     final lineHeight =
         initialLineHeight +
-        (maxLineHeight - initialLineHeight) * linesLength.value;
+        (maximumLineHeight - initialLineHeight) * linesLength.value;
     final lineSize = Size(maxLineWidth, lineHeight);
 
     layoutChild(_ForegroundPart.topLine, BoxConstraints.tight(lineSize));
@@ -314,7 +307,9 @@ class _ForegroundLayoutDelegate extends MultiChildLayoutDelegate {
   bool shouldRelayout(_ForegroundLayoutDelegate oldDelegate) {
     return split != oldDelegate.split ||
         linesLength != oldDelegate.linesLength ||
-        linesGap != oldDelegate.linesGap;
+        linesGap != oldDelegate.linesGap ||
+        initialLineHeight != oldDelegate.initialLineHeight ||
+        maximumLineHeight != oldDelegate.maximumLineHeight;
   }
 }
 
@@ -324,26 +319,33 @@ class _LogoPainter extends CustomPainter {
     required this.rotation,
     required this.expansion,
     required this.linesLength,
+    required this.logoWidth,
+    required this.diagonalRatio,
+    required this.thicknessRatio,
+    required this.handoffProgress,
+    required this.diagonalExitProgress,
   }) : super(repaint: Listenable.merge([rotation, expansion, linesLength]));
 
   final Color color;
   final Animation<double> rotation;
   final Animation<double> expansion;
   final Animation<double> linesLength;
+  final double logoWidth;
+  final double diagonalRatio;
+  final double thicknessRatio;
+  final double handoffProgress;
+  final double diagonalExitProgress;
 
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width;
 
-    final logoWidthFactor = _logoWidth / w;
+    final logoWidthFactor = logoWidth / w;
     final logoFullWidth = w * logoWidthFactor;
     final horizontalHalfWidth = logoFullWidth / 2;
 
-    const diagToHorizRatio = 470 / 705;
-    final diagonalLength = logoFullWidth * diagToHorizRatio;
-
-    const thicknessToHorizRatio = 35 / 705;
-    final thickness = logoFullWidth * thicknessToHorizRatio;
+    final diagonalLength = logoFullWidth * diagonalRatio;
+    final thickness = logoFullWidth * thicknessRatio;
 
     final center = Offset(size.width / 2, size.height / 2);
     final halfWidth =
@@ -353,8 +355,7 @@ class _LogoPainter extends CustomPainter {
       ..save()
       ..translate(center.dx, center.dy);
 
-    const handoffThreshold = 0.2;
-    if (linesLength.value < handoffThreshold && halfWidth > 0) {
+    if (linesLength.value < handoffProgress && halfWidth > 0) {
       final fillPaint = Paint()
         ..color = color
         ..style = PaintingStyle.fill;
@@ -368,7 +369,7 @@ class _LogoPainter extends CustomPainter {
       );
     }
 
-    if (rotation.value < 0.98) {
+    if (rotation.value < diagonalExitProgress) {
       final fillPaint = Paint()
         ..color = color
         ..style = PaintingStyle.fill;
@@ -396,6 +397,11 @@ class _LogoPainter extends CustomPainter {
     return color != oldDelegate.color ||
         rotation != oldDelegate.rotation ||
         expansion != oldDelegate.expansion ||
-        linesLength != oldDelegate.linesLength;
+        linesLength != oldDelegate.linesLength ||
+        logoWidth != oldDelegate.logoWidth ||
+        diagonalRatio != oldDelegate.diagonalRatio ||
+        thicknessRatio != oldDelegate.thicknessRatio ||
+        handoffProgress != oldDelegate.handoffProgress ||
+        diagonalExitProgress != oldDelegate.diagonalExitProgress;
   }
 }

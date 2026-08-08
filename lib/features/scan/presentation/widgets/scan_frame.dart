@@ -29,7 +29,6 @@ class ScanFrame extends ConsumerWidget {
     final colors = context.appColors;
     final effects = context.effects;
     final metrics = context.metrics;
-    final radius = context.radii;
     final icons = context.icons;
     final strokes = context.strokes;
     final frameSize =
@@ -44,20 +43,17 @@ class ScanFrame extends ConsumerWidget {
       ),
       child: Align(
         alignment: Alignment.bottomCenter,
-        child: Container(
+        child: AsterPill(
           padding: EdgeInsets.all(spacing.xs),
-          decoration: BoxDecoration(
-            color: colors.scanControlSurface.withValues(
-              alpha: effects.scanControlSurfaceOpacity,
-            ),
-            borderRadius: BorderRadius.circular(radius.pill),
+          color: colors.scanControlSurface.withValues(
+            alpha: effects.scanControlSurfaceOpacity,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               ScanControlButton(
                 semanticLabel: 'Open gallery',
-                onTap: onGalleryTap ?? () {},
+                onTap: onGalleryTap,
                 child: Icon(
                   MingCuteIcons.mgc_photo_album_line,
                   color: colors.onScan,
@@ -67,7 +63,8 @@ class ScanFrame extends ConsumerWidget {
               SizedBox(width: spacing.sm),
               ScanControlButton(
                 semanticLabel: flashOn ? 'Turn flash off' : 'Turn flash on',
-                onTap: onFlashTap ?? () {},
+                hapticIntent: HapticIntent.selection,
+                onTap: onFlashTap,
                 child: Icon(
                   flashOn
                       ? MingCuteIcons.mgc_flash_fill
@@ -79,7 +76,8 @@ class ScanFrame extends ConsumerWidget {
               SizedBox(width: spacing.sm),
               ScanControlButton(
                 semanticLabel: 'Change zoom',
-                onTap: onZoomTap ?? () {},
+                hapticIntent: HapticIntent.selection,
+                onTap: onZoomTap,
                 child: Text(zoomDisplayText, style: context.type.scanControl),
               ),
             ],

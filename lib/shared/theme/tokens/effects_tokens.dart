@@ -22,6 +22,15 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
     this.marketPillDotOpacity = 0.5,
     this.artNoiseOpacity = 0.05,
     this.artNoiseTintOpacity = 0.5,
+    this.loaderBreathingMinimumOpacity = 0.35,
+    this.loaderBreathingMaximumOpacity = 1,
+    this.loaderTrailStrongOpacity = 0.8,
+    this.loaderTrailMediumOpacity = 0.55,
+    this.loaderTrailWeakOpacity = 0.3,
+    this.loaderPlusTrailWeakOpacity = 0.5,
+    this.chartLoadingBaseOpacity = 0.5,
+    this.chartLoadingOpacityAmplitude = 0.3,
+    this.chartContentOpacity = 0.8,
   });
 
   final double brandContentStrongOpacity;
@@ -41,6 +50,15 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
   final double marketPillDotOpacity;
   final double artNoiseOpacity;
   final double artNoiseTintOpacity;
+  final double loaderBreathingMinimumOpacity;
+  final double loaderBreathingMaximumOpacity;
+  final double loaderTrailStrongOpacity;
+  final double loaderTrailMediumOpacity;
+  final double loaderTrailWeakOpacity;
+  final double loaderPlusTrailWeakOpacity;
+  final double chartLoadingBaseOpacity;
+  final double chartLoadingOpacityAmplitude;
+  final double chartContentOpacity;
 
   @override
   AsterEffects copyWith({
@@ -61,6 +79,15 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
     double? marketPillDotOpacity,
     double? artNoiseOpacity,
     double? artNoiseTintOpacity,
+    double? loaderBreathingMinimumOpacity,
+    double? loaderBreathingMaximumOpacity,
+    double? loaderTrailStrongOpacity,
+    double? loaderTrailMediumOpacity,
+    double? loaderTrailWeakOpacity,
+    double? loaderPlusTrailWeakOpacity,
+    double? chartLoadingBaseOpacity,
+    double? chartLoadingOpacityAmplitude,
+    double? chartContentOpacity,
   }) {
     return AsterEffects(
       brandContentStrongOpacity:
@@ -92,6 +119,23 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
       marketPillDotOpacity: marketPillDotOpacity ?? this.marketPillDotOpacity,
       artNoiseOpacity: artNoiseOpacity ?? this.artNoiseOpacity,
       artNoiseTintOpacity: artNoiseTintOpacity ?? this.artNoiseTintOpacity,
+      loaderBreathingMinimumOpacity:
+          loaderBreathingMinimumOpacity ?? this.loaderBreathingMinimumOpacity,
+      loaderBreathingMaximumOpacity:
+          loaderBreathingMaximumOpacity ?? this.loaderBreathingMaximumOpacity,
+      loaderTrailStrongOpacity:
+          loaderTrailStrongOpacity ?? this.loaderTrailStrongOpacity,
+      loaderTrailMediumOpacity:
+          loaderTrailMediumOpacity ?? this.loaderTrailMediumOpacity,
+      loaderTrailWeakOpacity:
+          loaderTrailWeakOpacity ?? this.loaderTrailWeakOpacity,
+      loaderPlusTrailWeakOpacity:
+          loaderPlusTrailWeakOpacity ?? this.loaderPlusTrailWeakOpacity,
+      chartLoadingBaseOpacity:
+          chartLoadingBaseOpacity ?? this.chartLoadingBaseOpacity,
+      chartLoadingOpacityAmplitude:
+          chartLoadingOpacityAmplitude ?? this.chartLoadingOpacityAmplitude,
+      chartContentOpacity: chartContentOpacity ?? this.chartContentOpacity,
     );
   }
 
@@ -178,6 +222,51 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
       artNoiseTintOpacity: _lerp(
         artNoiseTintOpacity,
         other.artNoiseTintOpacity,
+        t,
+      ),
+      loaderBreathingMinimumOpacity: _lerp(
+        loaderBreathingMinimumOpacity,
+        other.loaderBreathingMinimumOpacity,
+        t,
+      ),
+      loaderBreathingMaximumOpacity: _lerp(
+        loaderBreathingMaximumOpacity,
+        other.loaderBreathingMaximumOpacity,
+        t,
+      ),
+      loaderTrailStrongOpacity: _lerp(
+        loaderTrailStrongOpacity,
+        other.loaderTrailStrongOpacity,
+        t,
+      ),
+      loaderTrailMediumOpacity: _lerp(
+        loaderTrailMediumOpacity,
+        other.loaderTrailMediumOpacity,
+        t,
+      ),
+      loaderTrailWeakOpacity: _lerp(
+        loaderTrailWeakOpacity,
+        other.loaderTrailWeakOpacity,
+        t,
+      ),
+      loaderPlusTrailWeakOpacity: _lerp(
+        loaderPlusTrailWeakOpacity,
+        other.loaderPlusTrailWeakOpacity,
+        t,
+      ),
+      chartLoadingBaseOpacity: _lerp(
+        chartLoadingBaseOpacity,
+        other.chartLoadingBaseOpacity,
+        t,
+      ),
+      chartLoadingOpacityAmplitude: _lerp(
+        chartLoadingOpacityAmplitude,
+        other.chartLoadingOpacityAmplitude,
+        t,
+      ),
+      chartContentOpacity: _lerp(
+        chartContentOpacity,
+        other.chartContentOpacity,
         t,
       ),
     );

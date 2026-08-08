@@ -16,6 +16,13 @@ class AsterArt extends ThemeExtension<AsterArt> {
     this.onboardingIconColumns = 7,
     this.onboardingIconGridGap = 6,
     this.onboardingIconBlurSigma = 14,
+    this.splashLineInitialHeight = 8.5,
+    this.splashLineMaximumHeight = 50,
+    this.splashLineGapExtent = 1.3,
+    this.splashLogoDiagonalRatio = 470 / 705,
+    this.splashLogoThicknessRatio = 35 / 705,
+    this.splashLogoHandoffProgress = 0.2,
+    this.splashLogoDiagonalExitProgress = 0.98,
   });
 
   final int homeMeshColumns;
@@ -27,6 +34,13 @@ class AsterArt extends ThemeExtension<AsterArt> {
   final int onboardingIconColumns;
   final double onboardingIconGridGap;
   final double onboardingIconBlurSigma;
+  final double splashLineInitialHeight;
+  final double splashLineMaximumHeight;
+  final double splashLineGapExtent;
+  final double splashLogoDiagonalRatio;
+  final double splashLogoThicknessRatio;
+  final double splashLogoHandoffProgress;
+  final double splashLogoDiagonalExitProgress;
 
   @override
   AsterArt copyWith({
@@ -39,6 +53,13 @@ class AsterArt extends ThemeExtension<AsterArt> {
     int? onboardingIconColumns,
     double? onboardingIconGridGap,
     double? onboardingIconBlurSigma,
+    double? splashLineInitialHeight,
+    double? splashLineMaximumHeight,
+    double? splashLineGapExtent,
+    double? splashLogoDiagonalRatio,
+    double? splashLogoThicknessRatio,
+    double? splashLogoHandoffProgress,
+    double? splashLogoDiagonalExitProgress,
   }) {
     return AsterArt(
       homeMeshColumns: homeMeshColumns ?? this.homeMeshColumns,
@@ -54,6 +75,19 @@ class AsterArt extends ThemeExtension<AsterArt> {
           onboardingIconGridGap ?? this.onboardingIconGridGap,
       onboardingIconBlurSigma:
           onboardingIconBlurSigma ?? this.onboardingIconBlurSigma,
+      splashLineInitialHeight:
+          splashLineInitialHeight ?? this.splashLineInitialHeight,
+      splashLineMaximumHeight:
+          splashLineMaximumHeight ?? this.splashLineMaximumHeight,
+      splashLineGapExtent: splashLineGapExtent ?? this.splashLineGapExtent,
+      splashLogoDiagonalRatio:
+          splashLogoDiagonalRatio ?? this.splashLogoDiagonalRatio,
+      splashLogoThicknessRatio:
+          splashLogoThicknessRatio ?? this.splashLogoThicknessRatio,
+      splashLogoHandoffProgress:
+          splashLogoHandoffProgress ?? this.splashLogoHandoffProgress,
+      splashLogoDiagonalExitProgress:
+          splashLogoDiagonalExitProgress ?? this.splashLogoDiagonalExitProgress,
     );
   }
 
@@ -96,6 +130,41 @@ class AsterArt extends ThemeExtension<AsterArt> {
       onboardingIconBlurSigma: _lerp(
         onboardingIconBlurSigma,
         other.onboardingIconBlurSigma,
+        t,
+      ),
+      splashLineInitialHeight: _lerp(
+        splashLineInitialHeight,
+        other.splashLineInitialHeight,
+        t,
+      ),
+      splashLineMaximumHeight: _lerp(
+        splashLineMaximumHeight,
+        other.splashLineMaximumHeight,
+        t,
+      ),
+      splashLineGapExtent: _lerp(
+        splashLineGapExtent,
+        other.splashLineGapExtent,
+        t,
+      ),
+      splashLogoDiagonalRatio: _lerp(
+        splashLogoDiagonalRatio,
+        other.splashLogoDiagonalRatio,
+        t,
+      ),
+      splashLogoThicknessRatio: _lerp(
+        splashLogoThicknessRatio,
+        other.splashLogoThicknessRatio,
+        t,
+      ),
+      splashLogoHandoffProgress: _lerp(
+        splashLogoHandoffProgress,
+        other.splashLogoHandoffProgress,
+        t,
+      ),
+      splashLogoDiagonalExitProgress: _lerp(
+        splashLogoDiagonalExitProgress,
+        other.splashLogoDiagonalExitProgress,
         t,
       ),
     );

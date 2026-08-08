@@ -7,30 +7,30 @@ extension ThemeContext on BuildContext {
   TextTheme get textTheme => theme.textTheme;
   ColorScheme get colorScheme => theme.colorScheme;
 
-  AsterColors get appColors =>
-      theme.extension<AsterColors>() ?? AsterColors.light;
-  AsterSpacing get spacing =>
-      theme.extension<AsterSpacing>() ?? const AsterSpacing();
-  AsterRadii get radii => theme.extension<AsterRadii>() ?? const AsterRadii();
-  AsterShadows get shadows =>
-      theme.extension<AsterShadows>() ?? const AsterShadows();
-  AsterTypography get typography =>
-      theme.extension<AsterTypography>() ?? const AsterTypography();
+  AsterColors get appColors => _requireExtension<AsterColors>();
+  AsterSpacing get spacing => _requireExtension<AsterSpacing>();
+  AsterRadii get radii => _requireExtension<AsterRadii>();
+  AsterShadows get shadows => _requireExtension<AsterShadows>();
+  AsterTypography get typography => _requireExtension<AsterTypography>();
   AsterComponentMetrics get metrics =>
-      theme.extension<AsterComponentMetrics>() ?? const AsterComponentMetrics();
-  AsterMotion get motion =>
-      theme.extension<AsterMotion>() ?? const AsterMotion();
-  AsterEffects get effects =>
-      theme.extension<AsterEffects>() ?? const AsterEffects();
-  AsterIconography get icons =>
-      theme.extension<AsterIconography>() ?? const AsterIconography();
-  AsterStrokes get strokes =>
-      theme.extension<AsterStrokes>() ?? const AsterStrokes();
-  AsterStateLayers get stateLayers =>
-      theme.extension<AsterStateLayers>() ?? const AsterStateLayers();
-  AsterGradients get gradients =>
-      theme.extension<AsterGradients>() ?? AsterGradients.light;
-  AsterArt get art => theme.extension<AsterArt>() ?? const AsterArt();
-  AsterTypeRoles get type =>
-      theme.extension<AsterTypeRoles>() ?? AsterTypeRoles.fallback;
+      _requireExtension<AsterComponentMetrics>();
+  AsterMotion get motion => _requireExtension<AsterMotion>();
+  AsterEffects get effects => _requireExtension<AsterEffects>();
+  AsterIconography get icons => _requireExtension<AsterIconography>();
+  AsterStrokes get strokes => _requireExtension<AsterStrokes>();
+  AsterStateLayers get stateLayers => _requireExtension<AsterStateLayers>();
+  AsterGradients get gradients => _requireExtension<AsterGradients>();
+  AsterArt get art => _requireExtension<AsterArt>();
+  AsterTypeRoles get type => _requireExtension<AsterTypeRoles>();
+
+  T _requireExtension<T extends ThemeExtension<T>>() {
+    final extension = theme.extension<T>();
+    if (extension == null) {
+      throw FlutterError(
+        'Missing $T in ThemeData.extensions. Use AppTheme.light() at every '
+        'application and widget-test root.',
+      );
+    }
+    return extension;
+  }
 }

@@ -39,12 +39,6 @@ class AsterSpacing extends ThemeExtension<AsterSpacing> {
   final double sectionGap;
   final double controlGap;
 
-  double topSafeRaw(BuildContext context) => MediaQuery.of(context).padding.top;
-  double bottomSafeRaw(BuildContext context) =>
-      MediaQuery.of(context).viewPadding.bottom;
-  double topSafe(BuildContext context) => topSafeRaw(context) + lg;
-  double bottomSafe(BuildContext context) => bottomSafeRaw(context) + lg;
-
   @override
   AsterSpacing copyWith({
     double? none,

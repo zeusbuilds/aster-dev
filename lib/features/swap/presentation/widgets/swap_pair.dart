@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:flutter_svg/flutter_svg.dart';
@@ -44,6 +46,11 @@ class SwapPair extends StatelessWidget {
     final icons = context.icons;
     final type = context.type;
 
+    void selectAsset() {
+      unawaited(context.haptics.trigger(HapticIntent.selection));
+      onAssetTap?.call();
+    }
+
     return Squircle(
       padding: EdgeInsets.zero,
       borderColor: colors.transparentSurface,
@@ -63,40 +70,44 @@ class SwapPair extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Semantics(
-              button: onAssetTap != null,
+              button: true,
+              enabled: onAssetTap != null,
               label: 'Select ${asset.token}',
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: onAssetTap,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    NumericText(
-                      marketPrice,
-                      style: type.rowMetaStrong.copyWith(
+              excludeSemantics: true,
+              child: Material(
+                color: colors.transparentSurface,
+                child: InkWell(
+                  onTap: onAssetTap == null ? null : selectAsset,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      NumericText(
+                        marketPrice,
+                        style: type.rowMetaStrong.copyWith(
+                          color: colors.textTertiary,
+                        ),
+                      ),
+                      const Spacer(),
+                      SvgPicture.asset(
+                        asset.icon,
+                        width: icons.lg,
+                        height: icons.lg,
+                        errorBuilder: (context, error, stackTrace) => Icon(
+                          Icons.circle,
+                          size: icons.lg,
+                          color: AssetDisplay.colorOf(context, asset),
+                        ),
+                      ),
+                      SizedBox(width: spacing.sm),
+                      Text(asset.token, style: type.title),
+                      SizedBox(width: spacing.xs),
+                      Icon(
+                        RemixIcons.arrow_right_s_line,
+                        size: icons.sm,
                         color: colors.textTertiary,
                       ),
-                    ),
-                    const Spacer(),
-                    SvgPicture.asset(
-                      asset.icon,
-                      width: icons.lg,
-                      height: icons.lg,
-                      errorBuilder: (context, error, stackTrace) => Icon(
-                        Icons.circle,
-                        size: icons.lg,
-                        color: AssetDisplay.colorOf(context, asset),
-                      ),
-                    ),
-                    SizedBox(width: spacing.sm),
-                    Text(asset.token, style: type.title),
-                    SizedBox(width: spacing.xs),
-                    Icon(
-                      RemixIcons.arrow_right_s_line,
-                      size: icons.sm,
-                      color: colors.textTertiary,
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),

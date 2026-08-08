@@ -102,7 +102,10 @@ class MarketScreen extends StatelessWidget {
         padding: EdgeInsets.only(
           left: spacing.screenPadding,
           right: spacing.screenPadding,
-          bottom: spacing.bottomSafe(context) + metrics.floatingNavClearance,
+          bottom:
+              context.windowInsets.bottomSystem +
+              spacing.lg +
+              metrics.floatingNavClearance,
         ),
         itemCount: tiles.length,
         itemBuilder: (context, index) {

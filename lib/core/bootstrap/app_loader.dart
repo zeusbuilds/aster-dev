@@ -56,6 +56,9 @@ class _AppLoaderState extends State<AppLoader>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _controller.duration = context.motionPolicy.duration(
+      _bootstrapMotion.splashRevealDuration,
+    );
     _loader ??= _load();
   }
 
@@ -84,9 +87,12 @@ class _AppLoaderState extends State<AppLoader>
       SchedulerBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _revealTimer?.cancel();
-        _revealTimer = Timer(_bootstrapMotion.bootstrapRevealDelay, () {
-          if (mounted) _controller.forward().ignore();
-        });
+        _revealTimer = Timer(
+          context.motionPolicy.duration(_bootstrapMotion.bootstrapRevealDelay),
+          () {
+            if (mounted) _controller.forward().ignore();
+          },
+        );
       });
     } catch (error, stackTrace) {
       if (!mounted) return;
@@ -116,52 +122,59 @@ class _AppLoaderState extends State<AppLoader>
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.appColors;
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle(
-        systemNavigationBarColor: colors.transparentSurface,
-        systemNavigationBarIconBrightness: Brightness.light,
-      ),
-      child: Directionality(
-        textDirection: TextDirection.ltr,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            ValueListenableBuilder<ProviderContainer?>(
-              valueListenable: _container,
-              builder: (context, container, _) {
-                if (container == null) {
-                  return const SizedBox.expand();
-                }
+    return Theme(
+      data: AppTheme.light(),
+      child: Builder(
+        builder: (context) {
+          final colors = context.appColors;
+          return AnnotatedRegion<SystemUiOverlayStyle>(
+            value: SystemUiOverlayStyle(
+              systemNavigationBarColor: colors.transparentSurface,
+              systemNavigationBarIconBrightness: Brightness.light,
+            ),
+            child: Directionality(
+              textDirection: TextDirection.ltr,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  ValueListenableBuilder<ProviderContainer?>(
+                    valueListenable: _container,
+                    builder: (context, container, _) {
+                      if (container == null) {
+                        return const SizedBox.expand();
+                      }
 
-                return UncontrolledProviderScope(
-                  container: container,
-                  child: widget.child,
-                );
-              },
+                      return UncontrolledProviderScope(
+                        container: container,
+                        child: widget.child,
+                      );
+                    },
+                  ),
+                  ValueListenableBuilder<AppFailure?>(
+                    valueListenable: _failure,
+                    builder: (context, failure, _) {
+                      if (failure != null) {
+                        return _BootstrapFailureView(
+                          failure: failure,
+                          retrying: _isRetrying,
+                          onRetry: _retry,
+                        );
+                      }
+                      return ValueListenableBuilder<bool>(
+                        valueListenable: _isSplashScreenVisible,
+                        builder: (context, isVisible, splash) {
+                          if (!isVisible) return const SizedBox.shrink();
+                          return splash!;
+                        },
+                        child: AnimatedSplashScreen(controller: _controller),
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
-            ValueListenableBuilder<AppFailure?>(
-              valueListenable: _failure,
-              builder: (context, failure, _) {
-                if (failure != null) {
-                  return _BootstrapFailureView(
-                    failure: failure,
-                    retrying: _isRetrying,
-                    onRetry: _retry,
-                  );
-                }
-                return ValueListenableBuilder<bool>(
-                  valueListenable: _isSplashScreenVisible,
-                  builder: (context, isVisible, splash) {
-                    if (!isVisible) return const SizedBox.shrink();
-                    return splash!;
-                  },
-                  child: AnimatedSplashScreen(controller: _controller),
-                );
-              },
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -180,57 +193,50 @@ class _BootstrapFailureView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Theme(
-      data: AppTheme.light(),
-      child: Builder(
-        builder: (context) {
-          final themedSpacing = context.spacing;
-          return Material(
-            color: context.colorScheme.surface,
-            child: SafeArea(
-              child: Center(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.all(themedSpacing.screenPadding),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.lock_outline,
-                        size: context.icons.xl,
-                        color: context.appColors.danger,
-                      ),
-                      SizedBox(height: themedSpacing.lg),
-                      Text(
-                        'Wallet could not be opened',
-                        style: context.type.title,
-                        textAlign: TextAlign.center,
-                      ),
-                      SizedBox(height: themedSpacing.sm),
-                      Text(
-                        failure.userMessage,
-                        style: context.textTheme.bodyMedium,
-                        textAlign: TextAlign.center,
-                      ),
-                      if (failure.retryable) ...[
-                        SizedBox(height: themedSpacing.xxl),
-                        ValueListenableBuilder<bool>(
-                          valueListenable: retrying,
-                          builder: (context, loading, _) {
-                            return CustomButton(
-                              text: 'Retry',
-                              loading: loading,
-                              onTap: loading ? null : onRetry,
-                            );
-                          },
-                        ),
-                      ],
-                    ],
-                  ),
+    final themedSpacing = context.spacing;
+    return Material(
+      color: context.colorScheme.surface,
+      child: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.all(themedSpacing.screenPadding),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.lock_outline,
+                  size: context.icons.xl,
+                  color: context.appColors.danger,
                 ),
-              ),
+                SizedBox(height: themedSpacing.lg),
+                Text(
+                  'Wallet could not be opened',
+                  style: context.type.title,
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: themedSpacing.sm),
+                Text(
+                  failure.userMessage,
+                  style: context.textTheme.bodyMedium,
+                  textAlign: TextAlign.center,
+                ),
+                if (failure.retryable) ...[
+                  SizedBox(height: themedSpacing.xxl),
+                  ValueListenableBuilder<bool>(
+                    valueListenable: retrying,
+                    builder: (context, loading, _) {
+                      return CustomButton(
+                        text: 'Retry',
+                        loading: loading,
+                        onTap: loading ? null : onRetry,
+                      );
+                    },
+                  ),
+                ],
+              ],
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }

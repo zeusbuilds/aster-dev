@@ -9,13 +9,6 @@ import '../../../../shared/shared.dart';
 import '../../data/models/chart_data_item.dart';
 
 const _kCandleCount = 24;
-const _kMinBodyHeight = 2.0;
-
-const _kBaseHeight = 0.8;
-const _kHeightAmplitude = 0.2;
-const _kBaseOpacity = 0.5;
-const _kOpacityAmplitude = 0.3;
-const _kTargetOpacity = 0.8;
 
 /// Widget displaying a candle chart of price data.
 ///
@@ -35,19 +28,12 @@ class _CandleChartState extends State<CandleChart>
     with TickerProviderStateMixin {
   late final AnimationController _loadingController;
   late final AnimationController _transitionController;
-
-  bool _shouldShowLoading = true;
-  bool _dataReady = false;
-  bool _transitionTriggered = false;
-  bool _isTransitioning = false;
-  double? _loadingAnimationProgress;
+  double _loadingAnimationProgress = 0;
 
   List<CandleData>? _candles;
   double? _minPrice;
   double? _maxPrice;
   double? _priceRange;
-  Timer? _transitionDelayTimer;
-  Timer? _transitionPauseTimer;
 
   @override
   void initState() {
@@ -57,25 +43,13 @@ class _CandleChartState extends State<CandleChart>
       vsync: this,
       duration: motion.chartLoadingCycleDuration,
     );
-    unawaited(_loadingController.repeat());
-
     _transitionController = AnimationController(
       vsync: this,
       duration: motion.chartTransitionDuration,
     );
-
-    _loadingController.addListener(_checkAnimationProgress);
-    _transitionController.addListener(() {
-      if (_transitionController.isCompleted) {
-        setState(() {
-          _isTransitioning = false;
-          _shouldShowLoading = false;
-        });
-      }
-    });
     if (!widget.isSkeleton) {
       _prepareChartData();
-      _dataReady = _candles != null;
+      _transitionController.value = 1;
     }
   }
 
@@ -83,51 +57,31 @@ class _CandleChartState extends State<CandleChart>
   void didChangeDependencies() {
     super.didChangeDependencies();
     final motion = context.motion;
-    _loadingController.duration = motion.chartLoadingCycleDuration;
-    _transitionController.duration = motion.chartTransitionDuration;
-  }
+    final loadingDuration = motion.chartLoadingCycleDuration;
+    final transitionDuration = context.motionPolicy.duration(
+      motion.chartTransitionDuration,
+    );
+    final loadingDurationChanged =
+        _loadingController.duration != loadingDuration;
+    _loadingController.duration = loadingDuration;
+    _transitionController.duration = transitionDuration;
+    if (!_loadingController.isAnimating) {
+      _loadingAnimationProgress = motion.settledLoopProgress;
+    }
 
-  void _checkAnimationProgress() {
-    if (!_dataReady || _transitionTriggered) return;
-
-    final motion = context.motion;
-    final progress = _loadingController.value;
-    final currentIndex = (progress * _kCandleCount).floor() % _kCandleCount;
-
-    if (currentIndex == _kCandleCount - 1) {
-      _transitionTriggered = true;
-
-      final remainingProgress = 1.0 - progress;
-      final remainingTime =
-          remainingProgress * motion.chartLoadingCycleDuration.inMilliseconds;
-
-      _transitionDelayTimer?.cancel();
-      _transitionDelayTimer = Timer(
-        Duration(
-          milliseconds:
-              remainingTime.toInt() +
-              motion.chartTransitionSettleDelay.inMilliseconds,
-        ),
-        () {
-          if (mounted && _dataReady && _candles != null) {
-            _loadingController.stop();
-            _loadingAnimationProgress = _loadingController.value;
-
-            _transitionPauseTimer?.cancel();
-            _transitionPauseTimer = Timer(
-              motion.chartTransitionPauseDuration,
-              () {
-                if (mounted && _dataReady && _candles != null) {
-                  setState(() {
-                    _isTransitioning = true;
-                  });
-                  unawaited(_transitionController.forward());
-                }
-              },
-            );
-          }
-        },
-      );
+    if (widget.isSkeleton && !context.motionPolicy.reduceMotion) {
+      if (loadingDurationChanged || !_loadingController.isAnimating) {
+        _loadingController.stop();
+        unawaited(_loadingController.repeat(period: loadingDuration));
+      }
+    } else {
+      _loadingController.stop();
+      if (widget.isSkeleton) {
+        _loadingController.value = motion.settledLoopProgress;
+      }
+      if (!widget.isSkeleton && context.motionPolicy.reduceMotion) {
+        _transitionController.value = 1;
+      }
     }
   }
 
@@ -137,31 +91,29 @@ class _CandleChartState extends State<CandleChart>
 
     if (!widget.isSkeleton &&
         (oldWidget.isSkeleton || !listEquals(oldWidget.data, widget.data))) {
-      _cancelPendingTransition();
+      _loadingAnimationProgress = _loadingController.value;
+      _loadingController.stop();
       _prepareChartData();
-      _dataReady = _candles != null;
-      _transitionTriggered = false;
-      _shouldShowLoading = true;
-      _isTransitioning = false;
-      _loadingAnimationProgress = null;
-      _transitionController.reset();
-      if (!_loadingController.isAnimating) {
-        unawaited(_loadingController.repeat());
+      if (_candles == null || context.motionPolicy.reduceMotion) {
+        _transitionController.value = 1;
+      } else {
+        unawaited(_transitionController.forward(from: 0));
       }
     } else if (widget.isSkeleton) {
-      _cancelPendingTransition();
-      _dataReady = false;
-      _transitionTriggered = false;
-      _shouldShowLoading = true;
-      _isTransitioning = false;
-      _loadingAnimationProgress = null;
       _transitionController.reset();
       _candles = null;
       _minPrice = null;
       _maxPrice = null;
       _priceRange = null;
-      if (!_loadingController.isAnimating) {
-        unawaited(_loadingController.repeat());
+      if (context.motionPolicy.reduceMotion) {
+        _loadingController.stop();
+        _loadingController.value = context.motion.settledLoopProgress;
+      } else if (!_loadingController.isAnimating) {
+        unawaited(
+          _loadingController.repeat(
+            period: context.motion.chartLoadingCycleDuration,
+          ),
+        );
       }
     }
   }
@@ -190,59 +142,44 @@ class _CandleChartState extends State<CandleChart>
 
   @override
   void dispose() {
-    _cancelPendingTransition();
-    _loadingController.removeListener(_checkAnimationProgress);
     _loadingController.dispose();
     _transitionController.dispose();
     super.dispose();
-  }
-
-  void _cancelPendingTransition() {
-    _transitionDelayTimer?.cancel();
-    _transitionDelayTimer = null;
-    _transitionPauseTimer?.cancel();
-    _transitionPauseTimer = null;
   }
 
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
     final metrics = context.metrics;
-    final showLoading =
-        widget.isSkeleton || (_shouldShowLoading && !_isTransitioning);
 
     return SizedBox(
       height: metrics.chartHeight,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final radius = context.radii;
           final candleSpacing = spacing.xxs;
-          final borderRadius = radius.pill;
 
           final totalSpacing = candleSpacing * (_kCandleCount - 1);
           final calculatedCandleWidth =
               (constraints.maxWidth - totalSpacing) / (_kCandleCount + 1);
           final sidePadding = calculatedCandleWidth / 2;
 
-          if (showLoading) {
+          if (widget.isSkeleton) {
             return _buildLoadingState(
               context,
               constraints,
               calculatedCandleWidth,
               sidePadding,
               candleSpacing,
-              borderRadius,
             );
           }
 
-          if (_isTransitioning && _candles != null) {
+          if (_transitionController.value < 1 && _candles != null) {
             return _buildTransitionState(
               context,
               constraints,
               calculatedCandleWidth,
               sidePadding,
               candleSpacing,
-              borderRadius,
             );
           }
 
@@ -253,7 +190,6 @@ class _CandleChartState extends State<CandleChart>
               calculatedCandleWidth,
               sidePadding,
               candleSpacing,
-              borderRadius,
             );
           }
 
@@ -269,13 +205,14 @@ class _CandleChartState extends State<CandleChart>
     double candleWidth,
     double sidePadding,
     double candleSpacing,
-    double borderRadius,
   ) {
     return AnimatedBuilder(
       animation: _loadingController,
       builder: (context, _) {
         final progress = _loadingController.value;
         final colors = context.appColors;
+        final effects = context.effects;
+        final metrics = context.metrics;
 
         return Stack(
           children: List.generate(_kCandleCount, (index) {
@@ -283,11 +220,14 @@ class _CandleChartState extends State<CandleChart>
             final sinValue =
                 (math.sin(wavePosition * 2 * math.pi / _kCandleCount) + 1) / 2;
 
-            final heightFactor = _kBaseHeight + (_kHeightAmplitude * sinValue);
+            final heightFactor =
+                metrics.chartLoadingBaseHeightFactor +
+                (metrics.chartLoadingHeightAmplitude * sinValue);
             final candleHeight = constraints.maxHeight * heightFactor;
 
             final opacityFactor =
-                _kBaseOpacity + (_kOpacityAmplitude * sinValue);
+                effects.chartLoadingBaseOpacity +
+                (effects.chartLoadingOpacityAmplitude * sinValue);
             final candleColor = colors.onBrandArt.withValues(
               alpha: opacityFactor,
             );
@@ -300,7 +240,6 @@ class _CandleChartState extends State<CandleChart>
               height: candleHeight,
               centerY: constraints.maxHeight / 2,
               color: candleColor,
-              borderRadius: borderRadius,
             );
           }),
         );
@@ -314,7 +253,6 @@ class _CandleChartState extends State<CandleChart>
     double candleWidth,
     double sidePadding,
     double candleSpacing,
-    double borderRadius,
   ) {
     if (_candles == null ||
         _minPrice == null ||
@@ -327,6 +265,8 @@ class _CandleChartState extends State<CandleChart>
       animation: _transitionController,
       builder: (context, _) {
         final colors = context.appColors;
+        final effects = context.effects;
+        final metrics = context.metrics;
         final animationValue = context.motion.chartTransitionCurve.transform(
           _transitionController.value,
         );
@@ -345,25 +285,28 @@ class _CandleChartState extends State<CandleChart>
             final targetBodyBottom = openY < closeY ? closeY : openY;
             final targetBodyHeight = targetBodyBottom - targetBodyTop;
 
-            final actualTargetHeight = targetBodyHeight < _kMinBodyHeight
-                ? _kMinBodyHeight
+            final minimumBodyHeight = metrics.chartMinimumBodyHeight;
+            final actualTargetHeight = targetBodyHeight < minimumBodyHeight
+                ? minimumBodyHeight
                 : targetBodyHeight;
-            final actualTargetTop = targetBodyHeight < _kMinBodyHeight
-                ? (targetBodyTop + targetBodyBottom) / 2 - _kMinBodyHeight / 2
+            final actualTargetTop = targetBodyHeight < minimumBodyHeight
+                ? (targetBodyTop + targetBodyBottom) / 2 - minimumBodyHeight / 2
                 : targetBodyTop;
 
             final targetCenterY = actualTargetTop + actualTargetHeight / 2;
 
-            final loadingProgress = _loadingAnimationProgress ?? 0.0;
+            final loadingProgress = _loadingAnimationProgress;
             final wavePosition = index - (loadingProgress * _kCandleCount);
             final sinValue =
                 (math.sin(wavePosition * 2 * math.pi / _kCandleCount) + 1) / 2;
 
             final startHeightFactor =
-                _kBaseHeight + (_kHeightAmplitude * sinValue);
+                metrics.chartLoadingBaseHeightFactor +
+                (metrics.chartLoadingHeightAmplitude * sinValue);
             final startHeight = constraints.maxHeight * startHeightFactor;
             final startOpacity =
-                _kBaseOpacity + (_kOpacityAmplitude * sinValue);
+                effects.chartLoadingBaseOpacity +
+                (effects.chartLoadingOpacityAmplitude * sinValue);
 
             final currentHeight =
                 startHeight +
@@ -377,7 +320,7 @@ class _CandleChartState extends State<CandleChart>
               alpha: startOpacity,
             );
             final targetColor = colors.onBrandArt.withValues(
-              alpha: _kTargetOpacity,
+              alpha: effects.chartContentOpacity,
             );
             final currentColor = Color.lerp(
               startColor,
@@ -393,7 +336,6 @@ class _CandleChartState extends State<CandleChart>
               height: currentHeight,
               centerY: currentCenterY,
               color: currentColor,
-              borderRadius: borderRadius,
             );
           }),
         );
@@ -407,7 +349,6 @@ class _CandleChartState extends State<CandleChart>
     double candleWidth,
     double sidePadding,
     double candleSpacing,
-    double borderRadius,
   ) {
     if (_candles == null ||
         _minPrice == null ||
@@ -430,11 +371,12 @@ class _CandleChartState extends State<CandleChart>
         final bodyBottom = openY < closeY ? closeY : openY;
         final bodyHeight = bodyBottom - bodyTop;
 
-        final actualBodyHeight = bodyHeight < _kMinBodyHeight
-            ? _kMinBodyHeight
+        final minimumBodyHeight = context.metrics.chartMinimumBodyHeight;
+        final actualBodyHeight = bodyHeight < minimumBodyHeight
+            ? minimumBodyHeight
             : bodyHeight;
-        final actualBodyTop = bodyHeight < _kMinBodyHeight
-            ? (bodyTop + bodyBottom) / 2 - _kMinBodyHeight / 2
+        final actualBodyTop = bodyHeight < minimumBodyHeight
+            ? (bodyTop + bodyBottom) / 2 - minimumBodyHeight / 2
             : bodyTop;
 
         final centerY = actualBodyTop + actualBodyHeight / 2;
@@ -446,9 +388,8 @@ class _CandleChartState extends State<CandleChart>
           height: actualBodyHeight,
           centerY: centerY,
           color: context.appColors.onBrandArt.withValues(
-            alpha: _kTargetOpacity,
+            alpha: context.effects.chartContentOpacity,
           ),
-          borderRadius: borderRadius,
         );
       }),
     );
@@ -480,7 +421,6 @@ class _CandleWidget extends StatelessWidget {
     required this.height,
     required this.centerY,
     required this.color,
-    required this.borderRadius,
     required this.x,
   });
 
@@ -488,7 +428,6 @@ class _CandleWidget extends StatelessWidget {
   final double height;
   final double centerY;
   final Color color;
-  final double borderRadius;
   final double x;
 
   @override
@@ -496,12 +435,14 @@ class _CandleWidget extends StatelessWidget {
     return Positioned(
       left: x,
       top: centerY - height / 2,
-      child: Container(
+      child: SizedBox(
         width: width,
         height: height,
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(borderRadius),
+        child: DecoratedBox(
+          decoration: ShapeDecoration(
+            color: color,
+            shape: const StadiumBorder(),
+          ),
         ),
       ),
     );

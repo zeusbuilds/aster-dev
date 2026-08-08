@@ -16,7 +16,6 @@ class DetailRow extends StatelessWidget {
   final String title;
   final String value;
   final EdgeInsets padding;
-  final VoidCallback? onTap;
 
   const DetailRow({
     super.key,
@@ -29,7 +28,6 @@ class DetailRow extends StatelessWidget {
     required this.title,
     this.value = '',
     this.padding = EdgeInsets.zero,
-    this.onTap,
   });
 
   @override
@@ -40,48 +38,44 @@ class DetailRow extends StatelessWidget {
     final type = context.type;
 
     return Semantics(
-      button: onTap != null,
       label: value.isEmpty ? title : '$title, $value',
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Padding(
-          padding: padding,
-          child: Row(
-            children: [
-              if (prefixIcon != null) ...[
-                Icon(
-                  prefixIcon,
-                  size: icons.sm,
-                  color: prefixIconColor ?? colors.textTertiary,
-                ),
-                SizedBox(width: spacing.sm),
-              ],
-              Expanded(
-                child: Text(
-                  title,
-                  style: type.rowMeta.copyWith(
-                    color: titleColor ?? colors.textTertiary,
-                  ),
+      excludeSemantics: true,
+      child: Padding(
+        padding: padding,
+        child: Row(
+          children: [
+            if (prefixIcon != null) ...[
+              Icon(
+                prefixIcon,
+                size: icons.sm,
+                color: prefixIconColor ?? colors.textTertiary,
+              ),
+              SizedBox(width: spacing.sm),
+            ],
+            Expanded(
+              child: Text(
+                title,
+                style: type.rowMeta.copyWith(
+                  color: titleColor ?? colors.textTertiary,
                 ),
               ),
-              if (suffixIcon != null) ...[
-                SizedBox(width: spacing.sm),
-                Icon(
-                  suffixIcon,
-                  size: icons.sm,
-                  color: suffixIconColor ?? colors.textTertiary,
-                ),
-              ],
+            ),
+            if (suffixIcon != null) ...[
               SizedBox(width: spacing.sm),
-              AmountText(
-                value,
-                style: type.rowValue.copyWith(
-                  color: valueColor ?? context.colorScheme.onSurface,
-                ),
+              Icon(
+                suffixIcon,
+                size: icons.sm,
+                color: suffixIconColor ?? colors.textTertiary,
               ),
             ],
-          ),
+            SizedBox(width: spacing.sm),
+            AmountText(
+              value,
+              style: type.rowValue.copyWith(
+                color: valueColor ?? context.colorScheme.onSurface,
+              ),
+            ),
+          ],
         ),
       ),
     );

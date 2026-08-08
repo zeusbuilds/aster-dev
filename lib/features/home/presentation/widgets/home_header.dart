@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -31,47 +33,50 @@ class HomeHeader extends ConsumerWidget {
         mainAxisAlignment: MainAxisAlignment.start,
         children: [
           Semantics(
-            button: true,
-            label: 'Open onboarding',
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => context.pushNamed(RouteNames.onboardingWelcome),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: SvgPicture.asset(
-                  'assets/brand/aster-logo.svg',
-                  width: icons.xl,
-                  colorFilter: ColorFilter.mode(
-                    colors.onBrandArt,
-                    BlendMode.srcIn,
-                  ),
-                ),
-              ),
+            image: true,
+            label: 'UTEXO',
+            child: SvgPicture.asset(
+              'assets/brand/aster-logo.svg',
+              width: icons.xl,
+              colorFilter: ColorFilter.mode(colors.onBrandArt, BlendMode.srcIn),
             ),
           ),
           const Spacer(),
           Semantics(
             button: true,
             label: 'Select wallet, ${activeWallet?.name ?? 'Main Wallet'}',
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => context.pushNamed(RouteNames.walletSelection),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    activeWallet?.name ?? 'Main Wallet',
-                    style: context.type.brandAction.copyWith(
-                      color: colors.onBrandArt,
-                    ),
+            excludeSemantics: true,
+            child: Material(
+              color: colors.transparentSurface,
+              child: InkWell(
+                onTap: () {
+                  unawaited(context.haptics.trigger(HapticIntent.lightImpact));
+                  unawaited(
+                    context.pushNamed<void>(RouteNames.walletSelection),
+                  );
+                },
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: context.metrics.minTouchTarget,
                   ),
-                  SizedBox(width: spacing.xs),
-                  Icon(
-                    MingCuteIcons.mgc_wallet_3_line,
-                    size: icons.md,
-                    color: colors.onBrandArt,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text(
+                        activeWallet?.name ?? 'Main Wallet',
+                        style: context.type.brandAction.copyWith(
+                          color: colors.onBrandArt,
+                        ),
+                      ),
+                      SizedBox(width: spacing.xs),
+                      Icon(
+                        MingCuteIcons.mgc_wallet_3_line,
+                        size: icons.md,
+                        color: colors.onBrandArt,
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),

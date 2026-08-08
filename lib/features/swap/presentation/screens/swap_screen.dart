@@ -67,10 +67,15 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final motion = context.motion;
-    _detailsAnimationController.duration = motion.swapDetailsRevealDuration;
-    _detailsFadeOutController.duration = motion.swapDetailsDismissDuration;
-    _swapTextAnimationController.duration =
-        motion.swapMessageTransitionDuration;
+    _detailsAnimationController.duration = context.motionPolicy.duration(
+      motion.swapDetailsRevealDuration,
+    );
+    _detailsFadeOutController.duration = context.motionPolicy.duration(
+      motion.swapDetailsDismissDuration,
+    );
+    _swapTextAnimationController.duration = context.motionPolicy.duration(
+      motion.swapMessageTransitionDuration,
+    );
     _buildAnimations(motion);
   }
 
@@ -133,17 +138,20 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
     // Phase 2: Swap text becomes visible (takes space, but opacity 0)
     // This triggers AnimatedSize to grow the Column, smoothly moving button up
     _continueTimer?.cancel();
-    _continueTimer = Timer(motion.swapKeyboardTransitionDuration, () {
-      if (mounted) {
-        unawaited(_swapTextAnimationController.forward());
-        _detailsAnimationController.reset();
-        _detailsFadeOutController.reset();
-        setState(() {
-          _showDetails = true;
-        });
-        unawaited(_detailsAnimationController.forward());
-      }
-    });
+    _continueTimer = Timer(
+      context.motionPolicy.duration(motion.swapKeyboardTransitionDuration),
+      () {
+        if (mounted) {
+          unawaited(_swapTextAnimationController.forward());
+          _detailsAnimationController.reset();
+          _detailsFadeOutController.reset();
+          setState(() {
+            _showDetails = true;
+          });
+          unawaited(_detailsAnimationController.forward());
+        }
+      },
+    );
   }
 
   /// Handles cancel button tap
@@ -160,11 +168,14 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
 
     // Phase 2: Fade out cancel text (start slightly after details start fading)
     _cancelTimer?.cancel();
-    _cancelTimer = Timer(motion.swapCancelStaggerDelay, () {
-      if (mounted) {
-        unawaited(_restoreKeyboard());
-      }
-    });
+    _cancelTimer = Timer(
+      context.motionPolicy.duration(motion.swapCancelStaggerDelay),
+      () {
+        if (mounted) {
+          unawaited(_restoreKeyboard());
+        }
+      },
+    );
   }
 
   Future<void> _hideDetails() async {
@@ -282,7 +293,9 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       AnimatedSwitcher(
-                        duration: motion.swapKeyboardTransitionDuration,
+                        duration: context.motionPolicy.duration(
+                          motion.swapKeyboardTransitionDuration,
+                        ),
                         switchInCurve: motion.fadeInCurve,
                         switchOutCurve: motion.fadeOutCurve,
                         transitionBuilder:
@@ -313,7 +326,9 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
                       CustomButton(text: 'Continue', onTap: _onContinueTap),
                       // Reserve the cancel action space while its label fades.
                       AnimatedContainer(
-                        duration: motion.swapMessageTransitionDuration,
+                        duration: context.motionPolicy.duration(
+                          motion.swapMessageTransitionDuration,
+                        ),
                         curve: motion.choreographyCurve,
                         height: !_showKeyboard
                             ? metrics.collapsedMessageHeight
@@ -327,20 +342,20 @@ class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
                                     child: child,
                                   );
                                 },
-                                child: Semantics(
-                                  button: true,
-                                  label: 'Cancel swap',
-                                  child: GestureDetector(
-                                    behavior: HitTestBehavior.opaque,
-                                    onTap: _onCancelTap,
-                                    child: Padding(
-                                      padding: EdgeInsets.only(top: spacing.md),
-                                      child: Center(
-                                        child: Text(
-                                          'cancel',
-                                          style: context.type.rowTitle,
+                                child: Padding(
+                                  padding: EdgeInsets.only(top: spacing.xs),
+                                  child: TextButton(
+                                    onPressed: () {
+                                      unawaited(
+                                        context.haptics.trigger(
+                                          HapticIntent.lightImpact,
                                         ),
-                                      ),
+                                      );
+                                      _onCancelTap();
+                                    },
+                                    child: Text(
+                                      'Cancel',
+                                      style: context.type.rowTitle,
                                     ),
                                   ),
                                 ),

@@ -44,32 +44,33 @@ class _SendAddressScreenState extends State<SendAddressScreen> {
           title: 'Send',
           leadingIcon: true,
           centerTitle: false,
-          action: IconButton(
+          action: AsterIconButton(
             onPressed: () async => _openScan(context),
-            icon: Icon(
-              MingCuteIcons.mgc_scan_line,
-              size: icons.sm,
-              color: context.colorScheme.onSurface,
-            ),
+            icon: MingCuteIcons.mgc_scan_line,
+            iconSize: icons.sm,
+            tooltip: 'Scan address',
           ),
         ),
-        body: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: context.spacing.screenPadding,
-          ),
-          child: Column(
-            children: [
-              SendAddressCard(
-                asset: AssetModel.bitcoin,
-                controller: _addressController,
-              ),
-              const Spacer(),
-              CustomButton(
-                text: 'Continue',
-                onTap: () async => context.pushNamed(RouteNames.send),
-              ),
-              SizedBox(height: context.spacing.bottomSafe(context)),
-            ],
+        body: SafeArea(
+          top: false,
+          minimum: EdgeInsets.only(bottom: context.spacing.lg),
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: context.spacing.screenPadding,
+            ),
+            child: Column(
+              children: [
+                SendAddressCard(
+                  asset: AssetModel.bitcoin,
+                  controller: _addressController,
+                ),
+                const Spacer(),
+                CustomButton(
+                  text: 'Continue',
+                  onTap: () async => context.pushNamed(RouteNames.send),
+                ),
+              ],
+            ),
           ),
         ),
       ),

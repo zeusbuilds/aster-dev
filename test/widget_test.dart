@@ -32,11 +32,10 @@ void main() {
 
     expect(radii.card, 24);
     expect(radii.input, 12);
-    expect(radii.pill, 999);
 
     expect(icons.xxs, 12);
     expect(icons.md, 24);
-    expect(metrics.minTouchTarget, 44);
+    expect(metrics.minTouchTarget, 48);
     expect(metrics.flagSize, 32);
     expect(metrics.selectionIndicatorWidth, 4);
   });

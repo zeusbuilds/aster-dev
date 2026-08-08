@@ -9,9 +9,7 @@ import '../../../settings/presentation/screens/settings_screen.dart';
 import '../providers/skeleton_index_provider.dart';
 import '../widgets/bottom_nav.dart';
 
-/// Main skeleton screen containing bottom navigation and screen stack
-///
-/// Manages navigation between home, cards, settings, and other screens
+/// Main shell containing the persistent navigation and feature screen stack.
 class SkeletonScreen extends ConsumerWidget {
   const SkeletonScreen({super.key});
 
@@ -21,7 +19,6 @@ class SkeletonScreen extends ConsumerWidget {
 
     final screens = <Widget>[
       const HomeScreen(),
-      // const Center(child: Text('Card Screen')),
       const ScanScreen(),
       const MarketScreen(),
       const SettingsScreen(),
@@ -30,8 +27,25 @@ class SkeletonScreen extends ConsumerWidget {
     return Scaffold(
       body: Stack(
         children: [
-          // Use IndexedStack so that all screens stay mounted
-          IndexedStack(index: index, children: screens),
+          IndexedStack(
+            index: index,
+            children: [
+              for (
+                var screenIndex = 0;
+                screenIndex < screens.length;
+                screenIndex += 1
+              )
+                TickerMode(
+                  enabled: screenIndex == index,
+                  child: IgnorePointer(
+                    ignoring: screenIndex != index,
+                    child: screenIndex == index
+                        ? screens[screenIndex]
+                        : ExcludeSemantics(child: screens[screenIndex]),
+                  ),
+                ),
+            ],
+          ),
           const BottomNav(),
         ],
       ),

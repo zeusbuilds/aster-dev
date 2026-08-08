@@ -20,9 +20,12 @@ class NumericText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: style?.toNumeric(context),
+    final resolvedStyle = style ?? DefaultTextStyle.of(context).style;
+    return Text.rich(
+      TextSpan(
+        style: resolvedStyle,
+        children: NumericTextSpans.build(context, text, resolvedStyle),
+      ),
       textAlign: textAlign,
       maxLines: maxLines,
       overflow: overflow,
@@ -48,9 +51,12 @@ class AmountText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final resolvedStyle = style ?? DefaultTextStyle.of(context).style;
     return Text.rich(
-      TextSpan(children: NumericTextSpans.build(context, text, style)),
-      style: style,
+      TextSpan(
+        style: resolvedStyle,
+        children: NumericTextSpans.build(context, text, resolvedStyle),
+      ),
       textAlign: textAlign ?? TextAlign.start,
       maxLines: maxLines,
       overflow: overflow,
@@ -61,7 +67,11 @@ class AmountText extends StatelessWidget {
 class NumericTextSpans {
   NumericTextSpans._();
 
-  static final RegExp _numericChunk = RegExp(r'[+\-]?\$?\d[\d,._:/]*%?');
+  // Currency and percentage symbols are deliberately excluded: they are
+  // semantic units and stay in the primary UI font.
+  static final RegExp _numericChunk = RegExp(
+    r'[+\-]?\d+(?:[.,_]\d+)*(?::\d+)*',
+  );
 
   static List<TextSpan> build(
     BuildContext context,

@@ -62,10 +62,10 @@ class SettingsScreen extends ConsumerWidget {
                     details: 'Main',
                     prefixIcon: MingCuteIcons.mgc_information_line,
                     onTap: () {
-                      ToastHelper.showSuccess(
-                        context,
+                      context.toasts.show(
                         title: 'Wallet details',
-                        message: 'Viewing wallet information',
+                        message: 'Wallet details are not available yet.',
+                        variant: ToastVariant.info,
                       );
                     },
                   ),
@@ -74,10 +74,10 @@ class SettingsScreen extends ConsumerWidget {
                     title: 'Manage assets',
                     prefixIcon: MingCuteIcons.mgc_coin_2_line,
                     onTap: () {
-                      ToastHelper.showFailure(
-                        context,
+                      context.toasts.show(
                         title: 'Manage assets',
-                        message: 'Failed to load asset management',
+                        message: 'Asset management is not available yet.',
+                        variant: ToastVariant.info,
                       );
                     },
                   ),
@@ -86,10 +86,10 @@ class SettingsScreen extends ConsumerWidget {
                     title: 'Advanced',
                     prefixIcon: MingCuteIcons.mgc_tool_line,
                     onTap: () {
-                      ToastHelper.showWarning(
-                        context,
+                      context.toasts.show(
                         title: 'Advanced options',
-                        message: 'Proceed with caution',
+                        message: 'Advanced options are not available yet.',
+                        variant: ToastVariant.info,
                       );
                     },
                   ),
@@ -195,7 +195,9 @@ class SettingsScreen extends ConsumerWidget {
             ),
             SizedBox(
               height:
-                  spacing.bottomSafe(context) + metrics.floatingNavClearance,
+                  context.windowInsets.bottomSystem +
+                  spacing.lg +
+                  metrics.floatingNavClearance,
             ),
           ],
         ),

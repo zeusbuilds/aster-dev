@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -39,6 +41,38 @@ class _SendAddressCardState extends State<SendAddressCard> {
   void dispose() {
     _internalController?.dispose();
     super.dispose();
+  }
+
+  void _clearAddress(BuildContext context) {
+    _addressController.clear();
+    setState(() {});
+    unawaited(context.haptics.trigger(HapticIntent.lightImpact));
+  }
+
+  Future<void> _pasteAddress(BuildContext context) async {
+    try {
+      final clipboard = await Clipboard.getData('text/plain');
+      if (!context.mounted) return;
+      final value = clipboard?.text?.trim();
+      if (value == null || value.isEmpty) {
+        context.toasts.show(
+          title: 'Clipboard is empty',
+          variant: ToastVariant.info,
+        );
+        return;
+      }
+      _addressController.text = value;
+      setState(() {});
+      unawaited(context.haptics.trigger(HapticIntent.lightImpact));
+    } catch (_) {
+      if (!context.mounted) return;
+      unawaited(context.haptics.trigger(HapticIntent.error));
+      context.toasts.show(
+        title: 'Could not read the clipboard',
+        message: 'Enter the address manually and try again.',
+        variant: ToastVariant.failure,
+      );
+    }
   }
 
   @override
@@ -125,33 +159,35 @@ class _SendAddressCardState extends State<SendAddressCard> {
                 label: _addressController.text.isNotEmpty
                     ? 'Clear address'
                     : 'Paste address',
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: _addressController.text.isNotEmpty
-                      ? () {
-                          setState(() {
-                            _addressController.clear();
-                          });
-                        }
-                      : () async {
-                          final value = await Clipboard.getData('text/plain');
-                          if (!mounted || value?.text == null) return;
-                          setState(() {
-                            _addressController.text = value!.text!;
-                          });
-                        },
-                  child: Squircle(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: spacing.md,
-                      vertical: spacing.xs,
-                    ),
-                    borderRadius: radius.badge,
-                    borderColor: context.colorScheme.primaryContainer,
-                    color: context.colorScheme.primaryContainer,
-                    child: Text(
-                      _addressController.text.isNotEmpty ? 'clear' : 'paste',
-                      style: type.badgeLabel.copyWith(
-                        color: context.colorScheme.primary,
+                excludeSemantics: true,
+                child: Material(
+                  color: colors.transparentSurface,
+                  child: InkWell(
+                    onTap: _addressController.text.isNotEmpty
+                        ? () => _clearAddress(context)
+                        : () => unawaited(_pasteAddress(context)),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: context.metrics.minTouchTarget,
+                      ),
+                      child: Center(
+                        child: Squircle(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: spacing.md,
+                            vertical: spacing.xs,
+                          ),
+                          borderRadius: radius.badge,
+                          borderColor: context.colorScheme.primaryContainer,
+                          color: context.colorScheme.primaryContainer,
+                          child: Text(
+                            _addressController.text.isNotEmpty
+                                ? 'clear'
+                                : 'paste',
+                            style: type.badgeLabel.copyWith(
+                              color: context.colorScheme.primary,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),

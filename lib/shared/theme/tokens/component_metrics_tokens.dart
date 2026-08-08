@@ -6,9 +6,9 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
   const AsterComponentMetrics({
     this.buttonHeight = 48,
     this.compactButtonHeight = 40,
-    this.minTouchTarget = 44,
-    this.appBarLeadingWidth = 44,
-    this.floatingNavClearance = 44,
+    this.minTouchTarget = 48,
+    this.appBarLeadingWidth = 48,
+    this.floatingNavClearance = 64,
     this.homeHeroHeightFactor = 0.4,
     this.scanFrameSizeFactor = 0.7,
     this.recoveryWordGridAspectRatio = 4.5,
@@ -21,6 +21,7 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
     this.keypadGap = 10,
     this.keypadHorizontalReserve = 80,
     this.bottomNavHeight = 56,
+    this.bottomNavMaxWidth = 320,
     this.bottomNavIndicatorWidth = 56,
     this.bottomNavIndicatorHeight = 40,
     this.sheetHandleWidth = 56,
@@ -28,6 +29,12 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
     this.sheetMaxHeightFactor = 0.7,
     this.collapsedMessageHeight = 32,
     this.chartHeight = 100,
+    this.chartMinimumBodyHeight = 2,
+    this.chartLoadingBaseHeightFactor = 0.8,
+    this.chartLoadingHeightAmplitude = 0.2,
+    this.gridLoaderSmallCell = 8,
+    this.gridLoaderMediumCell = 10,
+    this.gridLoaderLargeCell = 12,
     this.splashLogoWidth = 160,
     this.brandMarkSize = 48,
     this.compactFlagSize = 24,
@@ -54,6 +61,7 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
   final double keypadGap;
   final double keypadHorizontalReserve;
   final double bottomNavHeight;
+  final double bottomNavMaxWidth;
   final double bottomNavIndicatorWidth;
   final double bottomNavIndicatorHeight;
   final double sheetHandleWidth;
@@ -61,6 +69,12 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
   final double sheetMaxHeightFactor;
   final double collapsedMessageHeight;
   final double chartHeight;
+  final double chartMinimumBodyHeight;
+  final double chartLoadingBaseHeightFactor;
+  final double chartLoadingHeightAmplitude;
+  final double gridLoaderSmallCell;
+  final double gridLoaderMediumCell;
+  final double gridLoaderLargeCell;
   final double splashLogoWidth;
   final double brandMarkSize;
   final double compactFlagSize;
@@ -88,6 +102,7 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
     double? keypadGap,
     double? keypadHorizontalReserve,
     double? bottomNavHeight,
+    double? bottomNavMaxWidth,
     double? bottomNavIndicatorWidth,
     double? bottomNavIndicatorHeight,
     double? sheetHandleWidth,
@@ -95,6 +110,12 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
     double? sheetMaxHeightFactor,
     double? collapsedMessageHeight,
     double? chartHeight,
+    double? chartMinimumBodyHeight,
+    double? chartLoadingBaseHeightFactor,
+    double? chartLoadingHeightAmplitude,
+    double? gridLoaderSmallCell,
+    double? gridLoaderMediumCell,
+    double? gridLoaderLargeCell,
     double? splashLogoWidth,
     double? brandMarkSize,
     double? compactFlagSize,
@@ -124,6 +145,7 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
       keypadHorizontalReserve:
           keypadHorizontalReserve ?? this.keypadHorizontalReserve,
       bottomNavHeight: bottomNavHeight ?? this.bottomNavHeight,
+      bottomNavMaxWidth: bottomNavMaxWidth ?? this.bottomNavMaxWidth,
       bottomNavIndicatorWidth:
           bottomNavIndicatorWidth ?? this.bottomNavIndicatorWidth,
       bottomNavIndicatorHeight:
@@ -134,6 +156,15 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
       collapsedMessageHeight:
           collapsedMessageHeight ?? this.collapsedMessageHeight,
       chartHeight: chartHeight ?? this.chartHeight,
+      chartMinimumBodyHeight:
+          chartMinimumBodyHeight ?? this.chartMinimumBodyHeight,
+      chartLoadingBaseHeightFactor:
+          chartLoadingBaseHeightFactor ?? this.chartLoadingBaseHeightFactor,
+      chartLoadingHeightAmplitude:
+          chartLoadingHeightAmplitude ?? this.chartLoadingHeightAmplitude,
+      gridLoaderSmallCell: gridLoaderSmallCell ?? this.gridLoaderSmallCell,
+      gridLoaderMediumCell: gridLoaderMediumCell ?? this.gridLoaderMediumCell,
+      gridLoaderLargeCell: gridLoaderLargeCell ?? this.gridLoaderLargeCell,
       splashLogoWidth: splashLogoWidth ?? this.splashLogoWidth,
       brandMarkSize: brandMarkSize ?? this.brandMarkSize,
       compactFlagSize: compactFlagSize ?? this.compactFlagSize,
@@ -214,6 +245,7 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
         t,
       ),
       bottomNavHeight: _lerp(bottomNavHeight, other.bottomNavHeight, t),
+      bottomNavMaxWidth: _lerp(bottomNavMaxWidth, other.bottomNavMaxWidth, t),
       bottomNavIndicatorWidth: _lerp(
         bottomNavIndicatorWidth,
         other.bottomNavIndicatorWidth,
@@ -237,6 +269,36 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
         t,
       ),
       chartHeight: _lerp(chartHeight, other.chartHeight, t),
+      chartMinimumBodyHeight: _lerp(
+        chartMinimumBodyHeight,
+        other.chartMinimumBodyHeight,
+        t,
+      ),
+      chartLoadingBaseHeightFactor: _lerp(
+        chartLoadingBaseHeightFactor,
+        other.chartLoadingBaseHeightFactor,
+        t,
+      ),
+      chartLoadingHeightAmplitude: _lerp(
+        chartLoadingHeightAmplitude,
+        other.chartLoadingHeightAmplitude,
+        t,
+      ),
+      gridLoaderSmallCell: _lerp(
+        gridLoaderSmallCell,
+        other.gridLoaderSmallCell,
+        t,
+      ),
+      gridLoaderMediumCell: _lerp(
+        gridLoaderMediumCell,
+        other.gridLoaderMediumCell,
+        t,
+      ),
+      gridLoaderLargeCell: _lerp(
+        gridLoaderLargeCell,
+        other.gridLoaderLargeCell,
+        t,
+      ),
       splashLogoWidth: _lerp(splashLogoWidth, other.splashLogoWidth, t),
       brandMarkSize: _lerp(brandMarkSize, other.brandMarkSize, t),
       compactFlagSize: _lerp(compactFlagSize, other.compactFlagSize, t),

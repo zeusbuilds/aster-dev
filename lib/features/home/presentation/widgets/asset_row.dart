@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:go_router/go_router.dart';
@@ -48,69 +50,77 @@ class AssetRow extends StatelessWidget {
     final type = context.type;
     final metrics = context.metrics;
 
+    void openTransactions() {
+      unawaited(context.haptics.trigger(HapticIntent.lightImpact));
+      unawaited(context.push<void>(RoutePaths.transactionList));
+    }
+
     return Semantics(
       button: true,
       label: '$name, $fiatBalance, $assetBalance',
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () async => context.push(RoutePaths.transactionList),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: metrics.minTouchTarget),
-          child: Row(
-            children: [
-              Center(
-                child: Icon(
-                  icon,
-                  color: iconColor ?? context.colorScheme.onSurface,
-                  size: icons.xl,
+      excludeSemantics: true,
+      child: Material(
+        color: colors.transparentSurface,
+        child: InkWell(
+          onTap: openTransactions,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: metrics.minTouchTarget),
+            child: Row(
+              children: [
+                Center(
+                  child: Icon(
+                    icon,
+                    color: iconColor ?? context.colorScheme.onSurface,
+                    size: icons.xl,
+                  ),
                 ),
-              ),
-              SizedBox(width: spacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      textBaseline: TextBaseline.alphabetic,
-                      children: [
-                        Expanded(child: Text(name, style: type.assetTitle)),
-                        AppSkeletonizer(
-                          enabled: isLoading,
-                          child: NumericText(
-                            fiatBalance,
-                            style: type.assetValue,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      textBaseline: TextBaseline.alphabetic,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            denomination,
-                            style: type.assetMeta.copyWith(
-                              color: colors.textTertiary,
+                SizedBox(width: spacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Expanded(child: Text(name, style: type.assetTitle)),
+                          AppSkeletonizer(
+                            enabled: isLoading,
+                            child: NumericText(
+                              fiatBalance,
+                              style: type.assetValue,
                             ),
                           ),
-                        ),
-                        AppSkeletonizer(
-                          enabled: isLoading,
-                          child: AmountText(
-                            assetBalance,
-                            style: type.assetMeta.copyWith(
-                              color: colors.textTertiary,
+                        ],
+                      ),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              denomination,
+                              style: type.assetMeta.copyWith(
+                                color: colors.textTertiary,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                          AppSkeletonizer(
+                            enabled: isLoading,
+                            child: AmountText(
+                              assetBalance,
+                              style: type.assetMeta.copyWith(
+                                color: colors.textTertiary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

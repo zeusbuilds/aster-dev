@@ -58,7 +58,7 @@ and emphasis so widgets do not locally choose weights.
 ```dart
 Text('Recent activity', style: context.type.sectionTitle);
 Text('Recipient address', style: context.type.addressLabel);
-Text('Aster • Version 1.0.0', style: context.type.versionLabel);
+Text('UTEXO - Version 0.1.0', style: context.type.versionLabel);
 ```
 
 Use `NumericText` for fully numeric strings and `AmountText` for mixed values
@@ -79,8 +79,8 @@ back into `context.textTheme` for captions, error states, and secondary labels.
 
 ## Spacing
 
-`AsterSpacing` is only layout distance: gaps, padding, screen insets, and safe
-area helpers.
+`AsterSpacing` is only layout distance: gaps and layout padding. Window insets
+belong to `SafeArea` and `context.windowInsets`, not the spacing scale.
 
 ```dart
 Padding(
@@ -103,7 +103,7 @@ Use the dedicated token family for the kind of geometry being expressed:
 Icon(icon, size: context.icons.md);
 SizedBox(height: context.metrics.buttonHeight);
 Divider(thickness: context.strokes.divider);
-BorderRadius.circular(context.radii.card);
+Squircle(borderRadius: context.radii.card, child: child);
 ```
 
 - `context.icons`: icon glyph sizes.
@@ -142,15 +142,17 @@ Use `context.motion` for reusable component timing and screen choreography:
 
 ```dart
 AnimatedContainer(
-  duration: context.motion.selectionTransitionDuration,
+  duration: context.motionPolicy.duration(
+    context.motion.selectionTransitionDuration,
+  ),
   curve: context.motion.fastEase,
   child: child,
 );
 ```
 
 Prefer semantic motion names such as `swapKeyboardTransitionDuration` over
-generic duration names. Painter phase math and one-off art timelines may stay
-local when they are part of the drawing algorithm.
+generic duration names. Authored choreography phases belong in the motion
+system; only mathematical interpolation remains local to a painter.
 
 ## Gradients And Art
 
@@ -176,7 +178,9 @@ padding: EdgeInsets.all(context.spacing.spacing20);
 
 // After
 color: context.colorScheme.surface;
-borderRadius: BorderRadius.circular(context.radii.card);
+shape: RoundedSuperellipseBorder(
+  borderRadius: BorderRadius.circular(context.radii.card),
+);
 padding: EdgeInsets.all(context.spacing.screenPadding);
 ```
 

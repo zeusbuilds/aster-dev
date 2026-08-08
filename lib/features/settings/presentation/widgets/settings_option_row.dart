@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:remixicon/remixicon.dart';
@@ -26,6 +28,9 @@ class SettingsOptionRow extends StatelessWidget {
   /// Callback when row is tapped
   final VoidCallback? onTap;
 
+  /// Semantic tactile feedback emitted after an accepted activation.
+  final HapticIntent hapticIntent;
+
   const SettingsOptionRow({
     super.key,
     required this.title,
@@ -34,6 +39,7 @@ class SettingsOptionRow extends StatelessWidget {
     this.suffixIcon,
     this.suffixIconColor,
     this.onTap,
+    this.hapticIntent = HapticIntent.lightImpact,
   });
 
   @override
@@ -43,12 +49,18 @@ class SettingsOptionRow extends StatelessWidget {
     final icons = context.icons;
     final type = context.type;
 
+    void activate() {
+      unawaited(context.haptics.trigger(hapticIntent));
+      onTap?.call();
+    }
+
     return Semantics(
-      button: onTap != null,
+      button: true,
+      enabled: onTap != null,
       label: details == null ? title : '$title, $details',
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: onTap == null ? null : activate,
         child: Padding(
           padding: EdgeInsets.symmetric(
             horizontal: spacing.screenPadding,
