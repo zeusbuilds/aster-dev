@@ -52,7 +52,7 @@ and relevant tests/builds have passed on the recorded commit.
 | DEC-021 | verified | Present transient messages through one bounded FIFO toast queue with deduplication and an app-root host. | The bounded injectable controller supports success/failure/warning/info, accessible dismissal, safe text, deterministic advancement, and reduced motion. |
 | DEC-022 | verified | Resolve animation durations through one reduced-motion policy and mute offscreen feature tickers. | Decorative loops settle when motion is disabled; navigation/toast/component transitions use effective durations; inactive tabs disable tickers and interaction. |
 | DEC-023 | fixing | Use the canonical Bitcoin BIPs English BIP39 list for per-word UX, while the pinned SDK remains authoritative for full mnemonic checksum validation. | Vendor the exact 2,048-word UTF-8 source with provenance and SHA-256; validate asset shape/order at load and in tests; never import a dependency's private word-list implementation. |
-| DEC-024 | fixing | Persist app preferences through one typed, versioned settings repository and generated Riverpod ViewModel. | Currency, region, Bitcoin unit, and balance visibility must survive restart; defaults preserve current behavior (`USD`, `US`, `BTC`) and writes are serialized/failure-aware. |
+| DEC-024 | verified | Persist app preferences through one typed, versioned settings repository and generated Riverpod ViewModel. | Currency, region, Bitcoin unit, and balance visibility survive repository reconstruction; defaults preserve current behavior (`USD`, `US`, `BTC`), writes are serialized, and failure/repair paths pass at `6cc7376`. |
 | DEC-025 | fixing | Keep recovery phrases route-scoped and minimize copies rather than pretending Dart strings can be zeroized. | No phrase enters logs, analytics, route arguments, durable preferences, or global wallet state. Controllers/state release references on disposal; secure clipboard clears matching content after a bounded interval and on screen exit. |
 | DEC-026 | fixing | Route access is derived from the durable active-wallet state. | Empty registries enter onboarding; wallet-only routes redirect to onboarding; confirmed provisioning reloads registry state before replacing navigation with Home. |
 | DEC-027 | blocked | Do not expose seed or xpub disclosure actions before SEC-007 is decided. | Advanced settings may expose truthful network diagnostics now, but sensitive rows remain disabled and explicitly unavailable rather than bypassing authentication policy. |
@@ -129,6 +129,20 @@ Baseline screenshots are stored in `docs/release/evidence/baseline/`.
 | Tracker inventory | Pass | 312 non-generated repository files after Phase 3, including presentation-system docs and golden evidence; inventory sync and verifier pass. |
 | Delivery | Blocked | Pushes of `98b7a40` and `3f1215b` to the configured Zeus origin failed with GitHub `Repository not found`; no remote or global Git identity was changed. |
 
+## Phase 4 Incremental Evidence
+
+| Check | Result | Exact evidence |
+| --- | --- | --- |
+| Settings implementation | Pass | Commit `6cc7376` adds typed/versioned preferences, serialized writes, bounded catalog loading, generated Riverpod ViewModels, Bitcoin-unit selection, advanced settings, and redacted network diagnostics. |
+| Monetary formatting | Pass | Integer-only BTC/sats formatting covers zero, negative, boundary, grouping, and fractional-display cases without `double` conversion. App-wide feature consumption remains `SETTINGS-001`. |
+| Catalog integrity | Pass | Production JSON catalogs load under tests; duplicate ISO identities are canonicalized deterministically by first curated occurrence, invalid persisted values self-heal to typed defaults, and raw loader failures do not reach UI state. |
+| Flags and dependency graph | Pass | Currency and region UI use `circle_flags`; `country_flags`, `jovial_misc`, and `jovial_svg` no longer resolve in `pubspec.lock`. |
+| Generation | Pass | `build_runner` processed 233 inputs; an immediate second run skipped all 233 and wrote zero outputs. |
+| Format and analysis | Pass | Repository-wide format checked 244 Dart files with zero changes; fatal-warning/fatal-info analysis has zero diagnostics. |
+| Host tests | Pass | 164 tests pass, including repository restart persistence, corrupt/invalid preference repair, overlapping mutation suppression, exact amount formatting, settings interaction, accessibility, and disabled sensitive disclosures. |
+| Tracker inventory | Pass after correction | The verifier found and removed two stale rows for deleted legacy models; 334 non-generated repository files are now represented. |
+| Delivery | Blocked | Push of `6cc7376` to the configured Zeus origin failed with GitHub `Repository not found`; no remote or global Git identity was changed. |
+
 ## Phase Plan
 
 | Phase | Scope | Status | Exit evidence |
@@ -155,14 +169,14 @@ Baseline screenshots are stored in `docs/release/evidence/baseline/`.
 | LIFE-001 | P0 | Lifecycle | verified | No single serialized owner existed for native wallet init, unlock, sync, reinit, shutdown, and destroy. | Source inventory and fault-path review | `1b3273a` | One injectable `WalletRuntime` serializes every native lifecycle and operation path; concurrency, reinit, rollback, disposal, and retry tests pass. |
 | SEC-001 | P0 | Logging | verified | The unused HTTP logging interceptor could emit request/response bodies and sensitive native/network material. | `lib/core/network/interceptors/logging_interceptor.dart` | `8e97370` | Dead Chopper/interceptor surface and dependencies removed; repository search and fatal analysis pass. A production logging policy is still required in Phase 2. |
 | PLAT-001 | P0 | Platform identity | blocked | Android/iOS use `com.example` identifiers and Android release uses debug signing. | Platform build files; DEC-006 | - | - |
-| TEST-001 | P0 | Testing | fixing | Baseline had only two token assertions and no behavioral, platform, integration, accessibility, golden, lifecycle, or performance coverage. | Baseline through Phase 3 test runs | `1b3273a`, `3f1215b` | 153 host tests pass with 39.46% line coverage plus real storage tests on each platform and presentation golden/accessibility gates. Feature end-to-end and measured performance coverage remains open. |
+| TEST-001 | P0 | Testing | fixing | Baseline had only two token assertions and no behavioral, platform, integration, accessibility, golden, lifecycle, or performance coverage. | Baseline through Phase 4 settings slice | `1b3273a`, `3f1215b`, `6cc7376` | 164 host tests pass plus real storage tests on each platform and presentation golden/accessibility gates. Feature end-to-end, updated aggregate coverage, and measured performance evidence remain open. |
 | BUILD-001 | P1 | Android | verified | Baseline Android build could not download Gradle and therefore did not compile. | Baseline `flutter build apk --debug` timeout | `8e97370` | Exact current-candidate x86_64 debug APK packages successfully; artifact hash is recorded above. |
 | DOC-001 | P1 | Documentation | unreviewed | Architecture and setup material describe Aster/GDK/Boltz/Liquid-era concepts instead of the target UTEXO SDK architecture. | `README.md`, `docs/architecture/` | - | - |
 | DOC-002 | P2 | API docs | verified | `dart doc` emitted two unresolved `[enableLogging]` references. | Baseline dartdoc output | `8e97370` | `dart doc --validate-links` completes with zero warnings and zero errors. |
 | DOC-003 | P1 | Development setup | verified | Development instructions described removed import tools, non-fatal analysis, Flutter 3.38, and referenced no SDK override contract. | `docs/DEVELOPMENT.md`; `pubspec.yaml` comment | `8e97370` | Guide now matches executable Make/CI gates and documents a non-committed local SDK override. |
 | DEP-001 | P1 | Dependencies | verified | Direct constraints were stale, `intl` was unconstrained, and unused architecture packages remained direct dependencies. | Baseline `flutter pub outdated`; consumer searches | `8e97370` | Direct dependencies were deliberately upgraded or removed; compatibility pins are recorded in DEC-007 and DEC-008. |
 | DEP-002 | P2 | SDK dependency graph | blocked | Discontinued transitive package `js` 0.7.2 remains through `pointycastle` 3.9.1, which is constrained by the immutable SDK dependency. | `flutter pub deps`; SDK `pubspec.yaml` | - | Requires a future SDK revision that supports pointycastle 4 or removes that dependency; do not override the pinned SDK graph in the app. |
-| FLAG-001 | P2 | Assets/dependencies | fixing | `circle_flags` and `country_flags` coexist despite one required flag implementation. | `pubspec.yaml` and settings imports | - | Migrate country/region to `circle_flags`, remove `country_flags`, resolve dependencies, and verify both platform builds. |
+| FLAG-001 | P2 | Assets/dependencies | verified | `circle_flags` and `country_flags` coexisted despite one required flag implementation. | `pubspec.yaml`, settings/send/receive imports, resolved dependency graph | `6cc7376` | All app flag consumers use `circle_flags`; `country_flags` and its two otherwise-unused transitive packages are absent from `pubspec.lock`, and all host gates pass. |
 | FONT-001 | P1 | Determinism | verified | UI typography relied on `google_fonts` rather than bundled exact DM Sans and Public Sans assets. | Theme source and `pubspec.yaml` | `8e97370` | Exact variable fonts and OFL licenses are bundled with recorded provenance/checksums; iOS and Android builds pass offline font registration. |
 | NET-001 | P1 | Reliability | verified | The network layer lacked a uniform timeout, idempotent retry/backoff, failure taxonomy, and safe observability policy. | `lib/core/network/`; transport fault tests | `1b3273a` | Abortable GET-only retries run under one monotonic budget with bounded backoff/jitter, `Retry-After`, body limits, and redacted typed failures; all fault tests pass. |
 | UX-001 | P1 | Shared UX | verified | Haptics were called directly from widgets with repeated capability probes and no semantic/testable policy owner. | Direct plugin call-site audit; DEC-020 | `98b7a40` | One injectable semantic service owns cached capability and failure isolation; all app consumers use intents and adapter fault tests pass. |
@@ -174,13 +188,14 @@ Baseline screenshots are stored in `docs/release/evidence/baseline/`.
 | RECV-001 | P1 | Receive | unreviewed | Receive has no asset/rail selection or real invoice lifecycle and includes obsolete Direct Peg In behavior. | Baseline Receive and source | - | - |
 | SWAP-001 | P1 | Swap | unreviewed | Swap assets do not match the target domain and execution must be made explicitly unavailable without simulating success. | Swap source; CON-002 | - | - |
 | TX-001 | P1 | Activity | unreviewed | There is no normalized cross-rail activity model or transaction-details route/screen. | Transaction source inventory | - | - |
-| SETTINGS-001 | P1 | Settings | fixing | Bitcoin unit and required advanced wallet/network settings are absent or placeholders; currency/region selection is not persisted. | Baseline Settings and Phase 4 source audit | - | Add typed persisted preferences, app-wide unit formatting, advanced navigation, safe network diagnostics, and explicit SEC-007 gating. |
-| SETTINGS-002 | P1 | Settings architecture | fixing | Stateful screens perform asset I/O, own selection/loading/error state, and immediately pop before any durable write; model classes own unbounded static caches and leak exception text. | Country/currency screens and shared model audit | - | Move catalogs and serialized preference writes behind repository/ViewModel boundaries with typed failures, bounded immutable caches, retry, disabled-saving state, and tests. |
+| SETTINGS-001 | P1 | Settings | fixing | Bitcoin unit and required advanced wallet/network settings were absent or placeholders; currency/region selection was not persisted. | Settings implementation and tests at `6cc7376` | `6cc7376` | Typed preferences, selection screens, advanced navigation, redacted network diagnostics, and SEC-007 gating are implemented. Applying the selected unit to every feature amount remains Phase 5 work. |
+| SETTINGS-002 | P1 | Settings architecture | verified | Stateful screens performed asset I/O, owned selection/loading/error state, and popped before any durable write; model classes owned unbounded static caches and leaked exception text. | Repository/ViewModel/screen tests and source-boundary audit | `6cc7376` | Catalog I/O and serialized durable writes sit behind typed repository/ViewModel boundaries; controls wait for success, suppress overlap, expose retry, and retain redacted failures. |
+| SETTINGS-003 | P1 | Catalog identity | verified | The production currency catalog contains duplicate ISO identities, so persisted ISO code could map ambiguously or make single-value lookup throw. | Production-catalog invariant test and repository review | `6cc7376` | Catalog loading canonicalizes by ISO code in curated source order before validating persisted identity; production data and restart/repair tests pass. |
 | SAFE-001 | P2 | Layout | verified | Safe-area helpers lived in spacing and mixed `padding`, `viewPadding`, and keyboard obstruction behind ambiguous names. | Insets and SafeArea call-site audit; DEC-019 | `98b7a40` | Typed window insets own safe/system/keyboard spaces, spacing is purely spatial, consumers avoid double padding, and composition tests pass. |
 | PERF-001 | P1 | Performance | unreviewed | No measured launch, frame, memory, leak, rebuild, cache, or SDK-handle baseline exists. | Test/tooling inventory | - | - |
 | SEC-002 | P0 | Seed security | verified | Two hardcoded 12-word mnemonics were compiled into the app, printed around migration activity, and written to secure storage at startup. | `lib/core/utils/wallet_migration_service.dart`; `lib/main.dart` | `8e97370` | Migration and startup writes removed; repository search contains no mnemonic fixture or logging path. |
 | SEC-003 | P0 | Seed privacy | verified | Legacy wallet identity and display name were deterministically derived directly from mnemonic text, creating a stable seed fingerprint outside the SDK lifecycle. | `wallet_id_generator.dart`; legacy `wallet_model.dart` | `8e97370` | Seed-derived generator removed; replacement `WalletProfile` accepts only an opaque post-SDK wallet ID and non-secret metadata. |
-| GIT-001 | P1 | Delivery | blocked | Repository-local Zeus commits succeed, but the active host credential is not authorized for origin and GitHub returns `Repository not found`. | Pushes through Phase 3 evidence commit `71cdbdc` | - | Restore project-scoped Zeus access; do not change global identity or remote. |
+| GIT-001 | P1 | Delivery | blocked | Repository-local Zeus commits succeed, but the active host credential is not authorized for origin and GitHub returns `Repository not found`. | Pushes through Phase 4 settings commit `6cc7376` | - | Restore project-scoped Zeus access; do not change global identity or remote. |
 | BUILD-002 | P1 | Code generation | verified | The original Riverpod 2.4 generator used analyzer 6.4, which only understood Dart 3.4 while the app now uses Dart 3.12. | Baseline Phase 1 build-runner warning | `8e97370` | Riverpod 3.3.2 / generator 4.0.4 resolves analyzer 12.1; generation completes without a language-version warning. |
 | ARCH-001 | P1 | Networking/DI | verified | Unused Chopper clients, duplicate interceptors, and no-op DI modules exposed stale APIs and an unsafe body logger. | Consumer search found definitions only | `8e97370` | Removed the dead Chopper surface and dependency; fatal analyzer is clean. |
 | PLAT-002 | P2 | Android toolchain | blocked | Flutter 3.44 warns that the app and `haptic_feedback`, `mobile_scanner`, and `rgb_sdk_flutter` apply the legacy Kotlin Gradle plugin, which a future Flutter release will reject. | Exact Android build output | - | App migration requires Flutter 3.47+; plugin owners must also publish built-in Kotlin support. Current AGP 9.0.1/Kotlin 2.3.20 build passes with Flutter-generated compatibility flags. |
@@ -246,7 +261,7 @@ through their owning tool.
 
 | Artifact | Owner | Status | Verification |
 | --- | --- | --- | --- |
-| `pubspec.lock` | Flutter pub | verified | Resolves on Flutter 3.44.9; SDK resolved-ref and dependency graph reviewed; both platform builds pass. |
+| `pubspec.lock` | Flutter pub | verified | Resolves on Flutter 3.44.9; SDK resolved-ref and dependency graph reviewed; Phase 4 removal of `country_flags` and its otherwise-unused transitive packages is resolved at `6cc7376`; both platform builds pass on the latest full platform checkpoint. |
 | `ios/Podfile.lock` | CocoaPods / Flutter | verified | Regenerated for the pinned SDK and deployment target; exact simulator build and launch pass. |
 | `**/*.g.dart` | build_runner generators | verified | Generated files remain ignored and reproducible; generation, fatal analysis, and tests pass. |
 | `ios/.spm.pods/**` | CocoaPods SwiftPM bridge | verified | Flutter/CocoaPods generated cache remains ignored and is recreated by the toolchain; it is not hand-edited or committed. |
@@ -365,7 +380,7 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `lib/core/constants/storage_keys.dart` | Dart source | verified | STORE-001, SEC-005 | Only versioned, namespaced registry/credential and legacy-detection keys remain | `1b3273a` |
 | `lib/core/core.dart` | Dart source | verified | CONFIG-001 | Core boundary exports reviewed after configuration/error/network normalization | `1b3273a` |
 | `lib/core/di/di.dart` | Dart source | unreviewed | - | - | - |
-| `lib/core/di/providers.dart` | Dart source | verified | SDK-001, LIFE-001, LIFE-005 | One keep-alive runtime/repository owner, injectable dependencies, and teardown fallback pass provider tests | `1b3273a` |
+| `lib/core/di/providers.dart` | Dart source | verified | SDK-001, LIFE-001, LIFE-005, SETTINGS-002 | One keep-alive wallet runtime/repository owner plus injectable settings/storage dependencies pass provider, repository, and ViewModel tests | `1b3273a`, `6cc7376` |
 | `lib/core/errors/app_failure.dart` | Dart source | verified | SEC-004, SEC-008 | Sealed typed failure contract, redacted UI fields, retryability, and unknown-outcome semantics reviewed/tested | `1b3273a` |
 | `lib/core/errors/app_result.dart` | Dart source | verified | DEC-012 | Sealed success/failure result boundary reviewed and exercised across repositories/ViewModels | `1b3273a` |
 | `lib/core/errors/errors.dart` | Dart source | verified | DEC-012 | Boundary barrel exports only the normalized error/result surface | `1b3273a` |
@@ -435,31 +450,31 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `lib/features/send/presentation/widgets/send_address_card.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/send/presentation/widgets/send_card.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/send/presentation/widgets/widgets.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/settings/data/repository/repository.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/settings/data/repository/settings_repository.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/settings/domain/models/app_preferences.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/settings/domain/models/fiat_currency.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/settings/domain/models/models.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/settings/domain/models/region.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/settings/domain/models/settings_snapshot.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/settings/presentation/models/models.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/settings/presentation/models/network_configuration_state.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/settings/presentation/models/settings_state.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/settings/presentation/screens/advanced_settings_screen.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/settings/presentation/screens/bitcoin_unit_selection_screen.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/settings/presentation/screens/country_selection_screen.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/settings/presentation/screens/currency_selection_screen.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/settings/presentation/screens/network_configuration_screen.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/settings/presentation/screens/screens.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/settings/presentation/screens/settings_screen.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/settings/presentation/view_model/network_configuration_view_model.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/settings/presentation/view_model/settings_view_model.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/settings/presentation/view_model/view_models.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/settings/presentation/widgets/country_select_option_row.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/settings/presentation/widgets/currency_select_option_row.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/settings/presentation/widgets/settings_choice_row.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/settings/presentation/widgets/settings_option_row.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/settings/presentation/widgets/widgets.dart` | Dart source | unreviewed | - | - | - |
+| `lib/features/settings/data/repository/repository.dart` | Dart source | verified | SETTINGS-002 | Feature data boundary exports only the typed settings repository | `6cc7376` |
+| `lib/features/settings/data/repository/settings_repository.dart` | Dart source | verified | DEC-024, SETTINGS-002, SETTINGS-003 | Versioned preferences, serialized writes, bounded catalog loading, canonical identity, self-healing defaults, and redacted failures pass tests | `6cc7376` |
+| `lib/features/settings/domain/models/app_preferences.dart` | Dart source | verified | DEC-024 | Typed immutable defaults and persisted identity contract reviewed and restart-tested | `6cc7376` |
+| `lib/features/settings/domain/models/fiat_currency.dart` | Dart source | verified | SETTINGS-003 | Immutable ISO identity and display metadata stay app-owned and are catalog-tested | `6cc7376` |
+| `lib/features/settings/domain/models/models.dart` | Dart source | verified | SETTINGS-002 | Domain barrel exports only app-owned settings models | `6cc7376` |
+| `lib/features/settings/domain/models/region.dart` | Dart source | verified | SETTINGS-002 | Immutable ISO region identity remains independent from display assets | `6cc7376` |
+| `lib/features/settings/domain/models/settings_snapshot.dart` | Dart source | verified | DEC-024 | One immutable snapshot joins preferences and validated catalogs for presentation | `6cc7376` |
+| `lib/features/settings/presentation/models/models.dart` | Dart source | verified | SETTINGS-002 | Presentation barrel exports only typed immutable screen state | `6cc7376` |
+| `lib/features/settings/presentation/models/network_configuration_state.dart` | Dart source | verified | SETTINGS-001, SEC-004 | Network diagnostics expose redacted typed display values and operation-specific health state | `6cc7376` |
+| `lib/features/settings/presentation/models/settings_state.dart` | Dart source | verified | DEC-024, SETTINGS-002 | Selection/loading/failure state is immutable and operation-specific | `6cc7376` |
+| `lib/features/settings/presentation/screens/advanced_settings_screen.dart` | Dart source | verified | SETTINGS-001, SEC-007, ACCESS-001 | Network diagnostics are reachable; sensitive disclosures are explicitly disabled pending SEC-007 and semantics tests pass | `6cc7376` |
+| `lib/features/settings/presentation/screens/bitcoin_unit_selection_screen.dart` | Dart source | verified | SETTINGS-001, ACCESS-001 | Durable selection waits for success, suppresses duplicate mutation, and passes widget/accessibility tests | `6cc7376` |
+| `lib/features/settings/presentation/screens/country_selection_screen.dart` | Dart source | verified | DEC-024, FLAG-001 | Region selection consumes typed state and `circle_flags`, persists before pop, and compiles under the full host suite | `6cc7376` |
+| `lib/features/settings/presentation/screens/currency_selection_screen.dart` | Dart source | verified | DEC-024, FLAG-001 | Currency selection consumes typed state and `circle_flags`, persists before pop, and compiles under the full host suite | `6cc7376` |
+| `lib/features/settings/presentation/screens/network_configuration_screen.dart` | Dart source | reviewed-clean | SETTINGS-001, SEC-004 | Source review confirms redacted endpoint presentation, real health state, and retry ownership; dedicated platform-health evidence remains Phase 6 | `6cc7376` |
+| `lib/features/settings/presentation/screens/screens.dart` | Dart source | verified | SETTINGS-001 | Feature screen boundary exports reviewed settings screens only | `6cc7376` |
+| `lib/features/settings/presentation/screens/settings_screen.dart` | Dart source | fixing | SETTINGS-001 | Typed persisted values and advanced navigation are wired; app-wide unit consumption and remaining feature rows continue in Phase 5 | `6cc7376` |
+| `lib/features/settings/presentation/view_model/network_configuration_view_model.dart` | Dart source | reviewed-clean | SETTINGS-001, SEC-004 | Provider-owned load/retry state maps real configuration and bounded health checks without leaking URL paths | `6cc7376` |
+| `lib/features/settings/presentation/view_model/settings_view_model.dart` | Dart source | verified | DEC-024, SETTINGS-002 | Generated AsyncNotifier serializes effective mutations, suppresses overlap, retains prior data on failure, and passes fault tests | `6cc7376` |
+| `lib/features/settings/presentation/view_model/view_models.dart` | Dart source | verified | SETTINGS-002 | Presentation boundary exports generated-owner source declarations without exporting generated files | `6cc7376` |
+| `lib/features/settings/presentation/widgets/country_select_option_row.dart` | Dart source | verified | FLAG-001, ACCESS-001 | Shared region row uses `circle_flags`, stable selection semantics, and semantic haptic ownership | `6cc7376` |
+| `lib/features/settings/presentation/widgets/currency_select_option_row.dart` | Dart source | verified | FLAG-001, ACCESS-001 | Shared currency row uses `circle_flags`, stable selection semantics, and semantic haptic ownership | `6cc7376` |
+| `lib/features/settings/presentation/widgets/settings_choice_row.dart` | Dart source | verified | SETTINGS-002, ACCESS-001 | Reusable choice row owns disabled/loading/selected semantics without direct persistence | `6cc7376` |
+| `lib/features/settings/presentation/widgets/settings_option_row.dart` | Dart source | verified | SETTINGS-001, ACCESS-001 | Settings navigation row handles long details, disabled state, and accessible labeling without layout overflow | `6cc7376` |
+| `lib/features/settings/presentation/widgets/widgets.dart` | Dart source | verified | SETTINGS-002 | Feature widget boundary exports reviewed public settings rows only | `6cc7376` |
 | `lib/features/skeleton/presentation/providers/providers.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/skeleton/presentation/providers/skeleton_index_provider.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/skeleton/presentation/screens/screens.dart` | Dart source | unreviewed | - | - | - |
@@ -512,14 +527,12 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `lib/shared/feedback/toast_controller.dart` | Dart source | verified | UX-002 | Bounded FIFO queue, duplicate coalescing, dismissal, and disposal contracts pass deterministic tests | `98b7a40` |
 | `lib/shared/feedback/toast_host.dart` | Dart source | verified | UX-002, MOTION-001, SAFE-001 | App-root host serializes display, supports reduced motion, keyboard insets, accessible dismissal, and lifecycle-safe timers | `98b7a40` |
 | `lib/shared/feedback/toast_message.dart` | Dart source | verified | UX-002 | Immutable semantic message identity/severity contract reviewed and tested | `98b7a40` |
-| `lib/shared/formatting/bitcoin_amount_formatter.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/formatting/bitcoin_unit.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/formatting/formatting.dart` | Dart source | unreviewed | - | - | - |
+| `lib/shared/formatting/bitcoin_amount_formatter.dart` | Dart source | verified | SETTINGS-001 | Exact integer sats/BTC formatting, grouping, sign, precision, and unit separation pass boundary tests | `6cc7376` |
+| `lib/shared/formatting/bitcoin_unit.dart` | Dart source | verified | SETTINGS-001 | Typed persisted display-unit identity is independent from monetary value and payment rail | `6cc7376` |
+| `lib/shared/formatting/formatting.dart` | Dart source | verified | SETTINGS-001 | Shared formatting boundary exports only typed public format contracts | `6cc7376` |
 | `lib/shared/layout/layout.dart` | Dart source | verified | SAFE-001 | Boundary barrel exports only typed runtime layout environment | `98b7a40` |
 | `lib/shared/layout/window_insets.dart` | Dart source | verified | SAFE-001 | Safe, persistent-system, and keyboard inset semantics are distinct and widget-tested | `98b7a40` |
 | `lib/shared/models/asset_model.dart` | Dart source | fixing | DOMAIN-001 | Existing model reviewed; typed asset/rail/environment replacement remains Phase 2 | - |
-| `lib/shared/models/country_model.dart` | Dart source | unreviewed | - | - | - |
-| `lib/shared/models/currency_model.dart` | Dart source | unreviewed | - | - | - |
 | `lib/shared/models/models.dart` | Dart source | unreviewed | - | - | - |
 | `lib/shared/motion/motion.dart` | Dart source | verified | MOTION-001 | Boundary barrel exports only the effective animation policy | `98b7a40` |
 | `lib/shared/motion/motion_policy.dart` | Dart source | verified | MOTION-001 | Platform/view accessibility settings resolve deterministic effective durations and stable disabled-motion behavior | `98b7a40` |
@@ -566,7 +579,7 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `lib/shared/widgets/grid_loader.dart` | Dart source | verified | DS-004, MOTION-001 | Geometry/effects are token-owned; ticker lifecycle and stable reduced-motion frame pass tests | `98b7a40` |
 | `lib/shared/widgets/squircle.dart` | Dart source | unreviewed | - | - | - |
 | `lib/shared/widgets/widgets.dart` | Dart source | verified | DS-001, DS-002, ACCESS-002 | Shared widget boundary exports reviewed public components without private/generated implementation leakage | `98b7a40` |
-| `pubspec.yaml` | Project configuration | verified | BASE-001, SDK-001, DEP-001, DEP-002, DEP-003, DEP-004, FONT-001, FLAG-001 | Immutable SDK pin, compatible constraints, Cupertino font, removed reachability dependency, and assets reviewed; external/transitional findings remain tracked | `1b3273a` |
+| `pubspec.yaml` | Project configuration | verified | BASE-001, SDK-001, DEP-001, DEP-002, DEP-003, DEP-004, FONT-001, FLAG-001 | Immutable SDK pin, compatible constraints, bundled fonts, and one flag implementation reviewed; full host resolution passes | `1b3273a`, `6cc7376` |
 | `scripts/git-hooks/pre-commit` | Tooling | verified | BUILD-002 | Non-mutating quality gate executes successfully | `8e97370` |
 | `scripts/install-git-hooks.sh` | Tooling | unreviewed | - | - | - |
 | `test/core/bootstrap/app_bootstrap_test.dart` | Test | verified | LIFE-002, LIFE-005 | Partial-construction cleanup and composed unknown-outcome failures pass | `1b3273a` |
@@ -577,9 +590,9 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `test/core/network/resilient_http_client_test.dart` | Test | verified | NET-001, NET-002, NET-003 | Retry/budget/abort/cancel/redirect/body/scheme/policy fault matrix passes | `1b3273a` |
 | `test/features/home/bitcoin_market_repository_test.dart` | Test | verified | DATA-002 | Integer mapping, sorting, deduplication, fallback, freshness, bounds, and malformed-data cases pass | `1b3273a` |
 | `test/features/home/bitcoin_market_view_model_test.dart` | Test | verified | ARCH-002 | Duplicate retry is suppressed while initial request is active | `1b3273a` |
-| `test/features/settings/settings_repository_test.dart` | Test | unreviewed | - | - | - |
-| `test/features/settings/settings_screens_test.dart` | Test | unreviewed | - | - | - |
-| `test/features/settings/settings_view_model_test.dart` | Test | unreviewed | - | - | - |
+| `test/features/settings/settings_repository_test.dart` | Test | verified | DEC-024, SETTINGS-002, SETTINGS-003 | Defaults, persistence across reconstruction, invalid/corrupt repair, serialization, redaction, and production catalog invariants pass | `6cc7376` |
+| `test/features/settings/settings_screens_test.dart` | Test | verified | SETTINGS-001, SEC-007, ACCESS-001 | Durable unit interaction and disabled sensitive-disclosure accessibility behavior pass | `6cc7376` |
+| `test/features/settings/settings_view_model_test.dart` | Test | verified | DEC-024, SETTINGS-002 | Overlapping settings mutations are suppressed and state remains coherent | `6cc7376` |
 | `test/features/wallet/rgb_wallet_engine_test.dart` | Test | verified | SDK-001, DOMAIN-002 | Stable SDK forwarding and adversarial native mapping matrix passes | `1b3273a` |
 | `test/features/wallet/wallet_domain_models_test.dart` | Test | verified | DEC-013, DOMAIN-002 | Value, unit, overflow, timestamp, key, and Unicode-control invariants pass | `1b3273a` |
 | `test/features/wallet/wallet_identity_generator_test.dart` | Test | verified | SEC-003, SEC-006 | CSPRNG output length, alphabet, uniqueness, and secret size pass | `1b3273a` |
@@ -589,7 +602,7 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `test/features/wallet/wallet_viewmodel_test.dart` | Test | verified | DEC-012, LIFE-003 | Initial loading overlap suppression passes | `1b3273a` |
 | `test/goldens/presentation_components.png` | Test | verified | DS-001, DS-002, ACCESS-003 | 390x844 approved rendering was generated with bundled UI, numeric, and package icon fonts and visually inspected | `3f1215b` |
 | `test/goldens/presentation_components_golden_test.dart` | Test | verified | DS-001, DS-002, ACCESS-002, ACCESS-003 | Golden plus Android target-size, labeled-target, and contrast guidelines pass | `3f1215b` |
-| `test/shared/bitcoin_amount_formatter_test.dart` | Test | unreviewed | - | - | - |
+| `test/shared/bitcoin_amount_formatter_test.dart` | Test | verified | SETTINGS-001 | Exact integer BTC/sats formatter boundaries, signs, grouping, and no-precision-loss cases pass | `6cc7376` |
 | `test/shared/feedback_system_test.dart` | Test | verified | UX-001, UX-002, UX-003 | Haptic support caching/failure isolation and bounded toast ordering/deduplication/disposal matrix passes | `98b7a40` |
 | `test/shared/presentation_system_test.dart` | Test | verified | DS-001, DS-002, DS-003, MOTION-001, NAV-001, SAFE-001 | Theme failure, inset semantics, numeric spans, shape types, button behavior, reduced motion, navigation geometry, and toast host tests pass | `98b7a40` |
 | `test/support/wallet_fakes.dart` | Test | verified | TEST-001 | Deterministic fault-injection fakes are test-only, injectable, and cannot enter release code | `1b3273a` |
