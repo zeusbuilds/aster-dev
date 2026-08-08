@@ -214,7 +214,7 @@ class _AssetItem extends StatelessWidget {
                     SizedBox(height: spacing.xxs),
                     Text(
                       asset.chain,
-                      style: type.rowMeta.copyWith(color: colors.textTertiary),
+                      style: type.rowMeta.copyWith(color: colors.textSecondary),
                     ),
                   ],
                 ),
@@ -229,7 +229,7 @@ class _AssetItem extends StatelessWidget {
                   SizedBox(height: spacing.xxs),
                   AmountText(
                     '0 sats',
-                    style: type.rowMeta.copyWith(color: colors.textTertiary),
+                    style: type.rowMeta.copyWith(color: colors.textSecondary),
                   ),
                 ],
               ),

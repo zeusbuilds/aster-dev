@@ -101,7 +101,7 @@ class AssetRow extends StatelessWidget {
                             child: Text(
                               denomination,
                               style: type.assetMeta.copyWith(
-                                color: colors.textTertiary,
+                                color: colors.textSecondary,
                               ),
                             ),
                           ),
@@ -110,7 +110,7 @@ class AssetRow extends StatelessWidget {
                             child: AmountText(
                               assetBalance,
                               style: type.assetMeta.copyWith(
-                                color: colors.textTertiary,
+                                color: colors.textSecondary,
                               ),
                             ),
                           ),

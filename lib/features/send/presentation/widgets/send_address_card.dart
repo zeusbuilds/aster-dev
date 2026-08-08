@@ -99,7 +99,7 @@ class _SendAddressCardState extends State<SendAddressCard> {
             children: [
               Text(
                 'Recipient Address',
-                style: type.addressLabel.copyWith(color: colors.textTertiary),
+                style: type.addressLabel.copyWith(color: colors.textSecondary),
               ),
               SizedBox(height: spacing.xs),
               TextField(

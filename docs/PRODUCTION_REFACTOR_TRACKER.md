@@ -534,6 +534,8 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `test/features/wallet/wallet_runtime_test.dart` | Test | verified | LIFE-001, LIFE-004, SEC-006, STORE-004 | Runtime ordering, rollback, quarantine, reinit, cleanup, audit, and disposal matrix passes | `1b3273a` |
 | `test/features/wallet/wallet_storage_test.dart` | Test | verified | SEC-005, STORE-001, STORE-002, STORE-003, STORE-005, STORE-006, STORE-007 | Credential, journal, corruption, ownership, legacy, collision, and timestamp matrix passes | `1b3273a` |
 | `test/features/wallet/wallet_viewmodel_test.dart` | Test | verified | DEC-012, LIFE-003 | Initial loading overlap suppression passes | `1b3273a` |
+| `test/goldens/presentation_components.png` | Test | unreviewed | - | - | - |
+| `test/goldens/presentation_components_golden_test.dart` | Test | unreviewed | - | - | - |
 | `test/shared/feedback_system_test.dart` | Test | unreviewed | - | - | - |
 | `test/shared/presentation_system_test.dart` | Test | unreviewed | - | - | - |
 | `test/support/wallet_fakes.dart` | Test | verified | TEST-001 | Deterministic fault-injection fakes are test-only, injectable, and cannot enter release code | `1b3273a` |

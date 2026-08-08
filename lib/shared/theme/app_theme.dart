@@ -93,7 +93,7 @@ class AppTheme {
         labelStyle: textTheme.bodyMedium?.copyWith(
           color: _colors.textSecondary,
         ),
-        hintStyle: textTheme.bodyMedium?.copyWith(color: _colors.textTertiary),
+        hintStyle: textTheme.bodyMedium?.copyWith(color: _colors.textSecondary),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: _buttonStyle(

@@ -164,11 +164,15 @@ class AsterTypeRoles extends ThemeExtension<AsterTypeRoles> {
         FontWeight.w600,
         colorScheme.onSurface,
       ),
-      rowMeta: role(textTheme.bodyMedium, FontWeight.w500, colors.textTertiary),
+      rowMeta: role(
+        textTheme.bodyMedium,
+        FontWeight.w500,
+        colors.textSecondary,
+      ),
       rowMetaStrong: role(
         textTheme.bodyMedium,
         FontWeight.w600,
-        colors.textTertiary,
+        colors.textSecondary,
       ),
       bodyStrong: role(
         textTheme.bodyLarge,
@@ -188,7 +192,7 @@ class AsterTypeRoles extends ThemeExtension<AsterTypeRoles> {
       amountSmall: role(
         textTheme.bodySmall,
         FontWeight.w500,
-        colors.textTertiary,
+        colors.textSecondary,
       ),
       assetTitle: role(
         textTheme.bodyLarge,
@@ -203,7 +207,7 @@ class AsterTypeRoles extends ThemeExtension<AsterTypeRoles> {
       assetMeta: role(
         textTheme.bodySmall,
         FontWeight.w500,
-        colors.textTertiary,
+        colors.textSecondary,
       ),
       brandHero: role(
         textTheme.displaySmall,
@@ -257,12 +261,12 @@ class AsterTypeRoles extends ThemeExtension<AsterTypeRoles> {
       versionLabel: role(
         textTheme.bodySmall,
         FontWeight.w400,
-        colors.textTertiary,
+        colors.textSecondary,
       ),
       addressLabel: role(
         textTheme.bodyMedium,
         FontWeight.w600,
-        colors.textTertiary,
+        colors.textSecondary,
       ),
       address: role(
         textTheme.bodyLarge,
@@ -272,7 +276,7 @@ class AsterTypeRoles extends ThemeExtension<AsterTypeRoles> {
       addressHint: role(
         textTheme.bodyLarge,
         FontWeight.w500,
-        colors.textDisabled,
+        colors.textSecondary,
       ),
       addressSmall: role(
         textTheme.bodySmall,

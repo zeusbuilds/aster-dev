@@ -56,7 +56,7 @@ class DetailRow extends StatelessWidget {
               child: Text(
                 title,
                 style: type.rowMeta.copyWith(
-                  color: titleColor ?? colors.textTertiary,
+                  color: titleColor ?? colors.textSecondary,
                 ),
               ),
             ),

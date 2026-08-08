@@ -84,7 +84,7 @@ class SwapPair extends StatelessWidget {
                       NumericText(
                         marketPrice,
                         style: type.rowMetaStrong.copyWith(
-                          color: colors.textTertiary,
+                          color: colors.textSecondary,
                         ),
                       ),
                       const Spacer(),
@@ -119,7 +119,7 @@ class SwapPair extends StatelessWidget {
                 AmountText(
                   'Bal: $balance',
                   style: type.rowMetaStrong.copyWith(
-                    color: colors.textTertiary,
+                    color: colors.textSecondary,
                   ),
                 ),
                 if (from) ...[

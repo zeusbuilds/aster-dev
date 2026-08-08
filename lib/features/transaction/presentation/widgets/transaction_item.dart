@@ -70,7 +70,7 @@ class TransactionItem extends StatelessWidget {
               SizedBox(height: spacing.xxs),
               AmountText(
                 time,
-                style: textRoles.rowMeta.copyWith(color: colors.textTertiary),
+                style: textRoles.rowMeta.copyWith(color: colors.textSecondary),
               ),
             ],
           ),

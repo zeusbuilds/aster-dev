@@ -44,14 +44,14 @@ class TransactionListScreen extends StatelessWidget {
                       Text(
                         'Balance',
                         style: type.rowMeta.copyWith(
-                          color: colors.textTertiary,
+                          color: colors.textSecondary,
                         ),
                       ),
                       AmountText('0.00001 BTC', style: type.bodyStrong),
                       NumericText(
                         '\$100,000',
                         style: type.rowMeta.copyWith(
-                          color: colors.textTertiary,
+                          color: colors.textSecondary,
                         ),
                       ),
                     ],
@@ -68,7 +68,7 @@ class TransactionListScreen extends StatelessWidget {
             SizedBox(height: spacing.lg),
             Text(
               'Today',
-              style: type.rowMeta.copyWith(color: colors.textTertiary),
+              style: type.rowMeta.copyWith(color: colors.textSecondary),
             ),
             SizedBox(height: spacing.lg),
             const TransactionItem(
@@ -94,7 +94,7 @@ class TransactionListScreen extends StatelessWidget {
             SizedBox(height: spacing.lg),
             Text(
               'Yesterday',
-              style: type.rowMeta.copyWith(color: colors.textTertiary),
+              style: type.rowMeta.copyWith(color: colors.textSecondary),
             ),
             SizedBox(height: spacing.lg),
             const TransactionItem(

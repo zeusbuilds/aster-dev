@@ -74,14 +74,14 @@ class ReceiveCard extends StatelessWidget {
                   NumericText(
                     marketPrice,
                     style: type.rowMetaStrong.copyWith(
-                      color: colors.textTertiary,
+                      color: colors.textSecondary,
                     ),
                   ),
                   const Spacer(),
                   AmountText(
                     'Bal: $balance',
                     style: type.rowMetaStrong.copyWith(
-                      color: colors.textTertiary,
+                      color: colors.textSecondary,
                     ),
                   ),
                 ],
