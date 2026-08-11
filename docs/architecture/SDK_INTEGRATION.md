@@ -119,6 +119,14 @@ RGB USDT identity is its immutable contract ID, never the `USDT` ticker.
 Amounts use integer sats, millisats, or RGB smallest units. Fiat market data is
 converted to integer cents at the repository boundary.
 
+The app reads the environment-specific USDT contract through
+`UTEXO_USDT_ASSET_ID` and its integer precision through
+`UTEXO_USDT_PRECISION`. Both must be present and valid or both USDT payment
+routes fail closed as unavailable. Stable navigation carries only the product
+target (`usdt-onchain` or `usdt-lightning`); the repository resolves that
+untrusted identifier back to deployment-owned contract metadata before any SDK
+operation.
+
 The SDK's accepted PKG-006 artifact-provenance constraint remains visible in
 the app release report. Until that constraint is resolved upstream, this app
 cannot make a truthful funds-bearing mainnet production claim.

@@ -20,7 +20,9 @@ final class WalletRepository {
     this._services,
     this._legacySeedPreflight, {
     DateTime Function()? clock,
-  }) : _clock = clock ?? _utcNow;
+  }) : _clock = clock ?? _utcNow {
+    _services.validate();
+  }
 
   final WalletProfilePersistence _profiles;
   final WalletRuntime _runtime;
@@ -32,6 +34,77 @@ final class WalletRepository {
   Future<void> _operationTail = Future<void>.value();
 
   Future<AppResult<WalletRegistry>> load() => _enqueueOperation(_profiles.read);
+
+  /// Product payment targets and whether this deployment can execute them.
+  ///
+  /// Bitcoin is always identified by the protocol. RGB USDT remains visible
+  /// but unavailable until its environment-specific contract metadata exists.
+  List<WalletPaymentCapability> get paymentCapabilities {
+    final usdt = _services.usdtAsset;
+    final capabilities = <WalletPaymentCapability>[
+      WalletPaymentCapability.available(
+        const PaymentRoute(
+          asset: WalletAsset.bitcoin,
+          rail: PaymentRail.onchain,
+        ),
+      ),
+      WalletPaymentCapability.available(
+        const PaymentRoute(
+          asset: WalletAsset.bitcoin,
+          rail: PaymentRail.lightning,
+        ),
+      ),
+      if (usdt == null) ...const [
+        WalletPaymentCapability.unavailable(WalletPaymentTarget.usdtOnchain),
+        WalletPaymentCapability.unavailable(WalletPaymentTarget.usdtLightning),
+      ] else ...[
+        WalletPaymentCapability.available(
+          PaymentRoute(
+            asset: WalletAsset.rgbUsdt(
+              assetId: usdt.contractId,
+              precision: usdt.precision,
+            ),
+            rail: PaymentRail.onchain,
+          ),
+        ),
+        WalletPaymentCapability.available(
+          PaymentRoute(
+            asset: WalletAsset.rgbUsdt(
+              assetId: usdt.contractId,
+              precision: usdt.precision,
+            ),
+            rail: PaymentRail.lightning,
+          ),
+        ),
+      ],
+    ];
+    return List<WalletPaymentCapability>.unmodifiable(capabilities);
+  }
+
+  /// Resolves an untrusted route identifier to deployment-owned asset data.
+  AppResult<PaymentRoute> resolvePaymentTarget(WalletPaymentTarget target) {
+    for (final capability in paymentCapabilities) {
+      if (capability.target != target) continue;
+      final route = capability.route;
+      if (route != null) return AppResult.success(route);
+      return AppResult.failure(
+        const AppFailure(
+          code: 'rgb_usdt_not_configured',
+          kind: AppFailureKind.configuration,
+          userMessage: 'USDT is not configured for this network.',
+          retryable: false,
+        ),
+      );
+    }
+    return AppResult.failure(
+      const AppFailure(
+        code: 'payment_target_unknown',
+        kind: AppFailureKind.validation,
+        userMessage: 'Choose a supported asset and network.',
+        retryable: false,
+      ),
+    );
+  }
 
   /// Restores the persisted active wallet during app bootstrap.
   Future<AppResult<WalletRegistry>> bootstrap() {

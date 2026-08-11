@@ -11,7 +11,7 @@ verified on the exact candidate commit.
 - Baseline date: 2026-08-08 (Asia/Kolkata)
 - Target product: UTEXO Bitcoin, RGB USDT, and Lightning wallet
 - SDK target: `rgb_sdk_flutter` at `3dd82e23d80bb4bb6a2d2526c6c6741ac1ea1236`
-- Current phase: Phase 4, onboarding and settings
+- Current phase: Phase 5, wallet features
 - Release status: not eligible for funds-bearing release
 
 Statuses are `unreviewed`, `reviewed-clean`, `fixing`, `verified`, `blocked`,
@@ -58,6 +58,7 @@ and relevant tests/builds have passed on the recorded commit.
 | DEC-027 | blocked | Do not expose seed or xpub disclosure actions before SEC-007 is decided. | Advanced settings may expose truthful network diagnostics now, but sensitive rows remain disabled and explicitly unavailable rather than bypassing authentication policy. |
 | DEC-028 | verified | Accept bounded multiword paste at the import fields without programmatically reading the system clipboard. | Input is lowercased, stripped to canonical word characters, capped to 12 BIP39-sized words, distributed from the focused field, and still requires SDK checksum validation; focused UX and adversarial tests pass at `05c7edf`. |
 | DEC-029 | blocked | Never remove detected legacy seed records merely to unblock startup. | Product must choose between an explicit-consent, idempotent in-app migration and a support-assisted recovery release. Either path must preserve the old record until a new ownership-bound wallet commit is proven. |
+| DEC-030 | verified | Stable feature navigation carries a product asset/rail target; repositories resolve it to deployment-owned contract metadata before wallet execution. | Prevents route arguments, ticker text, or presentation models from substituting an RGB contract ID or precision. Focused domain/configuration/repository tests pass in the Phase 5 foundation slice. |
 
 ## Baseline Evidence
 
@@ -158,6 +159,14 @@ Baseline screenshots are stored in `docs/release/evidence/baseline/`.
 | Successful native provisioning/restart | Blocked, not claimed | Fresh create reached the real SDK and failed with a redacted node-operation message because no configured RLN/LSP service is available. No success or navigation was simulated. A successful process-restart smoke remains ROUTE-002/TEST-001 work. |
 | Post-audit tracker inventory | Pass | All 360 non-generated repository files are represented and implementation rows are reconciled to `518b077`. |
 
+## Phase 5 Incremental Evidence
+
+| Check | Result | Exact evidence |
+| --- | --- | --- |
+| Payment-domain foundation | Pass in working tree | Four stable `bitcoin/usdt` by `onchain/lightning` targets remain independent from chain environment. The repository resolves targets to immutable deployment metadata and returns a typed configuration failure for absent USDT instead of guessing identity. |
+| RGB deployment configuration | Partial by design | `UTEXO_USDT_ASSET_ID` and `UTEXO_USDT_PRECISION` are validated as an all-or-nothing pair. Fail-closed behavior passes; real environment values remain the external `CONFIG-002` blocker. |
+| Focused host gates | Pass in working tree | Configuration, wallet-domain, and wallet-repository suites pass 37 tests; fatal-warning/fatal-info analysis has zero diagnostics. |
+
 ## Phase Plan
 
 | Phase | Scope | Status | Exit evidence |
@@ -167,7 +176,7 @@ Baseline screenshots are stored in `docs/release/evidence/baseline/`.
 | 2 | Domain architecture, SDK lifecycle, repositories, models, error/result policy, networking, storage, and security | verified | Unit/contract/fault tests, real platform storage tests, and both platform builds pass at `1b3273a`. |
 | 3 | Design system and shared UX systems | verified | Semantic shape/inset/haptic/toast/motion systems, strict analysis, 153 host tests, approved golden/accessibility gates, and both platform builds pass at `3f1215b`. |
 | 4 | Onboarding and settings | fixing | Create/import/restart/unit/advanced end-to-end evidence. |
-| 5 | Home, send, receive, swap, activity, and transaction details | unreviewed | Truthful four-rail flows and integration/widget evidence. |
+| 5 | Home, send, receive, swap, activity, and transaction details | fixing | Truthful four-rail flows and integration/widget evidence. |
 | 6 | Documentation, performance, memory, platform hardening, and release evidence | unreviewed | Exact-candidate release report with measurements and constraints. |
 | 7 | Independent file-by-file closeout | unreviewed | Zero unreviewed files and zero untracked non-accepted findings. |
 
@@ -239,7 +248,7 @@ Baseline screenshots are stored in `docs/release/evidence/baseline/`.
 | NET-002 | P1 | Cancellation | verified | Whole-operation HTTP timeout did not abort an active request and could permit retries after the caller had timed out. | Abortable transport tests | `1b3273a` | `AbortableRequest` and one monotonic operation budget abort active I/O and prevent later attempts; timeout/cancellation tests pass. |
 | DEP-003 | P2 | Dependency hygiene | verified | `connectivity_plus` and its provider abstraction were unused and could encourage treating reachability hints as request truth. | Consumer search and dependency graph | `1b3273a` | Package/provider removed; request-result-based reachability policy is documented and both platform builds pass. |
 | PLAT-003 | P0 | Android backup | verified | Wallet databases, preferences, or encrypted storage could enter Android cloud backup or device transfer. | Android manifest and extraction rules | `1b3273a` | Release manifest has `allowBackup=false` and restrictive legacy/Android 12+ rules; platform tests and release build pass. |
-| CONFIG-002 | P0 | RGB asset identity | blocked | No deployment-owned RGB USDT contract ID and precision are configured, so the app cannot truthfully identify or aggregate USDT on any target environment. | Product requirements and app configuration audit | - | Requires an environment-specific immutable contract ID/precision source before Phase 5 integration. Never infer identity from ticker text. |
+| CONFIG-002 | P0 | RGB asset identity | blocked | No deployment-owned RGB USDT contract ID and precision are configured, so the app cannot truthfully identify or aggregate USDT on any target environment. | Product requirements and Phase 5 fail-closed configuration tests | - | The app now validates the two values as one deployment contract and keeps USDT routes unavailable when absent. Real per-environment values are still required; identity is never inferred from ticker text. |
 | SEC-007 | P0 | User authentication | blocked | The product has not decided whether viewing a seed, exporting xpubs, or reopening wallet credentials requires device authentication, an app PIN, both, or neither. | Secure-storage and settings requirements | - | A product/security decision is required before those screens can be release-qualified; storage contracts are designed to accept a later user-presence policy. |
 | STORE-002 | P0 | Upgrade safety | verified | A failed legacy-seed preflight could be cached as complete and silently bypassed on a later retry. | `legacy_wallet_seed_preflight.dart`; repeated-failure tests | `1b3273a` | The guard rechecks until it observes an authoritative empty source; failure and late-seed tests pass. |
 | STORE-003 | P0 | Metadata durability | verified | A single mutable metadata document could lose the wallet registry during a torn write or corrupt replacement. | `wallet_registry_document_store.dart`; corruption/torn-write tests | `1b3273a` | The checksummed, generation-numbered two-slot journal recovers the newest valid document and fsyncs atomic replacement; fault tests pass. |
@@ -399,7 +408,7 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `ios/RunnerTests/RunnerTests.swift` | iOS platform | unreviewed | - | - | - |
 | `lib/core/bootstrap/app_bootstrap.dart` | Dart source | verified | LIFE-002, LIFE-005 | Bootstrap ownership, unknown-outcome composition, awaited cleanup, and container disposal pass fault tests | `1b3273a` |
 | `lib/core/bootstrap/app_loader.dart` | Dart source | verified | LIFE-002, LIFE-005 | Typed failure/retry, reveal timer cancellation, retry gating, and container disposal pass widget tests | `1b3273a` |
-| `lib/core/config/app_environment.dart` | Dart source | verified | CONFIG-001, CONFIG-003 | Network/service validation, credential rejection, development schemes, and protected-port policy pass tests | `1b3273a` |
+| `lib/core/config/app_environment.dart` | Dart source | fixing | CONFIG-001, CONFIG-002, CONFIG-003 | Existing endpoint policy remains verified; Phase 5 adds all-or-nothing RGB contract/precision validation while real deployment values remain blocked | `1b3273a`, pending Phase 5 foundation |
 | `lib/core/config/config.dart` | Dart source | verified | CONFIG-001 | Boundary barrel exports only app configuration | `1b3273a` |
 | `lib/core/constants/app_constants.dart` | Dart source | verified | NET-001 | Reusable timeout/page constants were removed in favor of owned semantic policies; remaining app identity constants reviewed | `1b3273a` |
 | `lib/core/constants/constants.dart` | Dart source | verified | ARCH-001 | Barrel no longer exports removed endpoint surface | `1b3273a` |
@@ -534,7 +543,7 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `lib/features/transaction/presentation/widgets/transaction_item.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/transaction/presentation/widgets/widgets.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/wallet/data/repository/repository.dart` | Dart source | verified | SDK-001 | Repository boundary barrel exports only the app-owned repository | `1b3273a` |
-| `lib/features/wallet/data/repository/wallet_repository.dart` | Dart source | verified | SDK-001, LIFE-001, LIFE-003, LIFE-005, WALLET-001, STORE-004, SEC-006, SEC-009, ONB-003 | Provision returns the exact committed registry and public checksum validation stays serialized behind the SDK adapter; repository/onboarding fault tests pass | `1b3273a`, `5f3698f`, `05c7edf` |
+| `lib/features/wallet/data/repository/wallet_repository.dart` | Dart source | fixing | SDK-001, LIFE-001, LIFE-003, LIFE-005, WALLET-001, STORE-004, SEC-006, SEC-009, ONB-003, CONFIG-002, DOMAIN-001 | Existing lifecycle/provision paths remain verified; Phase 5 resolves stable targets to deployment-owned asset metadata and fails closed for absent USDT | `1b3273a`, `5f3698f`, `05c7edf`, pending Phase 5 foundation |
 | `lib/features/wallet/data/runtime/rgb_wallet_engine.dart` | Dart source | verified | SDK-001, DOMAIN-002 | Stable SDK adapter validates network, keys, counters, addresses, balances, units, and overflow; adapter tests pass | `1b3273a` |
 | `lib/features/wallet/data/runtime/runtime.dart` | Dart source | verified | LIFE-001 | Runtime boundary exports only owned interfaces/implementation | `1b3273a` |
 | `lib/features/wallet/data/runtime/wallet_directory_manager.dart` | Dart source | verified | PLAT-004, SEC-006 | Create/open/collision/rollback ownership semantics pass host and platform tests | `1b3273a` |
@@ -549,7 +558,7 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `lib/features/wallet/data/storage/wallet_storage_security.dart` | Dart source | verified | PLAT-004 | Typed platform-channel policy validates inputs and maps bounded native failures; real platform tests pass | `1b3273a` |
 | `lib/features/wallet/domain/models/models.dart` | Dart source | verified | DEC-013 | Domain boundary exports only app-owned asset/network/amount/balance/profile/registry models | `1b3273a` |
 | `lib/features/wallet/domain/models/wallet_amount.dart` | Dart source | verified | DEC-013, DOMAIN-002 | Integer smallest-unit/rail/asset invariants and signed-64-bit bounds pass tests | `1b3273a` |
-| `lib/features/wallet/domain/models/wallet_asset.dart` | Dart source | verified | DEC-013 | Asset protocol/ID/precision are independent from rail and environment; validation/value tests pass | `1b3273a` |
+| `lib/features/wallet/domain/models/wallet_asset.dart` | Dart source | fixing | DEC-013, DEC-030, DOMAIN-001 | Stable four-route identifiers, product kind, protocol ID/precision, rail, and environment remain separate; focused value/route tests pass | `1b3273a`, pending Phase 5 foundation |
 | `lib/features/wallet/domain/models/wallet_balance.dart` | Dart source | verified | DOMAIN-002 | Onchain/Lightning total, available, pending, locked, receivable dimensions use checked integer aggregation; tests pass | `1b3273a` |
 | `lib/features/wallet/domain/models/wallet_network.dart` | Dart source | verified | CONFIG-001, DOMAIN-002 | Network status and public-key bounds/value semantics pass tests | `1b3273a` |
 | `lib/features/wallet/domain/models/wallet_profile.dart` | Dart source | verified | ARCH-003, SEC-003 | Non-secret immutable metadata, Unicode control rejection, UTC timestamps, and opaque identity pass tests | `1b3273a` |
@@ -627,7 +636,7 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `scripts/install-git-hooks.sh` | Tooling | unreviewed | - | - | - |
 | `test/core/bootstrap/app_bootstrap_test.dart` | Test | verified | LIFE-002, LIFE-005 | Partial-construction cleanup and composed unknown-outcome failures pass | `1b3273a` |
 | `test/core/bootstrap/app_loader_test.dart` | Test | verified | LIFE-002, SEC-004 | Redacted retryable and unknown-outcome bootstrap widget states pass | `1b3273a` |
-| `test/core/config/app_environment_test.dart` | Test | verified | CONFIG-001, CONFIG-003 | Scheme, network, credential, protected-port, and local-development policy matrix passes | `1b3273a` |
+| `test/core/config/app_environment_test.dart` | Test | fixing | CONFIG-001, CONFIG-002, CONFIG-003 | Existing endpoint matrix plus RGB identity/precision validation pass; real deployment values remain blocked | `1b3273a`, pending Phase 5 foundation |
 | `test/core/di/providers_test.dart` | Test | verified | LIFE-001 | Keep-alive async repository composition remains mounted | `1b3273a` |
 | `test/core/errors/failure_mapper_test.dart` | Test | verified | DEC-012, SEC-004, SEC-008 | SDK/HTTP/storage/protocol taxonomy, redaction, retry, and unknown-outcome matrix passes | `1b3273a` |
 | `test/core/network/resilient_http_client_test.dart` | Test | verified | NET-001, NET-002, NET-003 | Retry/budget/abort/cancel/redirect/body/scheme/policy fault matrix passes | `1b3273a` |
@@ -641,9 +650,9 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `test/features/settings/settings_screens_test.dart` | Test | verified | SETTINGS-001, SEC-007, ACCESS-001 | Durable unit interaction and disabled sensitive-disclosure accessibility behavior pass | `6cc7376` |
 | `test/features/settings/settings_view_model_test.dart` | Test | verified | DEC-024, SETTINGS-002 | Overlapping settings mutations are suppressed and state remains coherent | `6cc7376` |
 | `test/features/wallet/rgb_wallet_engine_test.dart` | Test | verified | SDK-001, DOMAIN-002 | Stable SDK forwarding and adversarial native mapping matrix passes | `1b3273a` |
-| `test/features/wallet/wallet_domain_models_test.dart` | Test | verified | DEC-013, DOMAIN-002 | Value, unit, overflow, timestamp, key, and Unicode-control invariants pass | `1b3273a` |
+| `test/features/wallet/wallet_domain_models_test.dart` | Test | fixing | DEC-013, DEC-030, DOMAIN-001, DOMAIN-002 | Existing invariants plus stable target parsing, route resolution, and availability state pass | `1b3273a`, pending Phase 5 foundation |
 | `test/features/wallet/wallet_identity_generator_test.dart` | Test | verified | SEC-003, SEC-006 | CSPRNG output length, alphabet, uniqueness, and secret size pass | `1b3273a` |
-| `test/features/wallet/wallet_repository_test.dart` | Test | verified | WALLET-001, LIFE-003, STORE-004, SEC-006, SEC-009, ONB-003 | Provision/bootstrap/reconcile/switch/resume plus normalized/checksum-invalid mnemonic cases pass with committed-registry assertions | `1b3273a`, `5f3698f`, `05c7edf` |
+| `test/features/wallet/wallet_repository_test.dart` | Test | fixing | WALLET-001, LIFE-003, STORE-004, SEC-006, SEC-009, ONB-003, CONFIG-002, DOMAIN-001 | Existing lifecycle matrix plus configured/unconfigured payment-target resolution pass | `1b3273a`, `5f3698f`, `05c7edf`, pending Phase 5 foundation |
 | `test/features/wallet/wallet_runtime_test.dart` | Test | verified | LIFE-001, LIFE-004, SEC-006, STORE-004 | Runtime ordering, rollback, quarantine, reinit, cleanup, audit, and disposal matrix passes | `1b3273a` |
 | `test/features/wallet/wallet_storage_test.dart` | Test | verified | SEC-005, STORE-001, STORE-002, STORE-003, STORE-005, STORE-006, STORE-007 | Credential, journal, corruption, ownership, legacy, collision, and timestamp matrix passes | `1b3273a` |
 | `test/features/wallet/wallet_viewmodel_test.dart` | Test | verified | DEC-012, LIFE-003 | Initial loading overlap suppression passes | `1b3273a` |

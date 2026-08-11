@@ -171,4 +171,42 @@ void main() {
 
     expect(configuration.validate, throwsA(isA<AppConfigurationException>()));
   });
+
+  test('accepts a complete deployment-owned RGB asset identity', () {
+    const configuration = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.regtest,
+      sdkNetwork: 'regtest',
+      usdtAsset: RgbAssetConfiguration(
+        contractId: 'rgb:usdt-contract',
+        precision: 6,
+      ),
+    );
+
+    expect(configuration.validate, returnsNormally);
+  });
+
+  test('rejects malformed RGB asset identity and precision', () {
+    const malformedId = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.regtest,
+      sdkNetwork: 'regtest',
+      usdtAsset: RgbAssetConfiguration(
+        contractId: 'rgb:usdt contract',
+        precision: 6,
+      ),
+    );
+    const malformedPrecision = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.regtest,
+      sdkNetwork: 'regtest',
+      usdtAsset: RgbAssetConfiguration(
+        contractId: 'rgb:usdt-contract',
+        precision: 19,
+      ),
+    );
+
+    expect(malformedId.validate, throwsA(isA<AppConfigurationException>()));
+    expect(
+      malformedPrecision.validate,
+      throwsA(isA<AppConfigurationException>()),
+    );
+  });
 }

@@ -18,6 +18,35 @@ enum BlockchainEnvironment {
   }
 }
 
+/// Deployment-owned identity for one RGB fungible asset.
+///
+/// Contract identity and precision are release configuration, not values that
+/// may be inferred from a ticker returned by a wallet or entered by a user.
+@immutable
+final class RgbAssetConfiguration {
+  const RgbAssetConfiguration({
+    required this.contractId,
+    required this.precision,
+  });
+
+  final String contractId;
+
+  /// Decimal precision used to format integer asset-smallest units.
+  final int precision;
+
+  void validate() {
+    if (contractId.isEmpty ||
+        contractId != contractId.trim() ||
+        contractId.length > 512 ||
+        contractId.contains(RegExp(r'\s'))) {
+      throw const AppConfigurationException();
+    }
+    if (precision < 0 || precision > 18) {
+      throw const AppConfigurationException();
+    }
+  }
+}
+
 /// Public, non-secret service configuration supplied to the wallet runtime.
 @immutable
 final class WalletServiceConfiguration {
@@ -28,6 +57,7 @@ final class WalletServiceConfiguration {
     this.rgbTransportProxy,
     this.lspBaseUrl,
     this.vssUrl,
+    this.usdtAsset,
   });
 
   /// Reads compile-time configuration without embedding credentials.
@@ -52,6 +82,13 @@ final class WalletServiceConfiguration {
       rgbTransportProxy: _optionalEnvironment('UTEXO_RGB_PROXY_URL'),
       lspBaseUrl: _optionalEnvironment('UTEXO_LSP_URL'),
       vssUrl: _optionalEnvironment('UTEXO_VSS_URL'),
+      usdtAsset: _rgbAssetEnvironment(
+        contractId: const String.fromEnvironment('UTEXO_USDT_ASSET_ID'),
+        precision: const int.fromEnvironment(
+          'UTEXO_USDT_PRECISION',
+          defaultValue: -1,
+        ),
+      ),
     );
   }
 
@@ -64,6 +101,12 @@ final class WalletServiceConfiguration {
   final String? rgbTransportProxy;
   final String? lspBaseUrl;
   final String? vssUrl;
+
+  /// RGB USDT identity for this exact blockchain environment.
+  ///
+  /// `null` means the deployment has not configured USDT. Callers must expose
+  /// that route as unavailable rather than substituting a ticker-derived ID.
+  final RgbAssetConfiguration? usdtAsset;
 
   /// Whether the validated VSS endpoint is an HTTP development endpoint.
   ///
@@ -95,6 +138,7 @@ final class WalletServiceConfiguration {
     );
     _validateEndpoint(lspBaseUrl, _EndpointKind.webService, environment);
     _validateEndpoint(vssUrl, _EndpointKind.webService, environment);
+    usdtAsset?.validate();
   }
 
   static void _validateEndpoint(
@@ -174,4 +218,17 @@ String? _optionalEnvironment(String name) {
     _ => '',
   };
   return value.isEmpty ? null : value;
+}
+
+RgbAssetConfiguration? _rgbAssetEnvironment({
+  required String contractId,
+  required int precision,
+}) {
+  final hasContractId = contractId.isNotEmpty;
+  final hasPrecision = precision >= 0;
+  if (!hasContractId && !hasPrecision) return null;
+  if (!hasContractId || !hasPrecision) {
+    throw const AppConfigurationException();
+  }
+  return RgbAssetConfiguration(contractId: contractId, precision: precision);
 }

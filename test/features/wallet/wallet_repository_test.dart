@@ -23,6 +23,79 @@ void main() {
     sdkNetwork: 'regtest',
   );
 
+  test('publishes four targets and fails closed for unconfigured USDT', () {
+    final runtime = WalletRuntime(
+      FakeWalletEngineFactory(const []),
+      FakeWalletDirectoryManager(),
+      WalletSecretStore(MemorySecureStore()),
+      services,
+    );
+    addTearDown(runtime.dispose);
+    final repository = WalletRepository(
+      _FailingRegistrationStore(),
+      runtime,
+      FakeWalletKeyGenerator(),
+      FakeWalletIdentityGenerator(walletId: walletId),
+      services,
+      const SuccessfulLegacyWalletSeedPreflight(),
+    );
+
+    expect(
+      repository.paymentCapabilities.map((item) => item.target),
+      WalletPaymentTarget.values,
+    );
+    expect(repository.paymentCapabilities.map((item) => item.isAvailable), [
+      true,
+      true,
+      false,
+      false,
+    ]);
+    final result = repository.resolvePaymentTarget(
+      WalletPaymentTarget.usdtOnchain,
+    );
+    expect(result, isA<AppFailureResult<PaymentRoute>>());
+    expect(
+      (result as AppFailureResult<PaymentRoute>).failure.code,
+      'rgb_usdt_not_configured',
+    );
+  });
+
+  test('resolves configured USDT from immutable deployment identity', () {
+    const configured = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.regtest,
+      sdkNetwork: 'regtest',
+      usdtAsset: RgbAssetConfiguration(
+        contractId: 'rgb:configured-usdt',
+        precision: 6,
+      ),
+    );
+    final runtime = WalletRuntime(
+      FakeWalletEngineFactory(const []),
+      FakeWalletDirectoryManager(),
+      WalletSecretStore(MemorySecureStore()),
+      configured,
+    );
+    addTearDown(runtime.dispose);
+    final repository = WalletRepository(
+      _FailingRegistrationStore(),
+      runtime,
+      FakeWalletKeyGenerator(),
+      FakeWalletIdentityGenerator(walletId: walletId),
+      configured,
+      const SuccessfulLegacyWalletSeedPreflight(),
+    );
+
+    final result = repository.resolvePaymentTarget(
+      WalletPaymentTarget.usdtLightning,
+    );
+
+    expect(result, isA<AppSuccess<PaymentRoute>>());
+    final route = (result as AppSuccess<PaymentRoute>).value;
+    expect(route.asset.id.value, 'rgb:configured-usdt');
+    expect(route.asset.precision, 6);
+    expect(route.rail, PaymentRail.lightning);
+  });
+
   test('normalizes and validates every generated recovery phrase', () async {
     final keyGenerator = FakeWalletKeyGenerator()
       ..generatedMnemonic =

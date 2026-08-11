@@ -3,6 +3,9 @@ import 'package:flutter/foundation.dart';
 /// Payment rail used to move an asset.
 enum PaymentRail { onchain, lightning }
 
+/// Product asset identity independent from its protocol contract identifier.
+enum WalletAssetKind { bitcoin, usdt }
+
 /// Asset protocol independent from its payment rail.
 enum WalletAssetProtocol { bitcoin, rgb }
 
@@ -49,6 +52,7 @@ final class WalletAssetId {
 @immutable
 final class WalletAsset {
   const WalletAsset._({
+    required this.kind,
     required this.id,
     required this.displayName,
     required this.symbol,
@@ -56,6 +60,7 @@ final class WalletAsset {
   });
 
   static const bitcoin = WalletAsset._(
+    kind: WalletAssetKind.bitcoin,
     id: WalletAssetId.bitcoin(),
     displayName: 'Bitcoin',
     symbol: 'BTC',
@@ -74,6 +79,7 @@ final class WalletAsset {
       );
     }
     return WalletAsset._(
+      kind: WalletAssetKind.usdt,
       id: WalletAssetId.rgb(assetId),
       displayName: 'Tether USD',
       symbol: 'USDT',
@@ -81,6 +87,7 @@ final class WalletAsset {
     );
   }
 
+  final WalletAssetKind kind;
   final WalletAssetId id;
   final String displayName;
   final String symbol;
@@ -91,13 +98,60 @@ final class WalletAsset {
   @override
   bool operator ==(Object other) =>
       other is WalletAsset &&
+      other.kind == kind &&
       other.id == id &&
       other.displayName == displayName &&
       other.symbol == symbol &&
       other.precision == precision;
 
   @override
-  int get hashCode => Object.hash(id, displayName, symbol, precision);
+  int get hashCode => Object.hash(kind, id, displayName, symbol, precision);
+}
+
+/// Stable route identifier used in URLs, persisted UI state, and analytics.
+///
+/// This identifies a product choice without pretending that deployment-owned
+/// RGB metadata is configured. Resolve it to a [PaymentRoute] before executing
+/// a wallet operation.
+enum WalletPaymentTarget {
+  bitcoinOnchain(
+    slug: 'bitcoin-onchain',
+    assetKind: WalletAssetKind.bitcoin,
+    rail: PaymentRail.onchain,
+  ),
+  bitcoinLightning(
+    slug: 'bitcoin-lightning',
+    assetKind: WalletAssetKind.bitcoin,
+    rail: PaymentRail.lightning,
+  ),
+  usdtOnchain(
+    slug: 'usdt-onchain',
+    assetKind: WalletAssetKind.usdt,
+    rail: PaymentRail.onchain,
+  ),
+  usdtLightning(
+    slug: 'usdt-lightning',
+    assetKind: WalletAssetKind.usdt,
+    rail: PaymentRail.lightning,
+  );
+
+  const WalletPaymentTarget({
+    required this.slug,
+    required this.assetKind,
+    required this.rail,
+  });
+
+  final String slug;
+  final WalletAssetKind assetKind;
+  final PaymentRail rail;
+
+  static WalletPaymentTarget? tryParse(String? value) {
+    if (value == null) return null;
+    for (final target in values) {
+      if (target.slug == value) return target;
+    }
+    return null;
+  }
 }
 
 /// A supported asset and rail combination.
@@ -108,10 +162,39 @@ final class PaymentRoute {
   final WalletAsset asset;
   final PaymentRail rail;
 
+  WalletPaymentTarget get target => switch ((asset.kind, rail)) {
+    (WalletAssetKind.bitcoin, PaymentRail.onchain) =>
+      WalletPaymentTarget.bitcoinOnchain,
+    (WalletAssetKind.bitcoin, PaymentRail.lightning) =>
+      WalletPaymentTarget.bitcoinLightning,
+    (WalletAssetKind.usdt, PaymentRail.onchain) =>
+      WalletPaymentTarget.usdtOnchain,
+    (WalletAssetKind.usdt, PaymentRail.lightning) =>
+      WalletPaymentTarget.usdtLightning,
+  };
+
   @override
   bool operator ==(Object other) =>
       other is PaymentRoute && other.asset.id == asset.id && other.rail == rail;
 
   @override
   int get hashCode => Object.hash(asset.id, rail);
+}
+
+/// Availability of one product payment target in the active deployment.
+@immutable
+final class WalletPaymentCapability {
+  const WalletPaymentCapability._({required this.target, this.route});
+
+  factory WalletPaymentCapability.available(PaymentRoute route) {
+    return WalletPaymentCapability._(target: route.target, route: route);
+  }
+
+  const WalletPaymentCapability.unavailable(WalletPaymentTarget target)
+    : this._(target: target);
+
+  final WalletPaymentTarget target;
+  final PaymentRoute? route;
+
+  bool get isAvailable => route != null;
 }

@@ -49,6 +49,46 @@ void main() {
     expect(balance.hashCode, sameBalance.hashCode);
   });
 
+  test(
+    'payment targets have stable slugs and resolve from concrete routes',
+    () {
+      final usdt = WalletAsset.rgbUsdt(
+        assetId: 'rgb:usdt-contract',
+        precision: 6,
+      );
+
+      for (final target in WalletPaymentTarget.values) {
+        expect(WalletPaymentTarget.tryParse(target.slug), target);
+      }
+      expect(WalletPaymentTarget.tryParse('BTC'), isNull);
+      expect(
+        PaymentRoute(
+          asset: WalletAsset.bitcoin,
+          rail: PaymentRail.lightning,
+        ).target,
+        WalletPaymentTarget.bitcoinLightning,
+      );
+      expect(
+        PaymentRoute(asset: usdt, rail: PaymentRail.onchain).target,
+        WalletPaymentTarget.usdtOnchain,
+      );
+    },
+  );
+
+  test('payment capabilities distinguish missing deployment metadata', () {
+    final available = WalletPaymentCapability.available(
+      PaymentRoute(asset: WalletAsset.bitcoin, rail: PaymentRail.onchain),
+    );
+    const unavailable = WalletPaymentCapability.unavailable(
+      WalletPaymentTarget.usdtLightning,
+    );
+
+    expect(available.isAvailable, isTrue);
+    expect(available.route, isNotNull);
+    expect(unavailable.isAvailable, isFalse);
+    expect(unavailable.route, isNull);
+  });
+
   test('registry and network metadata compare by value', () {
     final created = DateTime.utc(2026, 8, 8);
     final profile = WalletProfile(

@@ -182,6 +182,12 @@ non-secret endpoint overrides are documented in
 other credentials with `--dart-define`, because compile-time values are part of
 the application binary.
 
+RGB USDT requires both `UTEXO_USDT_ASSET_ID` and
+`UTEXO_USDT_PRECISION` for the selected environment. These are non-secret
+deployment identity values and must be supplied together. When either is
+missing, the app keeps both USDT rails visible but unavailable; it never infers
+an asset contract or decimal precision from the `USDT` ticker.
+
 An unrelated Compose project named `rgb-lightning-node-perf-lab` owns host
 ports `18443`, `50001`, and `3000` and persistent external data. App development
 must not stop, reset, recreate, inspect, or reuse that project or its data. Any
