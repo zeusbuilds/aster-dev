@@ -241,11 +241,13 @@ final class FakeWalletEngine implements WalletEngine {
   Object? createReceiveError;
   Object? sendPaymentError;
   Object? feeEstimateError;
+  Object? balanceError;
   Completer<void>? initializeGate;
   Completer<void>? addressGate;
   Completer<void>? decodeInvoiceGate;
   Completer<void>? createReceiveGate;
   Completer<void>? sendPaymentGate;
+  Completer<void>? balanceGate;
   String address = 'bcrt1qtest';
   String? initializedPassword;
   String? initializedMnemonic;
@@ -253,12 +255,14 @@ final class FakeWalletEngine implements WalletEngine {
   WalletReceiveRequest? createdReceiveRequest;
   WalletSendResult? sentPayment;
   WalletFeeRateEstimate? feeEstimate;
+  WalletBalance? balance;
   PaymentRoute? decodedInvoiceRoute;
   String? decodedInvoiceValue;
   PaymentRoute? createdReceiveRoute;
   WalletAmount? createdReceiveAmount;
   WalletSendCommand? sentPaymentCommand;
   int? feeTargetBlocks;
+  WalletAsset? requestedBalanceAsset;
 
   @override
   Future<void> initialize({
@@ -362,6 +366,16 @@ final class FakeWalletEngine implements WalletEngine {
   @override
   Future<WalletBalance> getBalance(WalletAsset asset) async {
     calls.add('balance');
+    requestedBalanceAsset = asset;
+    await balanceGate?.future;
+    if (balanceError case final Object error) throw error;
+    final configured = balance;
+    if (configured != null) {
+      if (configured.asset != asset) {
+        throw StateError('Configured fake balance has a different asset.');
+      }
+      return configured;
+    }
     WalletAmount onchain(int units) =>
         WalletAmount.onchain(assetId: asset.id, units: units);
     WalletAmount lightning(int units) =>
