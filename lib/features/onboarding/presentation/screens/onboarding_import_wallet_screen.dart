@@ -95,7 +95,7 @@ class _OnboardingImportWalletScreenState
                     primaryLabel: 'Retry',
                     onPrimary: () =>
                         ref.invalidate(importWalletViewModelProvider),
-                    onBack: context.pop,
+                    onBack: () => _returnToWelcome(context),
                   ),
                 _ => const OnboardingStatusPanel.loading(),
               },
@@ -182,6 +182,7 @@ class _OnboardingImportWalletScreenState
                     startIndex: start,
                     fieldHeight: wordFieldHeight,
                     enabled: !state.submitting,
+                    canSubmit: state.canSubmit,
                     onChanged: _handleWordInput,
                     onSubmitted: (index) =>
                         unawaited(_handleSubmitted(index, state)),
@@ -211,7 +212,8 @@ class _OnboardingImportWalletScreenState
                     ),
                     dotHeight: spacing.sm,
                     dotWidth: spacing.sm,
-                    expansionFactor: 4,
+                    expansionFactor:
+                        context.art.onboardingIndicatorExpansionFactor,
                     spacing: spacing.sm,
                   ),
                 ),
@@ -240,7 +242,7 @@ class _OnboardingImportWalletScreenState
                 OnboardingTextAction(
                   label: 'Back',
                   enabled: !state.submitting,
-                  onPressed: context.pop,
+                  onPressed: () => _returnToWelcome(context),
                 ),
               ],
             ),
@@ -312,6 +314,14 @@ class _OnboardingImportWalletScreenState
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
     await ref.read(importWalletViewModelProvider.notifier).submit();
+  }
+}
+
+void _returnToWelcome(BuildContext context) {
+  if (context.canPop()) {
+    context.pop();
+  } else {
+    context.go(RoutePaths.onboardingWelcome);
   }
 }
 

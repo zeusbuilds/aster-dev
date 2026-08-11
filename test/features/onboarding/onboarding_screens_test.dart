@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:aster/features/onboarding/presentation/screens/screens.dart';
 import 'package:aster/features/onboarding/presentation/view_model/view_models.dart';
@@ -27,7 +28,16 @@ void main() {
     await tester.enterText(first, 'ABANDON1');
     await tester.pump();
     expect(tester.widget<TextField>(first).controller!.text, 'abandon');
-    expect(find.bySemanticsLabel('Valid word'), findsOneWidget);
+    final firstFieldSemantics = tester
+        .getSemantics(find.bySemanticsLabel('Recovery word 1'))
+        .getSemanticsData();
+    expect(firstFieldSemantics.hint, 'valid word');
+    expect(firstFieldSemantics.hasAction(ui.SemanticsAction.tap), isTrue);
+    expect(firstFieldSemantics.hasAction(ui.SemanticsAction.setText), isTrue);
+    expect(
+      find.bySemanticsLabel(RegExp(r'^Recovery word \d+$')),
+      findsNWidgets(4),
+    );
 
     for (var index = 1; index < 4; index += 1) {
       await tester.enterText(
@@ -110,6 +120,10 @@ void main() {
 
     final twelfth = find.byKey(const ValueKey('recovery-word-12'));
     expect(tester.widget<TextField>(twelfth).controller?.text, 'about');
+    expect(
+      tester.widget<TextField>(twelfth).textInputAction,
+      TextInputAction.done,
+    );
     expect(
       tester.widget<TextField>(twelfth).focusNode?.hasPrimaryFocus,
       isTrue,

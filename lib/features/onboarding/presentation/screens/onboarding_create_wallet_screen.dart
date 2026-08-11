@@ -41,7 +41,7 @@ class OnboardingCreateWalletScreen extends ConsumerWidget {
                     primaryLabel: 'Retry',
                     onPrimary: () =>
                         ref.invalidate(createWalletViewModelProvider),
-                    onBack: context.pop,
+                    onBack: () => _returnToWelcome(context),
                   ),
                 _ => const OnboardingStatusPanel.loading(
                   message: 'Generating your recovery phrase...',
@@ -141,7 +141,7 @@ class _CreateWalletContent extends ConsumerWidget {
                 OnboardingTextAction(
                   label: 'Back',
                   enabled: !state.submitting,
-                  onPressed: context.pop,
+                  onPressed: () => _returnToWelcome(context),
                 ),
               ],
             ),
@@ -170,5 +170,13 @@ class _CreateWalletContent extends ConsumerWidget {
           variant: ToastVariant.failure,
         );
     }
+  }
+}
+
+void _returnToWelcome(BuildContext context) {
+  if (context.canPop()) {
+    context.pop();
+  } else {
+    context.go(RoutePaths.onboardingWelcome);
   }
 }

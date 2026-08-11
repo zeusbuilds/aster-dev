@@ -16,6 +16,7 @@ class OnboardingImportWalletWordPage extends StatelessWidget {
     required this.startIndex,
     required this.fieldHeight,
     required this.enabled,
+    required this.canSubmit,
     required this.onChanged,
     required this.onSubmitted,
   }) : assert(controllers.length == ImportWalletState.wordsPerPage),
@@ -29,6 +30,7 @@ class OnboardingImportWalletWordPage extends StatelessWidget {
   final int startIndex;
   final double fieldHeight;
   final bool enabled;
+  final bool canSubmit;
   final void Function(int index, String value) onChanged;
   final ValueChanged<int> onSubmitted;
 
@@ -54,6 +56,7 @@ class OnboardingImportWalletWordPage extends StatelessWidget {
               status: statuses[offset],
               height: fieldHeight,
               enabled: enabled,
+              canSubmit: canSubmit,
               onChanged: (value) => onChanged(index, value),
               onSubmitted: () => onSubmitted(index),
             ),
@@ -72,6 +75,7 @@ class _RecoveryWordField extends StatelessWidget {
     required this.status,
     required this.height,
     required this.enabled,
+    required this.canSubmit,
     required this.onChanged,
     required this.onSubmitted,
   });
@@ -82,6 +86,7 @@ class _RecoveryWordField extends StatelessWidget {
   final MnemonicWordStatus status;
   final double height;
   final bool enabled;
+  final bool canSubmit;
   final ValueChanged<String> onChanged;
   final VoidCallback onSubmitted;
 
@@ -117,71 +122,78 @@ class _RecoveryWordField extends StatelessWidget {
       ),
     );
 
-    return Semantics(
-      label: 'Recovery word ${index + 1}',
-      value: statusDescription,
-      textField: true,
-      child: SizedBox(
-        height: height,
-        child: TextField(
-          key: ValueKey('recovery-word-${index + 1}'),
-          controller: controller,
-          focusNode: focusNode,
-          readOnly: !enabled,
-          autocorrect: false,
-          enableSuggestions: false,
-          enableIMEPersonalizedLearning: false,
-          smartDashesType: SmartDashesType.disabled,
-          smartQuotesType: SmartQuotesType.disabled,
-          textCapitalization: TextCapitalization.none,
-          textInputAction: index == ImportWalletState.wordCount - 1
-              ? TextInputAction.done
-              : TextInputAction.next,
-          keyboardType: TextInputType.text,
-          inputFormatters: const [_RecoveryPhraseInputFormatter()],
-          style: context.type.assetValue.copyWith(color: colors.onBrandArt),
-          cursorColor: colors.onBrandArt,
-          decoration: InputDecoration(
-            constraints: BoxConstraints(minHeight: height),
-            filled: true,
-            fillColor: context.colorScheme.surface.withValues(
-              alpha: effects.brandGlassSurfaceOpacity,
+    return MergeSemantics(
+      child: Semantics(
+        container: true,
+        label: 'Recovery word ${index + 1}',
+        hint: statusDescription,
+        child: SizedBox(
+          height: height,
+          child: TextField(
+            key: ValueKey('recovery-word-${index + 1}'),
+            controller: controller,
+            focusNode: focusNode,
+            readOnly: !enabled,
+            autocorrect: false,
+            enableSuggestions: false,
+            enableIMEPersonalizedLearning: false,
+            smartDashesType: SmartDashesType.disabled,
+            smartQuotesType: SmartQuotesType.disabled,
+            textCapitalization: TextCapitalization.none,
+            textInputAction:
+                index == ImportWalletState.wordCount - 1 && canSubmit
+                ? TextInputAction.done
+                : TextInputAction.next,
+            keyboardType: TextInputType.text,
+            inputFormatters: const [_RecoveryPhraseInputFormatter()],
+            style: context.type.assetValue.copyWith(color: colors.onBrandArt),
+            cursorColor: colors.onBrandArt,
+            decoration: InputDecoration(
+              constraints: BoxConstraints(minHeight: height),
+              filled: true,
+              fillColor: context.colorScheme.surface.withValues(
+                alpha: effects.brandGlassSurfaceOpacity,
+              ),
+              prefixIcon: ExcludeSemantics(
+                child: Center(
+                  widthFactor: 1,
+                  child: Text(
+                    '${index + 1}.',
+                    style: context.type.assetMeta
+                        .copyWith(
+                          color: colors.onBrandArt.withValues(
+                            alpha: effects.brandContentMutedOpacity,
+                          ),
+                        )
+                        .toNumeric(context),
+                  ),
+                ),
+              ),
+              suffixIcon: switch (status) {
+                MnemonicWordStatus.empty => null,
+                MnemonicWordStatus.valid => ExcludeSemantics(
+                  child: Icon(
+                    MingCuteIcons.mgc_check_fill,
+                    size: context.icons.sm,
+                    color: colors.success,
+                  ),
+                ),
+                MnemonicWordStatus.invalid => ExcludeSemantics(
+                  child: Icon(
+                    MingCuteIcons.mgc_close_fill,
+                    size: context.icons.sm,
+                    color: colors.danger,
+                  ),
+                ),
+              },
+              border: border,
+              enabledBorder: border,
+              disabledBorder: border,
+              focusedBorder: focusedBorder,
             ),
-            prefixIcon: Center(
-              widthFactor: 1,
-              child: Text(
-                '${index + 1}.',
-                style: context.type.assetMeta
-                    .copyWith(
-                      color: colors.onBrandArt.withValues(
-                        alpha: effects.brandContentMutedOpacity,
-                      ),
-                    )
-                    .toNumeric(context),
-              ),
-            ),
-            suffixIcon: switch (status) {
-              MnemonicWordStatus.empty => null,
-              MnemonicWordStatus.valid => Icon(
-                MingCuteIcons.mgc_check_fill,
-                semanticLabel: 'Valid word',
-                size: context.icons.sm,
-                color: colors.success,
-              ),
-              MnemonicWordStatus.invalid => Icon(
-                MingCuteIcons.mgc_close_fill,
-                semanticLabel: 'Word not found',
-                size: context.icons.sm,
-                color: colors.danger,
-              ),
-            },
-            border: border,
-            enabledBorder: border,
-            disabledBorder: border,
-            focusedBorder: focusedBorder,
+            onChanged: onChanged,
+            onSubmitted: (_) => onSubmitted(),
           ),
-          onChanged: onChanged,
-          onSubmitted: (_) => onSubmitted(),
         ),
       ),
     );

@@ -29,7 +29,7 @@ void main() {
       final notifier = harness.container.read(
         importWalletViewModelProvider.notifier,
       );
-      notifier.updateWord(0, 'ABANDON');
+      notifier.updateWord(0, 'ABAN-DON123');
       expect(
         harness.container
             .read(importWalletViewModelProvider)
@@ -45,6 +45,11 @@ void main() {
             .value!
             .wordStatuses[1],
         MnemonicWordStatus.invalid,
+      );
+      notifier.updateWord(2, 'NOTA-WORD-THAT-IS-TOO-LONG');
+      expect(
+        harness.container.read(importWalletViewModelProvider).value!.words[2],
+        'notaword',
       );
 
       for (var index = 0; index < validTestMnemonicWords.length; index += 1) {

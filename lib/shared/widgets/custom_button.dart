@@ -120,6 +120,7 @@ class _CustomButtonState extends State<CustomButton> {
       label: widget.text,
       value: widget.loading ? 'Loading' : null,
       liveRegion: widget.loading,
+      onTap: isEnabled ? activate : null,
       excludeSemantics: true,
       child: Opacity(
         opacity: opacity,

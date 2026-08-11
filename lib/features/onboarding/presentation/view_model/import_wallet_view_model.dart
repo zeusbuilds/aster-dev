@@ -15,6 +15,8 @@ part 'import_wallet_view_model.g.dart';
 /// Owns route-scoped import input, SDK checksum validation, and provisioning.
 @riverpod
 class ImportWalletViewModel extends _$ImportWalletViewModel {
+  static final _nonLetters = RegExp('[^a-z]');
+
   late Bip39WordList _wordList;
   var _validationRevision = 0;
 
@@ -60,7 +62,7 @@ class ImportWalletViewModel extends _$ImportWalletViewModel {
       offset += 1
     ) {
       final index = startIndex + offset;
-      final normalized = inputs[offset].trim().toLowerCase();
+      final normalized = _normalizeWord(inputs[offset]);
       final status = switch (normalized) {
         '' => MnemonicWordStatus.empty,
         _ when _wordList.contains(normalized) => MnemonicWordStatus.valid,
@@ -83,6 +85,14 @@ class ImportWalletViewModel extends _$ImportWalletViewModel {
     if (next.allWordsKnown) {
       unawaited(_validateChecksum(next.mnemonic, revision));
     }
+  }
+
+  static String _normalizeWord(String input) {
+    final letters = input.trim().toLowerCase().replaceAll(_nonLetters, '');
+    if (letters.length <= ImportWalletState.maximumWordCharacters) {
+      return letters;
+    }
+    return letters.substring(0, ImportWalletState.maximumWordCharacters);
   }
 
   /// Provisions only after every word and the SDK checksum are valid.

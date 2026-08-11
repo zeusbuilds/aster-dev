@@ -61,11 +61,27 @@ class PriceCard extends ConsumerWidget {
                     ),
                   ),
                   SizedBox(width: spacing.xs),
-                  Text('Bitcoin Price', style: type.brandTitle),
-                  const Spacer(),
-                  NumericText(
-                    _formatUsd(snapshot?.currentUsdCents),
-                    style: type.brandAmount,
+                  Flexible(
+                    flex: 3,
+                    child: Text(
+                      'Bitcoin Price',
+                      style: type.brandTitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  SizedBox(width: spacing.md),
+                  Expanded(
+                    flex: 4,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerRight,
+                      child: NumericText(
+                        _formatUsd(snapshot?.currentUsdCents),
+                        style: type.brandAmount,
+                        maxLines: 1,
+                      ),
+                    ),
                   ),
                 ],
               ),

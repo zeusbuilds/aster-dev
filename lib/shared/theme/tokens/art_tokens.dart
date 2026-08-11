@@ -14,8 +14,11 @@ class AsterArt extends ThemeExtension<AsterArt> {
     this.brandMeshBlurSigma = 20,
     this.onboardingIconRows = 4,
     this.onboardingIconColumns = 7,
+    this.onboardingIconHighlightRow = 1,
+    this.onboardingIconHighlightColumn = 3,
     this.onboardingIconGridGap = 6,
     this.onboardingIconBlurSigma = 14,
+    this.onboardingIndicatorExpansionFactor = 4,
     this.splashLineInitialHeight = 8.5,
     this.splashLineMaximumHeight = 50,
     this.splashLineGapExtent = 1.3,
@@ -32,8 +35,11 @@ class AsterArt extends ThemeExtension<AsterArt> {
   final double brandMeshBlurSigma;
   final int onboardingIconRows;
   final int onboardingIconColumns;
+  final int onboardingIconHighlightRow;
+  final int onboardingIconHighlightColumn;
   final double onboardingIconGridGap;
   final double onboardingIconBlurSigma;
+  final double onboardingIndicatorExpansionFactor;
   final double splashLineInitialHeight;
   final double splashLineMaximumHeight;
   final double splashLineGapExtent;
@@ -51,8 +57,11 @@ class AsterArt extends ThemeExtension<AsterArt> {
     double? brandMeshBlurSigma,
     int? onboardingIconRows,
     int? onboardingIconColumns,
+    int? onboardingIconHighlightRow,
+    int? onboardingIconHighlightColumn,
     double? onboardingIconGridGap,
     double? onboardingIconBlurSigma,
+    double? onboardingIndicatorExpansionFactor,
     double? splashLineInitialHeight,
     double? splashLineMaximumHeight,
     double? splashLineGapExtent,
@@ -71,10 +80,17 @@ class AsterArt extends ThemeExtension<AsterArt> {
       onboardingIconRows: onboardingIconRows ?? this.onboardingIconRows,
       onboardingIconColumns:
           onboardingIconColumns ?? this.onboardingIconColumns,
+      onboardingIconHighlightRow:
+          onboardingIconHighlightRow ?? this.onboardingIconHighlightRow,
+      onboardingIconHighlightColumn:
+          onboardingIconHighlightColumn ?? this.onboardingIconHighlightColumn,
       onboardingIconGridGap:
           onboardingIconGridGap ?? this.onboardingIconGridGap,
       onboardingIconBlurSigma:
           onboardingIconBlurSigma ?? this.onboardingIconBlurSigma,
+      onboardingIndicatorExpansionFactor:
+          onboardingIndicatorExpansionFactor ??
+          this.onboardingIndicatorExpansionFactor,
       splashLineInitialHeight:
           splashLineInitialHeight ?? this.splashLineInitialHeight,
       splashLineMaximumHeight:
@@ -122,6 +138,16 @@ class AsterArt extends ThemeExtension<AsterArt> {
         other.onboardingIconColumns,
         t,
       ),
+      onboardingIconHighlightRow: _lerpInt(
+        onboardingIconHighlightRow,
+        other.onboardingIconHighlightRow,
+        t,
+      ),
+      onboardingIconHighlightColumn: _lerpInt(
+        onboardingIconHighlightColumn,
+        other.onboardingIconHighlightColumn,
+        t,
+      ),
       onboardingIconGridGap: _lerp(
         onboardingIconGridGap,
         other.onboardingIconGridGap,
@@ -130,6 +156,11 @@ class AsterArt extends ThemeExtension<AsterArt> {
       onboardingIconBlurSigma: _lerp(
         onboardingIconBlurSigma,
         other.onboardingIconBlurSigma,
+        t,
+      ),
+      onboardingIndicatorExpansionFactor: _lerp(
+        onboardingIndicatorExpansionFactor,
+        other.onboardingIndicatorExpansionFactor,
         t,
       ),
       splashLineInitialHeight: _lerp(

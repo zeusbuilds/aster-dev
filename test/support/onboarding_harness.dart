@@ -60,6 +60,7 @@ final class OnboardingTestHarness {
   static Future<OnboardingTestHarness> create({
     Object? validationError,
     Completer<void>? clipboardWriteGate,
+    ResilientHttpClient? httpClient,
   }) async {
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
@@ -99,6 +100,7 @@ final class OnboardingTestHarness {
     final haptics = RecordingHapticFeedbackService();
     final toasts = RecordingToastPresentationService();
     final container = ProviderContainer(
+      retry: (retryCount, error) => null,
       overrides: [
         walletRepositoryProvider.overrideWith((ref) async => repository),
         bip39WordListRepositoryProvider.overrideWithValue(
@@ -106,6 +108,8 @@ final class OnboardingTestHarness {
         ),
         sensitiveClipboardServiceProvider.overrideWithValue(clipboard),
         hapticFeedbackServiceProvider.overrideWithValue(haptics),
+        if (httpClient != null)
+          resilientHttpClientProvider.overrideWithValue(httpClient),
       ],
     );
     return OnboardingTestHarness._(

@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:aster/features/skeleton/presentation/widgets/bottom_nav.dart';
 import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
@@ -103,6 +105,13 @@ void main() {
       ),
     );
     expect(tester.getSize(find.byType(CustomButton)).height, 48);
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('Continue'))
+          .getSemanticsData()
+          .hasAction(ui.SemanticsAction.tap),
+      isTrue,
+    );
     await tester.tap(find.byType(CustomButton));
     await tester.pump();
     expect(activations, 1);
@@ -123,6 +132,13 @@ void main() {
     expect(activations, 1);
     expect(haptics.intents, [HapticIntent.commit]);
     expect(find.bySemanticsLabel('Continue'), findsOneWidget);
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('Continue'))
+          .getSemanticsData()
+          .hasAction(ui.SemanticsAction.tap),
+      isFalse,
+    );
   });
 
   testWidgets('button activation is keyboard operable', (tester) async {

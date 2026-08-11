@@ -12,20 +12,21 @@ class OnboardingWelcomeIconGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final art = context.art;
+    final effects = context.effects;
     final rows = art.onboardingIconRows;
     final cols = art.onboardingIconColumns;
     final total = rows * cols;
 
-    // Center highlight tile (3rd from left, 2nd row).
-    const centerRow = 1;
-    const centerCol = 3;
-    final centerIndex = centerRow * cols + centerCol;
-    // Per-tile opacities, row order: top → bottom, col order: left → right.
-    const tileOpacities = <List<double>>[
-      [0.30, 0.05, 0.30, 0.30, 0.30, 0.30, 0.05],
-      [0.30, 0.30, 0.05, 0.30, 0.05, 0.30, 0.30],
-      [0.05, 0.30, 0.05, 0.30, 0.30, 0.05, 0.30],
-      [0.30, 0.05, 0.30, 0.30, 0.05, 0.30, 0.05],
+    final centerIndex =
+        art.onboardingIconHighlightRow * cols +
+        art.onboardingIconHighlightColumn;
+    // Authored tile composition in row-major order. Visual effect values stay
+    // in the semantic effects system.
+    const faintTiles = <List<bool>>[
+      [false, true, false, false, false, false, true],
+      [false, false, true, false, true, false, false],
+      [true, false, true, false, false, true, false],
+      [false, true, false, false, true, false, true],
     ];
 
     return AspectRatio(
@@ -45,9 +46,14 @@ class OnboardingWelcomeIconGrid extends StatelessWidget {
 
           final row = index ~/ cols;
           final col = index % cols;
-          final opacity = tileOpacities[row][col];
+          final faint = faintTiles[row][col];
 
-          return _BlurTile(opacity: opacity);
+          return _BlurTile(
+            opacity: faint
+                ? effects.onboardingIconTileFaintOpacity
+                : effects.onboardingIconTileStrongOpacity,
+            outlined: faint,
+          );
         },
       ),
     );
@@ -75,9 +81,10 @@ class _CenterTile extends StatelessWidget {
 }
 
 class _BlurTile extends StatelessWidget {
-  const _BlurTile({required this.opacity});
+  const _BlurTile({required this.opacity, required this.outlined});
 
   final double opacity;
+  final bool outlined;
 
   @override
   Widget build(BuildContext context) {
@@ -86,16 +93,15 @@ class _BlurTile extends StatelessWidget {
     final effects = context.effects;
     final art = context.art;
     final strokes = context.strokes;
-    final hasBorder = (opacity - 0.05).abs() < 0.001;
 
     return Squircle(
       borderRadius: radius.xs,
-      borderColor: hasBorder
+      borderColor: outlined
           ? context.colorScheme.surface.withValues(
               alpha: effects.brandGlassBorderOpacity,
             )
           : colors.transparentSurface,
-      borderWidth: hasBorder ? strokes.hairline : 0,
+      borderWidth: outlined ? strokes.hairline : 0,
       color: context.colorScheme.surface.withValues(alpha: opacity),
       padding: EdgeInsets.zero,
       backdropFilter: ImageFilter.blur(

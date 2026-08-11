@@ -11,6 +11,8 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
     this.brandIndicatorInactiveOpacity = 0.35,
     this.brandGlassSurfaceOpacity = 0.15,
     this.brandGlassBorderOpacity = 0.1,
+    this.onboardingIconTileStrongOpacity = 0.3,
+    this.onboardingIconTileFaintOpacity = 0.05,
     this.bitcoinIconOpacity = 0.8,
     this.scanScrimStrongOpacity = 0.75,
     this.scanScrimMediumOpacity = 0.65,
@@ -39,6 +41,8 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
   final double brandIndicatorInactiveOpacity;
   final double brandGlassSurfaceOpacity;
   final double brandGlassBorderOpacity;
+  final double onboardingIconTileStrongOpacity;
+  final double onboardingIconTileFaintOpacity;
   final double bitcoinIconOpacity;
   final double scanScrimStrongOpacity;
   final double scanScrimMediumOpacity;
@@ -68,6 +72,8 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
     double? brandIndicatorInactiveOpacity,
     double? brandGlassSurfaceOpacity,
     double? brandGlassBorderOpacity,
+    double? onboardingIconTileStrongOpacity,
+    double? onboardingIconTileFaintOpacity,
     double? bitcoinIconOpacity,
     double? scanScrimStrongOpacity,
     double? scanScrimMediumOpacity,
@@ -102,6 +108,11 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
           brandGlassSurfaceOpacity ?? this.brandGlassSurfaceOpacity,
       brandGlassBorderOpacity:
           brandGlassBorderOpacity ?? this.brandGlassBorderOpacity,
+      onboardingIconTileStrongOpacity:
+          onboardingIconTileStrongOpacity ??
+          this.onboardingIconTileStrongOpacity,
+      onboardingIconTileFaintOpacity:
+          onboardingIconTileFaintOpacity ?? this.onboardingIconTileFaintOpacity,
       bitcoinIconOpacity: bitcoinIconOpacity ?? this.bitcoinIconOpacity,
       scanScrimStrongOpacity:
           scanScrimStrongOpacity ?? this.scanScrimStrongOpacity,
@@ -171,6 +182,16 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
       brandGlassBorderOpacity: _lerp(
         brandGlassBorderOpacity,
         other.brandGlassBorderOpacity,
+        t,
+      ),
+      onboardingIconTileStrongOpacity: _lerp(
+        onboardingIconTileStrongOpacity,
+        other.onboardingIconTileStrongOpacity,
+        t,
+      ),
+      onboardingIconTileFaintOpacity: _lerp(
+        onboardingIconTileFaintOpacity,
+        other.onboardingIconTileFaintOpacity,
         t,
       ),
       bitcoinIconOpacity: _lerp(
