@@ -71,7 +71,7 @@ WalletServiceConfiguration walletServiceConfiguration(Ref ref) {
 @riverpod
 WalletEngineFactory walletEngineFactory(Ref ref) {
   return RgbWalletEngineFactory.withAddresses(
-    ref.watch(bitcoinDestinationDecoderProvider),
+    ref.watch(bitcoinPaymentInstructionDecoderProvider),
   );
 }
 
@@ -86,8 +86,8 @@ WalletIdentityGenerator walletIdentityGenerator(Ref ref) {
 }
 
 @riverpod
-BitcoinDestinationDecoder bitcoinDestinationDecoder(Ref ref) {
-  return const BitcoinDestinationParser();
+BitcoinPaymentInstructionDecoder bitcoinPaymentInstructionDecoder(Ref ref) {
+  return const BitcoinPaymentInstructionParser();
 }
 
 @riverpod
@@ -173,6 +173,6 @@ Future<WalletRepository> walletRepository(Ref ref) async {
     identityGenerator,
     services,
     legacySeedPreflight,
-    bitcoinDestinations: ref.watch(bitcoinDestinationDecoderProvider),
+    bitcoinInstructions: ref.watch(bitcoinPaymentInstructionDecoderProvider),
   );
 }

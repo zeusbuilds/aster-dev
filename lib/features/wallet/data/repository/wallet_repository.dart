@@ -20,7 +20,7 @@ final class WalletRepository {
     this._identityGenerator,
     this._services,
     this._legacySeedPreflight, {
-    this._bitcoinDestinations = const BitcoinDestinationParser(),
+    this._bitcoinInstructions = const BitcoinPaymentInstructionParser(),
     DateTime Function()? clock,
   }) : _clock = clock ?? _utcNow {
     _services.validate();
@@ -32,7 +32,7 @@ final class WalletRepository {
   final WalletIdentityGenerator _identityGenerator;
   final WalletServiceConfiguration _services;
   final LegacyWalletSeedPreflight _legacySeedPreflight;
-  final BitcoinDestinationDecoder _bitcoinDestinations;
+  final BitcoinPaymentInstructionDecoder _bitcoinInstructions;
   final DateTime Function() _clock;
   Future<void> _operationTail = Future<void>.value();
 
@@ -524,7 +524,7 @@ final class WalletRepository {
     }
     final route = (routeResult as AppSuccess<PaymentRoute>).value;
     if (target == WalletPaymentTarget.bitcoinOnchain) {
-      final parsed = _bitcoinDestinations.decode(
+      final parsed = _bitcoinInstructions.decodeOnchain(
         destination,
         _services.environment,
       );
@@ -541,6 +541,33 @@ final class WalletRepository {
         ),
         AppFailureResult<BitcoinDestination>(:final failure) =>
           AppResult.failure(failure),
+      });
+    }
+    if (target == WalletPaymentTarget.bitcoinLightning) {
+      final parsed = _bitcoinInstructions.extractLightning(destination);
+      if (parsed case AppFailureResult<BitcoinLightningInstruction>(
+        :final failure,
+      )) {
+        return Future<AppResult<WalletPaymentPreview>>.value(
+          AppResult.failure(failure),
+        );
+      }
+      final instruction =
+          (parsed as AppSuccess<BitcoinLightningInstruction>).value;
+      return _enqueueOperation(() async {
+        final decoded = await _runtime.run(
+          (engine) => engine.decodeInvoice(route, instruction.invoice),
+        );
+        return switch (decoded) {
+          AppSuccess<WalletPaymentPreview>(:final value) => AppResult.success(
+            value.withDisplayMetadata(
+              recipientLabel: instruction.recipientLabel,
+              message: instruction.message,
+            ),
+          ),
+          AppFailureResult<WalletPaymentPreview>(:final failure) =>
+            AppResult.failure(failure),
+        };
       });
     }
     if (!_isValidPaymentString(destination)) {
@@ -615,7 +642,7 @@ final class WalletRepository {
     }
     final String submissionDestination;
     if (target == WalletPaymentTarget.bitcoinOnchain) {
-      final parsed = _bitcoinDestinations.decode(
+      final parsed = _bitcoinInstructions.decodeOnchain(
         destination,
         _services.environment,
       );
@@ -633,6 +660,17 @@ final class WalletRepository {
         );
       }
       submissionDestination = bitcoinDestination.address;
+    } else if (target == WalletPaymentTarget.bitcoinLightning) {
+      final parsed = _bitcoinInstructions.extractLightning(destination);
+      if (parsed case AppFailureResult<BitcoinLightningInstruction>(
+        :final failure,
+      )) {
+        return Future<AppResult<WalletSendResult>>.value(
+          AppResult.failure(failure),
+        );
+      }
+      submissionDestination =
+          (parsed as AppSuccess<BitcoinLightningInstruction>).value.invoice;
     } else {
       if (!_isValidPaymentString(destination)) {
         return Future<AppResult<WalletSendResult>>.value(

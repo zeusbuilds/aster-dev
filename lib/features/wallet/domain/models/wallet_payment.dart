@@ -56,6 +56,23 @@ final class WalletPaymentPreview {
     return expiry != null && !now.toUtc().isBefore(expiry);
   }
 
+  /// Adds safe URI display metadata without retaining the original URI.
+  WalletPaymentPreview withDisplayMetadata({
+    String? recipientLabel,
+    String? message,
+  }) {
+    return WalletPaymentPreview(
+      route: route,
+      encodedDestination: encodedDestination,
+      displayDestination: displayDestination,
+      amount: amount,
+      expiresAt: expiresAt,
+      referenceId: referenceId,
+      recipientLabel: recipientLabel ?? this.recipientLabel,
+      message: message ?? this.message,
+    );
+  }
+
   @override
   String toString() => 'WalletPaymentPreview(${route.target.slug})';
 

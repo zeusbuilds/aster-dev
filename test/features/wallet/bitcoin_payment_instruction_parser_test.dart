@@ -7,7 +7,7 @@ import 'package:dart_bech32/dart_bech32.dart' as bech32_codec;
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  const parser = BitcoinDestinationParser();
+  const parser = BitcoinPaymentInstructionParser();
 
   test('accepts official BIP173 and BIP350 witness vectors', () {
     const mainnetVectors = <String>[
@@ -25,14 +25,14 @@ void main() {
 
     for (final address in mainnetVectors) {
       final destination = _success(
-        parser.decode(address, BlockchainEnvironment.mainnet),
+        parser.decodeOnchain(address, BlockchainEnvironment.mainnet),
       );
       expect(destination.address, address.toLowerCase());
       expect(destination.wasUri, isFalse);
     }
     for (final address in testnetVectors) {
       expect(
-        parser.decode(address, BlockchainEnvironment.signet),
+        parser.decodeOnchain(address, BlockchainEnvironment.signet),
         isA<AppSuccess<BitcoinDestination>>(),
       );
     }
@@ -56,7 +56,10 @@ void main() {
     ];
 
     for (final address in vectors) {
-      final result = parser.decode(address, BlockchainEnvironment.mainnet);
+      final result = parser.decodeOnchain(
+        address,
+        BlockchainEnvironment.mainnet,
+      );
       expect(result, isA<AppFailureResult<BitcoinDestination>>());
     }
   });
@@ -76,16 +79,18 @@ void main() {
       isNull,
     );
     expect(
-      parser.decode(regtestAddress, BlockchainEnvironment.regtest),
+      parser.decodeOnchain(regtestAddress, BlockchainEnvironment.regtest),
       isA<AppSuccess<BitcoinDestination>>(),
     );
     expect(
-      _failureCode(parser.decode(regtestAddress, BlockchainEnvironment.signet)),
+      _failureCode(
+        parser.decodeOnchain(regtestAddress, BlockchainEnvironment.signet),
+      ),
       'bitcoin_destination_network_mismatch',
     );
     expect(
       _failureCode(
-        parser.decode(
+        parser.decodeOnchain(
           'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4',
           BlockchainEnvironment.regtest,
         ),
@@ -106,27 +111,29 @@ void main() {
 
     for (final address in mainnet) {
       expect(
-        parser.decode(address, BlockchainEnvironment.mainnet),
+        parser.decodeOnchain(address, BlockchainEnvironment.mainnet),
         isA<AppSuccess<BitcoinDestination>>(),
       );
       expect(
-        _failureCode(parser.decode(address, BlockchainEnvironment.regtest)),
+        _failureCode(
+          parser.decodeOnchain(address, BlockchainEnvironment.regtest),
+        ),
         'bitcoin_destination_network_mismatch',
       );
     }
     for (final address in testnet) {
       expect(
-        parser.decode(address, BlockchainEnvironment.signet),
+        parser.decodeOnchain(address, BlockchainEnvironment.signet),
         isA<AppSuccess<BitcoinDestination>>(),
       );
       expect(
-        parser.decode(address, BlockchainEnvironment.regtest),
+        parser.decodeOnchain(address, BlockchainEnvironment.regtest),
         isA<AppSuccess<BitcoinDestination>>(),
       );
     }
     expect(
       _failureCode(
-        parser.decode(
+        parser.decodeOnchain(
           '1BoatSLRHtKNngkdXEeobR76b53LETtpyU',
           BlockchainEnvironment.mainnet,
         ),
@@ -138,7 +145,7 @@ void main() {
   test('parses BIP321 metadata and amount with exact integer arithmetic', () {
     const address = '1BoatSLRHtKNngkdXEeobR76b53LETtpyT';
     final destination = _success(
-      parser.decode(
+      parser.decodeOnchain(
         'BITCOIN:$address?AMOUNT=20.3&LABEL=Luke-Jr&'
         'MESSAGE=Donation%20for%20UTEXO&lightning=lnbc1ignored',
         BlockchainEnvironment.mainnet,
@@ -154,7 +161,7 @@ void main() {
     expect(destination.toString(), isNot(contains(address)));
 
     final blankMetadata = _success(
-      parser.decode(
+      parser.decodeOnchain(
         'bitcoin:$address?label=&message=',
         BlockchainEnvironment.mainnet,
       ),
@@ -164,7 +171,7 @@ void main() {
   });
 
   test('accepts unknown optional instructions with an onchain fallback', () {
-    final result = parser.decode(
+    final result = parser.decodeOnchain(
       'bitcoin:1BoatSLRHtKNngkdXEeobR76b53LETtpyT?future=a&future=b',
       BlockchainEnvironment.mainnet,
     );
@@ -172,12 +179,99 @@ void main() {
     expect(result, isA<AppSuccess<BitcoinDestination>>());
   });
 
+  test('resolves modern onchain instructions without a fallback address', () {
+    const first =
+        'tb1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3q0sl5k7';
+    const second =
+        'tb1pqqqqp399et2xygdj5xreqhjjvcmzhxw4aywxecjdzew6hylgvsesf3hn0c';
+    final resolved = _success(
+      parser.decodeOnchain(
+        'BITCOIN:?TB=$first&tb=$second&label=Merchant',
+        BlockchainEnvironment.signet,
+      ),
+    );
+
+    expect(resolved.address, first);
+    expect(resolved.recipientLabel, 'Merchant');
+    expect(resolved.wasUri, isTrue);
+    expect(
+      _failureCode(
+        parser.decodeOnchain(
+          'bitcoin:?bc=$first',
+          BlockchainEnvironment.signet,
+        ),
+      ),
+      'bitcoin_destination_network_mismatch',
+    );
+    expect(
+      _failureCode(
+        parser.decodeOnchain(
+          'bitcoin:?label=Merchant',
+          BlockchainEnvironment.signet,
+        ),
+      ),
+      'bitcoin_destination_invalid',
+    );
+  });
+
+  test(
+    'extracts the selected BOLT11 instruction without retaining its URI',
+    () {
+      final direct = _lightningSuccess(
+        parser.extractLightning('lnbcrt1direct'),
+      );
+      final embedded = _lightningSuccess(
+        parser.extractLightning(
+          'BITCOIN:?LIGHTNING=lnbcrt1embedded&label=Merchant&'
+          'message=Order%20123',
+        ),
+      );
+
+      expect(direct.invoice, 'lnbcrt1direct');
+      expect(direct.wasUri, isFalse);
+      expect(embedded.invoice, 'lnbcrt1embedded');
+      expect(embedded.recipientLabel, 'Merchant');
+      expect(embedded.message, 'Order 123');
+      expect(embedded.wasUri, isTrue);
+      expect(embedded.toString(), isNot(contains('lnbcrt1embedded')));
+    },
+  );
+
+  test('fails closed for missing, ambiguous, or required instructions', () {
+    expect(
+      _failureCode(parser.extractLightning('bitcoin:?lno=lno1offer')),
+      'bitcoin_lightning_instruction_missing',
+    );
+    expect(
+      _failureCode(
+        parser.extractLightning(
+          'bitcoin:?lightning=lnbcrt1first&lightning=lnbcrt1second',
+        ),
+      ),
+      'bitcoin_lightning_instruction_ambiguous',
+    );
+    expect(
+      _failureCode(
+        parser.extractLightning(
+          'bitcoin:?lightning=lnbcrt1invoice&req-pop=callback%3A',
+        ),
+      ),
+      'bitcoin_destination_instruction_unsupported',
+    );
+    expect(
+      _failureCode(
+        parser.extractLightning('bitcoin:?lightning=lnbcrt1invoice&amount=1.'),
+      ),
+      'bitcoin_destination_amount_invalid',
+    );
+  });
+
   test('rejects duplicate and unsupported required instructions', () {
     const address = '1BoatSLRHtKNngkdXEeobR76b53LETtpyT';
 
     expect(
       _failureCode(
-        parser.decode(
+        parser.decodeOnchain(
           'bitcoin:$address?amount=1&AMOUNT=1',
           BlockchainEnvironment.mainnet,
         ),
@@ -186,7 +280,7 @@ void main() {
     );
     expect(
       _failureCode(
-        parser.decode(
+        parser.decodeOnchain(
           'bitcoin:$address?req-pop=callback%3A',
           BlockchainEnvironment.mainnet,
         ),
@@ -195,7 +289,7 @@ void main() {
     );
     expect(
       _failureCode(
-        parser.decode(
+        parser.decodeOnchain(
           'bitcoin:?lightning=lnbc1invoice',
           BlockchainEnvironment.mainnet,
         ),
@@ -220,7 +314,7 @@ void main() {
     for (final amount in amounts) {
       expect(
         _failureCode(
-          parser.decode(
+          parser.decodeOnchain(
             'bitcoin:$address?amount=$amount',
             BlockchainEnvironment.mainnet,
           ),
@@ -229,7 +323,7 @@ void main() {
       );
     }
     final zero = _success(
-      parser.decode(
+      parser.decodeOnchain(
         'bitcoin:$address?amount=0.00000000',
         BlockchainEnvironment.mainnet,
       ),
@@ -249,21 +343,39 @@ void main() {
       'bitcoin:1BoatSLRHtKNngkdXEeobR76b53LETtpyT?label=Main%E2%81%A0Wallet',
       'bitcoin:1BoatSLRHtKNngkdXEeobR76b53LETtpyT?label=Main%EF%BB%BFWallet',
       'bitcoin:1BoatSLRHtKNngkdXEeobR76b53LETtpyT?label=a&&message=b',
+      'bitcoin:1BoatSLRHtKNngkdXEeobR76b53LETtpyT?',
+      'bitcoin:1BoatSLRHtKNngkdXEeobR76b53LETtpyT?label',
+      'bitcoin:1BoatSLRHtKNngkdXEeobR76b53LETtpyT?label=a=b',
+      'bitcoin:1BoatSLRHtKNngkdXEeobR76b53LETtpyT?label=Main Wallet',
+      'bitcoin:1BoatSLRHtKNngkdXEeobR76b53LETtpyT?label=Jos\u00e9',
     ];
 
     for (final value in values) {
       expect(
-        parser.decode(value, BlockchainEnvironment.mainnet),
+        parser.decodeOnchain(value, BlockchainEnvironment.mainnet),
         isA<AppFailureResult<BitcoinDestination>>(),
       );
     }
     expect(
-      parser.decode(
+      parser.decodeOnchain(
         'bitcoin:$address?label=${List<String>.filled(257, 'a').join()}',
         BlockchainEnvironment.mainnet,
       ),
       isA<AppFailureResult<BitcoinDestination>>(),
     );
+  });
+
+  test('decodes query values with RFC 3986 rather than form semantics', () {
+    const address = '1BoatSLRHtKNngkdXEeobR76b53LETtpyT';
+    final destination = _success(
+      parser.decodeOnchain(
+        'bitcoin:$address?label=C++&message=A%3DB%20for%20Jos%C3%A9',
+        BlockchainEnvironment.mainnet,
+      ),
+    );
+
+    expect(destination.recipientLabel, 'C++');
+    expect(destination.message, 'A=B for Jos\u00e9');
   });
 }
 
@@ -272,9 +384,16 @@ BitcoinDestination _success(AppResult<BitcoinDestination> result) {
   return (result as AppSuccess<BitcoinDestination>).value;
 }
 
-String _failureCode(AppResult<BitcoinDestination> result) {
-  expect(result, isA<AppFailureResult<BitcoinDestination>>());
-  return (result as AppFailureResult<BitcoinDestination>).failure.code;
+BitcoinLightningInstruction _lightningSuccess(
+  AppResult<BitcoinLightningInstruction> result,
+) {
+  expect(result, isA<AppSuccess<BitcoinLightningInstruction>>());
+  return (result as AppSuccess<BitcoinLightningInstruction>).value;
+}
+
+String _failureCode<T>(AppResult<T> result) {
+  expect(result, isA<AppFailureResult<T>>());
+  return (result as AppFailureResult<T>).failure.code;
 }
 
 String _regtestAddress() {

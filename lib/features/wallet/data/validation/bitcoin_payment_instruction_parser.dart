@@ -10,27 +10,33 @@ import '../../domain/models/models.dart';
 ///
 /// Returns `null` when [value] is malformed, has an invalid checksum, or belongs
 /// to another network. Payment URIs are deliberately outside this narrow
-/// contract and must be passed to [BitcoinDestinationDecoder.decode].
+/// contract and must be passed to
+/// [BitcoinPaymentInstructionDecoder.decodeOnchain].
 abstract interface class BitcoinAddressValidator {
   String? normalizeAddress(String value, BlockchainEnvironment environment);
 }
 
-/// Decodes Bitcoin addresses and modern `bitcoin:` payment instructions.
-abstract interface class BitcoinDestinationDecoder
+/// Resolves a selected Bitcoin payment rail from direct or BIP321 input.
+abstract interface class BitcoinPaymentInstructionDecoder
     implements BitcoinAddressValidator {
-  AppResult<BitcoinDestination> decode(
+  AppResult<BitcoinDestination> decodeOnchain(
     String value,
     BlockchainEnvironment environment,
   );
+
+  AppResult<BitcoinLightningInstruction> extractLightning(String value);
 }
 
-/// Checksum-validating BIP173, BIP350, and BIP321 destination parser.
+/// Checksum-validating BIP173, BIP350, and BIP321 instruction parser.
 ///
-/// The parser accepts the on-chain fallback address from BIP321. Optional
-/// payment instructions are ignored only when a valid fallback exists, while
-/// every unsupported `req-*` instruction fails closed.
-final class BitcoinDestinationParser implements BitcoinDestinationDecoder {
-  const BitcoinDestinationParser();
+/// The caller selects the rail before parsing, so this parser never switches
+/// rails based on URI contents. Repeated on-chain instructions are evaluated in
+/// sender order, while repeated Lightning invoices fail as ambiguous because
+/// the app has no invoice-choice UI. Every unsupported `req-*` instruction
+/// fails closed.
+final class BitcoinPaymentInstructionParser
+    implements BitcoinPaymentInstructionDecoder {
+  const BitcoinPaymentInstructionParser();
 
   static const _maximumInputLength = 8192;
   static const _maximumBitcoinSatoshis = 2100000000000000;
@@ -46,28 +52,27 @@ final class BitcoinDestinationParser implements BitcoinDestinationDecoder {
   }
 
   @override
-  AppResult<BitcoinDestination> decode(
+  AppResult<BitcoinDestination> decodeOnchain(
     String value,
     BlockchainEnvironment environment,
   ) {
-    if (value.isEmpty ||
-        value != value.trim() ||
-        value.length > _maximumInputLength ||
-        value.contains(RegExp(r'[\u0000-\u001f\u007f]'))) {
+    if (!_isValidInstructionInput(value)) {
       return AppResult.failure(_invalidDestination());
     }
 
     try {
-      final input = _parseInput(value);
-      final address = _validateAddress(input.address, environment);
-      final amount = _parseAmount(input.amount);
+      final uri = _parsePaymentUri(value);
+      final address = uri == null
+          ? _validateAddress(value, environment)
+          : _resolveOnchainAddress(uri, environment);
+      final amount = _parseAmount(uri?.singleValue('amount'));
       return AppResult.success(
         BitcoinDestination._(
           address: address,
-          wasUri: input.wasUri,
+          wasUri: uri != null,
           amount: amount,
-          recipientLabel: input.label,
-          message: input.message,
+          recipientLabel: _displayText(uri?.singleValue('label'), 256),
+          message: _displayText(uri?.singleValue('message'), 1024),
         ),
       );
     } on _DestinationRejection catch (rejection) {
@@ -75,10 +80,45 @@ final class BitcoinDestinationParser implements BitcoinDestinationDecoder {
     }
   }
 
-  static _DestinationInput _parseInput(String value) {
-    if (!value.toLowerCase().startsWith('bitcoin:')) {
-      return _DestinationInput(address: value, wasUri: false);
+  @override
+  AppResult<BitcoinLightningInstruction> extractLightning(String value) {
+    if (!_isValidInstructionInput(value)) {
+      return AppResult.failure(_invalidLightningInstruction());
     }
+
+    try {
+      final uri = _parsePaymentUri(value);
+      if (uri == null) {
+        return AppResult.success(
+          BitcoinLightningInstruction._(invoice: value, wasUri: false),
+        );
+      }
+      final invoices = uri.valuesFor('lightning');
+      if (invoices.isEmpty) {
+        throw _DestinationRejection(_missingLightningInstruction());
+      }
+      if (invoices.length != 1) {
+        throw _DestinationRejection(_ambiguousLightningInstruction());
+      }
+      final invoice = invoices.single;
+      if (!_isValidInstructionInput(invoice)) {
+        throw _DestinationRejection(_invalidLightningInstruction());
+      }
+      return AppResult.success(
+        BitcoinLightningInstruction._(
+          invoice: invoice,
+          wasUri: true,
+          recipientLabel: _displayText(uri.singleValue('label'), 256),
+          message: _displayText(uri.singleValue('message'), 1024),
+        ),
+      );
+    } on _DestinationRejection catch (rejection) {
+      return AppResult.failure(rejection.failure);
+    }
+  }
+
+  static _PaymentUri? _parsePaymentUri(String value) {
+    if (!value.toLowerCase().startsWith('bitcoin:')) return null;
 
     final uri = Uri.tryParse(value);
     if (uri == null ||
@@ -97,11 +137,12 @@ final class BitcoinDestinationParser implements BitcoinDestinationDecoder {
       throw _DestinationRejection(_invalidDestination());
     }
 
-    String? amount;
-    String? label;
-    String? message;
+    final values = <String, List<String>>{};
     final uniqueKeys = <String>{};
-    if (queryStart != -1 && queryStart + 1 < value.length) {
+    if (queryStart != -1 && queryStart + 1 == value.length) {
+      throw _DestinationRejection(_invalidDestination());
+    }
+    if (queryStart != -1) {
       final rawQuery = value.substring(queryStart + 1);
       for (final segment in rawQuery.split('&')) {
         if (segment.isEmpty) {
@@ -113,8 +154,11 @@ final class BitcoinDestinationParser implements BitcoinDestinationDecoder {
         final String key;
         final String decodedValue;
         try {
-          key = Uri.decodeQueryComponent(rawKey).toLowerCase();
-          decodedValue = Uri.decodeQueryComponent(rawValue);
+          // BIP321 follows RFC 3986, where `+` is data rather than HTML form
+          // whitespace. Splitting separators before decoding also preserves an
+          // encoded `=` while rejecting an unescaped second separator below.
+          key = Uri.decodeComponent(rawKey).toLowerCase();
+          decodedValue = Uri.decodeComponent(rawValue);
         } on FormatException {
           throw _DestinationRejection(_invalidDestination());
         }
@@ -126,41 +170,79 @@ final class BitcoinDestinationParser implements BitcoinDestinationDecoder {
         if (key.startsWith('req-')) {
           throw _DestinationRejection(_unsupportedRequiredInstruction());
         }
+        if ((equals == -1 && _requiresValueSeparator(key)) ||
+            rawValue.contains('=')) {
+          throw _DestinationRejection(_invalidDestination());
+        }
         if (_mustBeUnique(key) && !uniqueKeys.add(key)) {
           throw _DestinationRejection(_invalidDestination());
         }
-        switch (key) {
-          case 'amount':
-            amount = decodedValue;
-          case 'label':
-            label = _displayText(decodedValue, 256);
-          case 'message':
-            message = _displayText(decodedValue, 1024);
-        }
+        values.putIfAbsent(key, () => <String>[]).add(decodedValue);
       }
     }
-    if (rawAddress.isEmpty) {
-      throw _DestinationRejection(_missingOnchainFallback());
+    if (rawAddress.isEmpty && values.isEmpty) {
+      throw _DestinationRejection(_invalidDestination());
     }
-    return _DestinationInput(
-      address: rawAddress,
-      wasUri: true,
-      amount: amount,
-      label: label,
-      message: message,
-    );
+    final paymentUri = _PaymentUri(fallbackAddress: rawAddress, values: values);
+    if (rawAddress.isEmpty && !paymentUri.hasPaymentInstruction) {
+      throw _DestinationRejection(_invalidDestination());
+    }
+    _parseAmount(paymentUri.singleValue('amount'));
+    _displayText(paymentUri.singleValue('label'), 256);
+    _displayText(paymentUri.singleValue('message'), 1024);
+    return paymentUri;
   }
 
   static bool _mustBeUnique(String key) =>
       key == 'amount' || key == 'label' || key == 'message' || key == 'pop';
 
-  static String? _displayText(String value, int maximumLength) {
+  static bool _requiresValueSeparator(String key) =>
+      _standardInstructionKeys.contains(key) ||
+      _networkInstructionKeys.contains(key);
+
+  static String? _displayText(String? value, int maximumLength) {
+    if (value == null || value.isEmpty) return null;
     if (value != value.trim() ||
         value.length > maximumLength ||
         _unsafeDisplayCharacters.hasMatch(value)) {
       throw _DestinationRejection(_invalidDestination());
     }
-    return value.isEmpty ? null : value;
+    return value;
+  }
+
+  static bool _isValidInstructionInput(String value) =>
+      value.isNotEmpty &&
+      value == value.trim() &&
+      value.length <= _maximumInputLength &&
+      value.codeUnits.every((unit) => unit >= 0x21 && unit <= 0x7e);
+
+  static String _resolveOnchainAddress(
+    _PaymentUri uri,
+    BlockchainEnvironment environment,
+  ) {
+    if (uri.fallbackAddress.isNotEmpty) {
+      return _validateAddress(uri.fallbackAddress, environment);
+    }
+    final expectedKey = switch (environment) {
+      BlockchainEnvironment.mainnet => 'bc',
+      BlockchainEnvironment.signet => 'tb',
+      BlockchainEnvironment.regtest => 'bcrt',
+    };
+    final candidates = uri.valuesFor(expectedKey);
+    if (candidates.isEmpty) {
+      if (_networkInstructionKeys.any(uri.hasKey)) {
+        throw _DestinationRejection(_networkMismatch());
+      }
+      throw _DestinationRejection(_missingOnchainFallback());
+    }
+    final normalized = <String>[];
+    for (final candidate in candidates) {
+      if (!candidate.toLowerCase().startsWith('${expectedKey}1')) {
+        throw _DestinationRejection(_invalidDestination());
+      }
+      normalized.add(_validateAddress(candidate, environment));
+    }
+    return normalized.first;
   }
 
   static String _validateAddress(
@@ -319,13 +401,35 @@ final class BitcoinDestinationParser implements BitcoinDestinationDecoder {
     userMessage: 'This payment request does not include an on-chain address.',
     retryable: false,
   );
+
+  static AppFailure _invalidLightningInstruction() => const AppFailure(
+    code: 'bitcoin_lightning_instruction_invalid',
+    kind: AppFailureKind.validation,
+    userMessage: 'Enter a valid Lightning invoice or Bitcoin payment request.',
+    retryable: false,
+  );
+
+  static AppFailure _missingLightningInstruction() => const AppFailure(
+    code: 'bitcoin_lightning_instruction_missing',
+    kind: AppFailureKind.validation,
+    userMessage: 'This payment request does not include a Lightning invoice.',
+    retryable: false,
+  );
+
+  static AppFailure _ambiguousLightningInstruction() => const AppFailure(
+    code: 'bitcoin_lightning_instruction_ambiguous',
+    kind: AppFailureKind.unsupported,
+    userMessage:
+        'This payment request contains multiple Lightning choices, which are not yet supported.',
+    retryable: false,
+  );
 }
 
 /// Parser-owned checksum-validated Bitcoin on-chain destination.
 ///
 /// The private constructor prevents feature code from fabricating a value that
-/// bypasses [BitcoinDestinationParser]. The original URI is intentionally not
-/// retained or included in diagnostics.
+/// bypasses [BitcoinPaymentInstructionParser]. The original URI is
+/// intentionally not retained or included in diagnostics.
 @immutable
 final class BitcoinDestination {
   BitcoinDestination._({
@@ -375,20 +479,66 @@ final class BitcoinDestination {
       'BitcoinDestination(uri: $wasUri, amount: ${amount != null})';
 }
 
-final class _DestinationInput {
-  const _DestinationInput({
-    required this.address,
+/// Parser-owned BOLT11 instruction selected from direct or BIP321 input.
+@immutable
+final class BitcoinLightningInstruction {
+  BitcoinLightningInstruction._({
+    required this.invoice,
     required this.wasUri,
-    this.amount,
-    this.label,
+    this.recipientLabel,
     this.message,
-  });
+  }) {
+    if (!BitcoinPaymentInstructionParser._isValidInstructionInput(invoice)) {
+      throw ArgumentError.value(invoice, 'invoice');
+    }
+    _requireOptionalDisplayText(recipientLabel, 'recipientLabel', 256);
+    _requireOptionalDisplayText(message, 'message', 1024);
+  }
 
-  final String address;
+  final String invoice;
   final bool wasUri;
-  final String? amount;
-  final String? label;
+  final String? recipientLabel;
   final String? message;
+
+  @override
+  bool operator ==(Object other) =>
+      other is BitcoinLightningInstruction &&
+      other.invoice == invoice &&
+      other.wasUri == wasUri &&
+      other.recipientLabel == recipientLabel &&
+      other.message == message;
+
+  @override
+  int get hashCode => Object.hash(invoice, wasUri, recipientLabel, message);
+
+  @override
+  String toString() => 'BitcoinLightningInstruction(uri: $wasUri)';
+}
+
+final class _PaymentUri {
+  _PaymentUri({
+    required this.fallbackAddress,
+    required Map<String, List<String>> values,
+  }) : _values = Map<String, List<String>>.unmodifiable(
+         values.map(
+           (key, value) => MapEntry(key, List<String>.unmodifiable(value)),
+         ),
+       );
+
+  final String fallbackAddress;
+  final Map<String, List<String>> _values;
+
+  bool get hasPaymentInstruction =>
+      _values.keys.any((key) => !_generalInstructionKeys.contains(key));
+
+  bool hasKey(String key) => _values.containsKey(key);
+
+  List<String> valuesFor(String key) => _values[key] ?? const <String>[];
+
+  String? singleValue(String key) {
+    final values = valuesFor(key);
+    return values.isEmpty ? null : values.single;
+  }
 }
 
 final class _DestinationRejection implements Exception {
@@ -411,3 +561,13 @@ final _unsafeDisplayCharacters = RegExp(
   r'\u200b-\u200f\u2028\u2029\u202a-\u202e\u2060-\u206f'
   r'\ufeff\ufff9-\ufffb]',
 );
+
+const _generalInstructionKeys = <String>{'amount', 'label', 'message', 'pop'};
+const _standardInstructionKeys = <String>{
+  ..._generalInstructionKeys,
+  'lightning',
+  'lno',
+  'pay',
+  'sp',
+};
+const _networkInstructionKeys = <String>{'bc', 'tb', 'bcrt'};

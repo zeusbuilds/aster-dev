@@ -164,9 +164,26 @@ void main() {
     expect(malformed, isA<AppFailureResult<WalletPaymentPreview>>());
     expect(
       (malformed as AppFailureResult<WalletPaymentPreview>).failure.code,
-      'payment_destination_invalid',
+      'bitcoin_lightning_instruction_invalid',
     );
     expect(harness.engine.calls, isNot(contains('decodeInvoice:start')));
+  });
+
+  test('extracts BIP321 Lightning before native preview validation', () async {
+    final harness = await _createActiveRepository();
+    addTearDown(harness.runtime.dispose);
+
+    final result = await harness.repository.previewPayment(
+      WalletPaymentTarget.bitcoinLightning,
+      'bitcoin:?lightning=lnbcrt1invoice&label=Merchant&message=Order%20123',
+    );
+
+    expect(result, isA<AppSuccess<WalletPaymentPreview>>());
+    final preview = (result as AppSuccess<WalletPaymentPreview>).value;
+    expect(harness.engine.decodedInvoiceValue, 'lnbcrt1invoice');
+    expect(preview.encodedDestination, 'lnbcrt1invoice');
+    expect(preview.recipientLabel, 'Merchant');
+    expect(preview.message, 'Order 123');
   });
 
   test('passes deployment-owned route and exact units to receive', () async {
@@ -232,7 +249,7 @@ void main() {
 
     final sent = await harness.repository.sendPayment(
       target: WalletPaymentTarget.bitcoinLightning,
-      destination: 'lnbcrt1invoice',
+      destination: 'bitcoin:?lightning=lnbcrt1invoice',
       amountUnits: 21000,
     );
 
@@ -242,6 +259,7 @@ void main() {
       WalletPaymentTarget.bitcoinLightning,
     );
     expect(engine.sentPaymentCommand?.amount.units, 21000);
+    expect(engine.sentPaymentCommand?.destination, 'lnbcrt1invoice');
     expect(
       engine.sentPaymentCommand?.amount.unit,
       WalletAmountUnit.millisatoshi,

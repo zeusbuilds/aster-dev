@@ -10,7 +10,7 @@ import 'wallet_engine.dart';
 final class RgbWalletEngineFactory implements WalletEngineFactory {
   const RgbWalletEngineFactory()
     : _sdk = const RgbSdkFlutter(),
-      _bitcoinAddresses = const BitcoinDestinationParser();
+      _bitcoinAddresses = const BitcoinPaymentInstructionParser();
 
   /// Production constructor for sharing the app-owned validation boundary.
   const RgbWalletEngineFactory.withAddresses(this._bitcoinAddresses)
@@ -19,7 +19,7 @@ final class RgbWalletEngineFactory implements WalletEngineFactory {
   /// Test seam for proving stable-SDK forwarding without global state.
   const RgbWalletEngineFactory.withSdk(
     this._sdk, [
-    this._bitcoinAddresses = const BitcoinDestinationParser(),
+    this._bitcoinAddresses = const BitcoinPaymentInstructionParser(),
   ]);
 
   final RgbSdkFlutter _sdk;
@@ -84,7 +84,7 @@ final class RgbWalletEngine implements WalletEngine {
     this._services,
     this._unlockConfig, {
     DateTime Function()? clock,
-    this._bitcoinAddresses = const BitcoinDestinationParser(),
+    this._bitcoinAddresses = const BitcoinPaymentInstructionParser(),
   }) : _clock = clock ?? _utcNow;
 
   static const _receiveLifetime = Duration(hours: 1);
