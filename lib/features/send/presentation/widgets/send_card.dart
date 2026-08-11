@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../shared/shared.dart';
 import '../../../wallet/domain/models/models.dart';
 import '../../../wallet/presentation/formatting/formatting.dart';
 import '../../../wallet/presentation/models/models.dart';
+import '../../../wallet/presentation/widgets/widgets.dart';
 
 /// Exact amount, quote, and available-balance surface for Send.
 class SendCard extends StatelessWidget {
@@ -28,7 +28,6 @@ class SendCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final target = route.target;
-    final asset = target.assetModel;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -54,15 +53,9 @@ class SendCard extends StatelessWidget {
                     ),
                   ),
                   SizedBox(width: context.spacing.md),
-                  SvgPicture.asset(
-                    asset.icon,
-                    width: context.icons.lg,
-                    height: context.icons.lg,
-                    errorBuilder: (context, error, stackTrace) => Icon(
-                      Icons.circle,
-                      size: context.icons.lg,
-                      color: AssetDisplay.colorOf(context, asset),
-                    ),
+                  WalletAssetIcon(
+                    kind: route.asset.kind,
+                    size: context.icons.lg,
                   ),
                   SizedBox(width: context.spacing.sm),
                   Text(route.asset.symbol, style: context.type.title),

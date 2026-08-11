@@ -277,4 +277,32 @@ void main() {
       isFalse,
     );
   });
+
+  test(
+    'repository rejects a quote at the exact maximum-age boundary',
+    () async {
+      final observedAt = now.subtract(BitcoinMarketSnapshot.maximumCurrentAge);
+      final transport = ResilientHttpClient(
+        client: MockClient((request) async {
+          if (request.url.path.endsWith('/range')) {
+            return http.Response('{"prices":[]}', 200);
+          }
+          return http.Response(
+            '{"bitcoin":{"usd":65000,"last_updated_at":'
+            '${observedAt.millisecondsSinceEpoch ~/ 1000}}}',
+            200,
+          );
+        }),
+        retryPolicy: RetryPolicy(maxAttempts: 1),
+      );
+      addTearDown(transport.close);
+
+      final result = await BitcoinMarketRepository(
+        transport,
+        clock: () => now,
+      ).fetch();
+
+      expect(result, isA<AppFailureResult<BitcoinMarketSnapshot>>());
+    },
+  );
 }

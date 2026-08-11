@@ -1,80 +1,95 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
-import 'package:go_router/go_router.dart';
-
 import '../../../../shared/shared.dart';
+import '../../../wallet/domain/models/models.dart';
+import '../../../wallet/presentation/widgets/widgets.dart';
+import '../formatting/formatting.dart';
 
-/// Widget displaying a single asset row with name, balance, and icon
-///
-/// Navigates to transaction list when tapped
+/// One typed cross-rail asset summary in the Home portfolio.
 class AssetRow extends StatelessWidget {
-  /// Asset name (e.g., "BTC", "LBTC")
-  final String name;
-
-  /// Denomination unit (e.g., "sats")
-  final String denomination;
-
-  /// Fiat currency balance display
-  final String fiatBalance;
-
-  /// Asset balance display
-  final String assetBalance;
-
-  /// Icon to display for the asset
-  final IconData icon;
-
-  /// Color of the asset icon
-  final Color? iconColor;
-
-  /// Whether to show skeleton loading for balances
-  final bool isLoading;
-
   const AssetRow({
     super.key,
-    required this.name,
-    required this.denomination,
-    required this.fiatBalance,
-    required this.assetBalance,
-    required this.icon,
-    this.iconColor,
-    this.isLoading = false,
+    required this.kind,
+    required this.title,
+    required this.totalText,
+    required this.availableText,
+    required this.fiatContext,
+    required this.balancesVisible,
+    this.onTap,
+    this.loading = false,
   });
+
+  factory AssetRow.loading({
+    required WalletAssetKind kind,
+    required String title,
+  }) {
+    return AssetRow(
+      kind: kind,
+      title: title,
+      totalText: kind == WalletAssetKind.bitcoin
+          ? '0.00000000 BTC'
+          : '0.000000 USDT',
+      availableText: kind == WalletAssetKind.bitcoin
+          ? '0.00000000 BTC'
+          : '0.000000 USDT',
+      fiatContext: 'USD estimate unavailable',
+      balancesVisible: true,
+      loading: true,
+    );
+  }
+
+  factory AssetRow.loaded({
+    Key? key,
+    required HomeAssetDisplay display,
+    required bool balancesVisible,
+    VoidCallback? onTap,
+  }) {
+    return AssetRow(
+      key: key,
+      kind: display.kind,
+      title: display.title,
+      totalText: display.total.text,
+      availableText: display.available.text,
+      fiatContext: display.fiatContext,
+      balancesVisible: balancesVisible,
+      onTap: onTap,
+    );
+  }
+
+  final WalletAssetKind kind;
+  final String title;
+  final String totalText;
+  final String availableText;
+  final String fiatContext;
+  final bool balancesVisible;
+  final VoidCallback? onTap;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.appColors;
-    final spacing = context.spacing;
-    final icons = context.icons;
-    final type = context.type;
-    final metrics = context.metrics;
-
-    void openTransactions() {
-      unawaited(context.haptics.trigger(HapticIntent.lightImpact));
-      unawaited(context.push<void>(RoutePaths.transactionList));
-    }
-
+    final hidden = !loading && !balancesVisible;
+    final semanticValue = loading
+        ? '$title balance loading'
+        : hidden
+        ? '$title balance hidden'
+        : '$title total $totalText, available $availableText, $fiatContext';
     return Semantics(
-      button: true,
-      label: '$name, $fiatBalance, $assetBalance',
+      button: onTap != null,
+      enabled: onTap != null,
+      label: semanticValue,
       excludeSemantics: true,
       child: Material(
-        color: colors.transparentSurface,
+        color: context.appColors.transparentSurface,
         child: InkWell(
-          onTap: openTransactions,
+          onTap: onTap,
           child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: metrics.minTouchTarget),
+            constraints: BoxConstraints(
+              minHeight: context.metrics.minTouchTarget,
+            ),
             child: Row(
               children: [
-                Center(
-                  child: Icon(
-                    icon,
-                    color: iconColor ?? context.colorScheme.onSurface,
-                    size: icons.xl,
-                  ),
-                ),
-                SizedBox(width: spacing.md),
+                WalletAssetIcon(kind: kind, size: context.icons.xl),
+                SizedBox(width: context.spacing.md),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -83,34 +98,49 @@ class AssetRow extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         textBaseline: TextBaseline.alphabetic,
                         children: [
-                          Expanded(child: Text(name, style: type.assetTitle)),
-                          AppSkeletonizer(
-                            enabled: isLoading,
-                            child: NumericText(
-                              fiatBalance,
-                              style: type.assetValue,
+                          Expanded(
+                            child: Text(title, style: context.type.assetTitle),
+                          ),
+                          SizedBox(width: context.spacing.md),
+                          Expanded(
+                            child: AppSkeletonizer(
+                              enabled: loading,
+                              child: _BalanceValue(
+                                value: hidden ? '••••' : totalText,
+                                style: context.type.assetValue,
+                                textAlign: TextAlign.end,
+                              ),
                             ),
                           ),
                         ],
                       ),
+                      SizedBox(height: context.spacing.xxs),
                       Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        textBaseline: TextBaseline.alphabetic,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
                             child: Text(
-                              denomination,
-                              style: type.assetMeta.copyWith(
-                                color: colors.textSecondary,
+                              hidden ? 'Balance hidden' : fiatContext,
+                              style: context.type.assetMeta.copyWith(
+                                color: context.appColors.textSecondary,
                               ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          AppSkeletonizer(
-                            enabled: isLoading,
-                            child: AmountText(
-                              assetBalance,
-                              style: type.assetMeta.copyWith(
-                                color: colors.textSecondary,
+                          SizedBox(width: context.spacing.md),
+                          Expanded(
+                            child: AppSkeletonizer(
+                              enabled: loading,
+                              child: _BalanceValue(
+                                value: hidden
+                                    ? 'Available ••••'
+                                    : 'Available $availableText',
+                                style: context.type.assetMeta.copyWith(
+                                  color: context.appColors.textSecondary,
+                                ),
+                                maxLines: 2,
+                                textAlign: TextAlign.end,
                               ),
                             ),
                           ),
@@ -124,6 +154,31 @@ class AssetRow extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _BalanceValue extends StatelessWidget {
+  const _BalanceValue({
+    required this.value,
+    required this.style,
+    this.maxLines = 1,
+    this.textAlign,
+  });
+
+  final String value;
+  final TextStyle style;
+  final int maxLines;
+  final TextAlign? textAlign;
+
+  @override
+  Widget build(BuildContext context) {
+    return AmountText(
+      value,
+      style: style,
+      maxLines: maxLines,
+      overflow: TextOverflow.ellipsis,
+      textAlign: textAlign,
     );
   }
 }

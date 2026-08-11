@@ -16,10 +16,8 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
     this.marketBadgeDotSize = 20,
     this.sliderThumbRadius = 8,
     this.sliderOverlayRadius = 16,
-    this.swapDetailSlideDistance = 50,
     this.keypadButtonHeight = 60,
     this.keypadGap = 10,
-    this.keypadHorizontalReserve = 80,
     this.bottomNavHeight = 56,
     this.bottomNavMaxWidth = 320,
     this.bottomNavIndicatorWidth = 56,
@@ -27,7 +25,6 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
     this.sheetHandleWidth = 56,
     this.sheetHandleHeight = 4,
     this.sheetMaxHeightFactor = 0.7,
-    this.collapsedMessageHeight = 32,
     this.chartHeight = 100,
     this.chartMinimumBodyHeight = 2,
     this.chartLoadingBaseHeightFactor = 0.8,
@@ -56,10 +53,8 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
   final double marketBadgeDotSize;
   final double sliderThumbRadius;
   final double sliderOverlayRadius;
-  final double swapDetailSlideDistance;
   final double keypadButtonHeight;
   final double keypadGap;
-  final double keypadHorizontalReserve;
   final double bottomNavHeight;
   final double bottomNavMaxWidth;
   final double bottomNavIndicatorWidth;
@@ -67,7 +62,6 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
   final double sheetHandleWidth;
   final double sheetHandleHeight;
   final double sheetMaxHeightFactor;
-  final double collapsedMessageHeight;
   final double chartHeight;
   final double chartMinimumBodyHeight;
   final double chartLoadingBaseHeightFactor;
@@ -97,10 +91,8 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
     double? marketBadgeDotSize,
     double? sliderThumbRadius,
     double? sliderOverlayRadius,
-    double? swapDetailSlideDistance,
     double? keypadButtonHeight,
     double? keypadGap,
-    double? keypadHorizontalReserve,
     double? bottomNavHeight,
     double? bottomNavMaxWidth,
     double? bottomNavIndicatorWidth,
@@ -108,7 +100,6 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
     double? sheetHandleWidth,
     double? sheetHandleHeight,
     double? sheetMaxHeightFactor,
-    double? collapsedMessageHeight,
     double? chartHeight,
     double? chartMinimumBodyHeight,
     double? chartLoadingBaseHeightFactor,
@@ -138,12 +129,8 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
       marketBadgeDotSize: marketBadgeDotSize ?? this.marketBadgeDotSize,
       sliderThumbRadius: sliderThumbRadius ?? this.sliderThumbRadius,
       sliderOverlayRadius: sliderOverlayRadius ?? this.sliderOverlayRadius,
-      swapDetailSlideDistance:
-          swapDetailSlideDistance ?? this.swapDetailSlideDistance,
       keypadButtonHeight: keypadButtonHeight ?? this.keypadButtonHeight,
       keypadGap: keypadGap ?? this.keypadGap,
-      keypadHorizontalReserve:
-          keypadHorizontalReserve ?? this.keypadHorizontalReserve,
       bottomNavHeight: bottomNavHeight ?? this.bottomNavHeight,
       bottomNavMaxWidth: bottomNavMaxWidth ?? this.bottomNavMaxWidth,
       bottomNavIndicatorWidth:
@@ -153,8 +140,6 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
       sheetHandleWidth: sheetHandleWidth ?? this.sheetHandleWidth,
       sheetHandleHeight: sheetHandleHeight ?? this.sheetHandleHeight,
       sheetMaxHeightFactor: sheetMaxHeightFactor ?? this.sheetMaxHeightFactor,
-      collapsedMessageHeight:
-          collapsedMessageHeight ?? this.collapsedMessageHeight,
       chartHeight: chartHeight ?? this.chartHeight,
       chartMinimumBodyHeight:
           chartMinimumBodyHeight ?? this.chartMinimumBodyHeight,
@@ -228,22 +213,12 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
         other.sliderOverlayRadius,
         t,
       ),
-      swapDetailSlideDistance: _lerp(
-        swapDetailSlideDistance,
-        other.swapDetailSlideDistance,
-        t,
-      ),
       keypadButtonHeight: _lerp(
         keypadButtonHeight,
         other.keypadButtonHeight,
         t,
       ),
       keypadGap: _lerp(keypadGap, other.keypadGap, t),
-      keypadHorizontalReserve: _lerp(
-        keypadHorizontalReserve,
-        other.keypadHorizontalReserve,
-        t,
-      ),
       bottomNavHeight: _lerp(bottomNavHeight, other.bottomNavHeight, t),
       bottomNavMaxWidth: _lerp(bottomNavMaxWidth, other.bottomNavMaxWidth, t),
       bottomNavIndicatorWidth: _lerp(
@@ -261,11 +236,6 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
       sheetMaxHeightFactor: _lerp(
         sheetMaxHeightFactor,
         other.sheetMaxHeightFactor,
-        t,
-      ),
-      collapsedMessageHeight: _lerp(
-        collapsedMessageHeight,
-        other.collapsedMessageHeight,
         t,
       ),
       chartHeight: _lerp(chartHeight, other.chartHeight, t),

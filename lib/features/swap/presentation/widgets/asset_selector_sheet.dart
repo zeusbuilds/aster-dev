@@ -2,113 +2,100 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'package:flutter_svg/flutter_svg.dart';
-
 import '../../../../shared/shared.dart';
+import '../../../wallet/domain/models/models.dart';
+import '../../../wallet/presentation/models/models.dart';
+import '../../../wallet/presentation/widgets/widgets.dart';
 
-/// Bottom sheet for selecting an asset
+/// Bottom sheet for choosing one configured asset-and-rail target.
 class AssetSelectorSheet extends StatelessWidget {
-  final List<AssetModel> assets;
-  final String? selectedAssetName;
-  final ValueChanged<AssetModel> onAssetSelected;
-
   const AssetSelectorSheet({
     super.key,
-    required this.assets,
-    this.selectedAssetName,
-    required this.onAssetSelected,
+    required this.capabilities,
+    required this.selected,
+    required this.otherSelection,
+    required this.onSelected,
   });
 
-  /// Shows the asset selector as a modal bottom sheet
-  ///
-  /// [context] - Build context for showing the bottom sheet
-  ///
-  /// [assets] - List of available assets to choose from
-  ///
-  /// [selectedAssetName] - Currently selected asset name (for highlighting)
-  ///
-  /// Returns the selected asset or null if dismissed
-  static Future<AssetModel?> show(
+  final List<WalletPaymentCapability> capabilities;
+  final WalletPaymentTarget selected;
+  final WalletPaymentTarget otherSelection;
+  final ValueChanged<WalletPaymentTarget> onSelected;
+
+  static Future<WalletPaymentTarget?> show(
     BuildContext context, {
-    required List<AssetModel> assets,
-    String? selectedAssetName,
+    required List<WalletPaymentCapability> capabilities,
+    required WalletPaymentTarget selected,
+    required WalletPaymentTarget otherSelection,
   }) {
-    final colors = context.appColors;
-    return showModalBottomSheet<AssetModel>(
+    return showModalBottomSheet<WalletPaymentTarget>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: colors.transparentSurface,
+      backgroundColor: context.appColors.transparentSurface,
       builder: (context) => AssetSelectorSheet(
-        assets: assets,
-        selectedAssetName: selectedAssetName,
-        onAssetSelected: (asset) {
-          Navigator.of(context).pop(asset);
-        },
+        capabilities: capabilities,
+        selected: selected,
+        otherSelection: otherSelection,
+        onSelected: (target) => Navigator.of(context).pop(target),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final spacing = context.spacing;
-    final radius = context.radii;
-    final metrics = context.metrics;
-    final type = context.type;
-    final maxHeight =
-        MediaQuery.of(context).size.height * metrics.sheetMaxHeightFactor;
-
+    final maximumHeight =
+        MediaQuery.sizeOf(context).height *
+        context.metrics.sheetMaxHeightFactor;
     return ConstrainedBox(
-      constraints: BoxConstraints(maxHeight: maxHeight),
+      constraints: BoxConstraints(maxHeight: maximumHeight),
       child: Squircle(
         color: context.colorScheme.surface,
-        border: BorderRadius.vertical(top: Radius.circular(radius.sheet)),
+        border: BorderRadius.vertical(
+          top: Radius.circular(context.radii.sheet),
+        ),
         borderColor: context.appColors.transparentSurface,
         borderWidth: 0,
         padding: EdgeInsets.zero,
         child: SafeArea(
           top: false,
-          minimum: EdgeInsets.only(bottom: spacing.lg),
+          minimum: EdgeInsets.only(bottom: context.spacing.lg),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
-              SizedBox(height: spacing.md),
-              // Handle bar
+              SizedBox(height: context.spacing.md),
               SizedBox(
-                width: metrics.sheetHandleWidth,
-                height: metrics.sheetHandleHeight,
+                width: context.metrics.sheetHandleWidth,
+                height: context.metrics.sheetHandleHeight,
                 child: AsterPill(
                   color: context.colorScheme.surfaceContainerHigh,
                   child: const SizedBox.expand(),
                 ),
               ),
-              SizedBox(height: spacing.lg),
-              // Title
+              SizedBox(height: context.spacing.lg),
               Padding(
                 padding: EdgeInsets.symmetric(
-                  horizontal: spacing.screenPadding,
+                  horizontal: context.spacing.screenPadding,
                 ),
-                child: Text('Select token', style: type.title),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Select asset and network',
+                    style: context.type.title,
+                  ),
+                ),
               ),
-              SizedBox(height: spacing.lg),
-              // Asset list
+              SizedBox(height: context.spacing.md),
               Flexible(
                 child: ListView.builder(
                   shrinkWrap: true,
-                  itemCount: assets.length,
+                  itemCount: capabilities.length,
                   itemBuilder: (context, index) {
-                    final asset = assets[index];
-                    final isSelected =
-                        asset.token == selectedAssetName ||
-                        asset.unit == selectedAssetName;
-
-                    return Padding(
-                      padding: EdgeInsets.only(bottom: spacing.xs),
-                      child: _AssetItem(
-                        asset: asset,
-                        isSelected: isSelected,
-                        onTap: () => onAssetSelected(asset),
-                      ),
+                    final capability = capabilities[index];
+                    return _AssetTargetItem(
+                      capability: capability,
+                      selected: capability.target == selected,
+                      conflictsWithOther: capability.target == otherSelection,
+                      onTap: () => onSelected(capability.target),
                     );
                   },
                 ),
@@ -121,120 +108,86 @@ class AssetSelectorSheet extends StatelessWidget {
   }
 }
 
-/// Individual asset item in the selector list
-///
-/// Displays asset icon, name, chain, and balance information
-class _AssetItem extends StatelessWidget {
-  /// Asset model to display
-  final AssetModel asset;
-
-  /// Whether this asset is currently selected
-  final bool isSelected;
-
-  /// Callback when asset is tapped
-  final VoidCallback onTap;
-
-  const _AssetItem({
-    required this.asset,
-    required this.isSelected,
+class _AssetTargetItem extends StatelessWidget {
+  const _AssetTargetItem({
+    required this.capability,
+    required this.selected,
+    required this.conflictsWithOther,
     required this.onTap,
   });
 
+  final WalletPaymentCapability capability;
+  final bool selected;
+  final bool conflictsWithOther;
+  final VoidCallback onTap;
+
   @override
   Widget build(BuildContext context) {
-    final colors = context.appColors;
-    final motion = context.motion;
-    final spacing = context.spacing;
-    final icons = context.icons;
-    final metrics = context.metrics;
-    final stateLayers = context.stateLayers;
-    final type = context.type;
-    final effectiveOnTap = isSelected ? null : onTap;
+    final enabled = capability.isAvailable && !selected && !conflictsWithOther;
+    final target = capability.target;
 
     void select() {
       unawaited(context.haptics.trigger(HapticIntent.selection));
-      effectiveOnTap?.call();
+      onTap();
     }
 
+    final status = !capability.isAvailable
+        ? 'Not configured'
+        : conflictsWithOther
+        ? 'Already selected'
+        : target.railLabel;
     return Semantics(
       button: true,
-      enabled: effectiveOnTap != null,
-      selected: isSelected,
-      label: '${asset.token}, ${asset.chain}',
+      enabled: enabled,
+      selected: selected,
+      label: target.semanticLabel,
+      value: selected ? 'Selected' : status,
       excludeSemantics: true,
-      child: InkWell(
-        onTap: effectiveOnTap == null ? null : select,
-        child: AnimatedContainer(
-          duration: context.motionPolicy.duration(
-            motion.selectionTransitionDuration,
-          ),
-          curve: motion.fastEase,
-          padding: EdgeInsets.symmetric(vertical: spacing.xs),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? context.colorScheme.primaryContainer.withValues(
-                    alpha: stateLayers.selectedContainer,
-                  )
-                : context.colorScheme.surface,
-          ),
-          child: Row(
-            children: [
-              SizedBox(width: spacing.sm),
-              // Selection indicator bar
-              SizedBox(
-                width: metrics.selectionIndicatorWidth,
-                height: metrics.selectionIndicatorHeight,
-                child: AsterPill(
-                  color: isSelected
-                      ? context.colorScheme.primary
-                      : colors.transparentSurface,
-                  child: const SizedBox.expand(),
-                ),
+      child: Opacity(
+        opacity: enabled || selected ? 1 : context.stateLayers.disabled,
+        child: InkWell(
+          onTap: enabled ? select : null,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: context.metrics.minTouchTarget,
+            ),
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: context.spacing.screenPadding,
+                vertical: context.spacing.md,
               ),
-              SizedBox(width: spacing.md),
-              // Icon
-              SvgPicture.asset(
-                asset.icon,
-                width: icons.xl,
-                height: icons.xl,
-                errorBuilder: (context, error, stackTrace) => Icon(
-                  Icons.circle,
-                  size: icons.xl,
-                  color: AssetDisplay.colorOf(context, asset),
-                ),
-              ),
-              SizedBox(width: spacing.sm),
-              // Name and subtitle
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(asset.token, style: type.title),
-                    SizedBox(height: spacing.xxs),
-                    Text(
-                      asset.chain,
-                      style: type.rowMeta.copyWith(color: colors.textSecondary),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(width: spacing.md),
-              // Balance information
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisSize: MainAxisSize.min,
+              child: Row(
                 children: [
-                  NumericText('\$0.0', style: type.rowValue),
-                  SizedBox(height: spacing.xxs),
-                  AmountText(
-                    '0 sats',
-                    style: type.rowMeta.copyWith(color: colors.textSecondary),
+                  WalletAssetIcon(
+                    kind: target.assetKind,
+                    size: context.icons.xl,
                   ),
+                  SizedBox(width: context.spacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(target.assetLabel, style: context.type.title),
+                        SizedBox(height: context.spacing.xxs),
+                        Text(
+                          status,
+                          style: context.type.rowMeta.copyWith(
+                            color: context.appColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (selected)
+                    Icon(
+                      Icons.check,
+                      size: context.icons.sm,
+                      color: context.colorScheme.primary,
+                    ),
                 ],
               ),
-              SizedBox(width: spacing.screenPadding),
-            ],
+            ),
           ),
         ),
       ),

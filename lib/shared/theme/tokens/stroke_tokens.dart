@@ -9,6 +9,7 @@ class AsterStrokes extends ThemeExtension<AsterStrokes> {
     this.border = 1,
     this.focusBorder = 1.5,
     this.focusRing = 3,
+    this.progressIndicator = 2,
   });
 
   final double hairline;
@@ -16,6 +17,7 @@ class AsterStrokes extends ThemeExtension<AsterStrokes> {
   final double border;
   final double focusBorder;
   final double focusRing;
+  final double progressIndicator;
 
   @override
   AsterStrokes copyWith({
@@ -24,6 +26,7 @@ class AsterStrokes extends ThemeExtension<AsterStrokes> {
     double? border,
     double? focusBorder,
     double? focusRing,
+    double? progressIndicator,
   }) {
     return AsterStrokes(
       hairline: hairline ?? this.hairline,
@@ -31,6 +34,7 @@ class AsterStrokes extends ThemeExtension<AsterStrokes> {
       border: border ?? this.border,
       focusBorder: focusBorder ?? this.focusBorder,
       focusRing: focusRing ?? this.focusRing,
+      progressIndicator: progressIndicator ?? this.progressIndicator,
     );
   }
 
@@ -43,6 +47,7 @@ class AsterStrokes extends ThemeExtension<AsterStrokes> {
       border: _lerp(border, other.border, t),
       focusBorder: _lerp(focusBorder, other.focusBorder, t),
       focusRing: _lerp(focusRing, other.focusRing, t),
+      progressIndicator: _lerp(progressIndicator, other.progressIndicator, t),
     );
   }
 

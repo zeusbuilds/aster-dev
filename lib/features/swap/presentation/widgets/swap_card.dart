@@ -1,97 +1,57 @@
 import 'package:flutter/material.dart';
-
 import 'package:remixicon/remixicon.dart';
 
 import '../../../../shared/shared.dart';
-import 'asset_selector_sheet.dart';
+import '../models/models.dart';
 import 'swap_pair.dart';
 
-/// Card widget displaying swap pair (from/to assets)
-///
-/// Shows asset selection, amounts, balances, and swap arrow indicator
-class SwapCard extends StatefulWidget {
-  const SwapCard({super.key});
+/// Typed pair selector with no quote or execution claims.
+class SwapCard extends StatelessWidget {
+  const SwapCard({
+    super.key,
+    required this.state,
+    required this.onSelectFrom,
+    required this.onSelectTo,
+    required this.onReverse,
+  });
 
-  @override
-  State<SwapCard> createState() => _SwapCardState();
-}
-
-class _SwapCardState extends State<SwapCard> {
-  AssetModel _fromAsset = AssetModel.bitcoin;
-  AssetModel _toAsset = AssetModel.usdt;
-
-  /// Shows asset selector bottom sheet
-  ///
-  /// [isFrom] - Whether selecting the "from" asset (true) or "to" asset (false)
-  Future<void> _showAssetSelector(bool isFrom) async {
-    final selected = await AssetSelectorSheet.show(
-      context,
-      assets: AssetModel.all,
-      selectedAssetName: isFrom ? _fromAsset.token : _toAsset.token,
-    );
-
-    if (selected != null && mounted) {
-      setState(() {
-        if (isFrom) {
-          _fromAsset = selected;
-        } else {
-          _toAsset = selected;
-        }
-      });
-    }
-  }
+  final SwapState state;
+  final VoidCallback onSelectFrom;
+  final VoidCallback onSelectTo;
+  final VoidCallback onReverse;
 
   @override
   Widget build(BuildContext context) {
-    final spacing = context.spacing;
-    final colors = context.appColors;
-    final radius = context.radii;
-    final icons = context.icons;
-    final strokes = context.strokes;
-
     return Stack(
       alignment: Alignment.center,
       children: [
         Squircle(
           color: context.colorScheme.surface,
-          borderColor: colors.surfaceSubtle,
-          borderRadius: radius.sheet,
-          padding: EdgeInsets.all(spacing.xs),
+          borderColor: context.appColors.borderSubtle,
+          borderRadius: context.radii.card,
+          padding: EdgeInsets.zero,
           child: Column(
             children: [
-              SwapPair(
-                from: true,
-                asset: _fromAsset,
-                amount: '100,000',
-                balance: '200,000',
-                marketPrice: '\$160,000',
-                onAssetTap: () => _showAssetSelector(true),
-              ),
-              SwapPair(
-                from: false,
-                asset: _toAsset,
-                amount: '7500',
-                balance: '2500',
-                marketPrice: '\$1',
-                onAssetTap: () => _showAssetSelector(false),
-              ),
+              SwapPair(label: 'From', target: state.from, onTap: onSelectFrom),
+              const AsterDivider(),
+              SwapPair(label: 'To', target: state.to, onTap: onSelectTo),
             ],
           ),
         ),
-        Container(
-          padding: EdgeInsets.all(spacing.sm),
+        DecoratedBox(
           decoration: BoxDecoration(
-            color: colors.surfaceSubtle,
+            color: context.appColors.surfaceRaised,
             shape: BoxShape.circle,
             border: Border.all(
               color: context.colorScheme.surface,
-              width: strokes.focusRing,
+              width: context.strokes.focusRing,
             ),
           ),
-          child: Icon(
-            RemixIcons.arrow_down_line,
-            size: icons.sm,
-            color: context.colorScheme.onSurface,
+          child: AsterIconButton(
+            icon: RemixIcons.arrow_up_down_line,
+            tooltip: 'Reverse swap direction',
+            hapticIntent: HapticIntent.selection,
+            onPressed: onReverse,
           ),
         ),
       ],

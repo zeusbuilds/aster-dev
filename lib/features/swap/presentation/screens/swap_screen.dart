@@ -1,374 +1,169 @@
 import 'dart:async';
 
-import 'package:custom_numeric_pad/custom_numpad_package.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
 
+import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
+import '../models/models.dart';
+import '../view_model/view_models.dart';
 import '../widgets/widgets.dart';
 
-/// Screen for swapping between different assets
-///
-/// Displays swap card, conversion rate, and transaction details with animations
-class SwapScreen extends StatefulWidget {
+/// Asset-and-rail swap preview with execution disabled by product policy.
+class SwapScreen extends ConsumerWidget {
   const SwapScreen({super.key});
 
   @override
-  State<SwapScreen> createState() => _SwapScreenState();
-}
-
-class _SwapScreenState extends State<SwapScreen> with TickerProviderStateMixin {
-  late AnimationController _detailsAnimationController;
-  late AnimationController _detailsFadeOutController;
-  late AnimationController _swapTextAnimationController;
-  late List<Animation<double>> _detailAnimations;
-  late Animation<double> _detailsFadeOutAnimation;
-  late Animation<double> _swapTextFadeAnimation;
-  bool _showDetails = false;
-  bool _showKeyboard = true;
-  Timer? _continueTimer;
-  Timer? _cancelTimer;
-
-  final List<Map<String, String>> _detailRows = [
-    {'title': 'SideSwap service fee', 'value': '\$0.0001'},
-    {'title': 'SideSwap network fee', 'value': '\$0.0001'},
-    {'title': 'Current Bitcoin rate', 'value': '7 sats/vbtye'},
-    {'title': 'Liquid Network fee', 'value': '0.00000000002 BTC'},
-    {'title': 'Current Liquid rate', 'value': '7 sats/vbtye'},
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    const motion = AsterMotion();
-
-    // Details sequential animation
-    _detailsAnimationController = AnimationController(
-      duration: motion.swapDetailsRevealDuration,
-      vsync: this,
-    );
-
-    // Details fade-out animation (for cancel - all at once)
-    _detailsFadeOutController = AnimationController(
-      duration: motion.swapDetailsDismissDuration,
-      vsync: this,
-    );
-
-    // Swap text fade-in animation follows the keyboard transition.
-    _swapTextAnimationController = AnimationController(
-      duration: motion.swapMessageTransitionDuration,
-      vsync: this,
-    );
-
-    _buildAnimations(motion);
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final motion = context.motion;
-    _detailsAnimationController.duration = context.motionPolicy.duration(
-      motion.swapDetailsRevealDuration,
-    );
-    _detailsFadeOutController.duration = context.motionPolicy.duration(
-      motion.swapDetailsDismissDuration,
-    );
-    _swapTextAnimationController.duration = context.motionPolicy.duration(
-      motion.swapMessageTransitionDuration,
-    );
-    _buildAnimations(motion);
-  }
-
-  void _buildAnimations(AsterMotion motion) {
-    _detailsFadeOutAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
-      CurvedAnimation(
-        parent: _detailsFadeOutController,
-        curve: motion.fadeOutCurve,
-      ),
-    );
-
-    _swapTextFadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _swapTextAnimationController,
-        curve: motion.fadeInCurve,
-      ),
-    );
-
-    // Create staggered animations for each detail row
-    _detailAnimations = List.generate(_detailRows.length, (index) {
-      final delay = index * motion.swapDetailStaggerStep;
-      final start = delay.clamp(0.0, 1.0);
-      final end = (delay + motion.swapDetailRevealWindow).clamp(0.0, 1.0);
-      return Tween<double>(begin: 0.0, end: 1.0).animate(
-        CurvedAnimation(
-          parent: _detailsAnimationController,
-          curve: Interval(start, end, curve: motion.choreographyCurve),
-        ),
-      );
-    });
-  }
-
-  @override
-  void dispose() {
-    _continueTimer?.cancel();
-    _cancelTimer?.cancel();
-    _detailsAnimationController.dispose();
-    _detailsFadeOutController.dispose();
-    _swapTextAnimationController.dispose();
-    super.dispose();
-  }
-
-  /// Handles continue button tap
-  ///
-  /// Hides keyboard, shows swap details with staggered animation, and displays cancel option
-  void _onContinueTap() {
-    if (!_showKeyboard) return;
-    _cancelTimer?.cancel();
-
-    final motion = context.motion;
-
-    // Dismiss keyboard with fade
-    FocusScope.of(context).unfocus();
-
-    // Phase 1: Remove keyboard from widget tree (AnimatedSwitcher will fade it out)
-    setState(() {
-      _showKeyboard = false;
-    });
-
-    // Phase 2: Swap text becomes visible (takes space, but opacity 0)
-    // This triggers AnimatedSize to grow the Column, smoothly moving button up
-    _continueTimer?.cancel();
-    _continueTimer = Timer(
-      context.motionPolicy.duration(motion.swapKeyboardTransitionDuration),
-      () {
-        if (mounted) {
-          unawaited(_swapTextAnimationController.forward());
-          _detailsAnimationController.reset();
-          _detailsFadeOutController.reset();
-          setState(() {
-            _showDetails = true;
-          });
-          unawaited(_detailsAnimationController.forward());
-        }
-      },
-    );
-  }
-
-  /// Handles cancel button tap
-  ///
-  /// Fades out details, hides cancel text, and shows keyboard again
-  void _onCancelTap() {
-    if (_showKeyboard) return;
-
-    final motion = context.motion;
-
-    // Phase 1: Fade out all detail rows at once
-    _continueTimer?.cancel();
-    unawaited(_hideDetails());
-
-    // Phase 2: Fade out cancel text (start slightly after details start fading)
-    _cancelTimer?.cancel();
-    _cancelTimer = Timer(
-      context.motionPolicy.duration(motion.swapCancelStaggerDelay),
-      () {
-        if (mounted) {
-          unawaited(_restoreKeyboard());
-        }
-      },
-    );
-  }
-
-  Future<void> _hideDetails() async {
-    await _detailsFadeOutController.forward();
-    if (!mounted) return;
-    setState(() {
-      _showDetails = false;
-    });
-    _detailsAnimationController.reset();
-    _detailsFadeOutController.reset();
-  }
-
-  Future<void> _restoreKeyboard() async {
-    await _swapTextAnimationController.reverse();
-    if (!mounted) return;
-    setState(() {
-      _showKeyboard = true;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final spacing = context.spacing;
-    final colors = context.appColors;
-    final metrics = context.metrics;
-    final motion = context.motion;
-
+  Widget build(BuildContext context, WidgetRef ref) {
+    final swap = ref.watch(swapViewModelProvider);
     return Scaffold(
       backgroundColor: context.colorScheme.surface,
-      appBar: CustomAppBar(
+      appBar: const CustomAppBar(
         title: 'Swap',
         leadingIcon: true,
         centerTitle: false,
       ),
       body: SafeArea(
-        bottom: true,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return Column(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: spacing.screenPadding,
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SwapCard(),
-                          SizedBox(height: spacing.xxxl),
-                          Column(
-                            children: [
-                              DetailRow(
-                                suffixIcon: MingCuteIcons.mgc_information_line,
-                                title: 'Conversion rate',
-                                value: '99.90%',
-                              ),
-                              if (_showDetails) ...[
-                                SizedBox(height: spacing.md),
-                                ...List.generate(
-                                  _detailRows.length,
-                                  (index) => AnimatedBuilder(
-                                    animation: Listenable.merge([
-                                      _detailAnimations[index],
-                                      _detailsFadeOutAnimation,
-                                    ]),
-                                    builder: (context, child) {
-                                      // Combine both animations: staggered show and simultaneous fade-out
-                                      final showOpacity =
-                                          _detailAnimations[index].value;
-                                      final fadeOutOpacity =
-                                          _detailsFadeOutAnimation.value;
-                                      final combinedOpacity =
-                                          showOpacity * fadeOutOpacity;
+        top: false,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: context.spacing.screenPadding,
+          ),
+          child: swap.when(
+            skipLoadingOnRefresh: false,
+            data: (state) => _SwapContent(state: state),
+            loading: () => const _SwapLoading(),
+            error: (error, stackTrace) => _SwapFailure(
+              failure: error is AppFailureException
+                  ? error.failure
+                  : FailureMapper.from(error, stackTrace),
+              onRetry: () => ref.read(swapViewModelProvider.notifier).retry(),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-                                      return Transform.translate(
-                                        offset: Offset(
-                                          (1 - _detailAnimations[index].value) *
-                                              metrics.swapDetailSlideDistance,
-                                          0,
-                                        ),
-                                        child: Opacity(
-                                          opacity: combinedOpacity,
-                                          child: child,
-                                        ),
-                                      );
-                                    },
-                                    child: Padding(
-                                      padding: EdgeInsets.only(
-                                        top: index > 0 ? spacing.md : 0,
-                                      ),
-                                      child: DetailRow(
-                                        title: _detailRows[index]['title']!,
-                                        value: _detailRows[index]['value']!,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                          SizedBox(height: spacing.xl),
-                        ],
+class _SwapContent extends ConsumerWidget {
+  const _SwapContent({required this.state});
+
+  final SwapState state;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    Future<void> select({required bool from}) async {
+      unawaited(context.haptics.trigger(HapticIntent.lightImpact));
+      final selected = await AssetSelectorSheet.show(
+        context,
+        capabilities: state.capabilities,
+        selected: from ? state.from : state.to,
+        otherSelection: from ? state.to : state.from,
+      );
+      if (selected == null || !context.mounted) return;
+      final notifier = ref.read(swapViewModelProvider.notifier);
+      if (from) {
+        notifier.selectFrom(selected);
+      } else {
+        notifier.selectTo(selected);
+      }
+    }
+
+    return Column(
+      children: [
+        Expanded(
+          child: ListView(
+            children: [
+              SwapCard(
+                state: state,
+                onSelectFrom: () => select(from: true),
+                onSelectTo: () => select(from: false),
+                onReverse: () =>
+                    ref.read(swapViewModelProvider.notifier).reverse(),
+              ),
+              SizedBox(height: context.spacing.xl),
+              Squircle(
+                color: context.appColors.surfaceSubtle,
+                borderColor: context.appColors.borderSubtle,
+                padding: EdgeInsets.all(context.spacing.lg),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      MingCuteIcons.mgc_information_line,
+                      size: context.icons.sm,
+                      color: context.colorScheme.primary,
+                    ),
+                    SizedBox(width: context.spacing.md),
+                    Expanded(
+                      child: Text(
+                        'Swap execution is not available in this build.',
+                        style: context.textTheme.bodyMedium,
                       ),
                     ),
-                  ),
+                  ],
                 ),
-                Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: spacing.screenPadding,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      AnimatedSwitcher(
-                        duration: context.motionPolicy.duration(
-                          motion.swapKeyboardTransitionDuration,
-                        ),
-                        switchInCurve: motion.fadeInCurve,
-                        switchOutCurve: motion.fadeOutCurve,
-                        transitionBuilder:
-                            (Widget child, Animation<double> animation) {
-                              return FadeTransition(
-                                opacity: animation,
-                                child: child,
-                              );
-                            },
-                        child: _showKeyboard
-                            ? CustomNumPad(
-                                key: const ValueKey('keyboard'),
-                                buttonWidth:
-                                    (MediaQuery.of(context).size.width -
-                                        spacing.screenPadding * 2 -
-                                        metrics.keypadHorizontalReserve) /
-                                    3,
-                                buttonHeight: metrics.keypadButtonHeight,
-                                rowSpacing: metrics.keypadGap,
-                                columnSpacing: metrics.keypadGap,
-                                buttonColor: colors.surfaceSubtle,
-                                buttonTextStyle: context.type.keypadNumber
-                                    .toNumeric(context),
-                              )
-                            : const SizedBox.shrink(key: ValueKey('empty')),
-                      ),
-                      SizedBox(height: spacing.xl),
-                      CustomButton(text: 'Continue', onTap: _onContinueTap),
-                      // Reserve the cancel action space while its label fades.
-                      AnimatedContainer(
-                        duration: context.motionPolicy.duration(
-                          motion.swapMessageTransitionDuration,
-                        ),
-                        curve: motion.choreographyCurve,
-                        height: !_showKeyboard
-                            ? metrics.collapsedMessageHeight
-                            : 0,
-                        child: !_showKeyboard
-                            ? AnimatedBuilder(
-                                animation: _swapTextFadeAnimation,
-                                builder: (context, child) {
-                                  return Opacity(
-                                    opacity: _swapTextFadeAnimation.value,
-                                    child: child,
-                                  );
-                                },
-                                child: Padding(
-                                  padding: EdgeInsets.only(top: spacing.xs),
-                                  child: TextButton(
-                                    onPressed: () {
-                                      unawaited(
-                                        context.haptics.trigger(
-                                          HapticIntent.lightImpact,
-                                        ),
-                                      );
-                                      _onCancelTap();
-                                    },
-                                    child: Text(
-                                      'Cancel',
-                                      style: context.type.rowTitle,
-                                    ),
-                                  ),
-                                ),
-                              )
-                            : const SizedBox.shrink(),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          },
+              ),
+            ],
+          ),
         ),
+        SizedBox(height: context.spacing.lg),
+        CustomButton(text: 'Swap unavailable', enabled: false, onTap: () {}),
+        SizedBox(height: context.spacing.lg),
+      ],
+    );
+  }
+}
+
+class _SwapLoading extends StatelessWidget {
+  const _SwapLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return AppSkeletonizer(
+      enabled: true,
+      child: Column(
+        children: [
+          for (var index = 0; index < 2; index += 1) ...[
+            Squircle(
+              padding: EdgeInsets.all(context.spacing.xl),
+              child: Text(
+                index == 0 ? 'Bitcoin · On-chain' : 'Bitcoin · Lightning',
+                style: context.type.title,
+              ),
+            ),
+            if (index == 0) SizedBox(height: context.spacing.sm),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SwapFailure extends StatelessWidget {
+  const _SwapFailure({required this.failure, required this.onRetry});
+
+  final AppFailure failure;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            failure.userMessage,
+            style: context.textTheme.bodyMedium,
+            textAlign: TextAlign.center,
+          ),
+          if (failure.retryable) ...[
+            SizedBox(height: context.spacing.lg),
+            CustomButton(text: 'Retry', onTap: onRetry),
+          ],
+        ],
       ),
     );
   }

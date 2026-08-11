@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../shared/shared.dart';
 import '../../../wallet/domain/models/models.dart';
 import '../../../wallet/presentation/models/models.dart';
+import '../../../wallet/presentation/widgets/widgets.dart';
 
 /// Controlled destination field for the selected Send asset and rail.
 class SendAddressCard extends StatelessWidget {
@@ -30,7 +30,6 @@ class SendAddressCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final asset = target.assetModel;
     return Column(
       children: [
         Squircle(
@@ -105,16 +104,7 @@ class SendAddressCard extends StatelessWidget {
           ),
           child: Row(
             children: [
-              SvgPicture.asset(
-                asset.icon,
-                height: context.icons.md,
-                width: context.icons.md,
-                errorBuilder: (context, error, stackTrace) => Icon(
-                  Icons.circle,
-                  size: context.icons.md,
-                  color: AssetDisplay.colorOf(context, asset),
-                ),
-              ),
+              WalletAssetIcon(kind: target.assetKind, size: context.icons.md),
               SizedBox(width: context.spacing.sm),
               Expanded(
                 child: Text(

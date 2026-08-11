@@ -1,0 +1,81 @@
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+import '../../../wallet/domain/models/models.dart';
+import '../../../wallet/presentation/view_model/viewmodels.dart';
+import '../models/models.dart';
+
+part 'swap_view_model.g.dart';
+
+/// Owns target selection while swap execution remains unavailable by policy.
+@riverpod
+class SwapViewModel extends _$SwapViewModel {
+  @override
+  Future<SwapState> build() async {
+    final capabilities = await ref.watch(
+      walletPaymentCapabilitiesProvider.future,
+    );
+    return _initialState(capabilities);
+  }
+
+  void retry() {
+    if (state.isLoading) return;
+    ref.invalidate(walletPaymentCapabilitiesProvider);
+    ref.invalidateSelf();
+  }
+
+  bool selectFrom(WalletPaymentTarget target) =>
+      _select(target, updateFrom: true);
+
+  bool selectTo(WalletPaymentTarget target) =>
+      _select(target, updateFrom: false);
+
+  bool reverse() {
+    final current = state.value;
+    if (current == null) return false;
+    state = AsyncData(current.copyWith(from: current.to, to: current.from));
+    return true;
+  }
+
+  bool _select(WalletPaymentTarget target, {required bool updateFrom}) {
+    final current = state.value;
+    if (current == null) return false;
+    final capability = current.capabilities
+        .where((item) => item.target == target)
+        .firstOrNull;
+    if (capability?.isAvailable != true) return false;
+    if (updateFrom) {
+      if (target == current.from) return false;
+      state = AsyncData(
+        target == current.to
+            ? current.copyWith(from: target, to: current.from)
+            : current.copyWith(from: target),
+      );
+      return true;
+    }
+    if (target == current.to) return false;
+    state = AsyncData(
+      target == current.from
+          ? current.copyWith(from: current.to, to: target)
+          : current.copyWith(to: target),
+    );
+    return true;
+  }
+
+  static SwapState _initialState(List<WalletPaymentCapability> capabilities) {
+    final available = capabilities
+        .where((item) => item.isAvailable)
+        .map((item) => item.target)
+        .toList(growable: false);
+    if (available.length < 2) {
+      throw StateError('At least two payment targets are required.');
+    }
+    final preferredTo = available.contains(WalletPaymentTarget.usdtOnchain)
+        ? WalletPaymentTarget.usdtOnchain
+        : available[1];
+    return SwapState(
+      capabilities: capabilities,
+      from: available.first,
+      to: preferredTo,
+    );
+  }
+}

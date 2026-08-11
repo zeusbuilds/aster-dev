@@ -1,12 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
 
 import '../../../../shared/shared.dart';
 import '../../domain/models/models.dart';
 import '../models/models.dart';
+import 'wallet_asset_icon.dart';
 
 /// Full-width asset-and-rail choice used by Send and Receive entry screens.
 class PaymentTargetTile extends StatelessWidget {
@@ -23,7 +23,6 @@ class PaymentTargetTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final target = capability.target;
     final available = capability.isAvailable;
-    final asset = target.assetModel;
     final shape = RoundedSuperellipseBorder(
       borderRadius: BorderRadius.circular(context.radii.card),
       side: BorderSide(
@@ -64,15 +63,9 @@ class PaymentTargetTile extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    SvgPicture.asset(
-                      asset.icon,
-                      width: context.icons.xl,
-                      height: context.icons.xl,
-                      errorBuilder: (context, error, stackTrace) => Icon(
-                        Icons.circle,
-                        size: context.icons.xl,
-                        color: AssetDisplay.colorOf(context, asset),
-                      ),
+                    WalletAssetIcon(
+                      kind: target.assetKind,
+                      size: context.icons.xl,
                     ),
                     SizedBox(width: context.spacing.md),
                     Expanded(

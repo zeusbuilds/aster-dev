@@ -1,58 +1,87 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../shared/shared.dart';
+import '../view_model/view_models.dart';
 import '../widgets/widgets.dart';
 
-/// Main home screen displaying wallet balance, Bitcoin price, and asset list
-class HomeScreen extends StatelessWidget {
+/// Active-wallet overview with truthful market and cross-rail balance states.
+class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    final metrics = context.metrics;
-    final screenHeight = MediaQuery.sizeOf(context).height;
-    final topPadding = context.windowInsets.topSystem;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final home = ref.watch(homeViewModelProvider);
+    final heroMinimumHeight =
+        MediaQuery.sizeOf(context).height *
+        context.metrics.homeHeroHeightFactor;
+    final bottomContentInset =
+        context.windowInsets.bottomSystem +
+        context.spacing.sm +
+        context.metrics.bottomNavHeight +
+        context.spacing.xxl;
+
+    Future<void> refresh() async {
+      final completed = await ref
+          .read(homeViewModelProvider.notifier)
+          .refresh();
+      if (!context.mounted || completed) return;
+      final failure = ref.read(homeViewModelProvider).value?.refreshFailure;
+      if (failure == null) return;
+      context.toasts.show(
+        title: 'Wallet refresh failed',
+        message: failure.userMessage,
+        variant: ToastVariant.failure,
+      );
+      ref.read(homeViewModelProvider.notifier).clearRefreshFailure();
+    }
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
-        statusBarColor: colors.transparentSurface,
-        statusBarIconBrightness: Brightness.light, // White icons for Android
-        statusBarBrightness: Brightness.dark, // Dark background for iOS
+        statusBarColor: context.appColors.transparentSurface,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
       ),
       child: Scaffold(
         backgroundColor: context.colorScheme.surface,
-        body: Stack(
-          children: [
-            Column(
-              children: [
-                SizedBox(
-                  height: screenHeight * metrics.homeHeroHeightFactor,
-                  width: double.infinity,
+        body: RefreshIndicator(
+          onRefresh: refresh,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: heroMinimumHeight),
                   child: ClipRect(
                     child: Stack(
-                      fit: StackFit.expand,
+                      fit: StackFit.passthrough,
                       children: [
-                        const MeshGradientBackground(),
-                        Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            SizedBox(height: topPadding),
-                            const HomeHeader(),
-                            const PriceCard(),
-                            SizedBox(height: context.spacing.lg),
-                            const HomeActionButtons(),
-                          ],
+                        const Positioned.fill(child: MeshGradientBackground()),
+                        Padding(
+                          padding: EdgeInsets.only(
+                            top: context.windowInsets.topSystem,
+                            bottom: context.spacing.lg,
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const HomeHeader(),
+                              const PriceCard(),
+                              SizedBox(height: context.spacing.lg),
+                              const HomeActionButtons(),
+                            ],
+                          ),
                         ),
                       ],
                     ),
                   ),
                 ),
-                const AssetsSection(),
-              ],
-            ),
-          ],
+              ),
+              SliverToBoxAdapter(child: AssetsSection(home: home)),
+              SliverToBoxAdapter(child: SizedBox(height: bottomContentInset)),
+            ],
+          ),
         ),
       ),
     );

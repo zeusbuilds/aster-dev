@@ -57,28 +57,38 @@ final class PaymentFlowTestHarness {
       services,
     );
     const walletId = '11111111111111111111111111111111';
+    final profile = WalletProfile(
+      id: walletId,
+      name: 'Active',
+      createdAt: DateTime.utc(2026, 8, 11),
+      updatedAt: DateTime.utc(2026, 8, 11),
+      environment: services.environment,
+      state: WalletProfileState.provisioning,
+      storageToken: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    );
     final provisioned = await runtime.provision(
-      profile: WalletProfile(
-        id: walletId,
-        name: 'Active',
-        createdAt: DateTime.utc(2026, 8, 11),
-        updatedAt: DateTime.utc(2026, 8, 11),
-        environment: services.environment,
-        state: WalletProfileState.provisioning,
-        storageToken: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      ),
+      profile: profile,
       mnemonic: 'test mnemonic',
       databasePassword: 'test-password',
     );
     if (provisioned is! AppSuccess<void>) {
       throw StateError('Payment test wallet runtime did not provision.');
     }
+    final profileStore = WalletProfileStore(
+      MemoryWalletRegistryDocumentStore(),
+      preferenceService,
+      clock: effectiveClock,
+    );
+    final staged = await profileStore.stageProvision(profile);
+    if (staged is! AppSuccess<WalletRegistry>) {
+      throw StateError('Payment test wallet profile did not stage.');
+    }
+    final committed = await profileStore.commitProvision(walletId);
+    if (committed is! AppSuccess<WalletRegistry>) {
+      throw StateError('Payment test wallet profile did not commit.');
+    }
     final repository = WalletRepository(
-      WalletProfileStore(
-        MemoryWalletRegistryDocumentStore(),
-        preferenceService,
-        clock: effectiveClock,
-      ),
+      profileStore,
       runtime,
       FakeWalletKeyGenerator(),
       FakeWalletIdentityGenerator(walletId: walletId),
@@ -121,8 +131,8 @@ final class PaymentFlowTestHarness {
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
-    container.dispose();
     await repository.dispose();
+    container.dispose();
   }
 }
 

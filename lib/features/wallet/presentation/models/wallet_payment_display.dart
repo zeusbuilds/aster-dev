@@ -1,12 +1,21 @@
-import '../../../../shared/models/models.dart';
 import '../../domain/models/models.dart';
 
-/// Product copy and visual identity for stable payment targets.
-extension WalletPaymentTargetDisplay on WalletPaymentTarget {
-  String get assetLabel => switch (assetKind) {
+/// Product copy and visual assets for typed wallet asset identities.
+extension WalletAssetKindDisplay on WalletAssetKind {
+  String get displayName => switch (this) {
     WalletAssetKind.bitcoin => 'Bitcoin',
     WalletAssetKind.usdt => 'USDT',
   };
+
+  String get iconAsset => switch (this) {
+    WalletAssetKind.bitcoin => 'assets/icons/tokens/btc.svg',
+    WalletAssetKind.usdt => 'assets/icons/tokens/usdt.svg',
+  };
+}
+
+/// Product copy and visual identity for stable payment targets.
+extension WalletPaymentTargetDisplay on WalletPaymentTarget {
+  String get assetLabel => assetKind.displayName;
 
   String get railLabel => switch ((assetKind, rail)) {
     (WalletAssetKind.bitcoin, PaymentRail.onchain) => 'On-chain',
@@ -31,9 +40,4 @@ extension WalletPaymentTargetDisplay on WalletPaymentTarget {
   };
 
   String get semanticLabel => '$assetLabel, $railLabel';
-
-  AssetModel get assetModel => switch (assetKind) {
-    WalletAssetKind.bitcoin => AssetModel.bitcoin,
-    WalletAssetKind.usdt => AssetModel.usdt,
-  };
 }

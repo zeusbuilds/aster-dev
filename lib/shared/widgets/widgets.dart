@@ -1,7 +1,6 @@
 // Public shared widget API.
 export 'amount_text.dart';
 export 'app_skeletonizer.dart';
-export 'asset_display.dart';
 export 'aster_divider.dart';
 export 'aster_icon_button.dart';
 export 'aster_numeric_keypad.dart';

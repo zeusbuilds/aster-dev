@@ -15,14 +15,7 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
     this.loadingCycleDuration = const Duration(milliseconds: 1200),
     this.chartLoadingCycleDuration = const Duration(milliseconds: 1500),
     this.chartTransitionDuration = const Duration(milliseconds: 800),
-    this.swapKeyboardTransitionDuration = const Duration(milliseconds: 300),
-    this.swapMessageTransitionDuration = const Duration(milliseconds: 400),
-    this.swapDetailsRevealDuration = const Duration(milliseconds: 1200),
-    this.swapDetailsDismissDuration = const Duration(milliseconds: 300),
-    this.swapCancelStaggerDelay = const Duration(milliseconds: 100),
     this.buttonPressedScale = 0.95,
-    this.swapDetailStaggerStep = 0.15,
-    this.swapDetailRevealWindow = 0.85,
     this.settledLoopProgress = 0.25,
     this.splashRotationStart = 0,
     this.splashRotationEnd = 0.192,
@@ -37,8 +30,6 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
     this.fastEase = Curves.easeInOut,
     this.navIndicatorCurve = Curves.fastOutSlowIn,
     this.toastCurve = Curves.easeOut,
-    this.fadeInCurve = Curves.easeIn,
-    this.fadeOutCurve = Curves.easeIn,
     this.choreographyCurve = Curves.easeOutCubic,
     this.splashSplitCurve = Curves.easeInOutCubic,
     this.splashRevealMoveCurve = Curves.easeInOutCubic,
@@ -56,14 +47,7 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
   final Duration loadingCycleDuration;
   final Duration chartLoadingCycleDuration;
   final Duration chartTransitionDuration;
-  final Duration swapKeyboardTransitionDuration;
-  final Duration swapMessageTransitionDuration;
-  final Duration swapDetailsRevealDuration;
-  final Duration swapDetailsDismissDuration;
-  final Duration swapCancelStaggerDelay;
   final double buttonPressedScale;
-  final double swapDetailStaggerStep;
-  final double swapDetailRevealWindow;
   final double settledLoopProgress;
   final double splashRotationStart;
   final double splashRotationEnd;
@@ -78,8 +62,6 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
   final Curve fastEase;
   final Curve navIndicatorCurve;
   final Curve toastCurve;
-  final Curve fadeInCurve;
-  final Curve fadeOutCurve;
   final Curve choreographyCurve;
   final Curve splashSplitCurve;
   final Curve splashRevealMoveCurve;
@@ -98,14 +80,7 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
     Duration? loadingCycleDuration,
     Duration? chartLoadingCycleDuration,
     Duration? chartTransitionDuration,
-    Duration? swapKeyboardTransitionDuration,
-    Duration? swapMessageTransitionDuration,
-    Duration? swapDetailsRevealDuration,
-    Duration? swapDetailsDismissDuration,
-    Duration? swapCancelStaggerDelay,
     double? buttonPressedScale,
-    double? swapDetailStaggerStep,
-    double? swapDetailRevealWindow,
     double? settledLoopProgress,
     double? splashRotationStart,
     double? splashRotationEnd,
@@ -120,8 +95,6 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
     Curve? fastEase,
     Curve? navIndicatorCurve,
     Curve? toastCurve,
-    Curve? fadeInCurve,
-    Curve? fadeOutCurve,
     Curve? choreographyCurve,
     Curve? splashSplitCurve,
     Curve? splashRevealMoveCurve,
@@ -144,21 +117,7 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
           chartLoadingCycleDuration ?? this.chartLoadingCycleDuration,
       chartTransitionDuration:
           chartTransitionDuration ?? this.chartTransitionDuration,
-      swapKeyboardTransitionDuration:
-          swapKeyboardTransitionDuration ?? this.swapKeyboardTransitionDuration,
-      swapMessageTransitionDuration:
-          swapMessageTransitionDuration ?? this.swapMessageTransitionDuration,
-      swapDetailsRevealDuration:
-          swapDetailsRevealDuration ?? this.swapDetailsRevealDuration,
-      swapDetailsDismissDuration:
-          swapDetailsDismissDuration ?? this.swapDetailsDismissDuration,
-      swapCancelStaggerDelay:
-          swapCancelStaggerDelay ?? this.swapCancelStaggerDelay,
       buttonPressedScale: buttonPressedScale ?? this.buttonPressedScale,
-      swapDetailStaggerStep:
-          swapDetailStaggerStep ?? this.swapDetailStaggerStep,
-      swapDetailRevealWindow:
-          swapDetailRevealWindow ?? this.swapDetailRevealWindow,
       settledLoopProgress: settledLoopProgress ?? this.settledLoopProgress,
       splashRotationStart: splashRotationStart ?? this.splashRotationStart,
       splashRotationEnd: splashRotationEnd ?? this.splashRotationEnd,
@@ -174,8 +133,6 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
       fastEase: fastEase ?? this.fastEase,
       navIndicatorCurve: navIndicatorCurve ?? this.navIndicatorCurve,
       toastCurve: toastCurve ?? this.toastCurve,
-      fadeInCurve: fadeInCurve ?? this.fadeInCurve,
-      fadeOutCurve: fadeOutCurve ?? this.fadeOutCurve,
       choreographyCurve: choreographyCurve ?? this.choreographyCurve,
       splashSplitCurve: splashSplitCurve ?? this.splashSplitCurve,
       splashRevealMoveCurve:
@@ -243,44 +200,9 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
         other.chartTransitionDuration,
         t,
       ),
-      swapKeyboardTransitionDuration: _lerpDuration(
-        swapKeyboardTransitionDuration,
-        other.swapKeyboardTransitionDuration,
-        t,
-      ),
-      swapMessageTransitionDuration: _lerpDuration(
-        swapMessageTransitionDuration,
-        other.swapMessageTransitionDuration,
-        t,
-      ),
-      swapDetailsRevealDuration: _lerpDuration(
-        swapDetailsRevealDuration,
-        other.swapDetailsRevealDuration,
-        t,
-      ),
-      swapDetailsDismissDuration: _lerpDuration(
-        swapDetailsDismissDuration,
-        other.swapDetailsDismissDuration,
-        t,
-      ),
-      swapCancelStaggerDelay: _lerpDuration(
-        swapCancelStaggerDelay,
-        other.swapCancelStaggerDelay,
-        t,
-      ),
       buttonPressedScale: _lerp(
         buttonPressedScale,
         other.buttonPressedScale,
-        t,
-      ),
-      swapDetailStaggerStep: _lerp(
-        swapDetailStaggerStep,
-        other.swapDetailStaggerStep,
-        t,
-      ),
-      swapDetailRevealWindow: _lerp(
-        swapDetailRevealWindow,
-        other.swapDetailRevealWindow,
         t,
       ),
       settledLoopProgress: _lerp(
@@ -325,8 +247,6 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
       fastEase: t < 0.5 ? fastEase : other.fastEase,
       navIndicatorCurve: t < 0.5 ? navIndicatorCurve : other.navIndicatorCurve,
       toastCurve: t < 0.5 ? toastCurve : other.toastCurve,
-      fadeInCurve: t < 0.5 ? fadeInCurve : other.fadeInCurve,
-      fadeOutCurve: t < 0.5 ? fadeOutCurve : other.fadeOutCurve,
       choreographyCurve: t < 0.5 ? choreographyCurve : other.choreographyCurve,
       splashSplitCurve: t < 0.5 ? splashSplitCurve : other.splashSplitCurve,
       splashRevealMoveCurve: t < 0.5

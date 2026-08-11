@@ -5,9 +5,7 @@ import 'package:remixicon/remixicon.dart';
 
 import '../../../../shared/shared.dart';
 
-/// Row of action buttons for Send, Receive, and Swap operations
-///
-/// Provides quick access to main wallet operations from the home screen
+/// Equal-width entry commands for the three wallet flows.
 class HomeActionButtons extends StatelessWidget {
   const HomeActionButtons({super.key});
 
@@ -27,7 +25,7 @@ class HomeActionButtons extends StatelessWidget {
               width: double.infinity,
               suffixIcon: RemixIcons.arrow_right_up_line,
               variant: ButtonVariant.translucent,
-              onTap: () async => context.push(RoutePaths.sendAddress),
+              onTap: () async => context.push(RoutePaths.send),
             ),
           ),
           SizedBox(width: spacing.md),

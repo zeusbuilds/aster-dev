@@ -10,9 +10,7 @@ import 'package:ming_cute_icons/ming_cute_icons.dart';
 import '../../../../shared/shared.dart';
 import '../../../wallet/presentation/view_model/viewmodels.dart';
 
-/// Header widget for the home screen
-///
-/// Displays the app logo and active wallet name with navigation to wallet selection
+/// Active wallet identity and wallet-selection command.
 class HomeHeader extends ConsumerWidget {
   const HomeHeader({super.key});
 
@@ -25,6 +23,11 @@ class HomeHeader extends ConsumerWidget {
     final activeWallet = switch (walletState) {
       AsyncData(:final value) => value.activeWallet,
       _ => null,
+    };
+    final walletName = activeWallet?.name;
+    final canSelectWallet = switch (walletState) {
+      AsyncData(:final value) when value.wallets.isNotEmpty => true,
+      _ => false,
     };
 
     return Padding(
@@ -41,40 +44,57 @@ class HomeHeader extends ConsumerWidget {
               colorFilter: ColorFilter.mode(colors.onBrandArt, BlendMode.srcIn),
             ),
           ),
-          const Spacer(),
-          Semantics(
-            button: true,
-            label: 'Select wallet, ${activeWallet?.name ?? 'Main Wallet'}',
-            excludeSemantics: true,
-            child: Material(
-              color: colors.transparentSurface,
-              child: InkWell(
-                onTap: () {
-                  unawaited(context.haptics.trigger(HapticIntent.lightImpact));
-                  unawaited(
-                    context.pushNamed<void>(RouteNames.walletSelection),
-                  );
-                },
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight: context.metrics.minTouchTarget,
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Text(
-                        activeWallet?.name ?? 'Main Wallet',
-                        style: context.type.brandAction.copyWith(
+          SizedBox(width: spacing.md),
+          Expanded(
+            child: Semantics(
+              button: true,
+              enabled: canSelectWallet,
+              label: walletName == null
+                  ? 'Wallet unavailable'
+                  : 'Select wallet, $walletName',
+              excludeSemantics: true,
+              child: Material(
+                color: colors.transparentSurface,
+                child: InkWell(
+                  onTap: !canSelectWallet
+                      ? null
+                      : () {
+                          unawaited(
+                            context.haptics.trigger(HapticIntent.lightImpact),
+                          );
+                          unawaited(
+                            context.pushNamed<void>(RouteNames.walletSelection),
+                          );
+                        },
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: context.metrics.minTouchTarget,
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: AppSkeletonizer(
+                            enabled: walletState.isLoading,
+                            child: Text(
+                              walletName ?? 'Wallet unavailable',
+                              style: context.type.brandAction.copyWith(
+                                color: colors.onBrandArt,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.end,
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: spacing.xs),
+                        Icon(
+                          MingCuteIcons.mgc_wallet_3_line,
+                          size: icons.md,
                           color: colors.onBrandArt,
                         ),
-                      ),
-                      SizedBox(width: spacing.xs),
-                      Icon(
-                        MingCuteIcons.mgc_wallet_3_line,
-                        size: icons.md,
-                        color: colors.onBrandArt,
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),

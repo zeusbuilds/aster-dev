@@ -243,6 +243,7 @@ final class FakeWalletEngine implements WalletEngine {
   Object? feeEstimateError;
   Object? balanceError;
   Completer<void>? initializeGate;
+  Completer<void>? syncGate;
   Completer<void>? addressGate;
   Completer<void>? decodeInvoiceGate;
   Completer<void>? createReceiveGate;
@@ -256,6 +257,7 @@ final class FakeWalletEngine implements WalletEngine {
   WalletSendResult? sentPayment;
   WalletFeeRateEstimate? feeEstimate;
   WalletBalance? balance;
+  final Map<WalletAssetId, WalletBalance> balances = {};
   PaymentRoute? decodedInvoiceRoute;
   String? decodedInvoiceValue;
   PaymentRoute? createdReceiveRoute;
@@ -285,6 +287,7 @@ final class FakeWalletEngine implements WalletEngine {
   @override
   Future<void> sync() async {
     calls.add('sync');
+    await syncGate?.future;
     if (syncError case final Object error) throw error;
   }
 
@@ -369,7 +372,7 @@ final class FakeWalletEngine implements WalletEngine {
     requestedBalanceAsset = asset;
     await balanceGate?.future;
     if (balanceError case final Object error) throw error;
-    final configured = balance;
+    final configured = balances[asset.id] ?? balance;
     if (configured != null) {
       if (configured.asset != asset) {
         throw StateError('Configured fake balance has a different asset.');

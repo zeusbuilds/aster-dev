@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:remixicon/remixicon.dart';
 import 'package:unicons/unicons.dart';
 
+import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
 import '../../../market/data/data.dart';
 import '../../../market/presentation/view_model/view_models.dart';
@@ -12,13 +15,48 @@ import '../../data/data.dart';
 import 'candle_chart.dart';
 
 /// Bitcoin market card backed by injected repository state.
-class PriceCard extends ConsumerWidget {
+class PriceCard extends ConsumerStatefulWidget {
   const PriceCard({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PriceCard> createState() => _PriceCardState();
+}
+
+class _PriceCardState extends ConsumerState<PriceCard> {
+  Timer? _expiryTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    ref.listenManual(
+      bitcoinMarketViewModelProvider,
+      (previous, next) => _scheduleExpiry(next.value),
+      fireImmediately: true,
+    );
+  }
+
+  @override
+  void dispose() {
+    _expiryTimer?.cancel();
+    super.dispose();
+  }
+
+  void _scheduleExpiry(BitcoinMarketSnapshot? snapshot) {
+    _expiryTimer?.cancel();
+    if (snapshot == null) return;
+    final now = ref.read(utcClockProvider)().toUtc();
+    final remaining = snapshot.expiresAt.difference(now);
+    _expiryTimer = Timer(remaining.isNegative ? Duration.zero : remaining, () {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final market = ref.watch(bitcoinMarketViewModelProvider);
-    final snapshot = market.value;
+    final now = ref.watch(utcClockProvider)().toUtc();
+    final rawSnapshot = market.value;
+    final snapshot = rawSnapshot?.isCurrentAt(now) == true ? rawSnapshot : null;
     final chartData = snapshot?.history.indexed
         .map(
           (entry) =>

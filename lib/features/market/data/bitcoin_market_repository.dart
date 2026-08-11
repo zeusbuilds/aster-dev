@@ -202,9 +202,7 @@ final class BitcoinMarketRepository {
   }
 
   static bool _isCurrent(DateTime observedAt, DateTime now) =>
-      !observedAt.isBefore(
-        now.subtract(BitcoinMarketSnapshot.maximumCurrentAge),
-      ) &&
+      now.isBefore(observedAt.add(BitcoinMarketSnapshot.maximumCurrentAge)) &&
       !observedAt.isAfter(now.add(_maximumFutureSkew));
 
   static DateTime _utcNow() => DateTime.now().toUtc();
