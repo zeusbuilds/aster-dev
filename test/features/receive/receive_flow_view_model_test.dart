@@ -146,9 +146,6 @@ void main() {
     expect(harness.share.sharedText, state.request.encodedRequest);
     expect(harness.share.sharedOrigin, same(origin));
     await Future<void>.delayed(Duration.zero);
-    expect(harness.haptics.intents, [
-      HapticIntent.lightImpact,
-      HapticIntent.lightImpact,
-    ]);
+    expect(harness.haptics.intents, [HapticIntent.lightImpact]);
   });
 }

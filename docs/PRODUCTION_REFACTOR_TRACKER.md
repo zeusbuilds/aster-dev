@@ -464,7 +464,6 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `lib/features/home/data/models/chart_data_item.dart` | Dart source | verified | DATA-002 | Immutable chart point equality supports deterministic widget data-change detection | `1b3273a` |
 | `lib/features/home/presentation/screens/home_screen.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/home/presentation/screens/screens.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/home/presentation/view_model/view_models.dart` | Dart source | verified | ARCH-002 | Feature-boundary barrel exports the market ViewModel only | `1b3273a` |
 | `lib/features/home/presentation/widgets/asset_row.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/home/presentation/widgets/assets_section.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/home/presentation/widgets/candle_chart.dart` | Dart source | verified | DATA-002 | Fabricated candle extrema removed; real point updates/reset and animation ownership reviewed | `1b3273a` |
@@ -508,12 +507,10 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `lib/features/receive/presentation/models/receive_flow_state.dart` | Dart source | verified | DEC-034, RECV-001, PAY-004 | Immutable request, pending exact amount, operation, expiry, and redacted failure state enforces route/text invariants; exact aggregate gates pass | `715e671` |
 | `lib/features/receive/presentation/screens/receive_request_screen.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/receive/presentation/screens/receive_screen.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/receive/presentation/screens/receive_set_amount_screen.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/receive/presentation/screens/screens.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/receive/presentation/view_model/receive_flow_view_model.dart` | Dart source | verified | DEC-034, RECV-001, PAY-004, UX-001 | Generated route-scoped AsyncNotifier resolves deployment metadata, generates real requests, suppresses overlap, and replaces QR state only after success; exact aggregate gates pass | `715e671` |
 | `lib/features/receive/presentation/view_model/view_models.dart` | Dart source | verified | RECV-001 | Boundary exports only the public Receive ViewModel | `715e671` |
 | `lib/features/receive/presentation/widgets/receive_amount_sheet.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/receive/presentation/widgets/receive_card.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/receive/presentation/widgets/widgets.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/scan/presentation/screens/scan_screen.dart` | Dart source | fixing | ARCH-004, SEC-004 | User-visible failures are redacted and feedback is semantic; plugin/service ownership remains Phase 5 | `98b7a40` |
 | `lib/features/scan/presentation/screens/screens.dart` | Dart source | unreviewed | - | - | - |
@@ -562,7 +559,6 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `lib/features/settings/presentation/widgets/country_select_option_row.dart` | Dart source | verified | FLAG-001, ACCESS-001 | Shared region row uses `circle_flags`, stable selection semantics, and semantic haptic ownership | `6cc7376` |
 | `lib/features/settings/presentation/widgets/currency_select_option_row.dart` | Dart source | verified | FLAG-001, ACCESS-001 | Shared currency row uses `circle_flags`, stable selection semantics, and semantic haptic ownership | `6cc7376` |
 | `lib/features/settings/presentation/widgets/settings_choice_row.dart` | Dart source | verified | SETTINGS-002, ACCESS-001 | Reusable choice row owns disabled/loading/selected semantics without direct persistence | `6cc7376` |
-| `lib/features/settings/presentation/widgets/settings_option_row.dart` | Dart source | verified | SETTINGS-001, ACCESS-001 | Settings navigation row handles long details, disabled state, and accessible labeling without layout overflow | `6cc7376` |
 | `lib/features/settings/presentation/widgets/widgets.dart` | Dart source | verified | SETTINGS-002 | Feature widget boundary exports reviewed public settings rows only | `6cc7376` |
 | `lib/features/skeleton/presentation/providers/providers.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/skeleton/presentation/providers/skeleton_index_provider.dart` | Dart source | unreviewed | - | - | - |

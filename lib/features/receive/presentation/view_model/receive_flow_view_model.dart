@@ -121,15 +121,11 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
     state = AsyncData(
       current.copyWith(operation: null, failure: _failureOf(result)),
     );
-    unawaited(
-      ref
-          .read(hapticFeedbackServiceProvider)
-          .trigger(
-            result is AppSuccess<ShareDisposition>
-                ? HapticIntent.lightImpact
-                : HapticIntent.error,
-          ),
-    );
+    if (result case AppFailureResult<ShareDisposition>()) {
+      unawaited(
+        ref.read(hapticFeedbackServiceProvider).trigger(HapticIntent.error),
+      );
+    }
     return result;
   }
 

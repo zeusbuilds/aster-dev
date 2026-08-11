@@ -10,20 +10,26 @@ import 'wallet_engine.dart';
 final class RgbWalletEngineFactory implements WalletEngineFactory {
   const RgbWalletEngineFactory()
     : _sdk = const RgbSdkFlutter(),
-      _bitcoinAddresses = const BitcoinPaymentInstructionParser();
+      _bitcoinAddresses = const BitcoinPaymentInstructionParser(),
+      utcClock = null;
 
   /// Production constructor for sharing the app-owned validation boundary.
-  const RgbWalletEngineFactory.withAddresses(this._bitcoinAddresses)
-    : _sdk = const RgbSdkFlutter();
+  const RgbWalletEngineFactory.withAddresses(
+    this._bitcoinAddresses, {
+    this.utcClock,
+  }) : _sdk = const RgbSdkFlutter();
 
   /// Test seam for proving stable-SDK forwarding without global state.
   const RgbWalletEngineFactory.withSdk(
     this._sdk, [
     this._bitcoinAddresses = const BitcoinPaymentInstructionParser(),
-  ]);
+  ]) : utcClock = null;
 
   final RgbSdkFlutter _sdk;
   final BitcoinAddressValidator _bitcoinAddresses;
+
+  /// UTC time source forwarded to each created adapter.
+  final DateTime Function()? utcClock;
 
   @override
   WalletEngine create(WalletEngineConfiguration configuration) {
@@ -41,6 +47,7 @@ final class RgbWalletEngineFactory implements WalletEngineFactory {
       wallet,
       services,
       _unlockConfiguration(services),
+      clock: utcClock,
       bitcoinAddresses: _bitcoinAddresses,
     );
   }

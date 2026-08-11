@@ -242,9 +242,11 @@ class SendFlowViewModel extends _$SendFlowViewModel {
     if (current == null || current.isBusy || current.result != null) {
       return false;
     }
-    final now = DateTime.now().toUtc();
+    final now = ref.read(utcClockProvider)();
     if (!current.canSubmitAt(now)) {
-      state = AsyncData(current.copyWith(failure: _submissionFailure(current)));
+      state = AsyncData(
+        current.copyWith(failure: _submissionFailure(current, now)),
+      );
       return false;
     }
     final preview = current.preview!;
@@ -343,7 +345,7 @@ class SendFlowViewModel extends _$SendFlowViewModel {
   }
 
   bool _acceptPreview(SendFlowState previous, WalletPaymentPreview preview) {
-    if (preview.isExpiredAt(DateTime.now().toUtc())) {
+    if (preview.isExpiredAt(ref.read(utcClockProvider)())) {
       return _fail(previous, _expiredRequestFailure());
     }
     final encodedAmount = preview.amount;
@@ -399,8 +401,8 @@ class SendFlowViewModel extends _$SendFlowViewModel {
     return false;
   }
 
-  static AppFailure _submissionFailure(SendFlowState state) {
-    if (state.isExpiredAt(DateTime.now().toUtc())) {
+  static AppFailure _submissionFailure(SendFlowState state, DateTime now) {
+    if (state.isExpiredAt(now)) {
       return _expiredRequestFailure();
     }
     if (!state.amountInput.isValid) {

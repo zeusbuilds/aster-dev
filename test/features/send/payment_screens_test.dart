@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:aster/core/core.dart';
+import 'package:aster/features/market/data/data.dart';
 import 'package:aster/features/receive/presentation/screens/screens.dart';
 import 'package:aster/features/receive/presentation/widgets/widgets.dart';
 import 'package:aster/features/send/presentation/screens/screens.dart';
@@ -121,6 +122,93 @@ void main() {
       findsOneWidget,
     );
     expect(harness.engine.sentPaymentCommand, isNull);
+  });
+
+  testWidgets('send removes a USD quote at its exact freshness boundary', (
+    tester,
+  ) async {
+    var clockNow = DateTime.utc(2026, 8, 11, 12);
+    final observedAt = clockNow.subtract(
+      BitcoinMarketSnapshot.maximumCurrentAge - const Duration(seconds: 1),
+    );
+    final transport = ResilientHttpClient(
+      client: MockClient((request) async {
+        if (request.url.path.endsWith('/range')) {
+          return http.Response(
+            jsonEncode({
+              'prices': [
+                [
+                  clockNow
+                      .subtract(const Duration(minutes: 10))
+                      .millisecondsSinceEpoch,
+                  65000,
+                ],
+              ],
+            }),
+            200,
+          );
+        }
+        return http.Response(
+          jsonEncode({
+            'bitcoin': {
+              'usd': 65000,
+              'last_updated_at': observedAt.millisecondsSinceEpoch ~/ 1000,
+            },
+          }),
+          200,
+        );
+      }),
+      retryPolicy: RetryPolicy(maxAttempts: 1),
+      clock: () => clockNow,
+    );
+    addTearDown(transport.close);
+    final engine = FakeWalletEngine()
+      ..balance = _bitcoinBalance(1000)
+      ..feeEstimate = WalletFeeRateEstimate(
+        targetBlocks: 6,
+        satsPerVbyte: 2,
+        observedAt: clockNow,
+      );
+    final harness = await PaymentFlowTestHarness.create(
+      engine: engine,
+      httpClient: transport,
+      clock: () => clockNow,
+    );
+    addTearDown(() => _disposeHarness(tester, harness));
+    final provider = sendFlowViewModelProvider(
+      WalletPaymentTarget.bitcoinOnchain,
+    );
+    final subscription = harness.container.listen(
+      provider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    await tester.runAsync(() => harness.container.read(provider.future));
+    final notifier = harness.container.read(provider.notifier);
+    notifier.updateDestination('mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn');
+    expect(await tester.runAsync(notifier.validateDestination), isTrue);
+
+    await _pumpWidget(
+      tester,
+      harness,
+      const SendAmountScreen(target: WalletPaymentTarget.bitcoinOnchain),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byType(AsterNumericKeypad).evaluate().isNotEmpty,
+    );
+    final keypad = find.byType(AsterNumericKeypad);
+    for (final digit in ['0', '.', '0', '0', '0', '0', '0', '1']) {
+      await tester.tap(find.descendant(of: keypad, matching: find.text(digit)));
+      await tester.pump();
+    }
+    await _pumpUntil(tester, () => find.text('≈ \$0.07').evaluate().isNotEmpty);
+
+    clockNow = clockNow.add(const Duration(seconds: 2));
+    await tester.pump(const Duration(seconds: 2));
+
+    expect(find.text('USD quote unavailable'), findsOneWidget);
   });
 
   testWidgets('Receive renders real request, copies it, and applies amount', (

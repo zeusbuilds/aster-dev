@@ -8,7 +8,6 @@ final class BitcoinMarketRepository {
     : _clock = clock ?? _utcNow;
 
   static const _baseUrl = 'https://api.coingecko.com/api/v3';
-  static const _maximumCurrentAge = Duration(minutes: 30);
   static const _maximumFutureSkew = Duration(minutes: 5);
   final ResilientHttpClient _http;
   final DateTime Function() _clock;
@@ -203,7 +202,9 @@ final class BitcoinMarketRepository {
   }
 
   static bool _isCurrent(DateTime observedAt, DateTime now) =>
-      !observedAt.isBefore(now.subtract(_maximumCurrentAge)) &&
+      !observedAt.isBefore(
+        now.subtract(BitcoinMarketSnapshot.maximumCurrentAge),
+      ) &&
       !observedAt.isAfter(now.add(_maximumFutureSkew));
 
   static DateTime _utcNow() => DateTime.now().toUtc();

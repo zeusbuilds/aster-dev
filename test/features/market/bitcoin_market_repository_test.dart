@@ -251,4 +251,30 @@ void main() {
       153,
     );
   });
+
+  test('market snapshot exposes an exact presentation freshness boundary', () {
+    final observedAt = DateTime.utc(2026, 8, 11, 12);
+    final snapshot = BitcoinMarketSnapshot(
+      currentUsdCents: 6500000,
+      currentObservedAt: observedAt,
+      currentSource: BitcoinPriceSource.spot,
+      history: const [],
+    );
+
+    expect(snapshot.isCurrentAt(observedAt), isTrue);
+    expect(
+      snapshot.isCurrentAt(
+        observedAt.add(
+          BitcoinMarketSnapshot.maximumCurrentAge -
+              const Duration(milliseconds: 1),
+        ),
+      ),
+      isTrue,
+    );
+    expect(snapshot.isCurrentAt(snapshot.expiresAt), isFalse);
+    expect(
+      snapshot.isCurrentAt(observedAt.subtract(const Duration(seconds: 1))),
+      isFalse,
+    );
+  });
 }

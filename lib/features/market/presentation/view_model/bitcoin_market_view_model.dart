@@ -7,7 +7,10 @@ part 'bitcoin_market_view_model.g.dart';
 
 @riverpod
 BitcoinMarketRepository bitcoinMarketRepository(Ref ref) {
-  return BitcoinMarketRepository(ref.watch(resilientHttpClientProvider));
+  return BitcoinMarketRepository(
+    ref.watch(resilientHttpClientProvider),
+    clock: ref.watch(utcClockProvider),
+  );
 }
 
 /// Owns initial-load and retry state for the Bitcoin market card.

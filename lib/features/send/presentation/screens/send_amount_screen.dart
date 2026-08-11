@@ -28,12 +28,32 @@ class SendAmountScreen extends ConsumerStatefulWidget {
 class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
     with WidgetsBindingObserver {
   Timer? _deadlineTimer;
-  DateTime _now = DateTime.now().toUtc();
+  late DateTime _now;
 
   @override
   void initState() {
     super.initState();
+    _now = ref.read(utcClockProvider)();
     WidgetsBinding.instance.addObserver(this);
+    final flowProvider = sendFlowViewModelProvider(widget.target);
+    ref.listenManual(
+      flowProvider,
+      (previous, next) => _scheduleDeadline(
+        next.value,
+        widget.target.assetKind == WalletAssetKind.bitcoin
+            ? ref.read(bitcoinMarketViewModelProvider).value
+            : null,
+      ),
+      fireImmediately: true,
+    );
+    if (widget.target.assetKind == WalletAssetKind.bitcoin) {
+      ref.listenManual(
+        bitcoinMarketViewModelProvider,
+        (previous, next) =>
+            _scheduleDeadline(ref.read(flowProvider).value, next.value),
+        fireImmediately: true,
+      );
+    }
   }
 
   @override
@@ -46,10 +66,10 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) return;
-    setState(() => _now = DateTime.now().toUtc());
+    setState(() => _now = ref.read(utcClockProvider)());
   }
 
-  void _scheduleDeadline(SendFlowState? state) {
+  void _scheduleDeadline(SendFlowState? state, BitcoinMarketSnapshot? market) {
     _deadlineTimer?.cancel();
     if (state == null) return;
     final deadlines = <DateTime>[];
@@ -61,16 +81,22 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
     if (fee != null) {
       deadlines.add(fee.observedAt.add(WalletFeeRateEstimate.maximumAge));
     }
+    if (market != null) deadlines.add(market.expiresAt);
     deadlines.sort();
     if (deadlines.isEmpty) return;
-    final delay = deadlines.first.difference(DateTime.now().toUtc());
-    if (delay <= Duration.zero) {
-      _now = DateTime.now().toUtc();
-      return;
+    final now = ref.read(utcClockProvider)();
+    DateTime? nextDeadline;
+    for (final deadline in deadlines) {
+      if (deadline.isAfter(now)) {
+        nextDeadline = deadline;
+        break;
+      }
     }
+    if (nextDeadline == null) return;
+    final delay = nextDeadline.difference(now);
     _deadlineTimer = Timer(delay + const Duration(milliseconds: 1), () {
       if (!mounted) return;
-      setState(() => _now = DateTime.now().toUtc());
+      setState(() => _now = ref.read(utcClockProvider)());
     });
   }
 
@@ -100,7 +126,6 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
   @override
   Widget build(BuildContext context) {
     final provider = sendFlowViewModelProvider(widget.target);
-    ref.listen(provider, (previous, next) => _scheduleDeadline(next.value));
     final flow = ref.watch(provider);
     final market = widget.target.assetKind == WalletAssetKind.bitcoin
         ? ref.watch(bitcoinMarketViewModelProvider)
@@ -192,7 +217,7 @@ final class _AmountBody extends StatelessWidget {
       route: state.route,
       bitcoinUnit: state.bitcoinUnit,
     );
-    final fiatText = _fiatText(state, market);
+    final fiatText = _fiatText(state, market, now);
     final inputMessage = _amountMessage(state);
     final fee = state.feeEstimate;
     final feeStale = fee?.isStaleAt(now) ?? false;
@@ -316,23 +341,29 @@ final class _AmountBody extends StatelessWidget {
   String _fiatText(
     SendFlowState state,
     AsyncValue<BitcoinMarketSnapshot>? market,
+    DateTime now,
   ) {
     if (state.currencyCode != 'USD') {
       return '${state.currencyCode} quote unavailable';
     }
     final units = state.amountInput.units;
     if (units == null) return '\$0.00';
-    final price = state.route.asset.kind == WalletAssetKind.bitcoin
-        ? market?.value?.currentUsdCents
+    final snapshot = market?.value;
+    final price =
+        state.route.asset.kind == WalletAssetKind.bitcoin &&
+            (snapshot?.isCurrentAt(now) ?? false)
+        ? snapshot!.currentUsdCents
         : null;
     final cents = WalletUsdEstimate.cents(
       units: units,
       route: state.route,
       bitcoinPriceCents: price,
     );
-    return cents == null
-        ? 'USD quote unavailable'
-        : '≈ ${WalletUsdEstimate.formatCents(cents)}';
+    if (cents == null) return 'USD quote unavailable';
+    final value = WalletUsdEstimate.formatCents(cents);
+    return state.route.asset.kind == WalletAssetKind.usdt
+        ? '$value face value'
+        : '≈ $value';
   }
 
   static String? _amountMessage(SendFlowState state) {

@@ -269,6 +269,46 @@ void main() {
       expect(harness.haptics.intents, [HapticIntent.lightImpact]);
     },
   );
+
+  test('rejects an expired invoice against the injected UTC clock', () async {
+    final now = DateTime.utc(2026, 8, 11, 12);
+    const route = PaymentRoute(
+      asset: WalletAsset.bitcoin,
+      rail: PaymentRail.lightning,
+    );
+    final engine = FakeWalletEngine()
+      ..balance = _balance(onchainSpendable: 0, lightningSpendable: 5000)
+      ..decodedInvoice = WalletPaymentPreview(
+        route: route,
+        encodedDestination: 'lnbcrt1expired',
+        displayDestination: 'lnbcrt1expired',
+        expiresAt: now.subtract(const Duration(seconds: 1)),
+      );
+    final harness = await PaymentFlowTestHarness.create(
+      engine: engine,
+      clock: () => now,
+    );
+    addTearDown(harness.dispose);
+    final provider = sendFlowViewModelProvider(
+      WalletPaymentTarget.bitcoinLightning,
+    );
+    final subscription = harness.container.listen(
+      provider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    await harness.container.read(provider.future);
+    final notifier = harness.container.read(provider.notifier);
+
+    notifier.updateDestination('lnbcrt1expired');
+
+    expect(await notifier.validateDestination(), isFalse);
+    expect(
+      harness.container.read(provider).requireValue.failure?.code,
+      'payment_request_expired',
+    );
+  });
 }
 
 WalletBalance _balance({

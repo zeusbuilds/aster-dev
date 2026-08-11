@@ -17,8 +17,10 @@ final class ResilientHttpClient {
     this.timeouts = const NetworkTimeoutPolicy(),
     RetryPolicy? retryPolicy,
     this.maximumResponseBytes = 1024 * 1024,
+    DateTime Function()? clock,
   }) : _client = client ?? http.Client(),
-       _retryPolicy = retryPolicy ?? RetryPolicy() {
+       _retryPolicy = retryPolicy ?? RetryPolicy(),
+       _clock = clock ?? _utcNow {
     if (maximumResponseBytes < 1) {
       throw ArgumentError.value(
         maximumResponseBytes,
@@ -36,6 +38,7 @@ final class ResilientHttpClient {
   final http.Client _client;
   final NetworkTimeoutPolicy timeouts;
   final RetryPolicy _retryPolicy;
+  final DateTime Function() _clock;
   final int maximumResponseBytes;
   bool _closed = false;
 
@@ -239,7 +242,7 @@ final class ResilientHttpClient {
     return builder.takeBytes();
   }
 
-  static AppFailure _httpFailure(http.StreamedResponse response) {
+  AppFailure _httpFailure(http.StreamedResponse response) {
     final status = response.statusCode;
     final retryAfter = _retryAfter(response.headers['retry-after']);
     if (status == 429) {
@@ -296,13 +299,13 @@ final class ResilientHttpClient {
     );
   }
 
-  static Duration? _retryAfter(String? value) {
+  Duration? _retryAfter(String? value) {
     if (value == null) return null;
     final seconds = int.tryParse(value.trim());
     if (seconds != null && seconds >= 0) return Duration(seconds: seconds);
     try {
       final date = HttpDate.parse(value);
-      final difference = date.difference(DateTime.now().toUtc());
+      final difference = date.difference(_clock().toUtc());
       return difference.isNegative ? Duration.zero : difference;
     } on FormatException {
       return null;
@@ -311,6 +314,8 @@ final class ResilientHttpClient {
 
   static Duration _shorter(Duration first, Duration second) =>
       first <= second ? first : second;
+
+  static DateTime _utcNow() => DateTime.now().toUtc();
 
   static AppFailure? _requestPolicyFailure(Uri uri) {
     if (!uri.isAbsolute ||

@@ -56,6 +56,15 @@ final class BitcoinMarketSnapshot {
   final BitcoinPriceSource currentSource;
   final List<BitcoinPricePoint> history;
 
+  /// Maximum age for presenting the current price as a live conversion.
+  static const maximumCurrentAge = Duration(minutes: 30);
+
+  DateTime get expiresAt => currentObservedAt.add(maximumCurrentAge);
+
+  bool isCurrentAt(DateTime now) =>
+      !now.toUtc().isBefore(currentObservedAt) &&
+      now.toUtc().isBefore(expiresAt);
+
   /// Price change in basis points, where 100 basis points equals one percent.
   int? get changeBasisPoints {
     if (history.length < 2 || history.first.usdCents == 0) return null;

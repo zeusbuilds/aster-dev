@@ -28,12 +28,18 @@ class ReceiveRequestScreen extends ConsumerStatefulWidget {
 class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
     with WidgetsBindingObserver {
   Timer? _expiryTimer;
-  DateTime _now = DateTime.now().toUtc();
+  late DateTime _now;
 
   @override
   void initState() {
     super.initState();
+    _now = ref.read(utcClockProvider)();
     WidgetsBinding.instance.addObserver(this);
+    ref.listenManual(
+      receiveFlowViewModelProvider(widget.target),
+      (previous, next) => _scheduleExpiry(next.value),
+      fireImmediately: true,
+    );
   }
 
   @override
@@ -46,21 +52,21 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) return;
-    setState(() => _now = DateTime.now().toUtc());
+    setState(() => _now = ref.read(utcClockProvider)());
   }
 
   void _scheduleExpiry(ReceiveFlowState? state) {
     _expiryTimer?.cancel();
     final expiry = state?.request.expiresAt;
     if (expiry == null) return;
-    final delay = expiry.difference(DateTime.now().toUtc());
+    final delay = expiry.difference(ref.read(utcClockProvider)());
     if (delay <= Duration.zero) {
-      _now = DateTime.now().toUtc();
+      _now = ref.read(utcClockProvider)();
       return;
     }
     _expiryTimer = Timer(delay, () {
       if (!mounted) return;
-      setState(() => _now = DateTime.now().toUtc());
+      setState(() => _now = ref.read(utcClockProvider)());
     });
   }
 
@@ -138,7 +144,6 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
   @override
   Widget build(BuildContext context) {
     final provider = receiveFlowViewModelProvider(widget.target);
-    ref.listen(provider, (previous, next) => _scheduleExpiry(next.value));
     final flow = ref.watch(provider);
     return Scaffold(
       backgroundColor: context.colorScheme.surface,

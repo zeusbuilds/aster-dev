@@ -19,6 +19,12 @@ import '../storage/storage.dart';
 
 part 'providers.g.dart';
 
+/// Injectable UTC wall clock shared by app-owned time-sensitive operations.
+typedef UtcClock = DateTime Function();
+
+@Riverpod(keepAlive: true)
+UtcClock utcClock(Ref ref) => _systemUtcNow;
+
 @riverpod
 AssetBundle appAssetBundle(Ref ref) => rootBundle;
 
@@ -68,7 +74,7 @@ ShareService shareService(Ref ref) {
 
 @Riverpod(keepAlive: true)
 ResilientHttpClient resilientHttpClient(Ref ref) {
-  final client = ResilientHttpClient();
+  final client = ResilientHttpClient(clock: ref.watch(utcClockProvider));
   ref.onDispose(client.close);
   return client;
 }
@@ -82,6 +88,7 @@ WalletServiceConfiguration walletServiceConfiguration(Ref ref) {
 WalletEngineFactory walletEngineFactory(Ref ref) {
   return RgbWalletEngineFactory.withAddresses(
     ref.watch(bitcoinPaymentInstructionDecoderProvider),
+    utcClock: ref.watch(utcClockProvider),
   );
 }
 
@@ -127,7 +134,11 @@ Future<WalletRegistryDocumentStore> walletRegistryDocumentStore(Ref ref) async {
 Future<WalletProfilePersistence> walletProfileStore(Ref ref) async {
   final preferences = await ref.watch(preferencesServiceProvider.future);
   final documents = await ref.watch(walletRegistryDocumentStoreProvider.future);
-  return WalletProfileStore(documents, preferences);
+  return WalletProfileStore(
+    documents,
+    preferences,
+    clock: ref.watch(utcClockProvider),
+  );
 }
 
 @riverpod
@@ -184,5 +195,8 @@ Future<WalletRepository> walletRepository(Ref ref) async {
     services,
     legacySeedPreflight,
     bitcoinInstructions: ref.watch(bitcoinPaymentInstructionDecoderProvider),
+    clock: ref.watch(utcClockProvider),
   );
 }
+
+DateTime _systemUtcNow() => DateTime.now().toUtc();

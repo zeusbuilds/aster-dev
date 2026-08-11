@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:aster/core/core.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -34,6 +35,43 @@ void main() {
     expect(calls, 2);
     expect(waits, [const Duration(seconds: 2)]);
   });
+
+  test(
+    'resolves HTTP-date Retry-After against the injected UTC clock',
+    () async {
+      final now = DateTime.utc(2026, 8, 11, 12);
+      var calls = 0;
+      final waits = <Duration>[];
+      final transport = ResilientHttpClient(
+        client: MockClient((request) async {
+          calls += 1;
+          return calls == 1
+              ? http.Response(
+                  '',
+                  503,
+                  headers: {
+                    'retry-after': HttpDate.format(
+                      now.add(const Duration(seconds: 3)),
+                    ),
+                  },
+                )
+              : http.Response('{}', 200);
+        }),
+        retryPolicy: RetryPolicy(
+          maxAttempts: 2,
+          sleep: (delay) async => waits.add(delay),
+        ),
+        clock: () => now,
+      );
+      addTearDown(transport.close);
+
+      expect(
+        await transport.get(Uri.https('example.com', '/data')),
+        isA<AppSuccess<HttpPayload>>(),
+      );
+      expect(waits, [const Duration(seconds: 3)]);
+    },
+  );
 
   test('does not retry a rejected non-transient request', () async {
     var calls = 0;

@@ -43,10 +43,12 @@ final class PaymentFlowTestHarness {
     ),
     Map<String, Object> preferenceValues = const {},
     ResilientHttpClient? httpClient,
+    UtcClock? clock,
   }) async {
     SharedPreferences.setMockInitialValues(preferenceValues);
     final preferences = await SharedPreferences.getInstance();
     final preferenceService = PreferencesService(preferences);
+    final effectiveClock = clock ?? () => DateTime.now().toUtc();
     final selectedEngine = engine ?? FakeWalletEngine();
     final runtime = WalletRuntime(
       FakeWalletEngineFactory([selectedEngine]),
@@ -75,12 +77,14 @@ final class PaymentFlowTestHarness {
       WalletProfileStore(
         MemoryWalletRegistryDocumentStore(),
         preferenceService,
+        clock: effectiveClock,
       ),
       runtime,
       FakeWalletKeyGenerator(),
       FakeWalletIdentityGenerator(walletId: walletId),
       services,
       const SuccessfulLegacyWalletSeedPreflight(),
+      clock: effectiveClock,
     );
     final settings = SettingsRepository(
       preferenceService,
@@ -98,6 +102,7 @@ final class PaymentFlowTestHarness {
         hapticFeedbackServiceProvider.overrideWithValue(haptics),
         clipboardServiceProvider.overrideWithValue(clipboard),
         shareServiceProvider.overrideWithValue(share),
+        utcClockProvider.overrideWithValue(effectiveClock),
         if (httpClient != null)
           resilientHttpClientProvider.overrideWithValue(httpClient),
       ],
