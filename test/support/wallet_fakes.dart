@@ -237,6 +237,7 @@ final class FakeWalletEngine implements WalletEngine {
   Object? shutdownError;
   Object? destroyError;
   Object? syncError;
+  Completer<void>? initializeGate;
   Completer<void>? addressGate;
   String address = 'bcrt1qtest';
   String? initializedPassword;
@@ -250,6 +251,7 @@ final class FakeWalletEngine implements WalletEngine {
     calls.add('initialize');
     initializedPassword = databasePassword;
     initializedMnemonic = mnemonic;
+    await initializeGate?.future;
     if (initializeError case final Object error) throw error;
   }
 
@@ -330,7 +332,9 @@ final class FakeWalletKeyGenerator implements WalletKeyGenerator {
       'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
   Object? generationError;
   Object? validationError;
+  Completer<void>? validationGate;
   final validatedMnemonics = <String>[];
+  var validationCompletionCount = 0;
 
   @override
   Future<String> generateMnemonic(BlockchainEnvironment environment) async {
@@ -341,6 +345,8 @@ final class FakeWalletKeyGenerator implements WalletKeyGenerator {
   @override
   Future<void> validateMnemonic(String mnemonic) async {
     validatedMnemonics.add(mnemonic);
+    await validationGate?.future;
+    validationCompletionCount += 1;
     if (validationError case final Object error) throw error;
   }
 }

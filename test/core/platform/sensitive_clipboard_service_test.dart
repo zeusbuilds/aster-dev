@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:aster/core/core.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -35,6 +37,28 @@ void main() {
     expect(clipboard, 'user replacement');
   });
 
+  test('serializes an expiring lease ahead of a newer copy', () async {
+    var clipboard = '';
+    final readGate = Completer<void>();
+    final service = PlatformSensitiveClipboardService(
+      reader: () async {
+        await readGate.future;
+        return clipboard;
+      },
+      writer: (text) async => clipboard = text,
+    );
+    addTearDown(service.dispose);
+
+    await service.copySensitive('first phrase');
+    final clear = service.clearSensitive();
+    final secondCopy = service.copySensitive('second phrase');
+    readGate.complete();
+
+    expect(await clear, isA<AppSuccess<void>>());
+    expect(await secondCopy, isA<AppSuccess<void>>());
+    expect(clipboard, 'second phrase');
+  });
+
   test('expires a matching secret after the bounded lifetime', () async {
     var clipboard = '';
     final service = PlatformSensitiveClipboardService(
@@ -67,4 +91,46 @@ void main() {
     expect(failure.userMessage, isNot(contains('secret')));
     expect(failure.cause, isA<FailureDiagnostic>());
   });
+
+  test('dispose clears the active lease and rejects later copies', () async {
+    var clipboard = '';
+    final service = PlatformSensitiveClipboardService(
+      reader: () async => clipboard,
+      writer: (text) async => clipboard = text,
+    );
+    await service.copySensitive('secret phrase');
+
+    await service.dispose();
+
+    expect(clipboard, isEmpty);
+    final afterDispose = await service.copySensitive('another phrase');
+    expect(afterDispose, isA<AppFailureResult<void>>());
+    expect(
+      (afterDispose as AppFailureResult<void>).failure.code,
+      'clipboard_request_invalid',
+    );
+  });
+
+  test(
+    'dispose drains an in-flight clipboard operation before returning',
+    () async {
+      var clipboard = '';
+      final writeGate = Completer<void>();
+      final service = PlatformSensitiveClipboardService(
+        reader: () async => clipboard,
+        writer: (text) async {
+          await writeGate.future;
+          clipboard = text;
+        },
+      );
+
+      final copy = service.copySensitive('secret phrase');
+      final disposal = service.dispose();
+      writeGate.complete();
+      await copy;
+      await disposal;
+
+      expect(clipboard, isEmpty);
+    },
+  );
 }

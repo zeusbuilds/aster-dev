@@ -34,32 +34,37 @@ final class PlatformSensitiveClipboardService
        _writer = writer ?? _writeSystemClipboard;
 
   static const defaultLifetime = Duration(minutes: 1);
+  static const clearRetryDelay = Duration(seconds: 5);
   static const maximumSecretCharacters = 512;
 
   final ClipboardTextReader _reader;
   final ClipboardTextWriter _writer;
   Timer? _clearTimer;
   List<int>? _leasedDigest;
+  Future<void> _operationTail = Future<void>.value();
+  var _pendingOperations = 0;
   bool _disposed = false;
 
   @override
   Future<AppResult<void>> copySensitive(
     String text, {
     Duration clearAfter = defaultLifetime,
+  }) {
+    return _enqueue(() => _copyUnsafe(text, clearAfter: clearAfter));
+  }
+
+  Future<AppResult<void>> _copyUnsafe(
+    String text, {
+    required Duration clearAfter,
   }) async {
-    if (_disposed ||
-        text.isEmpty ||
-        text.length > maximumSecretCharacters ||
-        clearAfter <= Duration.zero) {
-      return AppResult.failure(
-        const AppFailure(
-          code: 'clipboard_request_invalid',
-          kind: AppFailureKind.validation,
-          userMessage: 'The recovery phrase could not be copied safely.',
-          retryable: false,
-        ),
-      );
+    if (_disposed || text.isEmpty || text.length > maximumSecretCharacters) {
+      return AppResult.failure(_invalidRequestFailure());
     }
+    if (clearAfter <= Duration.zero) {
+      return AppResult.failure(_invalidRequestFailure());
+    }
+    final previousClear = await _clearUnsafe();
+    if (previousClear is AppFailureResult<void>) return previousClear;
     try {
       await _writer(text);
       _leasedDigest = _digest(text);
@@ -75,19 +80,24 @@ final class PlatformSensitiveClipboardService
   }
 
   @override
-  Future<AppResult<void>> clearSensitive() async {
+  Future<AppResult<void>> clearSensitive() => _enqueue(_clearUnsafe);
+
+  Future<AppResult<void>> _clearUnsafe() async {
     _clearTimer?.cancel();
     _clearTimer = null;
     final expected = _leasedDigest;
-    _leasedDigest = null;
     if (expected == null) return const AppResult<void>.success(null);
     try {
       final current = await _reader();
       if (current != null && _constantTimeEquals(_digest(current), expected)) {
         await _writer('');
       }
+      if (identical(_leasedDigest, expected)) _leasedDigest = null;
       return const AppResult<void>.success(null);
     } catch (error, stackTrace) {
+      if (!_disposed && identical(_leasedDigest, expected)) {
+        _clearTimer = Timer(clearRetryDelay, () => unawaited(clearSensitive()));
+      }
       return _failure('clipboard_clear_failed', error, stackTrace);
     }
   }
@@ -96,7 +106,39 @@ final class PlatformSensitiveClipboardService
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
-    await clearSensitive();
+    if (_pendingOperations == 0) {
+      await _clearUnsafe();
+      return;
+    }
+    await _enqueue(_clearUnsafe);
+  }
+
+  Future<AppResult<void>> _enqueue(
+    Future<AppResult<void>> Function() operation,
+  ) {
+    final completer = Completer<AppResult<void>>();
+    _pendingOperations += 1;
+    _operationTail = _operationTail.then((_) async {
+      try {
+        completer.complete(await operation());
+      } catch (error, stackTrace) {
+        completer.complete(
+          _failure('clipboard_operation_failed', error, stackTrace),
+        );
+      } finally {
+        _pendingOperations -= 1;
+      }
+    });
+    return completer.future;
+  }
+
+  static AppFailure _invalidRequestFailure() {
+    return const AppFailure(
+      code: 'clipboard_request_invalid',
+      kind: AppFailureKind.validation,
+      userMessage: 'The recovery phrase could not be copied safely.',
+      retryable: false,
+    );
   }
 
   static AppResult<void> _failure(

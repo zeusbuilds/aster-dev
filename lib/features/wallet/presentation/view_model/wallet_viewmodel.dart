@@ -7,7 +7,7 @@ import '../models/models.dart';
 part 'wallet_viewmodel.g.dart';
 
 /// Loads wallet metadata and coordinates transactional wallet switching.
-@riverpod
+@Riverpod(keepAlive: true)
 class WalletViewModel extends _$WalletViewModel {
   @override
   Future<WalletState> build() => _loadWallets();
@@ -17,6 +17,21 @@ class WalletViewModel extends _$WalletViewModel {
     state = const AsyncLoading();
     final next = await AsyncValue.guard(_loadWallets);
     if (ref.mounted) state = next;
+  }
+
+  /// Publishes the exact registry returned by a successful repository commit.
+  /// This avoids a second read and prevents onboarding from navigating on an
+  /// optimistic or independently reconstructed wallet state.
+  void adoptCommittedRegistry(WalletRegistry registry) {
+    final active = registry.activeProfile;
+    if (active == null) {
+      throw ArgumentError.value(
+        registry,
+        'registry',
+        'A committed onboarding registry must have an active wallet.',
+      );
+    }
+    state = AsyncData(_toState(registry));
   }
 
   /// Returns true only after the native runtime and persisted selection both

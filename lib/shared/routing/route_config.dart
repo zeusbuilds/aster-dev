@@ -11,7 +11,6 @@ import '../../features/skeleton/presentation/screens/screens.dart';
 import '../../features/swap/presentation/screens/screens.dart';
 import '../../features/transaction/presentation/screens/screens.dart';
 import '../../features/wallet/presentation/pages/pages.dart';
-import '../screens/splash_screen.dart';
 import 'route_names.dart';
 import 'route_paths.dart';
 
@@ -25,12 +24,17 @@ class RouteConfig {
       GoRoute(
         path: RoutePaths.splash,
         name: RouteNames.splash,
-        builder: (context, state) => const SplashScreen(),
+        builder: (context, state) => const WalletAccessScreen(),
       ),
       GoRoute(
         path: RoutePaths.onboardingWelcome,
         name: RouteNames.onboardingWelcome,
         builder: (context, state) => const OnboardingWelcomeScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.onboardingCreateWallet,
+        name: RouteNames.onboardingCreateWallet,
+        builder: (context, state) => const OnboardingCreateWalletScreen(),
       ),
       GoRoute(
         path: RoutePaths.onboardingImportWallet,

@@ -5,6 +5,7 @@ class RouteNames {
   // Splash & Auth
   static const String splash = 'splash';
   static const String onboardingWelcome = 'onboardingWelcome';
+  static const String onboardingCreateWallet = 'onboardingCreateWallet';
   static const String onboardingImportWallet = 'onboardingImportWallet';
 
   // Main

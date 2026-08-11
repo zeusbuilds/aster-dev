@@ -1,12 +1,25 @@
 import 'package:aster/core/bootstrap/app_bootstrap.dart';
 import 'package:aster/core/core.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
+import 'package:aster/features/wallet/presentation/view_model/wallet_viewmodel.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/onboarding_harness.dart';
 import '../../support/wallet_fakes.dart';
 
 void main() {
+  test('preloads authoritative wallet state before returning', () async {
+    final harness = await OnboardingTestHarness.create();
+    addTearDown(harness.dispose);
+
+    final container = await bootstrapApplicationContainer(harness.container);
+
+    expect(container, same(harness.container));
+    expect(container.read(walletViewModelProvider).hasValue, isTrue);
+    expect(container.read(walletViewModelProvider).value?.activeWallet, isNull);
+  });
+
   test(
     'awaits runtime destruction when repository construction fails',
     () async {

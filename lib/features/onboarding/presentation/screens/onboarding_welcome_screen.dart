@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../shared/shared.dart';
-import '../widgets/onboarding_welcome_header.dart';
-import '../widgets/onboarding_welcome_icon_grid.dart';
-import '../widgets/onboarding_welcome_mesh_background.dart';
+import '../widgets/widgets.dart';
 
 /// Onboarding welcome screen with branded hero, mesh background, and CTA.
 class OnboardingWelcomeScreen extends StatelessWidget {
@@ -32,56 +30,63 @@ class _OnboardingContent extends StatelessWidget {
     final spacing = context.spacing;
     final type = context.type;
 
-    return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: spacing.xxl,
-        vertical: spacing.xxl,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const OnboardingWelcomeHeader(),
-          SizedBox(height: spacing.huge),
-          const OnboardingWelcomeIconGrid(),
-          SizedBox(height: spacing.xxxl),
-          Text('Built for\nUSDT on Bitcoin', style: type.brandHero),
-          SizedBox(height: spacing.md),
-          Text(
-            'Responses are compared, adjusted, and\n'
-            'optimized to reduce noise and improve\n'
-            'clarity.',
-            style: type.brandBody,
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(
+            spacing.xxl,
+            spacing.xxl,
+            spacing.xxl,
+            spacing.lg,
           ),
-          const Spacer(),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              CustomButton(
-                text: 'Create Wallet',
-                variant: ButtonVariant.translucent,
-                onTap: () {
-                  // TODO: Create wallet flow.
-                },
-              ),
-              SizedBox(height: spacing.md),
-              Semantics(
-                button: true,
-                label: 'Import Wallet',
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => context.push(RoutePaths.onboardingImportWallet),
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: spacing.xs),
-                    child: Center(
-                      child: Text('Import Wallet', style: type.brandAction),
-                    ),
-                  ),
+          sliver: SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const OnboardingWelcomeHeader(),
+                SizedBox(height: spacing.huge),
+                const OnboardingWelcomeIconGrid(),
+                SizedBox(height: spacing.xxxl),
+                Text('Built for\nUSDT on Bitcoin', style: type.brandHero),
+                SizedBox(height: spacing.md),
+                Text(
+                  'One wallet for Bitcoin and RGB assets across onchain and '
+                  'Lightning.',
+                  style: type.brandBody,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ],
-      ),
+        ),
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              spacing.xxl,
+              0,
+              spacing.xxl,
+              spacing.xxl,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                CustomButton(
+                  text: 'Create Wallet',
+                  variant: ButtonVariant.translucent,
+                  onTap: () => context.push(RoutePaths.onboardingCreateWallet),
+                ),
+                SizedBox(height: spacing.md),
+                OnboardingTextAction(
+                  label: 'Import Wallet',
+                  onPressed: () =>
+                      context.push(RoutePaths.onboardingImportWallet),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

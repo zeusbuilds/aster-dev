@@ -1,29 +1,32 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../features/wallet/presentation/models/models.dart';
 import 'route_paths.dart';
 
-/// Route guard utilities
-class RouteGuards {
-  RouteGuards._();
+/// Pure wallet-access redirect policy shared by GoRouter and unit tests.
+abstract final class RouteGuards {
+  /// Resolves access only from the durable wallet session state.
+  static String? redirect({
+    required String location,
+    required AsyncValue<WalletState> walletState,
+  }) {
+    final wallet = walletState.value;
+    if (wallet == null) {
+      return location == RoutePaths.splash ? null : RoutePaths.splash;
+    }
 
-  /// Routes that require authentication
-  static const _protectedRoutes = [
-    RoutePaths.send,
-    RoutePaths.receive,
-    RoutePaths.settings,
-  ];
-
-  /// Routes that require onboarding completion
-  static const _onboardingRequiredRoutes = [
-    RoutePaths.send,
-    RoutePaths.receive,
-  ];
-
-  /// Checks if route requires authentication
-  static bool requiresAuth(String location) {
-    return _protectedRoutes.contains(location);
+    final onboarding = _isOnboarding(location);
+    if (wallet.activeWallet == null) {
+      return onboarding ? null : RoutePaths.onboardingWelcome;
+    }
+    if (location == RoutePaths.splash || onboarding) {
+      return RoutePaths.skeleton;
+    }
+    return null;
   }
 
-  /// Checks if route requires onboarding
-  static bool requiresOnboarding(String location) {
-    return _onboardingRequiredRoutes.contains(location);
+  static bool _isOnboarding(String location) {
+    return location == RoutePaths.onboardingWelcome ||
+        location.startsWith('/onboarding/');
   }
 }

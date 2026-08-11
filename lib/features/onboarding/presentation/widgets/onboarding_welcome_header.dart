@@ -22,8 +22,8 @@ class OnboardingWelcomeHeader extends StatelessWidget {
         ),
         SizedBox(width: context.spacing.sm),
         Text(
-          'Aster',
-          style: context.type.brandHero.copyWith(color: colors.onBrandArt),
+          'UTEXO',
+          style: context.type.brandTitle.copyWith(color: colors.onBrandArt),
         ),
       ],
     );

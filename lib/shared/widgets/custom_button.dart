@@ -49,7 +49,10 @@ class CustomButton extends StatefulWidget {
   final bool enabled;
   final bool loading;
   final double? width;
-  final HapticIntent hapticIntent;
+
+  /// Tap feedback intent. Use `null` when the owning async flow emits one
+  /// result haptic after success or failure instead of immediate tap feedback.
+  final HapticIntent? hapticIntent;
   final bool _isCompact;
 
   @override
@@ -105,7 +108,9 @@ class _CustomButtonState extends State<CustomButton> {
     );
 
     void activate() {
-      unawaited(context.haptics.trigger(widget.hapticIntent));
+      if (widget.hapticIntent case final intent?) {
+        unawaited(context.haptics.trigger(intent));
+      }
       widget.onTap?.call();
     }
 

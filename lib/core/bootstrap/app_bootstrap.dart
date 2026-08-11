@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../features/wallet/data/repository/repository.dart';
+import '../../features/wallet/presentation/view_model/wallet_viewmodel.dart';
 import '../di/providers.dart';
 import '../errors/errors.dart';
 
@@ -23,6 +24,9 @@ Future<ProviderContainer> bootstrapApplicationContainer(
     if (result case AppFailureResult(:final failure)) {
       throw AppFailureException(failure);
     }
+    // Preload the keep-alive wallet session before constructing GoRouter so
+    // access guards never race startup or discard an incoming deep link.
+    await container.read(walletViewModelProvider.future);
     return container;
   } catch (error, stackTrace) {
     final bootstrapFailure = FailureMapper.from(

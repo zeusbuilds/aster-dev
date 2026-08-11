@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../features/wallet/presentation/view_model/wallet_viewmodel.dart';
 import '../theme/theme.dart';
 import '../widgets/custom_button.dart';
 import 'route_config.dart';
+import 'route_guards.dart';
 import 'route_paths.dart';
 
 part 'app_router.g.dart';
@@ -12,18 +14,26 @@ part 'app_router.g.dart';
 /// App router provider
 @riverpod
 GoRouter appRouter(Ref ref) {
+  final refresh = _RouterRefreshNotifier();
+  ref.onDispose(refresh.dispose);
+  ref.listen(walletViewModelProvider, (_, _) => refresh.notify());
   final router = GoRouter(
-    initialLocation: RoutePaths.skeleton,
+    initialLocation: RoutePaths.splash,
     routes: RouteConfig.getRoutes(),
-    redirect: (context, state) {
-      // Auth and onboarding guards will be implemented when auth feature is added
-      return null;
-    },
+    refreshListenable: refresh,
+    redirect: (context, state) => RouteGuards.redirect(
+      location: state.matchedLocation,
+      walletState: ref.read(walletViewModelProvider),
+    ),
     errorBuilder: (context, state) => const ErrorScreen(),
     debugLogDiagnostics: false,
   );
   ref.onDispose(router.dispose);
   return router;
+}
+
+final class _RouterRefreshNotifier extends ChangeNotifier {
+  void notify() => notifyListeners();
 }
 
 /// Error screen for route errors

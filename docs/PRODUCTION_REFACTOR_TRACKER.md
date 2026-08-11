@@ -56,6 +56,8 @@ and relevant tests/builds have passed on the recorded commit.
 | DEC-025 | fixing | Keep recovery phrases route-scoped and minimize copies rather than pretending Dart strings can be zeroized. | No phrase enters logs, analytics, route arguments, durable preferences, or global wallet state. Controllers/state release references on disposal; secure clipboard clears matching content after a bounded interval and on screen exit. |
 | DEC-026 | fixing | Route access is derived from the durable active-wallet state. | Empty registries enter onboarding; wallet-only routes redirect to onboarding; confirmed provisioning reloads registry state before replacing navigation with Home. |
 | DEC-027 | blocked | Do not expose seed or xpub disclosure actions before SEC-007 is decided. | Advanced settings may expose truthful network diagnostics now, but sensitive rows remain disabled and explicitly unavailable rather than bypassing authentication policy. |
+| DEC-028 | fixing | Accept bounded multiword paste at the import fields without programmatically reading the system clipboard. | Input is lowercased, stripped to canonical word characters, capped to 12 BIP39-sized words, distributed from the focused field, and still requires SDK checksum validation. |
+| DEC-029 | blocked | Never remove detected legacy seed records merely to unblock startup. | Product must choose between an explicit-consent, idempotent in-app migration and a support-assisted recovery release. Either path must preserve the old record until a new ownership-bound wallet commit is proven. |
 
 ## Baseline Evidence
 
@@ -134,13 +136,16 @@ Baseline screenshots are stored in `docs/release/evidence/baseline/`.
 | Check | Result | Exact evidence |
 | --- | --- | --- |
 | Settings implementation | Pass | Commit `6cc7376` adds typed/versioned preferences, serialized writes, bounded catalog loading, generated Riverpod ViewModels, Bitcoin-unit selection, advanced settings, and redacted network diagnostics. |
+| Mnemonic foundation | Pass | Commit `5f3698f` vendors and integrity-checks the canonical BIP39 English list, keeps SDK checksum authority, adds transactional wallet creation results, and introduces a digest-only bounded clipboard lease. |
+| Onboarding candidate | Pass, commit pending | Create/import screens use route-scoped generated ViewModels, 12 real fields, bounded phrase paste, SDK checksum validation, current-screen loading, duplicate suppression, exact registry adoption, and guarded root navigation. |
 | Monetary formatting | Pass | Integer-only BTC/sats formatting covers zero, negative, boundary, grouping, and fractional-display cases without `double` conversion. App-wide feature consumption remains `SETTINGS-001`. |
 | Catalog integrity | Pass | Production JSON catalogs load under tests; duplicate ISO identities are canonicalized deterministically by first curated occurrence, invalid persisted values self-heal to typed defaults, and raw loader failures do not reach UI state. |
 | Flags and dependency graph | Pass | Currency and region UI use `circle_flags`; `country_flags`, `jovial_misc`, and `jovial_svg` no longer resolve in `pubspec.lock`. |
-| Generation | Pass | `build_runner` processed 233 inputs; an immediate second run skipped all 233 and wrote zero outputs. |
-| Format and analysis | Pass | Repository-wide format checked 244 Dart files with zero changes; fatal-warning/fatal-info analysis has zero diagnostics. |
-| Host tests | Pass | 164 tests pass, including repository restart persistence, corrupt/invalid preference repair, overlapping mutation suppression, exact amount formatting, settings interaction, accessibility, and disabled sensitive disclosures. |
-| Tracker inventory | Pass after correction | The verifier found and removed two stale rows for deleted legacy models; 334 non-generated repository files are now represented. |
+| Generation | Pass | `build_runner` processed 257 inputs; an immediate second run skipped all 257 and wrote zero outputs. |
+| Format and analysis | Pass | Repository-wide format checked 270 Dart files with zero changes; fatal-warning/fatal-info analysis has zero diagnostics. |
+| Host tests | Pass before final evidence commit | 193 tests pass with 54.97% aggregate line coverage. Onboarding coverage includes operation overlap, stale checksum completion, native failure, timer disposal, compact/large layouts, 2x text scaling, touch targets, labels, and contrast. |
+| Dart documentation | Pass | Fresh isolated output documents 225 public libraries with zero warnings and zero errors. |
+| Tracker inventory | Pass after sync | 359 non-generated repository files are represented; newly added onboarding rows remain `unreviewed` until the implementation commit and post-commit audit are recorded. |
 | Delivery | Blocked | Push of `6cc7376` to the configured Zeus origin failed with GitHub `Repository not found`; no remote or global Git identity was changed. |
 
 ## Phase Plan
@@ -192,6 +197,7 @@ Baseline screenshots are stored in `docs/release/evidence/baseline/`.
 | SETTINGS-001 | P1 | Settings | fixing | Bitcoin unit and required advanced wallet/network settings were absent or placeholders; currency/region selection was not persisted. | Settings implementation and tests at `6cc7376` | `6cc7376` | Typed preferences, selection screens, advanced navigation, redacted network diagnostics, and SEC-007 gating are implemented. Applying the selected unit to every feature amount remains Phase 5 work. |
 | SETTINGS-002 | P1 | Settings architecture | verified | Stateful screens performed asset I/O, owned selection/loading/error state, and popped before any durable write; model classes owned unbounded static caches and leaked exception text. | Repository/ViewModel/screen tests and source-boundary audit | `6cc7376` | Catalog I/O and serialized durable writes sit behind typed repository/ViewModel boundaries; controls wait for success, suppress overlap, expose retry, and retain redacted failures. |
 | SETTINGS-003 | P1 | Catalog identity | verified | The production currency catalog contains duplicate ISO identities, so persisted ISO code could map ambiguously or make single-value lookup throw. | Production-catalog invariant test and repository review | `6cc7376` | Catalog loading canonicalizes by ISO code in curated source order before validating persisted identity; production data and restart/repair tests pass. |
+| BRAND-001 | P1 | Product identity | fixing | Flutter product constants say UTEXO while visible copy, iOS/Android display metadata, privacy strings, and the settings version footer still carry Aster-era or hardcoded identity. | Repository-wide product-string and platform metadata audit | - | Onboarding and settings visible brand copy now say UTEXO. Platform labels/privacy copy and runtime package-version ownership remain Phase 6 work; final identifiers/signing remain DEC-006. |
 | SAFE-001 | P2 | Layout | verified | Safe-area helpers lived in spacing and mixed `padding`, `viewPadding`, and keyboard obstruction behind ambiguous names. | Insets and SafeArea call-site audit; DEC-019 | `98b7a40` | Typed window insets own safe/system/keyboard spaces, spacing is purely spatial, consumers avoid double padding, and composition tests pass. |
 | PERF-001 | P1 | Performance | unreviewed | No measured launch, frame, memory, leak, rebuild, cache, or SDK-handle baseline exists. | Test/tooling inventory | - | - |
 | SEC-002 | P0 | Seed security | verified | Two hardcoded 12-word mnemonics were compiled into the app, printed around migration activity, and written to secure storage at startup. | `lib/core/utils/wallet_migration_service.dart`; `lib/main.dart` | `8e97370` | Migration and startup writes removed; repository search contains no mnemonic fixture or logging path. |
@@ -253,7 +259,7 @@ Baseline screenshots are stored in `docs/release/evidence/baseline/`.
 | UX-004 | P2 | Selection choreography | verified | Wallet and asset selection inserted a fixed post-success delay before navigation and ignored reduced motion. | Wallet selection; asset selector sheet | `98b7a40` | Commit delay resolves through the motion policy and navigation occurs only after confirmed selection success; reduced motion removes decorative delay. |
 | ARCH-004 | P1 | Plugin boundary | unreviewed | Scan presentation constructs `ImagePicker` and `MobileScannerController` directly, contrary to the View -> ViewModel -> repository/service boundary. | scan screen/widget import audit | - | Move plugin ownership behind an injectable scanner/media service during the scan/send integration phase; do not hide the gap in Phase 3. |
 | NAV-001 | P1 | Bottom navigation | verified | The second bottom-nav item was announced as “Cards” while opening Scan, and the floating nav ignored the persistent bottom hardware inset. | `bottom_nav.dart`; `skeleton_index_provider.dart` | `98b7a40` | Scan label/icon, selection state/haptic, equal stable slots, centered indicator, squircle surface, and persistent bottom inset pass widget regression tests. |
-| STORE-008 | P0 | Legacy recovery UX | fixing | Fail-closed legacy-wallet detection presents an explanatory terminal state with no recovery, import, reset, or support action, leaving an existing user unable to proceed. | Exact `3f1215b` iPhone Air launch with pre-refactor simulator data | - | Phase 4 must provide an explicit non-destructive recovery route and keep destructive reset unavailable unless ownership and user confirmation are proven. |
+| STORE-008 | P0 | Legacy recovery UX | blocked | Fail-closed legacy-wallet detection presents an explanatory terminal state with no recovery, import, reset, or support action, leaving an existing user unable to proceed. | Exact `3f1215b` iPhone Air launch, legacy secure-store/history audit, and DEC-029 | - | Automatic recovery needs an idempotent per-record migration journal so a crash between new-wallet commit and old-record deletion cannot duplicate or lose a wallet. Product must choose in-app migration or support-assisted recovery; deletion-only reset remains prohibited. |
 
 ## Generated Artifact Validation
 
@@ -426,14 +432,26 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `lib/features/market/presentation/widgets/widgets.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/onboarding/data/repository/bip39_word_list_repository.dart` | Dart source | fixing | DEC-023, ONB-003 | Concurrent bounded load, byte digest, UTF-8/count/order/uniqueness checks, retryable redacted failure, and production/tamper tests pass; commit evidence pending | - |
 | `lib/features/onboarding/data/repository/repository.dart` | Dart source | fixing | ONB-003 | Feature data boundary exports only the canonical vocabulary repository; commit evidence pending | - |
+| `lib/features/onboarding/domain/models/mnemonic_word_status.dart` | Dart source | unreviewed | - | - | - |
+| `lib/features/onboarding/domain/models/models.dart` | Dart source | unreviewed | - | - | - |
+| `lib/features/onboarding/presentation/models/create_wallet_state.dart` | Dart source | unreviewed | - | - | - |
+| `lib/features/onboarding/presentation/models/import_wallet_state.dart` | Dart source | unreviewed | - | - | - |
+| `lib/features/onboarding/presentation/models/models.dart` | Dart source | unreviewed | - | - | - |
+| `lib/features/onboarding/presentation/screens/onboarding_create_wallet_screen.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/onboarding/presentation/screens/onboarding_import_wallet_screen.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/onboarding/presentation/screens/onboarding_welcome_screen.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/onboarding/presentation/screens/screens.dart` | Dart source | unreviewed | - | - | - |
+| `lib/features/onboarding/presentation/view_model/create_wallet_view_model.dart` | Dart source | unreviewed | - | - | - |
+| `lib/features/onboarding/presentation/view_model/import_wallet_view_model.dart` | Dart source | unreviewed | - | - | - |
+| `lib/features/onboarding/presentation/view_model/view_models.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/onboarding/presentation/widgets/onboarding_import_wallet_word_grid.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/onboarding/presentation/widgets/onboarding_import_wallet_word_page.dart` | Dart source | unreviewed | - | - | - |
+| `lib/features/onboarding/presentation/widgets/onboarding_status_panel.dart` | Dart source | unreviewed | - | - | - |
+| `lib/features/onboarding/presentation/widgets/onboarding_text_action.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/onboarding/presentation/widgets/onboarding_welcome_header.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/onboarding/presentation/widgets/onboarding_welcome_icon_grid.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/onboarding/presentation/widgets/onboarding_welcome_mesh_background.dart` | Dart source | unreviewed | - | - | - |
+| `lib/features/onboarding/presentation/widgets/widgets.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/receive/presentation/screens/receive_screen.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/receive/presentation/screens/receive_set_amount_screen.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/receive/presentation/screens/screens.dart` | Dart source | unreviewed | - | - | - |
@@ -523,6 +541,7 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `lib/features/wallet/presentation/models/models.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/wallet/presentation/models/wallet_state.dart` | Dart source | verified | SDK-001, DEC-012 | Immutable operation-specific state carries domain profiles and typed operation failure; equality reviewed/tested | `1b3273a` |
 | `lib/features/wallet/presentation/pages/pages.dart` | Dart source | unreviewed | - | - | - |
+| `lib/features/wallet/presentation/pages/wallet_access_screen.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/wallet/presentation/pages/wallet_selection_screen.dart` | Dart source | verified | LIFE-003, UX-004, MOTION-001 | Selection navigates only after confirmed transactional switch; duplicate/selected interactions remain disabled and choreography respects reduced motion | `1b3273a`, `98b7a40` |
 | `lib/features/wallet/presentation/view_model/viewmodels.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/wallet/presentation/view_model/wallet_viewmodel.dart` | Dart source | verified | SDK-001, DEC-012, LIFE-003 | Generated AsyncNotifier exposes repository-backed load/switch state, suppresses overlap, and maps typed failures; tests pass | `1b3273a` |
@@ -600,6 +619,8 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `test/features/home/bitcoin_market_repository_test.dart` | Test | verified | DATA-002 | Integer mapping, sorting, deduplication, fallback, freshness, bounds, and malformed-data cases pass | `1b3273a` |
 | `test/features/home/bitcoin_market_view_model_test.dart` | Test | verified | ARCH-002 | Duplicate retry is suppressed while initial request is active | `1b3273a` |
 | `test/features/onboarding/bip39_word_list_repository_test.dart` | Test | fixing | ONB-003 | Production asset, tampered bytes, canonical membership, and concurrent cache behavior pass; commit evidence pending | - |
+| `test/features/onboarding/onboarding_screens_test.dart` | Test | unreviewed | - | - | - |
+| `test/features/onboarding/onboarding_view_models_test.dart` | Test | unreviewed | - | - | - |
 | `test/features/settings/settings_repository_test.dart` | Test | verified | DEC-024, SETTINGS-002, SETTINGS-003 | Defaults, persistence across reconstruction, invalid/corrupt repair, serialization, redaction, and production catalog invariants pass | `6cc7376` |
 | `test/features/settings/settings_screens_test.dart` | Test | verified | SETTINGS-001, SEC-007, ACCESS-001 | Durable unit interaction and disabled sensitive-disclosure accessibility behavior pass | `6cc7376` |
 | `test/features/settings/settings_view_model_test.dart` | Test | verified | DEC-024, SETTINGS-002 | Overlapping settings mutations are suppressed and state remains coherent | `6cc7376` |
@@ -615,6 +636,8 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `test/shared/bitcoin_amount_formatter_test.dart` | Test | verified | SETTINGS-001 | Exact integer BTC/sats formatter boundaries, signs, grouping, and no-precision-loss cases pass | `6cc7376` |
 | `test/shared/feedback_system_test.dart` | Test | verified | UX-001, UX-002, UX-003 | Haptic support caching/failure isolation and bounded toast ordering/deduplication/disposal matrix passes | `98b7a40` |
 | `test/shared/presentation_system_test.dart` | Test | verified | DS-001, DS-002, DS-003, MOTION-001, NAV-001, SAFE-001 | Theme failure, inset semantics, numeric spans, shape types, button behavior, reduced motion, navigation geometry, and toast host tests pass | `98b7a40` |
+| `test/shared/route_guards_test.dart` | Test | unreviewed | - | - | - |
+| `test/support/onboarding_harness.dart` | Test | unreviewed | - | - | - |
 | `test/support/wallet_fakes.dart` | Test | verified | TEST-001 | Deterministic fault-injection fakes are test-only, injectable, and cannot enter release code | `1b3273a` |
 | `test/widget_test.dart` | Test | verified | TEST-001, MOTION-002 | Root presentation wiring and hidden-tab ticker/semantics behavior pass; broader feature coverage remains tracked independently | `98b7a40` |
 | `test_driver/integration_test.dart` | Project configuration | verified | TEST-002 | Standard integration-test driver compiled and executed on both platforms | `1b3273a` |

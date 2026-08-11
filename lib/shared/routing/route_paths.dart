@@ -5,6 +5,7 @@ class RoutePaths {
   // Splash & Auth
   static const String splash = '/';
   static const String onboardingWelcome = '/onboarding-welcome';
+  static const String onboardingCreateWallet = '/onboarding/create-wallet';
   static const String onboardingImportWallet = '/onboarding/import-wallet';
 
   // Main

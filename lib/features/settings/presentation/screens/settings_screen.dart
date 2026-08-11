@@ -235,7 +235,7 @@ class SettingsScreen extends ConsumerWidget {
             ),
             SizedBox(height: spacing.xs),
             Center(
-              child: Text('Aster • Version 1.0.0', style: type.versionLabel),
+              child: Text('UTEXO • Version 1.0.0', style: type.versionLabel),
             ),
             SizedBox(
               height:
