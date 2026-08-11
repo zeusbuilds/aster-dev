@@ -54,6 +54,30 @@ void main() {
     expect(_location(router), RoutePaths.skeleton);
   });
 
+  testWidgets('an invalid payment target slug returns to target selection', (
+    tester,
+  ) async {
+    tester.binding.platformDispatcher.defaultRouteNameTestValue =
+        '/send/not-a-payment-target/address';
+    addTearDown(
+      tester.binding.platformDispatcher.clearDefaultRouteNameTestValue,
+    );
+    final (harness, transport) = await _createHarness();
+    addTearDown(transport.close);
+    addTearDown(() => _disposeHarness(tester, harness));
+    final provision = await harness.repository.createFromMnemonic(
+      mnemonic: validTestMnemonic,
+      name: 'Primary Wallet',
+    );
+    expect(provision, isA<AppSuccess<WalletRegistry>>());
+    await harness.container.read(walletViewModelProvider.future);
+
+    final router = await _pumpRouter(tester, harness);
+
+    expect(_location(router), RoutePaths.send);
+    expect(find.text('Send'), findsWidgets);
+  });
+
   testWidgets('a direct onboarding deep link has a safe Back destination', (
     tester,
   ) async {

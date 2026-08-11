@@ -13,8 +13,9 @@ class RouteNames {
   static const String home = 'home';
   static const String send = 'send';
   static const String sendAddress = 'sendAddress';
+  static const String sendAmount = 'sendAmount';
   static const String receive = 'receive';
-  static const String receiveSetAmount = 'receiveSetAmount';
+  static const String receiveRequest = 'receiveRequest';
   static const String swap = 'swap';
   static const String market = 'market';
   static const String transactionList = 'transactionList';

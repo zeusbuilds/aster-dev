@@ -6,9 +6,9 @@ import 'package:remixicon/remixicon.dart';
 import 'package:unicons/unicons.dart';
 
 import '../../../../shared/shared.dart';
+import '../../../market/data/data.dart';
+import '../../../market/presentation/view_model/view_models.dart';
 import '../../data/data.dart';
-import '../../data/models/chart_data_item.dart';
-import '../view_model/view_models.dart';
 import 'candle_chart.dart';
 
 /// Bitcoin market card backed by injected repository state.

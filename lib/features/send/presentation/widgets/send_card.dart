@@ -1,135 +1,149 @@
-import 'package:circle_flags/circle_flags.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../shared/shared.dart';
+import '../../../wallet/domain/models/models.dart';
+import '../../../wallet/presentation/formatting/formatting.dart';
+import '../../../wallet/presentation/models/models.dart';
 
-/// Card widget displaying send amount information
-///
-/// Shows amount, asset, market price, balance, and fiat currency selector
+/// Exact amount, quote, and available-balance surface for Send.
 class SendCard extends StatelessWidget {
-  /// Amount to send
-  final String amount;
-
-  /// Asset model to send
-  final AssetModel asset;
-
-  /// Current market price
-  final String marketPrice;
-
-  /// Current wallet balance
-  final String balance;
-
-  /// Fiat currency code (default: "USD")
-  final String fiatCurrency;
   const SendCard({
     super.key,
-    required this.amount,
-    this.asset = AssetModel.bitcoin,
-    required this.marketPrice,
-    required this.balance,
-    this.fiatCurrency = 'USD',
+    required this.route,
+    required this.amountText,
+    required this.available,
+    required this.fiatText,
+    required this.amountLocked,
+    this.validationMessage,
   });
+
+  final PaymentRoute route;
+  final String amountText;
+  final FormattedWalletAmount available;
+  final String fiatText;
+  final bool amountLocked;
+  final String? validationMessage;
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.appColors;
-    final spacing = context.spacing;
-    final radius = context.radii;
-    final icons = context.icons;
-    final type = context.type;
-    final metrics = context.metrics;
-
+    final target = route.target;
+    final asset = target.assetModel;
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Squircle(
           border: BorderRadius.only(
-            topLeft: Radius.circular(radius.card),
-            topRight: Radius.circular(radius.card),
+            topLeft: Radius.circular(context.radii.card),
+            topRight: Radius.circular(context.radii.card),
           ),
           padding: EdgeInsets.symmetric(
-            vertical: spacing.lg,
-            horizontal: spacing.xl,
+            vertical: context.spacing.lg,
+            horizontal: context.spacing.xl,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  NumericText(amount, style: type.amountLarge),
-                  const Spacer(),
+                  Expanded(
+                    child: NumericText(
+                      amountText.isEmpty ? '0' : amountText,
+                      style: context.type.amountLarge,
+                      maxLines: 1,
+                    ),
+                  ),
+                  SizedBox(width: context.spacing.md),
                   SvgPicture.asset(
                     asset.icon,
-                    width: icons.lg,
-                    height: icons.lg,
+                    width: context.icons.lg,
+                    height: context.icons.lg,
                     errorBuilder: (context, error, stackTrace) => Icon(
                       Icons.circle,
-                      size: icons.lg,
+                      size: context.icons.lg,
                       color: AssetDisplay.colorOf(context, asset),
                     ),
                   ),
-                  SizedBox(width: spacing.sm),
-                  Text(asset.token, style: type.title),
+                  SizedBox(width: context.spacing.sm),
+                  Text(route.asset.symbol, style: context.type.title),
                 ],
               ),
-              SizedBox(height: spacing.xs),
+              SizedBox(height: context.spacing.xs),
               Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  NumericText(
-                    marketPrice,
-                    style: type.rowMetaStrong.copyWith(
-                      color: colors.textSecondary,
+                  Expanded(
+                    child: AmountText(
+                      fiatText,
+                      style: context.type.rowMetaStrong.copyWith(
+                        color: context.appColors.textSecondary,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const Spacer(),
-                  AmountText(
-                    'Bal: $balance',
-                    style: type.rowMetaStrong.copyWith(
-                      color: colors.textSecondary,
+                  SizedBox(width: context.spacing.md),
+                  Expanded(
+                    child: AmountText(
+                      'Available: ${available.text}',
+                      style: context.type.rowMetaStrong.copyWith(
+                        color: context.appColors.textSecondary,
+                      ),
+                      textAlign: TextAlign.end,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
               ),
+              if (validationMessage case final message?) ...[
+                SizedBox(height: context.spacing.sm),
+                Text(
+                  message,
+                  style: context.type.errorMessage.copyWith(
+                    color: context.appColors.danger,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
         Squircle(
-          color: colors.surfaceSubtle,
-          borderColor: colors.surfaceSubtle,
+          color: context.appColors.surfaceSubtle,
+          borderColor: context.appColors.surfaceSubtle,
           border: BorderRadius.only(
-            bottomLeft: Radius.circular(radius.card),
-            bottomRight: Radius.circular(radius.card),
+            bottomLeft: Radius.circular(context.radii.card),
+            bottomRight: Radius.circular(context.radii.card),
           ),
           padding: EdgeInsets.symmetric(
-            vertical: spacing.lg,
-            horizontal: spacing.xl,
+            vertical: context.spacing.sm,
+            horizontal: context.spacing.xl,
           ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              CircleFlag('US', size: metrics.compactFlagSize),
-              SizedBox(width: spacing.sm),
-              Text(fiatCurrency, style: type.rowTitleStrong),
-              const Spacer(),
-              Squircle(
-                padding: EdgeInsets.symmetric(
-                  horizontal: spacing.md,
-                  vertical: spacing.xs,
-                ),
-                borderRadius: radius.badge,
-                borderColor: context.colorScheme.onSurface,
-                color: context.colorScheme.onSurface,
+              Expanded(
                 child: Text(
-                  'Send max',
-                  style: type.badgeLabel.copyWith(
-                    color: context
-                        .colorScheme
-                        .surface, // Inverse color (background)
-                  ),
+                  target.railLabel,
+                  style: context.type.rowTitleStrong,
                 ),
               ),
+              if (amountLocked) ...[
+                AsterPill(
+                  color: context.colorScheme.primaryContainer,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: context.spacing.md,
+                    vertical: context.spacing.xs,
+                  ),
+                  child: Text(
+                    'Invoice amount',
+                    style: context.type.badgeLabel.copyWith(
+                      color: context.colorScheme.primary,
+                    ),
+                  ),
+                ),
+                SizedBox(width: context.spacing.sm),
+              ],
+              CustomButton.compact(text: 'Max', enabled: false, onTap: () {}),
             ],
           ),
         ),

@@ -120,4 +120,35 @@ void main() {
     expect(await notifier.applyAmount(), isFalse);
     expect(harness.engine.calls, hasLength(callsBefore));
   });
+
+  test('copy and share use injectable platform boundaries', () async {
+    final harness = await PaymentFlowTestHarness.create();
+    addTearDown(harness.dispose);
+    final provider = receiveFlowViewModelProvider(
+      WalletPaymentTarget.bitcoinOnchain,
+    );
+    final subscription = harness.container.listen(
+      provider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    final state = await harness.container.read(provider.future);
+    final notifier = harness.container.read(provider.notifier);
+
+    expect(await notifier.copyRequest(), isA<AppSuccess<void>>());
+    expect(harness.clipboard.text, state.request.encodedRequest);
+    const origin = ShareOrigin(left: 1, top: 2, width: 3, height: 4);
+    expect(
+      await notifier.shareRequest(origin: origin),
+      isA<AppSuccess<ShareDisposition>>(),
+    );
+    expect(harness.share.sharedText, state.request.encodedRequest);
+    expect(harness.share.sharedOrigin, same(origin));
+    await Future<void>.delayed(Duration.zero);
+    expect(harness.haptics.intents, [
+      HapticIntent.lightImpact,
+      HapticIntent.lightImpact,
+    ]);
+  });
 }

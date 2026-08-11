@@ -1,3 +1,4 @@
+import 'package:aster/core/core.dart';
 import 'package:aster/shared/feedback/feedback.dart';
 
 final class RecordingHapticFeedbackService implements HapticFeedbackService {
@@ -38,4 +39,47 @@ final class RecordingToastPresentationService
 
   @override
   void dismissCurrent({int? id}) {}
+}
+
+final class MemoryClipboardService implements ClipboardService {
+  String? text;
+  AppFailure? readFailure;
+  AppFailure? writeFailure;
+
+  @override
+  Future<AppResult<String?>> readText() async {
+    final failure = readFailure;
+    return failure == null
+        ? AppResult.success(text)
+        : AppResult.failure(failure);
+  }
+
+  @override
+  Future<AppResult<void>> writeText(String value) async {
+    final failure = writeFailure;
+    if (failure != null) return AppResult.failure(failure);
+    text = value;
+    return const AppResult.success(null);
+  }
+}
+
+final class RecordingShareService implements ShareService {
+  AppResult<ShareDisposition> result = const AppResult.success(
+    ShareDisposition.completed,
+  );
+  String? sharedText;
+  String? sharedSubject;
+  ShareOrigin? sharedOrigin;
+
+  @override
+  Future<AppResult<ShareDisposition>> shareText(
+    String text, {
+    String? subject,
+    ShareOrigin? origin,
+  }) async {
+    sharedText = text;
+    sharedSubject = subject;
+    sharedOrigin = origin;
+    return result;
+  }
 }

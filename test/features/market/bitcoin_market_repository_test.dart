@@ -1,5 +1,5 @@
 import 'package:aster/core/core.dart';
-import 'package:aster/features/home/data/data.dart';
+import 'package:aster/features/market/data/data.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';

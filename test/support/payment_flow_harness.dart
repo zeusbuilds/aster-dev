@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:aster/core/core.dart';
 import 'package:aster/features/settings/data/repository/repository.dart';
 import 'package:aster/features/wallet/data/repository/repository.dart';
@@ -19,12 +21,18 @@ final class PaymentFlowTestHarness {
     required this.repository,
     required this.engine,
     required this.haptics,
+    required this.toasts,
+    required this.clipboard,
+    required this.share,
   });
 
   final ProviderContainer container;
   final WalletRepository repository;
   final FakeWalletEngine engine;
   final RecordingHapticFeedbackService haptics;
+  final RecordingToastPresentationService toasts;
+  final MemoryClipboardService clipboard;
+  final RecordingShareService share;
   var _disposed = false;
 
   static Future<PaymentFlowTestHarness> create({
@@ -34,6 +42,7 @@ final class PaymentFlowTestHarness {
       sdkNetwork: 'regtest',
     ),
     Map<String, Object> preferenceValues = const {},
+    ResilientHttpClient? httpClient,
   }) async {
     SharedPreferences.setMockInitialValues(preferenceValues);
     final preferences = await SharedPreferences.getInstance();
@@ -73,14 +82,24 @@ final class PaymentFlowTestHarness {
       services,
       const SuccessfulLegacyWalletSeedPreflight(),
     );
-    final settings = SettingsRepository(preferenceService, rootBundle);
+    final settings = SettingsRepository(
+      preferenceService,
+      PaymentSettingsAssetBundle(),
+    );
     final haptics = RecordingHapticFeedbackService();
+    final toasts = RecordingToastPresentationService();
+    final clipboard = MemoryClipboardService();
+    final share = RecordingShareService();
     final container = ProviderContainer(
       retry: (retryCount, error) => null,
       overrides: [
         walletRepositoryProvider.overrideWith((ref) async => repository),
         settingsRepositoryProvider.overrideWith((ref) async => settings),
         hapticFeedbackServiceProvider.overrideWithValue(haptics),
+        clipboardServiceProvider.overrideWithValue(clipboard),
+        shareServiceProvider.overrideWithValue(share),
+        if (httpClient != null)
+          resilientHttpClientProvider.overrideWithValue(httpClient),
       ],
     );
     return PaymentFlowTestHarness._(
@@ -88,6 +107,9 @@ final class PaymentFlowTestHarness {
       repository: repository,
       engine: selectedEngine,
       haptics: haptics,
+      toasts: toasts,
+      clipboard: clipboard,
+      share: share,
     );
   }
 
@@ -96,5 +118,27 @@ final class PaymentFlowTestHarness {
     _disposed = true;
     container.dispose();
     await repository.dispose();
+  }
+}
+
+/// Minimal validated settings catalog for payment-flow tests.
+///
+/// Keeping this bundle local to tests avoids coupling deterministic provider
+/// initialization to Flutter's process-wide asset channel.
+final class PaymentSettingsAssetBundle extends CachingAssetBundle {
+  static const _sources = <String, String>{
+    'assets/data/currencies.json':
+        '[{"name":"United States Dollar","symbol":"\$",'
+        '"code":"USD","countryCode":"US"}]',
+    'assets/data/countries.json': '[{"name":"United States","code":"US"}]',
+  };
+
+  @override
+  Future<ByteData> load(String key) async {
+    final source = _sources[key];
+    if (source == null) {
+      throw StateError('Test asset not found: $key');
+    }
+    return ByteData.sublistView(Uint8List.fromList(utf8.encode(source)));
   }
 }

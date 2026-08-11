@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
 
 import '../../../../shared/shared.dart';
-import '../widgets/widgets.dart';
 
 /// Advanced wallet options, with sensitive disclosures gated by SEC-007.
 class AdvancedSettingsScreen extends StatelessWidget {
@@ -27,21 +26,21 @@ class AdvancedSettingsScreen extends StatelessWidget {
               padding: EdgeInsets.symmetric(vertical: spacing.xs),
               child: Column(
                 children: [
-                  SettingsOptionRow(
+                  AsterOptionRow(
                     title: 'Export xpubs',
                     details: 'Unavailable',
                     prefixIcon: MingCuteIcons.mgc_key_2_line,
                     suffixIcon: MingCuteIcons.mgc_lock_line,
                   ),
                   const AsterDivider.inset(),
-                  SettingsOptionRow(
+                  AsterOptionRow(
                     title: 'Check seed phrase',
                     details: 'Unavailable',
                     prefixIcon: MingCuteIcons.mgc_shield_line,
                     suffixIcon: MingCuteIcons.mgc_lock_line,
                   ),
                   const AsterDivider.inset(),
-                  SettingsOptionRow(
+                  AsterOptionRow(
                     title: 'Network configuration',
                     prefixIcon: MingCuteIcons.mgc_route_line,
                     onTap: () =>

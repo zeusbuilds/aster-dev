@@ -10,6 +10,7 @@ import '../../features/settings/presentation/screens/screens.dart';
 import '../../features/skeleton/presentation/screens/screens.dart';
 import '../../features/swap/presentation/screens/screens.dart';
 import '../../features/transaction/presentation/screens/screens.dart';
+import '../../features/wallet/domain/models/models.dart';
 import '../../features/wallet/presentation/pages/pages.dart';
 import 'route_names.dart';
 import 'route_paths.dart';
@@ -59,7 +60,18 @@ class RouteConfig {
       GoRoute(
         path: RoutePaths.sendAddress,
         name: RouteNames.sendAddress,
-        builder: (context, state) => const SendAddressScreen(),
+        redirect: (context, state) =>
+            _invalidPaymentTargetRedirect(state, fallback: RoutePaths.send),
+        builder: (context, state) =>
+            SendAddressScreen(target: _paymentTarget(state)),
+      ),
+      GoRoute(
+        path: RoutePaths.sendAmount,
+        name: RouteNames.sendAmount,
+        redirect: (context, state) =>
+            _invalidPaymentTargetRedirect(state, fallback: RoutePaths.send),
+        builder: (context, state) =>
+            SendAmountScreen(target: _paymentTarget(state)),
       ),
       GoRoute(
         path: RoutePaths.receive,
@@ -67,9 +79,12 @@ class RouteConfig {
         builder: (context, state) => const ReceiveScreen(),
       ),
       GoRoute(
-        path: RoutePaths.receiveSetAmount,
-        name: RouteNames.receiveSetAmount,
-        builder: (context, state) => const ReceiveSetAmountScreen(),
+        path: RoutePaths.receiveRequest,
+        name: RouteNames.receiveRequest,
+        redirect: (context, state) =>
+            _invalidPaymentTargetRedirect(state, fallback: RoutePaths.receive),
+        builder: (context, state) =>
+            ReceiveRequestScreen(target: _paymentTarget(state)),
       ),
       GoRoute(
         path: RoutePaths.swap,
@@ -131,5 +146,23 @@ class RouteConfig {
         ],
       ),
     ];
+  }
+
+  static WalletPaymentTarget _paymentTarget(GoRouterState state) {
+    return WalletPaymentTarget.tryParse(
+      state.pathParameters[RoutePaths.paymentTargetParameter],
+    )!;
+  }
+
+  static String? _invalidPaymentTargetRedirect(
+    GoRouterState state, {
+    required String fallback,
+  }) {
+    return WalletPaymentTarget.tryParse(
+              state.pathParameters[RoutePaths.paymentTargetParameter],
+            ) ==
+            null
+        ? fallback
+        : null;
   }
 }

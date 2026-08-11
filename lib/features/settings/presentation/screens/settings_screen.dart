@@ -9,7 +9,6 @@ import '../../../../core/errors/errors.dart';
 import '../../../../shared/shared.dart';
 import '../../../wallet/presentation/view_model/viewmodels.dart';
 import '../view_model/view_models.dart';
-import '../widgets/widgets.dart';
 
 /// Settings screen displaying wallet, app, and support options
 ///
@@ -48,7 +47,7 @@ class SettingsScreen extends ConsumerWidget {
               padding: EdgeInsets.symmetric(vertical: spacing.xs),
               child: Column(
                 children: [
-                  SettingsOptionRow(
+                  AsterOptionRow(
                     title: activeWallet?.name ?? 'Main',
                     details: activeWallet?.displayId,
                     prefixIcon: MingCuteIcons.mgc_wallet_3_line,
@@ -66,7 +65,7 @@ class SettingsScreen extends ConsumerWidget {
               padding: EdgeInsets.symmetric(vertical: spacing.xs),
               child: Column(
                 children: [
-                  SettingsOptionRow(
+                  AsterOptionRow(
                     title: 'Wallet details',
                     details: 'Main',
                     prefixIcon: MingCuteIcons.mgc_information_line,
@@ -79,7 +78,7 @@ class SettingsScreen extends ConsumerWidget {
                     },
                   ),
                   const AsterDivider.inset(),
-                  SettingsOptionRow(
+                  AsterOptionRow(
                     title: 'Manage assets',
                     prefixIcon: MingCuteIcons.mgc_coin_2_line,
                     onTap: () {
@@ -91,7 +90,7 @@ class SettingsScreen extends ConsumerWidget {
                     },
                   ),
                   const AsterDivider.inset(),
-                  SettingsOptionRow(
+                  AsterOptionRow(
                     title: 'Advanced',
                     prefixIcon: MingCuteIcons.mgc_tool_line,
                     onTap: () => context.pushNamed(RouteNames.advancedSettings),
@@ -113,7 +112,7 @@ class SettingsScreen extends ConsumerWidget {
                   padding: EdgeInsets.symmetric(vertical: spacing.xs),
                   child: Column(
                     children: [
-                      SettingsOptionRow(
+                      AsterOptionRow(
                         title: 'Currency',
                         details:
                             settingsSnapshot?.selectedCurrency.code ??
@@ -126,7 +125,7 @@ class SettingsScreen extends ConsumerWidget {
                             : null,
                       ),
                       const AsterDivider.inset(),
-                      SettingsOptionRow(
+                      AsterOptionRow(
                         title: 'Bitcoin unit',
                         details:
                             settingsSnapshot?.preferences.bitcoinUnit.label ??
@@ -139,13 +138,13 @@ class SettingsScreen extends ConsumerWidget {
                             : null,
                       ),
                       const AsterDivider.inset(),
-                      const SettingsOptionRow(
+                      const AsterOptionRow(
                         title: 'Language',
                         details: 'English',
                         prefixIcon: MingCuteIcons.mgc_translate_2_line,
                       ),
                       const AsterDivider.inset(),
-                      SettingsOptionRow(
+                      AsterOptionRow(
                         title: 'Region',
                         details:
                             settingsSnapshot?.selectedRegion.name ??
@@ -157,7 +156,7 @@ class SettingsScreen extends ConsumerWidget {
                             : null,
                       ),
                       const AsterDivider.inset(),
-                      const SettingsOptionRow(
+                      const AsterOptionRow(
                         title: 'Notifications',
                         details: 'Unavailable',
                         prefixIcon: MingCuteIcons.mgc_bell_ringing_line,
@@ -185,34 +184,34 @@ class SettingsScreen extends ConsumerWidget {
               padding: EdgeInsets.symmetric(vertical: spacing.xs),
               child: Column(
                 children: [
-                  SettingsOptionRow(
+                  AsterOptionRow(
                     title: 'Contact Support',
                     prefixIcon: MingCuteIcons.mgc_lifebuoy_line,
                   ),
                   const AsterDivider.inset(),
-                  SettingsOptionRow(
+                  AsterOptionRow(
                     title: 'Terms of Service',
                     prefixIcon: MingCuteIcons.mgc_document_2_line,
                   ),
                   const AsterDivider.inset(),
-                  SettingsOptionRow(
+                  AsterOptionRow(
                     title: 'Privacy Policy',
                     prefixIcon: MingCuteIcons.mgc_file_check_line,
                   ),
                   const AsterDivider.inset(),
-                  SettingsOptionRow(
+                  AsterOptionRow(
                     title: 'Twitter',
                     prefixIcon: MingCuteIcons.mgc_twitter_line,
                     onTap: () {},
                   ),
                   const AsterDivider.inset(),
-                  SettingsOptionRow(
+                  AsterOptionRow(
                     title: 'Telegram',
                     prefixIcon: MingCuteIcons.mgc_telegram_line,
                     onTap: () {},
                   ),
                   const AsterDivider.inset(),
-                  SettingsOptionRow(
+                  AsterOptionRow(
                     title: 'Instagram',
                     prefixIcon: MingCuteIcons.mgc_instagram_line,
                     onTap: () {},

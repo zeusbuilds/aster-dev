@@ -12,9 +12,11 @@ class RoutePaths {
   static const String skeleton = '/skeleton';
   static const String home = '/home';
   static const String send = '/send';
-  static const String sendAddress = '/send/address';
+  static const String paymentTargetParameter = 'paymentTarget';
+  static const String sendAddress = '/send/:paymentTarget/address';
+  static const String sendAmount = '/send/:paymentTarget/amount';
   static const String receive = '/receive';
-  static const String receiveSetAmount = '/receive/set-amount';
+  static const String receiveRequest = '/receive/:paymentTarget';
   static const String swap = '/swap';
   static const String market = '/market';
   static const String transactionList = '/transactions';

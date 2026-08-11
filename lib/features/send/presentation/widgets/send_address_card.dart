@@ -1,117 +1,73 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../shared/shared.dart';
+import '../../../wallet/domain/models/models.dart';
+import '../../../wallet/presentation/models/models.dart';
 
-/// Card widget for entering recipient address
-///
-/// Displays address input field with paste/clear functionality.
-/// Optionally accepts [controller] from parent (e.g. to set address from scan result).
-class SendAddressCard extends StatefulWidget {
-  /// Asset model for the send operation
-  final AssetModel asset;
+/// Controlled destination field for the selected Send asset and rail.
+class SendAddressCard extends StatelessWidget {
+  const SendAddressCard({
+    super.key,
+    required this.target,
+    required this.controller,
+    required this.enabled,
+    required this.onChanged,
+    required this.onClear,
+    required this.onPaste,
+    this.failureMessage,
+    this.pasting = false,
+  });
 
-  /// Optional controller; if provided, parent owns it and can set text (e.g. from scan).
-  final TextEditingController? controller;
-
-  const SendAddressCard({super.key, required this.asset, this.controller});
-
-  @override
-  State<SendAddressCard> createState() => _SendAddressCardState();
-}
-
-class _SendAddressCardState extends State<SendAddressCard> {
-  TextEditingController? _internalController;
-  TextEditingController get _addressController =>
-      widget.controller ?? _internalController!;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.controller == null) {
-      _internalController = TextEditingController();
-    }
-  }
-
-  @override
-  void dispose() {
-    _internalController?.dispose();
-    super.dispose();
-  }
-
-  void _clearAddress(BuildContext context) {
-    _addressController.clear();
-    setState(() {});
-    unawaited(context.haptics.trigger(HapticIntent.lightImpact));
-  }
-
-  Future<void> _pasteAddress(BuildContext context) async {
-    try {
-      final clipboard = await Clipboard.getData('text/plain');
-      if (!context.mounted) return;
-      final value = clipboard?.text?.trim();
-      if (value == null || value.isEmpty) {
-        context.toasts.show(
-          title: 'Clipboard is empty',
-          variant: ToastVariant.info,
-        );
-        return;
-      }
-      _addressController.text = value;
-      setState(() {});
-      unawaited(context.haptics.trigger(HapticIntent.lightImpact));
-    } catch (_) {
-      if (!context.mounted) return;
-      unawaited(context.haptics.trigger(HapticIntent.error));
-      context.toasts.show(
-        title: 'Could not read the clipboard',
-        message: 'Enter the address manually and try again.',
-        variant: ToastVariant.failure,
-      );
-    }
-  }
+  final WalletPaymentTarget target;
+  final TextEditingController controller;
+  final bool enabled;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+  final VoidCallback onPaste;
+  final String? failureMessage;
+  final bool pasting;
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.appColors;
-    final spacing = context.spacing;
-    final radius = context.radii;
-    final type = context.type;
-    final icons = context.icons;
-
+    final asset = target.assetModel;
     return Column(
       children: [
         Squircle(
           border: BorderRadius.only(
-            topLeft: Radius.circular(radius.card),
-            topRight: Radius.circular(radius.card),
+            topLeft: Radius.circular(context.radii.card),
+            topRight: Radius.circular(context.radii.card),
           ),
           padding: EdgeInsets.symmetric(
-            vertical: spacing.lg,
-            horizontal: spacing.xl,
+            vertical: context.spacing.lg,
+            horizontal: context.spacing.xl,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Recipient Address',
-                style: type.addressLabel.copyWith(color: colors.textSecondary),
+                target.destinationLabel,
+                style: context.type.addressLabel.copyWith(
+                  color: context.appColors.textSecondary,
+                ),
               ),
-              SizedBox(height: spacing.xs),
+              SizedBox(height: context.spacing.xs),
               TextField(
-                controller: _addressController,
-                style: type.address,
+                controller: controller,
+                enabled: enabled,
+                style: context.type.address,
                 cursorColor: context.colorScheme.primary,
+                keyboardType: TextInputType.url,
+                textInputAction: TextInputAction.done,
+                autocorrect: false,
+                enableSuggestions: false,
+                smartDashesType: SmartDashesType.disabled,
+                smartQuotesType: SmartQuotesType.disabled,
                 minLines: 2,
-                maxLines: 2,
+                maxLines: 4,
                 decoration: InputDecoration(
-                  hintText:
-                      'bc1p5d7rjq7g6rdk2yhzks9smlaqtedr4dekq08ge8ztwac72sfr9rusxg3297',
-                  hintStyle: type.addressHint,
+                  hintText: target.destinationHint,
+                  hintStyle: context.type.addressHint,
                   filled: false,
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
@@ -122,76 +78,58 @@ class _SendAddressCardState extends State<SendAddressCard> {
                   contentPadding: EdgeInsets.zero,
                   isDense: true,
                 ),
-                onChanged: (value) {
-                  setState(() {});
-                },
+                onChanged: onChanged,
               ),
+              if (failureMessage case final message?) ...[
+                SizedBox(height: context.spacing.sm),
+                Text(
+                  message,
+                  style: context.type.errorMessage.copyWith(
+                    color: context.appColors.danger,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
         Squircle(
+          color: context.appColors.surfaceSubtle,
+          borderColor: context.appColors.surfaceSubtle,
           border: BorderRadius.only(
-            bottomLeft: Radius.circular(radius.card),
-            bottomRight: Radius.circular(radius.card),
+            bottomLeft: Radius.circular(context.radii.card),
+            bottomRight: Radius.circular(context.radii.card),
           ),
           padding: EdgeInsets.symmetric(
-            vertical: spacing.lg,
-            horizontal: spacing.xl,
+            vertical: context.spacing.sm,
+            horizontal: context.spacing.xl,
           ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               SvgPicture.asset(
-                widget.asset.icon,
-                height: icons.md,
-                width: icons.md,
+                asset.icon,
+                height: context.icons.md,
+                width: context.icons.md,
                 errorBuilder: (context, error, stackTrace) => Icon(
                   Icons.circle,
-                  size: icons.md,
-                  color: AssetDisplay.colorOf(context, widget.asset),
+                  size: context.icons.md,
+                  color: AssetDisplay.colorOf(context, asset),
                 ),
               ),
-              SizedBox(width: spacing.sm),
-              Text(widget.asset.chain, style: type.rowTitleStrong),
-              const Spacer(),
-              Semantics(
-                button: true,
-                label: _addressController.text.isNotEmpty
-                    ? 'Clear address'
-                    : 'Paste address',
-                excludeSemantics: true,
-                child: Material(
-                  color: colors.transparentSurface,
-                  child: InkWell(
-                    onTap: _addressController.text.isNotEmpty
-                        ? () => _clearAddress(context)
-                        : () => unawaited(_pasteAddress(context)),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: context.metrics.minTouchTarget,
-                      ),
-                      child: Center(
-                        child: Squircle(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: spacing.md,
-                            vertical: spacing.xs,
-                          ),
-                          borderRadius: radius.badge,
-                          borderColor: context.colorScheme.primaryContainer,
-                          color: context.colorScheme.primaryContainer,
-                          child: Text(
-                            _addressController.text.isNotEmpty
-                                ? 'clear'
-                                : 'paste',
-                            style: type.badgeLabel.copyWith(
-                              color: context.colorScheme.primary,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+              SizedBox(width: context.spacing.sm),
+              Expanded(
+                child: Text(
+                  target.railLabel,
+                  style: context.type.rowTitleStrong,
                 ),
+              ),
+              CustomButton.compact(
+                text: controller.text.isEmpty ? 'Paste' : 'Clear',
+                loading: pasting,
+                enabled: enabled,
+                hapticIntent: controller.text.isEmpty
+                    ? null
+                    : HapticIntent.lightImpact,
+                onTap: controller.text.isEmpty ? onPaste : onClear,
               ),
             ],
           ),

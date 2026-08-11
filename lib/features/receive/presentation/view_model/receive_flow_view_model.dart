@@ -35,7 +35,7 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
   /// Updates pending amount-sheet input without regenerating on every key.
   void updateAmount(String value) {
     final current = state.value;
-    if (current == null || current.isGenerating) return;
+    if (current == null || current.isBusy) return;
     if (value == current.amountText) return;
     state = AsyncData(
       current.copyWith(
@@ -57,7 +57,7 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
   /// Generates a new address or invoice while preserving the applied amount.
   Future<bool> regenerate() async {
     final current = state.value;
-    if (current == null || current.isGenerating) return false;
+    if (current == null || current.isBusy) return false;
     return _generate(
       current,
       amountUnits: current.request.amount?.units,
@@ -65,9 +65,77 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
     );
   }
 
+  /// Copies the currently encoded request through the app platform boundary.
+  Future<AppResult<void>> copyRequest() async {
+    final current = state.value;
+    if (current == null || current.isBusy) {
+      return AppResult.failure(_operationUnavailableFailure());
+    }
+    state = AsyncData(
+      current.copyWith(
+        operation: ReceiveFlowOperation.copyingRequest,
+        failure: null,
+      ),
+    );
+    final result = await ref
+        .read(clipboardServiceProvider)
+        .writeText(current.request.encodedRequest);
+    if (!ref.mounted) return result;
+    state = AsyncData(
+      current.copyWith(operation: null, failure: _failureOf(result)),
+    );
+    unawaited(
+      ref
+          .read(hapticFeedbackServiceProvider)
+          .trigger(
+            result is AppSuccess<void>
+                ? HapticIntent.lightImpact
+                : HapticIntent.error,
+          ),
+    );
+    return result;
+  }
+
+  /// Opens the platform share sheet without exposing the request to widgets.
+  Future<AppResult<ShareDisposition>> shareRequest({
+    ShareOrigin? origin,
+  }) async {
+    final current = state.value;
+    if (current == null || current.isBusy) {
+      return AppResult.failure(_operationUnavailableFailure());
+    }
+    state = AsyncData(
+      current.copyWith(
+        operation: ReceiveFlowOperation.sharingRequest,
+        failure: null,
+      ),
+    );
+    final result = await ref
+        .read(shareServiceProvider)
+        .shareText(
+          current.request.encodedRequest,
+          subject: '${current.route.asset.displayName} payment request',
+          origin: origin,
+        );
+    if (!ref.mounted) return result;
+    state = AsyncData(
+      current.copyWith(operation: null, failure: _failureOf(result)),
+    );
+    unawaited(
+      ref
+          .read(hapticFeedbackServiceProvider)
+          .trigger(
+            result is AppSuccess<ShareDisposition>
+                ? HapticIntent.lightImpact
+                : HapticIntent.error,
+          ),
+    );
+    return result;
+  }
+
   void clearFailure() {
     final current = state.value;
-    if (current == null || current.failure == null || current.isGenerating) {
+    if (current == null || current.failure == null || current.isBusy) {
       return;
     }
     state = AsyncData(current.copyWith(failure: null));
@@ -95,10 +163,9 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
     )) {
       throw AppFailureException(failure);
     }
-    final bitcoinUnit = (settingsResult as AppSuccess<SettingsSnapshot>)
-        .value
-        .preferences
-        .bitcoinUnit;
+    final settingsSnapshot =
+        (settingsResult as AppSuccess<SettingsSnapshot>).value;
+    final bitcoinUnit = settingsSnapshot.preferences.bitcoinUnit;
     final requestResult = await repository.createReceiveRequest(_target);
     if (requestResult case AppFailureResult<WalletReceiveRequest>(
       :final failure,
@@ -109,6 +176,7 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
     return ReceiveFlowState(
       route: route,
       bitcoinUnit: bitcoinUnit,
+      currencyCode: settingsSnapshot.preferences.currencyCode,
       request: request,
       amountText: '',
       amountInput: _amountCodec.parse(
@@ -191,4 +259,16 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
       return AppResult.failure(FailureMapper.from(error, stackTrace));
     }
   }
+
+  static AppFailure _operationUnavailableFailure() => const AppFailure(
+    code: 'payment_operation_in_progress',
+    kind: AppFailureKind.conflict,
+    userMessage: 'Wait for the current payment action to finish.',
+    retryable: false,
+  );
+
+  static AppFailure? _failureOf<T>(AppResult<T> result) => switch (result) {
+    AppSuccess<T>() => null,
+    AppFailureResult<T>(:final failure) => failure,
+  };
 }

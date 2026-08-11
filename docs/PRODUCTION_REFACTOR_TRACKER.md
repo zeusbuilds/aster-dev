@@ -449,8 +449,10 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `lib/core/network/network_timeout_policy.dart` | Dart source | verified | NET-001 | Explicit connect/receive/send/operation budgets validated through transport tests | `1b3273a` |
 | `lib/core/network/resilient_http_client.dart` | Dart source | verified | NET-001, NET-002, NET-003, SEC-008 | Abort, deadline, retry, redirect, body-limit, classification, and redaction fault matrix passes | `1b3273a` |
 | `lib/core/network/retry_policy.dart` | Dart source | verified | NET-001 | Bounded ordered delays, finite jitter, exponential backoff, and injected sleep/random paths pass tests | `1b3273a` |
+| `lib/core/platform/clipboard_service.dart` | Dart source | unreviewed | - | - | - |
 | `lib/core/platform/platform.dart` | Dart source | verified | SEC-010 | Boundary exports only the secret-safe clipboard contract and adapter | `05c7edf` |
 | `lib/core/platform/sensitive_clipboard_service.dart` | Dart source | verified | SEC-010 | Bounded serialized lease stores only a digest, clears matching content, preserves replacement content, redacts failures, and passes fault/timer/disposal tests | `05c7edf` |
+| `lib/core/platform/share_service.dart` | Dart source | unreviewed | - | - | - |
 | `lib/core/storage/preferences_service.dart` | Dart source | verified | ARCH-001, STORE-001 | Async persistence forwarding and registry ownership reviewed under journal tests | `1b3273a` |
 | `lib/core/storage/secure_storage_service.dart` | Dart source | verified | SEC-005, TEST-002 | Explicit platform options and namespaced operations pass host and real iOS/Android round trips | `1b3273a` |
 | `lib/core/storage/storage.dart` | Dart source | unreviewed | - | - | - |
@@ -458,13 +460,10 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `lib/core/utils/formatters.dart` | Dart source | unreviewed | - | - | - |
 | `lib/core/utils/utils.dart` | Dart source | unreviewed | - | - | - |
 | `lib/core/utils/validators.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/home/data/bitcoin_market_repository.dart` | Dart source | verified | DATA-002, NET-001, NET-003 | Bounded CoinGecko mapping, integer conversion, chronology, freshness, fallback, and truthful failure tests pass | `1b3273a` |
 | `lib/features/home/data/data.dart` | Dart source | verified | ARCH-002 | Data boundary exports repository and immutable market models only | `1b3273a` |
-| `lib/features/home/data/models/bitcoin_market_snapshot.dart` | Dart source | verified | DATA-002 | Source/freshness/time/value invariants and value equality pass tests | `1b3273a` |
 | `lib/features/home/data/models/chart_data_item.dart` | Dart source | verified | DATA-002 | Immutable chart point equality supports deterministic widget data-change detection | `1b3273a` |
 | `lib/features/home/presentation/screens/home_screen.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/home/presentation/screens/screens.dart` | Dart source | unreviewed | - | - | - |
-| `lib/features/home/presentation/view_model/bitcoin_market_view_model.dart` | Dart source | verified | ARCH-002, DATA-002 | Generated AsyncNotifier owns repository request and suppresses duplicate retry; tests pass | `1b3273a` |
 | `lib/features/home/presentation/view_model/view_models.dart` | Dart source | verified | ARCH-002 | Feature-boundary barrel exports the market ViewModel only | `1b3273a` |
 | `lib/features/home/presentation/widgets/asset_row.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/home/presentation/widgets/assets_section.dart` | Dart source | unreviewed | - | - | - |
@@ -474,8 +473,13 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `lib/features/home/presentation/widgets/mesh_gradient_background.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/home/presentation/widgets/price_card.dart` | Dart source | verified | ARCH-002, DATA-002, HOME-002 | Consumer widget keeps injected truthful states and bounds loaded title/value layout at phone widths; 390x844 real-router regression passes | `1b3273a`, `518b077` |
 | `lib/features/home/presentation/widgets/widgets.dart` | Dart source | unreviewed | - | - | - |
+| `lib/features/market/data/bitcoin_market_repository.dart` | Dart source | unreviewed | - | - | - |
+| `lib/features/market/data/data.dart` | Dart source | unreviewed | - | - | - |
+| `lib/features/market/data/models/bitcoin_market_snapshot.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/market/presentation/screens/market_screen.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/market/presentation/screens/screens.dart` | Dart source | unreviewed | - | - | - |
+| `lib/features/market/presentation/view_model/bitcoin_market_view_model.dart` | Dart source | unreviewed | - | - | - |
+| `lib/features/market/presentation/view_model/view_models.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/market/presentation/widgets/market_tile.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/market/presentation/widgets/widgets.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/onboarding/data/repository/bip39_word_list_repository.dart` | Dart source | verified | DEC-023, ONB-003 | Concurrent bounded load, byte digest, UTF-8/count/order/uniqueness checks, retryable redacted failure, and production/tamper tests pass | `5f3698f`, `05c7edf` |
@@ -502,11 +506,13 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `lib/features/onboarding/presentation/widgets/widgets.dart` | Dart source | verified | ONB-001 | Boundary exports only public onboarding widgets, sorted without generated/private leakage | `05c7edf` |
 | `lib/features/receive/presentation/models/models.dart` | Dart source | verified | RECV-001 | Boundary exports only the typed Receive presentation state | `715e671` |
 | `lib/features/receive/presentation/models/receive_flow_state.dart` | Dart source | verified | DEC-034, RECV-001, PAY-004 | Immutable request, pending exact amount, operation, expiry, and redacted failure state enforces route/text invariants; exact aggregate gates pass | `715e671` |
+| `lib/features/receive/presentation/screens/receive_request_screen.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/receive/presentation/screens/receive_screen.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/receive/presentation/screens/receive_set_amount_screen.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/receive/presentation/screens/screens.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/receive/presentation/view_model/receive_flow_view_model.dart` | Dart source | verified | DEC-034, RECV-001, PAY-004, UX-001 | Generated route-scoped AsyncNotifier resolves deployment metadata, generates real requests, suppresses overlap, and replaces QR state only after success; exact aggregate gates pass | `715e671` |
 | `lib/features/receive/presentation/view_model/view_models.dart` | Dart source | verified | RECV-001 | Boundary exports only the public Receive ViewModel | `715e671` |
+| `lib/features/receive/presentation/widgets/receive_amount_sheet.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/receive/presentation/widgets/receive_card.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/receive/presentation/widgets/widgets.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/scan/presentation/screens/scan_screen.dart` | Dart source | fixing | ARCH-004, SEC-004 | User-visible failures are redacted and feedback is semantic; plugin/service ownership remains Phase 5 | `98b7a40` |
@@ -526,6 +532,7 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `lib/features/send/presentation/models/send_flow_state.dart` | Dart source | verified | DEC-034, SEND-001, SEND-003, PAY-004 | Immutable destination preview, exact amount, rail balance, fee, operation, expiry, and result state enforces cross-field invariants; exact aggregate gates pass | `715e671` |
 | `lib/features/send/presentation/screens/screens.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/send/presentation/screens/send_address_screen.dart` | Dart source | unreviewed | - | - | - |
+| `lib/features/send/presentation/screens/send_amount_screen.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/send/presentation/screens/send_screen.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/send/presentation/view_model/send_flow_view_model.dart` | Dart source | verified | DEC-034, SEND-001, SEND-003, PAY-004, UX-001 | Generated route-scoped AsyncNotifier validates only on demand, locks invoice amounts, enforces rail balance/fresh fee, suppresses overlap, submits once, and retains typed outcome state; exact aggregate gates pass | `715e671` |
 | `lib/features/send/presentation/view_model/view_models.dart` | Dart source | verified | SEND-001 | Boundary exports only the public Send ViewModel | `715e671` |
@@ -600,7 +607,10 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `lib/features/wallet/domain/models/wallet_portfolio.dart` | Dart source | verified | DOMAIN-001, PAY-002 | Cross-rail BTC and optional configured-USDT balances enforce product-kind and value invariants | `605b50c` |
 | `lib/features/wallet/domain/models/wallet_profile.dart` | Dart source | verified | ARCH-003, SEC-003 | Non-secret immutable metadata, Unicode control rejection, UTC timestamps, and opaque identity pass tests | `1b3273a` |
 | `lib/features/wallet/domain/models/wallet_registry.dart` | Dart source | verified | WALLET-001 | Immutable registry invariants, staged/ready/quarantined states, active selection, and equality pass tests | `1b3273a` |
+| `lib/features/wallet/presentation/formatting/formatting.dart` | Dart source | unreviewed | - | - | - |
+| `lib/features/wallet/presentation/formatting/wallet_amount_display_formatter.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/wallet/presentation/models/models.dart` | Dart source | unreviewed | - | - | - |
+| `lib/features/wallet/presentation/models/wallet_payment_display.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/wallet/presentation/models/wallet_state.dart` | Dart source | verified | SDK-001, DEC-012 | Immutable operation-specific state carries domain profiles and typed operation failure; equality reviewed/tested | `1b3273a` |
 | `lib/features/wallet/presentation/pages/pages.dart` | Dart source | verified | ROUTE-002 | Wallet presentation boundary exports access and selection pages only | `05c7edf` |
 | `lib/features/wallet/presentation/pages/wallet_access_screen.dart` | Dart source | verified | ROUTE-002, ACCESS-001 | Guard gate renders typed loading/failure/retry state while durable wallet state resolves | `05c7edf` |
@@ -608,6 +618,8 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `lib/features/wallet/presentation/view_model/payment_capabilities_view_model.dart` | Dart source | verified | DEC-030, SEND-001, RECV-001 | Generated provider exposes all four stable choices and deployment-owned availability without UI repository access; exact aggregate gates pass | `715e671` |
 | `lib/features/wallet/presentation/view_model/viewmodels.dart` | Dart source | verified | SEND-001, RECV-001 | Wallet presentation boundary exports capability and lifecycle ViewModels without generated leakage | `715e671` |
 | `lib/features/wallet/presentation/view_model/wallet_viewmodel.dart` | Dart source | verified | SDK-001, DEC-012, LIFE-003 | Generated AsyncNotifier exposes repository-backed load/switch state, suppresses overlap, and maps typed failures; tests pass | `1b3273a` |
+| `lib/features/wallet/presentation/widgets/payment_target_selection_view.dart` | Dart source | unreviewed | - | - | - |
+| `lib/features/wallet/presentation/widgets/payment_target_tile.dart` | Dart source | unreviewed | - | - | - |
 | `lib/features/wallet/presentation/widgets/wallet_select_option_row.dart` | Dart source | verified | ARCH-003 | Widget consumes domain profile rather than persistence model; strict analysis passes | `1b3273a` |
 | `lib/features/wallet/presentation/widgets/widgets.dart` | Dart source | unreviewed | - | - | - |
 | `lib/main.dart` | Dart source | verified | SEC-002, LIFE-001, LIFE-003, LIFE-005, UX-002 | One bootstrapped container and serialized lifecycle tail own repository resume/suspend/dispose; app-root feedback host is scoped without global mutable state | `1b3273a`, `98b7a40` |
@@ -660,6 +672,8 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `lib/shared/widgets/asset_display.dart` | Dart source | unreviewed | - | - | - |
 | `lib/shared/widgets/aster_divider.dart` | Dart source | unreviewed | - | - | - |
 | `lib/shared/widgets/aster_icon_button.dart` | Dart source | verified | ACCESS-002, UX-001 | Semantic labels, focus, target size, state layers, and haptic intent are centralized | `98b7a40` |
+| `lib/shared/widgets/aster_numeric_keypad.dart` | Dart source | unreviewed | - | - | - |
+| `lib/shared/widgets/aster_option_row.dart` | Dart source | unreviewed | - | - | - |
 | `lib/shared/widgets/aster_pill.dart` | Dart source | verified | DS-001 | True stadium geometry is encapsulated for pill-only surfaces | `98b7a40` |
 | `lib/shared/widgets/custom_app_bar.dart` | Dart source | verified | ACCESS-002 | Back action uses shared labeled keyboard-operable icon control with semantic haptic | `98b7a40` |
 | `lib/shared/widgets/custom_button.dart` | Dart source | verified | DS-001, ACCESS-002, ACCESS-004, UX-003, MOTION-001 | Shared semantic boundary owns the enabled tap action while preserving keyboard/focus, loading stability, duplicate suppression, haptics, and reduced motion; host and Android native actions pass | `98b7a40`, `3f1215b`, `518b077` |
@@ -678,19 +692,22 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `test/core/di/providers_test.dart` | Test | verified | LIFE-001 | Keep-alive async repository composition remains mounted | `1b3273a` |
 | `test/core/errors/failure_mapper_test.dart` | Test | verified | DEC-012, SEC-004, SEC-008 | SDK/HTTP/storage/protocol taxonomy, redaction, retry, and unknown-outcome matrix passes | `1b3273a` |
 | `test/core/network/resilient_http_client_test.dart` | Test | verified | NET-001, NET-002, NET-003 | Retry/budget/abort/cancel/redirect/body/scheme/policy fault matrix passes | `1b3273a` |
+| `test/core/platform/platform_services_test.dart` | Test | unreviewed | - | - | - |
 | `test/core/platform/sensitive_clipboard_service_test.dart` | Test | verified | SEC-010 | Matching clear, replacement preservation, expiry, disposal drain, and redacted platform-failure cases pass | `05c7edf` |
-| `test/features/home/bitcoin_market_repository_test.dart` | Test | verified | DATA-002 | Integer mapping, sorting, deduplication, fallback, freshness, bounds, and malformed-data cases pass | `1b3273a` |
-| `test/features/home/bitcoin_market_view_model_test.dart` | Test | verified | ARCH-002 | Duplicate retry is suppressed while initial request is active | `1b3273a` |
+| `test/features/market/bitcoin_market_repository_test.dart` | Test | unreviewed | - | - | - |
+| `test/features/market/bitcoin_market_view_model_test.dart` | Test | unreviewed | - | - | - |
 | `test/features/onboarding/bip39_word_list_repository_test.dart` | Test | verified | ONB-003 | Production asset, tampered bytes, canonical membership, retry, and concurrent cache behavior pass | `5f3698f`, `05c7edf` |
 | `test/features/onboarding/onboarding_screens_test.dart` | Test | verified | ONB-001, ONB-002, ACCESS-001, ACCESS-005 | Real fields/paste/loading/copy/keyboard/carousel plus merged editable semantics actions, compact/large/text-scale/accessibility behavior pass | `05c7edf`, `518b077` |
 | `test/features/onboarding/onboarding_view_models_test.dart` | Test | verified | ONB-001, ONB-003, ONB-004, SEC-010 | Character/length normalization, checksum, overlap, stale completion, copy, provision, failure, and secret-release paths pass | `05c7edf`, `518b077` |
 | `test/features/receive/receive_flow_view_model_test.dart` | Test | verified | RECV-001, PAY-004, UX-001 | Exact apply/clear, overlap, rollback, failure haptic, and invalid-precision mutation-suppression vectors pass against the real repository/runtime composition | `715e671` |
+| `test/features/send/payment_screens_test.dart` | Test | unreviewed | - | - | - |
 | `test/features/send/send_flow_view_model_test.dart` | Test | verified | SEND-001, SEND-003, PAY-004, UX-001 | Exact on-chain/Lightning, invoice lock, stale-fee, insufficient-balance, duplicate-submit, result-haptic, and four-capability vectors pass against the real repository/runtime composition | `715e671` |
 | `test/features/settings/settings_repository_test.dart` | Test | verified | DEC-024, SETTINGS-002, SETTINGS-003 | Defaults, persistence across reconstruction, invalid/corrupt repair, serialization, redaction, and production catalog invariants pass | `6cc7376` |
 | `test/features/settings/settings_screens_test.dart` | Test | verified | SETTINGS-001, SEC-007, ACCESS-001 | Durable unit interaction and disabled sensitive-disclosure accessibility behavior pass | `6cc7376` |
 | `test/features/settings/settings_view_model_test.dart` | Test | verified | DEC-024, SETTINGS-002 | Overlapping settings mutations are suppressed and state remains coherent | `6cc7376` |
 | `test/features/wallet/bitcoin_payment_instruction_parser_test.dart` | Test | verified | DEC-032, PAY-001, PAY-003, DEP-005 | Official BIP173/BIP350 vectors plus Base58, regtest, BIP321 rail selection, repeated instructions, exact amount, RFC 3986 decoding, duplicate/required/range, and display-attack cases pass in focused and aggregate suites | `021a610`, `633537e` |
 | `test/features/wallet/rgb_wallet_engine_test.dart` | Test | verified | SDK-001, DOMAIN-002, PAY-001, PAY-002, SEND-003 | Existing SDK/payment vectors plus fee rounding, target validation, malformed native estimates, checksum/network rejection, and pre-mutation suppression pass in the exact aggregate matrix | `1b3273a`, `605b50c`, `021a610`, `1d0627a` |
+| `test/features/wallet/wallet_amount_display_formatter_test.dart` | Test | unreviewed | - | - | - |
 | `test/features/wallet/wallet_amount_input_test.dart` | Test | verified | PAY-004 | Exact BTC/sats/msat/RGB conversions, reversible formatting, both rails, and every invalid-input class pass in the exact aggregate matrix | `1d0627a` |
 | `test/features/wallet/wallet_domain_models_test.dart` | Test | verified | DEC-013, DEC-030, DEC-033, DOMAIN-001, DOMAIN-002, PAY-002, PAY-004, SEND-003 | Existing invariants plus payment target, exact-unit, fee ownership/freshness, equality, route resolution, availability, and portfolio vectors pass in the exact aggregate matrix | `1b3273a`, `044a75c`, `605b50c`, `1d0627a` |
 | `test/features/wallet/wallet_identity_generator_test.dart` | Test | verified | SEC-003, SEC-006 | CSPRNG output length, alphabet, uniqueness, and secret size pass | `1b3273a` |
@@ -703,6 +720,7 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `test/shared/app_router_test.dart` | Test | verified | ROUTE-002, ROUTE-003, HOME-002 | Real GoRouter cold-link, persisted-active, safe-Back, live-provision transition, and loaded home-width regressions pass | `518b077` |
 | `test/shared/bitcoin_amount_formatter_test.dart` | Test | verified | SETTINGS-001 | Exact integer BTC/sats formatter boundaries, signs, grouping, and no-precision-loss cases pass | `6cc7376` |
 | `test/shared/feedback_system_test.dart` | Test | verified | UX-001, UX-002, UX-003 | Haptic support caching/failure isolation and bounded toast ordering/deduplication/disposal matrix passes | `98b7a40` |
+| `test/shared/numeric_keypad_test.dart` | Test | unreviewed | - | - | - |
 | `test/shared/presentation_system_test.dart` | Test | verified | DS-001, DS-002, DS-003, ACCESS-004, MOTION-001, NAV-001, SAFE-001 | Theme failure, inset semantics, numeric spans, shape types, native button tap-action ownership, reduced motion, navigation geometry, and toast host tests pass | `98b7a40`, `518b077` |
 | `test/shared/route_guards_test.dart` | Test | verified | ROUTE-002 | Pure unresolved/empty/active route matrix passes | `05c7edf` |
 | `test/support/onboarding_harness.dart` | Test | verified | TEST-001, ONB-001 | Existing real repository/runtime composition shares presentation recorders; onboarding regressions and exact aggregate gates pass | `05c7edf`, `518b077`, `715e671` |

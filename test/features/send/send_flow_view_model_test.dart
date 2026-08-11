@@ -238,6 +238,37 @@ void main() {
       ]);
     },
   );
+
+  test(
+    'paste adopts bounded clipboard text without exposing a plugin',
+    () async {
+      final harness = await PaymentFlowTestHarness.create();
+      addTearDown(harness.dispose);
+      harness.clipboard.text = '  mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn  ';
+      final provider = sendFlowViewModelProvider(
+        WalletPaymentTarget.bitcoinOnchain,
+      );
+      final subscription = harness.container.listen(
+        provider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      await harness.container.read(provider.future);
+
+      final result = await harness.container
+          .read(provider.notifier)
+          .pasteDestination();
+
+      expect(result, isA<AppSuccess<String>>());
+      expect(
+        harness.container.read(provider).requireValue.destination,
+        'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn',
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(harness.haptics.intents, [HapticIntent.lightImpact]);
+    },
+  );
 }
 
 WalletBalance _balance({

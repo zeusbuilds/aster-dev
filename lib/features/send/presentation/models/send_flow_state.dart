@@ -6,6 +6,7 @@ import '../../../wallet/domain/models/models.dart';
 
 /// Mutually exclusive work owned by one route-scoped Send flow.
 enum SendFlowOperation {
+  readingClipboard,
   validatingDestination,
   refreshingBalance,
   refreshingFee,
@@ -22,6 +23,7 @@ final class SendFlowState {
   SendFlowState({
     required this.route,
     required this.bitcoinUnit,
+    required this.currencyCode,
     required this.balance,
     required this.destination,
     required this.amountText,
@@ -39,6 +41,9 @@ final class SendFlowState {
         'amountInput',
         'Parsed text must match editable text.',
       );
+    }
+    if (!RegExp(r'^[A-Z]{3}$').hasMatch(currencyCode)) {
+      throw ArgumentError.value(currencyCode, 'currencyCode');
     }
     if (balance.asset != route.asset) {
       throw ArgumentError.value(balance, 'balance', 'Asset mismatch.');
@@ -79,6 +84,7 @@ final class SendFlowState {
 
   final PaymentRoute route;
   final BitcoinUnit bitcoinUnit;
+  final String currencyCode;
   final WalletBalance balance;
 
   /// Raw user input. Never include this value in logs or route arguments.
@@ -137,6 +143,7 @@ final class SendFlowState {
     return SendFlowState(
       route: route,
       bitcoinUnit: bitcoinUnit,
+      currencyCode: currencyCode,
       balance: balance ?? this.balance,
       destination: destination ?? this.destination,
       preview: identical(preview, _unchanged)
@@ -167,6 +174,7 @@ final class SendFlowState {
       other is SendFlowState &&
       other.route == route &&
       other.bitcoinUnit == bitcoinUnit &&
+      other.currencyCode == currencyCode &&
       other.balance == balance &&
       other.destination == destination &&
       other.preview == preview &&
@@ -182,6 +190,7 @@ final class SendFlowState {
   int get hashCode => Object.hash(
     route,
     bitcoinUnit,
+    currencyCode,
     balance,
     destination,
     preview,

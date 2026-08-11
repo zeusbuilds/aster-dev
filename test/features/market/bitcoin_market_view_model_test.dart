@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:aster/core/core.dart';
-import 'package:aster/features/home/presentation/view_model/view_models.dart';
+import 'package:aster/features/market/presentation/view_model/view_models.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;

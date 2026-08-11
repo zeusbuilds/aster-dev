@@ -56,6 +56,16 @@ SensitiveClipboardService sensitiveClipboardService(Ref ref) {
   return service;
 }
 
+@riverpod
+ClipboardService clipboardService(Ref ref) {
+  return PlatformClipboardService();
+}
+
+@riverpod
+ShareService shareService(Ref ref) {
+  return PlatformShareService();
+}
+
 @Riverpod(keepAlive: true)
 ResilientHttpClient resilientHttpClient(Ref ref) {
   final client = ResilientHttpClient();

@@ -1,2 +1,2 @@
 // Public receive widget API.
-export 'receive_card.dart';
+export 'receive_amount_sheet.dart';

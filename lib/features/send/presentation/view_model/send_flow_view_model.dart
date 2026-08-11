@@ -48,6 +48,54 @@ class SendFlowViewModel extends _$SendFlowViewModel {
     );
   }
 
+  /// Reads a bounded non-secret payment destination from the clipboard.
+  Future<AppResult<String>> pasteDestination() async {
+    final current = state.value;
+    if (current == null || current.isBusy || current.result != null) {
+      return AppResult.failure(_operationUnavailableFailure());
+    }
+    state = AsyncData(
+      current.copyWith(
+        operation: SendFlowOperation.readingClipboard,
+        failure: null,
+      ),
+    );
+    final result = await ref.read(clipboardServiceProvider).readText();
+    if (!ref.mounted) return _clipboardResult(result);
+    return switch (result) {
+      AppSuccess<String?>(:final value) => () {
+        final destination = value?.trim() ?? '';
+        if (destination.isEmpty) {
+          state = AsyncData(current.copyWith(operation: null));
+          return AppResult<String>.failure(_clipboardEmptyFailure());
+        }
+        state = AsyncData(
+          current.copyWith(
+            destination: destination,
+            preview: null,
+            amountText: '',
+            amountInput: _parseAmount('', current),
+            operation: null,
+            failure: null,
+          ),
+        );
+        unawaited(
+          ref
+              .read(hapticFeedbackServiceProvider)
+              .trigger(HapticIntent.lightImpact),
+        );
+        return AppResult<String>.success(destination);
+      }(),
+      AppFailureResult<String?>(:final failure) => () {
+        state = AsyncData(current.copyWith(operation: null));
+        unawaited(
+          ref.read(hapticFeedbackServiceProvider).trigger(HapticIntent.error),
+        );
+        return AppResult<String>.failure(failure);
+      }(),
+    };
+  }
+
   /// Validates the destination on demand and adopts any encoded amount.
   Future<bool> validateDestination() async {
     final current = state.value;
@@ -120,6 +168,11 @@ class SendFlowViewModel extends _$SendFlowViewModel {
         state = AsyncData(
           current.copyWith(balance: value, operation: null, failure: null),
         );
+        unawaited(
+          ref
+              .read(hapticFeedbackServiceProvider)
+              .trigger(HapticIntent.lightImpact),
+        );
         return true;
       }(),
       AppFailureResult<WalletBalance>(:final failure) => _fail(
@@ -159,6 +212,11 @@ class SendFlowViewModel extends _$SendFlowViewModel {
             operation: null,
             failure: null,
           ),
+        );
+        unawaited(
+          ref
+              .read(hapticFeedbackServiceProvider)
+              .trigger(HapticIntent.lightImpact),
         );
         return true;
       }(),
@@ -248,10 +306,9 @@ class SendFlowViewModel extends _$SendFlowViewModel {
     )) {
       throw AppFailureException(failure);
     }
-    final bitcoinUnit = (settingsResult as AppSuccess<SettingsSnapshot>)
-        .value
-        .preferences
-        .bitcoinUnit;
+    final settingsSnapshot =
+        (settingsResult as AppSuccess<SettingsSnapshot>).value;
+    final bitcoinUnit = settingsSnapshot.preferences.bitcoinUnit;
     final balanceResult = await repository.balance(route.asset.kind);
     if (balanceResult case AppFailureResult<WalletBalance>(:final failure)) {
       throw AppFailureException(failure);
@@ -271,6 +328,7 @@ class SendFlowViewModel extends _$SendFlowViewModel {
     return SendFlowState(
       route: route,
       bitcoinUnit: bitcoinUnit,
+      currencyCode: settingsSnapshot.preferences.currencyCode,
       balance: balance,
       destination: '',
       amountText: '',
@@ -381,6 +439,30 @@ class SendFlowViewModel extends _$SendFlowViewModel {
     code: 'payment_request_expired',
     kind: AppFailureKind.validation,
     userMessage: 'This payment request has expired.',
+    retryable: false,
+  );
+
+  static AppResult<String> _clipboardResult(AppResult<String?> result) {
+    return switch (result) {
+      AppSuccess<String?>(:final value)
+          when value != null && value.trim().isNotEmpty =>
+        AppResult.success(value.trim()),
+      AppSuccess<String?>() => AppResult.failure(_clipboardEmptyFailure()),
+      AppFailureResult<String?>(:final failure) => AppResult.failure(failure),
+    };
+  }
+
+  static AppFailure _clipboardEmptyFailure() => const AppFailure(
+    code: 'clipboard_empty',
+    kind: AppFailureKind.validation,
+    userMessage: 'The clipboard does not contain a payment address.',
+    retryable: false,
+  );
+
+  static AppFailure _operationUnavailableFailure() => const AppFailure(
+    code: 'payment_operation_in_progress',
+    kind: AppFailureKind.conflict,
+    userMessage: 'Wait for the current payment action to finish.',
     retryable: false,
   );
 }
