@@ -136,6 +136,67 @@ void main() {
     );
   });
 
+  test('onchain commands require typed fees and Lightning forbids them', () {
+    final observedAt = DateTime.utc(2026, 8, 11, 10);
+    final fee = WalletFeeRateEstimate(
+      targetBlocks: 6,
+      satsPerVbyte: 3,
+      observedAt: observedAt,
+    );
+    const onchain = PaymentRoute(
+      asset: WalletAsset.bitcoin,
+      rail: PaymentRail.onchain,
+    );
+    const lightning = PaymentRoute(
+      asset: WalletAsset.bitcoin,
+      rail: PaymentRail.lightning,
+    );
+    final onchainAmount = WalletAmount.onchain(
+      assetId: WalletAsset.bitcoin.id,
+      units: 1,
+    );
+    final lightningAmount = WalletAmount.lightning(
+      assetId: WalletAsset.bitcoin.id,
+      units: 1000,
+    );
+
+    final command = WalletSendCommand(
+      route: onchain,
+      destination: 'bcrt1destination',
+      amount: onchainAmount,
+      feeRate: fee,
+    );
+    expect(command.feeRate, fee);
+    expect(fee.isStaleAt(observedAt.add(const Duration(minutes: 2))), isFalse);
+    expect(
+      fee.isStaleAt(
+        observedAt.add(const Duration(minutes: 2, microseconds: 1)),
+      ),
+      isTrue,
+    );
+    expect(
+      fee.isStaleAt(observedAt.subtract(const Duration(seconds: 1))),
+      isTrue,
+    );
+    expect(
+      () => WalletSendCommand(
+        route: onchain,
+        destination: 'bcrt1destination',
+        amount: onchainAmount,
+      ),
+      throwsArgumentError,
+    );
+    expect(
+      () => WalletSendCommand(
+        route: lightning,
+        destination: 'lnbcrt1invoice',
+        amount: lightningAmount,
+        feeRate: fee,
+      ),
+      throwsArgumentError,
+    );
+  });
+
   test('portfolio exposes only configured product balances', () {
     final bitcoin = _balanceFor(WalletAsset.bitcoin);
     final usdtAsset = WalletAsset.rgbUsdt(

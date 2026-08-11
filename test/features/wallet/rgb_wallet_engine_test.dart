@@ -102,6 +102,62 @@ void main() {
     ).called(1);
   });
 
+  test(
+    'rounds native fee estimates up and records UTC observation time',
+    () async {
+      final observedAt = DateTime.utc(2026, 8, 11, 10);
+      final wallet = MockUtexoWallet();
+      when(
+        () => wallet.estimateFeeRate(6),
+      ).thenAnswer((_) async => const FeeEstimationResponse(feeRate: 1.25));
+      final engine = RgbWalletEngine(
+        wallet,
+        services,
+        UtexoUnlockConfig(),
+        clock: () => observedAt,
+      );
+
+      final estimate = await engine.estimateFeeRate(6);
+
+      expect(estimate.targetBlocks, 6);
+      expect(estimate.satsPerVbyte, 2);
+      expect(estimate.observedAt, observedAt);
+    },
+  );
+
+  test('rejects invalid fee targets and malformed native estimates', () async {
+    final invalidTargetWallet = MockUtexoWallet();
+    final invalidTargetEngine = RgbWalletEngine(
+      invalidTargetWallet,
+      services,
+      UtexoUnlockConfig(),
+    );
+
+    await expectLater(
+      invalidTargetEngine.estimateFeeRate(0),
+      throwsA(isA<WalletValidationException>()),
+    );
+    verifyNever(() => invalidTargetWallet.estimateFeeRate(any()));
+
+    for (final value in <double>[
+      0,
+      double.nan,
+      double.infinity,
+      WalletFeeRateEstimate.maximumSatsPerVbyte + 0.1,
+    ]) {
+      final wallet = MockUtexoWallet();
+      when(
+        () => wallet.estimateFeeRate(6),
+      ).thenAnswer((_) async => FeeEstimationResponse(feeRate: value));
+      final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
+
+      await expectLater(
+        engine.estimateFeeRate(6),
+        throwsA(isA<NativeProtocolException>()),
+      );
+    }
+  });
+
   test('returns validated native network status', () async {
     final wallet = MockUtexoWallet();
     when(() => wallet.getNetworkInfo()).thenAnswer(
@@ -519,7 +575,7 @@ void main() {
         route: route,
         destination: address,
         amount: amount,
-        feeRateSatsPerVbyte: 3,
+        feeRate: _feeRate(3),
       ),
     );
 
@@ -546,6 +602,7 @@ void main() {
             assetId: WalletAsset.bitcoin.id,
             units: 1,
           ),
+          feeRate: _feeRate(1),
         ),
       ),
       throwsA(isA<WalletValidationException>()),
@@ -721,7 +778,7 @@ void main() {
         route: route,
         destination: receive.encodedRequest,
         amount: amount,
-        feeRateSatsPerVbyte: 4,
+        feeRate: _feeRate(4),
       ),
     );
 
@@ -941,12 +998,19 @@ void main() {
             assetId: WalletAsset.bitcoin.id,
             units: 1,
           ),
+          feeRate: _feeRate(1),
         ),
       ),
       throwsA(isA<NativeProtocolException>()),
     );
   });
 }
+
+WalletFeeRateEstimate _feeRate(int satsPerVbyte) => WalletFeeRateEstimate(
+  targetBlocks: 6,
+  satsPerVbyte: satsPerVbyte,
+  observedAt: DateTime.utc(2026, 8, 11),
+);
 
 String _regtestAddress() {
   final program = Uint8List.fromList(List<int>.generate(20, (index) => index));

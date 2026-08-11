@@ -240,6 +240,7 @@ final class FakeWalletEngine implements WalletEngine {
   Object? decodeInvoiceError;
   Object? createReceiveError;
   Object? sendPaymentError;
+  Object? feeEstimateError;
   Completer<void>? initializeGate;
   Completer<void>? addressGate;
   Completer<void>? decodeInvoiceGate;
@@ -251,11 +252,13 @@ final class FakeWalletEngine implements WalletEngine {
   WalletPaymentPreview? decodedInvoice;
   WalletReceiveRequest? createdReceiveRequest;
   WalletSendResult? sentPayment;
+  WalletFeeRateEstimate? feeEstimate;
   PaymentRoute? decodedInvoiceRoute;
   String? decodedInvoiceValue;
   PaymentRoute? createdReceiveRoute;
   WalletAmount? createdReceiveAmount;
   WalletSendCommand? sentPaymentCommand;
+  int? feeTargetBlocks;
 
   @override
   Future<void> initialize({
@@ -373,6 +376,19 @@ final class FakeWalletEngine implements WalletEngine {
       lightningSpendable: lightning(0),
       lightningReceivable: lightning(0),
     );
+  }
+
+  @override
+  Future<WalletFeeRateEstimate> estimateFeeRate(int targetBlocks) async {
+    calls.add('estimateFeeRate');
+    feeTargetBlocks = targetBlocks;
+    if (feeEstimateError case final Object error) throw error;
+    return feeEstimate ??
+        WalletFeeRateEstimate(
+          targetBlocks: targetBlocks,
+          satsPerVbyte: 2,
+          observedAt: DateTime.utc(2026, 8, 11),
+        );
   }
 
   @override

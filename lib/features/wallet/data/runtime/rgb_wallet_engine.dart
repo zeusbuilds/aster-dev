@@ -153,6 +153,39 @@ final class RgbWalletEngine implements WalletEngine {
   }
 
   @override
+  Future<WalletFeeRateEstimate> estimateFeeRate(int targetBlocks) async {
+    if (targetBlocks < WalletFeeRateEstimate.minimumTargetBlocks ||
+        targetBlocks > WalletFeeRateEstimate.maximumTargetBlocks) {
+      throw const WalletValidationException(
+        'Confirmation target is outside the supported range.',
+        field: 'targetBlocks',
+      );
+    }
+    final response = await _wallet.estimateFeeRate(targetBlocks);
+    final nativeRate = response.feeRate;
+    if (!nativeRate.isFinite ||
+        nativeRate <= 0 ||
+        nativeRate > WalletFeeRateEstimate.maximumSatsPerVbyte) {
+      throw const NativeProtocolException(
+        'Native wallet returned an invalid fee-rate estimate.',
+        field: 'feeRate',
+      );
+    }
+    final roundedRate = nativeRate.ceil();
+    if (roundedRate > WalletFeeRateEstimate.maximumSatsPerVbyte) {
+      throw const NativeProtocolException(
+        'Native wallet returned an out-of-range fee-rate estimate.',
+        field: 'feeRate',
+      );
+    }
+    return WalletFeeRateEstimate(
+      targetBlocks: targetBlocks,
+      satsPerVbyte: roundedRate,
+      observedAt: _clock().toUtc(),
+    );
+  }
+
+  @override
   Future<WalletPaymentPreview> decodeInvoice(
     PaymentRoute route,
     String invoice,
@@ -454,7 +487,7 @@ final class RgbWalletEngine implements WalletEngine {
     final txid = await _wallet.sendBtc(
       amount: command.amount.units,
       address: address,
-      feeRate: command.feeRateSatsPerVbyte.toDouble(),
+      feeRate: command.feeRate!.satsPerVbyte.toDouble(),
     );
     return WalletSendResult(
       route: command.route,
@@ -473,7 +506,7 @@ final class RgbWalletEngine implements WalletEngine {
         invoice: command.destination,
         assetId: command.route.asset.id.value,
         amount: command.amount.units,
-        feeRate: command.feeRateSatsPerVbyte.toDouble(),
+        feeRate: command.feeRate!.satsPerVbyte.toDouble(),
       ),
     );
     return WalletSendResult(

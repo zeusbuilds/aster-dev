@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import 'wallet_amount.dart';
 import 'wallet_asset.dart';
+import 'wallet_fee.dart';
 
 /// App-owned lifecycle state for a payment or transfer.
 enum WalletPaymentStatus { pending, succeeded, failed, cancelled, expired }
@@ -175,13 +176,16 @@ final class WalletSendCommand {
     required this.route,
     required this.destination,
     required this.amount,
-    this.feeRateSatsPerVbyte = 1,
+    this.feeRate,
   }) {
     _requireEncoded(destination, 'destination');
     _requireRouteAmount(route, amount);
     if (amount.isZero) throw ArgumentError.value(amount.units, 'amount');
-    if (feeRateSatsPerVbyte <= 0 || feeRateSatsPerVbyte > 1000000) {
-      throw ArgumentError.value(feeRateSatsPerVbyte, 'feeRateSatsPerVbyte');
+    if (route.rail == PaymentRail.onchain && feeRate == null) {
+      throw ArgumentError.value(feeRate, 'feeRate', 'Required on-chain.');
+    }
+    if (route.rail == PaymentRail.lightning && feeRate != null) {
+      throw ArgumentError.value(feeRate, 'feeRate', 'Not used by Lightning.');
     }
   }
 
@@ -189,8 +193,8 @@ final class WalletSendCommand {
   final String destination;
   final WalletAmount amount;
 
-  /// Integer satoshis per virtual byte used only for on-chain sends.
-  final int feeRateSatsPerVbyte;
+  /// Fresh fee rate used only for on-chain sends.
+  final WalletFeeRateEstimate? feeRate;
 
   @override
   String toString() => 'WalletSendCommand(${route.target.slug})';
@@ -201,11 +205,10 @@ final class WalletSendCommand {
       other.route == route &&
       other.destination == destination &&
       other.amount == amount &&
-      other.feeRateSatsPerVbyte == feeRateSatsPerVbyte;
+      other.feeRate == feeRate;
 
   @override
-  int get hashCode =>
-      Object.hash(route, destination, amount, feeRateSatsPerVbyte);
+  int get hashCode => Object.hash(route, destination, amount, feeRate);
 }
 
 /// Confirmed native acceptance of a send mutation.

@@ -36,6 +36,9 @@ final class WalletRepository {
   final DateTime Function() _clock;
   Future<void> _operationTail = Future<void>.value();
 
+  /// Balanced confirmation target used until product fee selection exists.
+  static const standardFeeTargetBlocks = 6;
+
   Future<AppResult<WalletRegistry>> load() => _enqueueOperation(_profiles.read);
 
   /// Product payment targets and whether this deployment can execute them.
@@ -494,6 +497,21 @@ final class WalletRepository {
     );
   }
 
+  /// Loads a bounded on-chain fee rate for a confirmation target.
+  Future<AppResult<WalletFeeRateEstimate>> estimateFeeRate({
+    int targetBlocks = standardFeeTargetBlocks,
+  }) {
+    if (targetBlocks < WalletFeeRateEstimate.minimumTargetBlocks ||
+        targetBlocks > WalletFeeRateEstimate.maximumTargetBlocks) {
+      return Future<AppResult<WalletFeeRateEstimate>>.value(
+        AppResult.failure(_invalidFeeTargetFailure()),
+      );
+    }
+    return _enqueueOperation(
+      () => _runtime.run((engine) => engine.estimateFeeRate(targetBlocks)),
+    );
+  }
+
   /// Loads cross-rail balances under one serialized native operation.
   Future<AppResult<WalletPortfolio>> portfolio() {
     final usdtRoute = resolvePaymentTarget(WalletPaymentTarget.usdtOnchain);
@@ -614,7 +632,6 @@ final class WalletRepository {
     required WalletPaymentTarget target,
     required String destination,
     required int amountUnits,
-    int feeRateSatsPerVbyte = 1,
   }) {
     final routeResult = resolvePaymentTarget(target);
     if (routeResult case AppFailureResult<PaymentRoute>(:final failure)) {
@@ -627,11 +644,6 @@ final class WalletRepository {
     if (amountResult case AppFailureResult<WalletAmount?>(:final failure)) {
       return Future<AppResult<WalletSendResult>>.value(
         AppResult.failure(failure),
-      );
-    }
-    if (feeRateSatsPerVbyte <= 0 || feeRateSatsPerVbyte > 1000000) {
-      return Future<AppResult<WalletSendResult>>.value(
-        AppResult.failure(_invalidFeeRateFailure()),
       );
     }
     final amount = (amountResult as AppSuccess<WalletAmount?>).value;
@@ -679,11 +691,29 @@ final class WalletRepository {
       }
       submissionDestination = destination;
     }
+    if (route.rail == PaymentRail.onchain) {
+      return _enqueueOperation(() async {
+        final feeResult = await _runtime.run(
+          (engine) => engine.estimateFeeRate(standardFeeTargetBlocks),
+        );
+        if (feeResult case AppFailureResult<WalletFeeRateEstimate>(
+          :final failure,
+        )) {
+          return AppResult.failure(failure);
+        }
+        final command = WalletSendCommand(
+          route: route,
+          destination: submissionDestination,
+          amount: amount,
+          feeRate: (feeResult as AppSuccess<WalletFeeRateEstimate>).value,
+        );
+        return _runtime.run((engine) => engine.sendPayment(command));
+      });
+    }
     final command = WalletSendCommand(
       route: route,
       destination: submissionDestination,
       amount: amount,
-      feeRateSatsPerVbyte: feeRateSatsPerVbyte,
     );
     return _enqueueOperation(
       () => _runtime.run((engine) => engine.sendPayment(command)),
@@ -794,10 +824,10 @@ final class WalletRepository {
     retryable: false,
   );
 
-  static AppFailure _invalidFeeRateFailure() => const AppFailure(
-    code: 'payment_fee_rate_invalid',
+  static AppFailure _invalidFeeTargetFailure() => const AppFailure(
+    code: 'payment_fee_target_invalid',
     kind: AppFailureKind.validation,
-    userMessage: 'Enter a valid network fee rate.',
+    userMessage: 'Choose a valid confirmation target.',
     retryable: false,
   );
 

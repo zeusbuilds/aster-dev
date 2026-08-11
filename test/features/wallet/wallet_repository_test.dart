@@ -242,6 +242,67 @@ void main() {
     },
   );
 
+  test('refreshes a displayed fee inside every onchain send', () async {
+    final observedAt = DateTime.now().toUtc();
+    final engine = FakeWalletEngine()
+      ..feeEstimate = WalletFeeRateEstimate(
+        targetBlocks: 6,
+        satsPerVbyte: 3,
+        observedAt: observedAt,
+      );
+    final harness = await _createActiveRepository(engine: engine);
+    addTearDown(harness.runtime.dispose);
+
+    final estimateResult = await harness.repository.estimateFeeRate();
+    expect(estimateResult, isA<AppSuccess<WalletFeeRateEstimate>>());
+    final estimate =
+        (estimateResult as AppSuccess<WalletFeeRateEstimate>).value;
+    expect(estimate.satsPerVbyte, 3);
+    expect(engine.feeTargetBlocks, 6);
+
+    engine.feeEstimate = WalletFeeRateEstimate(
+      targetBlocks: 6,
+      satsPerVbyte: 4,
+      observedAt: observedAt,
+    );
+    final sent = await harness.repository.sendPayment(
+      target: WalletPaymentTarget.bitcoinOnchain,
+      destination: 'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn',
+      amountUnits: 1,
+    );
+    engine.feeEstimateError = const RlnOperationTimeoutException(
+      operation: 'estimateFeeRate',
+      timeout: Duration(seconds: 30),
+    );
+    final failedRefresh = await harness.repository.sendPayment(
+      target: WalletPaymentTarget.bitcoinOnchain,
+      destination: 'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn',
+      amountUnits: 1,
+    );
+    final invalidTarget = await harness.repository.estimateFeeRate(
+      targetBlocks: 0,
+    );
+
+    expect(sent, isA<AppSuccess<WalletSendResult>>());
+    expect(engine.sentPaymentCommand?.feeRate?.satsPerVbyte, 4);
+    expect(
+      (failedRefresh as AppFailureResult<WalletSendResult>).failure.code,
+      'wallet_operation_outcome_unknown',
+    );
+    expect(
+      (invalidTarget as AppFailureResult<WalletFeeRateEstimate>).failure.code,
+      'payment_fee_target_invalid',
+    );
+    expect(
+      engine.calls.where((call) => call == 'sendPayment:start'),
+      hasLength(1),
+    );
+    expect(
+      engine.calls.where((call) => call == 'estimateFeeRate'),
+      hasLength(3),
+    );
+  });
+
   test('submits an exact typed command and maps native failures', () async {
     final engine = FakeWalletEngine();
     final harness = await _createActiveRepository(engine: engine);
@@ -289,7 +350,6 @@ void main() {
       target: WalletPaymentTarget.bitcoinOnchain,
       destination: 'bitcoin:$address?amount=0.00000100&label=Merchant',
       amountUnits: 100,
-      feeRateSatsPerVbyte: 2,
     );
     final mismatch = await harness.repository.sendPayment(
       target: WalletPaymentTarget.bitcoinOnchain,
@@ -325,17 +385,11 @@ void main() {
       destination: ' bcrt1qdestination ',
       amountUnits: 1,
     );
-    final invalidFee = await harness.repository.sendPayment(
-      target: WalletPaymentTarget.bitcoinOnchain,
-      destination: 'bcrt1qdestination',
-      amountUnits: 1,
-      feeRateSatsPerVbyte: 0,
-    );
 
     expect(invalidAmount, isA<AppFailureResult<WalletSendResult>>());
     expect(invalidDestination, isA<AppFailureResult<WalletSendResult>>());
-    expect(invalidFee, isA<AppFailureResult<WalletSendResult>>());
     expect(harness.engine.calls, isNot(contains('sendPayment:start')));
+    expect(harness.engine.calls, isNot(contains('estimateFeeRate')));
   });
 
   test('serializes payment operations through the repository owner', () async {
