@@ -160,6 +160,45 @@ void main() {
     expect(haptics.intents, [HapticIntent.lightImpact]);
   });
 
+  testWidgets('icon buttons own enabled and loading semantic actions', (
+    tester,
+  ) async {
+    var activations = 0;
+    await tester.pumpWidget(
+      _themedHarness(
+        AsterIconButton(
+          icon: Icons.copy,
+          tooltip: 'Copy value',
+          onPressed: () => activations += 1,
+        ),
+      ),
+    );
+
+    final enabled = tester
+        .getSemantics(find.bySemanticsLabel('Copy value'))
+        .getSemanticsData();
+    expect(enabled.hasAction(ui.SemanticsAction.tap), isTrue);
+    await tester.tap(find.bySemanticsLabel('Copy value'));
+    expect(activations, 1);
+
+    await tester.pumpWidget(
+      _themedHarness(
+        AsterIconButton(
+          icon: Icons.copy,
+          tooltip: 'Copy value',
+          loading: true,
+          onPressed: () => activations += 1,
+        ),
+      ),
+    );
+
+    final loading = tester
+        .getSemantics(find.bySemanticsLabel('Copy value'))
+        .getSemanticsData();
+    expect(loading.hasAction(ui.SemanticsAction.tap), isFalse);
+    expect(loading.value, 'Loading');
+  });
+
   testWidgets('reduced motion leaves loaders settled', (tester) async {
     await tester.pumpWidget(
       _themedHarness(const GridLoader(), disableAnimations: true),

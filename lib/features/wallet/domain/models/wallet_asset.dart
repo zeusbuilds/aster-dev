@@ -4,7 +4,23 @@ import 'package:flutter/foundation.dart';
 enum PaymentRail { onchain, lightning }
 
 /// Product asset identity independent from its protocol contract identifier.
-enum WalletAssetKind { bitcoin, usdt }
+enum WalletAssetKind {
+  bitcoin('bitcoin'),
+  usdt('usdt');
+
+  const WalletAssetKind(this.slug);
+
+  /// Stable route identifier independent from display labels or tickers.
+  final String slug;
+
+  static WalletAssetKind? tryParse(String? value) {
+    if (value == null) return null;
+    for (final kind in values) {
+      if (kind.slug == value) return kind;
+    }
+    return null;
+  }
+}
 
 /// Asset protocol independent from its payment rail.
 enum WalletAssetProtocol { bitcoin, rgb }

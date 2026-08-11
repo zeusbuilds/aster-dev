@@ -1,4 +1,5 @@
 // Public wallet-domain model API.
+export 'wallet_activity.dart';
 export 'wallet_amount.dart';
 export 'wallet_amount_input.dart';
 export 'wallet_asset.dart';

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
 
 import '../../../../core/core.dart';
@@ -188,6 +189,17 @@ class _AssetsBody extends ConsumerWidget {
           AssetRow.loaded(
             display: displays[index],
             balancesVisible: preferences.balancesVisible,
+            onTap: () {
+              unawaited(context.haptics.trigger(HapticIntent.lightImpact));
+              unawaited(
+                context.pushNamed(
+                  RouteNames.transactionList,
+                  pathParameters: <String, String>{
+                    RoutePaths.assetKindParameter: displays[index].kind.slug,
+                  },
+                ),
+              );
+            },
           ),
           if (index < displays.length - 1) SizedBox(height: context.spacing.lg),
         ],

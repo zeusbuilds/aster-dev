@@ -105,4 +105,48 @@ void main() {
       );
     },
   );
+
+  test(
+    'external URI adapter accepts only bounded public HTTPS links',
+    () async {
+      Uri? opened;
+      final service = PlatformExternalUriService(
+        invoker: (uri) async {
+          opened = uri;
+          return true;
+        },
+      );
+      final uri = Uri.parse('https://mempool.space/tx/${'a' * 64}');
+
+      expect(await service.open(uri), isA<AppSuccess<void>>());
+      expect(opened, uri);
+      expect(
+        await service.open(Uri.parse('http://mempool.space/tx/value')),
+        isA<AppFailureResult<void>>(),
+      );
+      expect(
+        await service.open(Uri.parse('https://token@mempool.space/tx/value')),
+        isA<AppFailureResult<void>>(),
+      );
+
+      final unavailable = PlatformExternalUriService(
+        invoker: (uri) async => false,
+      );
+      final unavailableResult = await unavailable.open(uri);
+      expect(
+        (unavailableResult as AppFailureResult<void>).failure.code,
+        'external_uri_unavailable',
+      );
+
+      final failed = PlatformExternalUriService(
+        invoker: (uri) => throw StateError('private browser detail'),
+      );
+      final failedResult = await failed.open(uri) as AppFailureResult<void>;
+      expect(failedResult.failure.code, 'external_uri_open_failed');
+      expect(
+        failedResult.failure.userMessage,
+        isNot(contains('private browser detail')),
+      );
+    },
+  );
 }

@@ -310,7 +310,102 @@ void main() {
       throwsFormatException,
     );
   });
+
+  test('asset kinds expose stable route slugs', () {
+    expect(WalletAssetKind.bitcoin.slug, 'bitcoin');
+    expect(WalletAssetKind.usdt.slug, 'usdt');
+    expect(WalletAssetKind.tryParse('bitcoin'), WalletAssetKind.bitcoin);
+    expect(WalletAssetKind.tryParse('usdt'), WalletAssetKind.usdt);
+    expect(WalletAssetKind.tryParse('BTC'), isNull);
+  });
+
+  test('activity feed enforces opaque IDs, exact shape, and recency', () {
+    final older = _bitcoinActivity(
+      idCharacter: 'a',
+      occurredAt: DateTime.utc(2026, 8, 10),
+    );
+    final newer = _bitcoinActivity(
+      idCharacter: 'b',
+      occurredAt: DateTime.utc(2026, 8, 11),
+    );
+    final feed = WalletActivityFeed(
+      balance: _balanceFor(WalletAsset.bitcoin),
+      networkStatus: _networkStatus(),
+      activities: [newer, older],
+    );
+
+    expect(feed.findById(newer.id), newer);
+    expect(() => feed.activities.add(older), throwsUnsupportedError);
+    expect(newer.toString(), isNot(contains('native-txid')));
+    expect(
+      () => WalletActivityFeed(
+        balance: _balanceFor(WalletAsset.bitcoin),
+        networkStatus: _networkStatus(),
+        activities: [older, newer],
+      ),
+      throwsArgumentError,
+    );
+    expect(
+      () => _bitcoinActivity(idCharacter: 'x', occurredAt: null),
+      throwsArgumentError,
+    );
+  });
+
+  test('activity records reject cross-family operations and fields', () {
+    expect(
+      () => WalletActivity(
+        id: 'activity-${'c' * 64}',
+        source: WalletActivitySource.bitcoinTransaction,
+        operation: WalletActivityOperation.lightningPayment,
+        asset: WalletAsset.bitcoin,
+        rail: PaymentRail.onchain,
+        direction: WalletActivityDirection.received,
+        status: WalletActivityStatus.pending,
+        txid: 'native-txid',
+      ),
+      throwsArgumentError,
+    );
+    expect(
+      () => WalletActivity(
+        id: 'activity-${'d' * 64}',
+        source: WalletActivitySource.lightningPayment,
+        operation: WalletActivityOperation.lightningPayment,
+        asset: WalletAsset.bitcoin,
+        rail: PaymentRail.lightning,
+        direction: WalletActivityDirection.internal,
+        status: WalletActivityStatus.pending,
+        paymentHash: 'payment-hash',
+      ),
+      throwsArgumentError,
+    );
+    expect(
+      () => WalletActivity(
+        id: 'activity-${'e' * 64}',
+        source: WalletActivitySource.rgbTransfer,
+        operation: WalletActivityOperation.rgbReceive,
+        asset: WalletAsset.rgbUsdt(
+          assetId: 'rgb:configured-usdt',
+          precision: 6,
+        ),
+        rail: PaymentRail.onchain,
+        direction: WalletActivityDirection.received,
+        status: WalletActivityStatus.pending,
+        paymentHash: 'payment-hash',
+        transferIndex: 1,
+      ),
+      throwsArgumentError,
+    );
+  });
 }
+
+WalletNetworkStatus _networkStatus() => WalletNetworkStatus(
+  environment: BlockchainEnvironment.regtest,
+  blockHeight: 100,
+  nodePublicKey: _nodePublicKey,
+  channelCount: 0,
+  usableChannelCount: 0,
+  peerCount: 0,
+);
 
 WalletBalance _balanceFor(WalletAsset asset) {
   WalletAmount onchain(int units) =>
@@ -326,5 +421,23 @@ WalletBalance _balanceFor(WalletAsset asset) {
     lightningOwned: lightning(0),
     lightningSpendable: lightning(0),
     lightningReceivable: lightning(0),
+  );
+}
+
+WalletActivity _bitcoinActivity({
+  required String idCharacter,
+  required DateTime? occurredAt,
+}) {
+  return WalletActivity(
+    id: 'activity-${idCharacter * 64}',
+    source: WalletActivitySource.bitcoinTransaction,
+    operation: WalletActivityOperation.bitcoinReceive,
+    asset: WalletAsset.bitcoin,
+    rail: PaymentRail.onchain,
+    direction: WalletActivityDirection.received,
+    status: WalletActivityStatus.succeeded,
+    amount: WalletAmount.onchain(assetId: WalletAsset.bitcoin.id, units: 1),
+    occurredAt: occurredAt,
+    txid: 'native-txid',
   );
 }

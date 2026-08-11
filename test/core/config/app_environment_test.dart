@@ -209,4 +209,51 @@ void main() {
       throwsA(isA<AppConfigurationException>()),
     );
   });
+
+  test('builds only validated public transaction explorer links', () {
+    const mainnet = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.mainnet,
+      sdkNetwork: 'mainnet',
+      explorerBaseUrl: 'https://mempool.space',
+    );
+    const signet = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.signet,
+      sdkNetwork: 'utexo',
+      explorerBaseUrl: 'https://mempool.space/signet',
+    );
+    const regtest = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.regtest,
+      sdkNetwork: 'regtest',
+    );
+    final txid = 'A' * 64;
+
+    expect(mainnet.validate, returnsNormally);
+    expect(signet.validate, returnsNormally);
+    expect(
+      mainnet.transactionExplorerUri(txid).toString(),
+      'https://mempool.space/tx/${'a' * 64}',
+    );
+    expect(
+      signet.transactionExplorerUri(txid).toString(),
+      'https://mempool.space/signet/tx/${'a' * 64}',
+    );
+    expect(regtest.transactionExplorerUri(txid), isNull);
+    expect(mainnet.transactionExplorerUri('not-a-txid'), isNull);
+  });
+
+  test('rejects insecure or credential-bearing explorer bases', () {
+    const insecure = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.regtest,
+      sdkNetwork: 'regtest',
+      explorerBaseUrl: 'http://127.0.0.1:4000',
+    );
+    const credential = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.mainnet,
+      sdkNetwork: 'mainnet',
+      explorerBaseUrl: 'https://token@mempool.example',
+    );
+
+    expect(insecure.validate, throwsA(isA<AppConfigurationException>()));
+    expect(credential.validate, throwsA(isA<AppConfigurationException>()));
+  });
 }

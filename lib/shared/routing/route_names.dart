@@ -19,6 +19,7 @@ class RouteNames {
   static const String swap = 'swap';
   static const String market = 'market';
   static const String transactionList = 'transactionList';
+  static const String transactionDetails = 'transactionDetails';
   static const String settings = 'settings';
   static const String scan = 'scan';
   static const String walletSelection = 'walletSelection';

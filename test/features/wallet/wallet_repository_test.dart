@@ -143,6 +143,57 @@ void main() {
     },
   );
 
+  test('loads activity balance and records in one repository turn', () async {
+    final engine = FakeWalletEngine();
+    engine.activities = <WalletActivity>[
+      WalletActivity(
+        id: 'activity-${'a' * 64}',
+        source: WalletActivitySource.bitcoinTransaction,
+        operation: WalletActivityOperation.bitcoinReceive,
+        asset: WalletAsset.bitcoin,
+        rail: PaymentRail.onchain,
+        direction: WalletActivityDirection.received,
+        status: WalletActivityStatus.succeeded,
+        amount: WalletAmount.onchain(
+          assetId: WalletAsset.bitcoin.id,
+          units: 10,
+        ),
+        occurredAt: DateTime.utc(2026, 8, 11),
+        txid: 'activity-txid',
+      ),
+    ];
+    final harness = await _createActiveRepository(engine: engine);
+    addTearDown(harness.runtime.dispose);
+
+    final result = await harness.repository.activityFeed(
+      WalletAssetKind.bitcoin,
+    );
+
+    expect(result, isA<AppSuccess<WalletActivityFeed>>());
+    final feed = (result as AppSuccess<WalletActivityFeed>).value;
+    expect(feed.activities, engine.activities);
+    expect(feed.networkStatus.blockHeight, 0);
+    expect(engine.requestedBalanceAsset, WalletAsset.bitcoin);
+    expect(engine.requestedActivityAsset, WalletAsset.bitcoin);
+    expect(
+      engine.calls.where(
+        (call) =>
+            call == 'networkStatus' || call == 'balance' || call == 'activity',
+      ),
+      ['networkStatus', 'balance', 'activity'],
+    );
+  });
+
+  test('fails before native activity when USDT is not configured', () async {
+    final harness = await _createActiveRepository();
+    addTearDown(harness.runtime.dispose);
+
+    final result = await harness.repository.activityFeed(WalletAssetKind.usdt);
+
+    expect(result, isA<AppFailureResult<WalletActivityFeed>>());
+    expect(harness.engine.calls, isNot(contains('activity')));
+  });
+
   test('previews onchain locally and validates invoice input', () async {
     final harness = await _createActiveRepository();
     addTearDown(harness.runtime.dispose);

@@ -19,7 +19,11 @@ class RoutePaths {
   static const String receiveRequest = '/receive/:paymentTarget';
   static const String swap = '/swap';
   static const String market = '/market';
-  static const String transactionList = '/transactions';
+  static const String assetKindParameter = 'assetKind';
+  static const String activityIdParameter = 'activityId';
+  static const String transactionList = '/transactions/:assetKind';
+  static const String transactionDetails =
+      '/transactions/:assetKind/:activityId';
   static const String settings = '/settings';
   static const String scan = '/scan';
   static const String walletSelection = 'wallet-selection';

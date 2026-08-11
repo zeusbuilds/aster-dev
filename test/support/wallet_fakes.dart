@@ -242,6 +242,7 @@ final class FakeWalletEngine implements WalletEngine {
   Object? sendPaymentError;
   Object? feeEstimateError;
   Object? balanceError;
+  Object? activityError;
   Completer<void>? initializeGate;
   Completer<void>? syncGate;
   Completer<void>? addressGate;
@@ -249,6 +250,7 @@ final class FakeWalletEngine implements WalletEngine {
   Completer<void>? createReceiveGate;
   Completer<void>? sendPaymentGate;
   Completer<void>? balanceGate;
+  Completer<void>? activityGate;
   String address = 'bcrt1qtest';
   String? initializedPassword;
   String? initializedMnemonic;
@@ -257,6 +259,7 @@ final class FakeWalletEngine implements WalletEngine {
   WalletSendResult? sentPayment;
   WalletFeeRateEstimate? feeEstimate;
   WalletBalance? balance;
+  List<WalletActivity> activities = const <WalletActivity>[];
   final Map<WalletAssetId, WalletBalance> balances = {};
   PaymentRoute? decodedInvoiceRoute;
   String? decodedInvoiceValue;
@@ -265,6 +268,8 @@ final class FakeWalletEngine implements WalletEngine {
   WalletSendCommand? sentPaymentCommand;
   int? feeTargetBlocks;
   WalletAsset? requestedBalanceAsset;
+  WalletAsset? requestedActivityAsset;
+  WalletNetworkStatus? networkStatus;
 
   @override
   Future<void> initialize({
@@ -396,6 +401,15 @@ final class FakeWalletEngine implements WalletEngine {
   }
 
   @override
+  Future<List<WalletActivity>> listActivity(WalletAsset asset) async {
+    calls.add('activity');
+    requestedActivityAsset = asset;
+    await activityGate?.future;
+    if (activityError case final Object error) throw error;
+    return List<WalletActivity>.unmodifiable(activities);
+  }
+
+  @override
   Future<WalletFeeRateEstimate> estimateFeeRate(int targetBlocks) async {
     calls.add('estimateFeeRate');
     feeTargetBlocks = targetBlocks;
@@ -411,15 +425,16 @@ final class FakeWalletEngine implements WalletEngine {
   @override
   Future<WalletNetworkStatus> getNetworkStatus() async {
     calls.add('networkStatus');
-    return WalletNetworkStatus(
-      environment: BlockchainEnvironment.regtest,
-      blockHeight: 0,
-      nodePublicKey:
-          '020000000000000000000000000000000000000000000000000000000000000000',
-      channelCount: 0,
-      usableChannelCount: 0,
-      peerCount: 0,
-    );
+    return networkStatus ??
+        WalletNetworkStatus(
+          environment: BlockchainEnvironment.regtest,
+          blockHeight: 0,
+          nodePublicKey:
+              '020000000000000000000000000000000000000000000000000000000000000000',
+          channelCount: 0,
+          usableChannelCount: 0,
+          peerCount: 0,
+        );
   }
 
   @override

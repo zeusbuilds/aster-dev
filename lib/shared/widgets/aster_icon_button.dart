@@ -46,6 +46,7 @@ class AsterIconButton extends StatelessWidget {
       label: tooltip,
       value: loading ? 'Loading' : null,
       liveRegion: loading,
+      onTap: enabled ? activate : null,
       excludeSemantics: true,
       child: IconButton(
         onPressed: enabled ? activate : null,

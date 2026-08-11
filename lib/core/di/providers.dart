@@ -72,6 +72,11 @@ ShareService shareService(Ref ref) {
   return PlatformShareService();
 }
 
+@riverpod
+ExternalUriService externalUriService(Ref ref) {
+  return PlatformExternalUriService();
+}
+
 @Riverpod(keepAlive: true)
 ResilientHttpClient resilientHttpClient(Ref ref) {
   final client = ResilientHttpClient(clock: ref.watch(utcClockProvider));

@@ -83,3 +83,14 @@ final class RecordingShareService implements ShareService {
     return result;
   }
 }
+
+final class RecordingExternalUriService implements ExternalUriService {
+  AppResult<void> result = const AppResult.success(null);
+  Uri? openedUri;
+
+  @override
+  Future<AppResult<void>> open(Uri uri) async {
+    openedUri = uri;
+    return result;
+  }
+}

@@ -39,15 +39,9 @@ void main() {
   testWidgets('a persisted active wallet enters the wallet shell on launch', (
     tester,
   ) async {
-    final (harness, transport) = await _createHarness();
+    final (harness, transport) = await _createActiveHarness();
     addTearDown(transport.close);
     addTearDown(() => _disposeHarness(tester, harness));
-    final provision = await harness.repository.createFromMnemonic(
-      mnemonic: validTestMnemonic,
-      name: 'Primary Wallet',
-    );
-    expect(provision, isA<AppSuccess<WalletRegistry>>());
-    await harness.container.read(walletViewModelProvider.future);
 
     final router = await _pumpRouter(tester, harness);
 
@@ -62,21 +56,70 @@ void main() {
     addTearDown(
       tester.binding.platformDispatcher.clearDefaultRouteNameTestValue,
     );
-    final (harness, transport) = await _createHarness();
+    final (harness, transport) = await _createActiveHarness();
     addTearDown(transport.close);
     addTearDown(() => _disposeHarness(tester, harness));
-    final provision = await harness.repository.createFromMnemonic(
-      mnemonic: validTestMnemonic,
-      name: 'Primary Wallet',
-    );
-    expect(provision, isA<AppSuccess<WalletRegistry>>());
-    await harness.container.read(walletViewModelProvider.future);
 
     final router = await _pumpRouter(tester, harness);
 
     expect(_location(router), RoutePaths.send);
     expect(find.text('Send'), findsWidgets);
   });
+
+  testWidgets('an invalid Activity asset slug returns to wallet home', (
+    tester,
+  ) async {
+    tester.binding.platformDispatcher.defaultRouteNameTestValue =
+        '/transactions/not-an-asset';
+    addTearDown(
+      tester.binding.platformDispatcher.clearDefaultRouteNameTestValue,
+    );
+    final (harness, transport) = await _createActiveHarness();
+    addTearDown(transport.close);
+    addTearDown(() => _disposeHarness(tester, harness));
+
+    final router = await _pumpRouter(tester, harness);
+
+    expect(_location(router), RoutePaths.home);
+  });
+
+  testWidgets('a malformed Activity ID returns to the matching asset list', (
+    tester,
+  ) async {
+    tester.binding.platformDispatcher.defaultRouteNameTestValue =
+        '/transactions/bitcoin/not-an-opaque-id';
+    addTearDown(
+      tester.binding.platformDispatcher.clearDefaultRouteNameTestValue,
+    );
+    final (harness, transport) = await _createActiveHarness();
+    addTearDown(transport.close);
+    addTearDown(() => _disposeHarness(tester, harness));
+
+    final router = await _pumpRouter(tester, harness);
+
+    expect(_location(router), '/transactions/bitcoin');
+    expect(find.text('Bitcoin Activity'), findsOneWidget);
+  });
+
+  testWidgets(
+    'a valid opaque Activity deep link resolves without route extra',
+    (tester) async {
+      final activityId = 'activity-${'a' * 64}';
+      tester.binding.platformDispatcher.defaultRouteNameTestValue =
+          '/transactions/bitcoin/$activityId';
+      addTearDown(
+        tester.binding.platformDispatcher.clearDefaultRouteNameTestValue,
+      );
+      final (harness, transport) = await _createActiveHarness();
+      addTearDown(transport.close);
+      addTearDown(() => _disposeHarness(tester, harness));
+
+      final router = await _pumpRouter(tester, harness);
+
+      expect(_location(router), '/transactions/bitcoin/$activityId');
+      expect(find.text('Transaction details'), findsOneWidget);
+    },
+  );
 
   testWidgets('a direct onboarding deep link has a safe Back destination', (
     tester,
@@ -179,6 +222,18 @@ Future<(OnboardingTestHarness, ResilientHttpClient)> _createHarness() async {
     retryPolicy: RetryPolicy(maxAttempts: 1),
   );
   final harness = await OnboardingTestHarness.create(httpClient: transport);
+  return (harness, transport);
+}
+
+Future<(OnboardingTestHarness, ResilientHttpClient)>
+_createActiveHarness() async {
+  final (harness, transport) = await _createHarness();
+  final provision = await harness.repository.createFromMnemonic(
+    mnemonic: validTestMnemonic,
+    name: 'Primary Wallet',
+  );
+  expect(provision, isA<AppSuccess<WalletRegistry>>());
+  await harness.container.read(walletViewModelProvider.future);
   return (harness, transport);
 }
 

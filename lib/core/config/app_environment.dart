@@ -57,6 +57,7 @@ final class WalletServiceConfiguration {
     this.rgbTransportProxy,
     this.lspBaseUrl,
     this.vssUrl,
+    this.explorerBaseUrl,
     this.usdtAsset,
   });
 
@@ -82,6 +83,13 @@ final class WalletServiceConfiguration {
       rgbTransportProxy: _optionalEnvironment('UTEXO_RGB_PROXY_URL'),
       lspBaseUrl: _optionalEnvironment('UTEXO_LSP_URL'),
       vssUrl: _optionalEnvironment('UTEXO_VSS_URL'),
+      explorerBaseUrl:
+          _optionalEnvironment('UTEXO_EXPLORER_URL') ??
+          switch (environment) {
+            BlockchainEnvironment.mainnet => 'https://mempool.space',
+            BlockchainEnvironment.signet => 'https://mempool.space/signet',
+            BlockchainEnvironment.regtest => null,
+          },
       usdtAsset: _rgbAssetEnvironment(
         contractId: const String.fromEnvironment('UTEXO_USDT_ASSET_ID'),
         precision: const int.fromEnvironment(
@@ -101,6 +109,7 @@ final class WalletServiceConfiguration {
   final String? rgbTransportProxy;
   final String? lspBaseUrl;
   final String? vssUrl;
+  final String? explorerBaseUrl;
 
   /// RGB USDT identity for this exact blockchain environment.
   ///
@@ -138,7 +147,23 @@ final class WalletServiceConfiguration {
     );
     _validateEndpoint(lspBaseUrl, _EndpointKind.webService, environment);
     _validateEndpoint(vssUrl, _EndpointKind.webService, environment);
+    _validateEndpoint(explorerBaseUrl, _EndpointKind.explorer, environment);
     usdtAsset?.validate();
+  }
+
+  /// Returns a public explorer URL only for a canonical Bitcoin transaction
+  /// ID and a deployment with a validated explorer base.
+  Uri? transactionExplorerUri(String txid) {
+    final rawBase = explorerBaseUrl;
+    if (rawBase == null || !_transactionId.hasMatch(txid)) return null;
+    final base = Uri.parse(rawBase);
+    return base.replace(
+      pathSegments: <String>[
+        ...base.pathSegments.where((segment) => segment.isNotEmpty),
+        'tx',
+        txid.toLowerCase(),
+      ],
+    );
   }
 
   static void _validateEndpoint(
@@ -181,6 +206,7 @@ final class WalletServiceConfiguration {
             : const {'https', 'rpcs'},
       _EndpointKind.webService =>
         developmentHost ? const {'http', 'https'} : const {'https'},
+      _EndpointKind.explorer => const {'https'},
     };
     if (!allowed.contains(uri.scheme.toLowerCase())) {
       throw const AppConfigurationException();
@@ -205,7 +231,7 @@ final class WalletServiceConfiguration {
   static const _protectedDevelopmentPorts = {18443, 50001, 3000};
 }
 
-enum _EndpointKind { indexer, rgbTransport, webService }
+enum _EndpointKind { indexer, rgbTransport, webService, explorer }
 
 String? _optionalEnvironment(String name) {
   final value = switch (name) {
@@ -215,10 +241,13 @@ String? _optionalEnvironment(String name) {
     ),
     'UTEXO_LSP_URL' => const String.fromEnvironment('UTEXO_LSP_URL'),
     'UTEXO_VSS_URL' => const String.fromEnvironment('UTEXO_VSS_URL'),
+    'UTEXO_EXPLORER_URL' => const String.fromEnvironment('UTEXO_EXPLORER_URL'),
     _ => '',
   };
   return value.isEmpty ? null : value;
 }
+
+final _transactionId = RegExp(r'^[0-9a-fA-F]{64}$');
 
 RgbAssetConfiguration? _rgbAssetEnvironment({
   required String contractId,

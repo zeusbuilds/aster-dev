@@ -529,6 +529,34 @@ final class WalletRepository {
     );
   }
 
+  /// Loads one product asset's real balance and normalized cross-rail
+  /// activity under the repository's single serialized native owner.
+  Future<AppResult<WalletActivityFeed>> activityFeed(WalletAssetKind kind) {
+    final routeResult = resolvePaymentTarget(
+      kind == WalletAssetKind.bitcoin
+          ? WalletPaymentTarget.bitcoinOnchain
+          : WalletPaymentTarget.usdtOnchain,
+    );
+    if (routeResult case AppFailureResult<PaymentRoute>(:final failure)) {
+      return Future<AppResult<WalletActivityFeed>>.value(
+        AppResult.failure(failure),
+      );
+    }
+    final asset = (routeResult as AppSuccess<PaymentRoute>).value.asset;
+    return _enqueueOperation(
+      () => _runtime.run((engine) async {
+        final networkStatus = await engine.getNetworkStatus();
+        final balance = await engine.getBalance(asset);
+        final activities = await engine.listActivity(asset);
+        return WalletActivityFeed(
+          balance: balance,
+          networkStatus: networkStatus,
+          activities: activities,
+        );
+      }),
+    );
+  }
+
   /// Validates a destination and returns the route-bound payment preview.
   Future<AppResult<WalletPaymentPreview>> previewPayment(
     WalletPaymentTarget target,

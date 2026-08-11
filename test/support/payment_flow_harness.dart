@@ -24,6 +24,7 @@ final class PaymentFlowTestHarness {
     required this.toasts,
     required this.clipboard,
     required this.share,
+    required this.externalUris,
   });
 
   final ProviderContainer container;
@@ -33,6 +34,7 @@ final class PaymentFlowTestHarness {
   final RecordingToastPresentationService toasts;
   final MemoryClipboardService clipboard;
   final RecordingShareService share;
+  final RecordingExternalUriService externalUris;
   var _disposed = false;
 
   static Future<PaymentFlowTestHarness> create({
@@ -104,6 +106,7 @@ final class PaymentFlowTestHarness {
     final toasts = RecordingToastPresentationService();
     final clipboard = MemoryClipboardService();
     final share = RecordingShareService();
+    final externalUris = RecordingExternalUriService();
     final container = ProviderContainer(
       retry: (retryCount, error) => null,
       overrides: [
@@ -112,6 +115,8 @@ final class PaymentFlowTestHarness {
         hapticFeedbackServiceProvider.overrideWithValue(haptics),
         clipboardServiceProvider.overrideWithValue(clipboard),
         shareServiceProvider.overrideWithValue(share),
+        externalUriServiceProvider.overrideWithValue(externalUris),
+        walletServiceConfigurationProvider.overrideWithValue(services),
         utcClockProvider.overrideWithValue(effectiveClock),
         if (httpClient != null)
           resilientHttpClientProvider.overrideWithValue(httpClient),
@@ -125,6 +130,7 @@ final class PaymentFlowTestHarness {
       toasts: toasts,
       clipboard: clipboard,
       share: share,
+      externalUris: externalUris,
     );
   }
 

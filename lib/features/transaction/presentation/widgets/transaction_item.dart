@@ -1,81 +1,141 @@
 import 'package:flutter/material.dart';
+import 'package:remixicon/remixicon.dart';
 
 import '../../../../shared/shared.dart';
+import '../../../wallet/domain/models/models.dart';
+import '../formatting/formatting.dart';
 
-/// Widget displaying a single transaction item
-///
-/// Shows transaction type, amount, time, and icon with proper formatting
+/// One typed Activity record with stable semantics and exact amount display.
 class TransactionItem extends StatelessWidget {
-  /// Type of transaction (e.g., "Sent", "Received", "Swap")
-  final String type;
-
-  /// Transaction amount (with +/- prefix)
-  final String amount;
-
-  /// Time of transaction
-  final String time;
-
-  /// Icon to display for transaction type
-  final IconData icon;
-
-  /// Color of the transaction icon
-  final Color? iconColor;
-
   const TransactionItem({
     super.key,
-    required this.type,
-    required this.amount,
-    required this.time,
-    required this.icon,
-    this.iconColor,
+    required this.activity,
+    required this.bitcoinUnit,
+    required this.valuesVisible,
+    required this.onTap,
+    required this.formatter,
   });
+
+  final WalletActivity activity;
+  final BitcoinUnit bitcoinUnit;
+  final bool valuesVisible;
+  final VoidCallback onTap;
+  final ActivityDisplayFormatter formatter;
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.appColors;
-    final spacing = context.spacing;
-    final icons = context.icons;
-    final strokes = context.strokes;
-    final textRoles = context.type;
+    final title = formatter.activityTitle(activity);
+    final amount = formatter.amountText(activity, bitcoinUnit);
+    final amountLabel = !valuesVisible
+        ? 'Amount hidden'
+        : amount ?? 'Amount unavailable';
+    final status = formatter.statusLabel(activity.status);
+    final time = formatter.timeLabel(activity.occurredAt);
+    final lightning = activity.rail == PaymentRail.lightning;
+    final icon = switch (activity.direction) {
+      WalletActivityDirection.sent => RemixIcons.arrow_right_up_line,
+      WalletActivityDirection.received => RemixIcons.arrow_right_down_line,
+      WalletActivityDirection.internal => RemixIcons.exchange_2_line,
+      WalletActivityDirection.unknown => RemixIcons.flashlight_line,
+    };
+    final iconColor = switch (activity.direction) {
+      WalletActivityDirection.sent => context.appColors.danger,
+      WalletActivityDirection.received => context.appColors.success,
+      WalletActivityDirection.internal => context.colorScheme.primary,
+      WalletActivityDirection.unknown => context.appColors.warning,
+    };
 
-    return Row(
-      children: [
-        Container(
-          padding: EdgeInsets.all(spacing.sm),
-          decoration: BoxDecoration(
-            color: colors.surfaceSubtle,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: colors.borderSubtle,
-              width: strokes.divider,
+    return Semantics(
+      button: true,
+      label:
+          '$title${lightning ? ', Lightning' : ', on-chain'}, '
+          '$amountLabel, $status, $time',
+      onTap: onTap,
+      excludeSemantics: true,
+      child: Squircle(
+        padding: EdgeInsets.zero,
+        color: context.appColors.surfaceRaised,
+        child: Material(
+          color: context.appColors.transparentSurface,
+          child: InkWell(
+            onTap: onTap,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: context.metrics.minTouchTarget,
+              ),
+              child: Padding(
+                padding: EdgeInsets.all(context.spacing.lg),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(context.spacing.sm),
+                      decoration: BoxDecoration(
+                        color: context.appColors.surfaceSubtle,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: context.appColors.borderSubtle,
+                          width: context.strokes.divider,
+                        ),
+                      ),
+                      child: Icon(
+                        icon,
+                        size: context.icons.sm,
+                        color: iconColor,
+                      ),
+                    ),
+                    SizedBox(width: context.spacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  title,
+                                  style: context.type.rowTitle,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (lightning) ...[
+                                SizedBox(width: context.spacing.xs),
+                                Icon(
+                                  RemixIcons.flashlight_fill,
+                                  size: context.icons.xxs,
+                                  color: context.appColors.warning,
+                                  semanticLabel: 'Lightning',
+                                ),
+                              ],
+                            ],
+                          ),
+                          SizedBox(height: context.spacing.xxs),
+                          AmountText(
+                            '$time, $status',
+                            style: context.type.rowMeta,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(width: context.spacing.sm),
+                    Flexible(
+                      child: AmountText(
+                        valuesVisible ? amount ?? '--' : '••••',
+                        style: context.type.amountInline,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.end,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
-          child: Icon(
-            icon,
-            size: icons.sm,
-            color: iconColor ?? colors.textSecondary,
-          ),
         ),
-        SizedBox(width: spacing.lg),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(child: Text(type, style: context.type.rowTitle)),
-                  AmountText('$amount BTC', style: textRoles.amountInline),
-                ],
-              ),
-              SizedBox(height: spacing.xxs),
-              AmountText(
-                time,
-                style: textRoles.rowMeta.copyWith(color: colors.textSecondary),
-              ),
-            ],
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

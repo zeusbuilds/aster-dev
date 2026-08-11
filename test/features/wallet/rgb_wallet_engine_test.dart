@@ -1004,6 +1004,207 @@ void main() {
       throwsA(isA<NativeProtocolException>()),
     );
   });
+
+  test(
+    'normalizes Bitcoin onchain and Lightning activity without leaking IDs',
+    () async {
+      final wallet = MockUtexoWallet();
+      when(() => wallet.listTransactions()).thenAnswer(
+        (_) async => <CoreTransaction>[
+          const CoreTransaction(
+            txid: 'incoming-txid',
+            transactionType: 'Incoming',
+            received: 5000,
+            sent: 0,
+            fee: 0,
+            confirmationTime: CoreBlockTime(height: 100, timestamp: 1000),
+          ),
+          const CoreTransaction(
+            txid: 'outgoing-txid',
+            transactionType: 'SendBtc',
+            received: 2000,
+            sent: 10000,
+            fee: 100,
+          ),
+        ],
+      );
+      when(() => wallet.listPayments()).thenAnswer(
+        (_) async => <LightningPayment>[
+          const LightningPayment(
+            amtMsat: 2500,
+            paymentHash: 'bitcoin-payment-hash',
+            status: RlnPaymentStatuses.succeeded,
+            inbound: true,
+            createdAt: 2000,
+          ),
+          const LightningPayment(
+            assetAmount: 10,
+            assetId: 'other-rgb-asset',
+            paymentHash: 'other-payment-hash',
+            status: RlnPaymentStatuses.succeeded,
+            inbound: false,
+            createdAt: 3000,
+          ),
+        ],
+      );
+      final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
+
+      final activities = await engine.listActivity(WalletAsset.bitcoin);
+
+      expect(activities, hasLength(3));
+      expect(activities[0].source, WalletActivitySource.lightningPayment);
+      expect(activities[0].amount?.units, 2500);
+      expect(activities[1].direction, WalletActivityDirection.received);
+      expect(activities[1].amount?.units, 5000);
+      expect(activities[1].confirmationHeight, 100);
+      expect(activities[2].direction, WalletActivityDirection.sent);
+      expect(activities[2].amount?.units, 7900);
+      expect(activities[2].fee?.units, 100);
+      expect(activities[2].occurredAt, isNull);
+      for (final activity in activities) {
+        expect(activity.id, matches(RegExp(r'^activity-[0-9a-f]{64}$')));
+        expect(activity.id, isNot(contains('txid')));
+        expect(activity.id, isNot(contains('payment-hash')));
+      }
+    },
+  );
+
+  test('normalizes configured RGB onchain and Lightning activity', () async {
+    final wallet = MockUtexoWallet();
+    final asset = WalletAsset.rgbUsdt(assetId: 'rgb-usdt', precision: 6);
+    when(() => wallet.listTransfers(assetId: 'rgb-usdt')).thenAnswer(
+      (_) async => <CoreTransfer>[
+        CoreTransfer(
+          idx: 7,
+          batchTransferIdx: 8,
+          createdAt: 1000,
+          updatedAt: 1100,
+          status: 'WaitingConfirmations',
+          assignments: const <Assignment>[
+            Assignment(type: 'Fungible', amount: 4),
+            Assignment(type: 'Fungible', amount: 6),
+          ],
+          kind: 'Send',
+          txid: 'rgb-anchor-txid',
+          recipientId: 'rgb-recipient',
+          receiveUtxo: const Outpoint(txid: 'receive-txid', vout: 1),
+          changeUtxo: const Outpoint(txid: 'change-txid', vout: 2),
+          expiration: 2000,
+          transportEndpoints: const <CoreTransferTransportEndpoint>[
+            CoreTransferTransportEndpoint(
+              endpoint: 'https://proxy.example/secret-path',
+              transportType: 'JsonRpc',
+              used: true,
+            ),
+          ],
+        ),
+      ],
+    );
+    when(() => wallet.listPayments()).thenAnswer(
+      (_) async => <LightningPayment>[
+        const LightningPayment(
+          assetAmount: 25,
+          assetId: 'rgb-usdt',
+          paymentHash: 'usdt-payment-hash',
+          status: RlnPaymentStatuses.pending,
+          inbound: false,
+          createdAt: 3000,
+          invoice: 'lnbcrt1rgbinvoice',
+          payeePubkey: _nodePublicKey,
+        ),
+        const LightningPayment(
+          assetAmount: 99,
+          assetId: 'another-asset',
+          paymentHash: 'another-payment-hash',
+          status: RlnPaymentStatuses.succeeded,
+        ),
+      ],
+    );
+    final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
+
+    final activities = await engine.listActivity(asset);
+
+    expect(activities, hasLength(2));
+    expect(activities.first.rail, PaymentRail.lightning);
+    expect(activities.first.amount?.units, 25);
+    final transfer = activities.last;
+    expect(transfer.operation, WalletActivityOperation.rgbSend);
+    expect(transfer.amount?.units, 10);
+    expect(transfer.status, WalletActivityStatus.waitingConfirmations);
+    expect(transfer.receiveOutpoint, 'receive-txid:1');
+    expect(transfer.changeOutpoint, 'change-txid:2');
+    expect(transfer.transportEndpointCount, 1);
+    expect(transfer.usedTransportEndpointCount, 1);
+    expect(transfer.transportTypes, ['JsonRpc']);
+    expect(transfer.toString(), isNot(contains('secret-path')));
+  });
+
+  test(
+    'deduplicates identical activity and rejects conflicting records',
+    () async {
+      final wallet = MockUtexoWallet();
+      when(() => wallet.listTransactions()).thenAnswer((_) async => const []);
+      when(() => wallet.listPayments()).thenAnswer(
+        (_) async => const <LightningPayment>[
+          LightningPayment(
+            amtMsat: 1000,
+            paymentHash: 'duplicate-hash',
+            status: RlnPaymentStatuses.pending,
+          ),
+          LightningPayment(
+            amtMsat: 1000,
+            paymentHash: 'duplicate-hash',
+            status: RlnPaymentStatuses.pending,
+          ),
+        ],
+      );
+      final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
+
+      expect(await engine.listActivity(WalletAsset.bitcoin), hasLength(1));
+
+      when(() => wallet.listPayments()).thenAnswer(
+        (_) async => const <LightningPayment>[
+          LightningPayment(
+            amtMsat: 1000,
+            paymentHash: 'duplicate-hash',
+            status: RlnPaymentStatuses.pending,
+          ),
+          LightningPayment(
+            amtMsat: 2000,
+            paymentHash: 'duplicate-hash',
+            status: RlnPaymentStatuses.pending,
+          ),
+        ],
+      );
+      await expectLater(
+        engine.listActivity(WalletAsset.bitcoin),
+        throwsA(isA<NativeProtocolException>()),
+      );
+    },
+  );
+
+  test('fails closed for malformed fungible transfer amounts', () async {
+    final wallet = MockUtexoWallet();
+    final asset = WalletAsset.rgbUsdt(assetId: 'rgb-usdt', precision: 6);
+    when(() => wallet.listTransfers(assetId: 'rgb-usdt')).thenAnswer(
+      (_) async => <CoreTransfer>[
+        CoreTransfer(
+          idx: 1,
+          status: 'Settled',
+          assignments: const <Assignment>[Assignment(type: 'Fungible')],
+          kind: 'ReceiveBlind',
+          transportEndpoints: const <CoreTransferTransportEndpoint>[],
+        ),
+      ],
+    );
+    final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
+
+    await expectLater(
+      engine.listActivity(asset),
+      throwsA(isA<NativeProtocolException>()),
+    );
+    verifyNever(() => wallet.listPayments());
+  });
 }
 
 WalletFeeRateEstimate _feeRate(int satsPerVbyte) => WalletFeeRateEstimate(

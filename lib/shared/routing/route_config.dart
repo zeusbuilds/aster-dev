@@ -99,7 +99,18 @@ class RouteConfig {
       GoRoute(
         path: RoutePaths.transactionList,
         name: RouteNames.transactionList,
-        builder: (context, state) => const TransactionListScreen(),
+        redirect: (context, state) => _invalidActivityListRedirect(state),
+        builder: (context, state) =>
+            TransactionListScreen(assetKind: _assetKind(state)),
+      ),
+      GoRoute(
+        path: RoutePaths.transactionDetails,
+        name: RouteNames.transactionDetails,
+        redirect: (context, state) => _invalidActivityDetailsRedirect(state),
+        builder: (context, state) => TransactionDetailsScreen(
+          assetKind: _assetKind(state),
+          activityId: state.pathParameters[RoutePaths.activityIdParameter]!,
+        ),
       ),
       GoRoute(
         path: RoutePaths.scan,
@@ -152,6 +163,32 @@ class RouteConfig {
     return WalletPaymentTarget.tryParse(
       state.pathParameters[RoutePaths.paymentTargetParameter],
     )!;
+  }
+
+  static WalletAssetKind _assetKind(GoRouterState state) {
+    return WalletAssetKind.tryParse(
+      state.pathParameters[RoutePaths.assetKindParameter],
+    )!;
+  }
+
+  static String? _invalidActivityListRedirect(GoRouterState state) {
+    return WalletAssetKind.tryParse(
+              state.pathParameters[RoutePaths.assetKindParameter],
+            ) ==
+            null
+        ? RoutePaths.home
+        : null;
+  }
+
+  static String? _invalidActivityDetailsRedirect(GoRouterState state) {
+    final kind = WalletAssetKind.tryParse(
+      state.pathParameters[RoutePaths.assetKindParameter],
+    );
+    if (kind == null) return RoutePaths.home;
+    final activityId = state.pathParameters[RoutePaths.activityIdParameter];
+    return WalletActivity.isValidId(activityId)
+        ? null
+        : '/transactions/${kind.slug}';
   }
 
   static String? _invalidPaymentTargetRedirect(
