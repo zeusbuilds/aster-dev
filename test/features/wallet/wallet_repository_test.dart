@@ -143,23 +143,23 @@ void main() {
     },
   );
 
-  test('validates invoice input before crossing the native boundary', () async {
+  test('previews onchain locally and validates invoice input', () async {
     final harness = await _createActiveRepository();
     addTearDown(harness.runtime.dispose);
 
-    final onchain = await harness.repository.decodeInvoice(
+    final onchain = await harness.repository.previewPayment(
       WalletPaymentTarget.bitcoinOnchain,
-      'bcrt1qdestination',
+      'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn',
     );
-    final malformed = await harness.repository.decodeInvoice(
+    final malformed = await harness.repository.previewPayment(
       WalletPaymentTarget.bitcoinLightning,
       ' lnbcrt1invoice ',
     );
 
-    expect(onchain, isA<AppFailureResult<WalletPaymentPreview>>());
+    expect(onchain, isA<AppSuccess<WalletPaymentPreview>>());
     expect(
-      (onchain as AppFailureResult<WalletPaymentPreview>).failure.code,
-      'bitcoin_destination_not_invoice',
+      (onchain as AppSuccess<WalletPaymentPreview>).value.encodedDestination,
+      'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn',
     );
     expect(malformed, isA<AppFailureResult<WalletPaymentPreview>>());
     expect(
@@ -251,7 +251,7 @@ void main() {
       'Malformed native invoice.',
       field: 'invoice',
     );
-    final decoded = await harness.repository.decodeInvoice(
+    final decoded = await harness.repository.previewPayment(
       WalletPaymentTarget.bitcoinLightning,
       'lnbcrt1malformed',
     );
@@ -259,6 +259,37 @@ void main() {
     expect(
       (decoded as AppFailureResult<WalletPaymentPreview>).failure.code,
       'native_protocol_error',
+    );
+  });
+
+  test('normalizes BIP321 fallback and enforces its encoded amount', () async {
+    final harness = await _createActiveRepository();
+    addTearDown(harness.runtime.dispose);
+    const address = 'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn';
+
+    final sent = await harness.repository.sendPayment(
+      target: WalletPaymentTarget.bitcoinOnchain,
+      destination: 'bitcoin:$address?amount=0.00000100&label=Merchant',
+      amountUnits: 100,
+      feeRateSatsPerVbyte: 2,
+    );
+    final mismatch = await harness.repository.sendPayment(
+      target: WalletPaymentTarget.bitcoinOnchain,
+      destination: 'bitcoin:$address?amount=0.00000100',
+      amountUnits: 101,
+    );
+
+    expect(sent, isA<AppSuccess<WalletSendResult>>());
+    expect(harness.engine.sentPaymentCommand?.destination, address);
+    expect(harness.engine.sentPaymentCommand?.amount.units, 100);
+    expect(mismatch, isA<AppFailureResult<WalletSendResult>>());
+    expect(
+      (mismatch as AppFailureResult<WalletSendResult>).failure.code,
+      'payment_amount_mismatch',
+    );
+    expect(
+      harness.engine.calls.where((call) => call == 'sendPayment:start'),
+      hasLength(1),
     );
   });
 
@@ -294,7 +325,7 @@ void main() {
     final harness = await _createActiveRepository(engine: engine);
     addTearDown(harness.runtime.dispose);
 
-    final decoding = harness.repository.decodeInvoice(
+    final decoding = harness.repository.previewPayment(
       WalletPaymentTarget.bitcoinLightning,
       'lnbcrt1invoice',
     );

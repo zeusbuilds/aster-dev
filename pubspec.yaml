@@ -40,8 +40,11 @@ dependencies:
   go_router: ^17.4.0
 
   # Utilities
+  # Small, pure-Dart codecs used by the app-owned Bitcoin destination parser.
+  bs58check: 1.0.2
   collection: ^1.19.1
   crypto: ^3.0.7
+  dart_bech32: 2.0.0
   # Flutter 3.44.9 pins intl 0.20.2 through flutter_localizations.
   intl: ^0.20.2
 

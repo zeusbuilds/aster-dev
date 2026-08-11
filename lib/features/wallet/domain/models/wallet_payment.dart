@@ -8,7 +8,7 @@ enum WalletPaymentStatus { pending, succeeded, failed, cancelled, expired }
 
 /// Validated destination preview returned before a send is submitted.
 ///
-/// [encodedDestination] may be an address, BIP21 URI, RGB invoice, or BOLT11
+/// [encodedDestination] may be an address, BIP321 URI, RGB invoice, or BOLT11
 /// invoice. It is intentionally never included in `toString` output.
 @immutable
 final class WalletPaymentPreview {
@@ -19,6 +19,8 @@ final class WalletPaymentPreview {
     this.amount,
     this.expiresAt,
     this.referenceId,
+    this.recipientLabel,
+    this.message,
   }) {
     _requireEncoded(encodedDestination, 'encodedDestination');
     _requireEncoded(displayDestination, 'displayDestination');
@@ -26,6 +28,8 @@ final class WalletPaymentPreview {
     if (value != null) _requireRouteAmount(route, value);
     _requireUtc(expiresAt, 'expiresAt');
     _requireOptionalIdentifier(referenceId, 'referenceId');
+    _requireOptionalDisplayText(recipientLabel, 'recipientLabel', 256);
+    _requireOptionalDisplayText(message, 'message', 1024);
   }
 
   final PaymentRoute route;
@@ -38,6 +42,12 @@ final class WalletPaymentPreview {
 
   /// Payment hash or RGB recipient identifier, when available.
   final String? referenceId;
+
+  /// Optional recipient-authored display metadata from a payment instruction.
+  final String? recipientLabel;
+
+  /// Optional recipient-authored payment-purpose text.
+  final String? message;
 
   bool get requiresAmount => amount == null;
 
@@ -57,7 +67,9 @@ final class WalletPaymentPreview {
       other.displayDestination == displayDestination &&
       other.amount == amount &&
       other.expiresAt == expiresAt &&
-      other.referenceId == referenceId;
+      other.referenceId == referenceId &&
+      other.recipientLabel == recipientLabel &&
+      other.message == message;
 
   @override
   int get hashCode => Object.hash(
@@ -67,6 +79,8 @@ final class WalletPaymentPreview {
     amount,
     expiresAt,
     referenceId,
+    recipientLabel,
+    message,
   );
 }
 
@@ -250,3 +264,18 @@ void _requireUtc(DateTime? value, String field) {
     throw ArgumentError.value(value, field, 'Must use UTC.');
   }
 }
+
+void _requireOptionalDisplayText(String? value, String field, int maxLength) {
+  if (value == null) return;
+  if (value != value.trim() ||
+      value.length > maxLength ||
+      _unsafeDisplayCharacters.hasMatch(value)) {
+    throw ArgumentError.value(value, field, 'Unsafe display text.');
+  }
+}
+
+final _unsafeDisplayCharacters = RegExp(
+  r'[\u0000-\u001f\u007f-\u009f\u00ad\u061c\u070f\u180e'
+  r'\u200b-\u200f\u2028\u2029\u202a-\u202e\u2060-\u206f'
+  r'\ufeff\ufff9-\ufffb]',
+);

@@ -11,6 +11,7 @@ import '../../features/settings/data/repository/repository.dart';
 import '../../features/wallet/data/repository/repository.dart';
 import '../../features/wallet/data/runtime/runtime.dart';
 import '../../features/wallet/data/storage/storage.dart';
+import '../../features/wallet/data/validation/validation.dart';
 import '../config/config.dart';
 import '../network/network.dart';
 import '../platform/platform.dart';
@@ -69,7 +70,9 @@ WalletServiceConfiguration walletServiceConfiguration(Ref ref) {
 
 @riverpod
 WalletEngineFactory walletEngineFactory(Ref ref) {
-  return const RgbWalletEngineFactory();
+  return RgbWalletEngineFactory.withAddresses(
+    ref.watch(bitcoinDestinationDecoderProvider),
+  );
 }
 
 @riverpod
@@ -80,6 +83,11 @@ WalletKeyGenerator walletKeyGenerator(Ref ref) {
 @riverpod
 WalletIdentityGenerator walletIdentityGenerator(Ref ref) {
   return SecureWalletIdentityGenerator();
+}
+
+@riverpod
+BitcoinDestinationDecoder bitcoinDestinationDecoder(Ref ref) {
+  return const BitcoinDestinationParser();
 }
 
 @riverpod
@@ -165,5 +173,6 @@ Future<WalletRepository> walletRepository(Ref ref) async {
     identityGenerator,
     services,
     legacySeedPreflight,
+    bitcoinDestinations: ref.watch(bitcoinDestinationDecoderProvider),
   );
 }

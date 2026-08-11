@@ -5,6 +5,7 @@ import '../../../../core/errors/errors.dart';
 import '../../domain/models/models.dart';
 import '../runtime/runtime.dart';
 import '../storage/storage.dart';
+import '../validation/validation.dart';
 
 /// Coordinates wallet metadata transactions and the single native runtime.
 ///
@@ -19,6 +20,7 @@ final class WalletRepository {
     this._identityGenerator,
     this._services,
     this._legacySeedPreflight, {
+    this._bitcoinDestinations = const BitcoinDestinationParser(),
     DateTime Function()? clock,
   }) : _clock = clock ?? _utcNow {
     _services.validate();
@@ -30,6 +32,7 @@ final class WalletRepository {
   final WalletIdentityGenerator _identityGenerator;
   final WalletServiceConfiguration _services;
   final LegacyWalletSeedPreflight _legacySeedPreflight;
+  final BitcoinDestinationDecoder _bitcoinDestinations;
   final DateTime Function() _clock;
   Future<void> _operationTail = Future<void>.value();
 
@@ -508,10 +511,10 @@ final class WalletRepository {
     );
   }
 
-  /// Decodes an RGB or Lightning invoice through the active wallet.
-  Future<AppResult<WalletPaymentPreview>> decodeInvoice(
+  /// Validates a destination and returns the route-bound payment preview.
+  Future<AppResult<WalletPaymentPreview>> previewPayment(
     WalletPaymentTarget target,
-    String invoice,
+    String destination,
   ) {
     final routeResult = resolvePaymentTarget(target);
     if (routeResult case AppFailureResult<PaymentRoute>(:final failure)) {
@@ -519,26 +522,34 @@ final class WalletRepository {
         AppResult.failure(failure),
       );
     }
+    final route = (routeResult as AppSuccess<PaymentRoute>).value;
     if (target == WalletPaymentTarget.bitcoinOnchain) {
-      return Future<AppResult<WalletPaymentPreview>>.value(
-        AppResult.failure(
-          const AppFailure(
-            code: 'bitcoin_destination_not_invoice',
-            kind: AppFailureKind.validation,
-            userMessage: 'Enter a Bitcoin address.',
-            retryable: false,
+      final parsed = _bitcoinDestinations.decode(
+        destination,
+        _services.environment,
+      );
+      return Future<AppResult<WalletPaymentPreview>>.value(switch (parsed) {
+        AppSuccess<BitcoinDestination>(:final value) => AppResult.success(
+          WalletPaymentPreview(
+            route: route,
+            encodedDestination: value.address,
+            displayDestination: value.address,
+            amount: value.amount,
+            recipientLabel: value.recipientLabel,
+            message: value.message,
           ),
         ),
-      );
+        AppFailureResult<BitcoinDestination>(:final failure) =>
+          AppResult.failure(failure),
+      });
     }
-    if (!_isValidPaymentString(invoice)) {
+    if (!_isValidPaymentString(destination)) {
       return Future<AppResult<WalletPaymentPreview>>.value(
         AppResult.failure(_invalidDestinationFailure()),
       );
     }
-    final route = (routeResult as AppSuccess<PaymentRoute>).value;
     return _enqueueOperation(
-      () => _runtime.run((engine) => engine.decodeInvoice(route, invoice)),
+      () => _runtime.run((engine) => engine.decodeInvoice(route, destination)),
     );
   }
 
@@ -584,11 +595,6 @@ final class WalletRepository {
         AppResult.failure(failure),
       );
     }
-    if (!_isValidPaymentString(destination)) {
-      return Future<AppResult<WalletSendResult>>.value(
-        AppResult.failure(_invalidDestinationFailure()),
-      );
-    }
     final route = (routeResult as AppSuccess<PaymentRoute>).value;
     final amountResult = _amountForRoute(route, amountUnits);
     if (amountResult case AppFailureResult<WalletAmount?>(:final failure)) {
@@ -607,9 +613,37 @@ final class WalletRepository {
         AppResult.failure(_invalidAmountFailure()),
       );
     }
+    final String submissionDestination;
+    if (target == WalletPaymentTarget.bitcoinOnchain) {
+      final parsed = _bitcoinDestinations.decode(
+        destination,
+        _services.environment,
+      );
+      if (parsed case AppFailureResult<BitcoinDestination>(:final failure)) {
+        return Future<AppResult<WalletSendResult>>.value(
+          AppResult.failure(failure),
+        );
+      }
+      final bitcoinDestination =
+          (parsed as AppSuccess<BitcoinDestination>).value;
+      final encodedAmount = bitcoinDestination.amount;
+      if (encodedAmount != null && encodedAmount != amount) {
+        return Future<AppResult<WalletSendResult>>.value(
+          AppResult.failure(_amountMismatchFailure()),
+        );
+      }
+      submissionDestination = bitcoinDestination.address;
+    } else {
+      if (!_isValidPaymentString(destination)) {
+        return Future<AppResult<WalletSendResult>>.value(
+          AppResult.failure(_invalidDestinationFailure()),
+        );
+      }
+      submissionDestination = destination;
+    }
     final command = WalletSendCommand(
       route: route,
-      destination: destination,
+      destination: submissionDestination,
       amount: amount,
       feeRateSatsPerVbyte: feeRateSatsPerVbyte,
     );
@@ -726,6 +760,13 @@ final class WalletRepository {
     code: 'payment_fee_rate_invalid',
     kind: AppFailureKind.validation,
     userMessage: 'Enter a valid network fee rate.',
+    retryable: false,
+  );
+
+  static AppFailure _amountMismatchFailure() => const AppFailure(
+    code: 'payment_amount_mismatch',
+    kind: AppFailureKind.validation,
+    userMessage: 'The entered amount does not match the payment request.',
     retryable: false,
   );
 

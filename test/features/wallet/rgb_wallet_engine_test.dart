@@ -1,6 +1,9 @@
+import 'dart:typed_data';
+
 import 'package:aster/core/core.dart';
 import 'package:aster/features/wallet/data/runtime/runtime.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
+import 'package:dart_bech32/dart_bech32.dart' as bech32_codec;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:rgb_sdk_flutter/rgb_sdk_flutter.dart';
@@ -45,7 +48,7 @@ void main() {
       sdkNetwork: 'regtest',
       vssUrl: 'http://127.0.0.1:3200',
     );
-    final factory = RgbWalletEngineFactory(sdk);
+    final factory = RgbWalletEngineFactory.withSdk(sdk);
 
     factory.create(
       const WalletEngineConfiguration(
@@ -249,12 +252,23 @@ void main() {
 
   test('accepts only receive addresses for the configured network', () async {
     final wallet = MockUtexoWallet();
-    when(() => wallet.getAddress()).thenAnswer((_) async => 'bcrt1qexample');
+    final address = _regtestAddress();
+    when(() => wallet.getAddress()).thenAnswer((_) async => address);
     final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
 
-    expect(await engine.getBitcoinAddress(), 'bcrt1qexample');
+    expect(await engine.getBitcoinAddress(), address);
 
-    when(() => wallet.getAddress()).thenAnswer((_) async => 'bc1qmainnet');
+    when(
+      () => wallet.getAddress(),
+    ).thenAnswer((_) async => '1BoatSLRHtKNngkdXEeobR76b53LETtpyT');
+    await expectLater(
+      engine.getBitcoinAddress(),
+      throwsA(isA<NativeProtocolException>()),
+    );
+
+    when(
+      () => wallet.getAddress(),
+    ).thenAnswer((_) async => '${address.substring(0, address.length - 1)}x');
     await expectLater(
       engine.getBitcoinAddress(),
       throwsA(isA<NativeProtocolException>()),
@@ -482,15 +496,12 @@ void main() {
     );
   });
 
-  test('creates BIP21 requests and sends Bitcoin in integer sats', () async {
+  test('creates Bitcoin URI requests and sends in integer sats', () async {
     final wallet = MockUtexoWallet();
-    when(() => wallet.getAddress()).thenAnswer((_) async => 'bcrt1qreceiver');
+    final address = _regtestAddress();
+    when(() => wallet.getAddress()).thenAnswer((_) async => address);
     when(
-      () => wallet.sendBtc(
-        amount: 123456789,
-        address: 'bcrt1qdestination',
-        feeRate: 3,
-      ),
+      () => wallet.sendBtc(amount: 123456789, address: address, feeRate: 3),
     ).thenAnswer((_) async => 'bitcoin-txid');
     final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
     const route = PaymentRoute(
@@ -506,16 +517,46 @@ void main() {
     final sent = await engine.sendPayment(
       WalletSendCommand(
         route: route,
-        destination: 'bcrt1qdestination',
+        destination: address,
         amount: amount,
         feeRateSatsPerVbyte: 3,
       ),
     );
 
-    expect(receive.encodedRequest, 'bitcoin:bcrt1qreceiver?amount=1.23456789');
-    expect(receive.displayValue, 'bcrt1qreceiver');
+    expect(receive.encodedRequest, 'bitcoin:$address?amount=1.23456789');
+    expect(receive.displayValue, address);
     expect(sent.referenceId, 'bitcoin-txid');
     expect(sent.status, WalletPaymentStatus.pending);
+  });
+
+  test('rejects invalid Bitcoin destinations before native mutation', () async {
+    final wallet = MockUtexoWallet();
+    final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
+    const route = PaymentRoute(
+      asset: WalletAsset.bitcoin,
+      rail: PaymentRail.onchain,
+    );
+
+    await expectLater(
+      engine.sendPayment(
+        WalletSendCommand(
+          route: route,
+          destination: 'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfU',
+          amount: WalletAmount.onchain(
+            assetId: WalletAsset.bitcoin.id,
+            units: 1,
+          ),
+        ),
+      ),
+      throwsA(isA<WalletValidationException>()),
+    );
+    verifyNever(
+      () => wallet.sendBtc(
+        amount: any(named: 'amount'),
+        address: any(named: 'address'),
+        feeRate: any(named: 'feeRate'),
+      ),
+    );
   });
 
   test('creates, verifies, and pays Bitcoin Lightning invoices', () async {
@@ -871,7 +912,11 @@ void main() {
       ),
     );
     when(
-      () => wallet.sendBtc(amount: 1, address: 'bcrt1qdestination', feeRate: 1),
+      () => wallet.sendBtc(
+        amount: 1,
+        address: 'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn',
+        feeRate: 1,
+      ),
     ).thenAnswer((_) async => ' invalid-txid ');
     final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
     const lightningRoute = PaymentRoute(
@@ -891,7 +936,7 @@ void main() {
       engine.sendPayment(
         WalletSendCommand(
           route: onchainRoute,
-          destination: 'bcrt1qdestination',
+          destination: 'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn',
           amount: WalletAmount.onchain(
             assetId: WalletAsset.bitcoin.id,
             units: 1,
@@ -901,4 +946,15 @@ void main() {
       throwsA(isA<NativeProtocolException>()),
     );
   });
+}
+
+String _regtestAddress() {
+  final program = Uint8List.fromList(List<int>.generate(20, (index) => index));
+  final words = Uint8List.fromList(<int>[
+    0,
+    ...bech32_codec.bech32.toWords(program),
+  ]);
+  return bech32_codec.bech32.encode(
+    bech32_codec.Decoded(prefix: 'bcrt', words: words),
+  );
 }

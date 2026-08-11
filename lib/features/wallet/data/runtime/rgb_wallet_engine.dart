@@ -3,13 +3,27 @@ import 'package:rgb_sdk_flutter/rgb_sdk_flutter.dart';
 import '../../../../core/config/app_environment.dart';
 import '../../../../core/errors/app_failure.dart';
 import '../../domain/models/models.dart';
+import '../validation/validation.dart';
 import 'wallet_engine.dart';
 
 /// Stable-public-API adapter for `rgb_sdk_flutter`.
 final class RgbWalletEngineFactory implements WalletEngineFactory {
-  const RgbWalletEngineFactory([this._sdk = const RgbSdkFlutter()]);
+  const RgbWalletEngineFactory()
+    : _sdk = const RgbSdkFlutter(),
+      _bitcoinAddresses = const BitcoinDestinationParser();
+
+  /// Production constructor for sharing the app-owned validation boundary.
+  const RgbWalletEngineFactory.withAddresses(this._bitcoinAddresses)
+    : _sdk = const RgbSdkFlutter();
+
+  /// Test seam for proving stable-SDK forwarding without global state.
+  const RgbWalletEngineFactory.withSdk(
+    this._sdk, [
+    this._bitcoinAddresses = const BitcoinDestinationParser(),
+  ]);
 
   final RgbSdkFlutter _sdk;
+  final BitcoinAddressValidator _bitcoinAddresses;
 
   @override
   WalletEngine create(WalletEngineConfiguration configuration) {
@@ -23,7 +37,12 @@ final class RgbWalletEngineFactory implements WalletEngineFactory {
         lspBaseUrl: services.lspBaseUrl,
       ),
     );
-    return RgbWalletEngine(wallet, services, _unlockConfiguration(services));
+    return RgbWalletEngine(
+      wallet,
+      services,
+      _unlockConfiguration(services),
+      bitcoinAddresses: _bitcoinAddresses,
+    );
   }
 
   static UtexoUnlockConfig _unlockConfiguration(
@@ -65,6 +84,7 @@ final class RgbWalletEngine implements WalletEngine {
     this._services,
     this._unlockConfig, {
     DateTime Function()? clock,
+    this._bitcoinAddresses = const BitcoinDestinationParser(),
   }) : _clock = clock ?? _utcNow;
 
   static const _receiveLifetime = Duration(hours: 1);
@@ -74,6 +94,7 @@ final class RgbWalletEngine implements WalletEngine {
   final WalletServiceConfiguration _services;
   final UtexoUnlockConfig _unlockConfig;
   final DateTime Function() _clock;
+  final BitcoinAddressValidator _bitcoinAddresses;
 
   @override
   Future<void> initialize({
@@ -118,13 +139,17 @@ final class RgbWalletEngine implements WalletEngine {
   @override
   Future<String> getBitcoinAddress() async {
     final address = await _wallet.getAddress();
-    if (!_isBitcoinAddressForEnvironment(address, _services.environment)) {
+    final normalized = _bitcoinAddresses.normalizeAddress(
+      address,
+      _services.environment,
+    );
+    if (normalized == null) {
       throw const NativeProtocolException(
         'Native wallet returned an invalid Bitcoin address.',
         field: 'address',
       );
     }
-    return address;
+    return normalized;
   }
 
   @override
@@ -416,9 +441,19 @@ final class RgbWalletEngine implements WalletEngine {
   }
 
   Future<WalletSendResult> _sendBitcoin(WalletSendCommand command) async {
+    final address = _bitcoinAddresses.normalizeAddress(
+      command.destination,
+      _services.environment,
+    );
+    if (address == null) {
+      throw const WalletValidationException(
+        'Bitcoin destination is malformed or belongs to another network.',
+        field: 'destination',
+      );
+    }
     final txid = await _wallet.sendBtc(
       amount: command.amount.units,
-      address: command.destination,
+      address: address,
       feeRate: command.feeRateSatsPerVbyte.toDouble(),
     );
     return WalletSendResult(
@@ -743,35 +778,6 @@ final class RgbWalletEngine implements WalletEngine {
         field: 'WalletNodeInfo.accountXpubs',
       );
     }
-  }
-
-  static bool _isBitcoinAddressForEnvironment(
-    String address,
-    BlockchainEnvironment environment,
-  ) {
-    if (address.isEmpty ||
-        address.length > 128 ||
-        address != address.trim() ||
-        address.contains(RegExp(r'\s'))) {
-      return false;
-    }
-    final normalized = address.toLowerCase();
-    return switch (environment) {
-      BlockchainEnvironment.mainnet =>
-        normalized.startsWith('bc1') ||
-            normalized.startsWith('1') ||
-            normalized.startsWith('3'),
-      BlockchainEnvironment.signet =>
-        normalized.startsWith('tb1') ||
-            normalized.startsWith('m') ||
-            normalized.startsWith('n') ||
-            normalized.startsWith('2'),
-      BlockchainEnvironment.regtest =>
-        normalized.startsWith('bcrt1') ||
-            normalized.startsWith('m') ||
-            normalized.startsWith('n') ||
-            normalized.startsWith('2'),
-    };
   }
 
   static WalletBalance _bitcoinBalance(
