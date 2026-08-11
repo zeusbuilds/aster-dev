@@ -175,10 +175,10 @@ final class PaymentRoute {
 
   @override
   bool operator ==(Object other) =>
-      other is PaymentRoute && other.asset.id == asset.id && other.rail == rail;
+      other is PaymentRoute && other.asset == asset && other.rail == rail;
 
   @override
-  int get hashCode => Object.hash(asset.id, rail);
+  int get hashCode => Object.hash(asset, rail);
 }
 
 /// Availability of one product payment target in the active deployment.
@@ -197,4 +197,13 @@ final class WalletPaymentCapability {
   final PaymentRoute? route;
 
   bool get isAvailable => route != null;
+
+  @override
+  bool operator ==(Object other) =>
+      other is WalletPaymentCapability &&
+      other.target == target &&
+      other.route == route;
+
+  @override
+  int get hashCode => Object.hash(target, route);
 }

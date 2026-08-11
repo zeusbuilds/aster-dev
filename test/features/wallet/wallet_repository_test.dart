@@ -6,6 +6,7 @@ import 'package:aster/features/wallet/data/runtime/runtime.dart';
 import 'package:aster/features/wallet/data/storage/storage.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rgb_sdk_flutter/rgb_sdk_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/wallet_fakes.dart';
@@ -94,6 +95,225 @@ void main() {
     expect(route.asset.id.value, 'rgb:configured-usdt');
     expect(route.asset.precision, 6);
     expect(route.rail, PaymentRail.lightning);
+  });
+
+  test(
+    'loads a configured cross-rail portfolio in one repository turn',
+    () async {
+      const configured = WalletServiceConfiguration(
+        environment: BlockchainEnvironment.regtest,
+        sdkNetwork: 'regtest',
+        usdtAsset: RgbAssetConfiguration(
+          contractId: 'rgb:configured-usdt',
+          precision: 6,
+        ),
+      );
+      final harness = await _createActiveRepository(services: configured);
+      addTearDown(harness.runtime.dispose);
+
+      final result = await harness.repository.portfolio();
+
+      expect(result, isA<AppSuccess<WalletPortfolio>>());
+      final portfolio = (result as AppSuccess<WalletPortfolio>).value;
+      expect(portfolio.bitcoin.asset, WalletAsset.bitcoin);
+      expect(portfolio.usdt?.asset.id.value, 'rgb:configured-usdt');
+      expect(portfolio.usdt?.asset.precision, 6);
+      expect(
+        harness.engine.calls.where((call) => call == 'balance'),
+        hasLength(2),
+      );
+    },
+  );
+
+  test(
+    'omits USDT portfolio balance when deployment metadata is absent',
+    () async {
+      final harness = await _createActiveRepository();
+      addTearDown(harness.runtime.dispose);
+
+      final result = await harness.repository.portfolio();
+
+      expect(result, isA<AppSuccess<WalletPortfolio>>());
+      final portfolio = (result as AppSuccess<WalletPortfolio>).value;
+      expect(portfolio.usdt, isNull);
+      expect(
+        harness.engine.calls.where((call) => call == 'balance'),
+        hasLength(1),
+      );
+    },
+  );
+
+  test('validates invoice input before crossing the native boundary', () async {
+    final harness = await _createActiveRepository();
+    addTearDown(harness.runtime.dispose);
+
+    final onchain = await harness.repository.decodeInvoice(
+      WalletPaymentTarget.bitcoinOnchain,
+      'bcrt1qdestination',
+    );
+    final malformed = await harness.repository.decodeInvoice(
+      WalletPaymentTarget.bitcoinLightning,
+      ' lnbcrt1invoice ',
+    );
+
+    expect(onchain, isA<AppFailureResult<WalletPaymentPreview>>());
+    expect(
+      (onchain as AppFailureResult<WalletPaymentPreview>).failure.code,
+      'bitcoin_destination_not_invoice',
+    );
+    expect(malformed, isA<AppFailureResult<WalletPaymentPreview>>());
+    expect(
+      (malformed as AppFailureResult<WalletPaymentPreview>).failure.code,
+      'payment_destination_invalid',
+    );
+    expect(harness.engine.calls, isNot(contains('decodeInvoice:start')));
+  });
+
+  test('passes deployment-owned route and exact units to receive', () async {
+    const configured = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.regtest,
+      sdkNetwork: 'regtest',
+      usdtAsset: RgbAssetConfiguration(
+        contractId: 'rgb:configured-usdt',
+        precision: 6,
+      ),
+    );
+    final harness = await _createActiveRepository(services: configured);
+    addTearDown(harness.runtime.dispose);
+
+    final result = await harness.repository.createReceiveRequest(
+      WalletPaymentTarget.usdtLightning,
+      amountUnits: 1250000,
+    );
+
+    expect(result, isA<AppSuccess<WalletReceiveRequest>>());
+    expect(
+      harness.engine.createdReceiveRoute?.target,
+      WalletPaymentTarget.usdtLightning,
+    );
+    expect(
+      harness.engine.createdReceiveRoute?.asset.id.value,
+      'rgb:configured-usdt',
+    );
+    expect(harness.engine.createdReceiveAmount?.units, 1250000);
+    expect(
+      harness.engine.createdReceiveAmount?.unit,
+      WalletAmountUnit.assetAtomic,
+    );
+  });
+
+  test(
+    'rejects invalid receive amounts without invoking native code',
+    () async {
+      final harness = await _createActiveRepository();
+      addTearDown(harness.runtime.dispose);
+
+      final result = await harness.repository.createReceiveRequest(
+        WalletPaymentTarget.bitcoinLightning,
+        amountUnits: 0,
+      );
+
+      expect(result, isA<AppFailureResult<WalletReceiveRequest>>());
+      expect(
+        (result as AppFailureResult<WalletReceiveRequest>).failure.code,
+        'payment_amount_invalid',
+      );
+      expect(
+        harness.engine.calls,
+        isNot(contains('createReceiveRequest:start')),
+      );
+    },
+  );
+
+  test('submits an exact typed command and maps native failures', () async {
+    final engine = FakeWalletEngine();
+    final harness = await _createActiveRepository(engine: engine);
+    addTearDown(harness.runtime.dispose);
+
+    final sent = await harness.repository.sendPayment(
+      target: WalletPaymentTarget.bitcoinLightning,
+      destination: 'lnbcrt1invoice',
+      amountUnits: 21000,
+    );
+
+    expect(sent, isA<AppSuccess<WalletSendResult>>());
+    expect(
+      engine.sentPaymentCommand?.route.target,
+      WalletPaymentTarget.bitcoinLightning,
+    );
+    expect(engine.sentPaymentCommand?.amount.units, 21000);
+    expect(
+      engine.sentPaymentCommand?.amount.unit,
+      WalletAmountUnit.millisatoshi,
+    );
+
+    engine.decodeInvoiceError = const NativeProtocolException(
+      'Malformed native invoice.',
+      field: 'invoice',
+    );
+    final decoded = await harness.repository.decodeInvoice(
+      WalletPaymentTarget.bitcoinLightning,
+      'lnbcrt1malformed',
+    );
+    expect(decoded, isA<AppFailureResult<WalletPaymentPreview>>());
+    expect(
+      (decoded as AppFailureResult<WalletPaymentPreview>).failure.code,
+      'native_protocol_error',
+    );
+  });
+
+  test('rejects invalid sends without invoking native code', () async {
+    final harness = await _createActiveRepository();
+    addTearDown(harness.runtime.dispose);
+
+    final invalidAmount = await harness.repository.sendPayment(
+      target: WalletPaymentTarget.bitcoinOnchain,
+      destination: 'bcrt1qdestination',
+      amountUnits: 0,
+    );
+    final invalidDestination = await harness.repository.sendPayment(
+      target: WalletPaymentTarget.bitcoinOnchain,
+      destination: ' bcrt1qdestination ',
+      amountUnits: 1,
+    );
+    final invalidFee = await harness.repository.sendPayment(
+      target: WalletPaymentTarget.bitcoinOnchain,
+      destination: 'bcrt1qdestination',
+      amountUnits: 1,
+      feeRateSatsPerVbyte: 0,
+    );
+
+    expect(invalidAmount, isA<AppFailureResult<WalletSendResult>>());
+    expect(invalidDestination, isA<AppFailureResult<WalletSendResult>>());
+    expect(invalidFee, isA<AppFailureResult<WalletSendResult>>());
+    expect(harness.engine.calls, isNot(contains('sendPayment:start')));
+  });
+
+  test('serializes payment operations through the repository owner', () async {
+    final engine = FakeWalletEngine()..decodeInvoiceGate = Completer<void>();
+    final harness = await _createActiveRepository(engine: engine);
+    addTearDown(harness.runtime.dispose);
+
+    final decoding = harness.repository.decodeInvoice(
+      WalletPaymentTarget.bitcoinLightning,
+      'lnbcrt1invoice',
+    );
+    final receiving = harness.repository.createReceiveRequest(
+      WalletPaymentTarget.bitcoinOnchain,
+      amountUnits: 100,
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    expect(engine.calls, contains('decodeInvoice:start'));
+    expect(engine.calls, isNot(contains('createReceiveRequest:start')));
+
+    engine.decodeInvoiceGate!.complete();
+    expect(await decoding, isA<AppSuccess<WalletPaymentPreview>>());
+    expect(await receiving, isA<AppSuccess<WalletReceiveRequest>>());
+    expect(
+      engine.calls.indexOf('decodeInvoice:end'),
+      lessThan(engine.calls.indexOf('createReceiveRequest:start')),
+    );
   });
 
   test('normalizes and validates every generated recovery phrase', () async {
@@ -856,7 +1076,7 @@ void main() {
 
     final switching = repository.switchWallet(secondWalletId);
     await Future<void>.delayed(Duration.zero);
-    final balance = repository.balance(WalletAsset.bitcoin);
+    final balance = repository.balance(WalletAssetKind.bitcoin);
     await Future<void>.delayed(Duration.zero);
 
     expect(firstEngine.calls, isNot(contains('balance')));
@@ -868,6 +1088,64 @@ void main() {
     expect(firstEngine.calls, isNot(contains('balance')));
     expect(secondEngine.calls, contains('balance'));
   });
+}
+
+final class _ActiveRepositoryHarness {
+  const _ActiveRepositoryHarness({
+    required this.repository,
+    required this.runtime,
+    required this.engine,
+  });
+
+  final WalletRepository repository;
+  final WalletRuntime runtime;
+  final FakeWalletEngine engine;
+}
+
+Future<_ActiveRepositoryHarness> _createActiveRepository({
+  WalletServiceConfiguration services = const WalletServiceConfiguration(
+    environment: BlockchainEnvironment.regtest,
+    sdkNetwork: 'regtest',
+  ),
+  FakeWalletEngine? engine,
+}) async {
+  const walletId = '11111111111111111111111111111111';
+  const storageToken = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+  final selectedEngine = engine ?? FakeWalletEngine();
+  final runtime = WalletRuntime(
+    FakeWalletEngineFactory([selectedEngine]),
+    FakeWalletDirectoryManager(),
+    WalletSecretStore(MemorySecureStore()),
+    services,
+  );
+  final provisioned = await runtime.provision(
+    profile: WalletProfile(
+      id: walletId,
+      name: 'Active',
+      createdAt: DateTime.utc(2026, 8, 11),
+      updatedAt: DateTime.utc(2026, 8, 11),
+      environment: services.environment,
+      state: WalletProfileState.provisioning,
+      storageToken: storageToken,
+    ),
+    mnemonic: 'test mnemonic',
+    databasePassword: 'test-password',
+  );
+  if (provisioned is! AppSuccess<void>) {
+    throw StateError('Test wallet runtime did not provision.');
+  }
+  return _ActiveRepositoryHarness(
+    repository: WalletRepository(
+      _FailingRegistrationStore(),
+      runtime,
+      FakeWalletKeyGenerator(),
+      FakeWalletIdentityGenerator(walletId: walletId),
+      services,
+      const SuccessfulLegacyWalletSeedPreflight(),
+    ),
+    runtime: runtime,
+    engine: selectedEngine,
+  );
 }
 
 final class _FailingRegistrationStore implements WalletProfilePersistence {

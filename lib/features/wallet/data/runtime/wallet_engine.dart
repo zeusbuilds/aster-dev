@@ -22,6 +22,15 @@ abstract interface class WalletEngine {
   Future<void> destroy();
   Future<WalletBalance> getBalance(WalletAsset asset);
   Future<String> getBitcoinAddress();
+  Future<WalletPaymentPreview> decodeInvoice(
+    PaymentRoute route,
+    String invoice,
+  );
+  Future<WalletReceiveRequest> createReceiveRequest(
+    PaymentRoute route, {
+    WalletAmount? amount,
+  });
+  Future<WalletSendResult> sendPayment(WalletSendCommand command);
   Future<WalletNetworkStatus> getNetworkStatus();
   Future<WalletPublicKeys> getPublicKeys();
 }

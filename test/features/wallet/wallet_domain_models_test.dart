@@ -89,6 +89,69 @@ void main() {
     expect(unavailable.route, isNull);
   });
 
+  test('payment contracts preserve exact units and reject route mismatch', () {
+    const route = PaymentRoute(
+      asset: WalletAsset.bitcoin,
+      rail: PaymentRail.lightning,
+    );
+    final amount = WalletAmount.lightning(
+      assetId: WalletAsset.bitcoin.id,
+      units: 1501,
+    );
+    final expiresAt = DateTime.utc(2026, 8, 11, 12);
+    final preview = WalletPaymentPreview(
+      route: route,
+      encodedDestination: 'lnbcrt1invoice',
+      displayDestination: 'lnbcrt1invoice',
+      amount: amount,
+      expiresAt: expiresAt,
+      referenceId: 'payment-hash',
+    );
+
+    expect(preview.amount?.units, 1501);
+    expect(preview.requiresAmount, isFalse);
+    expect(preview.isExpiredAt(expiresAt), isTrue);
+    expect(preview.toString(), isNot(contains('lnbcrt1invoice')));
+    expect(
+      preview,
+      WalletPaymentPreview(
+        route: route,
+        encodedDestination: 'lnbcrt1invoice',
+        displayDestination: 'lnbcrt1invoice',
+        amount: amount,
+        expiresAt: expiresAt,
+        referenceId: 'payment-hash',
+      ),
+    );
+    expect(
+      () => WalletSendCommand(
+        route: const PaymentRoute(
+          asset: WalletAsset.bitcoin,
+          rail: PaymentRail.onchain,
+        ),
+        destination: 'bcrt1destination',
+        amount: amount,
+      ),
+      throwsArgumentError,
+    );
+  });
+
+  test('portfolio exposes only configured product balances', () {
+    final bitcoin = _balanceFor(WalletAsset.bitcoin);
+    final usdtAsset = WalletAsset.rgbUsdt(
+      assetId: 'rgb:configured-usdt',
+      precision: 6,
+    );
+    final usdt = _balanceFor(usdtAsset);
+    final portfolio = WalletPortfolio(bitcoin: bitcoin, usdt: usdt);
+
+    expect(portfolio.balances, [bitcoin, usdt]);
+    expect(portfolio.balanceFor(WalletAssetKind.bitcoin), bitcoin);
+    expect(portfolio.balanceFor(WalletAssetKind.usdt), usdt);
+    expect(portfolio, WalletPortfolio(bitcoin: bitcoin, usdt: usdt));
+    expect(WalletPortfolio(bitcoin: bitcoin).balances, [bitcoin]);
+  });
+
   test('registry and network metadata compare by value', () {
     final created = DateTime.utc(2026, 8, 8);
     final profile = WalletProfile(
@@ -186,4 +249,21 @@ void main() {
       throwsFormatException,
     );
   });
+}
+
+WalletBalance _balanceFor(WalletAsset asset) {
+  WalletAmount onchain(int units) =>
+      WalletAmount.onchain(assetId: asset.id, units: units);
+  WalletAmount lightning(int units) =>
+      WalletAmount.lightning(assetId: asset.id, units: units);
+  return WalletBalance(
+    asset: asset,
+    onchainSettled: onchain(1),
+    onchainFuture: onchain(1),
+    onchainSpendable: onchain(1),
+    onchainLocked: onchain(0),
+    lightningOwned: lightning(0),
+    lightningSpendable: lightning(0),
+    lightningReceivable: lightning(0),
+  );
 }

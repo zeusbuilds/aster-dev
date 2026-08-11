@@ -29,6 +29,11 @@ void main() {
   setUpAll(() {
     registerFallbackValue(UtexoUnlockConfig());
     registerFallbackValue(UtexoWalletConfig(storageDirPath: '/wallet'));
+    registerFallbackValue(const RgbInvoiceRequest());
+    registerFallbackValue(
+      const RgbSendRequest(invoice: 'rgb:fallback', amount: 1),
+    );
+    registerFallbackValue(const LightningAsset(assetId: 'fallback', amount: 1));
   });
 
   test('forwards validated local VSS transport policy to the SDK', () {
@@ -473,6 +478,426 @@ void main() {
 
     await expectLater(
       engine.getBalance(WalletAsset.bitcoin),
+      throwsA(isA<NativeProtocolException>()),
+    );
+  });
+
+  test('creates BIP21 requests and sends Bitcoin in integer sats', () async {
+    final wallet = MockUtexoWallet();
+    when(() => wallet.getAddress()).thenAnswer((_) async => 'bcrt1qreceiver');
+    when(
+      () => wallet.sendBtc(
+        amount: 123456789,
+        address: 'bcrt1qdestination',
+        feeRate: 3,
+      ),
+    ).thenAnswer((_) async => 'bitcoin-txid');
+    final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
+    const route = PaymentRoute(
+      asset: WalletAsset.bitcoin,
+      rail: PaymentRail.onchain,
+    );
+    final amount = WalletAmount.onchain(
+      assetId: WalletAsset.bitcoin.id,
+      units: 123456789,
+    );
+
+    final receive = await engine.createReceiveRequest(route, amount: amount);
+    final sent = await engine.sendPayment(
+      WalletSendCommand(
+        route: route,
+        destination: 'bcrt1qdestination',
+        amount: amount,
+        feeRateSatsPerVbyte: 3,
+      ),
+    );
+
+    expect(receive.encodedRequest, 'bitcoin:bcrt1qreceiver?amount=1.23456789');
+    expect(receive.displayValue, 'bcrt1qreceiver');
+    expect(sent.referenceId, 'bitcoin-txid');
+    expect(sent.status, WalletPaymentStatus.pending);
+  });
+
+  test('creates, verifies, and pays Bitcoin Lightning invoices', () async {
+    final createdAt = DateTime.utc(2026, 8, 11, 10);
+    final timestamp = createdAt.millisecondsSinceEpoch ~/ 1000;
+    final wallet = MockUtexoWallet();
+    when(
+      () => wallet.createLightningInvoice(amountSats: 2, expirySeconds: 3600),
+    ).thenAnswer(
+      (_) async => const LightningReceiveRequest(lnInvoice: 'lnbcrt1bitcoin'),
+    );
+    when(() => wallet.decodeLnInvoice('lnbcrt1bitcoin')).thenAnswer(
+      (_) async => DecodedLightningInvoice(
+        amtMsat: 2000,
+        expirySec: 3600,
+        timestamp: timestamp,
+        paymentHash: 'bitcoin-payment-hash',
+        paymentSecret: 'not-retained',
+        network: 'regtest',
+      ),
+    );
+    when(
+      () => wallet.payLightningInvoice(
+        lnInvoice: 'lnbcrt1bitcoin',
+        amount: null,
+        assetId: null,
+        assetAmount: null,
+      ),
+    ).thenAnswer(
+      (_) async => const LightningSendRequest(
+        txid: 'bitcoin-payment-hash',
+        status: RlnPaymentStatuses.succeeded,
+      ),
+    );
+    final engine = RgbWalletEngine(
+      wallet,
+      services,
+      UtexoUnlockConfig(),
+      clock: () => createdAt,
+    );
+    const route = PaymentRoute(
+      asset: WalletAsset.bitcoin,
+      rail: PaymentRail.lightning,
+    );
+    final amount = WalletAmount.lightning(
+      assetId: WalletAsset.bitcoin.id,
+      units: 2000,
+    );
+
+    final receive = await engine.createReceiveRequest(route, amount: amount);
+    final sent = await engine.sendPayment(
+      WalletSendCommand(
+        route: route,
+        destination: receive.encodedRequest,
+        amount: amount,
+      ),
+    );
+
+    expect(receive.amount, amount);
+    expect(receive.expiresAt, createdAt.add(const Duration(hours: 1)));
+    expect(receive.referenceId, 'bitcoin-payment-hash');
+    expect(sent.status, WalletPaymentStatus.succeeded);
+  });
+
+  test(
+    'passes sats only for an amountless Bitcoin Lightning invoice',
+    () async {
+      final createdAt = DateTime.utc(2026, 8, 11, 10);
+      final wallet = MockUtexoWallet();
+      when(() => wallet.decodeLnInvoice('lnbcrt1amountless')).thenAnswer(
+        (_) async => DecodedLightningInvoice(
+          expirySec: 3600,
+          timestamp: createdAt.millisecondsSinceEpoch ~/ 1000,
+          paymentHash: 'amountless-payment-hash',
+          paymentSecret: 'not-retained',
+          network: 'regtest',
+        ),
+      );
+      when(
+        () => wallet.payLightningInvoice(
+          lnInvoice: 'lnbcrt1amountless',
+          amount: 21,
+          assetId: null,
+          assetAmount: null,
+        ),
+      ).thenAnswer(
+        (_) async =>
+            const LightningSendRequest(txid: 'amountless-payment-hash'),
+      );
+      final engine = RgbWalletEngine(
+        wallet,
+        services,
+        UtexoUnlockConfig(),
+        clock: () => createdAt,
+      );
+      const route = PaymentRoute(
+        asset: WalletAsset.bitcoin,
+        rail: PaymentRail.lightning,
+      );
+
+      final result = await engine.sendPayment(
+        WalletSendCommand(
+          route: route,
+          destination: 'lnbcrt1amountless',
+          amount: WalletAmount.lightning(
+            assetId: WalletAsset.bitcoin.id,
+            units: 21000,
+          ),
+        ),
+      );
+
+      expect(result.status, WalletPaymentStatus.pending);
+    },
+  );
+
+  test('creates, verifies, and sends configured RGB on-chain USDT', () async {
+    const assetId = 'rgb:configured-usdt';
+    const configuredServices = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.regtest,
+      sdkNetwork: 'regtest',
+      usdtAsset: RgbAssetConfiguration(contractId: assetId, precision: 6),
+    );
+    final asset = WalletAsset.rgbUsdt(assetId: assetId, precision: 6);
+    final route = PaymentRoute(asset: asset, rail: PaymentRail.onchain);
+    final amount = WalletAmount.onchain(assetId: asset.id, units: 1250000);
+    final wallet = MockUtexoWallet();
+    when(() => wallet.onchainReceive(any())).thenAnswer(
+      (_) async => const OnchainReceiveResponse(
+        invoice: 'rgb:invoice',
+        recipientId: 'rgb-recipient',
+        expirationTimestamp: 1786446000,
+        batchTransferIdx: 7,
+      ),
+    );
+    when(() => wallet.decodeRgbInvoice('rgb:invoice')).thenAnswer(
+      (_) async => CoreInvoiceData(
+        invoice: 'rgb:invoice',
+        recipientId: 'rgb-recipient',
+        assetId: assetId,
+        network: 'regtest',
+        assignment: const Assignment(type: 'Fungible', amount: 1250000),
+        expirationTimestamp: 1786446000,
+        transportEndpoints: const <String>[],
+      ),
+    );
+    when(() => wallet.onchainSend(any())).thenAnswer(
+      (_) async => const OnchainSendResponse(
+        txid: 'rgb-bitcoin-txid',
+        batchTransferIdx: 8,
+      ),
+    );
+    final engine = RgbWalletEngine(
+      wallet,
+      configuredServices,
+      UtexoUnlockConfig(),
+      clock: () => DateTime.utc(2026, 8, 11, 10),
+    );
+
+    final receive = await engine.createReceiveRequest(route, amount: amount);
+    final sent = await engine.sendPayment(
+      WalletSendCommand(
+        route: route,
+        destination: receive.encodedRequest,
+        amount: amount,
+        feeRateSatsPerVbyte: 4,
+      ),
+    );
+
+    final receiveRequest =
+        verify(() => wallet.onchainReceive(captureAny())).captured.single
+            as RgbInvoiceRequest;
+    final sendRequest =
+        verify(() => wallet.onchainSend(captureAny())).captured.single
+            as RgbSendRequest;
+    expect(receiveRequest.assetId, assetId);
+    expect(receiveRequest.amount, 1250000);
+    expect(receiveRequest.durationSeconds, 3600);
+    expect(receive.batchTransferIndex, 7);
+    expect(sendRequest.assetId, assetId);
+    expect(sendRequest.amount, 1250000);
+    expect(sendRequest.feeRate, 4);
+    expect(sent.referenceId, 'rgb-bitcoin-txid');
+    expect(sent.batchTransferIndex, 8);
+  });
+
+  test(
+    'requires amount and binds configured asset for RGB Lightning',
+    () async {
+      const assetId = 'rgb:configured-usdt';
+      const configuredServices = WalletServiceConfiguration(
+        environment: BlockchainEnvironment.regtest,
+        sdkNetwork: 'regtest',
+        usdtAsset: RgbAssetConfiguration(contractId: assetId, precision: 6),
+      );
+      final asset = WalletAsset.rgbUsdt(assetId: assetId, precision: 6);
+      final route = PaymentRoute(asset: asset, rail: PaymentRail.lightning);
+      final amount = WalletAmount.lightning(assetId: asset.id, units: 2500000);
+      final createdAt = DateTime.utc(2026, 8, 11, 10);
+      final wallet = MockUtexoWallet();
+      when(
+        () => wallet.createLightningInvoice(
+          asset: any(named: 'asset'),
+          expirySeconds: 3600,
+        ),
+      ).thenAnswer(
+        (_) async => const LightningReceiveRequest(lnInvoice: 'lnbcrt1rgb'),
+      );
+      when(() => wallet.decodeLnInvoice('lnbcrt1rgb')).thenAnswer(
+        (_) async => DecodedLightningInvoice(
+          expirySec: 3600,
+          timestamp: createdAt.millisecondsSinceEpoch ~/ 1000,
+          assetId: assetId,
+          assetAmount: 2500000,
+          paymentHash: 'rgb-payment-hash',
+          paymentSecret: 'not-retained',
+          network: 'regtest',
+        ),
+      );
+      when(
+        () => wallet.payLightningInvoice(
+          lnInvoice: 'lnbcrt1rgb',
+          amount: null,
+          assetId: assetId,
+          assetAmount: 2500000,
+        ),
+      ).thenAnswer(
+        (_) async => const LightningSendRequest(
+          txid: 'rgb-payment-hash',
+          status: RlnPaymentStatuses.pending,
+        ),
+      );
+      final engine = RgbWalletEngine(
+        wallet,
+        configuredServices,
+        UtexoUnlockConfig(),
+        clock: () => createdAt,
+      );
+
+      await expectLater(
+        engine.createReceiveRequest(route),
+        throwsA(isA<WalletValidationException>()),
+      );
+      final receive = await engine.createReceiveRequest(route, amount: amount);
+      final sent = await engine.sendPayment(
+        WalletSendCommand(
+          route: route,
+          destination: receive.encodedRequest,
+          amount: amount,
+        ),
+      );
+
+      final nativeAsset =
+          verify(
+                () => wallet.createLightningInvoice(
+                  asset: captureAny(named: 'asset'),
+                  expirySeconds: 3600,
+                ),
+              ).captured.single
+              as LightningAsset;
+      expect(nativeAsset.assetId, assetId);
+      expect(nativeAsset.amount, 2500000);
+      expect(sent.referenceId, 'rgb-payment-hash');
+    },
+  );
+
+  test(
+    'rejects mismatched, expired, and unconfigured payment requests',
+    () async {
+      final createdAt = DateTime.utc(2026, 8, 11, 10);
+      final wallet = MockUtexoWallet();
+      when(() => wallet.decodeLnInvoice('lnbcrt1expired')).thenAnswer(
+        (_) async => DecodedLightningInvoice(
+          amtMsat: 1000,
+          expirySec: 1,
+          timestamp: createdAt.millisecondsSinceEpoch ~/ 1000,
+          paymentHash: 'expired-payment-hash',
+          paymentSecret: 'not-retained',
+          network: 'regtest',
+        ),
+      );
+      when(() => wallet.decodeLnInvoice('lntb1wrongnetwork')).thenAnswer(
+        (_) async => DecodedLightningInvoice(
+          amtMsat: 1000,
+          expirySec: 3600,
+          timestamp: createdAt.millisecondsSinceEpoch ~/ 1000,
+          paymentHash: 'wrong-network-hash',
+          paymentSecret: 'not-retained',
+          network: 'mainnet',
+        ),
+      );
+      final engine = RgbWalletEngine(
+        wallet,
+        services,
+        UtexoUnlockConfig(),
+        clock: () => createdAt.add(const Duration(seconds: 2)),
+      );
+      const bitcoinRoute = PaymentRoute(
+        asset: WalletAsset.bitcoin,
+        rail: PaymentRail.lightning,
+      );
+      final amount = WalletAmount.lightning(
+        assetId: WalletAsset.bitcoin.id,
+        units: 1000,
+      );
+
+      await expectLater(
+        engine.sendPayment(
+          WalletSendCommand(
+            route: bitcoinRoute,
+            destination: 'lnbcrt1expired',
+            amount: amount,
+          ),
+        ),
+        throwsA(isA<WalletValidationException>()),
+      );
+      await expectLater(
+        engine.decodeInvoice(bitcoinRoute, 'lntb1wrongnetwork'),
+        throwsA(isA<WalletValidationException>()),
+      );
+      final unconfiguredUsdt = WalletAsset.rgbUsdt(
+        assetId: 'rgb:not-configured',
+        precision: 6,
+      );
+      await expectLater(
+        engine.decodeInvoice(
+          PaymentRoute(asset: unconfiguredUsdt, rail: PaymentRail.onchain),
+          'rgb:invoice',
+        ),
+        throwsA(isA<AppConfigurationException>()),
+      );
+      verifyNever(
+        () => wallet.payLightningInvoice(
+          lnInvoice: any(named: 'lnInvoice'),
+          amount: any(named: 'amount'),
+          assetId: any(named: 'assetId'),
+          assetAmount: any(named: 'assetAmount'),
+        ),
+      );
+    },
+  );
+
+  test('rejects malformed native payment identifiers and indexes', () async {
+    final createdAt = DateTime.utc(2026, 8, 11, 10);
+    final wallet = MockUtexoWallet();
+    when(() => wallet.decodeLnInvoice('lnbcrt1malformed')).thenAnswer(
+      (_) async => DecodedLightningInvoice(
+        amtMsat: 1000,
+        expirySec: 3600,
+        timestamp: createdAt.millisecondsSinceEpoch ~/ 1000,
+        paymentHash: 'invalid payment hash',
+        paymentSecret: 'not-retained',
+        network: 'regtest',
+      ),
+    );
+    when(
+      () => wallet.sendBtc(amount: 1, address: 'bcrt1qdestination', feeRate: 1),
+    ).thenAnswer((_) async => ' invalid-txid ');
+    final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
+    const lightningRoute = PaymentRoute(
+      asset: WalletAsset.bitcoin,
+      rail: PaymentRail.lightning,
+    );
+    const onchainRoute = PaymentRoute(
+      asset: WalletAsset.bitcoin,
+      rail: PaymentRail.onchain,
+    );
+
+    await expectLater(
+      engine.decodeInvoice(lightningRoute, 'lnbcrt1malformed'),
+      throwsA(isA<NativeProtocolException>()),
+    );
+    await expectLater(
+      engine.sendPayment(
+        WalletSendCommand(
+          route: onchainRoute,
+          destination: 'bcrt1qdestination',
+          amount: WalletAmount.onchain(
+            assetId: WalletAsset.bitcoin.id,
+            units: 1,
+          ),
+        ),
+      ),
       throwsA(isA<NativeProtocolException>()),
     );
   });

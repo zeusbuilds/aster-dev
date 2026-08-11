@@ -476,10 +476,147 @@ final class WalletRepository {
     );
   }
 
-  Future<AppResult<WalletBalance>> balance(WalletAsset asset) =>
-      _enqueueOperation(
-        () => _runtime.run((engine) => engine.getBalance(asset)),
+  Future<AppResult<WalletBalance>> balance(WalletAssetKind kind) {
+    final routeResult = resolvePaymentTarget(
+      kind == WalletAssetKind.bitcoin
+          ? WalletPaymentTarget.bitcoinOnchain
+          : WalletPaymentTarget.usdtOnchain,
+    );
+    if (routeResult case AppFailureResult<PaymentRoute>(:final failure)) {
+      return Future<AppResult<WalletBalance>>.value(AppResult.failure(failure));
+    }
+    final route = (routeResult as AppSuccess<PaymentRoute>).value;
+    return _enqueueOperation(
+      () => _runtime.run((engine) => engine.getBalance(route.asset)),
+    );
+  }
+
+  /// Loads cross-rail balances under one serialized native operation.
+  Future<AppResult<WalletPortfolio>> portfolio() {
+    final usdtRoute = resolvePaymentTarget(WalletPaymentTarget.usdtOnchain);
+    return _enqueueOperation(
+      () => _runtime.run((engine) async {
+        final bitcoin = await engine.getBalance(WalletAsset.bitcoin);
+        final WalletBalance? usdt;
+        if (usdtRoute case AppSuccess<PaymentRoute>(:final value)) {
+          usdt = await engine.getBalance(value.asset);
+        } else {
+          usdt = null;
+        }
+        return WalletPortfolio(bitcoin: bitcoin, usdt: usdt);
+      }),
+    );
+  }
+
+  /// Decodes an RGB or Lightning invoice through the active wallet.
+  Future<AppResult<WalletPaymentPreview>> decodeInvoice(
+    WalletPaymentTarget target,
+    String invoice,
+  ) {
+    final routeResult = resolvePaymentTarget(target);
+    if (routeResult case AppFailureResult<PaymentRoute>(:final failure)) {
+      return Future<AppResult<WalletPaymentPreview>>.value(
+        AppResult.failure(failure),
       );
+    }
+    if (target == WalletPaymentTarget.bitcoinOnchain) {
+      return Future<AppResult<WalletPaymentPreview>>.value(
+        AppResult.failure(
+          const AppFailure(
+            code: 'bitcoin_destination_not_invoice',
+            kind: AppFailureKind.validation,
+            userMessage: 'Enter a Bitcoin address.',
+            retryable: false,
+          ),
+        ),
+      );
+    }
+    if (!_isValidPaymentString(invoice)) {
+      return Future<AppResult<WalletPaymentPreview>>.value(
+        AppResult.failure(_invalidDestinationFailure()),
+      );
+    }
+    final route = (routeResult as AppSuccess<PaymentRoute>).value;
+    return _enqueueOperation(
+      () => _runtime.run((engine) => engine.decodeInvoice(route, invoice)),
+    );
+  }
+
+  /// Creates a receive request using canonical units for the selected target.
+  ///
+  /// Units are sats for Bitcoin on-chain, millisats for Bitcoin Lightning, and
+  /// RGB smallest units for USDT. Omit [amountUnits] for an amountless request.
+  Future<AppResult<WalletReceiveRequest>> createReceiveRequest(
+    WalletPaymentTarget target, {
+    int? amountUnits,
+  }) {
+    final routeResult = resolvePaymentTarget(target);
+    if (routeResult case AppFailureResult<PaymentRoute>(:final failure)) {
+      return Future<AppResult<WalletReceiveRequest>>.value(
+        AppResult.failure(failure),
+      );
+    }
+    final route = (routeResult as AppSuccess<PaymentRoute>).value;
+    final amountResult = _amountForRoute(route, amountUnits);
+    if (amountResult case AppFailureResult<WalletAmount?>(:final failure)) {
+      return Future<AppResult<WalletReceiveRequest>>.value(
+        AppResult.failure(failure),
+      );
+    }
+    final amount = (amountResult as AppSuccess<WalletAmount?>).value;
+    return _enqueueOperation(
+      () => _runtime.run(
+        (engine) => engine.createReceiveRequest(route, amount: amount),
+      ),
+    );
+  }
+
+  /// Submits one non-retryable payment mutation through the serialized owner.
+  Future<AppResult<WalletSendResult>> sendPayment({
+    required WalletPaymentTarget target,
+    required String destination,
+    required int amountUnits,
+    int feeRateSatsPerVbyte = 1,
+  }) {
+    final routeResult = resolvePaymentTarget(target);
+    if (routeResult case AppFailureResult<PaymentRoute>(:final failure)) {
+      return Future<AppResult<WalletSendResult>>.value(
+        AppResult.failure(failure),
+      );
+    }
+    if (!_isValidPaymentString(destination)) {
+      return Future<AppResult<WalletSendResult>>.value(
+        AppResult.failure(_invalidDestinationFailure()),
+      );
+    }
+    final route = (routeResult as AppSuccess<PaymentRoute>).value;
+    final amountResult = _amountForRoute(route, amountUnits);
+    if (amountResult case AppFailureResult<WalletAmount?>(:final failure)) {
+      return Future<AppResult<WalletSendResult>>.value(
+        AppResult.failure(failure),
+      );
+    }
+    if (feeRateSatsPerVbyte <= 0 || feeRateSatsPerVbyte > 1000000) {
+      return Future<AppResult<WalletSendResult>>.value(
+        AppResult.failure(_invalidFeeRateFailure()),
+      );
+    }
+    final amount = (amountResult as AppSuccess<WalletAmount?>).value;
+    if (amount == null) {
+      return Future<AppResult<WalletSendResult>>.value(
+        AppResult.failure(_invalidAmountFailure()),
+      );
+    }
+    final command = WalletSendCommand(
+      route: route,
+      destination: destination,
+      amount: amount,
+      feeRateSatsPerVbyte: feeRateSatsPerVbyte,
+    );
+    return _enqueueOperation(
+      () => _runtime.run((engine) => engine.sendPayment(command)),
+    );
+  }
 
   Future<AppResult<void>> sync() => _enqueueOperation(_runtime.sync);
 
@@ -550,6 +687,47 @@ final class WalletRepository {
       cause: cause,
     );
   }
+
+  static AppResult<WalletAmount?> _amountForRoute(
+    PaymentRoute route,
+    int? units,
+  ) {
+    if (units == null) return const AppResult.success(null);
+    if (units <= 0 || units > WalletAmount.maxNativeUnits) {
+      return AppResult.failure(_invalidAmountFailure());
+    }
+    final amount = route.rail == PaymentRail.onchain
+        ? WalletAmount.onchain(assetId: route.asset.id, units: units)
+        : WalletAmount.lightning(assetId: route.asset.id, units: units);
+    return AppResult.success(amount);
+  }
+
+  static bool _isValidPaymentString(String value) =>
+      value.isNotEmpty &&
+      value == value.trim() &&
+      value.length <= 8192 &&
+      !value.contains(RegExp(r'[\u0000-\u0020\u007f]'));
+
+  static AppFailure _invalidAmountFailure() => const AppFailure(
+    code: 'payment_amount_invalid',
+    kind: AppFailureKind.validation,
+    userMessage: 'Enter a valid amount greater than zero.',
+    retryable: false,
+  );
+
+  static AppFailure _invalidDestinationFailure() => const AppFailure(
+    code: 'payment_destination_invalid',
+    kind: AppFailureKind.validation,
+    userMessage: 'Enter a valid payment destination.',
+    retryable: false,
+  );
+
+  static AppFailure _invalidFeeRateFailure() => const AppFailure(
+    code: 'payment_fee_rate_invalid',
+    kind: AppFailureKind.validation,
+    userMessage: 'Enter a valid network fee rate.',
+    retryable: false,
+  );
 
   static DateTime _utcNow() => DateTime.now().toUtc();
 }

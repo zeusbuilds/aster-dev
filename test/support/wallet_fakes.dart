@@ -237,11 +237,25 @@ final class FakeWalletEngine implements WalletEngine {
   Object? shutdownError;
   Object? destroyError;
   Object? syncError;
+  Object? decodeInvoiceError;
+  Object? createReceiveError;
+  Object? sendPaymentError;
   Completer<void>? initializeGate;
   Completer<void>? addressGate;
+  Completer<void>? decodeInvoiceGate;
+  Completer<void>? createReceiveGate;
+  Completer<void>? sendPaymentGate;
   String address = 'bcrt1qtest';
   String? initializedPassword;
   String? initializedMnemonic;
+  WalletPaymentPreview? decodedInvoice;
+  WalletReceiveRequest? createdReceiveRequest;
+  WalletSendResult? sentPayment;
+  PaymentRoute? decodedInvoiceRoute;
+  String? decodedInvoiceValue;
+  PaymentRoute? createdReceiveRoute;
+  WalletAmount? createdReceiveAmount;
+  WalletSendCommand? sentPaymentCommand;
 
   @override
   Future<void> initialize({
@@ -285,6 +299,61 @@ final class FakeWalletEngine implements WalletEngine {
     await addressGate?.future;
     calls.add('address:end');
     return address;
+  }
+
+  @override
+  Future<WalletPaymentPreview> decodeInvoice(
+    PaymentRoute route,
+    String invoice,
+  ) async {
+    calls.add('decodeInvoice:start');
+    decodedInvoiceRoute = route;
+    decodedInvoiceValue = invoice;
+    await decodeInvoiceGate?.future;
+    calls.add('decodeInvoice:end');
+    if (decodeInvoiceError case final Object error) throw error;
+    return decodedInvoice ??
+        WalletPaymentPreview(
+          route: route,
+          encodedDestination: invoice,
+          displayDestination: invoice,
+        );
+  }
+
+  @override
+  Future<WalletReceiveRequest> createReceiveRequest(
+    PaymentRoute route, {
+    WalletAmount? amount,
+  }) async {
+    calls.add('createReceiveRequest:start');
+    createdReceiveRoute = route;
+    createdReceiveAmount = amount;
+    await createReceiveGate?.future;
+    calls.add('createReceiveRequest:end');
+    if (createReceiveError case final Object error) throw error;
+    return createdReceiveRequest ??
+        WalletReceiveRequest(
+          route: route,
+          encodedRequest: 'request-${route.target.slug}',
+          displayValue: 'request-${route.target.slug}',
+          amount: amount,
+        );
+  }
+
+  @override
+  Future<WalletSendResult> sendPayment(WalletSendCommand command) async {
+    calls.add('sendPayment:start');
+    sentPaymentCommand = command;
+    await sendPaymentGate?.future;
+    calls.add('sendPayment:end');
+    if (sendPaymentError case final Object error) throw error;
+    return sentPayment ??
+        WalletSendResult(
+          route: command.route,
+          amount: command.amount,
+          referenceId: 'payment-reference',
+          status: WalletPaymentStatus.pending,
+        );
   }
 
   @override
