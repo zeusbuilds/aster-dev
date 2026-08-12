@@ -11,11 +11,11 @@ import '../theme/theme.dart';
 class CustomRadio<T> extends StatelessWidget {
   final T option;
   final T? selected;
-  final ValueChanged<T?> onChanged;
+  final ValueChanged<T?>? onChanged;
 
   const CustomRadio({
     super.key,
-    required this.onChanged,
+    this.onChanged,
     required this.option,
     required this.selected,
   });

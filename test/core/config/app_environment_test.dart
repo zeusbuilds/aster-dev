@@ -256,4 +256,58 @@ void main() {
     expect(insecure.validate, throwsA(isA<AppConfigurationException>()));
     expect(credential.validate, throwsA(isA<AppConfigurationException>()));
   });
+
+  test('public links are optional and preserve destination identity', () {
+    final support = Uri.parse('https://support.example.com/help');
+    final terms = Uri.parse('https://wallet.example.com/legal/terms');
+    final configuration = PublicLinkConfiguration(
+      contactSupport: support,
+      termsOfService: terms,
+    );
+
+    expect(configuration.validate, returnsNormally);
+    expect(configuration.uriFor(PublicLinkDestination.contactSupport), support);
+    expect(configuration.uriFor(PublicLinkDestination.termsOfService), terms);
+    expect(configuration.uriFor(PublicLinkDestination.privacyPolicy), isNull);
+  });
+
+  test('public links reject insecure or credential-bearing destinations', () {
+    final configurations = [
+      PublicLinkConfiguration(
+        contactSupport: Uri.parse('http://support.example.com'),
+      ),
+      PublicLinkConfiguration(
+        contactSupport: Uri.parse('https://token@support.example.com'),
+      ),
+      PublicLinkConfiguration(
+        contactSupport: Uri.parse('https://support.example.com?token=value'),
+      ),
+      PublicLinkConfiguration(
+        contactSupport: Uri.parse('https://support.example.com#private'),
+      ),
+      PublicLinkConfiguration(
+        contactSupport: Uri.parse('https://support.example.com/${'a' * 2048}'),
+      ),
+      PublicLinkConfiguration(
+        contactSupport: Uri.parse('https://localhost/help'),
+      ),
+      PublicLinkConfiguration(
+        contactSupport: Uri.parse('https://127.0.0.1/help'),
+      ),
+      PublicLinkConfiguration(
+        contactSupport: Uri.parse('https://support.internal/help'),
+      ),
+      PublicLinkConfiguration(
+        contactSupport: Uri.parse('https://support.example/help'),
+      ),
+    ];
+
+    for (final configuration in configurations) {
+      expect(
+        configuration.validate,
+        throwsA(isA<AppConfigurationException>()),
+        reason: configuration.contactSupport.toString(),
+      );
+    }
+  });
 }

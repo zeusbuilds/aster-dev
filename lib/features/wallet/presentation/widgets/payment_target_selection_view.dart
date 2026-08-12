@@ -37,13 +37,10 @@ class PaymentTargetSelectionView extends StatelessWidget {
 }
 
 final class _PaymentTargetList extends StatelessWidget {
-  const _PaymentTargetList({
-    required this.capabilities,
-    required this.onSelected,
-  });
+  const _PaymentTargetList({required this.capabilities, this.onSelected});
 
   final List<WalletPaymentCapability> capabilities;
-  final ValueChanged<WalletPaymentTarget> onSelected;
+  final ValueChanged<WalletPaymentTarget>? onSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -70,7 +67,6 @@ final class _PaymentTargetLoading extends StatelessWidget {
         capabilities: WalletPaymentTarget.values
             .map(WalletPaymentCapability.unavailable)
             .toList(growable: false),
-        onSelected: (_) {},
       ),
     );
   }

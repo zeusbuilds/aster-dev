@@ -76,7 +76,8 @@ class AsterOptionRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                SizedBox(width: spacing.lg),
+                if (details != null || suffixIcon != null || onTap != null)
+                  SizedBox(width: spacing.lg),
                 if (details case final value?) ...[
                   Flexible(
                     child: Text(
@@ -89,11 +90,12 @@ class AsterOptionRow extends StatelessWidget {
                   ),
                   SizedBox(width: spacing.sm),
                 ],
-                Icon(
-                  suffixIcon ?? RemixIcons.arrow_right_s_line,
-                  size: context.icons.sm,
-                  color: suffixIconColor ?? colors.textTertiary,
-                ),
+                if (suffixIcon != null || onTap != null)
+                  Icon(
+                    suffixIcon ?? RemixIcons.arrow_right_s_line,
+                    size: context.icons.sm,
+                    color: suffixIconColor ?? colors.textTertiary,
+                  ),
               ],
             ),
           ),

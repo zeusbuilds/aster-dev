@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,14 +7,14 @@ import 'package:flutter_svg/svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
 
-import '../../../../core/errors/errors.dart';
+import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
 import '../../../wallet/presentation/view_model/viewmodels.dart';
+import '../../domain/models/models.dart';
 import '../view_model/view_models.dart';
+import '../widgets/widgets.dart';
 
-/// Settings screen displaying wallet, app, and support options
-///
-/// Shows active wallet, wallet management, app preferences, and support links
+/// Presents independent wallet, preference, package, and public-link state.
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
@@ -23,14 +25,25 @@ class SettingsScreen extends ConsumerWidget {
     final type = context.type;
     final walletState = ref.watch(walletViewModelProvider);
     final settings = ref.watch(settingsViewModelProvider);
+    final appInfo = ref.watch(settingsAppViewModelProvider);
     final activeWallet = switch (walletState) {
       AsyncData(:final value) => value.activeWallet,
       _ => null,
     };
+    final walletFailure = walletState.hasError
+        ? FailureMapper.from(
+            walletState.error!,
+            walletState.stackTrace ?? StackTrace.current,
+          ).userMessage
+        : null;
+    final walletLoading = walletState.isLoading;
     final settingsState = settings.value;
     final settingsSnapshot = settingsState?.snapshot;
     final settingsFailure = settings.hasError
-        ? FailureMapper.from(settings.error!, StackTrace.current).userMessage
+        ? FailureMapper.from(
+            settings.error!,
+            settings.stackTrace ?? StackTrace.current,
+          ).userMessage
         : null;
     final settingsEnabled = settingsState != null && !settingsState.isSaving;
 
@@ -42,20 +55,43 @@ class SettingsScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            /// Multiple wallets section
-            Squircle(
-              padding: EdgeInsets.symmetric(vertical: spacing.xs),
-              child: Column(
-                children: [
-                  AsterOptionRow(
-                    title: activeWallet?.name ?? 'Main',
-                    details: activeWallet?.displayId,
+            Semantics(
+              label: walletLoading ? 'Loading wallet' : null,
+              excludeSemantics: walletLoading,
+              child: AppSkeletonizer(
+                enabled: walletLoading,
+                child: Squircle(
+                  padding: EdgeInsets.symmetric(vertical: spacing.xs),
+                  child: AsterOptionRow(
+                    key: const ValueKey('settings-wallet-summary'),
+                    title: walletLoading
+                        ? 'Loading wallet'
+                        : walletFailure != null
+                        ? 'Wallet unavailable'
+                        : activeWallet?.name ?? 'No active wallet',
+                    details: walletLoading || walletFailure != null
+                        ? null
+                        : activeWallet?.displayId ?? 'Choose wallet',
                     prefixIcon: MingCuteIcons.mgc_wallet_3_line,
-                    onTap: () => context.pushNamed(RouteNames.walletSelection),
+                    onTap: walletLoading || walletFailure != null
+                        ? null
+                        : () => context.pushNamed(RouteNames.walletSelection),
                   ),
-                ],
+                ),
               ),
             ),
+            if (walletFailure != null) ...[
+              SizedBox(height: spacing.md),
+              Text(walletFailure, style: type.errorMessage),
+              SizedBox(height: spacing.sm),
+              CustomButton.compact(
+                text: 'Retry wallet',
+                variant: ButtonVariant.secondary,
+                onTap: () => unawaited(
+                  ref.read(walletViewModelProvider.notifier).reload(),
+                ),
+              ),
+            ],
             SizedBox(height: spacing.xxl),
 
             /// Wallet section
@@ -67,27 +103,14 @@ class SettingsScreen extends ConsumerWidget {
                 children: [
                   AsterOptionRow(
                     title: 'Wallet details',
-                    details: 'Main',
+                    details: walletLoading ? 'Loading' : 'Unavailable',
                     prefixIcon: MingCuteIcons.mgc_information_line,
-                    onTap: () {
-                      context.toasts.show(
-                        title: 'Wallet details',
-                        message: 'Wallet details are not available yet.',
-                        variant: ToastVariant.info,
-                      );
-                    },
                   ),
                   const AsterDivider.inset(),
-                  AsterOptionRow(
+                  const AsterOptionRow(
                     title: 'Manage assets',
+                    details: 'Unavailable',
                     prefixIcon: MingCuteIcons.mgc_coin_2_line,
-                    onTap: () {
-                      context.toasts.show(
-                        title: 'Manage assets',
-                        message: 'Asset management is not available yet.',
-                        variant: ToastVariant.info,
-                      );
-                    },
                   ),
                   const AsterDivider.inset(),
                   AsterOptionRow(
@@ -179,45 +202,10 @@ class SettingsScreen extends ConsumerWidget {
             ],
             SizedBox(height: spacing.xxl),
 
-            /// App settings section
-            Squircle(
-              padding: EdgeInsets.symmetric(vertical: spacing.xs),
-              child: Column(
-                children: [
-                  AsterOptionRow(
-                    title: 'Contact Support',
-                    prefixIcon: MingCuteIcons.mgc_lifebuoy_line,
-                  ),
-                  const AsterDivider.inset(),
-                  AsterOptionRow(
-                    title: 'Terms of Service',
-                    prefixIcon: MingCuteIcons.mgc_document_2_line,
-                  ),
-                  const AsterDivider.inset(),
-                  AsterOptionRow(
-                    title: 'Privacy Policy',
-                    prefixIcon: MingCuteIcons.mgc_file_check_line,
-                  ),
-                  const AsterDivider.inset(),
-                  AsterOptionRow(
-                    title: 'Twitter',
-                    prefixIcon: MingCuteIcons.mgc_twitter_line,
-                    onTap: () {},
-                  ),
-                  const AsterDivider.inset(),
-                  AsterOptionRow(
-                    title: 'Telegram',
-                    prefixIcon: MingCuteIcons.mgc_telegram_line,
-                    onTap: () {},
-                  ),
-                  const AsterDivider.inset(),
-                  AsterOptionRow(
-                    title: 'Instagram',
-                    prefixIcon: MingCuteIcons.mgc_instagram_line,
-                    onTap: () {},
-                  ),
-                ],
-              ),
+            SettingsLinksCard(
+              state: appInfo.value,
+              loading: appInfo.isLoading,
+              onOpen: (link) => unawaited(_openLink(context, ref, link)),
             ),
             SizedBox(height: spacing.xxxl),
 
@@ -233,8 +221,20 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ),
             SizedBox(height: spacing.xs),
-            Center(
-              child: Text('UTEXO • Version 1.0.0', style: type.versionLabel),
+            SettingsVersionFooter(
+              appInfo: appInfo,
+              onRetry: () {
+                if (appInfo.value case final state?) {
+                  if (state.metadataLoading) return;
+                  unawaited(
+                    ref
+                        .read(settingsAppViewModelProvider.notifier)
+                        .retryMetadata(),
+                  );
+                  return;
+                }
+                ref.invalidate(settingsAppViewModelProvider);
+              },
             ),
             SizedBox(
               height:
@@ -246,5 +246,32 @@ class SettingsScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _openLink(
+    BuildContext context,
+    WidgetRef ref,
+    SettingsExternalLink link,
+  ) async {
+    final opened = await ref
+        .read(settingsAppViewModelProvider.notifier)
+        .openLink(link);
+    if (!context.mounted) return;
+    if (opened) {
+      unawaited(context.haptics.trigger(HapticIntent.lightImpact));
+      return;
+    }
+    final failure = ref
+        .read(settingsAppViewModelProvider)
+        .value
+        ?.operationFailure;
+    if (failure == null) return;
+    unawaited(context.haptics.trigger(HapticIntent.error));
+    context.toasts.show(
+      title: 'Link not opened',
+      message: failure.userMessage,
+      variant: ToastVariant.failure,
+    );
+    ref.read(settingsAppViewModelProvider.notifier).clearOperationFailure();
   }
 }

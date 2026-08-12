@@ -110,7 +110,7 @@ class _SwapContent extends ConsumerWidget {
           ),
         ),
         SizedBox(height: context.spacing.lg),
-        CustomButton(text: 'Swap unavailable', enabled: false, onTap: () {}),
+        const CustomButton(text: 'Swap unavailable', enabled: false),
         SizedBox(height: context.spacing.lg),
       ],
     );

@@ -53,6 +53,24 @@ Future<SettingsRepository> settingsRepository(Ref ref) async {
 }
 
 @riverpod
+AppMetadataService appMetadataService(Ref ref) {
+  return PlatformAppMetadataService();
+}
+
+@riverpod
+PublicLinkConfiguration publicLinkConfiguration(Ref ref) {
+  return PublicLinkConfiguration.fromEnvironment()..validate();
+}
+
+@riverpod
+SettingsAppRepository settingsAppRepository(Ref ref) {
+  return SettingsAppRepository(
+    ref.watch(appMetadataServiceProvider),
+    ref.watch(externalUriServiceProvider),
+  );
+}
+
+@riverpod
 Bip39WordListRepository bip39WordListRepository(Ref ref) {
   return Bip39WordListRepository(ref.watch(appAssetBundleProvider));
 }

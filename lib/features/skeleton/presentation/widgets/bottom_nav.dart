@@ -39,6 +39,7 @@ class BottomNav extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    assert(_destinations.length == skeletonTabCount);
     final selectedIndex = ref.watch(skeletonIndexProvider);
     final spacing = context.spacing;
     final metrics = context.metrics;

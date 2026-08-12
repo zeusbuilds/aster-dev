@@ -1,11 +1,13 @@
 import 'dart:ui' as ui;
 
+import 'package:aster/features/skeleton/presentation/providers/providers.dart';
 import 'package:aster/features/skeleton/presentation/widgets/bottom_nav.dart';
 import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:remixicon/remixicon.dart';
 
 void main() {
   testWidgets('theme extensions fail fast outside an Aster theme root', (
@@ -199,6 +201,57 @@ void main() {
     expect(loading.value, 'Loading');
   });
 
+  testWidgets('option rows expose affordance and haptic only when enabled', (
+    tester,
+  ) async {
+    final haptics = _RecordingHaptics();
+    var activations = 0;
+    await tester.pumpWidget(
+      _themedHarness(
+        AsterOptionRow(
+          title: 'Configured action',
+          onTap: () => activations += 1,
+        ),
+        haptics: haptics,
+      ),
+    );
+
+    expect(find.byIcon(RemixIcons.arrow_right_s_line), findsOneWidget);
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('Configured action'))
+          .getSemanticsData()
+          .hasAction(ui.SemanticsAction.tap),
+      isTrue,
+    );
+    await tester.tap(find.bySemanticsLabel('Configured action'));
+    expect(activations, 1);
+    expect(haptics.intents, [HapticIntent.lightImpact]);
+
+    await tester.pumpWidget(
+      _themedHarness(
+        const AsterOptionRow(
+          title: 'Unavailable action',
+          details: 'Unavailable',
+        ),
+        haptics: haptics,
+      ),
+    );
+    expect(find.byIcon(RemixIcons.arrow_right_s_line), findsNothing);
+    expect(
+      tester
+          .getSemantics(
+            find.bySemanticsLabel('Unavailable action, Unavailable'),
+          )
+          .getSemanticsData()
+          .hasAction(ui.SemanticsAction.tap),
+      isFalse,
+    );
+    await tester.tap(find.text('Unavailable action'));
+    expect(activations, 1);
+    expect(haptics.intents, [HapticIntent.lightImpact]);
+  });
+
   testWidgets('reduced motion leaves loaders settled', (tester) async {
     await tester.pumpWidget(
       _themedHarness(const GridLoader(), disableAnimations: true),
@@ -239,6 +292,24 @@ void main() {
       tester.getCenter(indicator).dx,
       closeTo(tester.getCenter(scan).dx, 0.1),
     );
+  });
+
+  test('app-shell selection rejects impossible destination indices', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final subscription = container.listen<int>(
+      skeletonIndexProvider,
+      (_, _) {},
+    );
+    addTearDown(subscription.close);
+    final notifier = container.read(skeletonIndexProvider.notifier);
+
+    notifier.setIndex(skeletonTabCount - 1);
+    expect(container.read(skeletonIndexProvider), skeletonTabCount - 1);
+
+    expect(() => notifier.setIndex(-1), throwsRangeError);
+    expect(() => notifier.setIndex(skeletonTabCount), throwsRangeError);
+    expect(container.read(skeletonIndexProvider), skeletonTabCount - 1);
   });
 
   testWidgets('toast host announces, dismisses, and advances its queue', (

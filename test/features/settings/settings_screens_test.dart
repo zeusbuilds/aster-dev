@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' as ui;
 
@@ -5,6 +6,9 @@ import 'package:aster/core/core.dart';
 import 'package:aster/features/settings/data/repository/repository.dart';
 import 'package:aster/features/settings/domain/models/models.dart';
 import 'package:aster/features/settings/presentation/screens/screens.dart';
+import 'package:aster/features/wallet/domain/models/models.dart';
+import 'package:aster/features/wallet/presentation/models/models.dart';
+import 'package:aster/features/wallet/presentation/view_model/viewmodels.dart';
 import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -103,6 +107,262 @@ void main() {
     expect(find.text('Unavailable'), findsNWidgets(2));
     expect(haptics.intents, isEmpty);
   });
+
+  testWidgets('settings renders real wallet and package metadata only', (
+    tester,
+  ) async {
+    final externalUris = _ExternalUriService();
+    await _pumpSettingsScreen(
+      tester,
+      walletFuture: Future.value(WalletState(activeWallet: _walletProfile)),
+      appRepository: SettingsAppRepository(
+        _MetadataService(
+          const AppResult.success(
+            AppBuildMetadata(version: '2.3.4', buildNumber: '81'),
+          ),
+        ),
+        externalUris,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Primary wallet'), findsOneWidget);
+    expect(find.text(_walletProfile.displayId), findsOneWidget);
+    expect(find.text('Main'), findsNothing);
+    expect(find.text('UTEXO • Version 1.0.0'), findsNothing);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('settings-version-label')),
+      300,
+    );
+    expect(find.text('UTEXO • Version 2.3.4 (81)'), findsOneWidget);
+    for (final key in [
+      'settings-link-contactSupport',
+      'settings-link-termsOfService',
+      'settings-link-privacyPolicy',
+      'settings-link-twitter',
+      'settings-link-telegram',
+      'settings-link-instagram',
+    ]) {
+      final semantics = tester.getSemantics(find.byKey(ValueKey(key)));
+      expect(semantics.flagsCollection.isEnabled, ui.Tristate.isFalse);
+    }
+    expect(find.text('Unavailable'), findsWidgets);
+    expect(externalUris.opened, isEmpty);
+  });
+
+  testWidgets('wallet failure never falls back to an invented identity', (
+    tester,
+  ) async {
+    final wallet = Completer<WalletState>();
+    await _pumpSettingsScreen(
+      tester,
+      walletFuture: wallet.future,
+      appRepository: _appRepository(),
+    );
+
+    expect(find.text('Loading wallet'), findsWidgets);
+    expect(find.text('Main'), findsNothing);
+    wallet.completeError(
+      const AppFailureException(
+        AppFailure(
+          code: 'wallet_unavailable',
+          kind: AppFailureKind.storage,
+          userMessage: 'Wallet information is unavailable.',
+          retryable: true,
+        ),
+      ),
+      StackTrace.current,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Wallet unavailable'), findsOneWidget);
+    expect(find.text('Wallet information is unavailable.'), findsOneWidget);
+    expect(find.text('Retry wallet'), findsOneWidget);
+    expect(find.text('Main'), findsNothing);
+  });
+
+  testWidgets('configured public link reports a bounded launch failure', (
+    tester,
+  ) async {
+    final externalUris = _ExternalUriService(
+      result: const AppResult.failure(
+        AppFailure(
+          code: 'external_uri_open_failed',
+          kind: AppFailureKind.unavailable,
+          userMessage: 'The link could not be opened.',
+          retryable: true,
+        ),
+      ),
+    );
+    final haptics = _RecordingHaptics();
+    final toasts = _RecordingToasts();
+    final support = Uri.parse('https://support.example.com/help');
+    await _pumpSettingsScreen(
+      tester,
+      walletFuture: Future.value(WalletState(activeWallet: _walletProfile)),
+      appRepository: SettingsAppRepository(
+        _MetadataService(
+          const AppResult.success(
+            AppBuildMetadata(version: '1.0.0', buildNumber: '2'),
+          ),
+        ),
+        externalUris,
+      ),
+      linkConfiguration: PublicLinkConfiguration(contactSupport: support),
+      haptics: haptics,
+      toasts: toasts,
+    );
+    await tester.pumpAndSettle();
+
+    final supportRow = find.byKey(
+      const ValueKey('settings-link-contactSupport'),
+    );
+    await tester.scrollUntilVisible(supportRow, 250);
+    expect(
+      tester.getSemantics(supportRow).flagsCollection.isEnabled,
+      ui.Tristate.isTrue,
+    );
+    await tester.tap(supportRow);
+    await tester.pumpAndSettle();
+
+    expect(externalUris.opened, [support]);
+    expect(haptics.intents, [HapticIntent.error]);
+    expect(toasts.messages, ['Link not opened']);
+  });
+
+  testWidgets('version failure is explicit and independently retryable', (
+    tester,
+  ) async {
+    final retry = Completer<AppResult<AppBuildMetadata>>();
+    final metadata = _QueuedMetadataService([
+      Future.value(
+        const AppResult.failure(
+          AppFailure(
+            code: 'metadata_unavailable',
+            kind: AppFailureKind.unavailable,
+            userMessage: 'The app version could not be loaded.',
+            retryable: true,
+          ),
+        ),
+      ),
+      retry.future,
+    ]);
+    await _pumpSettingsScreen(
+      tester,
+      walletFuture: Future.value(WalletState(activeWallet: _walletProfile)),
+      appRepository: SettingsAppRepository(metadata, _ExternalUriService()),
+    );
+    await tester.pumpAndSettle();
+    final retryButton = find.text('Retry version');
+    await tester.scrollUntilVisible(retryButton, 300);
+
+    expect(find.text('UTEXO • Version unavailable'), findsOneWidget);
+    await tester.tap(retryButton);
+    await tester.pump();
+    expect(find.text('UTEXO • Version loading'), findsOneWidget);
+    retry.complete(
+      const AppResult.success(
+        AppBuildMetadata(version: '3.0.0', buildNumber: ''),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('UTEXO • Version 3.0.0'), findsOneWidget);
+    expect(find.text('Retry version'), findsNothing);
+  });
+
+  testWidgets('settings remains accessible at compact width and 2x text', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(640, 1136);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await _pumpSettingsScreen(
+      tester,
+      walletFuture: Future.value(WalletState(activeWallet: _walletProfile)),
+      appRepository: _appRepository(),
+      textScaler: const TextScaler.linear(2),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(tester, meetsGuideline(androidTapTargetGuideline));
+    expect(tester, meetsGuideline(labeledTapTargetGuideline));
+    expect(tester, meetsGuideline(textContrastGuideline));
+  });
+}
+
+final _walletProfile = WalletProfile(
+  id: '0123456789abcdef0123456789abcdef',
+  name: 'Primary wallet',
+  createdAt: DateTime.utc(2026),
+  updatedAt: DateTime.utc(2026),
+  environment: BlockchainEnvironment.regtest,
+  state: WalletProfileState.ready,
+  storageToken: 'fedcba9876543210fedcba9876543210',
+);
+
+Future<void> _pumpSettingsScreen(
+  WidgetTester tester, {
+  required Future<WalletState> walletFuture,
+  required SettingsAppRepository appRepository,
+  HapticFeedbackService? haptics,
+  ToastPresentationService? toasts,
+  TextScaler textScaler = TextScaler.noScaling,
+  PublicLinkConfiguration linkConfiguration = const PublicLinkConfiguration(),
+}) async {
+  SharedPreferences.setMockInitialValues({});
+  final settingsRepository = SettingsRepository(
+    PreferencesService(await SharedPreferences.getInstance()),
+    _CatalogAssetBundle(),
+  );
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        walletViewModelProvider.overrideWith(
+          () => _TestWalletViewModel(walletFuture),
+        ),
+        settingsRepositoryProvider.overrideWith(
+          (ref) async => settingsRepository,
+        ),
+        settingsAppRepositoryProvider.overrideWithValue(appRepository),
+        publicLinkConfigurationProvider.overrideWithValue(linkConfiguration),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.light(),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+          child: AsterFeedbackScope(
+            haptics: haptics ?? _RecordingHaptics(),
+            toasts: toasts ?? _RecordingToasts(),
+            child: child!,
+          ),
+        ),
+        home: const SettingsScreen(),
+      ),
+    ),
+  );
+}
+
+SettingsAppRepository _appRepository() {
+  return SettingsAppRepository(
+    _MetadataService(
+      const AppResult.success(
+        AppBuildMetadata(version: '1.0.0', buildNumber: '1'),
+      ),
+    ),
+    _ExternalUriService(),
+  );
+}
+
+final class _TestWalletViewModel extends WalletViewModel {
+  _TestWalletViewModel(this.walletFuture);
+
+  final Future<WalletState> walletFuture;
+
+  @override
+  Future<WalletState> build() => walletFuture;
 }
 
 final class _CatalogAssetBundle extends CachingAssetBundle {
@@ -116,6 +376,40 @@ final class _CatalogAssetBundle extends CachingAssetBundle {
   Future<ByteData> load(String key) async {
     final bytes = Uint8List.fromList(utf8.encode(_sources[key]!));
     return ByteData.sublistView(bytes);
+  }
+}
+
+final class _MetadataService implements AppMetadataService {
+  _MetadataService(this.result);
+
+  final AppResult<AppBuildMetadata> result;
+
+  @override
+  Future<AppResult<AppBuildMetadata>> load() async => result;
+}
+
+final class _QueuedMetadataService implements AppMetadataService {
+  _QueuedMetadataService(this.responses);
+
+  final List<Future<AppResult<AppBuildMetadata>>> responses;
+
+  @override
+  Future<AppResult<AppBuildMetadata>> load() {
+    if (responses.isEmpty) throw StateError('No metadata response queued.');
+    return responses.removeAt(0);
+  }
+}
+
+final class _ExternalUriService implements ExternalUriService {
+  _ExternalUriService({this.result = const AppResult.success(null)});
+
+  final AppResult<void> result;
+  final opened = <Uri>[];
+
+  @override
+  Future<AppResult<void>> open(Uri uri) async {
+    opened.add(uri);
+    return result;
   }
 }
 

@@ -6,4 +6,3 @@ export 'errors/errors.dart';
 export 'network/network.dart';
 export 'platform/platform.dart';
 export 'storage/storage.dart';
-export 'utils/utils.dart';

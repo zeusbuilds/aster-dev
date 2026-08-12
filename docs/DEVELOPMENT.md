@@ -188,6 +188,26 @@ deployment identity values and must be supplied together. When either is
 missing, the app keeps both USDT rails visible but unavailable; it never infers
 an asset contract or decimal precision from the `USDT` ticker.
 
+Settings support, legal, and social destinations are optional deployment
+configuration. Omitted values render as disabled actions; the app never ships
+a guessed URL or enabled no-op command.
+
+| Define | Settings action |
+| --- | --- |
+| `UTEXO_SUPPORT_URL` | Contact Support |
+| `UTEXO_TERMS_URL` | Terms of Service |
+| `UTEXO_PRIVACY_URL` | Privacy Policy |
+| `UTEXO_TWITTER_URL` | Twitter |
+| `UTEXO_TELEGRAM_URL` | Telegram |
+| `UTEXO_INSTAGRAM_URL` | Instagram |
+
+Each configured destination must be a bounded public HTTPS URL without
+embedded credentials, a query, or a fragment. Literal IPs, localhost,
+single-label intranet hosts, and reserved non-public suffixes are rejected.
+These values are compiled into the application and must never contain secrets.
+Settings obtains the installed version and build number from platform package
+metadata; release code must not hardcode that display value.
+
 An unrelated Compose project named `rgb-lightning-node-perf-lab` owns host
 ports `18443`, `50001`, and `3000` and persistent external data. App development
 must not stop, reset, recreate, inspect, or reuse that project or its data. Any

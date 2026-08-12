@@ -32,7 +32,6 @@ class _AsterPalette {
   static const danger = Color(0xFFF53F3F);
   static const dangerContainer = Color(0xFFFFECE8);
   static const bitcoin = Color(0xFFF7931A);
-  static const liquid = Color(0xFF14A38B);
 }
 
 /// App-specific color roles that are not covered by Material [ColorScheme].
@@ -59,7 +58,6 @@ class AsterColors extends ThemeExtension<AsterColors> {
     required this.onDanger,
     required this.dangerContainer,
     required this.bitcoin,
-    required this.liquid,
     required this.chartPositive,
     required this.chartNegative,
     required this.onBrandArt,
@@ -93,7 +91,6 @@ class AsterColors extends ThemeExtension<AsterColors> {
   final Color onDanger;
   final Color dangerContainer;
   final Color bitcoin;
-  final Color liquid;
   final Color chartPositive;
   final Color chartNegative;
   final Color onBrandArt;
@@ -127,7 +124,6 @@ class AsterColors extends ThemeExtension<AsterColors> {
     onDanger: _AsterPalette.white,
     dangerContainer: _AsterPalette.dangerContainer,
     bitcoin: _AsterPalette.bitcoin,
-    liquid: _AsterPalette.liquid,
     chartPositive: _AsterPalette.success,
     chartNegative: _AsterPalette.danger,
     onBrandArt: _AsterPalette.white,
@@ -199,7 +195,6 @@ class AsterColors extends ThemeExtension<AsterColors> {
     Color? onDanger,
     Color? dangerContainer,
     Color? bitcoin,
-    Color? liquid,
     Color? chartPositive,
     Color? chartNegative,
     Color? onBrandArt,
@@ -233,7 +228,6 @@ class AsterColors extends ThemeExtension<AsterColors> {
       onDanger: onDanger ?? this.onDanger,
       dangerContainer: dangerContainer ?? this.dangerContainer,
       bitcoin: bitcoin ?? this.bitcoin,
-      liquid: liquid ?? this.liquid,
       chartPositive: chartPositive ?? this.chartPositive,
       chartNegative: chartNegative ?? this.chartNegative,
       onBrandArt: onBrandArt ?? this.onBrandArt,
@@ -280,7 +274,6 @@ class AsterColors extends ThemeExtension<AsterColors> {
       onDanger: Color.lerp(onDanger, other.onDanger, t)!,
       dangerContainer: Color.lerp(dangerContainer, other.dangerContainer, t)!,
       bitcoin: Color.lerp(bitcoin, other.bitcoin, t)!,
-      liquid: Color.lerp(liquid, other.liquid, t)!,
       chartPositive: Color.lerp(chartPositive, other.chartPositive, t)!,
       chartNegative: Color.lerp(chartNegative, other.chartNegative, t)!,
       onBrandArt: Color.lerp(onBrandArt, other.onBrandArt, t)!,

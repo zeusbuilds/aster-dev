@@ -50,11 +50,7 @@ class SettingsChoiceRow extends StatelessWidget {
                 SizedBox(width: spacing.xxl),
                 ExcludeSemantics(
                   child: IgnorePointer(
-                    child: CustomRadio(
-                      option: true,
-                      selected: selected,
-                      onChanged: (_) {},
-                    ),
+                    child: CustomRadio(option: true, selected: selected),
                   ),
                 ),
               ],

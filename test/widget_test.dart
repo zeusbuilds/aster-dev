@@ -36,7 +36,30 @@ void main() {
     expect(icons.xxs, 12);
     expect(icons.md, 24);
     expect(metrics.minTouchTarget, 48);
+    expect(metrics.marketTileMinHeight, 156);
     expect(metrics.flagSize, 32);
     expect(metrics.selectionIndicatorWidth, 4);
   });
+
+  test(
+    'shadow tokens own immutable lists and preserve interpolation entries',
+    () {
+      final source = <BoxShadow>[
+        const BoxShadow(color: Colors.black, blurRadius: 4),
+      ];
+      final shadows = AsterShadows(raised: source);
+
+      source.clear();
+      expect(shadows.raised, hasLength(1));
+      expect(() => shadows.raised.clear(), throwsUnsupportedError);
+
+      final destination = AsterShadows(
+        raised: const [
+          BoxShadow(color: Colors.white, blurRadius: 8),
+          BoxShadow(color: Colors.blue, blurRadius: 12),
+        ],
+      );
+      expect(shadows.lerp(destination, 0.5).raised, hasLength(2));
+    },
+  );
 }

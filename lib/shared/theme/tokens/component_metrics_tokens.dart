@@ -14,6 +14,7 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
     this.scanFrameMaximumSize = 320,
     this.scanHeaderExtent = 172,
     this.recoveryWordGridAspectRatio = 4.5,
+    this.marketTileMinHeight = 156,
     this.marketTextureSize = 128,
     this.marketBadgeDotSize = 20,
     this.sliderThumbRadius = 8,
@@ -53,6 +54,7 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
   final double scanFrameMaximumSize;
   final double scanHeaderExtent;
   final double recoveryWordGridAspectRatio;
+  final double marketTileMinHeight;
   final double marketTextureSize;
   final double marketBadgeDotSize;
   final double sliderThumbRadius;
@@ -93,6 +95,7 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
     double? scanFrameMaximumSize,
     double? scanHeaderExtent,
     double? recoveryWordGridAspectRatio,
+    double? marketTileMinHeight,
     double? marketTextureSize,
     double? marketBadgeDotSize,
     double? sliderThumbRadius,
@@ -133,6 +136,7 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
       scanHeaderExtent: scanHeaderExtent ?? this.scanHeaderExtent,
       recoveryWordGridAspectRatio:
           recoveryWordGridAspectRatio ?? this.recoveryWordGridAspectRatio,
+      marketTileMinHeight: marketTileMinHeight ?? this.marketTileMinHeight,
       marketTextureSize: marketTextureSize ?? this.marketTextureSize,
       marketBadgeDotSize: marketBadgeDotSize ?? this.marketBadgeDotSize,
       sliderThumbRadius: sliderThumbRadius ?? this.sliderThumbRadius,
@@ -213,6 +217,11 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
       recoveryWordGridAspectRatio: _lerp(
         recoveryWordGridAspectRatio,
         other.recoveryWordGridAspectRatio,
+        t,
+      ),
+      marketTileMinHeight: _lerp(
+        marketTileMinHeight,
+        other.marketTileMinHeight,
         t,
       ),
       marketTextureSize: _lerp(marketTextureSize, other.marketTextureSize, t),

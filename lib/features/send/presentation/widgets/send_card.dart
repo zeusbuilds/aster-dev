@@ -136,7 +136,7 @@ class SendCard extends StatelessWidget {
                 ),
                 SizedBox(width: context.spacing.sm),
               ],
-              CustomButton.compact(text: 'Max', enabled: false, onTap: () {}),
+              const CustomButton.compact(text: 'Max', enabled: false),
             ],
           ),
         ),

@@ -9,7 +9,7 @@ class AppTheme {
   static const _colors = AsterColors.light;
   static const _spacing = AsterSpacing();
   static const _radii = AsterRadii();
-  static const _shadows = AsterShadows();
+  static final _shadows = AsterShadows();
   static const _typography = AsterTypography();
   static const _metrics = AsterComponentMetrics();
   static const _motion = AsterMotion();

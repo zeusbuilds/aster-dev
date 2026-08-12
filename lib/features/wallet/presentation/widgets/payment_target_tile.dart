@@ -13,16 +13,20 @@ class PaymentTargetTile extends StatelessWidget {
   const PaymentTargetTile({
     super.key,
     required this.capability,
-    required this.onSelected,
+    this.onSelected,
   });
 
+  /// Deployment-resolved support for this asset and payment rail.
   final WalletPaymentCapability capability;
-  final ValueChanged<WalletPaymentTarget> onSelected;
+
+  /// Selection owner, or `null` for a noninteractive placeholder.
+  final ValueChanged<WalletPaymentTarget>? onSelected;
 
   @override
   Widget build(BuildContext context) {
     final target = capability.target;
-    final available = capability.isAvailable;
+    final configured = capability.isAvailable;
+    final enabled = configured && onSelected != null;
     final shape = RoundedSuperellipseBorder(
       borderRadius: BorderRadius.circular(context.radii.card),
       side: BorderSide(
@@ -33,24 +37,24 @@ class PaymentTargetTile extends StatelessWidget {
 
     void select() {
       unawaited(context.haptics.trigger(HapticIntent.selection));
-      onSelected(target);
+      onSelected?.call(target);
     }
 
     return Semantics(
       button: true,
-      enabled: available,
+      enabled: enabled,
       label: target.semanticLabel,
-      value: available ? null : 'Not configured',
-      onTap: available ? select : null,
+      value: configured ? null : 'Not configured',
+      onTap: enabled ? select : null,
       excludeSemantics: true,
       child: Opacity(
-        opacity: available ? 1 : context.stateLayers.disabled,
+        opacity: configured ? 1 : context.stateLayers.disabled,
         child: Material(
           color: context.colorScheme.surface,
           shape: shape,
           clipBehavior: Clip.antiAlias,
           child: InkWell(
-            onTap: available ? select : null,
+            onTap: enabled ? select : null,
             customBorder: shape,
             child: ConstrainedBox(
               constraints: BoxConstraints(
@@ -76,7 +80,7 @@ class PaymentTargetTile extends StatelessWidget {
                           Text(target.assetLabel, style: context.type.title),
                           SizedBox(height: context.spacing.xxs),
                           Text(
-                            available
+                            configured
                                 ? target.railLabel
                                 : '${target.railLabel} - Not configured',
                             style: context.type.rowMeta.copyWith(
@@ -94,12 +98,14 @@ class PaymentTargetTile extends StatelessWidget {
                         color: context.appColors.bitcoin,
                       ),
                     ],
-                    SizedBox(width: context.spacing.sm),
-                    Icon(
-                      MingCuteIcons.mgc_right_line,
-                      size: context.icons.sm,
-                      color: context.appColors.textTertiary,
-                    ),
+                    if (enabled) ...[
+                      SizedBox(width: context.spacing.sm),
+                      Icon(
+                        MingCuteIcons.mgc_right_line,
+                        size: context.icons.sm,
+                        color: context.appColors.textTertiary,
+                      ),
+                    ],
                   ],
                 ),
               ),

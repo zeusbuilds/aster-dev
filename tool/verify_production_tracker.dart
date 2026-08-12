@@ -77,9 +77,11 @@ Set<String> _repositoryFiles() {
     exit(result.exitCode);
   }
 
-  return LineSplitter.split(
-    result.stdout as String,
-  ).where((path) => path.isNotEmpty && !_isGenerated(path)).toSet();
+  return LineSplitter.split(result.stdout as String).where((path) {
+    if (path.isEmpty || _isGenerated(path)) return false;
+    return FileSystemEntity.typeSync(path, followLinks: false) !=
+        FileSystemEntityType.notFound;
+  }).toSet();
 }
 
 Map<String, String> _parseInventory(String contents) {

@@ -4,17 +4,27 @@ import 'package:flutter/material.dart';
 
 import '../../../../shared/shared.dart';
 
-/// Market tile widget displaying text on left and SVG on right
-///
-/// Two texts in a column on the left, SVG icon on the right
-/// & tip text on bottom right
+/// Semantic Market action with stable squircle geometry and status capsule.
 class MarketTile extends StatelessWidget {
+  /// Short action name.
   final String label;
+
+  /// Supporting capability or availability copy.
   final String? subtitle;
+
+  /// Compact status rendered in the lower capsule.
   final String? tipText;
+
+  /// Visual identity for this action.
   final IconData icon;
+
+  /// Accepted action, or `null` when the capability is unavailable.
   final VoidCallback? onTap;
+
+  /// Authored Market background recipe.
   final AsterGradientSpec gradient;
+
+  /// Optional tint applied to the decorative texture shadow.
   final Color? shadowColor;
 
   const MarketTile({
@@ -58,83 +68,97 @@ class MarketTile extends StatelessWidget {
           color: colors.transparentSurface,
           child: InkWell(
             onTap: onTap == null ? null : activate,
-            child: Stack(
-              children: [
-                Positioned(
-                  top: -spacing.md,
-                  right: -spacing.xxxl,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      boxShadow: shadowColor != null
-                          ? shadows.modal
-                                .map((s) => s.copyWith(color: shadowColor!))
-                                .toList()
-                          : shadows.modal,
-                    ),
-                    child: Image.asset(
-                      'assets/texture/shape.png',
-                      width: metrics.marketTextureSize,
-                      height: metrics.marketTextureSize,
-                    ),
-                  ),
-                ),
-                Container(
-                  padding: EdgeInsets.all(spacing.lg),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(label, style: type.marketLabel),
-                            Text(subtitle ?? '', style: type.marketTitle),
-                            SizedBox(height: spacing.xxl),
-                            if (tipText != null) ...[
-                              AsterPill(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: spacing.xs,
-                                  vertical: spacing.xs,
-                                ),
-                                color: colors.onMarketTile.withValues(
-                                  alpha: effects.marketPillSurfaceOpacity,
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        color: colors.onMarketTile.withValues(
-                                          alpha: effects.marketPillDotOpacity,
-                                        ),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      width: metrics.marketBadgeDotSize,
-                                      height: metrics.marketBadgeDotSize,
-                                    ),
-                                    SizedBox(width: spacing.sm),
-                                    Text(
-                                      tipText!,
-                                      style: type.marketTip.copyWith(
-                                        color: colors.onMarketTile.withValues(
-                                          alpha:
-                                              effects.marketContentMutedOpacity,
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(width: spacing.md),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: metrics.marketTileMinHeight,
+              ),
+              child: Stack(
+                children: [
+                  Positioned(
+                    top: -spacing.md,
+                    right: -spacing.xxxl,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        boxShadow: shadowColor != null
+                            ? shadows.modal
+                                  .map((s) => s.copyWith(color: shadowColor!))
+                                  .toList(growable: false)
+                            : shadows.modal,
                       ),
-                    ],
+                      child: Image.asset(
+                        'assets/texture/shape.png',
+                        width: metrics.marketTextureSize,
+                        height: metrics.marketTextureSize,
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                  Padding(
+                    padding: EdgeInsets.all(spacing.lg),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(label, style: type.marketLabel),
+                              if (subtitle case final value?)
+                                Text(value, style: type.marketTitle),
+                              SizedBox(height: spacing.xxl),
+                              if (tipText case final value?)
+                                AsterPill(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: spacing.sm,
+                                    vertical: spacing.xs,
+                                  ),
+                                  color: colors.onMarketTile.withValues(
+                                    alpha: effects.marketPillSurfaceOpacity,
+                                  ),
+                                  child: Wrap(
+                                    spacing: spacing.sm,
+                                    runSpacing: spacing.xxs,
+                                    crossAxisAlignment:
+                                        WrapCrossAlignment.center,
+                                    children: [
+                                      Container(
+                                        decoration: BoxDecoration(
+                                          color: colors.onMarketTile.withValues(
+                                            alpha: effects.marketPillDotOpacity,
+                                          ),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        width: metrics.marketBadgeDotSize,
+                                        height: metrics.marketBadgeDotSize,
+                                      ),
+                                      Text(
+                                        value,
+                                        style: type.marketTip.copyWith(
+                                          color: colors.onMarketTile.withValues(
+                                            alpha: effects
+                                                .marketContentMutedOpacity,
+                                          ),
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(width: spacing.md),
+                        Icon(
+                          icon,
+                          size: context.icons.lg,
+                          color: colors.onMarketTile,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

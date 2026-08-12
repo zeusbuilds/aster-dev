@@ -58,11 +58,7 @@ class WalletSelectOptionRow extends StatelessWidget {
               children: [
                 ExcludeSemantics(
                   child: IgnorePointer(
-                    child: CustomRadio(
-                      option: true,
-                      selected: selected,
-                      onChanged: (_) {},
-                    ),
+                    child: CustomRadio(option: true, selected: selected),
                   ),
                 ),
                 SizedBox(width: spacing.lg),

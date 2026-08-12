@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' as ui;
 
 import 'package:aster/core/core.dart';
 import 'package:aster/features/market/data/data.dart';
@@ -17,6 +18,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:ming_cute_icons/ming_cute_icons.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 
 import '../../support/payment_flow_harness.dart';
@@ -72,6 +74,24 @@ void main() {
       '/send/bitcoin-onchain/address',
     );
     expect(find.textContaining('Not configured'), findsNWidgets(2));
+    final usdtOnchain = find.byWidgetPredicate(
+      (widget) =>
+          widget is PaymentTargetTile &&
+          widget.capability.target == WalletPaymentTarget.usdtOnchain,
+    );
+    expect(
+      tester.getSemantics(usdtOnchain).flagsCollection.isEnabled,
+      ui.Tristate.isFalse,
+    );
+    expect(
+      find.descendant(
+        of: usdtOnchain,
+        matching: find.byIcon(MingCuteIcons.mgc_right_line),
+      ),
+      findsNothing,
+    );
+    await tester.tap(usdtOnchain);
+    expect(harness.haptics.intents, isEmpty);
     await tester.tap(find.text('On-chain'));
     await tester.pumpAndSettle();
 

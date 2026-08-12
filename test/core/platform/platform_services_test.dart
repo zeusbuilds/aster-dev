@@ -149,4 +149,51 @@ void main() {
       );
     },
   );
+
+  test('app metadata adapter returns only bounded display fields', () async {
+    final service = PlatformAppMetadataService(
+      loader: () async =>
+          const AppBuildMetadata(version: '1.0.0', buildNumber: '42'),
+    );
+
+    final result = await service.load() as AppSuccess<AppBuildMetadata>;
+    expect(result.value.version, '1.0.0');
+    expect(result.value.buildNumber, '42');
+    expect(
+      const AppBuildMetadata(
+        version: '1.0.0-beta.1',
+        buildNumber: '42_debug',
+      ).isValid,
+      isTrue,
+    );
+
+    for (final metadata in [
+      const AppBuildMetadata(version: '', buildNumber: '1'),
+      const AppBuildMetadata(version: ' 1.0.0', buildNumber: '1'),
+      const AppBuildMetadata(version: '1.0 beta', buildNumber: '1'),
+      const AppBuildMetadata(version: '1.0.0\u202e', buildNumber: '1'),
+      const AppBuildMetadata(version: '1.0.0', buildNumber: '1\nsecret'),
+      AppBuildMetadata(
+        version: '1' * (AppBuildMetadata.maximumFieldCharacters + 1),
+        buildNumber: '1',
+      ),
+    ]) {
+      final invalid = PlatformAppMetadataService(loader: () async => metadata);
+      final failure =
+          await invalid.load() as AppFailureResult<AppBuildMetadata>;
+      expect(failure.failure.code, 'app_metadata_invalid');
+      expect(failure.failure.retryable, isFalse);
+    }
+  });
+
+  test('app metadata adapter redacts platform failures', () async {
+    final service = PlatformAppMetadataService(
+      loader: () => throw StateError('private package detail'),
+    );
+
+    final result = await service.load() as AppFailureResult<AppBuildMetadata>;
+    expect(result.failure.code, 'app_metadata_load_failed');
+    expect(result.failure.retryable, isTrue);
+    expect(result.failure.userMessage, isNot(contains('private package')));
+  });
 }

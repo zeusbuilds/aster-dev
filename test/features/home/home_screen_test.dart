@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:aster/core/core.dart';
 import 'package:aster/features/home/presentation/screens/screens.dart';
+import 'package:aster/features/home/presentation/widgets/widgets.dart';
 import 'package:aster/features/settings/domain/models/models.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:aster/shared/shared.dart';
@@ -120,6 +121,29 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Send target selector'), findsOneWidget);
+  });
+
+  testWidgets('home mesh blurs its own content without a backdrop capture', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: const Scaffold(body: MeshGradientBackground()),
+      ),
+    );
+
+    final mesh = find.byType(MeshGradientBackground);
+    expect(mesh, findsOneWidget);
+    expect(
+      find.descendant(of: mesh, matching: find.byType(ImageFiltered)),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: mesh, matching: find.byType(BackdropFilter)),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
   });
 }
 
