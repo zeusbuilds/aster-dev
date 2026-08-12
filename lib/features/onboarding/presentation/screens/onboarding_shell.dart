@@ -77,7 +77,7 @@ class _OnboardingShellState extends State<OnboardingShell> {
               controller: _backgroundSnapshot,
               autoresize: true,
               child: OnboardingWelcomeMeshBackground(
-                onTextureReady: _enableBackgroundSnapshot,
+                onCompositionReady: _enableBackgroundSnapshot,
               ),
             ),
           ),

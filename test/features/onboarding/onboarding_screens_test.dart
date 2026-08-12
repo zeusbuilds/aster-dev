@@ -185,7 +185,7 @@ void main() {
   testWidgets('welcome mesh avoids backdrop capture and bounds image decode', (
     tester,
   ) async {
-    var textureReadyCount = 0;
+    var compositionReadyCount = 0;
     tester.view.devicePixelRatio = 3;
     tester.view.physicalSize = const Size(1290, 2796);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -196,11 +196,12 @@ void main() {
         theme: AppTheme.light(),
         home: Scaffold(
           body: OnboardingWelcomeMeshBackground(
-            onTextureReady: () => textureReadyCount += 1,
+            onCompositionReady: () => compositionReadyCount += 1,
           ),
         ),
       ),
     );
+    expect(compositionReadyCount, 0);
     await tester.pumpAndSettle();
 
     final mesh = find.byType(OnboardingWelcomeMeshBackground);
@@ -221,9 +222,9 @@ void main() {
     );
     expect(noiseImage.image, isA<ResizeImage>());
     expect((noiseImage.image as ResizeImage).width, 1600);
-    expect(textureReadyCount, 1);
+    expect(compositionReadyCount, 1);
     await tester.pump();
-    expect(textureReadyCount, 1);
+    expect(compositionReadyCount, 1);
     expect(tester.takeException(), isNull);
   });
 
@@ -272,6 +273,17 @@ void main() {
         .widgetList<MediaQuery>(find.byType(MediaQuery))
         .singleWhere((mediaQuery) => mediaQuery.child is SnapshotWidget);
     expect(snapshotMediaQuery.data.devicePixelRatio, 3);
+    final snapshot = tester.widget<SnapshotWidget>(
+      find.descendant(
+        of: find.byType(OnboardingShell),
+        matching: find.byType(SnapshotWidget),
+      ),
+    );
+    expect(snapshot.controller.allowSnapshotting, isFalse);
+
+    await tester.pumpAndSettle();
+
+    expect(snapshot.controller.allowSnapshotting, isTrue);
   });
 
   for (final scenario in const [
