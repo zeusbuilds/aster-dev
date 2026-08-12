@@ -8,6 +8,7 @@ import 'package:aster/features/receive/presentation/screens/screens.dart';
 import 'package:aster/features/receive/presentation/widgets/widgets.dart';
 import 'package:aster/features/send/presentation/screens/screens.dart';
 import 'package:aster/features/send/presentation/view_model/view_models.dart';
+import 'package:aster/features/send/presentation/widgets/widgets.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:aster/features/wallet/presentation/view_model/view_models.dart';
 import 'package:aster/features/wallet/presentation/widgets/widgets.dart';
@@ -120,6 +121,49 @@ void main() {
     expect(tester, meetsGuideline(androidTapTargetGuideline));
     expect(tester, meetsGuideline(labeledTapTargetGuideline));
     expect(tester, meetsGuideline(textContrastGuideline));
+  });
+
+  testWidgets('send loading surfaces preserve compact 2x geometry', (
+    tester,
+  ) async {
+    final harness = await PaymentFlowTestHarness.create();
+    addTearDown(() => _disposeHarness(tester, harness));
+    await _pumpWidget(
+      tester,
+      harness,
+      Scaffold(
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                const SendAddressCard.loading(
+                  target: WalletPaymentTarget.bitcoinLightning,
+                ),
+                const SizedBox(height: 16),
+                const SendCard.loading(
+                  target: WalletPaymentTarget.bitcoinLightning,
+                ),
+                const SizedBox(height: 16),
+                const AsterNumericKeypad.loading(),
+              ],
+            ),
+          ),
+        ),
+      ),
+      size: const Size(320, 700),
+      textScaler: const TextScaler.linear(2),
+    );
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(find.bySemanticsLabel('Loading recipient form'), findsOneWidget);
+    expect(find.bySemanticsLabel('Loading payment amount'), findsOneWidget);
+    expect(tester, meetsGuideline(labeledTapTargetGuideline));
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('1')).flagsCollection.isEnabled,
+      ui.Tristate.isFalse,
+    );
   });
 
   testWidgets('direct amount deep link fails closed without a recipient', (
@@ -447,9 +491,10 @@ Future<void> _pumpWidget(
   WidgetTester tester,
   PaymentFlowTestHarness harness,
   Widget child, {
+  Size size = const Size(390, 844),
   TextScaler? textScaler,
 }) {
-  _configurePhone(tester);
+  _configurePhone(tester, size: size);
   return tester.pumpWidget(
     UncontrolledProviderScope(
       container: harness.container,
@@ -475,9 +520,9 @@ Future<void> _pumpWidget(
   );
 }
 
-void _configurePhone(WidgetTester tester) {
+void _configurePhone(WidgetTester tester, {Size size = const Size(390, 844)}) {
   tester.view.devicePixelRatio = 1;
-  tester.view.physicalSize = const Size(390, 844);
+  tester.view.physicalSize = size;
   addTearDown(tester.view.resetDevicePixelRatio);
   addTearDown(tester.view.resetPhysicalSize);
 }

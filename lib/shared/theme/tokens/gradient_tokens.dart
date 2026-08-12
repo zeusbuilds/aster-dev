@@ -2,17 +2,52 @@ import 'package:flutter/material.dart';
 
 @immutable
 class AsterGradientSpec {
-  const AsterGradientSpec({
-    required this.colors,
-    this.stops,
+  AsterGradientSpec({
+    required List<Color> colors,
+    List<double>? stops,
     this.begin = Alignment.topLeft,
     this.end = Alignment.bottomRight,
-  });
+  }) : colors = _validateColors(colors),
+       stops = _validateStops(colors, stops);
 
   final List<Color> colors;
   final List<double>? stops;
   final AlignmentGeometry begin;
   final AlignmentGeometry end;
+
+  static List<Color> _validateColors(List<Color> colors) {
+    if (colors.length < 2) {
+      throw ArgumentError.value(
+        colors,
+        'colors',
+        'A gradient requires at least two colors.',
+      );
+    }
+    return List<Color>.unmodifiable(colors);
+  }
+
+  static List<double>? _validateStops(List<Color> colors, List<double>? stops) {
+    if (stops == null) return null;
+    if (stops.length != colors.length) {
+      throw ArgumentError.value(
+        stops,
+        'stops',
+        'Gradient stops must match the number of colors.',
+      );
+    }
+    var previous = -1.0;
+    for (final stop in stops) {
+      if (!stop.isFinite || stop < 0 || stop > 1 || stop < previous) {
+        throw ArgumentError.value(
+          stops,
+          'stops',
+          'Gradient stops must be finite, ordered values from 0 to 1.',
+        );
+      }
+      previous = stop;
+    }
+    return List<double>.unmodifiable(stops);
+  }
 
   LinearGradient toLinearGradient() {
     return LinearGradient(colors: colors, stops: stops, begin: begin, end: end);
@@ -33,17 +68,17 @@ class AsterGradientSpec {
   }
 
   AsterGradientSpec lerp(AsterGradientSpec other, double t) {
+    final gradient = LinearGradient.lerp(
+      toLinearGradient(),
+      other.toLinearGradient(),
+      t,
+    )!;
     return AsterGradientSpec(
-      colors: _lerpColorList(colors, other.colors, t),
-      stops: stops ?? other.stops,
-      begin: t < 0.5 ? begin : other.begin,
-      end: t < 0.5 ? end : other.end,
+      colors: gradient.colors,
+      stops: gradient.stops,
+      begin: gradient.begin,
+      end: gradient.end,
     );
-  }
-
-  static List<Color> _lerpColorList(List<Color> a, List<Color> b, double t) {
-    final length = a.length < b.length ? a.length : b.length;
-    return List<Color>.generate(length, (i) => Color.lerp(a[i], b[i], t)!);
   }
 }
 
@@ -70,7 +105,7 @@ class AsterGradients extends ThemeExtension<AsterGradients> {
   final AsterGradientSpec splashBackdrop;
   final AsterGradientSpec scanOverlay;
 
-  static const light = AsterGradients(
+  static final light = AsterGradients(
     marketBuy: AsterGradientSpec(
       colors: [Color(0xFFE89B6B), Color(0xFFD47A4A)],
     ),

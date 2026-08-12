@@ -58,7 +58,7 @@ class PaymentTargetTile extends StatelessWidget {
             customBorder: shape,
             child: ConstrainedBox(
               constraints: BoxConstraints(
-                minHeight: context.metrics.selectionIndicatorHeight,
+                minHeight: context.metrics.paymentTargetTileMinHeight,
               ),
               child: Padding(
                 padding: EdgeInsets.symmetric(

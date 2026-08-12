@@ -40,8 +40,7 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
     this.compactFlagSize = 24,
     this.flagSize = 32,
     this.walletAvatarSize = 64,
-    this.selectionIndicatorWidth = 4,
-    this.selectionIndicatorHeight = 64,
+    this.paymentTargetTileMinHeight = 64,
   });
 
   final double buttonHeight;
@@ -80,8 +79,7 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
   final double compactFlagSize;
   final double flagSize;
   final double walletAvatarSize;
-  final double selectionIndicatorWidth;
-  final double selectionIndicatorHeight;
+  final double paymentTargetTileMinHeight;
 
   @override
   AsterComponentMetrics copyWith({
@@ -121,8 +119,7 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
     double? compactFlagSize,
     double? flagSize,
     double? walletAvatarSize,
-    double? selectionIndicatorWidth,
-    double? selectionIndicatorHeight,
+    double? paymentTargetTileMinHeight,
   }) {
     return AsterComponentMetrics(
       buttonHeight: buttonHeight ?? this.buttonHeight,
@@ -167,10 +164,8 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
       compactFlagSize: compactFlagSize ?? this.compactFlagSize,
       flagSize: flagSize ?? this.flagSize,
       walletAvatarSize: walletAvatarSize ?? this.walletAvatarSize,
-      selectionIndicatorWidth:
-          selectionIndicatorWidth ?? this.selectionIndicatorWidth,
-      selectionIndicatorHeight:
-          selectionIndicatorHeight ?? this.selectionIndicatorHeight,
+      paymentTargetTileMinHeight:
+          paymentTargetTileMinHeight ?? this.paymentTargetTileMinHeight,
     );
   }
 
@@ -297,14 +292,9 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
       compactFlagSize: _lerp(compactFlagSize, other.compactFlagSize, t),
       flagSize: _lerp(flagSize, other.flagSize, t),
       walletAvatarSize: _lerp(walletAvatarSize, other.walletAvatarSize, t),
-      selectionIndicatorWidth: _lerp(
-        selectionIndicatorWidth,
-        other.selectionIndicatorWidth,
-        t,
-      ),
-      selectionIndicatorHeight: _lerp(
-        selectionIndicatorHeight,
-        other.selectionIndicatorHeight,
+      paymentTargetTileMinHeight: _lerp(
+        paymentTargetTileMinHeight,
+        other.paymentTargetTileMinHeight,
         t,
       ),
     );

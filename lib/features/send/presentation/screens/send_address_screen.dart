@@ -129,7 +129,7 @@ class _SendAddressScreenState extends ConsumerState<SendAddressScreen> {
                 onPaste: () => unawaited(_paste()),
                 onContinue: () => unawaited(_continue()),
               ),
-              loading: () => const _DestinationLoading(),
+              loading: () => _DestinationLoading(target: widget.target),
               error: (error, stackTrace) => _DestinationFailure(
                 failure: error is AppFailureException
                     ? error.failure
@@ -192,22 +192,18 @@ final class _DestinationBody extends StatelessWidget {
 }
 
 final class _DestinationLoading extends StatelessWidget {
-  const _DestinationLoading();
+  const _DestinationLoading({required this.target});
+
+  final WalletPaymentTarget target;
 
   @override
   Widget build(BuildContext context) {
-    return AppSkeletonizer(
-      enabled: true,
-      child: Column(
-        children: [
-          Squircle(
-            borderRadius: context.radii.card,
-            child: SizedBox(height: context.metrics.selectionIndicatorHeight),
-          ),
-          const Spacer(),
-          const CustomButton(text: 'Continue'),
-        ],
-      ),
+    return Column(
+      children: [
+        SendAddressCard.loading(target: target),
+        const Spacer(),
+        const CustomButton(text: 'Continue'),
+      ],
     );
   }
 }

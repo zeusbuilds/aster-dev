@@ -8,20 +8,29 @@ import '../theme/theme.dart';
 
 /// Stable app-owned decimal keypad for exact monetary text entry.
 class AsterNumericKeypad extends StatelessWidget {
-  const AsterNumericKeypad({
+  AsterNumericKeypad({
     super.key,
     required this.value,
-    required this.onChanged,
+    required ValueChanged<String> onChanged,
     required this.allowDecimal,
     this.enabled = true,
     this.maximumCharacters = 64,
-  }) : assert(maximumCharacters > 0);
+  }) : _behavior = _NumericKeypadBehavior(onChanged),
+       assert(maximumCharacters > 0);
+
+  /// Inert keypad that reserves the same geometry as monetary input.
+  const AsterNumericKeypad.loading({super.key})
+    : value = '',
+      allowDecimal = true,
+      enabled = false,
+      maximumCharacters = 64,
+      _behavior = null;
 
   final String value;
-  final ValueChanged<String> onChanged;
   final bool allowDecimal;
   final bool enabled;
   final int maximumCharacters;
+  final _NumericKeypadBehavior? _behavior;
 
   @override
   Widget build(BuildContext context) {
@@ -61,7 +70,7 @@ class AsterNumericKeypad extends StatelessWidget {
                     unawaited(
                       context.haptics.trigger(HapticIntent.lightImpact),
                     );
-                    onChanged('');
+                    _behavior?.onChanged('');
                   }
                 : null,
           );
@@ -76,19 +85,25 @@ class AsterNumericKeypad extends StatelessWidget {
         if (value.length >= maximumCharacters) return;
         final digit = keyValue.label!;
         if (value == '0') {
-          if (digit != '0') onChanged(digit);
+          if (digit != '0') _behavior?.onChanged(digit);
           return;
         }
-        onChanged('$value$digit');
+        _behavior?.onChanged('$value$digit');
       case _KeypadKind.decimal:
         if (!allowDecimal || value.contains('.')) return;
         if (value.length >= maximumCharacters) return;
-        onChanged(value.isEmpty ? '0.' : '$value.');
+        _behavior?.onChanged(value.isEmpty ? '0.' : '$value.');
       case _KeypadKind.delete:
         if (value.isEmpty) return;
-        onChanged(value.substring(0, value.length - 1));
+        _behavior?.onChanged(value.substring(0, value.length - 1));
     }
   }
+}
+
+final class _NumericKeypadBehavior {
+  const _NumericKeypadBehavior(this.onChanged);
+
+  final ValueChanged<String> onChanged;
 }
 
 enum _KeypadKind { digit, decimal, delete }

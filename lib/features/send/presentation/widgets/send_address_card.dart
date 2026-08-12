@@ -7,30 +7,41 @@ import '../../../wallet/presentation/widgets/widgets.dart';
 
 /// Controlled destination field for the selected Send asset and rail.
 class SendAddressCard extends StatelessWidget {
-  const SendAddressCard({
+  SendAddressCard({
     super.key,
     required this.target,
-    required this.controller,
+    required TextEditingController controller,
     required this.enabled,
-    required this.onChanged,
-    required this.onClear,
-    required this.onPaste,
+    required ValueChanged<String> onChanged,
+    required VoidCallback onClear,
+    required VoidCallback onPaste,
     this.failureMessage,
     this.pasting = false,
-  });
+  }) : _behavior = _SendAddressCardBehavior(
+         controller: controller,
+         onChanged: onChanged,
+         onClear: onClear,
+         onPaste: onPaste,
+       );
+
+  /// Inert content skeleton with the same responsive geometry as the form.
+  const SendAddressCard.loading({super.key, required this.target})
+    : enabled = false,
+      failureMessage = null,
+      pasting = false,
+      _behavior = null;
 
   final WalletPaymentTarget target;
-  final TextEditingController controller;
   final bool enabled;
-  final ValueChanged<String> onChanged;
-  final VoidCallback onClear;
-  final VoidCallback onPaste;
   final String? failureMessage;
   final bool pasting;
+  final _SendAddressCardBehavior? _behavior;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    final input = _behavior?.controller;
+    final hasValue = input?.text.isNotEmpty ?? false;
+    final card = Column(
       children: [
         Squircle(
           border: BorderRadius.only(
@@ -52,7 +63,7 @@ class SendAddressCard extends StatelessWidget {
               ),
               SizedBox(height: context.spacing.xs),
               TextField(
-                controller: controller,
+                controller: input,
                 enabled: enabled,
                 style: context.type.address,
                 cursorColor: context.colorScheme.primary,
@@ -77,7 +88,7 @@ class SendAddressCard extends StatelessWidget {
                   contentPadding: EdgeInsets.zero,
                   isDense: true,
                 ),
-                onChanged: onChanged,
+                onChanged: _behavior?.onChanged,
               ),
               if (failureMessage case final message?) ...[
                 SizedBox(height: context.spacing.sm),
@@ -113,18 +124,36 @@ class SendAddressCard extends StatelessWidget {
                 ),
               ),
               CustomButton.compact(
-                text: controller.text.isEmpty ? 'Paste' : 'Clear',
+                text: hasValue ? 'Clear' : 'Paste',
                 loading: pasting,
                 enabled: enabled,
-                hapticIntent: controller.text.isEmpty
-                    ? null
-                    : HapticIntent.lightImpact,
-                onTap: controller.text.isEmpty ? onPaste : onClear,
+                hapticIntent: hasValue ? HapticIntent.lightImpact : null,
+                onTap: hasValue ? _behavior?.onClear : _behavior?.onPaste,
               ),
             ],
           ),
         ),
       ],
     );
+    if (_behavior != null) return card;
+    return Semantics(
+      label: 'Loading recipient form',
+      excludeSemantics: true,
+      child: AppSkeletonizer(enabled: true, child: card),
+    );
   }
+}
+
+final class _SendAddressCardBehavior {
+  const _SendAddressCardBehavior({
+    required this.controller,
+    required this.onChanged,
+    required this.onClear,
+    required this.onPaste,
+  });
+
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+  final VoidCallback onPaste;
 }

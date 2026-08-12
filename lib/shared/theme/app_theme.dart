@@ -17,7 +17,7 @@ class AppTheme {
   static const _icons = AsterIconography();
   static const _strokes = AsterStrokes();
   static const _stateLayers = AsterStateLayers();
-  static const _gradients = AsterGradients.light;
+  static final _gradients = AsterGradients.light;
   static const _art = AsterArt();
 
   static ThemeData light() {

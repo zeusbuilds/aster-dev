@@ -8,27 +8,46 @@ import '../../../wallet/presentation/widgets/widgets.dart';
 
 /// Exact amount, quote, and available-balance surface for Send.
 class SendCard extends StatelessWidget {
-  const SendCard({
+  SendCard({
     super.key,
-    required this.route,
-    required this.amountText,
-    required this.available,
-    required this.fiatText,
+    required PaymentRoute route,
+    required String amountText,
+    required FormattedWalletAmount available,
+    required String fiatText,
     required this.amountLocked,
     this.validationMessage,
-  });
+  }) : _content = _SendCardContent(
+         route: route,
+         amountText: amountText,
+         available: available,
+         fiatText: fiatText,
+       ),
+       _loadingTarget = null;
 
-  final PaymentRoute route;
-  final String amountText;
-  final FormattedWalletAmount available;
-  final String fiatText;
+  /// Inert content skeleton with the same responsive geometry as the card.
+  const SendCard.loading({super.key, required WalletPaymentTarget target})
+    : amountLocked = false,
+      validationMessage = null,
+      _content = null,
+      _loadingTarget = target;
+
   final bool amountLocked;
   final String? validationMessage;
+  final _SendCardContent? _content;
+  final WalletPaymentTarget? _loadingTarget;
 
   @override
   Widget build(BuildContext context) {
-    final target = route.target;
-    return Column(
+    final content = _content;
+    final paymentRoute = content?.route;
+    final target = paymentRoute?.target ?? _loadingTarget!;
+    final displaySymbol =
+        paymentRoute?.asset.symbol ??
+        switch (target.assetKind) {
+          WalletAssetKind.bitcoin => 'BTC',
+          WalletAssetKind.usdt => 'USDT',
+        };
+    final card = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Squircle(
@@ -47,18 +66,20 @@ class SendCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: NumericText(
-                      amountText.isEmpty ? '0' : amountText,
+                      content == null || content.amountText.isEmpty
+                          ? '0'
+                          : content.amountText,
                       style: context.type.amountLarge,
                       maxLines: 1,
                     ),
                   ),
                   SizedBox(width: context.spacing.md),
                   WalletAssetIcon(
-                    kind: route.asset.kind,
+                    kind: target.assetKind,
                     size: context.icons.lg,
                   ),
                   SizedBox(width: context.spacing.sm),
-                  Text(route.asset.symbol, style: context.type.title),
+                  Text(displaySymbol, style: context.type.title),
                 ],
               ),
               SizedBox(height: context.spacing.xs),
@@ -67,7 +88,7 @@ class SendCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: AmountText(
-                      fiatText,
+                      content == null ? 'Loading estimate' : content.fiatText,
                       style: context.type.rowMetaStrong.copyWith(
                         color: context.appColors.textSecondary,
                       ),
@@ -78,7 +99,9 @@ class SendCard extends StatelessWidget {
                   SizedBox(width: context.spacing.md),
                   Expanded(
                     child: AmountText(
-                      'Available: ${available.text}',
+                      content == null
+                          ? 'Available: Loading balance'
+                          : 'Available: ${content.available.text}',
                       style: context.type.rowMetaStrong.copyWith(
                         color: context.appColors.textSecondary,
                       ),
@@ -142,5 +165,25 @@ class SendCard extends StatelessWidget {
         ),
       ],
     );
+    if (content != null) return card;
+    return Semantics(
+      label: 'Loading payment amount',
+      excludeSemantics: true,
+      child: AppSkeletonizer(enabled: true, child: card),
+    );
   }
+}
+
+final class _SendCardContent {
+  const _SendCardContent({
+    required this.route,
+    required this.amountText,
+    required this.available,
+    required this.fiatText,
+  });
+
+  final PaymentRoute route;
+  final String amountText;
+  final FormattedWalletAmount available;
+  final String fiatText;
 }

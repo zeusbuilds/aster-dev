@@ -172,7 +172,7 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
                         : null,
                     onSubmit: () => unawaited(_submit()),
                   ),
-            loading: () => const _AmountLoading(),
+            loading: () => _AmountLoading(target: widget.target),
             error: (error, stackTrace) => _AmountFailure(
               failure: error is AppFailureException
                   ? error.failure
@@ -412,22 +412,20 @@ final class _MissingDestination extends StatelessWidget {
 }
 
 final class _AmountLoading extends StatelessWidget {
-  const _AmountLoading();
+  const _AmountLoading({required this.target});
+
+  final WalletPaymentTarget target;
 
   @override
   Widget build(BuildContext context) {
-    return AppSkeletonizer(
-      enabled: true,
-      child: Column(
-        children: [
-          Squircle(
-            borderRadius: context.radii.card,
-            child: SizedBox(height: context.metrics.selectionIndicatorHeight),
-          ),
-          const Spacer(),
-          const CustomButton(text: 'Send'),
-        ],
-      ),
+    return Column(
+      children: [
+        SendCard.loading(target: target),
+        const Spacer(),
+        const AsterNumericKeypad.loading(),
+        SizedBox(height: context.spacing.md),
+        const CustomButton(text: 'Send'),
+      ],
     );
   }
 }
