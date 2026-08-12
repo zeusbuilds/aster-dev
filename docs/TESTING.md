@@ -1,0 +1,53 @@
+# Testing And Release Evidence
+
+Tests prove contracts; they do not make an unconfigured dependency or missing
+product decision disappear.
+
+## Host Gates
+
+```sh
+make lint
+make test
+```
+
+The lint gate checks formatting, regenerates ignored generated sources, runs
+fatal analysis, generates fresh API docs with link validation, validates barrel
+boundaries, and verifies the file tracker. The test suite covers domain math,
+repository failures, runtime ordering, retry policy, ViewModels, widgets,
+routing, accessibility semantics, layout bounds, reduced motion, and goldens.
+
+Coverage is a diagnostic. New assertions must target behavior and failure
+boundaries; assertion-free tests or tests added only to raise a percentage are
+not accepted.
+
+## Native And Platform Gates
+
+An exact release candidate additionally requires:
+
+- iOS XCTest and storage integration tests
+- Android bridge/storage tests
+- clean iOS Simulator and Android release builds
+- install/launch smokes for the same source commit and architecture
+- configured-wallet create/import, restart, lifecycle, send/receive, and
+  funded/unfunded regtest evidence where deployment services exist
+- VoiceOver and TalkBack traversal on physical devices
+- physical-device haptic, camera, gallery, and secure-screen behavior
+- profile-mode launch/frame/memory/leak measurements
+
+Simulator and host tests cannot qualify physical haptics, camera hardware,
+screen readers, signing, or a funds-bearing native supply chain.
+
+## Test Data
+
+Production code has no fake balances, transactions, success delays, sample
+destinations, or mock wallet behavior. Test-only fakes live under `test/` or
+`integration_test/`, use synthetic non-funds-bearing values, and enter the app
+through provider or app-owned interface overrides.
+
+## Exact-Candidate Rule
+
+Evidence records the full commit, toolchain, command, device/OS/ABI, artifact
+size and digest, result, and constraints. Any source change makes prior runtime
+or performance evidence historical. The current ledger is
+`docs/PRODUCTION_REFACTOR_TRACKER.md`; the closeout procedure is
+`docs/release/RELEASE_CHECKLIST.md`.

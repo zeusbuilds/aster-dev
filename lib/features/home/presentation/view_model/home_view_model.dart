@@ -2,7 +2,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/core.dart';
 import '../../../wallet/domain/models/models.dart';
-import '../../../wallet/presentation/view_model/viewmodels.dart';
+import '../../../wallet/presentation/view_model/view_models.dart';
 import '../models/models.dart';
 
 part 'home_view_model.g.dart';

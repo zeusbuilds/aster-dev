@@ -25,7 +25,7 @@ class AppLoader extends StatefulWidget {
   final Future<ProviderContainer> Function() initialize;
 
   /// The root widget of the application to display once initialization
-  /// completes (typically `const Aster()`).
+  /// completes (typically `const UtexoApp()`).
   final Widget child;
 
   @override

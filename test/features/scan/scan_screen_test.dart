@@ -6,7 +6,7 @@ import 'package:aster/features/scan/data/services/services.dart';
 import 'package:aster/features/scan/domain/models/models.dart';
 import 'package:aster/features/scan/presentation/models/models.dart';
 import 'package:aster/features/scan/presentation/screens/screens.dart';
-import 'package:aster/features/scan/presentation/view_model/view_model.dart';
+import 'package:aster/features/scan/presentation/view_model/view_models.dart';
 import 'package:aster/features/scan/presentation/widgets/scan_control_button.dart';
 import 'package:aster/features/scan/presentation/widgets/widgets.dart';
 import 'package:aster/features/send/presentation/view_model/view_models.dart';

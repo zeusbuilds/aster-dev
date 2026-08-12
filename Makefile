@@ -1,4 +1,4 @@
-.PHONY: shell bootstrap clean build watch run test format format-check analyze verify verify-generated lint fvm-setup help
+.PHONY: shell bootstrap clean build watch run test format format-check analyze docs verify verify-barrels verify-generated lint fvm-setup help
 
 # Default target
 help:
@@ -14,9 +14,11 @@ help:
 	@echo "  make format    - Format Dart code"
 	@echo "  make format-check - Verify Dart formatting without changing files"
 	@echo "  make analyze   - Run static analysis"
-	@echo "  make verify    - Verify generated code and tracker inventory"
+	@echo "  make docs      - Generate and validate Dart API documentation"
+	@echo "  make verify    - Verify repository policy and tracker inventory"
+	@echo "  make verify-barrels - Verify barrel-export boundaries"
 	@echo "  make verify-generated - Regenerate ignored generated sources"
-	@echo "  make lint      - Run all non-mutating quality checks"
+	@echo "  make lint      - Run all repository quality checks"
 
 # Enter Nix development environment
 shell:
@@ -71,10 +73,21 @@ analyze:
 	@echo "Running static analysis..."
 	fvm flutter analyze --fatal-warnings --fatal-infos
 
+# Generate docs into a disposable directory and fail on warnings or bad links.
+docs:
+	@echo "Validating Dart API documentation..."
+	fvm dart run tool/verify_dartdoc.dart
+
 # Verify repository invariants that are not covered by the analyzer.
 verify:
+	@echo "Verifying barrel-export boundaries..."
+	fvm dart run tool/verify_barrel_exports.dart
 	@echo "Verifying production tracker inventory..."
 	fvm dart run tool/verify_production_tracker.dart
+
+verify-barrels:
+	@echo "Verifying barrel-export boundaries..."
+	fvm dart run tool/verify_barrel_exports.dart
 
 # Generated Dart sources are intentionally ignored and recreated from source.
 verify-generated:
@@ -82,7 +95,7 @@ verify-generated:
 	fvm dart run build_runner build
 
 # Quality checks suitable for pre-commit and CI.
-lint: format-check verify-generated analyze verify
+lint: format-check verify-generated analyze docs verify
 
 # One-time FVM setup for this project
 fvm-setup:

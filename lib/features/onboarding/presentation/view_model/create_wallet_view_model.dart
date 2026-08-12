@@ -5,7 +5,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../../core/core.dart';
 import '../../../../shared/feedback/feedback.dart';
 import '../../../wallet/domain/models/models.dart';
-import '../../../wallet/presentation/view_model/wallet_viewmodel.dart';
+import '../../../wallet/presentation/view_model/wallet_view_model.dart';
 import '../models/models.dart';
 
 part 'create_wallet_view_model.g.dart';

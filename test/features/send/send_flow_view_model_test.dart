@@ -4,7 +4,7 @@ import 'package:aster/core/core.dart';
 import 'package:aster/features/send/presentation/models/models.dart';
 import 'package:aster/features/send/presentation/view_model/view_models.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
-import 'package:aster/features/wallet/presentation/view_model/viewmodels.dart';
+import 'package:aster/features/wallet/presentation/view_model/view_models.dart';
 import 'package:aster/shared/feedback/feedback.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rgb_sdk_flutter/rgb_sdk_flutter.dart';

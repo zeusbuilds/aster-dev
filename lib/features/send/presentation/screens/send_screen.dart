@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../shared/shared.dart';
-import '../../../wallet/presentation/view_model/viewmodels.dart';
+import '../../../wallet/presentation/view_model/view_models.dart';
 import '../../../wallet/presentation/widgets/widgets.dart';
 import '../view_model/view_models.dart';
 

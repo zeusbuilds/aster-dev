@@ -106,7 +106,6 @@ bool _isGenerated(String path) {
   return path.endsWith('.g.dart') ||
       path.endsWith('.freezed.dart') ||
       path.endsWith('.mocks.dart') ||
-      path.endsWith('.config.dart') ||
       path == 'pubspec.lock' ||
       path == 'ios/Podfile.lock' ||
       path == 'lib/objectbox-model.json' ||

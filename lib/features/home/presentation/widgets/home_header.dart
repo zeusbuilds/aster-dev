@@ -8,7 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
 
 import '../../../../shared/shared.dart';
-import '../../../wallet/presentation/view_model/viewmodels.dart';
+import '../../../wallet/presentation/view_model/view_models.dart';
 
 /// Active wallet identity and wallet-selection command.
 class HomeHeader extends ConsumerWidget {

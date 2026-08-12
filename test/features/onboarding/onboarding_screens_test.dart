@@ -3,7 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:aster/features/onboarding/presentation/screens/screens.dart';
 import 'package:aster/features/onboarding/presentation/view_model/view_models.dart';
-import 'package:aster/features/wallet/presentation/view_model/wallet_viewmodel.dart';
+import 'package:aster/features/wallet/presentation/view_model/wallet_view_model.dart';
 import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

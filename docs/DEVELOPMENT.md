@@ -94,17 +94,20 @@ From the project root:
 ./scripts/install-git-hooks.sh
 ```
 
-After this, each `git commit` regenerates ignored generated sources, verifies
-formatting without mutating files, runs analysis with every diagnostic fatal,
-and verifies the production tracker inventory.
+After this, each `git commit` verifies formatting, regenerates ignored
+generated sources, runs analysis with every diagnostic fatal, validates fresh
+Dart API documentation and barrel boundaries, and verifies the production
+tracker inventory.
 
 ### Manual commands
 
 - `make format` - Format Dart code
 - `make format-check` - Verify formatting without changing files
 - `make analyze` - Run static analysis with warnings and infos fatal
+- `make docs` - Generate fresh API docs and fail on warnings or broken links
 - `make verify-generated` - Regenerate ignored generated Dart sources
-- `make verify` - Verify repository invariants and tracker inventory
+- `make verify` - Verify barrel policy and tracker inventory
+- `make verify-barrels` - Verify barrel boundaries directly
 - `make lint` - Run all non-mutating pre-commit quality gates
 
 ### CI (GitHub Actions)
@@ -115,6 +118,8 @@ On push to `main` and on pull requests, the **Dart** workflow runs:
 - `dart run build_runner build`
 - `flutter analyze --fatal-warnings --fatal-infos`
 - `flutter test`
+- `dart run tool/verify_dartdoc.dart`
+- `dart run tool/verify_barrel_exports.dart`
 - `dart run tool/verify_production_tracker.dart`
 
 Fix failures locally with `make format`, `make lint`, and `make test`, then
@@ -133,8 +138,10 @@ commit and push again.
 - `make format`     - Format Dart code
 - `make format-check` - Verify formatting without changing files
 - `make analyze`    - Run static analysis with all diagnostics fatal
+- `make docs`       - Generate and validate fresh Dart API docs
 - `make verify-generated` - Regenerate ignored generated Dart sources
 - `make verify`     - Verify repository invariants
+- `make verify-barrels` - Verify barrel boundaries
 - `make lint`       - Run all pre-commit quality gates
 - `make help`       - Show all available commands
 
@@ -162,6 +169,10 @@ This project uses [Nix Flakes](https://nixos.wiki/wiki/Flakes) to provide a repr
 - Android SDK with build tools
 - Java JDK 21
 - CocoaPods (macOS only)
+
+The Nix shell provides native build prerequisites; FVM remains the source of
+truth for Flutter and Dart. Do not use a separately installed Dart SDK for app
+generation, analysis, tests, or documentation.
 
 Flutter itself is managed via [FVM](https://fvm.app/) and pinned per project
 using `.fvmrc` (`flutterSdkVersion: 3.44.9`). This keeps the Flutter version

@@ -17,7 +17,7 @@ void main() async {
   // Run ASAP so we can show the startup animation while bootstrapping.
   runApp(
     AppLoader(
-      child: const Aster(),
+      child: const UtexoApp(),
       initialize: () async {
         final sharedPreferences = await SharedPreferences.getInstance();
         return bootstrapApplication(sharedPreferences);
@@ -26,19 +26,16 @@ void main() async {
   );
 }
 
-/// Main application widget
-///
-/// Sets up MaterialApp with routing, theming, and Riverpod provider scope.
-///
-/// This is the root widget of the application.
-class Aster extends ConsumerStatefulWidget {
-  const Aster({super.key});
+/// Root UTEXO application and authoritative app-lifecycle observer.
+class UtexoApp extends ConsumerStatefulWidget {
+  const UtexoApp({super.key});
 
   @override
-  ConsumerState<Aster> createState() => _AsterState();
+  ConsumerState<UtexoApp> createState() => _UtexoAppState();
 }
 
-class _AsterState extends ConsumerState<Aster> with WidgetsBindingObserver {
+class _UtexoAppState extends ConsumerState<UtexoApp>
+    with WidgetsBindingObserver {
   AppLifecycleState? _lifecycleState;
   Future<void> _lifecycleTail = Future<void>.value();
 

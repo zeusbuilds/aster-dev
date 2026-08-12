@@ -1,6 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../../wallet/presentation/view_model/viewmodels.dart';
+import '../../../wallet/presentation/view_model/view_models.dart';
 import '../models/models.dart';
 
 part 'scan_wallet_identity_provider.g.dart';

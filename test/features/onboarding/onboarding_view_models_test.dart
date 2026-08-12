@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:aster/core/core.dart';
 import 'package:aster/features/onboarding/domain/models/models.dart';
 import 'package:aster/features/onboarding/presentation/view_model/view_models.dart';
-import 'package:aster/features/wallet/presentation/view_model/wallet_viewmodel.dart';
+import 'package:aster/features/wallet/presentation/view_model/wallet_view_model.dart';
 import 'package:aster/shared/feedback/feedback.dart';
 import 'package:flutter_test/flutter_test.dart';
 

@@ -1,5 +1,6 @@
-# Format and analyze on push/PR. Fails if code is unformatted or has analyzer issues.
-name: Dart
+# Host-side quality gates. Platform packages and runtime evidence remain explicit
+# release-candidate gates because iOS cannot be qualified from this Linux job.
+name: Quality
 
 on:
   push:
@@ -7,14 +8,22 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   format-and-analyze:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: "3.44.9"
           cache: true
@@ -33,6 +42,12 @@ jobs:
 
       - name: Test
         run: flutter test
+
+      - name: Validate Dart API documentation
+        run: dart run tool/verify_dartdoc.dart
+
+      - name: Verify barrel boundaries
+        run: dart run tool/verify_barrel_exports.dart
 
       - name: Verify tracker inventory
         run: dart run tool/verify_production_tracker.dart

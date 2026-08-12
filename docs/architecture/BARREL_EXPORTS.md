@@ -1,64 +1,47 @@
 # Barrel Export Policy
 
-Barrel files are boundary files. They make imports cleaner across folders, but
-they should not hide dependencies inside the same folder.
+Barrels define import boundaries; they are not convenience files for every
+directory traversal. The executable policy is
+`dart run tool/verify_barrel_exports.dart`.
 
 ## Rules
 
-Use a barrel when importing across a folder boundary:
+1. A barrel is any repository Dart file with an `export` directive.
+2. Its filename matches its directory: `models/models.dart`,
+   `widgets/widgets.dart`, `repository/repository.dart`, and so on.
+   The `view_model` directory uses `view_models.dart`.
+3. Exports are relative, unique, and sorted by URI.
+4. Generated files, private files, missing files, and package/Dart SDK URIs are
+   never exported.
+5. A source file does not import its own directory barrel. Import the sibling
+   source directly to keep dependencies visible and avoid cycles.
+6. Higher-level aggregate barrels may export lower-level boundary barrels, but
+   the complete export graph must remain acyclic.
+7. Barrels expose intended public contracts only. Native DTOs, persistence
+   documents, generated providers, and private implementation helpers stay
+   behind their owning adapter or repository.
+
+## Usage
+
+Across a feature or layer boundary, import the narrowest useful barrel:
 
 ```dart
-import '../widgets/widgets.dart';
-import '../../../../shared/shared.dart';
+import '../../domain/models/models.dart';
+import '../view_model/view_models.dart';
 ```
 
-Do not import a barrel from a file in the same folder:
+Within the same directory, import the concrete sibling:
 
 ```dart
-// Avoid inside presentation/widgets
-import 'widgets.dart';
-
-// Prefer
-import 'asset_row.dart';
+import 'wallet_amount.dart';
 ```
 
-Do not import an aggregate barrel from inside the package it aggregates. For
-example, files in `lib/shared/widgets` should not import `../shared.dart`;
-they should import the specific shared layer they need:
+Do not create an app-wide feature barrel. `core/core.dart` and
+`shared/shared.dart` are deliberate infrastructure/presentation boundaries;
+feature dependencies remain explicit.
 
-```dart
-import '../theme/theme.dart';
+Run the policy locally with:
+
+```sh
+make verify-barrels
 ```
-
-Generated files are not exported from barrels. Source files own their generated
-parts with `part` directives.
-
-## Folder Pattern
-
-- `shared.dart` exports stable shared APIs only: routing, screens, theme,
-  models, and widgets.
-- `core.dart` exports stable app infrastructure only: constants, errors,
-  network, storage, utils, and DI.
-- `widgets.dart` exports public widgets in that folder.
-- `screens.dart` exports route-facing screens in that folder.
-- `pages.dart` exports route-facing pages when the feature uses `pages/`
-  instead of `screens/`.
-- `models.dart`, `repository.dart`, `providers.dart`, and `viewmodels.dart`
-  export public files for that layer.
-- `tokens.dart` exports design-token extensions.
-
-Barrels should be small, sorted by local dependency order, and limited to files
-that are meant to be used by another folder. If a file is purely private to one
-implementation, keep it out of the barrel.
-
-## Import Direction
-
-Feature screens may import their feature widget barrel. Feature widgets should
-import sibling widgets directly when they compose each other.
-
-Shared widgets may import `../theme/theme.dart` and direct sibling shared
-widgets. They should not import `../shared.dart`, because that creates a broad
-dependency on routing, models, screens, theme, and widgets.
-
-Router configuration may import feature `screens.dart` or `pages.dart` barrels.
-It should not import widget barrels.

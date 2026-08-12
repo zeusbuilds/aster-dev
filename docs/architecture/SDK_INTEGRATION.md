@@ -24,8 +24,8 @@ Both iOS and Android builds are required before accepting a new SDK commit.
 
 ## Optional Local Override
 
-When developing the SDK and app together, add this temporary block to the local
-`pubspec.yaml`:
+When developing the SDK and app together, create an ignored
+`pubspec_overrides.yaml` in the repository root:
 
 ```yaml
 dependency_overrides:
@@ -33,10 +33,10 @@ dependency_overrides:
     path: ../rgb-sdk-flutter
 ```
 
-Run `fvm flutter pub get` after adding or removing the override. Before any
-commit, remove the block, resolve dependencies again, and confirm that
-`pubspec.lock` contains the immutable Git `resolved-ref` above. The local
-override is never committed and is not supported for release evidence.
+Run `fvm flutter pub get` after adding or removing the file. Before release
+evidence, remove it, resolve dependencies again, and confirm that
+`pubspec.lock` contains the immutable Git `resolved-ref` above. The override is
+ignored by Git and is never supported for candidate evidence.
 
 ## Ownership Boundary
 

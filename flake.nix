@@ -1,5 +1,5 @@
 {
-  description = "Aster - Bitcoin & Layer 2 Wallet Development Environment";
+  description = "UTEXO Bitcoin, RGB, and Lightning wallet development shell";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/ffcdcf99d65c61956d882df249a9be53e5902ea5";
@@ -19,9 +19,9 @@
 
         androidComposition = pkgs.androidenv.composeAndroidPackages {
           cmdLineToolsVersion = "11.0";
-          platformToolsVersion = "34.0.5";
-          buildToolsVersions = [ "34.0.0" ];
-          platformVersions = [ "34" "33" "32" ];
+          platformToolsVersion = "36.0.0";
+          buildToolsVersions = [ "36.0.0" ];
+          platformVersions = [ "36" ];
           includeEmulator = false;
           includeSystemImages = false;
           includeSources = false;
@@ -32,7 +32,6 @@
         cocoapods = pkgs.cocoapods;
 
         commonBuildInputs = with pkgs; [
-          dart
           jdk
           androidSdk
           git
@@ -53,7 +52,7 @@
           export JAVA_HOME="${jdk}"
           export PATH="$JAVA_HOME/bin:$PATH"
           export PATH="$ANDROID_HOME/platform-tools:$PATH"
-          export PATH="$ANDROID_HOME/build-tools/34.0.0:$PATH"
+          export PATH="$ANDROID_HOME/build-tools/36.0.0:$PATH"
           export PATH="$ANDROID_HOME/tools:$PATH"
           export PATH="$ANDROID_HOME/tools/bin:$PATH"
           export PATH="$(pwd)/.fvm/flutter_sdk/bin:$PATH"
@@ -62,8 +61,13 @@
             export PATH="${cocoapods}/bin:$PATH"
           ''}
           
-          echo "✓ Dart version: $(dart --version)"
-          echo "✓ Java version: $(java -version 2>&1 | head -n 1)"
+          if [ -x "$(pwd)/.fvm/flutter_sdk/bin/flutter" ]; then
+            echo "Flutter: $(flutter --version | head -n 1)"
+            echo "Dart: $(dart --version 2>&1)"
+          else
+            echo "Flutter: not installed locally; run 'make fvm-setup'."
+          fi
+          echo "Java: $(java -version 2>&1 | head -n 1)"
           echo ""
           echo "Run 'flutter doctor' to check your setup (after FVM setup)."
           echo "Run 'make bootstrap' for initial project setup."

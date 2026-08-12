@@ -1,7 +1,7 @@
 import 'package:aster/core/bootstrap/app_bootstrap.dart';
 import 'package:aster/core/core.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
-import 'package:aster/features/wallet/presentation/view_model/wallet_viewmodel.dart';
+import 'package:aster/features/wallet/presentation/view_model/wallet_view_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 

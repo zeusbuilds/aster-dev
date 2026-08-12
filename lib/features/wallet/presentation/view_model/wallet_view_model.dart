@@ -4,7 +4,7 @@ import '../../../../core/core.dart';
 import '../../domain/models/models.dart';
 import '../models/models.dart';
 
-part 'wallet_viewmodel.g.dart';
+part 'wallet_view_model.g.dart';
 
 /// Loads wallet metadata and coordinates transactional wallet switching.
 @Riverpod(keepAlive: true)

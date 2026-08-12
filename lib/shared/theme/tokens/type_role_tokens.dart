@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'color_tokens.dart';
 import 'effects_tokens.dart';
 
-/// Semantic text roles used by Aster feature UI.
+/// Semantic text roles used by feature UI.
 ///
 /// Material `TextTheme` remains the size/role foundation. This extension adds
 /// product-level emphasis and color decisions so screens do not re-decide

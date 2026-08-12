@@ -8,7 +8,7 @@ import 'package:aster/features/settings/domain/models/models.dart';
 import 'package:aster/features/settings/presentation/screens/screens.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:aster/features/wallet/presentation/models/models.dart';
-import 'package:aster/features/wallet/presentation/view_model/viewmodels.dart';
+import 'package:aster/features/wallet/presentation/view_model/view_models.dart';
 import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

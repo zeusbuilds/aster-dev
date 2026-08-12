@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../features/wallet/presentation/view_model/wallet_viewmodel.dart';
+import '../../features/wallet/presentation/view_model/wallet_view_model.dart';
 import '../theme/theme.dart';
 import '../widgets/custom_button.dart';
 import 'route_config.dart';

@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
 import '../models/models.dart';
-import '../view_model/wallet_viewmodel.dart';
+import '../view_model/wallet_view_model.dart';
 
 /// Route-level wallet access gate shown only while session state is unresolved.
 class WalletAccessScreen extends ConsumerWidget {

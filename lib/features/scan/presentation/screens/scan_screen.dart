@@ -11,7 +11,7 @@ import '../../../../shared/shared.dart';
 import '../../../send/presentation/view_model/view_models.dart';
 import '../../../skeleton/presentation/providers/skeleton_index_provider.dart';
 import '../../domain/models/models.dart';
-import '../view_model/view_model.dart';
+import '../view_model/view_models.dart';
 import '../widgets/widgets.dart';
 
 /// Full-screen payment QR scanner with an explicit completion contract.

@@ -9,7 +9,7 @@ import 'package:ming_cute_icons/ming_cute_icons.dart';
 
 import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
-import '../../../wallet/presentation/view_model/viewmodels.dart';
+import '../../../wallet/presentation/view_model/view_models.dart';
 import '../../domain/models/models.dart';
 import '../view_model/view_models.dart';
 import '../widgets/widgets.dart';

@@ -33,12 +33,12 @@ migrate_working_dir/
 /build/
 /coverage/
 /android/build/
+/pubspec_overrides.yaml
 
 # Generated files
 *.g.dart
 *.freezed.dart
 *.mocks.dart
-*.config.dart
 
 # Symbolication related
 app.*.symbols

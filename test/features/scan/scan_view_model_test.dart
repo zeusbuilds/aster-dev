@@ -4,7 +4,7 @@ import 'package:aster/core/core.dart';
 import 'package:aster/features/scan/data/services/services.dart';
 import 'package:aster/features/scan/domain/models/models.dart';
 import 'package:aster/features/scan/presentation/models/models.dart';
-import 'package:aster/features/scan/presentation/view_model/view_model.dart';
+import 'package:aster/features/scan/presentation/view_model/view_models.dart';
 import 'package:aster/shared/feedback/feedback.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

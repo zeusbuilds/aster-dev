@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../features/wallet/data/repository/repository.dart';
-import '../../features/wallet/presentation/view_model/wallet_viewmodel.dart';
+import '../../features/wallet/presentation/view_model/wallet_view_model.dart';
 import '../di/providers.dart';
 import '../errors/errors.dart';
 
