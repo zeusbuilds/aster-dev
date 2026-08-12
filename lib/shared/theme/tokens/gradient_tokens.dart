@@ -58,6 +58,7 @@ class AsterGradients extends ThemeExtension<AsterGradients> {
     required this.marketSend,
     required this.marketReceive,
     required this.splashBackdrop,
+    required this.scanOverlay,
   });
 
   final AsterGradientSpec marketBuy;
@@ -67,6 +68,7 @@ class AsterGradients extends ThemeExtension<AsterGradients> {
   final AsterGradientSpec marketSend;
   final AsterGradientSpec marketReceive;
   final AsterGradientSpec splashBackdrop;
+  final AsterGradientSpec scanOverlay;
 
   static const light = AsterGradients(
     marketBuy: AsterGradientSpec(
@@ -93,6 +95,12 @@ class AsterGradients extends ThemeExtension<AsterGradients> {
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
     ),
+    scanOverlay: AsterGradientSpec(
+      colors: [Color(0xFF000000), Color(0xBF000000), Color(0xA6000000)],
+      stops: [0.25, 0.5, 1],
+      begin: Alignment.bottomCenter,
+      end: Alignment.topCenter,
+    ),
   );
 
   @override
@@ -104,6 +112,7 @@ class AsterGradients extends ThemeExtension<AsterGradients> {
     AsterGradientSpec? marketSend,
     AsterGradientSpec? marketReceive,
     AsterGradientSpec? splashBackdrop,
+    AsterGradientSpec? scanOverlay,
   }) {
     return AsterGradients(
       marketBuy: marketBuy ?? this.marketBuy,
@@ -113,6 +122,7 @@ class AsterGradients extends ThemeExtension<AsterGradients> {
       marketSend: marketSend ?? this.marketSend,
       marketReceive: marketReceive ?? this.marketReceive,
       splashBackdrop: splashBackdrop ?? this.splashBackdrop,
+      scanOverlay: scanOverlay ?? this.scanOverlay,
     );
   }
 
@@ -127,6 +137,7 @@ class AsterGradients extends ThemeExtension<AsterGradients> {
       marketSend: marketSend.lerp(other.marketSend, t),
       marketReceive: marketReceive.lerp(other.marketReceive, t),
       splashBackdrop: splashBackdrop.lerp(other.splashBackdrop, t),
+      scanOverlay: scanOverlay.lerp(other.scanOverlay, t),
     );
   }
 }

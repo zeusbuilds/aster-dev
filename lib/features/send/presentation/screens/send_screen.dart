@@ -7,13 +7,33 @@ import 'package:go_router/go_router.dart';
 import '../../../../shared/shared.dart';
 import '../../../wallet/presentation/view_model/viewmodels.dart';
 import '../../../wallet/presentation/widgets/widgets.dart';
+import '../view_model/view_models.dart';
 
 /// First Send step: choose an asset and payment rail.
-class SendScreen extends ConsumerWidget {
+class SendScreen extends ConsumerStatefulWidget {
   const SendScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SendScreen> createState() => _SendScreenState();
+}
+
+class _SendScreenState extends ConsumerState<SendScreen> {
+  late final SendDestinationHandoff _destinationHandoff;
+
+  @override
+  void initState() {
+    super.initState();
+    _destinationHandoff = ref.read(sendDestinationHandoffProvider.notifier);
+  }
+
+  @override
+  void dispose() {
+    _destinationHandoff.clear();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.colorScheme.surface,
       appBar: CustomAppBar(

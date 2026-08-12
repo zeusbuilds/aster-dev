@@ -1,60 +1,76 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../../../../shared/shared.dart';
 
-/// Individual control button for scan frame
+/// Accessible circular command used within the Scan frame control pill.
 class ScanControlButton extends StatelessWidget {
-  final Widget child;
-  final VoidCallback? onTap;
-  final String semanticLabel;
-  final HapticIntent hapticIntent;
-
   const ScanControlButton({
     super.key,
     required this.child,
     required this.semanticLabel,
     this.onTap,
-    this.hapticIntent = HapticIntent.lightImpact,
+    this.selected,
+    this.value,
+    this.loading = false,
   });
+
+  final Widget child;
+  final VoidCallback? onTap;
+  final String semanticLabel;
+  final bool? selected;
+  final String? value;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final icons = context.icons;
     final metrics = context.metrics;
+    final stateLayers = context.stateLayers;
 
-    void activate() {
-      unawaited(context.haptics.trigger(hapticIntent));
-      onTap?.call();
-    }
+    void activate() => onTap?.call();
+
+    final enabled = onTap != null && !loading;
 
     return Semantics(
       button: true,
-      enabled: onTap != null,
+      enabled: enabled,
+      selected: selected,
       label: semanticLabel,
+      value: value,
+      onTap: enabled ? activate : null,
       excludeSemantics: true,
       child: Material(
         color: colors.transparentSurface,
         child: InkResponse(
-          onTap: onTap == null ? null : activate,
+          onTap: enabled ? activate : null,
           containedInkWell: true,
           highlightShape: BoxShape.circle,
           radius: metrics.minTouchTarget / 2,
-          child: SizedBox(
-            width: metrics.minTouchTarget,
-            height: metrics.minTouchTarget,
-            child: Center(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: colors.scanControlSurface,
-                ),
-                child: SizedBox(
-                  width: icons.md,
-                  height: icons.md,
-                  child: Center(child: child),
+          child: Opacity(
+            opacity: enabled || loading ? 1 : stateLayers.disabled,
+            child: SizedBox(
+              width: metrics.minTouchTarget,
+              height: metrics.minTouchTarget,
+              child: Center(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: colors.scanControlSurface,
+                  ),
+                  child: SizedBox(
+                    width: icons.md,
+                    height: icons.md,
+                    child: Center(
+                      child: loading
+                          ? GridLoader(
+                              size: GridLoaderSize.small,
+                              colorStyle: GridLoaderColorStyle.custom,
+                              color: colors.onScan,
+                            )
+                          : child,
+                    ),
+                  ),
                 ),
               ),
             ),

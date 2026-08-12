@@ -7,6 +7,7 @@ import 'package:ming_cute_icons/ming_cute_icons.dart';
 
 import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
+import '../../../scan/domain/models/models.dart';
 import '../../../wallet/domain/models/models.dart';
 import '../../../wallet/presentation/models/models.dart';
 import '../models/models.dart';
@@ -33,7 +34,10 @@ class _SendAddressScreenState extends ConsumerState<SendAddressScreen> {
   }
 
   Future<void> _openScan() async {
-    final result = await context.push<String?>(RoutePaths.scan);
+    final result = await context.push<String?>(
+      RoutePaths.scan,
+      extra: ScanPurpose.destinationPicker,
+    );
     if (!mounted || result == null) return;
     ref
         .read(sendFlowViewModelProvider(widget.target).notifier)

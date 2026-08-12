@@ -4,6 +4,7 @@ import '../../features/home/presentation/screens/screens.dart';
 import '../../features/market/presentation/screens/screens.dart';
 import '../../features/onboarding/presentation/screens/screens.dart';
 import '../../features/receive/presentation/screens/screens.dart';
+import '../../features/scan/domain/models/models.dart';
 import '../../features/scan/presentation/screens/screens.dart';
 import '../../features/send/presentation/screens/screens.dart';
 import '../../features/settings/presentation/screens/screens.dart';
@@ -115,7 +116,11 @@ class RouteConfig {
       GoRoute(
         path: RoutePaths.scan,
         name: RouteNames.scan,
-        builder: (context, state) => const ScanScreen(),
+        builder: (context, state) => ScanScreen(
+          purpose: state.extra == ScanPurpose.destinationPicker
+              ? ScanPurpose.destinationPicker
+              : ScanPurpose.sendLauncher,
+        ),
       ),
       GoRoute(
         path: RoutePaths.settings,

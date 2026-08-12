@@ -8,6 +8,7 @@ import '../../../settings/domain/models/models.dart';
 import '../../../wallet/data/repository/repository.dart';
 import '../../../wallet/domain/models/models.dart';
 import '../models/models.dart';
+import 'send_destination_handoff.dart';
 
 part 'send_flow_view_model.g.dart';
 
@@ -327,12 +328,15 @@ class SendFlowViewModel extends _$SendFlowViewModel {
           feeFailure = failure;
       }
     }
+    final stagedDestination = ref
+        .read(sendDestinationHandoffProvider.notifier)
+        .take();
     return SendFlowState(
       route: route,
       bitcoinUnit: bitcoinUnit,
       currencyCode: settingsSnapshot.preferences.currencyCode,
       balance: balance,
-      destination: '',
+      destination: stagedDestination ?? '',
       amountText: '',
       amountInput: _amountCodec.parse(
         text: '',

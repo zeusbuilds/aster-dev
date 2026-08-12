@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../home/presentation/screens/home_screen.dart';
 import '../../../market/presentation/screens/market_screen.dart';
+import '../../../scan/domain/models/models.dart';
 import '../../../scan/presentation/screens/scan_screen.dart';
 import '../../../settings/presentation/screens/settings_screen.dart';
 import '../providers/skeleton_index_provider.dart';
@@ -19,7 +20,7 @@ class SkeletonScreen extends ConsumerWidget {
 
     final screens = <Widget>[
       const HomeScreen(),
-      const ScanScreen(),
+      const ScanScreen(purpose: ScanPurpose.sendLauncher),
       const MarketScreen(),
       const SettingsScreen(),
     ];

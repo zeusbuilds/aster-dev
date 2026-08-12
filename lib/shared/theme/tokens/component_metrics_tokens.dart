@@ -11,6 +11,8 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
     this.floatingNavClearance = 64,
     this.homeHeroHeightFactor = 0.4,
     this.scanFrameSizeFactor = 0.7,
+    this.scanFrameMaximumSize = 320,
+    this.scanHeaderExtent = 172,
     this.recoveryWordGridAspectRatio = 4.5,
     this.marketTextureSize = 128,
     this.marketBadgeDotSize = 20,
@@ -48,6 +50,8 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
   final double floatingNavClearance;
   final double homeHeroHeightFactor;
   final double scanFrameSizeFactor;
+  final double scanFrameMaximumSize;
+  final double scanHeaderExtent;
   final double recoveryWordGridAspectRatio;
   final double marketTextureSize;
   final double marketBadgeDotSize;
@@ -86,6 +90,8 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
     double? floatingNavClearance,
     double? homeHeroHeightFactor,
     double? scanFrameSizeFactor,
+    double? scanFrameMaximumSize,
+    double? scanHeaderExtent,
     double? recoveryWordGridAspectRatio,
     double? marketTextureSize,
     double? marketBadgeDotSize,
@@ -123,6 +129,8 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
       floatingNavClearance: floatingNavClearance ?? this.floatingNavClearance,
       homeHeroHeightFactor: homeHeroHeightFactor ?? this.homeHeroHeightFactor,
       scanFrameSizeFactor: scanFrameSizeFactor ?? this.scanFrameSizeFactor,
+      scanFrameMaximumSize: scanFrameMaximumSize ?? this.scanFrameMaximumSize,
+      scanHeaderExtent: scanHeaderExtent ?? this.scanHeaderExtent,
       recoveryWordGridAspectRatio:
           recoveryWordGridAspectRatio ?? this.recoveryWordGridAspectRatio,
       marketTextureSize: marketTextureSize ?? this.marketTextureSize,
@@ -196,6 +204,12 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
         other.scanFrameSizeFactor,
         t,
       ),
+      scanFrameMaximumSize: _lerp(
+        scanFrameMaximumSize,
+        other.scanFrameMaximumSize,
+        t,
+      ),
+      scanHeaderExtent: _lerp(scanHeaderExtent, other.scanHeaderExtent, t),
       recoveryWordGridAspectRatio: _lerp(
         recoveryWordGridAspectRatio,
         other.recoveryWordGridAspectRatio,

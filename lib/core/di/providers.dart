@@ -7,6 +7,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../features/onboarding/data/repository/repository.dart';
+import '../../features/scan/data/services/services.dart';
+import '../../features/scan/domain/models/models.dart';
 import '../../features/settings/data/repository/repository.dart';
 import '../../features/wallet/data/repository/repository.dart';
 import '../../features/wallet/data/runtime/runtime.dart';
@@ -75,6 +77,20 @@ ShareService shareService(Ref ref) {
 @riverpod
 ExternalUriService externalUriService(Ref ref) {
   return PlatformExternalUriService();
+}
+
+/// Injectable factory for native camera/gallery scan sessions.
+@Riverpod(keepAlive: true)
+ScanSessionFactory scanSessionFactory(Ref ref) {
+  return MobileScanSessionFactory();
+}
+
+/// One isolated native scan session for each presentation purpose.
+@riverpod
+ScanSession scanSession(Ref ref, ScanPurpose purpose) {
+  final session = ref.watch(scanSessionFactoryProvider).create();
+  ref.onDispose(() => unawaited(session.close()));
+  return session;
 }
 
 @Riverpod(keepAlive: true)

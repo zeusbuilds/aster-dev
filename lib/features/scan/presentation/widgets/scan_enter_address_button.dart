@@ -1,59 +1,64 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import 'package:remixicon/remixicon.dart';
 
 import '../../../../shared/shared.dart';
 
-/// Button to enter address manually
+/// Keyboard- and semantics-operable manual-entry command below Scan.
 class ScanEnterAddressButton extends StatelessWidget {
-  final VoidCallback onTap;
+  const ScanEnterAddressButton({
+    super.key,
+    required this.onTap,
+    this.label = 'Enter payment details to send',
+  });
 
-  const ScanEnterAddressButton({super.key, required this.onTap});
+  final VoidCallback? onTap;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
     final colors = context.appColors;
-    final effects = context.effects;
     final icons = context.icons;
+    final stateLayers = context.stateLayers;
+    final enabled = onTap != null;
 
-    void activate() {
-      unawaited(context.haptics.trigger(HapticIntent.lightImpact));
-      onTap();
-    }
+    void activate() => onTap?.call();
 
     return Semantics(
       button: true,
-      label: 'Enter address to send',
+      enabled: enabled,
+      label: label,
+      onTap: enabled ? activate : null,
       excludeSemantics: true,
       child: Material(
         color: colors.transparentSurface,
         child: InkWell(
-          onTap: activate,
-          child: Padding(
-            padding: EdgeInsets.symmetric(vertical: spacing.md),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'Enter address to send',
-                  style: context.type.scanCta.copyWith(
-                    color: colors.onScan.withValues(
-                      alpha: effects.brandContentMutedOpacity,
+          onTap: enabled ? activate : null,
+          child: Opacity(
+            opacity: enabled ? 1 : stateLayers.disabled,
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: spacing.md),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Flexible(
+                    child: Text(
+                      label,
+                      style: context.type.scanCta,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
                     ),
                   ),
-                ),
-                SizedBox(width: spacing.xxs),
-                Icon(
-                  RemixIcons.arrow_right_s_line,
-                  color: colors.onScan.withValues(
-                    alpha: effects.brandContentMutedOpacity,
+                  SizedBox(width: spacing.xxs),
+                  Icon(
+                    RemixIcons.arrow_right_s_line,
+                    color: context.type.scanCta.color,
+                    size: icons.sm,
                   ),
-                  size: icons.sm,
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

@@ -117,6 +117,9 @@ class AsterTypeRoles extends ThemeExtension<AsterTypeRoles> {
     final marketMuted = colors.onMarketTile.withValues(
       alpha: effects.marketContentMutedOpacity,
     );
+    final scanSecondary = colors.onScan.withValues(
+      alpha: effects.scanSecondaryContentOpacity,
+    );
 
     return AsterTypeRoles(
       appBarTitle: role(
@@ -296,13 +299,13 @@ class AsterTypeRoles extends ThemeExtension<AsterTypeRoles> {
       ),
       marketTip: role(textTheme.bodyMedium, FontWeight.w600, marketMuted),
       scanControl: role(textTheme.bodyMedium, FontWeight.w600, colors.onScan),
-      scanCta: role(textTheme.bodyMedium, FontWeight.w500, colors.onScan),
+      scanCta: role(textTheme.bodyMedium, FontWeight.w500, scanSecondary),
       scanHeaderTitle: role(
         textTheme.bodyMedium,
         FontWeight.w600,
         colors.onScan,
       ),
-      scanWalletId: role(textTheme.bodySmall, FontWeight.w400, colors.onScan),
+      scanWalletId: role(textTheme.bodySmall, FontWeight.w400, scanSecondary),
     );
   }
 
