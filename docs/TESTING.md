@@ -37,6 +37,35 @@ An exact release candidate additionally requires:
 Simulator and host tests cannot qualify physical haptics, camera hardware,
 screen readers, signing, or a funds-bearing native supply chain.
 
+## Profile Performance Gate
+
+Run the repeatable presentation workload on an otherwise idle app-owned
+Android emulator:
+
+```sh
+fvm flutter drive --no-dds \
+  --driver=test_driver/integration_test.dart \
+  --target=integration_test/presentation_performance_test.dart \
+  -d <device-id> \
+  --profile
+```
+
+`--no-dds` is required by Flutter's `watchPerformance` VM-service contract.
+The test warms image, shader, route, and BIP39 caches before measuring. It then
+separately measures six onboarding route push/pop cycles and one normal
+recovery-word PageView cycle, requires at least 60 frames per measured
+workload, and rejects more than 5% of build or raster frames over Flutter's
+16 ms budget. Four additional PageView cycles run outside the frame sample to
+stress retained memory; the gate rejects more than 32 MiB retained RSS growth
+across the full warm route/page workload. Raw results are written to ignored
+`build/integration_response_data.json`.
+
+Before accepting a result, record host load and memory pressure. A sample
+contaminated by OS indexing, thermal pressure, emulator startup, or unrelated
+process load is invalid evidence and must be rerun. Emulator numbers are
+regression baselines only; physical-device profile and leak evidence remains a
+separate release gate.
+
 ## Test Data
 
 Production code has no fake balances, transactions, success delays, sample

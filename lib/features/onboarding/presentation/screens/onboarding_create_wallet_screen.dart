@@ -22,33 +22,23 @@ class OnboardingCreateWalletScreen extends ConsumerWidget {
     return PopScope(
       canPop: !submitting,
       child: Scaffold(
-        body: Stack(
-          fit: StackFit.expand,
-          children: [
-            const OnboardingWelcomeMeshBackground(),
-            SafeArea(
-              child: switch (asyncState) {
-                AsyncData<CreateWalletState>(:final value)
-                    when !value.completed =>
-                  _CreateWalletContent(state: value),
-                AsyncError<CreateWalletState>(
-                  :final error,
-                  :final stackTrace,
-                ) =>
-                  OnboardingStatusPanel.failure(
-                    title: 'Wallet could not be prepared',
-                    message: FailureMapper.from(error, stackTrace).userMessage,
-                    primaryLabel: 'Retry',
-                    onPrimary: () =>
-                        ref.invalidate(createWalletViewModelProvider),
-                    onBack: () => _returnToWelcome(context),
-                  ),
-                _ => const OnboardingStatusPanel.loading(
-                  message: 'Generating your recovery phrase...',
-                ),
-              },
+        backgroundColor: context.appColors.transparentSurface,
+        body: SafeArea(
+          child: switch (asyncState) {
+            AsyncData<CreateWalletState>(:final value) when !value.completed =>
+              _CreateWalletContent(state: value),
+            AsyncError<CreateWalletState>(:final error, :final stackTrace) =>
+              OnboardingStatusPanel.failure(
+                title: 'Wallet could not be prepared',
+                message: FailureMapper.from(error, stackTrace).userMessage,
+                primaryLabel: 'Retry',
+                onPrimary: () => ref.invalidate(createWalletViewModelProvider),
+                onBack: () => _returnToWelcome(context),
+              ),
+            _ => const OnboardingStatusPanel.loading(
+              message: 'Generating your recovery phrase...',
             ),
-          ],
+          },
         ),
       ),
     );

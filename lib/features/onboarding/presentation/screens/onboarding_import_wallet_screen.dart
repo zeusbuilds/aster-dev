@@ -75,32 +75,21 @@ class _OnboardingImportWalletScreenState
     return PopScope(
       canPop: !submitting,
       child: Scaffold(
+        backgroundColor: context.appColors.transparentSurface,
         resizeToAvoidBottomInset: true,
-        body: Stack(
-          fit: StackFit.expand,
-          children: [
-            const OnboardingWelcomeMeshBackground(),
-            SafeArea(
-              child: switch (asyncState) {
-                AsyncData<ImportWalletState>(:final value) => _buildContent(
-                  value,
-                ),
-                AsyncError<ImportWalletState>(
-                  :final error,
-                  :final stackTrace,
-                ) =>
-                  OnboardingStatusPanel.failure(
-                    title: 'Recovery phrase unavailable',
-                    message: FailureMapper.from(error, stackTrace).userMessage,
-                    primaryLabel: 'Retry',
-                    onPrimary: () =>
-                        ref.invalidate(importWalletViewModelProvider),
-                    onBack: () => _returnToWelcome(context),
-                  ),
-                _ => const OnboardingStatusPanel.loading(),
-              },
-            ),
-          ],
+        body: SafeArea(
+          child: switch (asyncState) {
+            AsyncData<ImportWalletState>(:final value) => _buildContent(value),
+            AsyncError<ImportWalletState>(:final error, :final stackTrace) =>
+              OnboardingStatusPanel.failure(
+                title: 'Recovery phrase unavailable',
+                message: FailureMapper.from(error, stackTrace).userMessage,
+                primaryLabel: 'Retry',
+                onPrimary: () => ref.invalidate(importWalletViewModelProvider),
+                onBack: () => _returnToWelcome(context),
+              ),
+            _ => const OnboardingStatusPanel.loading(),
+          },
         ),
       ),
     );

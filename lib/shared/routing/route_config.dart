@@ -28,20 +28,25 @@ class RouteConfig {
         name: RouteNames.splash,
         builder: (context, state) => const WalletAccessScreen(),
       ),
-      GoRoute(
-        path: RoutePaths.onboardingWelcome,
-        name: RouteNames.onboardingWelcome,
-        builder: (context, state) => const OnboardingWelcomeScreen(),
-      ),
-      GoRoute(
-        path: RoutePaths.onboardingCreateWallet,
-        name: RouteNames.onboardingCreateWallet,
-        builder: (context, state) => const OnboardingCreateWalletScreen(),
-      ),
-      GoRoute(
-        path: RoutePaths.onboardingImportWallet,
-        name: RouteNames.onboardingImportWallet,
-        builder: (context, state) => const OnboardingImportWalletScreen(),
+      ShellRoute(
+        builder: (context, state, child) => OnboardingShell(child: child),
+        routes: [
+          GoRoute(
+            path: RoutePaths.onboardingWelcome,
+            name: RouteNames.onboardingWelcome,
+            builder: (context, state) => const OnboardingWelcomeScreen(),
+          ),
+          GoRoute(
+            path: RoutePaths.onboardingCreateWallet,
+            name: RouteNames.onboardingCreateWallet,
+            builder: (context, state) => const OnboardingCreateWalletScreen(),
+          ),
+          GoRoute(
+            path: RoutePaths.onboardingImportWallet,
+            name: RouteNames.onboardingImportWallet,
+            builder: (context, state) => const OnboardingImportWalletScreen(),
+          ),
+        ],
       ),
       GoRoute(
         path: RoutePaths.skeleton,

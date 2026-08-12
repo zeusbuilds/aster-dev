@@ -14,6 +14,11 @@ pass visual and platform-build review.
 | `data/countries.json` | Region catalog | Repository-supplied curated catalog: 249 unique ISO-like two-letter entries. Source ownership and update policy are not evidenced; see `ASSET-002`. | `40fd807353685a6f236659a761e41e59281a6e2b5a1b4fde77b1ebdd68f3e54b` |
 | `data/currencies.json` | Fiat currency catalog | Repository-supplied curated catalog: 94 entries with intentional shared currency codes normalized by repository tests. Source ownership and update policy are not evidenced; see `ASSET-002`. | `89124c28e8347f2026021e1dac1f53418686d1dacd825df4351455827afbc727` |
 
+The fiat catalog intentionally maps USD to US and EC, XPF to NC and PF, and
+EUR to the EU pseudo-region used by `circle_flags`. Runtime selection is keyed
+by the unique currency code and keeps the first curated presentation entry;
+the associated region catalog remains 249 unique two-letter entries.
+
 The BIP39 word list and bundled font files have their own pinned source and
 checksum records in `data/README.md` and `fonts/README.md`.
 

@@ -7,7 +7,10 @@ import '../../../../shared/shared.dart';
 
 /// Blue mesh gradient background used on the onboarding welcome screen.
 class OnboardingWelcomeMeshBackground extends StatelessWidget {
-  const OnboardingWelcomeMeshBackground({super.key});
+  const OnboardingWelcomeMeshBackground({super.key, this.onTextureReady});
+
+  /// Called once the noise texture can be captured without a blank frame.
+  final VoidCallback? onTextureReady;
 
   @override
   Widget build(BuildContext context) {
@@ -135,7 +138,9 @@ class OnboardingWelcomeMeshBackground extends StatelessWidget {
               ),
             ),
           ),
-          const Positioned.fill(child: AsterNoiseTexture()),
+          Positioned.fill(
+            child: AsterNoiseTexture(onImageReady: onTextureReady),
+          ),
         ],
       ),
     );

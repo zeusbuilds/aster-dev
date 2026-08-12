@@ -53,8 +53,6 @@
           export PATH="$JAVA_HOME/bin:$PATH"
           export PATH="$ANDROID_HOME/platform-tools:$PATH"
           export PATH="$ANDROID_HOME/build-tools/36.0.0:$PATH"
-          export PATH="$ANDROID_HOME/tools:$PATH"
-          export PATH="$ANDROID_HOME/tools/bin:$PATH"
           export PATH="$(pwd)/.fvm/flutter_sdk/bin:$PATH"
           
           ${pkgs.lib.optionalString (system == "aarch64-darwin" || system == "x86_64-darwin") ''

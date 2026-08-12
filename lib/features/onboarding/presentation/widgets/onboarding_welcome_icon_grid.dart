@@ -29,32 +29,34 @@ class OnboardingWelcomeIconGrid extends StatelessWidget {
       [false, true, false, false, true, false, true],
     ];
 
-    return AspectRatio(
-      aspectRatio: cols / rows,
-      child: GridView.builder(
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: cols,
-          mainAxisSpacing: art.onboardingIconGridGap,
-          crossAxisSpacing: art.onboardingIconGridGap,
+    return BackdropGroup(
+      child: AspectRatio(
+        aspectRatio: cols / rows,
+        child: GridView.builder(
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: cols,
+            mainAxisSpacing: art.onboardingIconGridGap,
+            crossAxisSpacing: art.onboardingIconGridGap,
+          ),
+          itemCount: total,
+          itemBuilder: (context, index) {
+            if (index == centerIndex) {
+              return const _CenterTile();
+            }
+
+            final row = index ~/ cols;
+            final col = index % cols;
+            final faint = faintTiles[row][col];
+
+            return _BlurTile(
+              opacity: faint
+                  ? effects.onboardingIconTileFaintOpacity
+                  : effects.onboardingIconTileStrongOpacity,
+              outlined: faint,
+            );
+          },
         ),
-        itemCount: total,
-        itemBuilder: (context, index) {
-          if (index == centerIndex) {
-            return const _CenterTile();
-          }
-
-          final row = index ~/ cols;
-          final col = index % cols;
-          final faint = faintTiles[row][col];
-
-          return _BlurTile(
-            opacity: faint
-                ? effects.onboardingIconTileFaintOpacity
-                : effects.onboardingIconTileStrongOpacity,
-            outlined: faint,
-          );
-        },
       ),
     );
   }
@@ -108,6 +110,7 @@ class _BlurTile extends StatelessWidget {
         sigmaX: art.onboardingIconBlurSigma,
         sigmaY: art.onboardingIconBlurSigma,
       ),
+      groupBackdropFilter: true,
       child: const SizedBox.expand(),
     );
   }

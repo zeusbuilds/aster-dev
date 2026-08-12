@@ -4,10 +4,11 @@ import 'package:flutter/material.dart';
 
 import '../theme/theme.dart';
 
-/// Widget that applies a squircle (rounded superellipse) shape to its child
+/// Widget that applies a squircle (rounded superellipse) shape to its child.
 ///
 /// Provides a modern rounded rectangle shape with customizable border radius,
-/// colors, gradients, shadows, and borders. Commonly used for cards and containers.
+/// colors, gradients, shadows, and borders. Commonly used for cards and
+/// containers.
 class Squircle extends StatelessWidget {
   final Widget child;
   final double? borderRadius;
@@ -19,6 +20,10 @@ class Squircle extends StatelessWidget {
   final EdgeInsets? padding;
   final BorderRadius? border;
   final ImageFilter? backdropFilter;
+
+  /// Shares this non-overlapping backdrop filter with the nearest
+  /// [BackdropGroup], allowing the engine to execute one filter pass.
+  final bool groupBackdropFilter;
 
   const Squircle({
     super.key,
@@ -32,7 +37,8 @@ class Squircle extends StatelessWidget {
     this.padding,
     this.border,
     this.backdropFilter,
-  });
+    this.groupBackdropFilter = false,
+  }) : assert(!groupBackdropFilter || backdropFilter != null);
 
   @override
   Widget build(BuildContext context) {
@@ -57,12 +63,16 @@ class Squircle extends StatelessWidget {
       ),
       child: Padding(padding: effectivePadding, child: child),
     );
+    Widget filteredContent = content;
+    if (backdropFilter != null) {
+      filteredContent = groupBackdropFilter
+          ? BackdropFilter.grouped(filter: backdropFilter!, child: content)
+          : BackdropFilter(filter: backdropFilter!, child: content);
+    }
 
     return ClipRSuperellipse(
       borderRadius: effectiveBorderRadius,
-      child: backdropFilter == null
-          ? content
-          : BackdropFilter(filter: backdropFilter!, child: content),
+      child: filteredContent,
     );
   }
 }

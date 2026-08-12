@@ -1,10 +1,13 @@
 import 'dart:convert';
 
 import 'package:aster/core/core.dart';
+import 'package:aster/features/onboarding/presentation/screens/screens.dart';
 import 'package:aster/features/onboarding/presentation/view_model/view_models.dart';
+import 'package:aster/features/onboarding/presentation/widgets/widgets.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:aster/features/wallet/presentation/view_model/wallet_view_model.dart';
 import 'package:aster/shared/shared.dart';
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -140,6 +143,52 @@ void main() {
     await _pumpFrames(tester);
 
     expect(_location(router), RoutePaths.onboardingWelcome);
+  });
+
+  testWidgets('onboarding routes retain one shared mesh background', (
+    tester,
+  ) async {
+    final (harness, transport) = await _createHarness();
+    addTearDown(transport.close);
+    addTearDown(() => _disposeHarness(tester, harness));
+    await harness.container.read(walletViewModelProvider.future);
+
+    final router = await _pumpRouter(tester, harness);
+    expect(find.byType(OnboardingWelcomeMeshBackground), findsOneWidget);
+    final backgroundSnapshot = tester
+        .widgetList<SnapshotWidget>(find.byType(SnapshotWidget))
+        .singleWhere(
+          (snapshot) => snapshot.child is OnboardingWelcomeMeshBackground,
+        );
+    expect(backgroundSnapshot.autoresize, isTrue);
+    expect(backgroundSnapshot.controller.allowSnapshotting, isTrue);
+
+    final importRoute = router.push<void>(RoutePaths.onboardingImportWallet);
+    await _pumpFrames(tester);
+    expect(find.byType(OnboardingWelcomeMeshBackground), findsOneWidget);
+    final importContext = tester.element(
+      find.byType(OnboardingImportWalletScreen),
+    );
+    final transitionTheme = Theme.of(importContext).pageTransitionsTheme;
+    final androidTransition = transitionTheme.builders[TargetPlatform.android];
+    expect(
+      androidTransition,
+      isA<PredictiveBackFullscreenPageTransitionsBuilder>(),
+    );
+    expect(
+      (androidTransition! as PredictiveBackFullscreenPageTransitionsBuilder)
+          .fallbackColor,
+      importContext.appColors.transparentSurface,
+    );
+    expect(
+      transitionTheme.builders[TargetPlatform.iOS],
+      isA<CupertinoPageTransitionsBuilder>(),
+    );
+
+    router.pop();
+    await _pumpFrames(tester);
+    await importRoute;
+    expect(find.byType(OnboardingWelcomeMeshBackground), findsOneWidget);
   });
 
   testWidgets('confirmed onboarding refreshes the real router to wallet root', (

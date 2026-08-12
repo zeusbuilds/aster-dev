@@ -7,6 +7,7 @@ import 'package:aster/features/onboarding/presentation/widgets/widgets.dart';
 import 'package:aster/features/wallet/presentation/view_model/wallet_view_model.dart';
 import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -184,6 +185,7 @@ void main() {
   testWidgets('welcome mesh avoids backdrop capture and bounds image decode', (
     tester,
   ) async {
+    var textureReadyCount = 0;
     tester.view.devicePixelRatio = 3;
     tester.view.physicalSize = const Size(1290, 2796);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -192,9 +194,14 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light(),
-        home: const Scaffold(body: OnboardingWelcomeMeshBackground()),
+        home: Scaffold(
+          body: OnboardingWelcomeMeshBackground(
+            onTextureReady: () => textureReadyCount += 1,
+          ),
+        ),
       ),
     );
+    await tester.pumpAndSettle();
 
     final mesh = find.byType(OnboardingWelcomeMeshBackground);
     expect(
@@ -214,7 +221,57 @@ void main() {
     );
     expect(noiseImage.image, isA<ResizeImage>());
     expect((noiseImage.image as ResizeImage).width, 1600);
+    expect(textureReadyCount, 1);
+    await tester.pump();
+    expect(textureReadyCount, 1);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('welcome icon tiles share one non-overlapping backdrop pass', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: const OnboardingShell(child: OnboardingWelcomeScreen()),
+      ),
+    );
+    await tester.pump();
+
+    final grid = find.byType(OnboardingWelcomeIconGrid);
+    final filters = find.descendant(
+      of: grid,
+      matching: find.byType(BackdropFilter),
+    );
+    expect(filters, findsNWidgets(27));
+    final backdropKeys = filters
+        .evaluate()
+        .map(
+          (element) =>
+              (element.renderObject! as RenderBackdropFilter).backdropKey,
+        )
+        .toSet();
+    expect(backdropKeys, hasLength(1));
+    expect(backdropKeys.single, isNotNull);
+  });
+
+  testWidgets('onboarding snapshot bounds retained texture density', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: const MediaQuery(
+          data: MediaQueryData(size: Size(390, 844), devicePixelRatio: 4),
+          child: OnboardingShell(child: SizedBox.expand()),
+        ),
+      ),
+    );
+
+    final snapshotMediaQuery = tester
+        .widgetList<MediaQuery>(find.byType(MediaQuery))
+        .singleWhere((mediaQuery) => mediaQuery.child is SnapshotWidget);
+    expect(snapshotMediaQuery.data.devicePixelRatio, 3);
   });
 
   for (final scenario in const [
@@ -307,7 +364,7 @@ Future<void> _pumpScreen(
         home: AsterFeedbackScope(
           haptics: harness.haptics,
           toasts: harness.toasts,
-          child: screen,
+          child: OnboardingShell(child: screen),
         ),
       ),
     ),

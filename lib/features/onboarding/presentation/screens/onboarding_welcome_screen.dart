@@ -11,13 +11,8 @@ class OnboardingWelcomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          const OnboardingWelcomeMeshBackground(),
-          const SafeArea(child: _OnboardingContent()),
-        ],
-      ),
+      backgroundColor: context.appColors.transparentSurface,
+      body: const SafeArea(child: _OnboardingContent()),
     );
   }
 }

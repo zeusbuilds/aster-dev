@@ -43,7 +43,14 @@ make bootstrap
 
 ## Development Workflow
 
-1. **Enter the development environment:**
+1. **Ensure FVM Flutter is installed (first time on a machine):**
+   ```bash
+   make fvm-setup
+   ```
+   This installs the Flutter version pinned in `.fvmrc` and wires it into the
+   project before the Nix shell adds that path to `PATH`.
+
+2. **Enter the development environment:**
    - **Without direnv (manual):**
      ```bash
      make shell
@@ -68,12 +75,6 @@ make bootstrap
         ```
 
      After this, simply `cd` into the project directory and direnv will automatically load the Nix dev environment (equivalent to `make shell`), so IDE shortcuts and terminals launched from the project will use the correct toolchain and FVM Flutter.
-
-2. **Ensure FVM Flutter is installed (first time on a machine):**
-   ```bash
-   make fvm-setup
-   ```
-   This installs the Flutter version pinned in `.fvmrc` and wires it into the project.
 
 3. **Run the app:**
    ```bash
@@ -162,17 +163,18 @@ make bootstrap
 
 ## Development Environment
 
-This project uses [Nix Flakes](https://nixos.wiki/wiki/Flakes) to provide a reproducible development environment for core tooling. The environment includes:
+This project uses [Nix Flakes](https://nixos.wiki/wiki/Flakes) to pin the native
+development prerequisites. The environment includes:
 
-- Flutter 3.44.9
-- Dart SDK 3.12.2
-- Android SDK with build tools
+- Android SDK platform/build/platform tools 36
 - Java JDK 21
 - CocoaPods (macOS only)
 
-The Nix shell provides native build prerequisites; FVM remains the source of
-truth for Flutter and Dart. Do not use a separately installed Dart SDK for app
-generation, analysis, tests, or documentation.
+The flake deliberately does not install Flutter or Dart. It places the
+project-local `.fvm/flutter_sdk/bin` on `PATH`; FVM remains the sole source of
+truth for Flutter 3.44.9 and Dart 3.12.2. Run `make fvm-setup` before entering
+the shell, and do not use a separately installed Dart SDK for app generation,
+analysis, tests, or documentation.
 
 Flutter itself is managed via [FVM](https://fvm.app/) and pinned per project
 using `.fvmrc` (`flutterSdkVersion: 3.44.9`). This keeps the Flutter version

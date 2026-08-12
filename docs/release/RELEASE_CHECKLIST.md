@@ -30,6 +30,7 @@ from a clean worktree and record commands/results in the production tracker.
 - [ ] screen-reader traversal, text scaling, contrast, keyboard, touch targets
 - [ ] physical haptics, camera/gallery, background capture policy
 - [ ] profile launch, frame, memory growth, leaks, and native-handle cleanup
+- [ ] performance samples were taken on an idle host and repeated for stability
 - [ ] no secret-bearing logs/screenshots/fixtures
 
 ## Closeout
