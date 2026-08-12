@@ -143,6 +143,21 @@ void main() {
       find.descendant(of: mesh, matching: find.byType(BackdropFilter)),
       findsNothing,
     );
+    expect(
+      find.descendant(of: mesh, matching: find.byType(RepaintBoundary)),
+      findsWidgets,
+    );
+    expect(
+      find.descendant(of: mesh, matching: find.byType(AsterNoiseTexture)),
+      findsOneWidget,
+    );
+    final noiseImage = tester.widget<Image>(
+      find.descendant(of: mesh, matching: find.byType(Image)),
+    );
+    expect(noiseImage.image, isA<ResizeImage>());
+    final resizedNoise = noiseImage.image as ResizeImage;
+    expect(resizedNoise.width, inInclusiveRange(1, 1600));
+    expect(resizedNoise.height, isNull);
     expect(tester.takeException(), isNull);
   });
 }

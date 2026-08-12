@@ -36,7 +36,11 @@ service endpoints reject credentials and unsafe host/scheme forms. Mutation
 requests are not retried without a real idempotency contract.
 
 Errors exposed outside adapters are typed, bounded, and redacted. Production
-logs contain stable codes only and never raw native/network payloads.
+logs contain stable codes only and never raw native/network payloads. Android
+release builds use R8 to remove dependency `android.util.Log` calls; debug and
+profile builds retain native diagnostics for local investigation. A future
+production telemetry system must use an app-owned redaction boundary instead
+of re-enabling arbitrary dependency logs.
 
 ## Open Security Decisions
 

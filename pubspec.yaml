@@ -91,11 +91,14 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/icons/images/
-    - assets/icons/tokens/
-    - assets/brand/
-    - assets/texture/
-    - assets/data/
+    - assets/brand/utexo-mark.svg
+    - assets/data/bip39_english.txt
+    - assets/data/countries.json
+    - assets/data/currencies.json
+    - assets/icons/tokens/btc.svg
+    - assets/icons/tokens/usdt.svg
+    - assets/texture/noise.jpg
+    - assets/texture/shape.png
 
   fonts:
     - family: DM Sans

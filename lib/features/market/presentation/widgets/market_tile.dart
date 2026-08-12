@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../../../../shared/shared.dart';
 
+const _marketTextureSourceDimension = 600;
+
 /// Semantic Market action with stable squircle geometry and status capsule.
 class MarketTile extends StatelessWidget {
   /// Short action name.
@@ -47,6 +49,10 @@ class MarketTile extends StatelessWidget {
     final radius = context.radii;
     final shadows = context.shadows;
     final type = context.type;
+    final textureDecodeDimension =
+        (metrics.marketTextureSize * MediaQuery.devicePixelRatioOf(context))
+            .ceil()
+            .clamp(1, _marketTextureSourceDimension);
 
     void activate() {
       unawaited(context.haptics.trigger(HapticIntent.lightImpact));
@@ -85,10 +91,15 @@ class MarketTile extends StatelessWidget {
                                   .toList(growable: false)
                             : shadows.modal,
                       ),
-                      child: Image.asset(
-                        'assets/texture/shape.png',
-                        width: metrics.marketTextureSize,
-                        height: metrics.marketTextureSize,
+                      child: ExcludeSemantics(
+                        child: Image.asset(
+                          'assets/texture/shape.png',
+                          width: metrics.marketTextureSize,
+                          height: metrics.marketTextureSize,
+                          cacheWidth: textureDecodeDimension,
+                          cacheHeight: textureDecodeDimension,
+                          filterQuality: FilterQuality.medium,
+                        ),
                       ),
                     ),
                   ),

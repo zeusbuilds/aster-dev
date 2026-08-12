@@ -3,6 +3,7 @@ export 'amount_text.dart';
 export 'app_skeletonizer.dart';
 export 'aster_divider.dart';
 export 'aster_icon_button.dart';
+export 'aster_noise_texture.dart';
 export 'aster_numeric_keypad.dart';
 export 'aster_option_row.dart';
 export 'aster_pill.dart';

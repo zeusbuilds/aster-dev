@@ -22,6 +22,14 @@ void main() {
     expect(find.text('12.4% APY'), findsNothing);
     expect(find.text('Best rate'), findsNothing);
     expect(find.text('Free & instant'), findsNothing);
+    final textures = tester.widgetList<Image>(find.byType(Image));
+    expect(textures, isNotEmpty);
+    for (final texture in textures) {
+      expect(texture.image, isA<ResizeImage>());
+      final resized = texture.image as ResizeImage;
+      expect(resized.width, inInclusiveRange(1, 600));
+      expect(resized.height, resized.width);
+    }
 
     for (final label in ['Buy', 'Sell', 'Lend']) {
       final tile = find.widgetWithText(MarketTile, label);

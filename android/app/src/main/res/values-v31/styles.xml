@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowSplashScreenBackground">@color/utexo_splash_blue</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/utexo_icon_foreground</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
+        <item name="android:statusBarColor">@color/utexo_splash_blue</item>
+        <item name="android:navigationBarColor">@color/utexo_splash_dark</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

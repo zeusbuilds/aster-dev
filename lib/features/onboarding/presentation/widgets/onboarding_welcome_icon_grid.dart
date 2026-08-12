@@ -75,7 +75,7 @@ class _CenterTile extends StatelessWidget {
       borderColor: colors.transparentSurface,
       borderWidth: 0,
       color: context.colorScheme.surface,
-      child: Center(child: SvgPicture.asset('assets/icons/tokens/usdc.svg')),
+      child: Center(child: SvgPicture.asset('assets/icons/tokens/usdt.svg')),
     );
   }
 }

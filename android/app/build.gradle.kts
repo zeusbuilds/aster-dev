@@ -6,6 +6,7 @@ plugins {
 }
 
 android {
+    // Final package identity is release-owned and remains blocked by DEC-006.
     namespace = "com.example.asterdev"
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
@@ -16,10 +17,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.example.asterdev"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 24
         targetSdk = 36
         versionCode = flutter.versionCode
@@ -28,9 +26,15 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            // Local release-mode evidence only. PLAT-001 blocks distribution
+            // until the release owner provides the production signing policy.
             signingConfig = signingConfigs.getByName("debug")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="utexo_surface">#FEFEFF</color>
+    <color name="utexo_splash_top">#8BD6FF</color>
+    <color name="utexo_splash_blue">#001AFF</color>
+    <color name="utexo_splash_dark">#000000</color>
+</resources>

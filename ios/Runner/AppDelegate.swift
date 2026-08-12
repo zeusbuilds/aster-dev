@@ -46,7 +46,7 @@ import UIKit
   }
 }
 
-private enum WalletStoragePolicy {
+enum WalletStoragePolicy {
   static let channelName = "com.utexo.wallet/storage_security"
   private static let ownerOnlyPermissions: mode_t = 0o700
 

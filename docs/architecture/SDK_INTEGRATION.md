@@ -100,8 +100,12 @@ showing an empty wallet or fabricating a migration; the user must restore from
 their recovery phrase through the real import flow.
 
 - iOS uses a non-synchronizing, this-device-only Keychain accessibility class.
-- Android uses a dedicated AES-GCM namespace, migration backup, and
-  `resetOnError: false`; app backup and device transfer are disabled.
+- Android pins RSA-OAEP key wrapping and AES-GCM data encryption in a dedicated
+  namespace, keeps crash-safe algorithm migration enabled, and uses
+  `resetOnError: false`; app backup and device transfer are disabled. Plugin
+  10.3.1 requires the migration path to establish algorithm markers on a clean
+  first install. Optimized releases remove dependency Android log calls, while
+  debug/profile builds retain local migration diagnostics.
 - Corruption is surfaced and retained for recovery analysis. It is never
   silently reset.
 - Dart strings cannot be reliably zeroized. Callers therefore keep credential

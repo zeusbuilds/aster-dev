@@ -11,3 +11,11 @@
 
 The app uses this file only for immediate per-word input feedback. The pinned
 `rgb_sdk_flutter` API remains authoritative for full BIP39 checksum validation.
+
+## Region And Currency Catalogs
+
+`countries.json` and `currencies.json` are repository-supplied curated product
+catalogs. Their structural invariants and intentional shared-currency
+normalization are covered by repository tests. Their original source,
+ownership, and release clearance are not evidenced in this repository and
+remain blocked under `ASSET-002`; engineering must not invent that provenance.

@@ -13,7 +13,6 @@ class MeshGradientBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final effects = context.effects;
     final art = context.art;
 
     return RepaintBoundary(
@@ -142,19 +141,7 @@ class MeshGradientBackground extends StatelessWidget {
               ),
             ),
           ),
-          Positioned.fill(
-            child: Opacity(
-              opacity: effects.artNoiseOpacity,
-              child: Image.asset(
-                'assets/texture/noise.jpg',
-                fit: BoxFit.cover,
-                color: colors.artNoiseTint.withValues(
-                  alpha: effects.artNoiseTintOpacity,
-                ),
-                colorBlendMode: BlendMode.overlay,
-              ),
-            ),
-          ),
+          const Positioned.fill(child: AsterNoiseTexture()),
         ],
       ),
     );

@@ -1,12 +1,22 @@
-import Flutter
-import UIKit
 import XCTest
+@testable import Runner
 
-class RunnerTests: XCTestCase {
+final class RunnerTests: XCTestCase {
 
-  func testExample() {
-    // If you add code to the Runner application, consider adding tests here.
-    // See https://developer.apple.com/documentation/xctest for more information about using XCTest.
+  func testWalletStorageChannelUsesStableProductNamespace() {
+    XCTAssertEqual(
+      WalletStoragePolicy.channelName,
+      "com.utexo.wallet/storage_security"
+    )
   }
 
+  func testUnknownNativeErrorMapsToRedactedDiagnosticCode() {
+    let error = NSError(
+      domain: "sensitive.native.domain",
+      code: 42,
+      userInfo: [NSLocalizedDescriptionKey: "must not cross the bridge"]
+    )
+
+    XCTAssertEqual(WalletStoragePolicy.diagnosticCode(error), "native")
+  }
 }

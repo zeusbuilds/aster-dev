@@ -16,7 +16,7 @@ class OnboardingWelcomeHeader extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.start,
       children: [
         SvgPicture.asset(
-          'assets/brand/aster-logo.svg',
+          'assets/brand/utexo-mark.svg',
           width: icons.lg,
           colorFilter: ColorFilter.mode(colors.onBrandArt, BlendMode.srcIn),
         ),

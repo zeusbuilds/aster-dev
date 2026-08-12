@@ -374,14 +374,18 @@ Baseline screenshots are stored in `docs/release/evidence/baseline/`.
 | ARCH-008 | P2 | Barrel exports | verified | Presentation barrel naming was inconsistent (`viewmodels.dart`, `view_model.dart`, and `view_models.dart`) and the existing guide permitted conventions that did not match repository boundaries. | Complete import/export graph plus exact validator execution | `270dd51` | All 76 barrels across 283 owned Dart sources use canonical boundary names, sorted relative exports, no private/generated/missing targets, no same-folder self-barrel imports, and no cycles. |
 | BRAND-002 | P0 | Brand assets | fixing | Android launcher resources are the default Flutter mark, the public README banner visibly says Aster, native asset names retain Aster ownership, and onboarding renders an obsolete USDC mark in a Bitcoin/RGB USDT product. | Visual/hash/consumer audit of all brand, token, Android launcher, and iOS icon/launch assets | - | Use the existing UTEXO mark and preserved brand colors across launch/icon surfaces, rename internal native assets, replace the obsolete onboarding mark with USDT, and remove unreferenced Aster/Liquid/USDC/bitmap assets. Final bundle identifiers/signing remain PLAT-001. |
 | ASSET-001 | P1 | Asset provenance | fixing | Repository-owned brand, token, catalog, and texture assets have no consolidated source, ownership, checksum, or replacement record. | Asset tree, consumer graph, and SHA-256 inventory | - | Add an asset manifest with role, provenance/ownership status, checksums, and replacement policy; use authoritative public Bitcoin/Tether marks where applicable and keep unconfirmed product-art clearance visible as a release blocker. |
+| ASSET-002 | P0 | Product-art clearance | blocked | The repository contains the UTEXO product mark, authored mesh textures, and curated country/currency catalogs, but no repository evidence identifies their creator, license, assignment, or release clearance. | Asset history, embedded metadata, source comments, and documentation audit | - | A release owner must record ownership or written clearance for the product mark, textures, and curated catalogs. Engineering may checksum and preserve them, but cannot truthfully manufacture legal provenance. |
 | PERF-003 | P1 | Image memory and mesh rendering | fixing | A 5554x3703 JPEG can decode to roughly 82 MiB on each uncapped noise use, a 1500x1500 PNG decodes to roughly 9 MiB for a small tile texture, and onboarding uses a backdrop readback to blur only its own mesh. | Source dimensions, decoded RGBA size calculation, and Home/onboarding/Market consumer audit | - | Bound runtime decode width, optimize source dimensions without changing authored appearance, share the noise treatment, replace the onboarding backdrop capture with direct filtering, and add structural/widget regression coverage before profile measurement. |
 | PLAT-006 | P1 | Native launch experience | fixing | Android launch resources still use the Flutter template white/black themes and default icon, diverging from the established light-only UTEXO splash; Android 12 has no explicit branded splash resources. | Full Android resource audit and exact launch comparison with Flutter/iOS splash recipes | - | Provide branded pre-engine and Android 12 launch resources using the existing splash colors/mark, preserve light-only behavior in night mode, and verify packaged resources and real launch on the exact candidate. |
+| PLAT-008 | P2 | Android dependency migration | fixing | `android.enableJetifier=true` remains enabled even though the app and current dependency graph target AndroidX, adding avoidable build transforms and concealing any stale support-library dependency. | Gradle properties and resolved Android dependency audit | - | Remove Jetifier and prove debug/release Android builds plus dependency resolution still pass; restore it only with a named incompatible dependency and tracked migration plan. |
+| PLAT-010 | P1 | iOS linker ownership | fixing | Every app configuration carries first-commit native header/library/framework flags, deprecated `ld_classic`, `-all_load`, and `allow_simulator_linking_to_ios`, despite the pinned SDK pod owning its native linkage. | Xcode build settings, git blame, podspec, and exact XCTest warning | - | Remove app-owned legacy search/linker overrides and prove Debug XCTest plus Profile/Release builds against the pod-owned native contract. |
 | PLAT-007 | P1 | Supported orientations | blocked | iOS declares iPhone landscape and iPad orientations although the wallet is designed and tested only for compact/large phone portrait layouts. | `Info.plist`, widget viewport matrix, and platform runtime evidence | - | Product must decide whether to support and qualify landscape/iPad. Until then, do not claim those declared layouts are release-qualified or silently restrict them. |
 | TEST-003 | P1 | Native unit tests | fixing | `RunnerTests.swift` is an assertion-free Flutter template test and therefore provides no native contract evidence. | Complete iOS test-target audit | - | Replace it with deterministic tests for the storage channel namespace and redacted native error mapping, then run XCTest on the exact candidate. |
 | BUILD-003 | P1 | Nix/toolchain parity | fixing | `flake.nix` describes Aster and provisions Android SDK/build-tools 34 while the app compiles and targets API 36; its mixed Nix-Dart/FVM path is not represented in release gates. | `.envrc`, `flake.nix`, `flake.lock`, Android Gradle configuration, and Makefile audit | - | Align the development shell with the pinned Flutter/Dart/API 36 contract and validate `nix flake check` plus a non-interactive shell command, or remove unsupported claims if the shell cannot be made reproducible. |
 | TOOL-004 | P2 | Git hooks | verified | The installer copied directly into `.git/hooks`, overwrote same-named user hooks, failed in worktrees, and the versioned pre-commit hook lacked its executable bit. | Installer audit, Git's `270dd51` diagnostic, and exact `b00b5b2` hook execution | `270dd51`, `b00b5b2` | Project-local `core.hooksPath` setup refuses conflicting ownership, supports worktrees, validates executable state, preserves global identity, is idempotent, and ran every gate during commit. |
 | BUILD-004 | P2 | Ignore policy | verified | `.gitignore` did not exclude the documented local-only `pubspec_overrides.yaml`, while broad `*.config.dart` exclusion could hide legitimate hand-authored configuration. | Ignore/tracker source review and exact 450-file inventory gate | `270dd51` | Only the explicit local override is ignored; arbitrary `.config.dart` is neither ignored nor excluded by tracker inventory, and generation/tracker gates pass. |
 | SEC-012 | P1 | Vulnerability reporting | blocked | The repository has no deployment-owned private vulnerability-reporting address or published security-response SLA. | Complete repository documentation/configuration audit | - | A release owner must configure an owned private reporting channel and response policy; documentation must not invent an address or ask users to disclose wallet material publicly. |
+| SEC-013 | P1 | Android release diagnostics | fixing | `flutter_secure_storage` emits verbose migration internals and false error-level key-mismatch messages in a release build on a clean install; migration failure paths can also log storage key identifiers. | Clean API 36 release install, PID-scoped logcat, plugin 10.3.1 source audit | - | Pin modern algorithms, retain crash-safe migration because plugin 10.3.1 needs it to establish first-install markers, and remove dependency `android.util.Log` calls during release shrinking. Clean-uninstall profile storage tests and clean optimized-release launch/log inspection pass; commit-bound host/platform gates remain. |
 | BUILD-005 | P1 | CI supply chain | verified | GitHub Actions used mutable major-version tags and had no explicit least-privilege permission or job timeout contract. | Upstream release/tag verification, YAML parse, and exact local command parity | `270dd51` | Checkout 7.0.1 and flutter-action 2.23.0 are pinned by full SHA; contents is read-only, runtime is bounded, superseded runs cancel, and all configured commands pass locally. Remote execution remains unavailable under GIT-001. |
 
 ## Generated Artifact Validation
@@ -417,17 +421,21 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `analysis_options.yaml` | Project configuration | verified | BUILD-002, ARCH-001 | Strict inference/casts/raw types and lifecycle/future/security lints pass with zero diagnostics | `8e97370` |
 | `android/.gitignore` | Android platform | unreviewed | - | - | - |
 | `android/app/build.gradle.kts` | Android platform | fixing | BUILD-001, PLAT-001, PLAT-002 | AGP 9 / Java 17 / SDK 36 x86_64 APK build passes; release identity/signing and future Kotlin migration remain open | `8e97370` |
+| `android/app/proguard-rules.pro` | Android platform | unreviewed | - | - | - |
 | `android/app/src/debug/AndroidManifest.xml` | Android platform | verified | CONFIG-001 | Debug cleartext policy is explicit and limited to development builds; merged release manifest remains cleartext-disabled | `1b3273a` |
 | `android/app/src/main/AndroidManifest.xml` | Android platform | blocked | PLAT-001, PLAT-003, BRAND-001 | Backup/transfer and cleartext policy are verified; exact candidate package inspection confirms the UTEXO label and QR camera declaration. Final application ID and release signing remain blocked by DEC-006 | `1b3273a`, `b606ebf` |
 | `android/app/src/main/kotlin/com/example/asterdev/MainActivity.kt` | Android platform | verified | PLAT-004, PLAT-005 | Native policy bridge reviewed; Android integration tests and release compilation pass | `1b3273a` |
-| `android/app/src/main/res/drawable-v21/launch_background.xml` | Android platform | unreviewed | - | - | - |
 | `android/app/src/main/res/drawable/launch_background.xml` | Android platform | unreviewed | - | - | - |
-| `android/app/src/main/res/mipmap-hdpi/ic_launcher.png` | Android platform | unreviewed | - | - | - |
-| `android/app/src/main/res/mipmap-mdpi/ic_launcher.png` | Android platform | unreviewed | - | - | - |
-| `android/app/src/main/res/mipmap-xhdpi/ic_launcher.png` | Android platform | unreviewed | - | - | - |
-| `android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png` | Android platform | unreviewed | - | - | - |
-| `android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png` | Android platform | unreviewed | - | - | - |
+| `android/app/src/main/res/drawable/utexo_icon_background.xml` | Android platform | unreviewed | - | - | - |
+| `android/app/src/main/res/drawable/utexo_icon_foreground.xml` | Android platform | unreviewed | - | - | - |
+| `android/app/src/main/res/drawable/utexo_launch_gradient.xml` | Android platform | unreviewed | - | - | - |
+| `android/app/src/main/res/drawable/utexo_mark_white.xml` | Android platform | unreviewed | - | - | - |
+| `android/app/src/main/res/mipmap-anydpi-v24/ic_launcher.xml` | Android platform | unreviewed | - | - | - |
+| `android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml` | Android platform | unreviewed | - | - | - |
+| `android/app/src/main/res/values-night-v31/styles.xml` | Android platform | unreviewed | - | - | - |
 | `android/app/src/main/res/values-night/styles.xml` | Android platform | unreviewed | - | - | - |
+| `android/app/src/main/res/values-v31/styles.xml` | Android platform | unreviewed | - | - | - |
+| `android/app/src/main/res/values/colors.xml` | Android platform | unreviewed | - | - | - |
 | `android/app/src/main/res/values/styles.xml` | Android platform | unreviewed | - | - | - |
 | `android/app/src/main/res/xml/backup_rules.xml` | Android platform | verified | PLAT-003 | Every application data domain excluded; merged release manifest references the rule | `1b3273a` |
 | `android/app/src/main/res/xml/data_extraction_rules.xml` | Android platform | verified | PLAT-003 | Cloud backup and device-transfer exclusions cover every application data domain | `1b3273a` |
@@ -436,8 +444,8 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `android/gradle.properties` | Android platform | fixing | PLAT-002 | Flutter-generated AGP 9 compatibility flags build; built-in Kotlin migration remains blocked on toolchain/plugins | `8e97370` |
 | `android/gradle/wrapper/gradle-wrapper.properties` | Android platform | verified | BUILD-001 | Gradle 9.1.0 matches Flutter 3.44 template and packages exact APK | `8e97370` |
 | `android/settings.gradle.kts` | Android platform | fixing | BUILD-001, PLAT-002 | AGP 9.0.1/Kotlin 2.3.20 compile; future built-in Kotlin migration tracked | `8e97370` |
-| `assets/brand/aster-logo.svg` | Asset | unreviewed | - | - | - |
-| `assets/brand/banner.svg` | Asset | unreviewed | - | - | - |
+| `assets/README.md` | Asset | unreviewed | - | - | - |
+| `assets/brand/utexo-mark.svg` | Asset | unreviewed | - | - | - |
 | `assets/data/README.md` | Asset | verified | ONB-003 | Immutable upstream commit, digest, entry count, and SDK checksum-authority boundary recorded | `5f3698f` |
 | `assets/data/bip39_english.txt` | Asset | verified | ONB-003 | Exact 2,048-word pinned bytes pass digest/shape/order and tamper tests | `5f3698f`, `05c7edf` |
 | `assets/data/countries.json` | Asset | unreviewed | - | - | - |
@@ -449,10 +457,7 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `assets/fonts/PublicSans-Italic-Variable.ttf` | Asset | verified | FONT-001 | SHA-256 and pinned upstream provenance recorded; platform builds pass | `8e97370` |
 | `assets/fonts/PublicSans-Variable.ttf` | Asset | verified | FONT-001 | SHA-256 and pinned upstream provenance recorded; platform builds pass | `8e97370` |
 | `assets/fonts/README.md` | Asset | verified | FONT-001 | Source commit, role ownership, hashes, and replacement policy reviewed | `8e97370` |
-| `assets/icons/images/bitcoin.png` | Asset | unreviewed | - | - | - |
 | `assets/icons/tokens/btc.svg` | Asset | unreviewed | - | - | - |
-| `assets/icons/tokens/lbtc.svg` | Asset | unreviewed | - | - | - |
-| `assets/icons/tokens/usdc.svg` | Asset | unreviewed | - | - | - |
 | `assets/icons/tokens/usdt.svg` | Asset | unreviewed | - | - | - |
 | `assets/texture/noise.jpg` | Asset | unreviewed | - | - | - |
 | `assets/texture/shape.png` | Asset | unreviewed | - | - | - |
@@ -496,16 +501,16 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `ios/Runner.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings` | iOS platform | unreviewed | - | - | - |
 | `ios/Runner/AppDelegate.swift` | iOS platform | verified | PLAT-004 | Native policy bridge reviewed; iOS integration tests and exact simulator build pass | `1b3273a` |
 | `ios/Runner/Assets.xcassets/Contents.json` | iOS platform | unreviewed | - | - | - |
-| `ios/Runner/Assets.xcassets/aster-logo.imageset/Contents.json` | iOS platform | unreviewed | - | - | - |
-| `ios/Runner/Assets.xcassets/aster-logo.imageset/aster-logo.svg` | iOS platform | unreviewed | - | - | - |
-| `ios/Runner/Assets.xcassets/background.imageset/Contents.json` | iOS platform | unreviewed | - | - | - |
-| `ios/Runner/Assets.xcassets/background.imageset/background.svg` | iOS platform | unreviewed | - | - | - |
-| `ios/Runner/AsterIcon.icon/Assets/aster_logo.svg` | iOS platform | unreviewed | - | - | - |
-| `ios/Runner/AsterIcon.icon/icon.json` | iOS platform | unreviewed | - | - | - |
+| `ios/Runner/Assets.xcassets/utexo-launch-background.imageset/Contents.json` | iOS platform | unreviewed | - | - | - |
+| `ios/Runner/Assets.xcassets/utexo-launch-background.imageset/utexo-launch-background.svg` | iOS platform | unreviewed | - | - | - |
+| `ios/Runner/Assets.xcassets/utexo-mark.imageset/Contents.json` | iOS platform | unreviewed | - | - | - |
+| `ios/Runner/Assets.xcassets/utexo-mark.imageset/utexo-mark.svg` | iOS platform | unreviewed | - | - | - |
 | `ios/Runner/Base.lproj/Main.storyboard` | iOS platform | unreviewed | - | - | - |
 | `ios/Runner/Info.plist` | iOS platform | blocked | PLAT-001, BRAND-001 | Exact built-plist inspection confirms the UTEXO label and bounded payment-QR camera/photo purpose strings. Final bundle ID/signing remain blocked by DEC-006 | `b606ebf` |
 | `ios/Runner/Launch Screen.storyboard` | iOS platform | unreviewed | - | - | - |
 | `ios/Runner/Runner-Bridging-Header.h` | iOS platform | unreviewed | - | - | - |
+| `ios/Runner/UtexoIcon.icon/Assets/utexo_mark.svg` | iOS platform | unreviewed | - | - | - |
+| `ios/Runner/UtexoIcon.icon/icon.json` | iOS platform | unreviewed | - | - | - |
 | `ios/RunnerTests/RunnerTests.swift` | iOS platform | unreviewed | - | - | - |
 | `lib/core/bootstrap/app_bootstrap.dart` | Dart source | verified | LIFE-002, LIFE-005 | Bootstrap ownership, unknown-outcome composition, awaited cleanup, and container disposal pass fault tests | `1b3273a` |
 | `lib/core/bootstrap/app_loader.dart` | Dart source | verified | LIFE-002, LIFE-005, BRAND-001 | Runtime behavior is unchanged; root-widget documentation names UTEXO and all aggregate tests pass | `1b3273a`, `270dd51`, `b00b5b2` |
@@ -779,6 +784,7 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `lib/shared/widgets/app_skeletonizer.dart` | Dart source | verified | MOTION-001 | Shimmer respects reduced motion and preserves truthful loading geometry | `98b7a40` |
 | `lib/shared/widgets/aster_divider.dart` | Dart source | reviewed-clean | DS-001, DS-004 | Divider consumes semantic border, stroke, and inset roles without raw feature geometry | `98b7a40` |
 | `lib/shared/widgets/aster_icon_button.dart` | Dart source | verified | ACCESS-002, ACCESS-006, UX-001, UX-003, MOTION-001 | Shared semantics own the tap action only while enabled so excluded native descendants cannot make icon commands inaccessible; focused and aggregate semantic tests pass | `98b7a40`, `acd42ab`, `e9d7fab` |
+| `lib/shared/widgets/aster_noise_texture.dart` | Dart source | unreviewed | - | - | - |
 | `lib/shared/widgets/aster_numeric_keypad.dart` | Dart source | verified | DEP-006, PAY-004, DS-001, UX-001, ACCESS-002 | App-owned semantic squircle keypad applies bounded exact-input edits, locale-neutral decimal behavior, haptics, keyboard semantics, fixed geometry, and disabled state under focused tests | `db844ac` |
 | `lib/shared/widgets/aster_option_row.dart` | Dart source | verified | ARCH-006, DS-001, ACCESS-002, SETTINGS-004 | Reusable action row omits a navigation chevron when no action exists while retaining disabled semantics, stable layout, keyboard activation, and accepted-action haptics; exact candidate tests pass | `db844ac`, `89c8d7f` |
 | `lib/shared/widgets/aster_pill.dart` | Dart source | verified | DS-001 | True stadium geometry is encapsulated for pill-only surfaces | `98b7a40` |

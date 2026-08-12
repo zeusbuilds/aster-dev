@@ -27,8 +27,14 @@ final class SecureStorageService implements SecureKeyValueStore {
             ),
             aOptions: AndroidOptions(
               resetOnError: false,
+              // Pin the cryptographic contract instead of inheriting mutable
+              // plugin defaults. Version 10.3.1 treats absent first-install
+              // markers as legacy, so crash-safe migration must stay enabled.
               migrateOnAlgorithmChange: true,
               migrateWithBackup: true,
+              keyCipherAlgorithm:
+                  KeyCipherAlgorithm.RSA_ECB_OAEPwithSHA_256andMGF1Padding,
+              storageCipherAlgorithm: StorageCipherAlgorithm.AES_GCM_NoPadding,
               storageNamespace: 'utexo_wallet_secrets_v1',
             ),
           );

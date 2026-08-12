@@ -26,8 +26,8 @@
             "solid" : "srgb:1.00000,1.00000,1.00000,1.00000"
           },
           "glass" : true,
-          "image-name" : "aster_logo.svg",
-          "name" : "aster_app_icon",
+          "image-name" : "utexo_mark.svg",
+          "name" : "utexo_app_icon",
           "position" : {
             "scale" : 2,
             "translation-in-points" : [

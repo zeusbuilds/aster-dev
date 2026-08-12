@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:aster/features/onboarding/presentation/screens/screens.dart';
 import 'package:aster/features/onboarding/presentation/view_model/view_models.dart';
+import 'package:aster/features/onboarding/presentation/widgets/widgets.dart';
 import 'package:aster/features/wallet/presentation/view_model/wallet_view_model.dart';
 import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
@@ -178,6 +179,42 @@ void main() {
           null,
     );
     expect(harness.haptics.intents, contains(HapticIntent.success));
+  });
+
+  testWidgets('welcome mesh avoids backdrop capture and bounds image decode', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 3;
+    tester.view.physicalSize = const Size(1290, 2796);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: const Scaffold(body: OnboardingWelcomeMeshBackground()),
+      ),
+    );
+
+    final mesh = find.byType(OnboardingWelcomeMeshBackground);
+    expect(
+      find.descendant(of: mesh, matching: find.byType(ImageFiltered)),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: mesh, matching: find.byType(BackdropFilter)),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: mesh, matching: find.byType(AsterNoiseTexture)),
+      findsOneWidget,
+    );
+    final noiseImage = tester.widget<Image>(
+      find.descendant(of: mesh, matching: find.byType(Image)),
+    );
+    expect(noiseImage.image, isA<ResizeImage>());
+    expect((noiseImage.image as ResizeImage).width, 1600);
+    expect(tester.takeException(), isNull);
   });
 
   for (final scenario in const [

@@ -23,7 +23,7 @@ class SplashScreen extends StatelessWidget {
         ),
         child: Center(
           child: SvgPicture.asset(
-            'assets/brand/aster-logo.svg',
+            'assets/brand/utexo-mark.svg',
             width: metrics.splashLogoWidth,
             colorFilter: ColorFilter.mode(colors.onBrandArt, BlendMode.srcIn),
           ),
