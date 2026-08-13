@@ -831,12 +831,10 @@ void main() {
       'wallet_id_collision',
     );
     expect(directories.created, isEmpty);
-    final retained =
-        (await WalletSecretStore(
-                  rawSecrets,
-                ).read(walletId, expectedStorageToken: storageToken)
-                as AppSuccess<WalletSecret>)
-            .value;
+    final retained = (await WalletSecretStore(rawSecrets).read(
+      walletId,
+      expectedStorageToken: storageToken,
+    ) as AppSuccess<WalletSecret>).value;
     expect(retained.databasePassword, existingSecret.databasePassword);
   });
 

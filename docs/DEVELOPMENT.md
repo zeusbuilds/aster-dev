@@ -172,12 +172,12 @@ development prerequisites. The environment includes:
 
 The flake deliberately does not install Flutter or Dart. It places the
 project-local `.fvm/flutter_sdk/bin` on `PATH`; FVM remains the sole source of
-truth for Flutter 3.44.9 and Dart 3.12.2. Run `make fvm-setup` before entering
+truth for Flutter 3.47.0 and Dart 3.13.0. Run `make fvm-setup` before entering
 the shell, and do not use a separately installed Dart SDK for app generation,
 analysis, tests, or documentation.
 
 Flutter itself is managed via [FVM](https://fvm.app/) and pinned per project
-using `.fvmrc` (`flutterSdkVersion: 3.44.9`). This keeps the Flutter version
+using `.fvmrc` (`flutter: 3.47.0`). This keeps the Flutter version
 consistent across developers without relying on the Nix store.
 
 ## Local SDK Development

@@ -367,8 +367,7 @@ final class _TestWalletViewModel extends WalletViewModel {
 
 final class _CatalogAssetBundle extends CachingAssetBundle {
   static const _sources = {
-    'assets/data/currencies.json':
-        '[{"name":"United States Dollar","symbol":"\$","code":"USD","countryCode":"US"}]',
+    'assets/data/currencies.json': '[{"name":"United States Dollar","symbol":"\$","code":"USD","countryCode":"US"}]',
     'assets/data/countries.json': '[{"name":"United States","code":"US"}]',
   };
 

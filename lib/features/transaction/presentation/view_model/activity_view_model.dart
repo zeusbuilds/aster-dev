@@ -79,7 +79,7 @@ class ActivityViewModel extends _$ActivityViewModel {
   Future<AppResult<WalletActivityFeed>> _feed(WalletAssetKind kind) async {
     try {
       final repository = await ref.read(walletRepositoryProvider.future);
-      return repository.activityFeed(kind);
+      return await repository.activityFeed(kind);
     } catch (error, stackTrace) {
       return AppResult.failure(FailureMapper.from(error, stackTrace));
     }
@@ -94,7 +94,7 @@ class ActivityViewModel extends _$ActivityViewModel {
       if (sync case AppFailureResult<void>(:final failure)) {
         return AppResult.failure(failure);
       }
-      return repository.activityFeed(kind);
+      return await repository.activityFeed(kind);
     } catch (error, stackTrace) {
       return AppResult.failure(FailureMapper.from(error, stackTrace));
     }

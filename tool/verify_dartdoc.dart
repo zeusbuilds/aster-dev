@@ -26,9 +26,9 @@ Future<void> main() async {
       return;
     }
 
-    final libraryCount = RegExp(
-      r'Documented ([0-9]+) public libraries',
-    ).firstMatch(diagnostics)?.group(1);
+    final libraryCount = RegExp(r'Documented ([0-9]+) public libraries')
+        .firstMatch(diagnostics)
+        ?.group(1);
     stdout.writeln(
       'Dartdoc completed without warnings or errors'
       '${libraryCount == null ? '' : ' for $libraryCount public libraries'}.',

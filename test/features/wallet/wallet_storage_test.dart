@@ -167,10 +167,10 @@ void main() {
       await store.write(firstId, original);
 
       final duplicate = await store.write(firstId, replacement);
-      final retained =
-          (await store.read(firstId, expectedStorageToken: firstToken)
-                  as AppSuccess<WalletSecret>)
-              .value;
+      final retained = (await store.read(
+        firstId,
+        expectedStorageToken: firstToken,
+      ) as AppSuccess<WalletSecret>).value;
 
       expect(duplicate, isA<AppFailureResult<void>>());
       expect(
@@ -528,9 +528,8 @@ void main() {
       );
       await store.write('{"revision":1}');
       await store.write('{"revision":2}');
-      await File(
-        '${root.path}${Platform.pathSeparator}wallet_registry.b.json',
-      ).writeAsString('{corrupt', flush: true);
+      await File('${root.path}${Platform.pathSeparator}wallet_registry.b.json')
+          .writeAsString('{corrupt', flush: true);
 
       expect(await store.read(), '{"revision":1}');
     },
@@ -549,12 +548,10 @@ void main() {
       );
       await store.write('{"revision":1}');
       await store.write('{"revision":2}');
-      await File(
-        '${root.path}${Platform.pathSeparator}wallet_registry.a.json',
-      ).writeAsString('{corrupt-a', flush: true);
-      await File(
-        '${root.path}${Platform.pathSeparator}wallet_registry.b.json',
-      ).writeAsString('{corrupt-b', flush: true);
+      await File('${root.path}${Platform.pathSeparator}wallet_registry.a.json')
+          .writeAsString('{corrupt-a', flush: true);
+      await File('${root.path}${Platform.pathSeparator}wallet_registry.b.json')
+          .writeAsString('{corrupt-b', flush: true);
 
       await expectLater(
         store.read(),

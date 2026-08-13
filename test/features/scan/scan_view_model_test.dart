@@ -20,9 +20,8 @@ void main() {
       final haptics = RecordingHapticFeedbackService();
       final container = ProviderContainer(
         overrides: [
-          scanSessionProvider(
-            ScanPurpose.sendLauncher,
-          ).overrideWithValue(session),
+          scanSessionProvider(ScanPurpose.sendLauncher)
+              .overrideWithValue(session),
           hapticFeedbackServiceProvider.overrideWithValue(haptics),
         ],
       );
@@ -78,9 +77,8 @@ void main() {
       final haptics = RecordingHapticFeedbackService();
       final container = ProviderContainer(
         overrides: [
-          scanSessionProvider(
-            ScanPurpose.sendLauncher,
-          ).overrideWithValue(session),
+          scanSessionProvider(ScanPurpose.sendLauncher)
+              .overrideWithValue(session),
           hapticFeedbackServiceProvider.overrideWithValue(haptics),
         ],
       );
@@ -116,9 +114,8 @@ void main() {
         ..reportedZoomScale = 0.5;
       final container = ProviderContainer(
         overrides: [
-          scanSessionProvider(
-            ScanPurpose.sendLauncher,
-          ).overrideWithValue(session),
+          scanSessionProvider(ScanPurpose.sendLauncher)
+              .overrideWithValue(session),
           hapticFeedbackServiceProvider.overrideWithValue(
             RecordingHapticFeedbackService(),
           ),
@@ -150,9 +147,8 @@ void main() {
       final haptics = RecordingHapticFeedbackService();
       final container = ProviderContainer(
         overrides: [
-          scanSessionProvider(
-            ScanPurpose.destinationPicker,
-          ).overrideWithValue(session),
+          scanSessionProvider(ScanPurpose.destinationPicker)
+              .overrideWithValue(session),
           hapticFeedbackServiceProvider.overrideWithValue(haptics),
         ],
       );
@@ -193,9 +189,8 @@ void main() {
       final haptics = RecordingHapticFeedbackService();
       final container = ProviderContainer(
         overrides: [
-          scanSessionProvider(
-            ScanPurpose.sendLauncher,
-          ).overrideWithValue(session),
+          scanSessionProvider(ScanPurpose.sendLauncher)
+              .overrideWithValue(session),
           hapticFeedbackServiceProvider.overrideWithValue(haptics),
         ],
       );
@@ -239,9 +234,8 @@ void main() {
     final haptics = RecordingHapticFeedbackService();
     final container = ProviderContainer(
       overrides: [
-        scanSessionProvider(
-          ScanPurpose.sendLauncher,
-        ).overrideWithValue(session),
+        scanSessionProvider(ScanPurpose.sendLauncher)
+            .overrideWithValue(session),
         hapticFeedbackServiceProvider.overrideWithValue(haptics),
       ],
     );
@@ -293,9 +287,8 @@ void main() {
     final haptics = RecordingHapticFeedbackService();
     final container = ProviderContainer(
       overrides: [
-        scanSessionProvider(
-          ScanPurpose.sendLauncher,
-        ).overrideWithValue(session),
+        scanSessionProvider(ScanPurpose.sendLauncher)
+            .overrideWithValue(session),
         hapticFeedbackServiceProvider.overrideWithValue(haptics),
       ],
     );
@@ -362,9 +355,8 @@ void main() {
     final haptics = RecordingHapticFeedbackService();
     final container = ProviderContainer(
       overrides: [
-        scanSessionProvider(
-          ScanPurpose.sendLauncher,
-        ).overrideWithValue(session),
+        scanSessionProvider(ScanPurpose.sendLauncher)
+            .overrideWithValue(session),
         hapticFeedbackServiceProvider.overrideWithValue(haptics),
       ],
     );

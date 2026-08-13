@@ -542,12 +542,10 @@ void main() {
       expect(result, isA<AppFailureResult<void>>());
       expect(directories.created, [firstId]);
       expect(directories.removed, [firstId]);
-      final retained =
-          (await WalletSecretStore(
-                    rawSecrets,
-                  ).read(firstId, expectedStorageToken: secondToken)
-                  as AppSuccess<WalletSecret>)
-              .value;
+      final retained = (await WalletSecretStore(rawSecrets).read(
+        firstId,
+        expectedStorageToken: secondToken,
+      ) as AppSuccess<WalletSecret>).value;
       expect(retained.databasePassword, original.databasePassword);
     },
   );

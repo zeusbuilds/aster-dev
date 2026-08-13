@@ -77,7 +77,7 @@ Future<AppResult<void>> _disposePartiallyConstructedRuntime(
 ) async {
   try {
     final runtime = await container.read(walletRuntimeProvider.future);
-    return runtime.dispose();
+    return await runtime.dispose();
   } catch (_) {
     // WalletRuntime is assigned only after all of its dependencies resolve.
     // A provider construction failure before that point owns no native handle.

@@ -97,7 +97,7 @@ class CreateWalletViewModel extends _$CreateWalletViewModel {
   Future<AppResult<String>> _generateMnemonic() async {
     try {
       final repository = await ref.read(walletRepositoryProvider.future);
-      return repository.generateMnemonic();
+      return await repository.generateMnemonic();
     } catch (error, stackTrace) {
       return AppResult.failure(FailureMapper.from(error, stackTrace));
     }
@@ -106,7 +106,7 @@ class CreateWalletViewModel extends _$CreateWalletViewModel {
   Future<AppResult<WalletRegistry>> _createWallet(String mnemonic) async {
     try {
       final repository = await ref.read(walletRepositoryProvider.future);
-      return repository.createFromMnemonic(
+      return await repository.createFromMnemonic(
         mnemonic: mnemonic,
         name: 'Primary Wallet',
       );

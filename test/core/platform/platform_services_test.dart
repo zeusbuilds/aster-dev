@@ -95,9 +95,9 @@ void main() {
         invoker: (text, subject, origin) =>
             throw StateError('private payment request'),
       );
-      final failedResult =
-          await failed.shareText('payment-request')
-              as AppFailureResult<ShareDisposition>;
+      final failedResult = await failed.shareText(
+        'payment-request',
+      ) as AppFailureResult<ShareDisposition>;
       expect(failedResult.failure.code, 'share_failed');
       expect(
         failedResult.failure.userMessage,

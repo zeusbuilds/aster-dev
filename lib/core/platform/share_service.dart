@@ -37,12 +37,11 @@ final class ShareOrigin {
       height > 0;
 }
 
-typedef ShareTextInvoker =
-    Future<ShareInvocationOutcome> Function(
-      String text,
-      String? subject,
-      ShareOrigin? origin,
-    );
+typedef ShareTextInvoker = Future<ShareInvocationOutcome> Function(
+  String text,
+  String? subject,
+  ShareOrigin? origin,
+);
 
 /// System share boundary for non-secret payment requests.
 abstract interface class ShareService {

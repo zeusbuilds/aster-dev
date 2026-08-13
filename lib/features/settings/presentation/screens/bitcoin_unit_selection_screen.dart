@@ -44,9 +44,8 @@ class BitcoinUnitSelectionScreen extends ConsumerWidget {
                     final unit = BitcoinUnit.values[index];
                     return SettingsChoiceRow(
                       title: unit.displayName,
-                      subtitle: BitcoinAmountFormatter(
-                        unit: unit,
-                      ).format(_exampleSatoshis),
+                      subtitle: BitcoinAmountFormatter(unit: unit)
+                          .format(_exampleSatoshis),
                       selected: selected == unit,
                       onTap: saving
                           ? null

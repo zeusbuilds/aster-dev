@@ -58,9 +58,9 @@ void main() {
     );
 
     final config =
-        verify(
-              () => sdk.wallet(config: captureAny(named: 'config')),
-            ).captured.single
+        verify(() => sdk.wallet(config: captureAny(named: 'config')))
+                .captured
+                .single
             as UtexoWalletConfig;
     expect(config.vssUrl, localServices.vssUrl);
     expect(config.vssAllowHttp, isTrue);
@@ -97,9 +97,8 @@ void main() {
         mnemonic: 'mnemonic words',
       ),
     ).called(1);
-    verify(
-      () => wallet.unlock(password: 'database-password', config: unlock),
-    ).called(1);
+    verify(() => wallet.unlock(password: 'database-password', config: unlock))
+        .called(1);
   });
 
   test(
@@ -107,9 +106,8 @@ void main() {
     () async {
       final observedAt = DateTime.utc(2026, 8, 11, 10);
       final wallet = MockUtexoWallet();
-      when(
-        () => wallet.estimateFeeRate(6),
-      ).thenAnswer((_) async => const FeeEstimationResponse(feeRate: 1.25));
+      when(() => wallet.estimateFeeRate(6))
+          .thenAnswer((_) async => const FeeEstimationResponse(feeRate: 1.25));
       final engine = RgbWalletEngine(
         wallet,
         services,
@@ -146,9 +144,8 @@ void main() {
       WalletFeeRateEstimate.maximumSatsPerVbyte + 0.1,
     ]) {
       final wallet = MockUtexoWallet();
-      when(
-        () => wallet.estimateFeeRate(6),
-      ).thenAnswer((_) async => FeeEstimationResponse(feeRate: value));
+      when(() => wallet.estimateFeeRate(6))
+          .thenAnswer((_) async => FeeEstimationResponse(feeRate: value));
       final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
 
       await expectLater(
@@ -314,9 +311,8 @@ void main() {
 
     expect(await engine.getBitcoinAddress(), address);
 
-    when(
-      () => wallet.getAddress(),
-    ).thenAnswer((_) async => '1BoatSLRHtKNngkdXEeobR76b53LETtpyT');
+    when(() => wallet.getAddress())
+        .thenAnswer((_) async => '1BoatSLRHtKNngkdXEeobR76b53LETtpyT');
     await expectLater(
       engine.getBitcoinAddress(),
       throwsA(isA<NativeProtocolException>()),
@@ -556,9 +552,8 @@ void main() {
     final wallet = MockUtexoWallet();
     final address = _regtestAddress();
     when(() => wallet.getAddress()).thenAnswer((_) async => address);
-    when(
-      () => wallet.sendBtc(amount: 123456789, address: address, feeRate: 3),
-    ).thenAnswer((_) async => 'bitcoin-txid');
+    when(() => wallet.sendBtc(amount: 123456789, address: address, feeRate: 3))
+        .thenAnswer((_) async => 'bitcoin-txid');
     final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
     const route = PaymentRoute(
       asset: WalletAsset.bitcoin,

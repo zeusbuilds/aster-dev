@@ -233,9 +233,8 @@ Future<void> _pump(
             return textScaler == null
                 ? content
                 : MediaQuery(
-                    data: MediaQuery.of(
-                      context,
-                    ).copyWith(textScaler: textScaler),
+                    data: MediaQuery.of(context)
+                        .copyWith(textScaler: textScaler),
                     child: content,
                   );
           },

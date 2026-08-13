@@ -77,7 +77,7 @@ class HomeViewModel extends _$HomeViewModel {
   Future<AppResult<WalletPortfolio>> _portfolio() async {
     try {
       final repository = await ref.read(walletRepositoryProvider.future);
-      return repository.portfolio();
+      return await repository.portfolio();
     } catch (error, stackTrace) {
       return AppResult.failure(FailureMapper.from(error, stackTrace));
     }
@@ -90,7 +90,7 @@ class HomeViewModel extends _$HomeViewModel {
       if (sync case AppFailureResult<void>(:final failure)) {
         return AppResult.failure(failure);
       }
-      return repository.portfolio();
+      return await repository.portfolio();
     } catch (error, stackTrace) {
       return AppResult.failure(FailureMapper.from(error, stackTrace));
     }

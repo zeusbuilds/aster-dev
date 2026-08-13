@@ -65,7 +65,7 @@ class WalletViewModel extends _$WalletViewModel {
   Future<AppResult<WalletRegistry>> _switchWallet(String walletId) async {
     try {
       final repository = await ref.read(walletRepositoryProvider.future);
-      return repository.switchWallet(walletId);
+      return await repository.switchWallet(walletId);
     } catch (error, stackTrace) {
       return AppResult.failure(FailureMapper.from(error, stackTrace));
     }

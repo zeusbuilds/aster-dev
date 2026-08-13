@@ -19,7 +19,7 @@ eligible for a funds-bearing mainnet release.
 - Swap has no execution backend and never simulates a quote or success.
 
 The complete, evidence-backed status is maintained in
-[PRODUCTION_REFACTOR_TRACKER.md](https://github.com/zeusbuilds/aster-dev/blob/main/docs/PRODUCTION_REFACTOR_TRACKER.md).
+`docs/PRODUCTION_REFACTOR_TRACKER.md`.
 
 ## Product Model
 
@@ -49,8 +49,8 @@ cross that boundary. Repositories and ViewModels use one typed `AppResult` /
 `AppFailure` contract, and feature UI does not call plugins or infrastructure
 directly.
 
-See [ARCHITECTURE.md](https://github.com/zeusbuilds/aster-dev/blob/main/docs/architecture/ARCHITECTURE.md)
-and [SDK_INTEGRATION.md](https://github.com/zeusbuilds/aster-dev/blob/main/docs/architecture/SDK_INTEGRATION.md).
+See `docs/architecture/ARCHITECTURE.md` and
+`docs/architecture/SDK_INTEGRATION.md`.
 
 ## Setup
 
@@ -67,12 +67,11 @@ make bootstrap
 make run
 ```
 
-Flutter `3.44.9` and Dart `3.12.2` are pinned. Flutter 3.44.9 was the latest
-stable patch when this release-candidate pass began on 2026-08-12.
+Flutter `3.47.0` and Dart `3.13.0` are pinned. Flutter 3.47.0 was the latest
+stable release in Flutter's official archive when verified on 2026-08-13.
 
 For complete setup, build defines, the optional uncommitted local SDK override,
-and protected-regtest isolation, read
-[DEVELOPMENT.md](https://github.com/zeusbuilds/aster-dev/blob/main/docs/DEVELOPMENT.md).
+and protected-regtest isolation, read `docs/DEVELOPMENT.md`.
 
 ## Quality Gates
 
@@ -87,26 +86,24 @@ boundaries, and checks tracker inventory. iOS/Android builds, native tests,
 runtime smokes, and profile measurements remain exact-candidate release gates;
 a host-only green CI job is not platform qualification.
 
-See [TESTING.md](https://github.com/zeusbuilds/aster-dev/blob/main/docs/TESTING.md)
-and [RELEASE_CHECKLIST.md](https://github.com/zeusbuilds/aster-dev/blob/main/docs/release/RELEASE_CHECKLIST.md).
+See `docs/TESTING.md` and `docs/release/RELEASE_CHECKLIST.md`.
 
 ## Security
 
 Never place mnemonics, database passwords, credentials, tokens, invoices, or
 live wallet paths in issues, logs, screenshots, build defines, or test fixtures.
-Read [SECURITY.md](https://github.com/zeusbuilds/aster-dev/blob/main/docs/SECURITY.md)
-before changing storage, lifecycle, networking, onboarding, disclosure, or
-logging behavior.
+Read `docs/SECURITY.md` before changing storage, lifecycle, networking,
+onboarding, disclosure, or logging behavior.
 
 ## Documentation
 
-- [Development setup](https://github.com/zeusbuilds/aster-dev/blob/main/docs/DEVELOPMENT.md)
-- [Architecture](https://github.com/zeusbuilds/aster-dev/blob/main/docs/architecture/ARCHITECTURE.md)
-- [SDK integration](https://github.com/zeusbuilds/aster-dev/blob/main/docs/architecture/SDK_INTEGRATION.md)
-- [Network reliability](https://github.com/zeusbuilds/aster-dev/blob/main/docs/architecture/NETWORK_RELIABILITY.md)
-- [Barrel exports](https://github.com/zeusbuilds/aster-dev/blob/main/docs/architecture/BARREL_EXPORTS.md)
-- [Presentation systems](https://github.com/zeusbuilds/aster-dev/blob/main/docs/design/PRESENTATION_SYSTEMS.md)
-- [Typography and tokens](https://github.com/zeusbuilds/aster-dev/blob/main/docs/design/TYPOGRAPHY_USAGE.md)
-- [Security](https://github.com/zeusbuilds/aster-dev/blob/main/docs/SECURITY.md)
-- [Testing](https://github.com/zeusbuilds/aster-dev/blob/main/docs/TESTING.md)
-- [Regtest isolation](https://github.com/zeusbuilds/aster-dev/blob/main/docs/REGTEST.md)
+- Development setup: `docs/DEVELOPMENT.md`
+- Architecture: `docs/architecture/ARCHITECTURE.md`
+- SDK integration: `docs/architecture/SDK_INTEGRATION.md`
+- Network reliability: `docs/architecture/NETWORK_RELIABILITY.md`
+- Barrel exports: `docs/architecture/BARREL_EXPORTS.md`
+- Presentation systems: `docs/design/PRESENTATION_SYSTEMS.md`
+- Typography and tokens: `docs/design/TYPOGRAPHY_USAGE.md`
+- Security: `docs/SECURITY.md`
+- Testing: `docs/TESTING.md`
+- Regtest isolation: `docs/REGTEST.md`

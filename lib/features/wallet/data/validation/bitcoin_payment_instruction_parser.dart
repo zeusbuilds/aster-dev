@@ -419,8 +419,7 @@ final class BitcoinPaymentInstructionParser
   static AppFailure _ambiguousLightningInstruction() => const AppFailure(
     code: 'bitcoin_lightning_instruction_ambiguous',
     kind: AppFailureKind.unsupported,
-    userMessage:
-        'This payment request contains multiple Lightning choices, which are not yet supported.',
+    userMessage: 'This payment request contains multiple Lightning choices, which are not yet supported.',
     retryable: false,
   );
 }

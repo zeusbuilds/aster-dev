@@ -180,9 +180,8 @@ final class BitcoinMarketRepository {
     if (!value.isFinite || value.isNegative) {
       throw const FormatException('Price must be finite and non-negative.');
     }
-    final match = RegExp(
-      r'^(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$',
-    ).firstMatch(value.toString());
+    final match = RegExp(r'^(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$')
+        .firstMatch(value.toString());
     if (match == null) throw const FormatException('Invalid decimal price.');
     final whole = match.group(1)!;
     final fraction = match.group(2) ?? '';

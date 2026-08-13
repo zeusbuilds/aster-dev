@@ -6,8 +6,8 @@ publish_to: "none"
 version: 1.0.0+1
 
 environment:
-  sdk: ">=3.12.2 <4.0.0"
-  flutter: ">=3.44.9"
+  sdk: ">=3.13.0 <4.0.0"
+  flutter: ">=3.47.0"
 
 dependencies:
   flutter:
@@ -16,10 +16,9 @@ dependencies:
     sdk: flutter
 
   # State Management
-  # Flutter 3.44.9 pins meta/test_api below the Riverpod 3.4 toolchain's
-  # requirements. This is the newest compatible stable Riverpod release set.
-  flutter_riverpod: 3.3.2
-  riverpod_annotation: 4.0.3
+  # Keep the Riverpod runtime and generated annotations on one reviewed set.
+  flutter_riverpod: 3.4.2
+  riverpod_annotation: 4.0.6
 
   # Networking
   http: ^1.6.0
@@ -31,7 +30,7 @@ dependencies:
       ref: 3dd82e23d80bb4bb6a2d2526c6c6741ac1ea1236
 
   # Storage
-  # 11.0.0 requires Android compile SDK 37, ahead of Flutter 3.44.9's SDK 36.
+  # 11.0.0 requires Android compile SDK 37, ahead of Flutter 3.47.0's SDK 36.
   flutter_secure_storage: 10.3.1
   package_info_plus: ^10.2.1
   path_provider: ^2.1.5
@@ -48,8 +47,7 @@ dependencies:
   collection: ^1.19.1
   crypto: ^3.0.7
   dart_bech32: 2.0.0
-  # Flutter 3.44.9 pins intl 0.20.2 through flutter_localizations.
-  intl: ^0.20.2
+  intl: ^0.20.3
 
   # Icons
   # Flutter's Cupertino framework paths require this font during release
@@ -79,8 +77,8 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 
   # Code Generation
-  build_runner: 2.15.1
-  riverpod_generator: 4.0.4
+  build_runner: 2.16.0
+  riverpod_generator: 4.0.8
 
   # Testing
   integration_test:

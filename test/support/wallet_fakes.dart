@@ -429,8 +429,7 @@ final class FakeWalletEngine implements WalletEngine {
         WalletNetworkStatus(
           environment: BlockchainEnvironment.regtest,
           blockHeight: 0,
-          nodePublicKey:
-              '020000000000000000000000000000000000000000000000000000000000000000',
+          nodePublicKey: '020000000000000000000000000000000000000000000000000000000000000000',
           channelCount: 0,
           usableChannelCount: 0,
           peerCount: 0,
