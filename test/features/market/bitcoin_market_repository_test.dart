@@ -9,6 +9,7 @@ import 'package:http/testing.dart';
 
 void main() {
   final now = DateTime.utc(2026, 8, 8, 12);
+  final windowFirst = now.subtract(BitcoinMarketSnapshot.historyWindow);
   final recentFirst = now.subtract(const Duration(minutes: 10));
   final recentLast = now.subtract(const Duration(minutes: 1));
 
@@ -21,7 +22,7 @@ void main() {
         expect(request.url.queryParameters['precision'], 'full');
         return _historyResponse([
           [recentLast.millisecondsSinceEpoch, 65000.129],
-          [recentFirst.millisecondsSinceEpoch, 64000.125],
+          [windowFirst.millisecondsSinceEpoch, 64000.125],
           [recentLast.millisecondsSinceEpoch, 65001.999],
         ]);
       }
@@ -59,7 +60,7 @@ void main() {
       6400013,
       6500200,
     ]);
-    expect(snapshot.history.first.timestamp.isUtc, isTrue);
+    expect(snapshot.history.first.timestamp, windowFirst);
   });
 
   test('rounds zero-, two-, and three-decimal fiat minor units', () async {
@@ -121,10 +122,8 @@ void main() {
 
     expect(snapshot.currentBitcoinPrice.minorUnits, 6500000);
     expect(snapshot.currentSource, BitcoinPriceSource.historyFallback);
-    expect(
-      snapshot.currentBitcoinPrice.observedAt,
-      snapshot.history.last.timestamp,
-    );
+    expect(snapshot.currentBitcoinPrice.observedAt, recentLast);
+    expect(snapshot.history, isEmpty);
     expect(snapshot.currentUsdtPrice, isNull);
   });
 
@@ -386,6 +385,90 @@ void main() {
       }
     },
   );
+
+  test('omits truncated chart history while retaining a valid spot', () async {
+    final transport = _transport((request) async {
+      if (request.url.path.endsWith('/range')) {
+        return _historyResponse([
+          [recentFirst.millisecondsSinceEpoch, 64000],
+          [recentLast.millisecondsSinceEpoch, 65000],
+        ]);
+      }
+      return _currentResponse(
+        currency: 'usd',
+        bitcoin: 65100,
+        tether: 1,
+        observedAt: recentLast,
+      );
+    });
+    addTearDown(transport.close);
+
+    final result = await BitcoinMarketRepository(
+      transport,
+      MarketDataConfiguration.developmentKeyless(),
+      clock: () => now,
+    ).fetch(currency: _usd);
+    final snapshot = (result as AppSuccess<BitcoinMarketSnapshot>).value;
+
+    expect(snapshot.currentBitcoinPrice.minorUnits, 6510000);
+    expect(snapshot.currentSource, BitcoinPriceSource.spot);
+    expect(snapshot.history, isEmpty);
+    expect(snapshot.changeBasisPoints, isNull);
+  });
+
+  test('enforces exact 24-hour chart endpoint tolerances', () async {
+    Future<List<BitcoinPricePoint>> fetchHistory({
+      required DateTime first,
+      required DateTime last,
+    }) async {
+      final transport = _transport((request) async {
+        if (request.url.path.endsWith('/range')) {
+          return _historyResponse([
+            [first.millisecondsSinceEpoch, 64000],
+            [last.millisecondsSinceEpoch, 65000],
+          ]);
+        }
+        return _currentResponse(
+          currency: 'usd',
+          bitcoin: 65100,
+          tether: 1,
+          observedAt: recentLast,
+        );
+      });
+      try {
+        final result = await BitcoinMarketRepository(
+          transport,
+          MarketDataConfiguration.developmentKeyless(),
+          clock: () => now,
+        ).fetch(currency: _usd);
+        return (result as AppSuccess<BitcoinMarketSnapshot>).value.history;
+      } finally {
+        transport.close();
+      }
+    }
+
+    final latestStart = windowFirst.add(
+      BitcoinMarketSnapshot.maximumHistoryStartLag,
+    );
+    final earliestEnd = now.subtract(
+      BitcoinMarketSnapshot.maximumHistoryEndAge,
+    );
+    expect(
+      await fetchHistory(
+        first: latestStart,
+        last: earliestEnd.add(const Duration(milliseconds: 1)),
+      ),
+      hasLength(2),
+    );
+    expect(
+      await fetchHistory(
+        first: latestStart.add(const Duration(milliseconds: 1)),
+        last: recentLast,
+      ),
+      isEmpty,
+    );
+    expect(await fetchHistory(first: windowFirst, last: earliestEnd), isEmpty);
+  });
 
   test('rejects stale and out-of-skew prices as current', () async {
     final stale = now.subtract(const Duration(hours: 2));

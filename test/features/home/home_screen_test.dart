@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:aster/core/core.dart';
@@ -219,6 +220,124 @@ void main() {
     expect(find.text('Send target selector'), findsOneWidget);
   });
 
+  testWidgets('market header preserves loading geometry and signed semantics', (
+    tester,
+  ) async {
+    final now = DateTime.utc(2026, 8, 11, 12);
+    final observed = now.subtract(const Duration(minutes: 1));
+    final historyGate = Completer<http.Response>();
+    final currentGate = Completer<http.Response>();
+    final httpClient = ResilientHttpClient(
+      client: MockClient((request) {
+        return request.url.path.endsWith('/range')
+            ? historyGate.future
+            : currentGate.future;
+      }),
+      retryPolicy: RetryPolicy(maxAttempts: 1),
+    );
+    final harness = await PaymentFlowTestHarness.create(
+      clock: () => now,
+      httpClient: httpClient,
+    );
+    addTearDown(httpClient.close);
+    addTearDown(() => _disposeHarness(tester, harness));
+
+    await _pump(tester, harness, const HomeScreen());
+    await _pumpUntil(
+      tester,
+      () => find
+          .bySemanticsLabel('Bitcoin price loading. Powered by CoinGecko.')
+          .evaluate()
+          .isNotEmpty,
+    );
+    final loadingSize = tester.getSize(find.byType(PriceCard));
+    expect(
+      tester
+          .widgetList<AppSkeletonizer>(
+            find.descendant(
+              of: find.byType(PriceCard),
+              matching: find.byType(AppSkeletonizer),
+            ),
+          )
+          .any((widget) => widget.enabled),
+      isTrue,
+    );
+    expect(find.bySemanticsLabel(RegExp('000,000')), findsNothing);
+
+    historyGate.complete(
+      _historyResponse(now: now, firstPrice: 99000, lastPrice: 100000),
+    );
+    currentGate.complete(
+      _currentResponse(observedAt: observed, bitcoinPrice: 100000),
+    );
+    const loadedLabel =
+        r'Bitcoin price $100,000.00 USD. up 1.0% over 24 hours. '
+        'Powered by CoinGecko.';
+    await _pumpUntil(
+      tester,
+      () => find.bySemanticsLabel(loadedLabel).evaluate().isNotEmpty,
+    );
+
+    expect(tester.getSize(find.byType(PriceCard)), loadingSize);
+    final percentage = find.byWidgetPredicate(
+      (widget) => widget is NumericText && widget.text == '1.0%',
+    );
+    expect(percentage, findsOneWidget);
+    final richText = tester.widget<Text>(
+      find.descendant(of: percentage, matching: find.byType(Text)),
+    );
+    final spans = (richText.textSpan! as TextSpan).children!.cast<TextSpan>();
+    expect(spans.map((span) => span.text), ['1.0', '%']);
+    expect(spans.map((span) => span.style?.fontFamily), [
+      'Public Sans',
+      'DM Sans',
+    ]);
+  });
+
+  testWidgets('market header announces falling and unavailable prices', (
+    tester,
+  ) async {
+    final now = DateTime.utc(2026, 8, 11, 12);
+    final fallingClient = _marketClient(
+      now,
+      firstPrice: 99000,
+      bitcoinPrice: 98000,
+    );
+    final fallingHarness = await PaymentFlowTestHarness.create(
+      clock: () => now,
+      httpClient: fallingClient,
+    );
+    await _pump(tester, fallingHarness, const HomeScreen());
+    const fallingLabel =
+        r'Bitcoin price $98,000.00 USD. down 1.0% over 24 hours. '
+        'Powered by CoinGecko.';
+    await _pumpUntil(
+      tester,
+      () => find.bySemanticsLabel(fallingLabel).evaluate().isNotEmpty,
+    );
+    await _disposeHarness(tester, fallingHarness);
+    fallingClient.close();
+
+    final unavailableClient = ResilientHttpClient(
+      client: MockClient((request) async => http.Response('unavailable', 503)),
+      retryPolicy: RetryPolicy(maxAttempts: 1),
+    );
+    final unavailableHarness = await PaymentFlowTestHarness.create(
+      clock: () => now,
+      httpClient: unavailableClient,
+    );
+    addTearDown(unavailableClient.close);
+    addTearDown(() => _disposeHarness(tester, unavailableHarness));
+    await _pump(tester, unavailableHarness, const HomeScreen());
+    await _pumpUntil(
+      tester,
+      () => find
+          .bySemanticsLabel('Bitcoin price unavailable. Powered by CoinGecko.')
+          .evaluate()
+          .isNotEmpty,
+    );
+  });
+
   testWidgets('home mesh blurs its own content without a backdrop capture', (
     tester,
   ) async {
@@ -258,35 +377,63 @@ void main() {
   });
 }
 
-ResilientHttpClient _marketClient(DateTime now) {
+ResilientHttpClient _marketClient(
+  DateTime now, {
+  int firstPrice = 99000,
+  int bitcoinPrice = 100000,
+}) {
   final observed = now.subtract(const Duration(minutes: 1));
   return ResilientHttpClient(
     client: MockClient((request) async {
       if (request.url.path.endsWith('/range')) {
-        return http.Response(
-          jsonEncode({
-            'prices': [
-              [
-                now.subtract(const Duration(hours: 1)).millisecondsSinceEpoch,
-                99000,
-              ],
-              [observed.millisecondsSinceEpoch, 100000],
-            ],
-          }),
-          200,
+        return _historyResponse(
+          now: now,
+          firstPrice: firstPrice,
+          lastPrice: bitcoinPrice,
         );
       }
-      return http.Response(
-        jsonEncode({
-          'bitcoin': {
-            'usd': 100000,
-            'last_updated_at': observed.millisecondsSinceEpoch ~/ 1000,
-          },
-        }),
-        200,
-      );
+      return _currentResponse(observedAt: observed, bitcoinPrice: bitcoinPrice);
     }),
     retryPolicy: RetryPolicy(maxAttempts: 1),
+  );
+}
+
+http.Response _historyResponse({
+  required DateTime now,
+  required int firstPrice,
+  required int lastPrice,
+}) {
+  return http.Response(
+    jsonEncode({
+      'prices': [
+        [
+          now
+              .subtract(BitcoinMarketSnapshot.historyWindow)
+              .millisecondsSinceEpoch,
+          firstPrice,
+        ],
+        [
+          now.subtract(const Duration(minutes: 1)).millisecondsSinceEpoch,
+          lastPrice,
+        ],
+      ],
+    }),
+    200,
+  );
+}
+
+http.Response _currentResponse({
+  required DateTime observedAt,
+  required int bitcoinPrice,
+}) {
+  return http.Response(
+    jsonEncode({
+      'bitcoin': {
+        'usd': bitcoinPrice,
+        'last_updated_at': observedAt.millisecondsSinceEpoch ~/ 1000,
+      },
+    }),
+    200,
   );
 }
 
@@ -303,7 +450,7 @@ ResilientHttpClient _marketClientWithAssetTimestamps({
             'prices': [
               [
                 now
-                    .subtract(const Duration(minutes: 20))
+                    .subtract(BitcoinMarketSnapshot.historyWindow)
                     .millisecondsSinceEpoch,
                 99000,
               ],

@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:aster/core/core.dart';
+import 'package:aster/features/home/presentation/models/models.dart';
 import 'package:aster/features/home/presentation/view_model/view_models.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:aster/features/wallet/presentation/view_model/view_models.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/payment_flow_harness.dart';
@@ -111,6 +113,56 @@ void main() {
     expect(engine.calls.where((call) => call == 'balance'), hasLength(2));
     expect(engine.calls, containsAllInOrder(['shutdown', 'reinitialize']));
   });
+
+  test('stale refresh cannot overwrite a newer provider generation', () async {
+    final engine = FakeWalletEngine();
+    final harness = await PaymentFlowTestHarness.create(engine: engine);
+    final subscription = harness.container.listen<AsyncValue<HomeState>>(
+      homeViewModelProvider,
+      (previous, next) {},
+      fireImmediately: true,
+    );
+    addTearDown(() async {
+      subscription.close();
+      await harness.dispose();
+    });
+    await harness.container.read(homeViewModelProvider.future);
+
+    final syncGate = Completer<void>();
+    engine.syncGate = syncGate;
+    final refresh = harness.container
+        .read(homeViewModelProvider.notifier)
+        .refresh();
+    await _waitFor(
+      () => engine.calls.where((call) => call == 'sync').length == 1,
+    );
+
+    final balanceGate = Completer<void>();
+    engine.balanceGate = balanceGate;
+    harness.container.invalidate(homeViewModelProvider);
+    await _waitFor(
+      () => harness.container.read(homeViewModelProvider).isLoading,
+    );
+
+    engine.syncError = StateError('stale refresh failure');
+    syncGate.complete();
+    expect(await refresh, isFalse);
+    await _waitFor(
+      () => engine.calls.where((call) => call == 'balance').length >= 2,
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    expect(
+      harness.container.read(homeViewModelProvider).isLoading,
+      isTrue,
+      reason: 'The newer build must retain publication ownership.',
+    );
+
+    balanceGate.complete();
+    final rebuilt = await harness.container.read(homeViewModelProvider.future);
+    expect(rebuilt.refreshFailure, isNull);
+    expect(rebuilt.refreshing, isFalse);
+  });
 }
 
 WalletBalance _bitcoinBalance() {
@@ -128,4 +180,12 @@ WalletBalance _bitcoinBalance() {
     lightningSpendable: lightning(1000),
     lightningReceivable: lightning(2500),
   );
+}
+
+Future<void> _waitFor(bool Function() predicate) async {
+  for (var attempt = 0; attempt < 200; attempt += 1) {
+    if (predicate()) return;
+    await Future<void>.delayed(Duration.zero);
+  }
+  fail('Timed out waiting for Home ViewModel state.');
 }

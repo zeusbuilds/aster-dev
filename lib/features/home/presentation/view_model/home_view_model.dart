@@ -11,8 +11,11 @@ part 'home_view_model.g.dart';
 /// Owns the active wallet's cross-rail portfolio and explicit refresh state.
 @riverpod
 class HomeViewModel extends _$HomeViewModel {
+  var _stateGeneration = 0;
+
   @override
   Future<HomeState> build() async {
+    _stateGeneration += 1;
     ref.watch(
       walletLifecycleViewModelProvider.select(
         (state) => state.foregroundGeneration,
@@ -32,6 +35,7 @@ class HomeViewModel extends _$HomeViewModel {
   /// Retries an initial portfolio failure without overlapping an active load.
   Future<void> retry() async {
     if (state.isLoading) return;
+    final generation = ++_stateGeneration;
     state = const AsyncLoading();
     if (ref.read(walletViewModelProvider).hasError) {
       await ref.read(walletViewModelProvider.notifier).reload();
@@ -40,7 +44,7 @@ class HomeViewModel extends _$HomeViewModel {
       final wallet = await ref.read(walletViewModelProvider.future);
       return _loadForActiveWallet(wallet.activeWallet);
     });
-    if (ref.mounted) state = next;
+    if (ref.mounted && generation == _stateGeneration) state = next;
   }
 
   /// Synchronizes the wallet and atomically replaces the displayed portfolio.
@@ -48,9 +52,10 @@ class HomeViewModel extends _$HomeViewModel {
   Future<bool> refresh() async {
     final current = state.value;
     if (current == null || current.refreshing) return false;
+    final generation = _stateGeneration;
     state = AsyncData(current.copyWith(refreshing: true, refreshFailure: null));
     final result = await _syncAndLoad();
-    if (!ref.mounted) return result is AppSuccess<WalletPortfolio>;
+    if (!ref.mounted || generation != _stateGeneration) return false;
     return switch (result) {
       AppSuccess<WalletPortfolio>(:final value) => () {
         state = AsyncData(HomeState(portfolio: value));

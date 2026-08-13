@@ -44,7 +44,7 @@ final class BitcoinMarketRepository {
         cached.snapshot.isCurrentAt(now)) {
       return AppResult.success(cached.snapshot);
     }
-    final from = now.subtract(const Duration(hours: 24));
+    final from = now.subtract(BitcoinMarketSnapshot.historyWindow);
     final historyUri = _configuration
         .endpoint('coins/bitcoin/market_chart/range')
         .replace(
@@ -71,12 +71,12 @@ final class BitcoinMarketRepository {
       _http.get(currentUri, cancellation: cancellation),
     ).wait;
 
-    List<BitcoinPricePoint> history = const [];
+    List<BitcoinPricePoint> historyCandidates = const [];
     AppFailure? historyFailure;
     switch (historyResult) {
       case AppSuccess<HttpPayload>(:final value):
         try {
-          history = _decodeHistory(
+          historyCandidates = _decodeHistory(
             value,
             currency: currency,
             earliest: from.subtract(const Duration(hours: 1)),
@@ -136,7 +136,7 @@ final class BitcoinMarketRepository {
         currentFailure = failure;
     }
 
-    final historyFallback = history.lastOrNull;
+    final historyFallback = historyCandidates.lastOrNull;
     if (currentBitcoinPrice == null &&
         historyFallback != null &&
         _isCurrent(historyFallback.timestamp, now)) {
@@ -149,6 +149,14 @@ final class BitcoinMarketRepository {
     if (currentBitcoinPrice == null) {
       return AppResult.failure(currentFailure ?? historyFailure!);
     }
+    final history =
+        _coversRequestedHistory(
+          historyCandidates,
+          requestedStart: from,
+          now: now,
+        )
+        ? historyCandidates
+        : const <BitcoinPricePoint>[];
     final snapshot = BitcoinMarketSnapshot(
       quoteCurrency: currency,
       currentBitcoinPrice: currentBitcoinPrice,
@@ -225,6 +233,22 @@ final class BitcoinMarketRepository {
           .round();
       return points[sourceIndex];
     }, growable: false);
+  }
+
+  static bool _coversRequestedHistory(
+    List<BitcoinPricePoint> points, {
+    required DateTime requestedStart,
+    required DateTime now,
+  }) {
+    if (points.length < 2) return false;
+    final latestStart = requestedStart.add(
+      BitcoinMarketSnapshot.maximumHistoryStartLag,
+    );
+    final earliestEnd = now.subtract(
+      BitcoinMarketSnapshot.maximumHistoryEndAge,
+    );
+    return !points.first.timestamp.isAfter(latestStart) &&
+        points.last.timestamp.isAfter(earliestEnd);
   }
 
   static Map<String, Object?> _decodeCurrentPayload(HttpPayload payload) {

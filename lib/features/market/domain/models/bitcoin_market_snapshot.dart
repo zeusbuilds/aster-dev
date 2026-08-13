@@ -191,6 +191,16 @@ final class BitcoinMarketSnapshot {
   /// Bounded provider/client clock skew accepted as a current observation.
   static const maximumFutureSkew = Duration(minutes: 5);
 
+  /// Requested provider window represented by a complete Home chart.
+  static const historyWindow = Duration(hours: 24);
+
+  /// Latest acceptable first observation relative to the requested start.
+  static const maximumHistoryStartLag = Duration(hours: 1);
+
+  /// Maximum age of the final chart observation. This boundary is exclusive,
+  /// matching the live-price freshness contract.
+  static const maximumHistoryEndAge = maximumCurrentAge;
+
   /// First instant at which the Bitcoin price must no longer be presented.
   DateTime get expiresAt => currentBitcoinPrice.expiresAt;
 

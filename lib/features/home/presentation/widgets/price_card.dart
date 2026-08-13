@@ -69,6 +69,7 @@ class _PriceCardState extends ConsumerState<PriceCard> {
         : null;
     final chartData = snapshot?.history;
     final change = snapshot?.changeBasisPoints;
+    final headerLoading = selectedQuote.isLoading || market.isLoading;
     final colors = context.appColors;
     final effects = context.effects;
     final spacing = context.spacing;
@@ -78,91 +79,90 @@ class _PriceCardState extends ConsumerState<PriceCard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: EdgeInsets.symmetric(
-            vertical: spacing.lg,
-            horizontal: spacing.lg,
+        Semantics(
+          container: true,
+          liveRegion: headerLoading,
+          label: _headerSemantics(
+            loading: headerLoading,
+            snapshot: snapshot,
+            changeBasisPoints: change,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: context.colorScheme.surface,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      UniconsLine.bitcoin,
-                      size: icons.md,
-                      color: colors.bitcoin.withValues(
-                        alpha: effects.bitcoinIconOpacity,
+          excludeSemantics: true,
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              vertical: spacing.lg,
+              horizontal: spacing.lg,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: context.colorScheme.surface,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        UniconsLine.bitcoin,
+                        size: icons.md,
+                        color: colors.bitcoin.withValues(
+                          alpha: effects.bitcoinIconOpacity,
+                        ),
                       ),
                     ),
-                  ),
-                  SizedBox(width: spacing.xs),
-                  Flexible(
-                    flex: 3,
-                    child: Text(
-                      'Bitcoin Price',
-                      style: type.brandTitle,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  SizedBox(width: spacing.md),
-                  Expanded(
-                    flex: 4,
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerRight,
-                      child: NumericText(
-                        _formatPrice(snapshot),
-                        style: type.brandAmount,
-                        maxLines: 1,
+                    SizedBox(width: spacing.xs),
+                    Flexible(
+                      flex: 3,
+                      child: Text(
+                        'Bitcoin Price',
+                        style: type.brandTitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                  ),
-                ],
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  if (change != null)
-                    Icon(
-                      change >= 0
-                          ? RemixIcons.arrow_up_line
-                          : RemixIcons.arrow_down_line,
-                      size: icons.xxs,
-                      color: change >= 0 ? colors.success : colors.danger,
-                    )
-                  else
-                    SizedBox(height: spacing.md),
-                  SizedBox(width: spacing.xxs),
-                  Text(
-                    _formatBasisPoints(change),
-                    style: type.brandMetric
-                        .copyWith(
-                          color: (change ?? 0) >= 0
-                              ? colors.success
-                              : colors.danger,
-                        )
-                        .toNumeric(context),
-                  ),
-                ],
-              ),
-              Text(
-                'Powered by CoinGecko',
-                style: type.brandMetric.copyWith(
-                  color: colors.onBrandArt.withValues(
-                    alpha: effects.chartContentOpacity,
+                    SizedBox(width: spacing.md),
+                    Expanded(
+                      flex: 4,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: AppSkeletonizer(
+                          enabled: headerLoading,
+                          baseColor: colors.onBrandArt.withValues(
+                            alpha: effects.chartLoadingBaseOpacity,
+                          ),
+                          highlightColor: colors.onBrandArt.withValues(
+                            alpha: effects.chartContentOpacity,
+                          ),
+                          child: NumericText(
+                            headerLoading
+                                ? '000,000.00'
+                                : _formatPrice(snapshot),
+                            style: type.brandAmount,
+                            maxLines: 1,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                _PriceChangeVisual(
+                  changeBasisPoints: change,
+                  loading: headerLoading,
+                ),
+                Text(
+                  'Powered by CoinGecko',
+                  style: type.brandMetric.copyWith(
+                    color: colors.onBrandArt.withValues(
+                      alpha: effects.chartContentOpacity,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         switch ((selectedQuote, market)) {
@@ -236,10 +236,78 @@ class _PriceCardState extends ConsumerState<PriceCard> {
     return '${absolute ~/ 100}.${(absolute % 100) ~/ 10}%';
   }
 
+  static String _headerSemantics({
+    required bool loading,
+    required BitcoinMarketSnapshot? snapshot,
+    required int? changeBasisPoints,
+  }) {
+    if (loading) return 'Bitcoin price loading. Powered by CoinGecko.';
+    if (snapshot == null) {
+      return 'Bitcoin price unavailable. Powered by CoinGecko.';
+    }
+    final change = switch (changeBasisPoints) {
+      null => '24-hour change unavailable',
+      0 =>
+        'unchanged at ${_formatBasisPoints(changeBasisPoints)} over 24 hours',
+      > 0 => 'up ${_formatBasisPoints(changeBasisPoints)} over 24 hours',
+      _ => 'down ${_formatBasisPoints(changeBasisPoints)} over 24 hours',
+    };
+    return 'Bitcoin price ${_formatPrice(snapshot)}. $change. '
+        'Powered by CoinGecko.';
+  }
+
   static AppFailure _failure(Object error, StackTrace stackTrace) =>
       error is AppFailureException
       ? error.failure
       : FailureMapper.from(error, stackTrace);
+}
+
+class _PriceChangeVisual extends StatelessWidget {
+  const _PriceChangeVisual({
+    required this.changeBasisPoints,
+    required this.loading,
+  });
+
+  final int? changeBasisPoints;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    final change = changeBasisPoints;
+    final positive = (change ?? 0) >= 0;
+    final colors = context.appColors;
+    final effects = context.effects;
+    final content = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (change != null || loading)
+          Icon(
+            positive ? RemixIcons.arrow_up_line : RemixIcons.arrow_down_line,
+            size: context.icons.xxs,
+            color: positive ? colors.success : colors.danger,
+          )
+        else
+          SizedBox(height: context.spacing.md),
+        SizedBox(width: context.spacing.xxs),
+        NumericText(
+          loading ? '0.0%' : _PriceCardState._formatBasisPoints(change),
+          style: context.type.brandMetric.copyWith(
+            color: positive ? colors.success : colors.danger,
+          ),
+        ),
+      ],
+    );
+    return AppSkeletonizer(
+      enabled: loading,
+      baseColor: colors.onBrandArt.withValues(
+        alpha: effects.chartLoadingBaseOpacity,
+      ),
+      highlightColor: colors.onBrandArt.withValues(
+        alpha: effects.chartContentOpacity,
+      ),
+      child: content,
+    );
+  }
 }
 
 class _MarketUnavailable extends StatelessWidget {
