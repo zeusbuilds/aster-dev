@@ -29,12 +29,13 @@ final class AppFailure {
     required this.code,
     required this.kind,
     required this.userMessage,
-    required this.retryable,
+    required bool retryable,
     this.outcomeUnknown = false,
     this.retryAfter,
     this.cause,
     this.stackTrace,
-  }) : assert(
+  }) : retryable = retryable && !outcomeUnknown,
+       assert(
          !outcomeUnknown || !retryable,
          'An outcome-unknown mutation cannot be safely retryable.',
        );
@@ -44,6 +45,11 @@ final class AppFailure {
 
   final AppFailureKind kind;
   final String userMessage;
+
+  /// Whether presentation may safely offer the same operation again.
+  ///
+  /// Unknown mutation outcomes always force this to false, including in
+  /// optimized builds where assertions are disabled.
   final bool retryable;
 
   /// Whether an interrupted mutation may still have completed underneath.

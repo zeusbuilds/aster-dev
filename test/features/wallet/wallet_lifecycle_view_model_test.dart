@@ -95,7 +95,7 @@ void main() {
     expect(haptics.intents, [HapticIntent.success]);
   });
 
-  test('maps thrown lifecycle faults without leaking native detail', () async {
+  test('fails closed for thrown lifecycle state faults', () async {
     final repository = _ControlledLifecycleRepository();
     final resume = repository.enqueue('resume');
     final container = _container(repository);
@@ -108,7 +108,9 @@ void main() {
     expect(await future, isFalse);
     final failed = container.read(walletLifecycleViewModelProvider);
     expect(failed.failure?.userMessage, isNot(contains('private')));
-    expect(failed.failure?.retryable, isTrue);
+    expect(failed.failure?.code, 'internal_state_violation');
+    expect(failed.failure?.kind, AppFailureKind.unknown);
+    expect(failed.failure?.retryable, isFalse);
   });
 
   test('rejects retry after a terminal foreground failure', () async {

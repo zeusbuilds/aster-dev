@@ -233,10 +233,9 @@ abstract final class FailureMapper {
     }
     if (error is StateError) {
       return _failure(
-        code: 'operation_conflict',
-        kind: AppFailureKind.conflict,
-        message: 'The wallet changed while this action was running. Try again.',
-        retryable: true,
+        code: 'internal_state_violation',
+        kind: AppFailureKind.unknown,
+        message: 'Something went wrong. Restart the app and try again.',
         error: error,
         stackTrace: stackTrace,
       );

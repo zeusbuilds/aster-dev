@@ -105,6 +105,40 @@ void main() {
     expect(failure.userMessage, isNot(contains('internal invariant')));
   });
 
+  test('does not misclassify generic state faults as retryable conflicts', () {
+    final failure = FailureMapper.from(
+      StateError('internal state with private details'),
+      StackTrace.current,
+    );
+
+    expect(failure.code, 'internal_state_violation');
+    expect(failure.kind, AppFailureKind.unknown);
+    expect(failure.retryable, isFalse);
+    expect(failure.userMessage, isNot(contains('private details')));
+  });
+
+  test('rejects retryable failures when a mutation outcome is unknown', () {
+    expect(
+      () => AppFailure(
+        code: 'unsafe_retry',
+        kind: AppFailureKind.timeout,
+        userMessage: 'Reconcile before continuing.',
+        retryable: true,
+        outcomeUnknown: true,
+      ),
+      throwsAssertionError,
+    );
+
+    const failure = AppFailure(
+      code: 'safe_unknown_outcome',
+      kind: AppFailureKind.timeout,
+      userMessage: 'Reconcile before continuing.',
+      retryable: false,
+      outcomeUnknown: true,
+    );
+    expect(failure.retryable, isFalse);
+  });
+
   test('preserves distinct LSP timeout and rate-limit semantics', () {
     final timeout = FailureMapper.from(
       const LspLiquidityTimeoutException(minMsat: 1000, elapsedMs: 5000),

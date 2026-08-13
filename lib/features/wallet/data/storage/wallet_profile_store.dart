@@ -57,7 +57,7 @@ final class WalletProfileStore implements WalletProfilePersistence {
         );
       }
       if (snapshot.profiles.any((item) => item.id == profile.id)) {
-        throw StateError('Wallet profile already exists.');
+        throw _profileConflict('wallet_profile_already_exists');
       }
       return WalletRegistry(
         profiles: [...snapshot.profiles, profile],
@@ -73,7 +73,7 @@ final class WalletProfileStore implements WalletProfilePersistence {
           .where((item) => item.id == walletId)
           .firstOrNull;
       if (profile == null || profile.state != WalletProfileState.provisioning) {
-        throw StateError('Staged wallet profile does not exist.');
+        throw _profileConflict('wallet_profile_stage_missing');
       }
       return WalletRegistry(
         profiles: [
@@ -98,7 +98,7 @@ final class WalletProfileStore implements WalletProfilePersistence {
         (profile) =>
             profile.id == walletId && profile.state == WalletProfileState.ready,
       )) {
-        throw StateError('Wallet profile does not exist.');
+        throw _profileConflict('wallet_profile_activation_conflict');
       }
       return WalletRegistry(
         profiles: snapshot.profiles,
@@ -113,9 +113,6 @@ final class WalletProfileStore implements WalletProfilePersistence {
       final remaining = snapshot.profiles
           .where((profile) => profile.id != walletId)
           .toList(growable: false);
-      if (remaining.length == snapshot.profiles.length) {
-        throw StateError('Wallet profile does not exist.');
-      }
       return WalletRegistry(
         profiles: remaining,
         activeWalletId: snapshot.activeWalletId == walletId
@@ -264,6 +261,18 @@ final class WalletProfileStore implements WalletProfilePersistence {
     'state': profile.state.name,
     'storageToken': profile.storageToken,
   };
+
+  static AppFailureException _profileConflict(String code) {
+    return AppFailureException(
+      AppFailure(
+        code: code,
+        kind: AppFailureKind.conflict,
+        userMessage:
+            'The wallet changed while this action was running. Try again.',
+        retryable: true,
+      ),
+    );
+  }
 
   DateTime _nextUpdatedAt(WalletProfile profile) {
     final now = _clock().toUtc();

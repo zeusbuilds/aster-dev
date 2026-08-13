@@ -12,8 +12,6 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_localizations:
-    sdk: flutter
 
   # State Management
   # Keep the Riverpod runtime and generated annotations on one reviewed set.

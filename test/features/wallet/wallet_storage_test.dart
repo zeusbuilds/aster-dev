@@ -307,6 +307,67 @@ void main() {
     expect(profile.updatedAt, committedAt);
   });
 
+  test('profile state races return explicit redacted conflicts', () async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    final store = WalletProfileStore(
+      MemoryWalletRegistryDocumentStore(),
+      PreferencesService(preferences),
+    );
+    final now = DateTime.utc(2026, 8, 8);
+    final profile = WalletProfile(
+      id: firstId,
+      name: 'First',
+      createdAt: now,
+      updatedAt: now,
+      environment: BlockchainEnvironment.regtest,
+      state: WalletProfileState.provisioning,
+      storageToken: firstToken,
+    );
+
+    expect(
+      await store.stageProvision(profile),
+      isA<AppSuccess<WalletRegistry>>(),
+    );
+    final duplicate = await store.stageProvision(profile);
+    final missingCommit = await store.commitProvision(secondId);
+    final missingActivation = await store.setActive(secondId);
+
+    expect(
+      (duplicate as AppFailureResult<WalletRegistry>).failure.code,
+      'wallet_profile_already_exists',
+    );
+    expect(duplicate.failure.retryable, isTrue);
+    expect(
+      (missingCommit as AppFailureResult<WalletRegistry>).failure.code,
+      'wallet_profile_stage_missing',
+    );
+    expect(missingCommit.failure.retryable, isTrue);
+    expect(
+      (missingActivation as AppFailureResult<WalletRegistry>).failure.code,
+      'wallet_profile_activation_conflict',
+    );
+    expect(missingActivation.failure.retryable, isTrue);
+    expect(missingActivation.failure.cause, isNull);
+    expect(missingActivation.failure.userMessage, isNot(contains(secondId)));
+  });
+
+  test('profile rollback removal is idempotent', () async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    final store = WalletProfileStore(
+      MemoryWalletRegistryDocumentStore(),
+      PreferencesService(preferences),
+    );
+
+    final result = await store.remove(firstId);
+
+    expect(result, isA<AppSuccess<WalletRegistry>>());
+    final registry = (result as AppSuccess<WalletRegistry>).value;
+    expect(registry.profiles, isEmpty);
+    expect(registry.activeWalletId, isNull);
+  });
+
   test('corrupt profile registry fails without overwriting evidence', () async {
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
