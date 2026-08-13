@@ -121,6 +121,7 @@ On push to `main` and on pull requests, the **Dart** workflow runs:
 - `flutter test`
 - `dart run tool/verify_dartdoc.dart`
 - `dart run tool/verify_barrel_exports.dart`
+- `dart run tool/verify_architecture.dart`
 - `dart run tool/verify_production_tracker.dart`
 
 Fix failures locally with `make format`, `make lint`, and `make test`, then

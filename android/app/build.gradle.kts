@@ -26,9 +26,9 @@ android {
 
     buildTypes {
         release {
-            // Local release-mode evidence only. PLAT-001 blocks distribution
-            // until the release owner provides the production signing policy.
-            signingConfig = signingConfigs.getByName("debug")
+            // Candidate artifacts are intentionally unsigned. The release
+            // pipeline must sign them with the approved key and verify its
+            // fingerprint; PLAT-001 blocks distribution until then.
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

@@ -1,4 +1,4 @@
-.PHONY: shell bootstrap clean build watch run test ios-storage-test format format-check analyze docs verify verify-architecture verify-barrels verify-generated lint android-release-bundle android-release-apks verify-android-release-apks fvm-setup help
+.PHONY: shell bootstrap clean build watch run test ios-storage-test format format-check analyze docs verify verify-architecture verify-barrels verify-generated lint android-release-bundle android-release-apks verify-android-release-bundle verify-android-release-apks fvm-setup help
 
 # Default target
 help:
@@ -23,6 +23,7 @@ help:
 	@echo "  make lint      - Run all repository quality checks"
 	@echo "  make android-release-bundle - Build the Play Store release bundle"
 	@echo "  make android-release-apks - Build and verify ABI-split release APKs"
+	@echo "  make verify-android-release-bundle - Verify the existing Play Store bundle"
 	@echo "  make verify-android-release-apks - Verify existing ABI-split APKs"
 
 # Enter Nix development environment
@@ -117,6 +118,7 @@ lint: format-check verify-generated analyze docs verify
 # application identity still have to be supplied by the release owner.
 android-release-bundle:
 	fvm flutter build appbundle --release
+	./scripts/verify-android-release-bundle.sh
 
 # The pinned wallet SDK AAR contains multiple native ABIs. Direct APK delivery
 # must therefore use Flutter's ABI splits; --target-platform alone does not
@@ -125,13 +127,16 @@ android-release-apks:
 	fvm flutter build apk --release --split-per-abi
 	./scripts/verify-android-release-apks.sh
 
+verify-android-release-bundle:
+	./scripts/verify-android-release-bundle.sh
+
 verify-android-release-apks:
 	./scripts/verify-android-release-apks.sh
 
 # One-time FVM setup for this project
 fvm-setup:
 	@echo "Setting up Flutter via FVM for this project..."
-	@echo "Using version from .fvm/fvm_config.json (if present) or default configured in FVM."
+	@echo "Using the exact Flutter version pinned in .fvmrc."
 	fvm install
 	fvm use
 	@echo "FVM setup complete. You can now run 'make bootstrap' and 'make run'."

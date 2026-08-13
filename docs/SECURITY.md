@@ -55,9 +55,27 @@ of re-enabling arbitrary dependency logs.
 - Legacy wallet recovery requires an explicit migration/support policy.
 - SDK native artifact provenance is accepted for internal beta only.
 - No public security-reporting contact is configured in this repository.
+- Store privacy/data-safety disclosures, an owned privacy-policy destination,
+  and cryptography/export-compliance answers are not approved. They require a
+  release-owned data-flow review across every configured wallet service.
 
 These are tracked blockers. Sensitive actions remain disabled rather than
 shipping an implicit policy.
+
+## Platform Privacy Manifests
+
+The iOS Runner aggregate-declares the required-reason APIs used by app-owned
+storage and the statically linked wallet executable: file metadata inside the
+app container and disk-capacity checks that can prevent a write. It does not
+declare tracking. The pinned wallet SDK's own privacy manifest is empty despite
+those native imports, so the Runner declaration is an app-level mitigation for
+that exact revision. Other package-owned API use, including preferences, remains
+in each dependency's own privacy manifest and is not duplicated in the Runner.
+
+This technical manifest is not a substitute for App Store privacy answers,
+Google Play Data safety declarations, a privacy policy, or export-compliance
+review. Those distribution disclosures depend on deployment endpoint behavior,
+retention, linkage, and legal ownership and remain blocked by `SEC-015`.
 
 ## Reporting
 

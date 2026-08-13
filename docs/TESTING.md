@@ -27,6 +27,7 @@ An exact release candidate additionally requires:
 - iOS XCTest and storage integration tests
 - Android bridge/storage tests
 - clean iOS Simulator and Android release builds
+- built iOS root privacy-manifest inspection and approved-reason validation
 - install/launch smokes for the same source commit and architecture
 - configured-wallet create/import, restart, lifecycle, send/receive, and
   funded/unfunded regtest evidence where deployment services exist
@@ -36,6 +37,21 @@ An exact release candidate additionally requires:
 
 Simulator and host tests cannot qualify physical haptics, camera hardware,
 screen readers, signing, or a funds-bearing native supply chain.
+
+Android release APK and AAB verification rejects every signed candidate unless
+`UTEXO_RELEASE_CERT_SHA256` identifies the one approved certificate. With no
+approved fingerprint configured, only unsigned candidate artifacts pass; they
+are build evidence and cannot be distributed.
+
+The same release verifiers inspect every packaged ELF LOAD segment and the APK
+ZIP alignment. The AAB gate also parses `BundleConfig.pb` with the exact
+Bundletool/protobuf versions resolved by AGP and requires
+`PAGE_ALIGNMENT_16K`. A passing package gate therefore requires 16 KiB
+alignment in both packaging and every 64-bit native dependency, plus GNU RELRO
+where dynamic relocations exist. The current pinned wallet SDK fails this gate
+at `librgb_lightning_node.so`; see `SDK-004`. After an immutable compatible SDK
+revision is approved, rerun both artifact gates and a real 16 KiB emulator or
+device smoke before qualification.
 
 Run the app-owned iOS storage/file-policy integration contract with:
 

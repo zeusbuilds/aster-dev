@@ -12,8 +12,12 @@ eligible for a funds-bearing mainnet release.
 - The SDK's accepted PKG-006 native-artifact provenance constraint permits
   development and internal beta, not a mainnet production claim.
 - Final application identifiers, signing ownership, authentication for secret
-  disclosure, legacy-wallet recovery, and screen-capture policy remain product
-  or security decisions.
+  disclosure, legacy-wallet recovery, screen-capture policy, and store privacy /
+  export declarations remain product, security, or release-owner decisions.
+- The pinned SDK's Android native library is still 4 KiB ELF-aligned. Android
+  16 KiB page-size qualification and a compatible SDK artifact remain blocked.
+- `1.0.0+1` is a provisional app version until release ownership defines the
+  public version/build-number and upgrade policy.
 - RGB USDT stays unavailable unless a deployment supplies a validated asset ID
   and precision for the selected environment.
 - Release market estimates stay unavailable unless a deployment supplies an
@@ -87,8 +91,9 @@ make test
 `make lint` checks formatting, regenerates generated sources, runs analysis with
 all diagnostics fatal, creates clean isolated Dart API docs, validates barrel
 boundaries, and checks tracker inventory. iOS/Android builds, native tests,
-runtime smokes, and profile measurements remain exact-candidate release gates;
-a host-only green CI job is not platform qualification.
+runtime smokes, Android package/signature/16 KiB native-library checks, and
+profile measurements remain exact-candidate release gates; a host-only green CI
+job is not platform qualification.
 
 See `docs/TESTING.md` and `docs/release/RELEASE_CHECKLIST.md`.
 

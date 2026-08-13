@@ -49,5 +49,8 @@ jobs:
       - name: Verify barrel boundaries
         run: dart run tool/verify_barrel_exports.dart
 
+      - name: Verify architecture boundaries
+        run: dart run tool/verify_architecture.dart
+
       - name: Verify tracker inventory
         run: dart run tool/verify_production_tracker.dart

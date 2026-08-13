@@ -28,6 +28,11 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>UTEXO uses the camera to scan payment QR codes.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>UTEXO uses a selected photo to scan a payment QR code.</string>
 	<key>UIApplicationSceneManifest</key>
