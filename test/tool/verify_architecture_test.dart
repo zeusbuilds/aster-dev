@@ -25,7 +25,8 @@ void main() {
     _write(
       repository,
       'lib/features/pay/presentation/view_model/pay_view_model.dart',
-      "import '../../data/repository.dart';",
+      "import '../../data/repository.dart';\n"
+          'void load() { walletRepositoryProvider; clipboardServiceProvider; }',
     );
     _write(
       repository,
@@ -66,7 +67,9 @@ void main() {
       'lib/features/pay/presentation/screens/pay_screen.dart',
       "import '../../data/repository.dart';\n"
           "import 'package:http/http.dart';\n"
-          "import 'package:rgb_sdk_flutter/rgb_sdk_flutter.dart';",
+          "import 'package:rgb_sdk_flutter/rgb_sdk_flutter.dart';\n"
+          'void submit() { '
+          'walletRepositoryProvider; clipboardServiceProvider; }',
     );
     _write(repository, 'lib/broken.dart', "import 'unterminated.dart;");
 
@@ -81,6 +84,8 @@ void main() {
         contains('presentation outside a ViewModel'),
         contains('package:http is infrastructure'),
         contains('rgb_sdk_flutter may be imported only'),
+        contains('walletRepositoryProvider intent through a ViewModel'),
+        contains('clipboardServiceProvider intent through a ViewModel'),
         contains('parse error:'),
       ]),
     );

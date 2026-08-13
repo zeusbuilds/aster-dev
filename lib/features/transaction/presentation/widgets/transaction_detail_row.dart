@@ -12,6 +12,7 @@ class TransactionDetailRow extends StatelessWidget {
     this.amount = false,
     this.onCopy,
     this.copying = false,
+    this.copyEnabled = true,
   });
 
   final String label;
@@ -19,6 +20,7 @@ class TransactionDetailRow extends StatelessWidget {
   final bool amount;
   final VoidCallback? onCopy;
   final bool copying;
+  final bool copyEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +39,7 @@ class TransactionDetailRow extends StatelessWidget {
                   tooltip: 'Copy $label',
                   hapticIntent: null,
                   loading: copying,
-                  onPressed: copy,
+                  onPressed: copyEnabled ? copy : null,
                 ),
             ],
           ),

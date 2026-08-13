@@ -21,16 +21,26 @@ abstract final class PublicHttpsUriPolicy {
   /// Validates a URI without accepting credentials or URL-carried state.
   static void validate(Uri uri) {
     final raw = uri.toString();
+    final decoded = _decode(raw);
     if (raw.isEmpty ||
         raw != raw.trim() ||
         raw.length > maximumCharacters ||
         raw.contains(RegExp(r'\s')) ||
+        _unsafeDecodedCharacters.hasMatch(decoded) ||
         uri.scheme.toLowerCase() != 'https' ||
         !_isPublicHost(uri.host) ||
         uri.userInfo.isNotEmpty ||
         uri.query.isNotEmpty ||
         uri.fragment.isNotEmpty ||
         (uri.hasPort && (uri.port < 1 || uri.port > 65535))) {
+      throw const AppConfigurationException();
+    }
+  }
+
+  static String _decode(String value) {
+    try {
+      return Uri.decodeFull(value);
+    } on FormatException {
       throw const AppConfigurationException();
     }
   }
@@ -63,6 +73,9 @@ abstract final class PublicHttpsUriPolicy {
 
   static final _ipv4Literal = RegExp(r'^\d{1,3}(?:\.\d{1,3}){3}$');
   static final _dnsLabel = RegExp(r'^[a-z0-9-]+$');
+  static final _unsafeDecodedCharacters = RegExp(
+    r'[\u0000-\u0020\u007f-\u009f\u202a-\u202e\u2066-\u2069]',
+  );
 
   static const _nonPublicSuffixes = <String>{
     'example',

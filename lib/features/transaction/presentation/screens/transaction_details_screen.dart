@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:remixicon/remixicon.dart';
@@ -16,7 +14,7 @@ import '../view_model/view_models.dart';
 import '../widgets/widgets.dart';
 
 /// Details for one opaque Activity ID resolved from the active wallet.
-class TransactionDetailsScreen extends ConsumerStatefulWidget {
+class TransactionDetailsScreen extends ConsumerWidget {
   const TransactionDetailsScreen({
     super.key,
     required this.assetKind,
@@ -26,62 +24,11 @@ class TransactionDetailsScreen extends ConsumerStatefulWidget {
   final WalletAssetKind assetKind;
   final String activityId;
 
-  @override
-  ConsumerState<TransactionDetailsScreen> createState() =>
-      _TransactionDetailsScreenState();
-}
-
-class _TransactionDetailsScreenState
-    extends ConsumerState<TransactionDetailsScreen> {
   static final _formatter = ActivityDisplayFormatter();
-  final Set<String> _copyingFields = <String>{};
-  bool _openingExplorer = false;
-
-  Future<void> _copy(String label, String value) async {
-    if (_copyingFields.contains(label)) return;
-    setState(() => _copyingFields.add(label));
-    final result = await ref.read(clipboardServiceProvider).writeText(value);
-    if (!mounted) return;
-    setState(() => _copyingFields.remove(label));
-    switch (result) {
-      case AppSuccess<void>():
-        unawaited(context.haptics.trigger(HapticIntent.lightImpact));
-        context.toasts.show(
-          title: '$label copied',
-          variant: ToastVariant.success,
-        );
-      case AppFailureResult<void>(:final failure):
-        unawaited(context.haptics.trigger(HapticIntent.error));
-        context.toasts.show(
-          title: 'Could not copy $label',
-          message: failure.userMessage,
-          variant: ToastVariant.failure,
-        );
-    }
-  }
-
-  Future<void> _openExplorer(Uri uri) async {
-    if (_openingExplorer) return;
-    setState(() => _openingExplorer = true);
-    final result = await ref.read(externalUriServiceProvider).open(uri);
-    if (!mounted) return;
-    setState(() => _openingExplorer = false);
-    switch (result) {
-      case AppSuccess<void>():
-        unawaited(context.haptics.trigger(HapticIntent.lightImpact));
-      case AppFailureResult<void>(:final failure):
-        unawaited(context.haptics.trigger(HapticIntent.error));
-        context.toasts.show(
-          title: 'Could not open explorer',
-          message: failure.userMessage,
-          variant: ToastVariant.failure,
-        );
-    }
-  }
 
   @override
-  Widget build(BuildContext context) {
-    final activity = ref.watch(activityViewModelProvider(widget.assetKind));
+  Widget build(BuildContext context, WidgetRef ref) {
+    final activity = ref.watch(activityViewModelProvider(assetKind));
     final settings = ref.watch(settingsViewModelProvider);
     return Scaffold(
       backgroundColor: context.colorScheme.surface,
@@ -95,13 +42,9 @@ class _TransactionDetailsScreenState
         child: _DetailsBody(
           activity: activity,
           settings: settings,
-          assetKind: widget.assetKind,
-          activityId: widget.activityId,
+          assetKind: assetKind,
+          activityId: activityId,
           formatter: _formatter,
-          copyingFields: _copyingFields,
-          openingExplorer: _openingExplorer,
-          onCopy: _copy,
-          onOpenExplorer: _openExplorer,
         ),
       ),
     );
@@ -115,10 +58,6 @@ class _DetailsBody extends ConsumerWidget {
     required this.assetKind,
     required this.activityId,
     required this.formatter,
-    required this.copyingFields,
-    required this.openingExplorer,
-    required this.onCopy,
-    required this.onOpenExplorer,
   });
 
   final AsyncValue<ActivityState> activity;
@@ -126,10 +65,6 @@ class _DetailsBody extends ConsumerWidget {
   final WalletAssetKind assetKind;
   final String activityId;
   final ActivityDisplayFormatter formatter;
-  final Set<String> copyingFields;
-  final bool openingExplorer;
-  final Future<void> Function(String label, String value) onCopy;
-  final Future<void> Function(Uri uri) onOpenExplorer;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -168,6 +103,11 @@ class _DetailsBody extends ConsumerWidget {
     }
     final preferences = settings.requireValue.snapshot.preferences;
     final valuesVisible = preferences.balancesVisible;
+    final actionsProvider = transactionDetailsActionsViewModelProvider(
+      record.id,
+      record.txid,
+    );
+    final actions = ref.watch(actionsProvider);
     final amount = formatter.amountText(record, preferences.bitcoinUnit);
     final entries = _entries(
       record: record,
@@ -176,12 +116,7 @@ class _DetailsBody extends ConsumerWidget {
       valuesVisible: valuesVisible,
       formatter: formatter,
     );
-    final txid = record.txid;
-    final explorerUri = txid == null
-        ? null
-        : ref
-              .watch(walletServiceConfigurationProvider)
-              .transactionExplorerUri(txid);
+    final actionsNotifier = ref.read(actionsProvider.notifier);
 
     return CustomScrollView(
       slivers: [
@@ -239,10 +174,15 @@ class _DetailsBody extends ConsumerWidget {
                         label: entries[index].label,
                         value: entries[index].value,
                         amount: entries[index].amount,
-                        copying: copyingFields.contains(entries[index].label),
+                        copying:
+                            actions.copyingField == entries[index].copyField,
+                        copyEnabled: actions.copyingField == null,
                         onCopy: entries[index].copyValue == null
                             ? null
-                            : () => onCopy(
+                            : () => _copy(
+                                context,
+                                actionsNotifier,
+                                entries[index].copyField!,
                                 entries[index].label,
                                 entries[index].copyValue!,
                               ),
@@ -252,14 +192,14 @@ class _DetailsBody extends ConsumerWidget {
                   ],
                 ),
               ),
-              if (explorerUri != null) ...[
+              if (actions.explorerUri != null) ...[
                 SizedBox(height: context.spacing.sectionGap),
                 CustomButton(
                   text: 'View in explorer',
                   suffixIcon: RemixIcons.external_link_line,
-                  loading: openingExplorer,
+                  loading: actions.openingExplorer,
                   hapticIntent: null,
-                  onTap: () => onOpenExplorer(explorerUri),
+                  onTap: () => _openExplorer(context, actionsNotifier),
                 ),
               ],
             ],
@@ -273,6 +213,45 @@ class _DetailsBody extends ConsumerWidget {
       error is AppFailureException
       ? error.failure
       : FailureMapper.from(error, stackTrace);
+
+  static Future<void> _copy(
+    BuildContext context,
+    TransactionDetailsActionsViewModel notifier,
+    TransactionDetailField field,
+    String label,
+    String value,
+  ) async {
+    final result = await notifier.copyField(field, value);
+    if (!context.mounted || result == null) return;
+    switch (result) {
+      case AppSuccess<void>():
+        context.toasts.show(
+          title: '$label copied',
+          variant: ToastVariant.success,
+        );
+      case AppFailureResult<void>(:final failure):
+        context.toasts.show(
+          title: 'Could not copy $label',
+          message: failure.userMessage,
+          variant: ToastVariant.failure,
+        );
+    }
+  }
+
+  static Future<void> _openExplorer(
+    BuildContext context,
+    TransactionDetailsActionsViewModel notifier,
+  ) async {
+    final result = await notifier.openExplorer();
+    if (!context.mounted || result == null) return;
+    if (result case AppFailureResult<void>(:final failure)) {
+      context.toasts.show(
+        title: 'Could not open explorer',
+        message: failure.userMessage,
+        variant: ToastVariant.failure,
+      );
+    }
+  }
 
   static List<_DetailEntry> _entries({
     required WalletActivity record,
@@ -326,6 +305,7 @@ class _DetailsBody extends ConsumerWidget {
         _DetailEntry(
           'Transaction ID',
           formatter.compactIdentifier(value),
+          copyField: TransactionDetailField.transactionId,
           copyValue: value,
         ),
       );
@@ -335,6 +315,7 @@ class _DetailsBody extends ConsumerWidget {
         _DetailEntry(
           'Payment hash',
           formatter.compactIdentifier(value),
+          copyField: TransactionDetailField.paymentHash,
           copyValue: value,
         ),
       );
@@ -344,6 +325,7 @@ class _DetailsBody extends ConsumerWidget {
         _DetailEntry(
           'Invoice',
           formatter.compactIdentifier(value),
+          copyField: TransactionDetailField.invoice,
           copyValue: value,
         ),
       );
@@ -353,6 +335,7 @@ class _DetailsBody extends ConsumerWidget {
         _DetailEntry(
           'Recipient',
           formatter.compactIdentifier(value),
+          copyField: TransactionDetailField.recipient,
           copyValue: value,
         ),
       );
@@ -362,6 +345,7 @@ class _DetailsBody extends ConsumerWidget {
         _DetailEntry(
           'Payee public key',
           formatter.compactIdentifier(value),
+          copyField: TransactionDetailField.payeePublicKey,
           copyValue: value,
         ),
       );
@@ -384,6 +368,7 @@ class _DetailsBody extends ConsumerWidget {
         _DetailEntry(
           'Receive outpoint',
           formatter.compactIdentifier(value),
+          copyField: TransactionDetailField.receiveOutpoint,
           copyValue: value,
         ),
       );
@@ -393,6 +378,7 @@ class _DetailsBody extends ConsumerWidget {
         _DetailEntry(
           'Change outpoint',
           formatter.compactIdentifier(value),
+          copyField: TransactionDetailField.changeOutpoint,
           copyValue: value,
         ),
       );
@@ -420,12 +406,14 @@ class _DetailEntry {
     this.label,
     this.value, {
     this.amount = false,
+    this.copyField,
     this.copyValue,
-  });
+  }) : assert((copyField == null) == (copyValue == null));
 
   final String label;
   final String value;
   final bool amount;
+  final TransactionDetailField? copyField;
   final String? copyValue;
 }
 

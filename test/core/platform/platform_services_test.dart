@@ -106,49 +106,65 @@ void main() {
     },
   );
 
-  test(
-    'external URI adapter accepts only bounded public HTTPS links',
-    () async {
-      Uri? opened;
-      final service = PlatformExternalUriService(
-        invoker: (uri) async {
-          opened = uri;
-          return true;
-        },
-      );
-      final uri = Uri.parse('https://mempool.space/tx/${'a' * 64}');
+  test('external URI adapter accepts only bounded public HTTPS links', () async {
+    Uri? opened;
+    final service = PlatformExternalUriService(
+      invoker: (uri) async {
+        opened = uri;
+        return true;
+      },
+    );
+    final uri = Uri.parse('https://mempool.space/tx/${'a' * 64}');
 
-      expect(await service.open(uri), isA<AppSuccess<void>>());
-      expect(opened, uri);
+    expect(await service.open(uri), isA<AppSuccess<void>>());
+    expect(opened, uri);
+    expect(
+      await service.open(Uri.parse('http://mempool.space/tx/value')),
+      isA<AppFailureResult<void>>(),
+    );
+    expect(
+      await service.open(Uri.parse('https://token@mempool.space/tx/value')),
+      isA<AppFailureResult<void>>(),
+    );
+    for (final invalid in <Uri>[
+      Uri.parse('https://localhost/tx/value'),
+      Uri.parse('https://wallet.internal/tx/value'),
+      Uri.parse('https://127.0.0.1/tx/value'),
+      Uri.parse('https://[::1]/tx/value'),
+      Uri.parse('https://mempool.space/tx/value?token=secret'),
+      Uri.parse('https://mempool.space/tx/value#fragment'),
+      Uri.parse('https://mempool.space/tx/value%0Ahidden'),
+      Uri.parse(
+        'https://mempool.space/${'a' * PlatformExternalUriService.maximumUriCharacters}',
+      ),
+    ]) {
+      final result = await service.open(invalid);
       expect(
-        await service.open(Uri.parse('http://mempool.space/tx/value')),
-        isA<AppFailureResult<void>>(),
+        (result as AppFailureResult<void>).failure.code,
+        'external_uri_invalid',
+        reason: '$invalid',
       );
-      expect(
-        await service.open(Uri.parse('https://token@mempool.space/tx/value')),
-        isA<AppFailureResult<void>>(),
-      );
+    }
 
-      final unavailable = PlatformExternalUriService(
-        invoker: (uri) async => false,
-      );
-      final unavailableResult = await unavailable.open(uri);
-      expect(
-        (unavailableResult as AppFailureResult<void>).failure.code,
-        'external_uri_unavailable',
-      );
+    final unavailable = PlatformExternalUriService(
+      invoker: (uri) async => false,
+    );
+    final unavailableResult = await unavailable.open(uri);
+    expect(
+      (unavailableResult as AppFailureResult<void>).failure.code,
+      'external_uri_unavailable',
+    );
 
-      final failed = PlatformExternalUriService(
-        invoker: (uri) => throw StateError('private browser detail'),
-      );
-      final failedResult = await failed.open(uri) as AppFailureResult<void>;
-      expect(failedResult.failure.code, 'external_uri_open_failed');
-      expect(
-        failedResult.failure.userMessage,
-        isNot(contains('private browser detail')),
-      );
-    },
-  );
+    final failed = PlatformExternalUriService(
+      invoker: (uri) => throw StateError('private browser detail'),
+    );
+    final failedResult = await failed.open(uri) as AppFailureResult<void>;
+    expect(failedResult.failure.code, 'external_uri_open_failed');
+    expect(
+      failedResult.failure.userMessage,
+      isNot(contains('private browser detail')),
+    );
+  });
 
   test('app metadata adapter returns only bounded display fields', () async {
     final service = PlatformAppMetadataService(

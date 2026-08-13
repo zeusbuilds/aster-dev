@@ -1,5 +1,6 @@
 import 'package:url_launcher/url_launcher.dart';
 
+import '../config/public_https_uri_policy.dart';
 import '../errors/errors.dart';
 
 typedef ExternalUriInvoker = Future<bool> Function(Uri uri);
@@ -14,15 +15,14 @@ final class PlatformExternalUriService implements ExternalUriService {
   PlatformExternalUriService({ExternalUriInvoker? invoker})
     : _invoker = invoker ?? _launch;
 
-  static const maximumUriCharacters = 2048;
+  static const maximumUriCharacters = PublicHttpsUriPolicy.maximumCharacters;
   final ExternalUriInvoker _invoker;
 
   @override
   Future<AppResult<void>> open(Uri uri) async {
-    if (uri.scheme != 'https' ||
-        uri.host.isEmpty ||
-        uri.userInfo.isNotEmpty ||
-        uri.toString().length > maximumUriCharacters) {
+    try {
+      PublicHttpsUriPolicy.validate(uri);
+    } on AppConfigurationException {
       return AppResult.failure(_invalidUriFailure);
     }
     try {

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:analyzer/dart/analysis/features.dart';
 import 'package:analyzer/dart/analysis/utilities.dart';
 import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/ast/visitor.dart';
 
 const _infrastructureOwners = <String, Set<String>>{
   'flutter_secure_storage': {
@@ -30,6 +31,22 @@ const _infrastructureOwners = <String, Set<String>>{
 const _sdkOwners = {
   'lib/core/errors/failure_mapper.dart',
   'lib/features/wallet/data/runtime/rgb_wallet_engine.dart',
+};
+
+const _presentationInfrastructureProviders = <String>{
+  'appMetadataServiceProvider',
+  'clipboardServiceProvider',
+  'externalUriServiceProvider',
+  'preferencesServiceProvider',
+  'resilientHttpClientProvider',
+  'secureStorageServiceProvider',
+  'sensitiveClipboardServiceProvider',
+  'shareServiceProvider',
+  'sharedPreferencesProvider',
+  'walletDirectoryManagerProvider',
+  'walletRegistryDocumentStoreProvider',
+  'walletSecretStoreProvider',
+  'walletStorageSecurityProvider',
 };
 
 /// Result of checking one repository tree against the architecture policy.
@@ -154,6 +171,26 @@ ArchitectureVerification verifyArchitecture(Directory repositoryRoot) {
         );
       }
     }
+
+    if (_isFeaturePresentation(sourcePath) && !_isViewModel(sourcePath)) {
+      final identifiers = <String>{};
+      parsed.unit.accept(_SimpleIdentifierCollector(identifiers));
+      final forbidden =
+          identifiers
+              .where(
+                (name) =>
+                    _presentationInfrastructureProviders.contains(name) ||
+                    name.endsWith('RepositoryProvider'),
+              )
+              .toList()
+            ..sort();
+      for (final name in forbidden) {
+        failures.add(
+          '$sourcePath: feature presentation must send $name intent through '
+          'a ViewModel rather than access infrastructure directly.',
+        );
+      }
+    }
   }
 
   return ArchitectureVerification(
@@ -198,3 +235,15 @@ bool _isOwnedDartSource(String path) =>
 
 String _relative(Directory root, File file) =>
     file.absolute.path.substring(root.path.length + 1);
+
+final class _SimpleIdentifierCollector extends RecursiveAstVisitor<void> {
+  _SimpleIdentifierCollector(this.names);
+
+  final Set<String> names;
+
+  @override
+  void visitSimpleIdentifier(SimpleIdentifier node) {
+    names.add(node.name);
+    super.visitSimpleIdentifier(node);
+  }
+}
