@@ -25,8 +25,8 @@ class CurrencySelectionScreen extends ConsumerWidget {
         skipLoadingOnRefresh: false,
         data: (state) => _CurrencyList(state: state),
         loading: () => const _CurrencyLoading(),
-        error: (error, _) => _SettingsLoadFailure(
-          message: FailureMapper.from(error, StackTrace.current).userMessage,
+        error: (error, stackTrace) => _SettingsLoadFailure(
+          message: FailureMapper.from(error, stackTrace).userMessage,
           onRetry: () => ref.read(settingsViewModelProvider.notifier).retry(),
         ),
       ),
@@ -84,15 +84,15 @@ class _CurrencyList extends ConsumerWidget {
       context.pop();
       return;
     }
-    unawaited(context.haptics.trigger(HapticIntent.error));
     final failure = ref.read(settingsViewModelProvider).value?.operationFailure;
-    if (failure != null) {
-      context.toasts.show(
-        title: 'Currency not saved',
-        message: failure.userMessage,
-        variant: ToastVariant.failure,
-      );
-    }
+    if (failure == null) return;
+    unawaited(context.haptics.trigger(HapticIntent.error));
+    context.toasts.show(
+      title: 'Currency not saved',
+      message: failure.userMessage,
+      variant: ToastVariant.failure,
+    );
+    ref.read(settingsViewModelProvider.notifier).clearOperationFailure();
   }
 }
 
@@ -101,19 +101,25 @@ class _CurrencyLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppSkeletonizer(
-      enabled: true,
-      child: ListView.separated(
-        itemCount: 8,
-        separatorBuilder: (context, index) => const AsterDivider.inset(),
-        itemBuilder: (context, index) => CurrencySelectOptionRow(
-          currency: FiatCurrency(
-            name: 'Loading currency',
-            symbol: r'$',
-            code: 'USD',
-            countryCode: 'US',
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: 'Loading currencies',
+      excludeSemantics: true,
+      child: AppSkeletonizer(
+        enabled: true,
+        child: ListView.separated(
+          itemCount: 8,
+          separatorBuilder: (context, index) => const AsterDivider.inset(),
+          itemBuilder: (context, index) => CurrencySelectOptionRow(
+            currency: FiatCurrency(
+              name: 'Loading currency',
+              symbol: r'$',
+              code: 'USD',
+              countryCode: 'US',
+            ),
+            selected: false,
           ),
-          selected: false,
         ),
       ),
     );

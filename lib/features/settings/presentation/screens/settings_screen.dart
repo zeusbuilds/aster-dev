@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:go_router/go_router.dart';
@@ -94,7 +93,6 @@ class SettingsScreen extends ConsumerWidget {
             ],
             SizedBox(height: spacing.xxl),
 
-            /// Wallet section
             Text('Wallet', style: type.sectionLabel),
             SizedBox(height: spacing.md),
             Squircle(
@@ -123,7 +121,6 @@ class SettingsScreen extends ConsumerWidget {
             ),
             SizedBox(height: spacing.xxl),
 
-            /// App settings section
             Text('App', style: type.sectionLabel),
             SizedBox(height: spacing.md),
             Semantics(
@@ -209,7 +206,6 @@ class SettingsScreen extends ConsumerWidget {
             ),
             SizedBox(height: spacing.xxxl),
 
-            /// Footer
             Center(
               child: SvgPicture.asset(
                 'assets/brand/utexo-mark.svg',

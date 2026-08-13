@@ -191,6 +191,18 @@ ArchitectureVerification verifyArchitecture(Directory repositoryRoot) {
         );
       }
     }
+
+    if (_isFeaturePresentation(sourcePath)) {
+      final syntheticStacks = <MethodInvocation>[];
+      parsed.unit.accept(_SyntheticFailureStackCollector(syntheticStacks));
+      for (final invocation in syntheticStacks) {
+        final line = parsed.lineInfo.getLocation(invocation.offset).lineNumber;
+        failures.add(
+          '$sourcePath:$line: feature presentation must pass the captured '
+          'failure stack instead of replacing it with StackTrace.current.',
+        );
+      }
+    }
   }
 
   return ArchitectureVerification(
@@ -245,5 +257,23 @@ final class _SimpleIdentifierCollector extends RecursiveAstVisitor<void> {
   void visitSimpleIdentifier(SimpleIdentifier node) {
     names.add(node.name);
     super.visitSimpleIdentifier(node);
+  }
+}
+
+final class _SyntheticFailureStackCollector extends RecursiveAstVisitor<void> {
+  _SyntheticFailureStackCollector(this.invocations);
+
+  final List<MethodInvocation> invocations;
+
+  @override
+  void visitMethodInvocation(MethodInvocation node) {
+    final arguments = node.argumentList.arguments;
+    if (node.target?.toSource() == 'FailureMapper' &&
+        node.methodName.name == 'from' &&
+        arguments.length >= 2 &&
+        arguments[1].toSource() == 'StackTrace.current') {
+      invocations.add(node);
+    }
+    super.visitMethodInvocation(node);
   }
 }

@@ -4,14 +4,10 @@ import 'package:flutter/material.dart';
 import '../../../../shared/shared.dart';
 import '../../domain/models/models.dart';
 
-/// Widget representing a single currency option in the currency selection list
-///
-/// Shows currency flag, name, symbol, code, and selection indicator
+/// Accessible single-choice row for one supported fiat currency.
 class CurrencySelectOptionRow extends StatelessWidget {
-  /// The currency model to display
   final FiatCurrency currency;
 
-  /// Callback when the row is tapped
   final VoidCallback? onTap;
 
   /// Whether this currency is currently selected.
@@ -29,13 +25,16 @@ class CurrencySelectOptionRow extends StatelessWidget {
     final spacing = context.spacing;
     final metrics = context.metrics;
     final type = context.type;
-    final effectiveOnTap = selected ? null : onTap;
+    final available = onTap != null;
+    final effectiveOnTap = available && !selected ? onTap : null;
 
     return Semantics(
       button: true,
-      enabled: effectiveOnTap != null,
+      enabled: available,
       selected: selected,
+      inMutuallyExclusiveGroup: true,
       label: '${currency.name}, ${currency.symbol} ${currency.code}',
+      onTap: effectiveOnTap,
       excludeSemantics: true,
       child: Material(
         color: context.appColors.transparentSurface,

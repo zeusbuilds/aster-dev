@@ -25,8 +25,8 @@ class CountrySelectionScreen extends ConsumerWidget {
         skipLoadingOnRefresh: false,
         data: (state) => _RegionList(state: state),
         loading: () => const _RegionLoading(),
-        error: (error, _) => _RegionLoadFailure(
-          message: FailureMapper.from(error, StackTrace.current).userMessage,
+        error: (error, stackTrace) => _RegionLoadFailure(
+          message: FailureMapper.from(error, stackTrace).userMessage,
           onRetry: () => ref.read(settingsViewModelProvider.notifier).retry(),
         ),
       ),
@@ -87,15 +87,15 @@ class _RegionList extends ConsumerWidget {
       context.pop();
       return;
     }
-    unawaited(context.haptics.trigger(HapticIntent.error));
     final failure = ref.read(settingsViewModelProvider).value?.operationFailure;
-    if (failure != null) {
-      context.toasts.show(
-        title: 'Region not saved',
-        message: failure.userMessage,
-        variant: ToastVariant.failure,
-      );
-    }
+    if (failure == null) return;
+    unawaited(context.haptics.trigger(HapticIntent.error));
+    context.toasts.show(
+      title: 'Region not saved',
+      message: failure.userMessage,
+      variant: ToastVariant.failure,
+    );
+    ref.read(settingsViewModelProvider.notifier).clearOperationFailure();
   }
 }
 
@@ -104,14 +104,20 @@ class _RegionLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppSkeletonizer(
-      enabled: true,
-      child: ListView.separated(
-        itemCount: 8,
-        separatorBuilder: (context, index) => const AsterDivider.inset(),
-        itemBuilder: (context, index) => CountrySelectOptionRow(
-          country: Region(name: 'Loading region', code: 'US'),
-          selected: false,
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: 'Loading regions',
+      excludeSemantics: true,
+      child: AppSkeletonizer(
+        enabled: true,
+        child: ListView.separated(
+          itemCount: 8,
+          separatorBuilder: (context, index) => const AsterDivider.inset(),
+          itemBuilder: (context, index) => CountrySelectOptionRow(
+            country: Region(name: 'Loading region', code: 'US'),
+            selected: false,
+          ),
         ),
       ),
     );

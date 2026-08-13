@@ -10,8 +10,11 @@ part 'settings_app_view_model.g.dart';
 /// Owns package metadata loading and serialized public-link launches.
 @riverpod
 class SettingsAppViewModel extends _$SettingsAppViewModel {
+  var _stateGeneration = 0;
+
   @override
   Future<SettingsAppState> build() async {
+    _stateGeneration += 1;
     final repository = ref.watch(settingsAppRepositoryProvider);
     final links = _resolveLinks(repository);
     return _load(repository, links);
@@ -21,10 +24,11 @@ class SettingsAppViewModel extends _$SettingsAppViewModel {
   Future<void> retryMetadata() async {
     final current = state.value;
     if (current == null || current.metadataLoading) return;
+    final generation = _stateGeneration;
     state = AsyncData(current.beginMetadataLoad());
     final repository = ref.read(settingsAppRepositoryProvider);
     final result = await _guardMetadata(repository);
-    if (!ref.mounted) return;
+    if (!ref.mounted || generation != _stateGeneration) return;
     final latest = state.value;
     if (latest == null) return;
     state = AsyncData(_applyMetadataResult(latest, result));
@@ -38,10 +42,11 @@ class SettingsAppViewModel extends _$SettingsAppViewModel {
         !current.isAvailable(link)) {
       return false;
     }
+    final generation = _stateGeneration;
     state = AsyncData(current.beginOpening(link));
     final repository = ref.read(settingsAppRepositoryProvider);
     final result = await _guardOpen(repository, link);
-    if (!ref.mounted) return result is AppSuccess<void>;
+    if (!ref.mounted || generation != _stateGeneration) return false;
     final latest = state.value;
     if (latest == null || latest.openingLink != link) return false;
     return switch (result) {

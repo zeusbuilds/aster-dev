@@ -4,10 +4,13 @@ import 'dart:convert';
 import 'package:aster/core/core.dart';
 import 'package:aster/features/settings/data/repository/repository.dart';
 import 'package:aster/features/settings/presentation/view_model/view_models.dart';
+import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../support/payment_flow_harness.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -52,6 +55,139 @@ void main() {
     expect(state.snapshot.preferences.regionCode, 'US');
     expect(state.operation, isNull);
   });
+
+  test('stale preference mutation cannot overwrite a rebuilt state', () async {
+    SharedPreferences.setMockInitialValues({
+      'utexo.settings.v1.currency': 'USD',
+      'utexo.settings.v1.region': 'US',
+      'utexo.settings.v1.bitcoin_unit': 'btc',
+      'utexo.settings.v1.balances_visible': true,
+    });
+    final preferences = _DelayedPreferencesService(
+      await SharedPreferences.getInstance(),
+    );
+    var repository = SettingsRepository(preferences, _CatalogAssetBundle());
+    final container = ProviderContainer(
+      overrides: [
+        settingsRepositoryProvider.overrideWith((ref) async => repository),
+      ],
+    );
+    final subscription = container.listen(
+      settingsViewModelProvider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(() {
+      subscription.close();
+      container.dispose();
+    });
+    await container.read(settingsViewModelProvider.future);
+    final staleMutation = container
+        .read(settingsViewModelProvider.notifier)
+        .selectCurrency('EUR');
+    await preferences.writeStarted.future;
+
+    repository = SettingsRepository(
+      PreferencesService(await SharedPreferences.getInstance()),
+      _CatalogAssetBundle(),
+    );
+    container.invalidate(settingsRepositoryProvider);
+    final rebuilt = await container.read(settingsViewModelProvider.future);
+    expect(rebuilt.snapshot.preferences.currencyCode, 'USD');
+
+    preferences.releaseWrite.complete();
+    expect(await staleMutation, isFalse);
+    expect(
+      container
+          .read(settingsViewModelProvider)
+          .requireValue
+          .snapshot
+          .preferences
+          .currencyCode,
+      'USD',
+    );
+  });
+
+  test('stale health retry cannot overwrite a rebuilt configuration', () async {
+    const services = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.regtest,
+      sdkNetwork: 'regtest',
+    );
+    final firstHarness = await PaymentFlowTestHarness.create(
+      services: services,
+    );
+    final secondHarness = await PaymentFlowTestHarness.create(
+      services: services,
+    );
+    addTearDown(firstHarness.dispose);
+    addTearDown(secondHarness.dispose);
+    secondHarness.engine.networkStatus = WalletNetworkStatus(
+      environment: BlockchainEnvironment.regtest,
+      blockHeight: 101,
+      nodePublicKey:
+          '020000000000000000000000000000000000000000000000000000000000000000',
+      channelCount: 2,
+      usableChannelCount: 1,
+      peerCount: 3,
+    );
+    var repository = firstHarness.repository;
+    final container = ProviderContainer(
+      retry: (retryCount, error) => null,
+      overrides: [
+        walletRepositoryProvider.overrideWith((ref) async => repository),
+        walletServiceConfigurationProvider.overrideWithValue(services),
+      ],
+    );
+    final subscription = container.listen(
+      networkConfigurationViewModelProvider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(() {
+      subscription.close();
+      container.dispose();
+    });
+    await container.read(networkConfigurationViewModelProvider.future);
+    final gate = Completer<void>();
+    firstHarness.engine.networkStatusGate = gate;
+    final staleRetry = container
+        .read(networkConfigurationViewModelProvider.notifier)
+        .retryHealth();
+    await _waitFor(
+      () =>
+          firstHarness.engine.calls
+              .where((call) => call == 'networkStatus')
+              .length ==
+          2,
+    );
+
+    repository = secondHarness.repository;
+    container.invalidate(walletRepositoryProvider);
+    final rebuilt = await container.read(
+      networkConfigurationViewModelProvider.future,
+    );
+    expect(rebuilt.status?.blockHeight, 101);
+
+    firstHarness.engine.networkStatusError = StateError('stale native failure');
+    gate.complete();
+    await staleRetry;
+    expect(
+      container
+          .read(networkConfigurationViewModelProvider)
+          .requireValue
+          .status
+          ?.blockHeight,
+      101,
+    );
+  });
+}
+
+Future<void> _waitFor(bool Function() predicate) async {
+  for (var attempt = 0; attempt < 100; attempt += 1) {
+    if (predicate()) return;
+    await Future<void>.delayed(Duration.zero);
+  }
+  fail('Timed out waiting for asynchronous state.');
 }
 
 final class _DelayedPreferencesService extends PreferencesService {

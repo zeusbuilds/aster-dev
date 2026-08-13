@@ -37,10 +37,13 @@ final class ImportWalletState {
   final AppFailure? failure;
 
   bool get allWordsKnown =>
+      words.every((word) => word.isNotEmpty) &&
       wordStatuses.every((status) => status == MnemonicWordStatus.valid);
 
   bool get canSubmit =>
-      !submitting && checksumStatus == MnemonicChecksumStatus.valid;
+      !submitting &&
+      allWordsKnown &&
+      checksumStatus == MnemonicChecksumStatus.valid;
 
   String get mnemonic => words.join(' ');
 

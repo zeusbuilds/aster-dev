@@ -31,7 +31,9 @@ void main() {
     _write(
       repository,
       'lib/features/pay/presentation/screens/pay_screen.dart',
-      "import '../../domain/model.dart';",
+      "import '../../domain/model.dart';\n"
+          'void render(Object error, StackTrace stackTrace) { '
+          'FailureMapper.from(error, stackTrace); }',
     );
     _write(
       repository,
@@ -69,7 +71,9 @@ void main() {
           "import 'package:http/http.dart';\n"
           "import 'package:rgb_sdk_flutter/rgb_sdk_flutter.dart';\n"
           'void submit() { '
-          'walletRepositoryProvider; clipboardServiceProvider; }',
+          'walletRepositoryProvider; clipboardServiceProvider; }\n'
+          'void render(Object error) { '
+          'FailureMapper.from(error, StackTrace.current); }',
     );
     _write(repository, 'lib/broken.dart', "import 'unterminated.dart;");
 
@@ -86,6 +90,7 @@ void main() {
         contains('rgb_sdk_flutter may be imported only'),
         contains('walletRepositoryProvider intent through a ViewModel'),
         contains('clipboardServiceProvider intent through a ViewModel'),
+        contains('must pass the captured failure stack'),
         contains('parse error:'),
       ]),
     );

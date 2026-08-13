@@ -5,7 +5,10 @@ import 'dart:ui' as ui;
 import 'package:aster/core/core.dart';
 import 'package:aster/features/settings/data/repository/repository.dart';
 import 'package:aster/features/settings/domain/models/models.dart';
+import 'package:aster/features/settings/presentation/models/models.dart';
 import 'package:aster/features/settings/presentation/screens/screens.dart';
+import 'package:aster/features/settings/presentation/view_model/view_models.dart';
+import 'package:aster/features/settings/presentation/widgets/widgets.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:aster/features/wallet/presentation/models/models.dart';
 import 'package:aster/features/wallet/presentation/view_model/view_models.dart';
@@ -71,6 +74,19 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Satoshis'), findsOneWidget);
+    final selected = tester
+        .getSemantics(find.bySemanticsLabel(RegExp(r'^Bitcoin,')))
+        .getSemanticsData();
+    final unselected = tester
+        .getSemantics(find.bySemanticsLabel(RegExp(r'^Satoshis,')))
+        .getSemanticsData();
+    expect(selected.flagsCollection.isEnabled, ui.Tristate.isTrue);
+    expect(selected.flagsCollection.isSelected, ui.Tristate.isTrue);
+    expect(selected.flagsCollection.isInMutuallyExclusiveGroup, isTrue);
+    expect(selected.hasAction(ui.SemanticsAction.tap), isFalse);
+    expect(unselected.flagsCollection.isSelected, ui.Tristate.isFalse);
+    expect(unselected.flagsCollection.isInMutuallyExclusiveGroup, isTrue);
+    expect(unselected.hasAction(ui.SemanticsAction.tap), isTrue);
     expect(tester, meetsGuideline(androidTapTargetGuideline));
     expect(tester, meetsGuideline(labeledTapTargetGuideline));
     expect(tester, meetsGuideline(textContrastGuideline));
@@ -83,6 +99,156 @@ void main() {
     expect(persisted.value.preferences.bitcoinUnit, BitcoinUnit.sats);
     expect(haptics.intents, [HapticIntent.selection]);
     expect(toasts.messages, isEmpty);
+  });
+
+  testWidgets('choice loading exposes status without fabricated options', (
+    tester,
+  ) async {
+    await _pumpPendingSelection(
+      tester,
+      screen: const CurrencySelectionScreen(),
+    );
+    expect(find.bySemanticsLabel('Loading currencies'), findsOneWidget);
+    expect(find.bySemanticsLabel('Loading currency'), findsNothing);
+
+    await _pumpPendingSelection(tester, screen: const CountrySelectionScreen());
+    expect(find.bySemanticsLabel('Loading regions'), findsOneWidget);
+    expect(find.bySemanticsLabel('Loading region'), findsNothing);
+  });
+
+  testWidgets('region and currency rows expose available choice semantics', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Scaffold(
+          body: Column(
+            children: [
+              CountrySelectOptionRow(
+                country: Region(name: 'United States', code: 'US'),
+                selected: true,
+                onTap: () {},
+              ),
+              CurrencySelectOptionRow(
+                currency: FiatCurrency(
+                  name: 'United States Dollar',
+                  symbol: r'$',
+                  code: 'USD',
+                  countryCode: 'US',
+                ),
+                selected: true,
+                onTap: () {},
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    for (final label in ['United States', r'United States Dollar, $ USD']) {
+      final semantics = tester
+          .getSemantics(find.bySemanticsLabel(label))
+          .getSemanticsData();
+      expect(semantics.flagsCollection.isEnabled, ui.Tristate.isTrue);
+      expect(semantics.flagsCollection.isSelected, ui.Tristate.isTrue);
+      expect(semantics.flagsCollection.isInMutuallyExclusiveGroup, isTrue);
+      expect(semantics.hasAction(ui.SemanticsAction.tap), isFalse);
+    }
+  });
+
+  testWidgets('failed preference save is presented and consumed once', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'utexo.settings.v1.currency': 'USD',
+      'utexo.settings.v1.region': 'US',
+      'utexo.settings.v1.bitcoin_unit': 'btc',
+      'utexo.settings.v1.balances_visible': true,
+    });
+    final repository = SettingsRepository(
+      _FailingPreferencesService(await SharedPreferences.getInstance()),
+      _CatalogAssetBundle(),
+    );
+    final haptics = _RecordingHaptics();
+    final toasts = _RecordingToasts();
+    late ProviderContainer container;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsRepositoryProvider.overrideWith((ref) async => repository),
+        ],
+        child: Builder(
+          builder: (context) {
+            container = ProviderScope.containerOf(context);
+            return MaterialApp(
+              theme: AppTheme.light(),
+              home: AsterFeedbackScope(
+                haptics: haptics,
+                toasts: toasts,
+                child: const BitcoinUnitSelectionScreen(),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Satoshis'));
+    await tester.pumpAndSettle();
+
+    expect(haptics.intents, [HapticIntent.error]);
+    expect(toasts.messages, ['Bitcoin unit not saved']);
+    expect(
+      container.read(settingsViewModelProvider).value?.operationFailure,
+      isNull,
+    );
+  });
+
+  testWidgets('network refresh remains explicitly announced', (tester) async {
+    const configuration = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.regtest,
+      sdkNetwork: 'regtest',
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          networkConfigurationViewModelProvider.overrideWith(
+            () => _StaticNetworkConfigurationViewModel(
+              const NetworkConfigurationState(
+                configuration: configuration,
+                healthFailure: AppFailure(
+                  code: 'health_unavailable',
+                  kind: AppFailureKind.unavailable,
+                  userMessage: 'Node health is temporarily unavailable.',
+                  retryable: true,
+                ),
+                refreshing: true,
+              ),
+            ),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const NetworkConfigurationScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    final retryButton = find.byWidgetPredicate(
+      (widget) => widget is CustomButton && widget.text == 'Retry health check',
+    );
+    await tester.scrollUntilVisible(retryButton, 300);
+    await tester.pump();
+
+    final retry = tester.getSemantics(
+      find.bySemanticsLabel('Retry health check'),
+    );
+    expect(retry.value, 'Loading');
+    expect(retry.flagsCollection.isEnabled, ui.Tristate.isFalse);
+    expect(find.text('Status'), findsOneWidget);
   });
 
   testWidgets('advanced disclosures are disabled without auth policy', (
@@ -293,6 +459,22 @@ void main() {
   });
 }
 
+Future<void> _pumpPendingSelection(
+  WidgetTester tester, {
+  required Widget screen,
+}) async {
+  final pending = Completer<SettingsRepository>();
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        settingsRepositoryProvider.overrideWith((ref) => pending.future),
+      ],
+      child: MaterialApp(theme: AppTheme.light(), home: screen),
+    ),
+  );
+  await tester.pump();
+}
+
 final _walletProfile = WalletProfile(
   id: '0123456789abcdef0123456789abcdef',
   name: 'Primary wallet',
@@ -376,6 +558,25 @@ final class _CatalogAssetBundle extends CachingAssetBundle {
     final bytes = Uint8List.fromList(utf8.encode(_sources[key]!));
     return ByteData.sublistView(bytes);
   }
+}
+
+final class _FailingPreferencesService extends PreferencesService {
+  _FailingPreferencesService(super.preferences);
+
+  @override
+  Future<void> setString(String key, String value) {
+    throw StateError('Injected preference write failure.');
+  }
+}
+
+final class _StaticNetworkConfigurationViewModel
+    extends NetworkConfigurationViewModel {
+  _StaticNetworkConfigurationViewModel(this.value);
+
+  final NetworkConfigurationState value;
+
+  @override
+  Future<NetworkConfigurationState> build() async => value;
 }
 
 final class _MetadataService implements AppMetadataService {

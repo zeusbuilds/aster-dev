@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 
+import 'package:aster/core/core.dart';
 import 'package:aster/features/onboarding/presentation/screens/screens.dart';
 import 'package:aster/features/onboarding/presentation/view_model/view_models.dart';
 import 'package:aster/features/onboarding/presentation/widgets/widgets.dart';
@@ -134,6 +135,101 @@ void main() {
       '3 of 3',
     );
     expect(find.text('Recovery phrase is valid'), findsOneWidget);
+  });
+
+  testWidgets('import exposes and completes a retryable phrase check', (
+    tester,
+  ) async {
+    final harness = await OnboardingTestHarness.create(
+      validationError: const AppFailureException(
+        AppFailure(
+          code: 'checksum_service_unavailable',
+          kind: AppFailureKind.unavailable,
+          userMessage: 'Phrase checking is temporarily unavailable.',
+          retryable: true,
+        ),
+      ),
+    );
+    addTearDown(() => _disposeHarness(tester, harness));
+    await _pumpScreen(tester, harness, const OnboardingImportWalletScreen());
+
+    await tester.enterText(
+      find.byKey(const ValueKey('recovery-word-1')),
+      validTestMnemonic,
+    );
+    await _pumpUntil(
+      tester,
+      () =>
+          harness.container
+              .read(importWalletViewModelProvider)
+              .value
+              ?.failure
+              ?.code ==
+          'checksum_service_unavailable',
+    );
+    await tester.pump();
+    expect(find.text('Retry phrase check'), findsOneWidget);
+
+    harness.keyGenerator.validationError = null;
+    await tester.tap(find.text('Retry phrase check'));
+    await _pumpUntil(
+      tester,
+      () =>
+          harness.container
+              .read(importWalletViewModelProvider)
+              .value
+              ?.canSubmit ==
+          true,
+    );
+    await tester.pump();
+
+    expect(find.text('Recovery phrase is valid'), findsOneWidget);
+    expect(find.text('Retry phrase check'), findsNothing);
+  });
+
+  testWidgets('import presents provisioning failure as Continue retry', (
+    tester,
+  ) async {
+    final harness = await OnboardingTestHarness.create();
+    addTearDown(() => _disposeHarness(tester, harness));
+    await _pumpScreen(tester, harness, const OnboardingImportWalletScreen());
+    final notifier = harness.container.read(
+      importWalletViewModelProvider.notifier,
+    );
+    notifier.updateWords(0, validTestMnemonicWords);
+    await _pumpUntil(
+      tester,
+      () =>
+          harness.container
+              .read(importWalletViewModelProvider)
+              .value
+              ?.canSubmit ==
+          true,
+    );
+    harness.engine.initializeError = const AppFailureException(
+      AppFailure(
+        code: 'wallet_setup_unavailable',
+        kind: AppFailureKind.unavailable,
+        userMessage: 'Wallet setup is temporarily unavailable.',
+        retryable: true,
+      ),
+    );
+
+    expect(await notifier.submit(), isFalse);
+    await tester.pump();
+
+    expect(
+      find.text('Wallet setup is temporarily unavailable.'),
+      findsOneWidget,
+    );
+    expect(find.text('Retry phrase check'), findsNothing);
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('Continue'))
+          .flagsCollection
+          .isEnabled,
+      ui.Tristate.isTrue,
+    );
   });
 
   testWidgets('import keeps loading on the current screen until commit', (

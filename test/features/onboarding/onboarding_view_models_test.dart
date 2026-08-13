@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:aster/core/core.dart';
 import 'package:aster/features/onboarding/domain/models/models.dart';
+import 'package:aster/features/onboarding/presentation/models/models.dart';
 import 'package:aster/features/onboarding/presentation/view_model/view_models.dart';
 import 'package:aster/features/wallet/presentation/view_model/wallet_view_model.dart';
 import 'package:aster/shared/feedback/feedback.dart';
@@ -11,6 +12,26 @@ import '../../support/onboarding_harness.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('import state requires known words as well as a valid checksum', () {
+    final malformed = ImportWalletState(
+      checksumStatus: MnemonicChecksumStatus.valid,
+    );
+
+    expect(malformed.allWordsKnown, isFalse);
+    expect(malformed.canSubmit, isFalse);
+
+    final mismatched = ImportWalletState(
+      words: List.filled(ImportWalletState.wordCount, ''),
+      wordStatuses: List.filled(
+        ImportWalletState.wordCount,
+        MnemonicWordStatus.valid,
+      ),
+      checksumStatus: MnemonicChecksumStatus.valid,
+    );
+    expect(mismatched.allWordsKnown, isFalse);
+    expect(mismatched.canSubmit, isFalse);
+  });
 
   test(
     'import normalizes words and adopts only a committed registry',
@@ -162,6 +183,55 @@ void main() {
     },
   );
 
+  test(
+    'import retains a provisioning failure as a retryable submit state',
+    () async {
+      final harness = await OnboardingTestHarness.create();
+      addTearDown(harness.dispose);
+      final subscription = harness.container.listen(
+        importWalletViewModelProvider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      await harness.container.read(importWalletViewModelProvider.future);
+      final notifier = harness.container.read(
+        importWalletViewModelProvider.notifier,
+      );
+      notifier.updateWords(0, validTestMnemonicWords);
+      await _waitFor(
+        () =>
+            harness.container
+                .read(importWalletViewModelProvider)
+                .value
+                ?.canSubmit ==
+            true,
+      );
+      harness.engine.initializeError = const AppFailureException(
+        AppFailure(
+          code: 'wallet_setup_unavailable',
+          kind: AppFailureKind.unavailable,
+          userMessage: 'Wallet setup is temporarily unavailable.',
+          retryable: true,
+        ),
+      );
+
+      expect(await notifier.submit(), isFalse);
+      final failed = harness.container
+          .read(importWalletViewModelProvider)
+          .requireValue;
+      expect(failed.checksumStatus, MnemonicChecksumStatus.valid);
+      expect(failed.failure?.code, 'wallet_setup_unavailable');
+      expect(failed.canSubmit, isTrue);
+      final validationCount = harness.keyGenerator.validatedMnemonics.length;
+      await notifier.retryChecksum();
+      expect(
+        harness.keyGenerator.validatedMnemonics,
+        hasLength(validationCount),
+      );
+    },
+  );
+
   test('import ignores a stale checksum result after input changes', () async {
     final harness = await OnboardingTestHarness.create();
     addTearDown(harness.dispose);
@@ -190,6 +260,57 @@ void main() {
     expect(state.checksumStatus, MnemonicChecksumStatus.incomplete);
     expect(state.canSubmit, isFalse);
   });
+
+  test(
+    'import retries a transient checksum failure exactly on demand',
+    () async {
+      final harness = await OnboardingTestHarness.create(
+        validationError: const AppFailureException(
+          AppFailure(
+            code: 'checksum_service_unavailable',
+            kind: AppFailureKind.unavailable,
+            userMessage: 'Phrase checking is temporarily unavailable.',
+            retryable: true,
+          ),
+        ),
+      );
+      addTearDown(harness.dispose);
+      final subscription = harness.container.listen(
+        importWalletViewModelProvider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      await harness.container.read(importWalletViewModelProvider.future);
+      final notifier = harness.container.read(
+        importWalletViewModelProvider.notifier,
+      );
+
+      notifier.updateWords(0, validTestMnemonicWords);
+      await _waitFor(
+        () =>
+            harness.container
+                .read(importWalletViewModelProvider)
+                .value
+                ?.failure
+                ?.code ==
+            'checksum_service_unavailable',
+      );
+      expect(harness.keyGenerator.validatedMnemonics, hasLength(1));
+
+      harness.keyGenerator.validationError = null;
+      final retry = notifier.retryChecksum();
+      await notifier.retryChecksum();
+      await retry;
+      final recovered = harness.container
+          .read(importWalletViewModelProvider)
+          .requireValue;
+      expect(recovered.checksumStatus, MnemonicChecksumStatus.valid);
+      expect(recovered.failure, isNull);
+      expect(recovered.canSubmit, isTrue);
+      expect(harness.keyGenerator.validatedMnemonics, hasLength(2));
+    },
+  );
 
   test(
     'create copies, provisions, clears, and adopts the exact wallet',

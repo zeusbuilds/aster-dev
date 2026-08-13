@@ -9,16 +9,22 @@ part 'network_configuration_view_model.g.dart';
 /// Loads non-secret configuration and live native node status.
 @riverpod
 class NetworkConfigurationViewModel extends _$NetworkConfigurationViewModel {
+  var _stateGeneration = 0;
+
   @override
-  Future<NetworkConfigurationState> build() => _load();
+  Future<NetworkConfigurationState> build() {
+    _stateGeneration += 1;
+    return _load();
+  }
 
   /// Refreshes health while preserving the last confirmed status.
   Future<void> retryHealth() async {
     final current = state.value;
     if (current == null || current.refreshing) return;
-    state = AsyncData(current.copyWith(refreshing: true, healthFailure: null));
+    final generation = _stateGeneration;
+    state = AsyncData(current.copyWith(refreshing: true));
     final result = await _readNetworkStatus();
-    if (!ref.mounted) return;
+    if (!ref.mounted || generation != _stateGeneration) return;
     state = AsyncData(switch (result) {
       AppSuccess(:final value) => current.copyWith(
         status: value,

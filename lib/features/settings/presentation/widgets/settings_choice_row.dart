@@ -20,12 +20,15 @@ class SettingsChoiceRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
-    final effectiveOnTap = selected ? null : onTap;
+    final available = onTap != null;
+    final effectiveOnTap = available && !selected ? onTap : null;
     return Semantics(
       button: true,
-      enabled: effectiveOnTap != null,
+      enabled: available,
       selected: selected,
+      inMutuallyExclusiveGroup: true,
       label: '$title, $subtitle',
+      onTap: effectiveOnTap,
       excludeSemantics: true,
       child: Material(
         color: context.appColors.transparentSurface,

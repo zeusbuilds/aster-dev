@@ -4,17 +4,12 @@ import 'package:flutter/material.dart';
 import '../../../../shared/shared.dart';
 import '../../domain/models/models.dart';
 
-/// Widget representing a single country option in the country selection list
-///
-/// Shows country flag, name, and selection indicator
+/// Accessible single-choice row for one supported region.
 class CountrySelectOptionRow extends StatelessWidget {
-  /// The country model to display
   final Region country;
 
-  /// Callback when the row is tapped
   final VoidCallback? onTap;
 
-  /// Whether this country is currently selected
   final bool selected;
 
   const CountrySelectOptionRow({
@@ -29,13 +24,16 @@ class CountrySelectOptionRow extends StatelessWidget {
     final spacing = context.spacing;
     final type = context.type;
     final metrics = context.metrics;
-    final effectiveOnTap = selected ? null : onTap;
+    final available = onTap != null;
+    final effectiveOnTap = available && !selected ? onTap : null;
 
     return Semantics(
       button: true,
-      enabled: effectiveOnTap != null,
+      enabled: available,
       selected: selected,
+      inMutuallyExclusiveGroup: true,
       label: country.name,
+      onTap: effectiveOnTap,
       excludeSemantics: true,
       child: Material(
         color: context.appColors.transparentSurface,

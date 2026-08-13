@@ -171,6 +171,49 @@ void main() {
     expect(await second, isA<AppSuccess<SettingsSnapshot>>());
     expect(preferences.maxConcurrentWrites, 1);
   });
+
+  test('settings snapshots reject malformed catalog invariants', () {
+    final usd = FiatCurrency(
+      name: 'United States Dollar',
+      symbol: r'$',
+      code: 'USD',
+      countryCode: 'US',
+    );
+    final us = Region(name: 'United States', code: 'US');
+
+    expect(
+      () => SettingsSnapshot(
+        preferences: AppPreferences.defaults,
+        currencies: const [],
+        regions: [us],
+      ),
+      throwsArgumentError,
+    );
+    expect(
+      () => SettingsSnapshot(
+        preferences: AppPreferences.defaults,
+        currencies: [usd, usd],
+        regions: [us],
+      ),
+      throwsArgumentError,
+    );
+    expect(
+      () => SettingsSnapshot(
+        preferences: AppPreferences.defaults.copyWith(currencyCode: 'EUR'),
+        currencies: [usd],
+        regions: [us],
+      ),
+      throwsArgumentError,
+    );
+    expect(
+      () => SettingsSnapshot(
+        preferences: AppPreferences.defaults.copyWith(regionCode: 'DE'),
+        currencies: [usd],
+        regions: [us],
+      ),
+      throwsArgumentError,
+    );
+  });
 }
 
 _MemoryAssetBundle _validCatalog() => _MemoryAssetBundle({

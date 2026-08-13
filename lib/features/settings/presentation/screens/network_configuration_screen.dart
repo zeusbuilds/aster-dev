@@ -21,8 +21,8 @@ class NetworkConfigurationScreen extends ConsumerWidget {
       ),
       body: configuration.when(
         loading: () => const Center(child: GridLoader()),
-        error: (error, _) => _NetworkLoadFailure(
-          message: FailureMapper.from(error, StackTrace.current).userMessage,
+        error: (error, stackTrace) => _NetworkLoadFailure(
+          message: FailureMapper.from(error, stackTrace).userMessage,
           onRetry: () => ref.invalidate(networkConfigurationViewModelProvider),
         ),
         data: (state) => _NetworkConfigurationContent(state: state),

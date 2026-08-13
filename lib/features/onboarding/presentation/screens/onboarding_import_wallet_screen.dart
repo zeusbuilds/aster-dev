@@ -209,7 +209,18 @@ class _OnboardingImportWalletScreenState
               ),
             ),
           ),
-          _PhraseStatus(state: state),
+          _PhraseStatus(
+            state: state,
+            onRetry:
+                state.checksumStatus == MnemonicChecksumStatus.incomplete &&
+                    state.failure?.retryable == true
+                ? () => unawaited(
+                    ref
+                        .read(importWalletViewModelProvider.notifier)
+                        .retryChecksum(),
+                  )
+                : null,
+          ),
           Padding(
             padding: EdgeInsets.fromLTRB(
               spacing.xxl,
@@ -315,13 +326,18 @@ void _returnToWelcome(BuildContext context) {
 }
 
 class _PhraseStatus extends StatelessWidget {
-  const _PhraseStatus({required this.state});
+  const _PhraseStatus({required this.state, this.onRetry});
 
   final ImportWalletState state;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
     final (message, color) = switch (state.checksumStatus) {
+      _ when state.failure != null => (
+        state.failure!.userMessage,
+        context.appColors.danger,
+      ),
       MnemonicChecksumStatus.checking => (
         'Checking recovery phrase...',
         context.appColors.onBrandArt,
@@ -332,10 +348,6 @@ class _PhraseStatus extends StatelessWidget {
       ),
       MnemonicChecksumStatus.invalid => (
         'The phrase checksum does not match',
-        context.appColors.danger,
-      ),
-      MnemonicChecksumStatus.incomplete when state.failure != null => (
-        state.failure!.userMessage,
         context.appColors.danger,
       ),
       _ => ('Never share your recovery phrase', context.appColors.onBrandArt),
@@ -351,12 +363,19 @@ class _PhraseStatus extends StatelessWidget {
           context.spacing.xxl,
           0,
         ),
-        child: Center(
-          child: Text(
-            message,
-            style: context.type.brandBody.copyWith(color: color),
-            textAlign: TextAlign.center,
-          ),
+        child: Column(
+          children: [
+            Text(
+              message,
+              style: context.type.brandBody.copyWith(color: color),
+              textAlign: TextAlign.center,
+            ),
+            if (onRetry case final retry?)
+              OnboardingTextAction(
+                label: 'Retry phrase check',
+                onPressed: retry,
+              ),
+          ],
         ),
       ),
     );

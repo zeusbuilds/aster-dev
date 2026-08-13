@@ -243,6 +243,7 @@ final class FakeWalletEngine implements WalletEngine {
   Object? feeEstimateError;
   Object? balanceError;
   Object? activityError;
+  Object? networkStatusError;
   Completer<void>? initializeGate;
   Completer<void>? syncGate;
   Completer<void>? addressGate;
@@ -251,6 +252,7 @@ final class FakeWalletEngine implements WalletEngine {
   Completer<void>? sendPaymentGate;
   Completer<void>? balanceGate;
   Completer<void>? activityGate;
+  Completer<void>? networkStatusGate;
   String address = 'bcrt1qtest';
   String? initializedPassword;
   String? initializedMnemonic;
@@ -425,6 +427,9 @@ final class FakeWalletEngine implements WalletEngine {
   @override
   Future<WalletNetworkStatus> getNetworkStatus() async {
     calls.add('networkStatus');
+    final gate = networkStatusGate;
+    await gate?.future;
+    if (networkStatusError case final Object error) throw error;
     return networkStatus ??
         WalletNetworkStatus(
           environment: BlockchainEnvironment.regtest,

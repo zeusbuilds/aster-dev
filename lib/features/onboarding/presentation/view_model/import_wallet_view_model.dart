@@ -95,6 +95,20 @@ class ImportWalletViewModel extends _$ImportWalletViewModel {
     return letters.substring(0, ImportWalletState.maximumWordCharacters);
   }
 
+  /// Retries a transient native checksum failure for the unchanged phrase.
+  Future<void> retryChecksum() async {
+    final current = state.value;
+    if (current == null ||
+        current.submitting ||
+        current.checksumStatus != MnemonicChecksumStatus.incomplete ||
+        !current.allWordsKnown ||
+        current.failure?.retryable != true) {
+      return;
+    }
+    final revision = ++_validationRevision;
+    await _validateChecksum(current.mnemonic, revision);
+  }
+
   /// Provisions only after every word and the SDK checksum are valid.
   Future<bool> submit() async {
     final current = state.value;
@@ -129,7 +143,10 @@ class ImportWalletViewModel extends _$ImportWalletViewModel {
     final current = state.value;
     if (current == null || current.submitting) return;
     state = AsyncData(
-      current.copyWith(checksumStatus: MnemonicChecksumStatus.checking),
+      current.copyWith(
+        checksumStatus: MnemonicChecksumStatus.checking,
+        failure: null,
+      ),
     );
     final result = await _validateMnemonic(mnemonic);
     if (!ref.mounted || revision != _validationRevision) return;
@@ -138,12 +155,18 @@ class ImportWalletViewModel extends _$ImportWalletViewModel {
     switch (result) {
       case AppSuccess<void>():
         state = AsyncData(
-          latest.copyWith(checksumStatus: MnemonicChecksumStatus.valid),
+          latest.copyWith(
+            checksumStatus: MnemonicChecksumStatus.valid,
+            failure: null,
+          ),
         );
       case AppFailureResult<void>(:final failure)
           when failure.code == 'wallet_mnemonic_invalid':
         state = AsyncData(
-          latest.copyWith(checksumStatus: MnemonicChecksumStatus.invalid),
+          latest.copyWith(
+            checksumStatus: MnemonicChecksumStatus.invalid,
+            failure: null,
+          ),
         );
       case AppFailureResult<void>(:final failure):
         state = AsyncData(

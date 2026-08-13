@@ -14,8 +14,13 @@ final class SettingsAppState {
     this.linkConfigurationFailure,
     this.openingLink,
     this.operationFailure,
-  }) : availableLinks = Set.unmodifiable(availableLinks),
-       assert(openingLink == null || availableLinks.contains(openingLink));
+  }) : availableLinks = Set.unmodifiable(availableLinks) {
+    if (openingLink != null && !this.availableLinks.contains(openingLink)) {
+      throw ArgumentError(
+        'The active Settings link must be available in this build.',
+      );
+    }
+  }
 
   /// Public actions configured for this exact build.
   final Set<SettingsExternalLink> availableLinks;

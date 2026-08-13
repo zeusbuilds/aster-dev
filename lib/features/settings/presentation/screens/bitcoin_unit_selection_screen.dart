@@ -25,8 +25,8 @@ class BitcoinUnitSelectionScreen extends ConsumerWidget {
       body: settings.when(
         skipLoadingOnRefresh: false,
         loading: () => const Center(child: GridLoader()),
-        error: (error, _) => _UnitLoadFailure(
-          message: FailureMapper.from(error, StackTrace.current).userMessage,
+        error: (error, stackTrace) => _UnitLoadFailure(
+          message: FailureMapper.from(error, stackTrace).userMessage,
           onRetry: () => ref.read(settingsViewModelProvider.notifier).retry(),
         ),
         data: (state) {
@@ -81,15 +81,15 @@ class BitcoinUnitSelectionScreen extends ConsumerWidget {
       context.pop();
       return;
     }
-    unawaited(context.haptics.trigger(HapticIntent.error));
     final failure = ref.read(settingsViewModelProvider).value?.operationFailure;
-    if (failure != null) {
-      context.toasts.show(
-        title: 'Bitcoin unit not saved',
-        message: failure.userMessage,
-        variant: ToastVariant.failure,
-      );
-    }
+    if (failure == null) return;
+    unawaited(context.haptics.trigger(HapticIntent.error));
+    context.toasts.show(
+      title: 'Bitcoin unit not saved',
+      message: failure.userMessage,
+      variant: ToastVariant.failure,
+    );
+    ref.read(settingsViewModelProvider.notifier).clearOperationFailure();
   }
 }
 

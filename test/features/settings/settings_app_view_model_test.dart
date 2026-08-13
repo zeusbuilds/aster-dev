@@ -3,11 +3,22 @@ import 'dart:async';
 import 'package:aster/core/core.dart';
 import 'package:aster/features/settings/data/repository/repository.dart';
 import 'package:aster/features/settings/domain/models/models.dart';
+import 'package:aster/features/settings/presentation/models/models.dart';
 import 'package:aster/features/settings/presentation/view_model/view_models.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('app state rejects an unavailable in-flight link in release mode', () {
+    expect(
+      () => SettingsAppState(
+        availableLinks: const {},
+        openingLink: SettingsExternalLink.contactSupport,
+      ),
+      throwsArgumentError,
+    );
+  });
+
   test(
     'loads metadata and configured link availability independently',
     () async {
@@ -179,6 +190,73 @@ void main() {
     expect(state.metadata?.version, '4.0.0');
     expect(state.availableLinks, isEmpty);
     expect(state.linkConfigurationFailure?.kind, AppFailureKind.configuration);
+  });
+
+  test('stale metadata retry cannot overwrite a dependency rebuild', () async {
+    final staleRetry = Completer<AppResult<AppBuildMetadata>>();
+    var repository = SettingsAppRepository(
+      _QueuedMetadataService([
+        Future.value(
+          const AppResult.failure(
+            AppFailure(
+              code: 'metadata_unavailable',
+              kind: AppFailureKind.unavailable,
+              userMessage: 'Version unavailable.',
+              retryable: true,
+            ),
+          ),
+        ),
+        staleRetry.future,
+      ]),
+      _ControlledExternalUriService(),
+    );
+    final container = ProviderContainer(
+      overrides: [
+        settingsAppRepositoryProvider.overrideWith((ref) => repository),
+        publicLinkConfigurationProvider.overrideWithValue(
+          const PublicLinkConfiguration(),
+        ),
+      ],
+    );
+    final subscription = container.listen(
+      settingsAppViewModelProvider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(() {
+      subscription.close();
+      container.dispose();
+    });
+    await container.read(settingsAppViewModelProvider.future);
+    final stale = container
+        .read(settingsAppViewModelProvider.notifier)
+        .retryMetadata();
+    await Future<void>.delayed(Duration.zero);
+
+    repository = SettingsAppRepository(
+      _QueuedMetadataService([
+        Future.value(
+          const AppResult.success(
+            AppBuildMetadata(version: '9.0.0', buildNumber: '1'),
+          ),
+        ),
+      ]),
+      _ControlledExternalUriService(),
+    );
+    container.invalidate(settingsAppRepositoryProvider);
+    final rebuilt = await container.read(settingsAppViewModelProvider.future);
+    expect(rebuilt.metadata?.version, '9.0.0');
+
+    staleRetry.complete(
+      const AppResult.success(
+        AppBuildMetadata(version: '1.0.0', buildNumber: 'old'),
+      ),
+    );
+    await stale;
+    expect(
+      container.read(settingsAppViewModelProvider).value?.metadata?.version,
+      '9.0.0',
+    );
   });
 }
 
