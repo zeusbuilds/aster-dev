@@ -210,6 +210,7 @@ class _GridLoaderPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final paint = Paint()..style = PaintingStyle.fill;
     for (int row = 0; row < _gridLoaderRows; row++) {
       for (int col = 0; col < _gridLoaderColumns; col++) {
         double opacity;
@@ -289,9 +290,7 @@ class _GridLoaderPainter extends CustomPainter {
         final y = row * squareSize;
         final rect = Rect.fromLTWH(x, y, squareSize, squareSize);
 
-        final paint = Paint()
-          ..color = color.withValues(alpha: opacity)
-          ..style = PaintingStyle.fill;
+        paint.color = color.withValues(alpha: opacity);
         canvas.drawRect(rect, paint);
       }
     }

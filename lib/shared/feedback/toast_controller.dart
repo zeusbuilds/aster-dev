@@ -17,7 +17,7 @@ class ToastController extends _$ToastController
   int _nextId = 0;
 
   @override
-  ToastQueueState build() => const ToastQueueState();
+  ToastQueueState build() => ToastQueueState();
 
   @override
   bool show({
@@ -64,7 +64,7 @@ class ToastController extends _$ToastController
     final current = state.current;
     if (current == null || (id != null && current.id != id)) return;
     if (state.pending.isEmpty) {
-      state = const ToastQueueState();
+      state = ToastQueueState();
       return;
     }
     state = ToastQueueState(

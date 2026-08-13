@@ -7,7 +7,6 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
   const AsterEffects({
     this.brandContentStrongOpacity = 0.9,
     this.brandContentMutedOpacity = 0.75,
-    this.brandContentSubtleOpacity = 0.7,
     this.brandIndicatorInactiveOpacity = 0.35,
     this.brandGlassSurfaceOpacity = 0.15,
     this.brandGlassBorderOpacity = 0.1,
@@ -36,7 +35,6 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
 
   final double brandContentStrongOpacity;
   final double brandContentMutedOpacity;
-  final double brandContentSubtleOpacity;
   final double brandIndicatorInactiveOpacity;
   final double brandGlassSurfaceOpacity;
   final double brandGlassBorderOpacity;
@@ -66,7 +64,6 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
   AsterEffects copyWith({
     double? brandContentStrongOpacity,
     double? brandContentMutedOpacity,
-    double? brandContentSubtleOpacity,
     double? brandIndicatorInactiveOpacity,
     double? brandGlassSurfaceOpacity,
     double? brandGlassBorderOpacity,
@@ -97,8 +94,6 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
           brandContentStrongOpacity ?? this.brandContentStrongOpacity,
       brandContentMutedOpacity:
           brandContentMutedOpacity ?? this.brandContentMutedOpacity,
-      brandContentSubtleOpacity:
-          brandContentSubtleOpacity ?? this.brandContentSubtleOpacity,
       brandIndicatorInactiveOpacity:
           brandIndicatorInactiveOpacity ?? this.brandIndicatorInactiveOpacity,
       brandGlassSurfaceOpacity:
@@ -157,11 +152,6 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
       brandContentMutedOpacity: _lerp(
         brandContentMutedOpacity,
         other.brandContentMutedOpacity,
-        t,
-      ),
-      brandContentSubtleOpacity: _lerp(
-        brandContentSubtleOpacity,
-        other.brandContentSubtleOpacity,
         t,
       ),
       brandIndicatorInactiveOpacity: _lerp(

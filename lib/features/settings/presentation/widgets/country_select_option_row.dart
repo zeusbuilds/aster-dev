@@ -59,11 +59,7 @@ class CountrySelectOptionRow extends StatelessWidget {
                   ),
                 ),
                 SizedBox(width: spacing.xxxl),
-                ExcludeSemantics(
-                  child: IgnorePointer(
-                    child: CustomRadio(option: true, selected: selected),
-                  ),
-                ),
+                AsterSelectionIndicator(selected: selected),
               ],
             ),
           ),

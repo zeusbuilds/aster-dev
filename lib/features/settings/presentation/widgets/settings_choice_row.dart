@@ -48,11 +48,7 @@ class SettingsChoiceRow extends StatelessWidget {
                   ),
                 ),
                 SizedBox(width: spacing.xxl),
-                ExcludeSemantics(
-                  child: IgnorePointer(
-                    child: CustomRadio(option: true, selected: selected),
-                  ),
-                ),
+                AsterSelectionIndicator(selected: selected),
               ],
             ),
           ),

@@ -28,7 +28,7 @@ void main() {
 
     expect(spacing.screenPadding, 20);
     expect(spacing.sectionGap, 24);
-    expect(spacing.controlGap, 12);
+    expect(spacing.md, 12);
 
     expect(radii.card, 24);
     expect(radii.input, 12);
@@ -38,6 +38,7 @@ void main() {
     expect(metrics.minTouchTarget, 48);
     expect(metrics.marketTileMinHeight, 156);
     expect(metrics.flagSize, 32);
+    expect(metrics.selectionIndicatorSize, 16);
     expect(metrics.paymentTargetTileMinHeight, 64);
   });
 

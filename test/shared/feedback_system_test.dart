@@ -68,6 +68,21 @@ void main() {
 
     tearDown(() => container.dispose());
 
+    test('queue state defensively owns pending messages', () {
+      const message = ToastMessage(
+        id: 1,
+        title: 'Owned',
+        variant: ToastVariant.info,
+        duration: Duration(seconds: 1),
+      );
+      final source = <ToastMessage>[message];
+      final state = ToastQueueState(pending: source);
+
+      source.clear();
+      expect(state.pending, [message]);
+      expect(() => state.pending.clear(), throwsUnsupportedError);
+    });
+
     test('normalizes, deduplicates, bounds, and drains FIFO messages', () {
       expect(
         controller.show(

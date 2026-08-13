@@ -29,15 +29,24 @@ final class BitcoinAmountFormatter {
     final whole = absolute ~/ BigInt.from(satoshisPerBitcoin);
     final remainder = absolute.remainder(BigInt.from(satoshisPerBitcoin));
     final groupedWhole = _integer.format(whole.toInt());
+    final sign = negative ? _integer.symbols.MINUS_SIGN : '';
     if (remainder == BigInt.zero) {
-      return '${negative ? '-' : ''}$groupedWhole';
+      return '$sign$groupedWhole';
     }
 
     final fraction = remainder
         .toString()
         .padLeft(8, '0')
         .replaceFirst(RegExp(r'0+$'), '');
-    return '${negative ? '-' : ''}$groupedWhole'
-        '${_integer.symbols.DECIMAL_SEP}$fraction';
+    return '$sign$groupedWhole'
+        '${_integer.symbols.DECIMAL_SEP}${_localizeDigits(fraction)}';
+  }
+
+  String _localizeDigits(String value) {
+    final zero = _integer.symbols.ZERO_DIGIT.codeUnitAt(0);
+    if (zero == 0x30) return value;
+    return String.fromCharCodes(
+      value.codeUnits.map((digit) => zero + digit - 0x30),
+    );
   }
 }

@@ -32,7 +32,8 @@ final class ToastMessage {
 /// Current toast plus the bounded FIFO waiting behind it.
 @immutable
 final class ToastQueueState {
-  const ToastQueueState({this.current, this.pending = const []});
+  ToastQueueState({this.current, List<ToastMessage> pending = const []})
+    : pending = List<ToastMessage>.unmodifiable(pending);
 
   final ToastMessage? current;
   final List<ToastMessage> pending;
@@ -45,7 +46,7 @@ final class ToastQueueState {
       current: identical(current, _unchanged)
           ? this.current
           : current as ToastMessage?,
-      pending: List<ToastMessage>.unmodifiable(pending ?? this.pending),
+      pending: pending ?? this.pending,
     );
   }
 }

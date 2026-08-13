@@ -126,6 +126,17 @@ class _PresentationGoldenHarness extends StatelessWidget {
                               ],
                             ),
                           ),
+                          SizedBox(height: spacing.md),
+                          Row(
+                            children: [
+                              const AsterSelectionIndicator(selected: true),
+                              SizedBox(width: spacing.sm),
+                              Text(
+                                'Selected wallet',
+                                style: context.type.rowTitle,
+                              ),
+                            ],
+                          ),
                           const Spacer(),
                           CustomToast(
                             title: 'Address copied',

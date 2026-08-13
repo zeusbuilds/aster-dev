@@ -70,7 +70,8 @@ class NumericTextSpans {
   // Currency and percentage symbols are deliberately excluded: they are
   // semantic units and stay in the primary UI font.
   static final RegExp _numericChunk = RegExp(
-    r'[+\-]?\d+(?:[.,_]\d+)*(?::\d+)*',
+    r'[+\-\u2212]?\p{Nd}+(?:[.,_:\u066B\u066C\u00A0\u202F\u2009\u0027\u2019]\p{Nd}+)*',
+    unicode: true,
   );
 
   static List<TextSpan> build(

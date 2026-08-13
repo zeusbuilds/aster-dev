@@ -21,8 +21,6 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
     this.splashRotationEnd = 0.192,
     this.splashExpansionStart = 0.096,
     this.splashExpansionEnd = 0.416,
-    this.splashSplitStart = 0.416,
-    this.splashSplitEnd = 0.56,
     this.splashLinesLengthStart = 0.544,
     this.splashLinesLengthEnd = 0.864,
     this.splashLinesGapStart = 0.576,
@@ -31,7 +29,6 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
     this.navIndicatorCurve = Curves.fastOutSlowIn,
     this.toastCurve = Curves.easeOut,
     this.choreographyCurve = Curves.easeOutCubic,
-    this.splashSplitCurve = Curves.easeInOutCubic,
     this.splashRevealMoveCurve = Curves.easeInOutCubic,
     this.chartTransitionCurve = Curves.easeInOut,
   });
@@ -53,8 +50,6 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
   final double splashRotationEnd;
   final double splashExpansionStart;
   final double splashExpansionEnd;
-  final double splashSplitStart;
-  final double splashSplitEnd;
   final double splashLinesLengthStart;
   final double splashLinesLengthEnd;
   final double splashLinesGapStart;
@@ -63,7 +58,6 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
   final Curve navIndicatorCurve;
   final Curve toastCurve;
   final Curve choreographyCurve;
-  final Curve splashSplitCurve;
   final Curve splashRevealMoveCurve;
   final Curve chartTransitionCurve;
 
@@ -86,8 +80,6 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
     double? splashRotationEnd,
     double? splashExpansionStart,
     double? splashExpansionEnd,
-    double? splashSplitStart,
-    double? splashSplitEnd,
     double? splashLinesLengthStart,
     double? splashLinesLengthEnd,
     double? splashLinesGapStart,
@@ -96,7 +88,6 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
     Curve? navIndicatorCurve,
     Curve? toastCurve,
     Curve? choreographyCurve,
-    Curve? splashSplitCurve,
     Curve? splashRevealMoveCurve,
     Curve? chartTransitionCurve,
   }) {
@@ -123,8 +114,6 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
       splashRotationEnd: splashRotationEnd ?? this.splashRotationEnd,
       splashExpansionStart: splashExpansionStart ?? this.splashExpansionStart,
       splashExpansionEnd: splashExpansionEnd ?? this.splashExpansionEnd,
-      splashSplitStart: splashSplitStart ?? this.splashSplitStart,
-      splashSplitEnd: splashSplitEnd ?? this.splashSplitEnd,
       splashLinesLengthStart:
           splashLinesLengthStart ?? this.splashLinesLengthStart,
       splashLinesLengthEnd: splashLinesLengthEnd ?? this.splashLinesLengthEnd,
@@ -134,7 +123,6 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
       navIndicatorCurve: navIndicatorCurve ?? this.navIndicatorCurve,
       toastCurve: toastCurve ?? this.toastCurve,
       choreographyCurve: choreographyCurve ?? this.choreographyCurve,
-      splashSplitCurve: splashSplitCurve ?? this.splashSplitCurve,
       splashRevealMoveCurve:
           splashRevealMoveCurve ?? this.splashRevealMoveCurve,
       chartTransitionCurve: chartTransitionCurve ?? this.chartTransitionCurve,
@@ -226,8 +214,6 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
         other.splashExpansionEnd,
         t,
       ),
-      splashSplitStart: _lerp(splashSplitStart, other.splashSplitStart, t),
-      splashSplitEnd: _lerp(splashSplitEnd, other.splashSplitEnd, t),
       splashLinesLengthStart: _lerp(
         splashLinesLengthStart,
         other.splashLinesLengthStart,
@@ -248,7 +234,6 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
       navIndicatorCurve: t < 0.5 ? navIndicatorCurve : other.navIndicatorCurve,
       toastCurve: t < 0.5 ? toastCurve : other.toastCurve,
       choreographyCurve: t < 0.5 ? choreographyCurve : other.choreographyCurve,
-      splashSplitCurve: t < 0.5 ? splashSplitCurve : other.splashSplitCurve,
       splashRevealMoveCurve: t < 0.5
           ? splashRevealMoveCurve
           : other.splashRevealMoveCurve,

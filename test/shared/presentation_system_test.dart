@@ -76,6 +76,45 @@ void main() {
     ]);
   });
 
+  testWidgets('numeric spans preserve localized digits and separators', (
+    tester,
+  ) async {
+    late List<TextSpan> arabicSpans;
+    late List<TextSpan> indicSpans;
+    await tester.pumpWidget(
+      _themedHarness(
+        Builder(
+          builder: (context) {
+            arabicSpans = NumericTextSpans.build(
+              context,
+              'د.إ −١٬٢٣٤٫٥٠ BTC',
+              context.type.rowValue,
+            );
+            indicSpans = NumericTextSpans.build(
+              context,
+              '₹१२ ३४५.६७ INR',
+              context.type.rowValue,
+            );
+            return const SizedBox();
+          },
+        ),
+      ),
+    );
+
+    expect(arabicSpans.map((span) => span.text), ['د.إ ', '−١٬٢٣٤٫٥٠', ' BTC']);
+    expect(arabicSpans.map((span) => span.style?.fontFamily), [
+      'DM Sans',
+      'Public Sans',
+      'DM Sans',
+    ]);
+    expect(indicSpans.map((span) => span.text), ['₹', '१२ ३४५.६७', ' INR']);
+    expect(indicSpans.map((span) => span.style?.fontFamily), [
+      'DM Sans',
+      'Public Sans',
+      'DM Sans',
+    ]);
+  });
+
   test('theme assigns exact squircle and capsule shape types', () {
     final theme = AppTheme.light();
     expect(theme.cardTheme.shape, isA<RoundedSuperellipseBorder>());
@@ -87,6 +126,57 @@ void main() {
     expect(
       (input! as ShapedInputBorder).shape,
       isA<RoundedSuperellipseBorder>(),
+    );
+  });
+
+  testWidgets('squircle resolves its default border from the active theme', (
+    tester,
+  ) async {
+    final baseTheme = AppTheme.light();
+    final theme = baseTheme.copyWith(
+      extensions: [
+        ...baseTheme.extensions.values.where((value) => value is! AsterStrokes),
+        const AsterStrokes(border: 2.5),
+      ],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: theme,
+        home: const Scaffold(
+          body: Squircle(child: SizedBox.square(dimension: 8)),
+        ),
+      ),
+    );
+
+    final decoratedBox = tester.widget<DecoratedBox>(
+      find.descendant(
+        of: find.byType(Squircle),
+        matching: find.byType(DecoratedBox),
+      ),
+    );
+    final decoration = decoratedBox.decoration as ShapeDecoration;
+    final shape = decoration.shape as RoundedSuperellipseBorder;
+    expect(shape.side.width, 2.5);
+  });
+
+  testWidgets('selection indicator is decorative and token-sized', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _themedHarness(const AsterSelectionIndicator(selected: true)),
+    );
+
+    expect(
+      tester.getSize(find.byType(AsterSelectionIndicator)),
+      const Size.square(16),
+    );
+    expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(AsterSelectionIndicator),
+        matching: find.byType(ExcludeSemantics),
+      ),
+      findsWidgets,
     );
   });
 
@@ -160,6 +250,45 @@ void main() {
 
     expect(activations, 1);
     expect(haptics.intents, [HapticIntent.lightImpact]);
+  });
+
+  testWidgets('button releases pressed scale when disabled during a gesture', (
+    tester,
+  ) async {
+    var loading = false;
+    var activations = 0;
+    late StateSetter rebuild;
+    await tester.pumpWidget(
+      _themedHarness(
+        StatefulBuilder(
+          builder: (context, setState) {
+            rebuild = setState;
+            return CustomButton(
+              text: 'Continue',
+              loading: loading,
+              onTap: () => activations += 1,
+            );
+          },
+        ),
+      ),
+    );
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(CustomButton)),
+    );
+    await tester.pump();
+    expect(
+      tester.widget<AnimatedScale>(find.byType(AnimatedScale)).scale,
+      const AsterMotion().buttonPressedScale,
+    );
+
+    rebuild(() => loading = true);
+    await tester.pump();
+    expect(tester.widget<AnimatedScale>(find.byType(AnimatedScale)).scale, 1);
+
+    await gesture.up();
+    await tester.pump();
+    expect(activations, 0);
   });
 
   testWidgets('icon buttons own enabled and loading semantic actions', (

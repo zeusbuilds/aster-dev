@@ -60,7 +60,6 @@ dependencies:
 
   # Core
   circle_flags: ^5.0.1
-  easy_radio: ^0.0.3
   flutter_svg: ^2.3.0
   haptic_feedback: ^0.6.5
   mesh: ^0.5.0

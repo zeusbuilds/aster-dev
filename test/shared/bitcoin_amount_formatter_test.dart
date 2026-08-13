@@ -27,6 +27,21 @@ void main() {
       expect(formatter.format(-1), '-1 sats');
     });
 
+    test('localizes whole and fractional digits without mixed scripts', () {
+      final bitcoin = BitcoinAmountFormatter(
+        unit: BitcoinUnit.bitcoin,
+        locale: 'ar_EG',
+      );
+      final sats = BitcoinAmountFormatter(
+        unit: BitcoinUnit.sats,
+        locale: 'ar_EG',
+      );
+
+      expect(bitcoin.format(125000000), '١٫٢٥ BTC');
+      expect(sats.format(12345678), '١٢٬٣٤٥٬٦٧٨ sats');
+      expect(bitcoin.format(1), '٠٫٠٠٠٠٠٠٠١ BTC');
+    });
+
     test('persisted unit parsing fails closed', () {
       expect(BitcoinUnit.parse('btc'), BitcoinUnit.bitcoin);
       expect(BitcoinUnit.parse('sats'), BitcoinUnit.sats);

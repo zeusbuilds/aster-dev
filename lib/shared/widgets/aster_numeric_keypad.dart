@@ -59,13 +59,12 @@ class AsterNumericKeypad extends StatelessWidget {
         ),
         itemBuilder: (context, index) {
           final keyValue = keys[index];
-          final keyEnabled =
-              enabled && (keyValue.kind != _KeypadKind.decimal || allowDecimal);
+          final keyEnabled = _canActivate(keyValue);
           return _NumericKey(
             value: keyValue,
             enabled: keyEnabled,
             onPressed: () => _activate(keyValue),
-            onLongPress: keyValue.kind == _KeypadKind.delete && value.isNotEmpty
+            onLongPress: keyEnabled && keyValue.kind == _KeypadKind.delete
                 ? () {
                     unawaited(
                       context.haptics.trigger(HapticIntent.lightImpact),
@@ -77,6 +76,21 @@ class AsterNumericKeypad extends StatelessWidget {
         },
       ),
     );
+  }
+
+  bool _canActivate(_KeypadValue keyValue) {
+    if (!enabled || _behavior == null) return false;
+
+    return switch (keyValue.kind) {
+      _KeypadKind.digit =>
+        value.length < maximumCharacters &&
+            (value != '0' || keyValue.label != '0'),
+      _KeypadKind.decimal =>
+        allowDecimal &&
+            !value.contains('.') &&
+            value.length < maximumCharacters,
+      _KeypadKind.delete => value.isNotEmpty,
+    };
   }
 
   void _activate(_KeypadValue keyValue) {

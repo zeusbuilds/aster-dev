@@ -7,6 +7,7 @@ class AsterStrokes extends ThemeExtension<AsterStrokes> {
     this.hairline = 0.5,
     this.divider = 1,
     this.border = 1,
+    this.selectionIndicator = 2,
     this.focusBorder = 1.5,
     this.focusRing = 3,
     this.progressIndicator = 2,
@@ -15,6 +16,7 @@ class AsterStrokes extends ThemeExtension<AsterStrokes> {
   final double hairline;
   final double divider;
   final double border;
+  final double selectionIndicator;
   final double focusBorder;
   final double focusRing;
   final double progressIndicator;
@@ -24,6 +26,7 @@ class AsterStrokes extends ThemeExtension<AsterStrokes> {
     double? hairline,
     double? divider,
     double? border,
+    double? selectionIndicator,
     double? focusBorder,
     double? focusRing,
     double? progressIndicator,
@@ -32,6 +35,7 @@ class AsterStrokes extends ThemeExtension<AsterStrokes> {
       hairline: hairline ?? this.hairline,
       divider: divider ?? this.divider,
       border: border ?? this.border,
+      selectionIndicator: selectionIndicator ?? this.selectionIndicator,
       focusBorder: focusBorder ?? this.focusBorder,
       focusRing: focusRing ?? this.focusRing,
       progressIndicator: progressIndicator ?? this.progressIndicator,
@@ -45,6 +49,11 @@ class AsterStrokes extends ThemeExtension<AsterStrokes> {
       hairline: _lerp(hairline, other.hairline, t),
       divider: _lerp(divider, other.divider, t),
       border: _lerp(border, other.border, t),
+      selectionIndicator: _lerp(
+        selectionIndicator,
+        other.selectionIndicator,
+        t,
+      ),
       focusBorder: _lerp(focusBorder, other.focusBorder, t),
       focusRing: _lerp(focusRing, other.focusRing, t),
       progressIndicator: _lerp(progressIndicator, other.progressIndicator, t),

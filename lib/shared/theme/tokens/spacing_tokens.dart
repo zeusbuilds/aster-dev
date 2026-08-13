@@ -18,10 +18,8 @@ class AsterSpacing extends ThemeExtension<AsterSpacing> {
     this.xxl = 24,
     this.xxxl = 32,
     this.huge = 48,
-    this.giant = 64,
     this.screenPadding = 20,
     this.sectionGap = 24,
-    this.controlGap = 12,
   });
 
   final double none;
@@ -34,10 +32,8 @@ class AsterSpacing extends ThemeExtension<AsterSpacing> {
   final double xxl;
   final double xxxl;
   final double huge;
-  final double giant;
   final double screenPadding;
   final double sectionGap;
-  final double controlGap;
 
   @override
   AsterSpacing copyWith({
@@ -51,10 +47,8 @@ class AsterSpacing extends ThemeExtension<AsterSpacing> {
     double? xxl,
     double? xxxl,
     double? huge,
-    double? giant,
     double? screenPadding,
     double? sectionGap,
-    double? controlGap,
   }) {
     return AsterSpacing(
       none: none ?? this.none,
@@ -67,10 +61,8 @@ class AsterSpacing extends ThemeExtension<AsterSpacing> {
       xxl: xxl ?? this.xxl,
       xxxl: xxxl ?? this.xxxl,
       huge: huge ?? this.huge,
-      giant: giant ?? this.giant,
       screenPadding: screenPadding ?? this.screenPadding,
       sectionGap: sectionGap ?? this.sectionGap,
-      controlGap: controlGap ?? this.controlGap,
     );
   }
 
@@ -88,10 +80,8 @@ class AsterSpacing extends ThemeExtension<AsterSpacing> {
       xxl: _lerp(xxl, other.xxl, t),
       xxxl: _lerp(xxxl, other.xxxl, t),
       huge: _lerp(huge, other.huge, t),
-      giant: _lerp(giant, other.giant, t),
       screenPadding: _lerp(screenPadding, other.screenPadding, t),
       sectionGap: _lerp(sectionGap, other.sectionGap, t),
-      controlGap: _lerp(controlGap, other.controlGap, t),
     );
   }
 

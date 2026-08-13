@@ -106,36 +106,34 @@ class _BackgroundPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
-    canvas.saveLayer(rect, Paint());
-
     final gradientPaint = Paint()
       ..shader = gradient.toLinearGradient().createShader(rect);
-    canvas.drawRect(rect, gradientPaint);
-
-    if (linesLength.value > 0) {
-      final centerY = size.height / 2;
-
-      final lineHeight =
-          initialLineHeight +
-          (maximumLineHeight - initialLineHeight) * linesLength.value;
-
-      final topY = (centerY - lineHeight / 2) * (1 - linesGap.value);
-      final bottomY =
-          (centerY - lineHeight / 2) * (1 - linesGap.value) +
-          (size.height - lineHeight) * linesGap.value;
-
-      final clearTop = topY + lineHeight;
-      final clearBottom = bottomY;
-
-      if (clearBottom > clearTop) {
-        canvas.drawRect(
-          Rect.fromLTRB(0, clearTop, size.width, clearBottom),
-          Paint()..blendMode = BlendMode.clear,
-        );
-      }
+    if (linesLength.value <= 0) {
+      canvas.drawRect(rect, gradientPaint);
+      return;
     }
 
-    canvas.restore();
+    final centerY = size.height / 2;
+    final lineHeight =
+        initialLineHeight +
+        (maximumLineHeight - initialLineHeight) * linesLength.value;
+    final topY = (centerY - lineHeight / 2) * (1 - linesGap.value);
+    final bottomY =
+        (centerY - lineHeight / 2) * (1 - linesGap.value) +
+        (size.height - lineHeight) * linesGap.value;
+    final clearTop = topY + lineHeight;
+    final clearBottom = bottomY;
+
+    if (clearBottom <= clearTop) {
+      canvas.drawRect(rect, gradientPaint);
+      return;
+    }
+    canvas
+      ..drawRect(Rect.fromLTRB(0, 0, size.width, clearTop), gradientPaint)
+      ..drawRect(
+        Rect.fromLTRB(0, clearBottom, size.width, size.height),
+        gradientPaint,
+      );
   }
 
   @override
@@ -160,7 +158,6 @@ class _Foreground extends StatefulWidget {
 class _ForegroundState extends State<_Foreground> {
   late Animation<double> _rotation;
   late Animation<double> _expansion;
-  late Animation<double> _split;
   late Animation<double> _linesLength;
   late Animation<double> _linesGap;
 
@@ -177,11 +174,6 @@ class _ForegroundState extends State<_Foreground> {
       begin: motion.splashExpansionStart,
       end: motion.splashExpansionEnd,
       curve: motion.choreographyCurve,
-    );
-    _split = _phaseAnimation(
-      begin: motion.splashSplitStart,
-      end: motion.splashSplitEnd,
-      curve: motion.splashSplitCurve,
     );
     _linesLength = _phaseAnimation(
       begin: motion.splashLinesLengthStart,
@@ -217,7 +209,6 @@ class _ForegroundState extends State<_Foreground> {
     final art = context.art;
     return CustomMultiChildLayout(
       delegate: _ForegroundLayoutDelegate(
-        split: _split,
         linesLength: _linesLength,
         linesGap: _linesGap,
         initialLineHeight: art.splashLineInitialHeight,
@@ -257,14 +248,12 @@ enum _ForegroundPart { logo, topLine, bottomLine }
 
 class _ForegroundLayoutDelegate extends MultiChildLayoutDelegate {
   _ForegroundLayoutDelegate({
-    required this.split,
     required this.linesLength,
     required this.linesGap,
     required this.initialLineHeight,
     required this.maximumLineHeight,
-  }) : super(relayout: Listenable.merge([split, linesLength, linesGap]));
+  }) : super(relayout: Listenable.merge([linesLength, linesGap]));
 
-  final Animation<double> split;
   final Animation<double> linesLength;
   final Animation<double> linesGap;
   final double initialLineHeight;
@@ -305,8 +294,7 @@ class _ForegroundLayoutDelegate extends MultiChildLayoutDelegate {
 
   @override
   bool shouldRelayout(_ForegroundLayoutDelegate oldDelegate) {
-    return split != oldDelegate.split ||
-        linesLength != oldDelegate.linesLength ||
+    return linesLength != oldDelegate.linesLength ||
         linesGap != oldDelegate.linesGap ||
         initialLineHeight != oldDelegate.initialLineHeight ||
         maximumLineHeight != oldDelegate.maximumLineHeight;

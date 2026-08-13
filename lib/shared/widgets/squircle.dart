@@ -11,7 +11,7 @@ class Squircle extends StatelessWidget {
   final Widget child;
   final double? borderRadius;
   final Color? borderColor;
-  final double borderWidth;
+  final double? borderWidth;
   final Color? color;
   final Gradient? gradient;
   final List<BoxShadow> shadows;
@@ -23,7 +23,7 @@ class Squircle extends StatelessWidget {
     required this.child,
     this.borderRadius,
     this.borderColor,
-    this.borderWidth = 1,
+    this.borderWidth,
     this.color,
     this.gradient,
     this.shadows = const [],
@@ -41,6 +41,7 @@ class Squircle extends StatelessWidget {
     final effectiveBorderRadius =
         border ?? BorderRadius.circular(borderRadius ?? radius.card);
     final effectivePadding = padding ?? EdgeInsets.all(spacing.sm);
+    final effectiveBorderWidth = borderWidth ?? context.strokes.border;
 
     final content = DecoratedBox(
       decoration: ShapeDecoration(
@@ -48,7 +49,10 @@ class Squircle extends StatelessWidget {
         gradient: gradient,
         shape: RoundedSuperellipseBorder(
           borderRadius: effectiveBorderRadius,
-          side: BorderSide(color: effectiveBorderColor, width: borderWidth),
+          side: BorderSide(
+            color: effectiveBorderColor,
+            width: effectiveBorderWidth,
+          ),
         ),
         shadows: shadows,
       ),

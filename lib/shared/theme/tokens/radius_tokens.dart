@@ -15,8 +15,6 @@ class AsterRadii extends ThemeExtension<AsterRadii> {
     this.button = 18,
     this.input = 12,
     this.badge = 8,
-    this.iconButton = 12,
-    this.control = 16,
   });
 
   final double none;
@@ -31,8 +29,6 @@ class AsterRadii extends ThemeExtension<AsterRadii> {
   final double button;
   final double input;
   final double badge;
-  final double iconButton;
-  final double control;
 
   @override
   AsterRadii copyWith({
@@ -48,8 +44,6 @@ class AsterRadii extends ThemeExtension<AsterRadii> {
     double? button,
     double? input,
     double? badge,
-    double? iconButton,
-    double? control,
   }) {
     return AsterRadii(
       none: none ?? this.none,
@@ -64,8 +58,6 @@ class AsterRadii extends ThemeExtension<AsterRadii> {
       button: button ?? this.button,
       input: input ?? this.input,
       badge: badge ?? this.badge,
-      iconButton: iconButton ?? this.iconButton,
-      control: control ?? this.control,
     );
   }
 
@@ -85,8 +77,6 @@ class AsterRadii extends ThemeExtension<AsterRadii> {
       button: _lerp(button, other.button, t),
       input: _lerp(input, other.input, t),
       badge: _lerp(badge, other.badge, t),
-      iconButton: _lerp(iconButton, other.iconButton, t),
-      control: _lerp(control, other.control, t),
     );
   }
 

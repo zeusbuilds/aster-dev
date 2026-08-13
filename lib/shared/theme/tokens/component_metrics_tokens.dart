@@ -13,10 +13,10 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
     this.scanFrameSizeFactor = 0.7,
     this.scanFrameMaximumSize = 320,
     this.scanHeaderExtent = 172,
-    this.recoveryWordGridAspectRatio = 4.5,
     this.marketTileMinHeight = 156,
     this.marketTextureSize = 128,
     this.marketBadgeDotSize = 20,
+    this.selectionIndicatorSize = 16,
     this.sliderThumbRadius = 8,
     this.sliderOverlayRadius = 16,
     this.keypadButtonHeight = 60,
@@ -37,7 +37,6 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
     this.gridLoaderLargeCell = 12,
     this.splashLogoWidth = 160,
     this.brandMarkSize = 48,
-    this.compactFlagSize = 24,
     this.flagSize = 32,
     this.walletAvatarSize = 64,
     this.paymentTargetTileMinHeight = 64,
@@ -52,10 +51,10 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
   final double scanFrameSizeFactor;
   final double scanFrameMaximumSize;
   final double scanHeaderExtent;
-  final double recoveryWordGridAspectRatio;
   final double marketTileMinHeight;
   final double marketTextureSize;
   final double marketBadgeDotSize;
+  final double selectionIndicatorSize;
   final double sliderThumbRadius;
   final double sliderOverlayRadius;
   final double keypadButtonHeight;
@@ -76,7 +75,6 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
   final double gridLoaderLargeCell;
   final double splashLogoWidth;
   final double brandMarkSize;
-  final double compactFlagSize;
   final double flagSize;
   final double walletAvatarSize;
   final double paymentTargetTileMinHeight;
@@ -92,10 +90,10 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
     double? scanFrameSizeFactor,
     double? scanFrameMaximumSize,
     double? scanHeaderExtent,
-    double? recoveryWordGridAspectRatio,
     double? marketTileMinHeight,
     double? marketTextureSize,
     double? marketBadgeDotSize,
+    double? selectionIndicatorSize,
     double? sliderThumbRadius,
     double? sliderOverlayRadius,
     double? keypadButtonHeight,
@@ -116,7 +114,6 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
     double? gridLoaderLargeCell,
     double? splashLogoWidth,
     double? brandMarkSize,
-    double? compactFlagSize,
     double? flagSize,
     double? walletAvatarSize,
     double? paymentTargetTileMinHeight,
@@ -131,11 +128,11 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
       scanFrameSizeFactor: scanFrameSizeFactor ?? this.scanFrameSizeFactor,
       scanFrameMaximumSize: scanFrameMaximumSize ?? this.scanFrameMaximumSize,
       scanHeaderExtent: scanHeaderExtent ?? this.scanHeaderExtent,
-      recoveryWordGridAspectRatio:
-          recoveryWordGridAspectRatio ?? this.recoveryWordGridAspectRatio,
       marketTileMinHeight: marketTileMinHeight ?? this.marketTileMinHeight,
       marketTextureSize: marketTextureSize ?? this.marketTextureSize,
       marketBadgeDotSize: marketBadgeDotSize ?? this.marketBadgeDotSize,
+      selectionIndicatorSize:
+          selectionIndicatorSize ?? this.selectionIndicatorSize,
       sliderThumbRadius: sliderThumbRadius ?? this.sliderThumbRadius,
       sliderOverlayRadius: sliderOverlayRadius ?? this.sliderOverlayRadius,
       keypadButtonHeight: keypadButtonHeight ?? this.keypadButtonHeight,
@@ -161,7 +158,6 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
       gridLoaderLargeCell: gridLoaderLargeCell ?? this.gridLoaderLargeCell,
       splashLogoWidth: splashLogoWidth ?? this.splashLogoWidth,
       brandMarkSize: brandMarkSize ?? this.brandMarkSize,
-      compactFlagSize: compactFlagSize ?? this.compactFlagSize,
       flagSize: flagSize ?? this.flagSize,
       walletAvatarSize: walletAvatarSize ?? this.walletAvatarSize,
       paymentTargetTileMinHeight:
@@ -209,11 +205,6 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
         t,
       ),
       scanHeaderExtent: _lerp(scanHeaderExtent, other.scanHeaderExtent, t),
-      recoveryWordGridAspectRatio: _lerp(
-        recoveryWordGridAspectRatio,
-        other.recoveryWordGridAspectRatio,
-        t,
-      ),
       marketTileMinHeight: _lerp(
         marketTileMinHeight,
         other.marketTileMinHeight,
@@ -223,6 +214,11 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
       marketBadgeDotSize: _lerp(
         marketBadgeDotSize,
         other.marketBadgeDotSize,
+        t,
+      ),
+      selectionIndicatorSize: _lerp(
+        selectionIndicatorSize,
+        other.selectionIndicatorSize,
         t,
       ),
       sliderThumbRadius: _lerp(sliderThumbRadius, other.sliderThumbRadius, t),
@@ -289,7 +285,6 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
       ),
       splashLogoWidth: _lerp(splashLogoWidth, other.splashLogoWidth, t),
       brandMarkSize: _lerp(brandMarkSize, other.brandMarkSize, t),
-      compactFlagSize: _lerp(compactFlagSize, other.compactFlagSize, t),
       flagSize: _lerp(flagSize, other.flagSize, t),
       walletAvatarSize: _lerp(walletAvatarSize, other.walletAvatarSize, t),
       paymentTargetTileMinHeight: _lerp(

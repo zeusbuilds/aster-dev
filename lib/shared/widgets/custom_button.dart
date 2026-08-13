@@ -62,6 +62,15 @@ class CustomButton extends StatefulWidget {
 class _CustomButtonState extends State<CustomButton> {
   bool _isPressed = false;
 
+  bool get _isInteractive =>
+      !widget.loading && widget.enabled && widget.onTap != null;
+
+  @override
+  void didUpdateWidget(CustomButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_isPressed && !_isInteractive) _isPressed = false;
+  }
+
   void _handleHighlight(bool highlighted) {
     if (_isPressed == highlighted) return;
     setState(() => _isPressed = highlighted);
@@ -101,7 +110,7 @@ class _CustomButtonState extends State<CustomButton> {
             borderRadius: BorderRadius.circular(context.radii.button),
             side: side,
           );
-    final isEnabled = !widget.loading && widget.enabled && widget.onTap != null;
+    final isEnabled = _isInteractive;
     final opacity = widget.loading || isEnabled ? 1.0 : stateLayers.disabled;
     final effectiveDuration = context.motionPolicy.duration(
       motion.buttonPressDuration,
