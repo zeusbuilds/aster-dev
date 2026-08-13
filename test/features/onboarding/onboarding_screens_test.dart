@@ -7,7 +7,6 @@ import 'package:aster/features/onboarding/presentation/widgets/widgets.dart';
 import 'package:aster/features/wallet/presentation/view_model/wallet_view_model.dart';
 import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -228,7 +227,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('welcome icon tiles share one non-overlapping backdrop pass', (
+  testWidgets('welcome icon tiles avoid redundant backdrop reads', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -244,28 +243,20 @@ void main() {
       of: grid,
       matching: find.byType(BackdropFilter),
     );
-    expect(filters, findsNWidgets(27));
-    final backdropKeys = filters
-        .evaluate()
-        .map(
-          (element) =>
-              (element.renderObject! as RenderBackdropFilter).backdropKey,
-        )
-        .toSet();
-    expect(backdropKeys, hasLength(1));
-    expect(backdropKeys.single, isNotNull);
+    expect(filters, findsNothing);
   });
 
   testWidgets('onboarding snapshot bounds retained texture density', (
     tester,
   ) async {
+    tester.view.devicePixelRatio = 4;
+    tester.view.physicalSize = const Size(1560, 3376);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light(),
-        home: const MediaQuery(
-          data: MediaQueryData(size: Size(390, 844), devicePixelRatio: 4),
-          child: OnboardingShell(child: SizedBox.expand()),
-        ),
+        home: const OnboardingShell(child: SizedBox.expand()),
       ),
     );
 
@@ -280,10 +271,17 @@ void main() {
       ),
     );
     expect(snapshot.controller.allowSnapshotting, isFalse);
+    expect(snapshot.painter, isA<OnboardingBackgroundSnapshotPainter>());
+    final snapshotPainter =
+        snapshot.painter as OnboardingBackgroundSnapshotPainter;
+    expect(snapshotPainter.hasPaintedSnapshot, isFalse);
 
     await tester.pumpAndSettle();
 
     expect(snapshot.controller.allowSnapshotting, isTrue);
+    expect(snapshotPainter.hasPaintedSnapshot, isTrue);
+    expect(snapshotPainter.physicalSize, const Size(1170, 2532));
+    expect(snapshotPainter.pixelRatio, 3);
   });
 
   for (final scenario in const [

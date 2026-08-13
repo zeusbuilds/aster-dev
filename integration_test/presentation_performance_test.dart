@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:aster/features/onboarding/presentation/screens/onboarding_shell.dart';
 import 'package:aster/features/onboarding/presentation/widgets/widgets.dart';
 import 'package:aster/main.dart' as app;
 import 'package:aster/shared/shared.dart';
@@ -25,15 +26,14 @@ void main() {
     app.main();
     await _pumpUntilGone(tester, find.byType(AnimatedSplashScreen));
     await _pumpUntilFound(tester, find.bySemanticsLabel('Import Wallet'));
+    final backgroundSnapshot = await _waitForBackgroundSnapshot(tester);
 
     // Warm image, shader, route, and BIP39 caches before measuring retention.
     await _exerciseImportRoute(tester);
-    final backgroundSnapshot = tester
-        .widgetList<SnapshotWidget>(find.byType(SnapshotWidget))
-        .singleWhere(
-          (snapshot) => snapshot.child is OnboardingWelcomeMeshBackground,
-        );
     expect(backgroundSnapshot.controller.allowSnapshotting, isTrue);
+    final backgroundPainter =
+        backgroundSnapshot.painter as OnboardingBackgroundSnapshotPainter;
+    expect(backgroundPainter.hasPaintedSnapshot, isTrue);
     final warmRssBytes = ProcessInfo.currentRss;
 
     await binding.watchPerformance(() async {
@@ -62,6 +62,12 @@ void main() {
       'route_cycles': _routeCycles,
       'page_cycles': _pageCycles,
     };
+    binding.reportData!['onboarding_background_snapshot'] = <String, Object>{
+      'painted': backgroundPainter.hasPaintedSnapshot,
+      'physical_width': backgroundPainter.physicalSize!.width,
+      'physical_height': backgroundPainter.physicalSize!.height,
+      'pixel_ratio': backgroundPainter.pixelRatio!,
+    };
 
     expect(
       retainedGrowthBytes,
@@ -80,6 +86,29 @@ void main() {
       workload: 'Onboarding page choreography',
     );
   });
+}
+
+Future<SnapshotWidget> _waitForBackgroundSnapshot(
+  WidgetTester tester, {
+  Duration timeout = _setupTimeout,
+}) async {
+  final snapshot = tester
+      .widgetList<SnapshotWidget>(find.byType(SnapshotWidget))
+      .singleWhere(
+        (candidate) => candidate.child is OnboardingWelcomeMeshBackground,
+      );
+  expect(snapshot.painter, isA<OnboardingBackgroundSnapshotPainter>());
+  final painter = snapshot.painter as OnboardingBackgroundSnapshotPainter;
+  final deadline = DateTime.now().add(timeout);
+  while (!painter.hasPaintedSnapshot && DateTime.now().isBefore(deadline)) {
+    await tester.pump(const Duration(milliseconds: 16));
+  }
+  expect(
+    painter.hasPaintedSnapshot,
+    isTrue,
+    reason: 'The onboarding background never produced a retained snapshot.',
+  );
+  return snapshot;
 }
 
 Future<void> _exerciseImportRoute(WidgetTester tester) async {

@@ -162,6 +162,15 @@ void main() {
         );
     expect(backgroundSnapshot.autoresize, isTrue);
     expect(backgroundSnapshot.controller.allowSnapshotting, isTrue);
+    expect(
+      backgroundSnapshot.painter,
+      isA<OnboardingBackgroundSnapshotPainter>(),
+    );
+    expect(
+      (backgroundSnapshot.painter as OnboardingBackgroundSnapshotPainter)
+          .hasPaintedSnapshot,
+      isTrue,
+    );
 
     final importRoute = router.push<void>(RoutePaths.onboardingImportWallet);
     await _pumpFrames(tester);

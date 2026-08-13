@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 
 import '../theme/theme.dart';
@@ -19,11 +17,6 @@ class Squircle extends StatelessWidget {
   final List<BoxShadow> shadows;
   final EdgeInsets? padding;
   final BorderRadius? border;
-  final ImageFilter? backdropFilter;
-
-  /// Shares this non-overlapping backdrop filter with the nearest
-  /// [BackdropGroup], allowing the engine to execute one filter pass.
-  final bool groupBackdropFilter;
 
   const Squircle({
     super.key,
@@ -36,9 +29,7 @@ class Squircle extends StatelessWidget {
     this.shadows = const [],
     this.padding,
     this.border,
-    this.backdropFilter,
-    this.groupBackdropFilter = false,
-  }) : assert(!groupBackdropFilter || backdropFilter != null);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -63,16 +54,9 @@ class Squircle extends StatelessWidget {
       ),
       child: Padding(padding: effectivePadding, child: child),
     );
-    Widget filteredContent = content;
-    if (backdropFilter != null) {
-      filteredContent = groupBackdropFilter
-          ? BackdropFilter.grouped(filter: backdropFilter!, child: content)
-          : BackdropFilter(filter: backdropFilter!, child: content);
-    }
-
     return ClipRSuperellipse(
       borderRadius: effectiveBorderRadius,
-      child: filteredContent,
+      child: content,
     );
   }
 }
