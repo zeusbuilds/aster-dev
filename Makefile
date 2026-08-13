@@ -1,4 +1,4 @@
-.PHONY: shell bootstrap clean build watch run test format format-check analyze docs verify verify-architecture verify-barrels verify-generated lint android-release-bundle android-release-apks verify-android-release-apks fvm-setup help
+.PHONY: shell bootstrap clean build watch run test ios-storage-test format format-check analyze docs verify verify-architecture verify-barrels verify-generated lint android-release-bundle android-release-apks verify-android-release-apks fvm-setup help
 
 # Default target
 help:
@@ -11,6 +11,7 @@ help:
 	@echo "  make watch     - Run build_runner in watch mode"
 	@echo "  make run       - Run Flutter app"
 	@echo "  make test      - Run Flutter tests"
+	@echo "  make ios-storage-test IOS_SIMULATOR_ID=<id> - Run iOS storage integration tests safely"
 	@echo "  make format    - Format Dart code"
 	@echo "  make format-check - Verify Dart formatting without changing files"
 	@echo "  make analyze   - Run static analysis"
@@ -61,6 +62,11 @@ run:
 test:
 	@echo "Running Flutter tests..."
 	fvm flutter test
+
+# Flutter integration tests temporarily rewrite ignored iOS build settings to a
+# disposable listener target. The wrapper restores lib/main.dart on every exit.
+ios-storage-test:
+	./scripts/run-ios-integration-test.sh integration_test/wallet_storage_security_test.dart "$(IOS_SIMULATOR_ID)"
 
 # Format Dart code
 format:

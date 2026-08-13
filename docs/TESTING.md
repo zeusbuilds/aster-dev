@@ -37,6 +37,18 @@ An exact release candidate additionally requires:
 Simulator and host tests cannot qualify physical haptics, camera hardware,
 screen readers, signing, or a funds-bearing native supply chain.
 
+Run the app-owned iOS storage/file-policy integration contract with:
+
+```sh
+make ios-storage-test IOS_SIMULATOR_ID=<simulator-udid>
+```
+
+Use this target instead of invoking the iOS integration test directly. Flutter
+temporarily points ignored iOS build settings at a disposable test listener;
+the owned wrapper preserves the test result and restores the ordinary
+`lib/main.dart` simulator target on every exit so later Xcode builds remain
+reproducible.
+
 ## Profile Performance Gate
 
 Run the repeatable presentation workload on an otherwise idle app-owned
