@@ -11,6 +11,7 @@ import 'package:integration_test/integration_test.dart';
 const _mebibyte = 1024 * 1024;
 const _maximumRetainedGrowthBytes = 32 * _mebibyte;
 const _maximumMissedFrameRatio = 0.05;
+const _frameBudgetMicroseconds = 16000;
 const _setupTimeout = Duration(seconds: 45);
 const _routeCycles = 6;
 const _pageCycles = 5;
@@ -152,13 +153,44 @@ void _expectWithinFrameBudget(Object? report, {required String workload}) {
   expect(
     missedBuildFrames / frameCount,
     lessThanOrEqualTo(_maximumMissedFrameRatio),
-    reason: '$workload missed more than 5% of build budgets: $metrics',
+    reason: _budgetFailure(
+      workload,
+      phase: 'build',
+      metrics: metrics,
+      frameCount: frameCount,
+      missedFrames: missedBuildFrames,
+    ),
   );
   expect(
     missedRasterFrames / frameCount,
     lessThanOrEqualTo(_maximumMissedFrameRatio),
-    reason: '$workload missed more than 5% of raster budgets: $metrics',
+    reason: _budgetFailure(
+      workload,
+      phase: 'rasterizer',
+      metrics: metrics,
+      frameCount: frameCount,
+      missedFrames: missedRasterFrames,
+    ),
   );
+}
+
+String _budgetFailure(
+  String workload, {
+  required String phase,
+  required Map<String, dynamic> metrics,
+  required int frameCount,
+  required int missedFrames,
+}) {
+  final rawTimes = metrics['frame_${phase}_times'];
+  final slowFrames = <String>[];
+  if (rawTimes is List<dynamic>) {
+    for (final (index, value) in rawTimes.indexed) {
+      if (value is! int || value <= _frameBudgetMicroseconds) continue;
+      slowFrames.add('$index:${(value / 1000).toStringAsFixed(3)}ms');
+    }
+  }
+  return '$workload missed $missedFrames/$frameCount $phase budgets; '
+      'slow frames: ${slowFrames.join(', ')}.';
 }
 
 Future<void> _semanticTap(WidgetTester tester, String label) async {
