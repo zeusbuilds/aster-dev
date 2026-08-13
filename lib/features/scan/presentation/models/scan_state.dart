@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../../core/errors/errors.dart';
-import '../../data/services/services.dart';
 
 /// User-initiated operations that temporarily disable Scan controls.
 enum ScanOperation {
@@ -56,18 +55,6 @@ final class ScanState {
     this.operation,
     this.failure,
   });
-
-  factory ScanState.fromSession(ScanSessionSnapshot snapshot) {
-    return ScanState(
-      cameraInitialized: snapshot.isInitialized,
-      cameraRunning: snapshot.isRunning,
-      torchAvailable: snapshot.torchAvailable,
-      flashOn: snapshot.torchOn,
-      zoomPreset: ScanZoomPreset.nearest(snapshot.zoomScale),
-      captureLocked: snapshot.captureLocked,
-      failure: snapshot.failure,
-    );
-  }
 
   final bool cameraInitialized;
   final bool cameraRunning;

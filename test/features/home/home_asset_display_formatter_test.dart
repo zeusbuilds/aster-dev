@@ -1,5 +1,5 @@
 import 'package:aster/features/home/presentation/formatting/formatting.dart';
-import 'package:aster/features/market/data/data.dart';
+import 'package:aster/features/market/domain/models/models.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:aster/shared/formatting/formatting.dart';
 import 'package:flutter_test/flutter_test.dart';

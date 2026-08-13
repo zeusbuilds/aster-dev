@@ -9,9 +9,8 @@ import 'package:unicons/unicons.dart';
 
 import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
-import '../../../market/data/data.dart';
+import '../../../market/domain/models/models.dart';
 import '../../../market/presentation/view_model/view_models.dart';
-import '../../data/data.dart';
 import 'candle_chart.dart';
 
 /// Bitcoin market card backed by injected repository state.
@@ -57,12 +56,7 @@ class _PriceCardState extends ConsumerState<PriceCard> {
     final now = ref.watch(utcClockProvider)().toUtc();
     final rawSnapshot = market.value;
     final snapshot = rawSnapshot?.isCurrentAt(now) == true ? rawSnapshot : null;
-    final chartData = snapshot?.history.indexed
-        .map(
-          (entry) =>
-              ChartDataItem(entry.$1.toDouble(), entry.$2.usdCents.toDouble()),
-        )
-        .toList(growable: false);
+    final chartData = snapshot?.history;
     final change = snapshot?.changeBasisPoints;
     final colors = context.appColors;
     final effects = context.effects;

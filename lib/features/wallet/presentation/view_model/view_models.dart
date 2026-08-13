@@ -1,3 +1,4 @@
 // Public wallet view-model API.
 export 'payment_capabilities_view_model.dart';
+export 'wallet_lifecycle_view_model.dart';
 export 'wallet_view_model.dart';

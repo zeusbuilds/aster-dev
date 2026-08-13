@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../../shared/formatting/bitcoin_unit.dart';
-import '../../../market/data/data.dart';
+import '../../../market/domain/models/models.dart';
 import '../../../wallet/domain/models/models.dart';
 import '../../../wallet/presentation/formatting/formatting.dart';
 import '../../../wallet/presentation/models/models.dart';

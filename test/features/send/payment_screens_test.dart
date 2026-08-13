@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:ui' as ui;
 
 import 'package:aster/core/core.dart';
-import 'package:aster/features/market/data/data.dart';
+import 'package:aster/features/market/domain/models/models.dart';
 import 'package:aster/features/receive/presentation/screens/screens.dart';
 import 'package:aster/features/receive/presentation/widgets/widgets.dart';
 import 'package:aster/features/send/presentation/screens/screens.dart';

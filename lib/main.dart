@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +8,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'core/bootstrap/app_bootstrap.dart';
 import 'core/bootstrap/app_loader.dart';
 import 'core/core.dart';
+import 'features/wallet/presentation/view_model/view_models.dart';
+import 'features/wallet/presentation/widgets/widgets.dart';
 import 'shared/shared.dart';
 
 void main() async {
@@ -36,9 +37,6 @@ class UtexoApp extends ConsumerStatefulWidget {
 
 class _UtexoAppState extends ConsumerState<UtexoApp>
     with WidgetsBindingObserver {
-  AppLifecycleState? _lifecycleState;
-  Future<void> _lifecycleTail = Future<void>.value();
-
   @override
   void initState() {
     super.initState();
@@ -53,33 +51,9 @@ class _UtexoAppState extends ConsumerState<UtexoApp>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    _lifecycleTail = _lifecycleTail.then((_) => _applyWalletLifecycle(state));
-    unawaited(_lifecycleTail);
-    setState(() {
-      _lifecycleState = state;
-    });
-  }
-
-  Future<void> _applyWalletLifecycle(AppLifecycleState state) async {
-    try {
-      final repository = await ref.read(walletRepositoryProvider.future);
-      final result = switch (state) {
-        AppLifecycleState.resumed => await repository.resume(),
-        AppLifecycleState.hidden ||
-        AppLifecycleState.paused => await repository.suspend(),
-        AppLifecycleState.detached => await repository.dispose(),
-        AppLifecycleState.inactive => const AppResult<void>.success(null),
-      };
-      if (result case AppFailureResult<void>(:final failure)) {
-        if (kDebugMode) {
-          debugPrint(
-            'Wallet lifecycle failed: ${failure.code} (${failure.kind.name})',
-          );
-        }
-      }
-    } catch (_) {
-      if (kDebugMode) debugPrint('Wallet lifecycle provider failed.');
-    }
+    unawaited(
+      ref.read(walletLifecycleViewModelProvider.notifier).handle(state),
+    );
   }
 
   @override
@@ -87,10 +61,7 @@ class _UtexoAppState extends ConsumerState<UtexoApp>
     final router = ref.watch(appRouterProvider);
     final haptics = ref.watch(hapticFeedbackServiceProvider);
     final toasts = ref.watch(toastControllerProvider.notifier);
-    final showSplashOverlay =
-        _lifecycleState == AppLifecycleState.hidden ||
-        _lifecycleState == AppLifecycleState.paused ||
-        _lifecycleState == AppLifecycleState.inactive;
+    final lifecycle = ref.watch(walletLifecycleViewModelProvider);
 
     return MaterialApp.router(
       title: AppConstants.appName,
@@ -102,14 +73,12 @@ class _UtexoAppState extends ConsumerState<UtexoApp>
         return AsterFeedbackScope(
           haptics: haptics,
           toasts: toasts,
-          child: ToastHost(
-            child: Stack(
-              children: [
-                ?child,
-                if (showSplashOverlay)
-                  const Positioned.fill(child: SplashScreen()),
-              ],
+          child: WalletLifecycleGate(
+            state: lifecycle,
+            onRetry: () => unawaited(
+              ref.read(walletLifecycleViewModelProvider.notifier).retry(),
             ),
+            child: ToastHost(child: child ?? const SizedBox.shrink()),
           ),
         );
       },

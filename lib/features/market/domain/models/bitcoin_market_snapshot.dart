@@ -1,14 +1,25 @@
 import 'package:flutter/foundation.dart';
 
+/// One validated Bitcoin/USD observation from the market-data provider.
 @immutable
 final class BitcoinPricePoint {
   BitcoinPricePoint({required this.timestamp, required this.usdCents}) {
-    if (!timestamp.isUtc || usdCents < 0 || usdCents > _maximumSignedInteger) {
-      throw ArgumentError('Market points require UTC time and a valid price.');
+    if (!timestamp.isUtc) {
+      throw ArgumentError.value(timestamp, 'timestamp', 'Must be UTC.');
+    }
+    if (usdCents < 0 || usdCents > _maximumSignedInteger) {
+      throw ArgumentError.value(
+        usdCents,
+        'usdCents',
+        'Must be a non-negative signed 64-bit integer.',
+      );
     }
   }
 
+  /// UTC instant at which the provider observed this price.
   final DateTime timestamp;
+
+  /// Price in integer US-dollar cents.
   final int usdCents;
 
   @override
@@ -22,9 +33,15 @@ final class BitcoinPricePoint {
 }
 
 /// Provenance of the value rendered as the current Bitcoin market price.
-enum BitcoinPriceSource { spot, historyFallback }
+enum BitcoinPriceSource {
+  /// A dedicated provider spot-price response.
+  spot,
 
-/// Real market data suitable for rendering without synthetic fallback points.
+  /// The newest validated history point when a current response was absent.
+  historyFallback,
+}
+
+/// Validated market data suitable for rendering without synthetic fallbacks.
 @immutable
 final class BitcoinMarketSnapshot {
   BitcoinMarketSnapshot({
@@ -33,13 +50,18 @@ final class BitcoinMarketSnapshot {
     required this.currentSource,
     required List<BitcoinPricePoint> history,
   }) : history = List<BitcoinPricePoint>.unmodifiable(history) {
-    if (currentUsdCents < 0 ||
-        currentUsdCents > _maximumSignedInteger ||
-        !currentObservedAt.isUtc) {
+    if (currentUsdCents < 0 || currentUsdCents > _maximumSignedInteger) {
       throw ArgumentError.value(
         currentUsdCents,
         'currentUsdCents',
-        'Must not be negative.',
+        'Must be a non-negative signed 64-bit integer.',
+      );
+    }
+    if (!currentObservedAt.isUtc) {
+      throw ArgumentError.value(
+        currentObservedAt,
+        'currentObservedAt',
+        'Must be UTC.',
       );
     }
     for (var index = 1; index < this.history.length; index += 1) {
@@ -51,19 +73,41 @@ final class BitcoinMarketSnapshot {
     }
   }
 
+  /// Current Bitcoin price in integer US-dollar cents.
   final int currentUsdCents;
+
+  /// UTC instant at which [currentUsdCents] was observed.
   final DateTime currentObservedAt;
+
+  /// Provider path from which the current value was selected.
   final BitcoinPriceSource currentSource;
+
+  /// Strictly chronological, immutable provider observations.
   final List<BitcoinPricePoint> history;
 
   /// Maximum age for presenting the current price as a live conversion.
   static const maximumCurrentAge = Duration(minutes: 30);
 
+  /// Bounded provider/client clock skew accepted as a current observation.
+  static const maximumFutureSkew = Duration(minutes: 5);
+
+  /// First instant at which this snapshot must no longer be presented as live.
   DateTime get expiresAt => currentObservedAt.add(maximumCurrentAge);
 
+  /// Whether the current observation is valid at the supplied instant.
   bool isCurrentAt(DateTime now) =>
-      !now.toUtc().isBefore(currentObservedAt) &&
-      now.toUtc().isBefore(expiresAt);
+      isObservationCurrentAt(observedAt: currentObservedAt, now: now);
+
+  /// Applies the exact freshness and clock-skew policy used at every layer.
+  static bool isObservationCurrentAt({
+    required DateTime observedAt,
+    required DateTime now,
+  }) {
+    final utcObservedAt = observedAt.toUtc();
+    final utcNow = now.toUtc();
+    return !utcObservedAt.isAfter(utcNow.add(maximumFutureSkew)) &&
+        utcNow.isBefore(utcObservedAt.add(maximumCurrentAge));
+  }
 
   /// Price change in basis points, where 100 basis points equals one percent.
   int? get changeBasisPoints {

@@ -7,7 +7,7 @@ import 'package:ming_cute_icons/ming_cute_icons.dart';
 
 import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
-import '../../../market/data/data.dart';
+import '../../../market/domain/models/models.dart';
 import '../../../market/presentation/view_model/view_models.dart';
 import '../../../settings/presentation/models/models.dart';
 import '../../../settings/presentation/view_model/view_models.dart';

@@ -1,3 +1,4 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/core.dart';
@@ -12,6 +13,11 @@ part 'home_view_model.g.dart';
 class HomeViewModel extends _$HomeViewModel {
   @override
   Future<HomeState> build() async {
+    ref.watch(
+      walletLifecycleViewModelProvider.select(
+        (state) => state.foregroundGeneration,
+      ),
+    );
     final wallet = await ref.watch(walletViewModelProvider.future);
     return _loadForActiveWallet(wallet.activeWallet);
   }

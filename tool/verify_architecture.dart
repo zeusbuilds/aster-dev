@@ -1,0 +1,200 @@
+import 'dart:io';
+
+import 'package:analyzer/dart/analysis/features.dart';
+import 'package:analyzer/dart/analysis/utilities.dart';
+import 'package:analyzer/dart/ast/ast.dart';
+
+const _infrastructureOwners = <String, Set<String>>{
+  'flutter_secure_storage': {
+    'lib/core/storage/secure_storage_service.dart',
+    'lib/features/wallet/data/storage/legacy_wallet_seed_preflight.dart',
+  },
+  'haptic_feedback': {'lib/shared/feedback/haptic_feedback_service.dart'},
+  'http': {'lib/core/network/resilient_http_client.dart'},
+  'image_picker': {'lib/features/scan/data/services/mobile_scan_adapters.dart'},
+  'mobile_scanner': {
+    'lib/features/scan/data/services/mobile_scan_adapters.dart',
+  },
+  'package_info_plus': {'lib/core/platform/app_metadata_service.dart'},
+  'path_provider': {'lib/core/di/providers.dart'},
+  'share_plus': {'lib/core/platform/share_service.dart'},
+  'shared_preferences': {
+    'lib/core/bootstrap/app_bootstrap.dart',
+    'lib/core/di/providers.dart',
+    'lib/core/storage/preferences_service.dart',
+    'lib/main.dart',
+  },
+  'url_launcher': {'lib/core/platform/external_uri_service.dart'},
+};
+
+const _sdkOwners = {
+  'lib/core/errors/failure_mapper.dart',
+  'lib/features/wallet/data/runtime/rgb_wallet_engine.dart',
+};
+
+/// Result of checking one repository tree against the architecture policy.
+final class ArchitectureVerification {
+  const ArchitectureVerification({
+    required this.sourceCount,
+    required this.importCount,
+    required this.failures,
+  });
+
+  /// Number of non-generated Dart files examined under `lib/`.
+  final int sourceCount;
+
+  /// Number of import directives examined.
+  final int importCount;
+
+  /// Deterministically sorted policy or parse failures.
+  final List<String> failures;
+
+  /// Whether every examined source satisfies the policy.
+  bool get passed => failures.isEmpty;
+}
+
+/// Verifies dependency direction and infrastructure-adapter ownership.
+void main() {
+  final result = verifyArchitecture(Directory.current);
+  if (!result.passed) {
+    for (final failure in result.failures) {
+      stderr.writeln(failure);
+    }
+    exitCode = 1;
+    return;
+  }
+
+  stdout.writeln(
+    'Architecture policy verified across ${result.sourceCount} Dart sources '
+    'and ${result.importCount} imports.',
+  );
+}
+
+/// Checks the owned Dart sources beneath [repositoryRoot].
+///
+/// This function does not mutate global process state, which allows the same
+/// release policy to be fault-tested against isolated repository fixtures.
+ArchitectureVerification verifyArchitecture(Directory repositoryRoot) {
+  final root = repositoryRoot.absolute;
+  final sourceRoot = Directory('${root.path}/lib');
+  if (!sourceRoot.existsSync()) {
+    return const ArchitectureVerification(
+      sourceCount: 0,
+      importCount: 0,
+      failures: ['Missing lib directory. Run this tool from the repo root.'],
+    );
+  }
+
+  final sources =
+      sourceRoot
+          .listSync(recursive: true, followLinks: false)
+          .whereType<File>()
+          .where((file) => _isOwnedDartSource(file.path))
+          .toList()
+        ..sort((left, right) => left.path.compareTo(right.path));
+  final failures = <String>[];
+  final featureSet = FeatureSet.latestLanguageVersion();
+  var importCount = 0;
+
+  for (final source in sources) {
+    final sourcePath = _relative(root, source);
+    final parsed = parseFile(
+      path: source.path,
+      featureSet: featureSet,
+      throwIfDiagnostics: false,
+    );
+    for (final error in parsed.errors) {
+      final line = parsed.lineInfo.getLocation(error.offset).lineNumber;
+      failures.add('$sourcePath:$line: parse error: ${error.message}');
+    }
+    for (final directive
+        in parsed.unit.directives.whereType<ImportDirective>()) {
+      final uri = directive.uri.stringValue;
+      if (uri == null) continue;
+      importCount += 1;
+      final line = parsed.lineInfo.getLocation(directive.offset).lineNumber;
+      final package = _packageName(uri);
+
+      if (package == 'rgb_sdk_flutter' && !_sdkOwners.contains(sourcePath)) {
+        failures.add(
+          '$sourcePath:$line: rgb_sdk_flutter may be imported only by the '
+          'wallet adapter or SDK failure mapper.',
+        );
+      }
+
+      final infrastructureOwners = _infrastructureOwners[package];
+      if (infrastructureOwners != null &&
+          !infrastructureOwners.contains(sourcePath)) {
+        failures.add(
+          '$sourcePath:$line: package:$package is infrastructure and must be '
+          'imported only by its approved adapter/composition owner.',
+        );
+      }
+
+      final targetPath = _repositoryTarget(root, source, uri);
+      if (targetPath == null) continue;
+      if (_isFeatureDomain(sourcePath) &&
+          (_isFeatureData(targetPath) || _isFeaturePresentation(targetPath))) {
+        failures.add(
+          '$sourcePath:$line: domain code must not depend on $targetPath.',
+        );
+      }
+      if (_isFeatureData(sourcePath) && _isFeaturePresentation(targetPath)) {
+        failures.add(
+          '$sourcePath:$line: data code must not depend on presentation '
+          '$targetPath.',
+        );
+      }
+      if (_isFeaturePresentation(sourcePath) &&
+          !_isViewModel(sourcePath) &&
+          _isFeatureData(targetPath)) {
+        failures.add(
+          '$sourcePath:$line: presentation outside a ViewModel must consume '
+          'domain/presentation contracts, not data implementation $targetPath.',
+        );
+      }
+    }
+  }
+
+  return ArchitectureVerification(
+    sourceCount: sources.length,
+    importCount: importCount,
+    failures: List<String>.unmodifiable(failures..sort()),
+  );
+}
+
+String? _repositoryTarget(Directory root, File source, String uri) {
+  if (uri.startsWith('package:aster/')) {
+    return 'lib/${uri.substring('package:aster/'.length)}';
+  }
+  if (uri.startsWith('dart:') || uri.startsWith('package:')) return null;
+  final target = File.fromUri(source.parent.uri.resolve(uri));
+  if (!target.absolute.path.startsWith('${root.path}/lib/')) return null;
+  return _relative(root, target);
+}
+
+String? _packageName(String uri) {
+  if (!uri.startsWith('package:')) return null;
+  final path = uri.substring('package:'.length);
+  return path.split('/').firstOrNull;
+}
+
+bool _isFeatureDomain(String path) =>
+    path.startsWith('lib/features/') && path.contains('/domain/');
+
+bool _isFeatureData(String path) =>
+    path.startsWith('lib/features/') && path.contains('/data/');
+
+bool _isFeaturePresentation(String path) =>
+    path.startsWith('lib/features/') && path.contains('/presentation/');
+
+bool _isViewModel(String path) => path.contains('/presentation/view_model/');
+
+bool _isOwnedDartSource(String path) =>
+    path.endsWith('.dart') &&
+    !path.endsWith('.g.dart') &&
+    !path.endsWith('.freezed.dart') &&
+    !path.endsWith('.mocks.dart');
+
+String _relative(Directory root, File file) =>
+    file.absolute.path.substring(root.path.length + 1);

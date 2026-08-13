@@ -23,7 +23,7 @@ class ScanViewModel extends _$ScanViewModel {
     void synchronizeSession() => _synchronizeSession(session);
     session.addListener(synchronizeSession);
     ref.onDispose(() => session.removeListener(synchronizeSession));
-    return ScanState.fromSession(session.snapshot);
+    return _stateFromSession(session.snapshot);
   }
 
   /// Accepts exactly one camera payload until the caller resumes this session.
@@ -279,6 +279,18 @@ class ScanViewModel extends _$ScanViewModel {
     return ref.mounted &&
         identical(session, _session) &&
         revision == _operationRevision;
+  }
+
+  static ScanState _stateFromSession(ScanSessionSnapshot snapshot) {
+    return ScanState(
+      cameraInitialized: snapshot.isInitialized,
+      cameraRunning: snapshot.isRunning,
+      torchAvailable: snapshot.torchAvailable,
+      flashOn: snapshot.torchOn,
+      zoomPreset: ScanZoomPreset.nearest(snapshot.zoomScale),
+      captureLocked: snapshot.captureLocked,
+      failure: snapshot.failure,
+    );
   }
 
   static AppFailure _operationUnavailableFailure() => const AppFailure(

@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 
 import '../../../../shared/shared.dart';
-import '../../data/models/chart_data_item.dart';
+import '../../../market/domain/models/models.dart';
 
 const _kCandleCount = 24;
 
@@ -17,7 +17,7 @@ const _kCandleCount = 24;
 class CandleChart extends StatefulWidget {
   const CandleChart({super.key, required this.data, required this.isSkeleton});
 
-  final List<ChartDataItem>? data;
+  final List<BitcoinPricePoint>? data;
   final bool isSkeleton;
 
   @override
@@ -30,7 +30,7 @@ class _CandleChartState extends State<CandleChart>
   late final AnimationController _transitionController;
   double _loadingAnimationProgress = 0;
 
-  List<CandleData>? _candles;
+  List<_CandleData>? _candles;
   double? _minPrice;
   double? _maxPrice;
   double? _priceRange;
@@ -132,7 +132,9 @@ class _CandleChartState extends State<CandleChart>
         ? items.sublist(items.length - _kCandleCount)
         : items;
 
-    final prices = last24Items.map((e) => e.y).toList();
+    final prices = last24Items
+        .map((point) => point.usdCents.toDouble())
+        .toList(growable: false);
     _minPrice = prices.min;
     _maxPrice = prices.max;
     _priceRange = _maxPrice! - _minPrice!;
@@ -401,14 +403,14 @@ class _CandleChartState extends State<CandleChart>
     return height - (normalized * height);
   }
 
-  List<CandleData> _generatePriceBars(List<ChartDataItem> items) {
-    final bars = <CandleData>[];
+  List<_CandleData> _generatePriceBars(List<BitcoinPricePoint> items) {
+    final bars = <_CandleData>[];
 
     for (int i = 0; i < items.length; i++) {
-      final price = items[i].y;
-      final prevPrice = i > 0 ? items[i - 1].y : price;
+      final price = items[i].usdCents.toDouble();
+      final prevPrice = i > 0 ? items[i - 1].usdCents.toDouble() : price;
 
-      bars.add(CandleData(open: prevPrice, close: price));
+      bars.add(_CandleData(open: prevPrice, close: price));
     }
 
     return bars;
@@ -449,8 +451,8 @@ class _CandleWidget extends StatelessWidget {
   }
 }
 
-class CandleData {
-  const CandleData({required this.open, required this.close});
+class _CandleData {
+  const _CandleData({required this.open, required this.close});
 
   final double open;
   final double close;

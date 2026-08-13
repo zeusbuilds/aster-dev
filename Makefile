@@ -1,4 +1,4 @@
-.PHONY: shell bootstrap clean build watch run test format format-check analyze docs verify verify-barrels verify-generated lint android-release-bundle android-release-apks verify-android-release-apks fvm-setup help
+.PHONY: shell bootstrap clean build watch run test format format-check analyze docs verify verify-architecture verify-barrels verify-generated lint android-release-bundle android-release-apks verify-android-release-apks fvm-setup help
 
 # Default target
 help:
@@ -16,6 +16,7 @@ help:
 	@echo "  make analyze   - Run static analysis"
 	@echo "  make docs      - Generate and validate Dart API documentation"
 	@echo "  make verify    - Verify repository policy and tracker inventory"
+	@echo "  make verify-architecture - Verify dependency and adapter boundaries"
 	@echo "  make verify-barrels - Verify barrel-export boundaries"
 	@echo "  make verify-generated - Regenerate ignored generated sources"
 	@echo "  make lint      - Run all repository quality checks"
@@ -83,10 +84,16 @@ docs:
 
 # Verify repository invariants that are not covered by the analyzer.
 verify:
+	@echo "Verifying architecture boundaries..."
+	fvm dart run tool/verify_architecture.dart
 	@echo "Verifying barrel-export boundaries..."
 	fvm dart run tool/verify_barrel_exports.dart
 	@echo "Verifying production tracker inventory..."
 	fvm dart run tool/verify_production_tracker.dart
+
+verify-architecture:
+	@echo "Verifying architecture boundaries..."
+	fvm dart run tool/verify_architecture.dart
 
 verify-barrels:
 	@echo "Verifying barrel-export boundaries..."

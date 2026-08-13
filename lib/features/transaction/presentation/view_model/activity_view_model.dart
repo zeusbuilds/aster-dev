@@ -1,3 +1,4 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/core.dart';
@@ -12,6 +13,11 @@ part 'activity_view_model.g.dart';
 class ActivityViewModel extends _$ActivityViewModel {
   @override
   Future<ActivityState> build(WalletAssetKind kind) async {
+    ref.watch(
+      walletLifecycleViewModelProvider.select(
+        (state) => state.foregroundGeneration,
+      ),
+    );
     final wallet = await ref.watch(walletViewModelProvider.future);
     if (wallet.activeWallet == null) {
       throw AppFailureException(_missingWalletFailure);

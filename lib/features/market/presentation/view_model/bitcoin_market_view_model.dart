@@ -2,6 +2,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/core.dart';
 import '../../data/data.dart';
+import '../../domain/models/models.dart';
 
 part 'bitcoin_market_view_model.g.dart';
 

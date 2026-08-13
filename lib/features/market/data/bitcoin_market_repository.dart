@@ -1,6 +1,6 @@
 import '../../../core/errors/errors.dart';
 import '../../../core/network/network.dart';
-import 'models/bitcoin_market_snapshot.dart';
+import '../domain/models/models.dart';
 
 /// Fetches truthful Bitcoin/USD market data through the shared HTTP policy.
 final class BitcoinMarketRepository {
@@ -8,7 +8,6 @@ final class BitcoinMarketRepository {
     : _clock = clock ?? _utcNow;
 
   static const _baseUrl = 'https://api.coingecko.com/api/v3';
-  static const _maximumFutureSkew = Duration(minutes: 5);
   final ResilientHttpClient _http;
   final DateTime Function() _clock;
 
@@ -46,7 +45,7 @@ final class BitcoinMarketRepository {
           history = _decodeHistory(
             value,
             earliest: from.subtract(const Duration(hours: 1)),
-            latest: now.add(_maximumFutureSkew),
+            latest: now.add(BitcoinMarketSnapshot.maximumFutureSkew),
           );
         } catch (error, stackTrace) {
           historyFailure = _invalidPayload(error, stackTrace);
@@ -201,8 +200,10 @@ final class BitcoinMarketRepository {
   }
 
   static bool _isCurrent(DateTime observedAt, DateTime now) =>
-      now.isBefore(observedAt.add(BitcoinMarketSnapshot.maximumCurrentAge)) &&
-      !observedAt.isAfter(now.add(_maximumFutureSkew));
+      BitcoinMarketSnapshot.isObservationCurrentAt(
+        observedAt: observedAt,
+        now: now,
+      );
 
   static DateTime _utcNow() => DateTime.now().toUtc();
 

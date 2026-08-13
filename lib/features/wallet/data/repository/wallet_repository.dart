@@ -6,13 +6,14 @@ import '../../domain/models/models.dart';
 import '../runtime/runtime.dart';
 import '../storage/storage.dart';
 import '../validation/validation.dart';
+import 'wallet_lifecycle_repository.dart';
 
 /// Coordinates wallet metadata transactions and the single native runtime.
 ///
 /// The repository never exposes SDK DTOs or credential records. Mutations are
 /// first staged durably, then marked ready only after native initialization
 /// succeeds. Rollback failures remain durable for startup recovery.
-final class WalletRepository {
+final class WalletRepository implements WalletLifecycleRepository {
   WalletRepository(
     this._profiles,
     this._runtime,
@@ -751,10 +752,12 @@ final class WalletRepository {
   Future<AppResult<void>> sync() => _enqueueOperation(_runtime.sync);
 
   /// Suspends the native owner after all in-flight wallet metadata mutations.
+  @override
   Future<AppResult<void>> suspend() => _enqueueOperation(_runtime.suspend);
 
   /// Resumes the native owner, reconciling a failed runtime with the durable
   /// active profile rather than trusting partially transitioned memory state.
+  @override
   Future<AppResult<void>> resume() => _enqueueOperation(_resumeUnsafe);
 
   Future<AppResult<void>> _resumeUnsafe() async {
@@ -772,6 +775,7 @@ final class WalletRepository {
   }
 
   /// Destroys the native owner after all repository mutations complete.
+  @override
   Future<AppResult<void>> dispose() => _enqueueOperation(_runtime.dispose);
 
   Future<AppResult<WalletNetworkStatus>> networkStatus() => _enqueueOperation(

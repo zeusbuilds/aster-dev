@@ -6,7 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
-import '../../../market/data/data.dart';
+import '../../../market/domain/models/models.dart';
 import '../../../market/presentation/view_model/view_models.dart';
 import '../../../wallet/domain/models/models.dart';
 import '../../../wallet/presentation/formatting/formatting.dart';

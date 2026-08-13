@@ -1,5 +1,6 @@
 import 'package:aster/core/core.dart';
 import 'package:aster/features/market/data/data.dart';
+import 'package:aster/features/market/domain/models/models.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -153,9 +154,11 @@ void main() {
     },
   );
 
-  test('never presents stale or future-dated prices as current', () async {
+  test('rejects stale and out-of-skew prices as current', () async {
     final stale = now.subtract(const Duration(hours: 2));
-    final future = now.add(const Duration(hours: 1));
+    final future = now.add(
+      BitcoinMarketSnapshot.maximumFutureSkew + const Duration(seconds: 1),
+    );
     var currentTimestamp = stale.millisecondsSinceEpoch ~/ 1000;
     final transport = ResilientHttpClient(
       client: MockClient((request) async {
@@ -273,7 +276,18 @@ void main() {
     );
     expect(snapshot.isCurrentAt(snapshot.expiresAt), isFalse);
     expect(
-      snapshot.isCurrentAt(observedAt.subtract(const Duration(seconds: 1))),
+      snapshot.isCurrentAt(
+        observedAt.subtract(BitcoinMarketSnapshot.maximumFutureSkew),
+      ),
+      isTrue,
+    );
+    expect(
+      snapshot.isCurrentAt(
+        observedAt.subtract(
+          BitcoinMarketSnapshot.maximumFutureSkew +
+              const Duration(milliseconds: 1),
+        ),
+      ),
       isFalse,
     );
   });

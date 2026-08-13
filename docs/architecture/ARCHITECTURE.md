@@ -131,7 +131,10 @@ layout-preserving shimmer; refresh retains existing content.
 ## Verification
 
 Host gates cover formatting, generated code, fatal analysis, tests, Dartdoc,
-barrel policy, and tracker inventory. Release qualification additionally
+architecture direction, adapter ownership, barrel policy, and tracker
+inventory. `make verify-architecture` parses every owned Dart import and fails
+when domain/data direction or infrastructure ownership regresses. Release
+qualification additionally
 requires exact-commit native tests, iOS/Android builds and runtime smokes,
 configured-wallet restart evidence, accessibility checks, and measured profile
 performance/memory. The tracker records what actually ran and preserves every

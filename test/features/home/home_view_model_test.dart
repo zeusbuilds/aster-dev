@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:aster/core/core.dart';
 import 'package:aster/features/home/presentation/view_model/view_models.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
+import 'package:aster/features/wallet/presentation/view_model/view_models.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/payment_flow_harness.dart';
@@ -87,6 +89,28 @@ void main() {
       expect(engine.calls.where((call) => call == 'balance'), hasLength(2));
     },
   );
+
+  test('reloads the read-only portfolio after a confirmed resume', () async {
+    final engine = FakeWalletEngine()..balance = _bitcoinBalance();
+    final harness = await PaymentFlowTestHarness.create(engine: engine);
+    addTearDown(harness.dispose);
+    final subscription = harness.container.listen(
+      homeViewModelProvider,
+      (_, _) {},
+    );
+    addTearDown(subscription.close);
+
+    await harness.container.read(homeViewModelProvider.future);
+    final lifecycle = harness.container.read(
+      walletLifecycleViewModelProvider.notifier,
+    );
+    expect(await lifecycle.handle(AppLifecycleState.paused), isTrue);
+    expect(await lifecycle.handle(AppLifecycleState.resumed), isTrue);
+    await harness.container.read(homeViewModelProvider.future);
+
+    expect(engine.calls.where((call) => call == 'balance'), hasLength(2));
+    expect(engine.calls, containsAllInOrder(['shutdown', 'reinitialize']));
+  });
 }
 
 WalletBalance _bitcoinBalance() {
