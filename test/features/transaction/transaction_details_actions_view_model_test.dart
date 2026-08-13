@@ -120,6 +120,90 @@ void main() {
     },
   );
 
+  test(
+    'stale copy and explorer completions cannot clear rebuilt work',
+    () async {
+      final clipboard = _ControlledClipboardService();
+      final externalUris = _ControlledExternalUriService();
+      final haptics = RecordingHapticFeedbackService();
+      var configuration = services;
+      final container = ProviderContainer(
+        overrides: [
+          walletServiceConfigurationProvider.overrideWith(
+            (ref) => configuration,
+          ),
+          clipboardServiceProvider.overrideWithValue(clipboard),
+          externalUriServiceProvider.overrideWithValue(externalUris),
+          hapticFeedbackServiceProvider.overrideWithValue(haptics),
+        ],
+      );
+      addTearDown(container.dispose);
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final notifier = container.read(provider.notifier);
+
+      final oldCopyGate = Completer<AppResult<void>>();
+      clipboard.next = oldCopyGate.future;
+      final oldCopy = notifier.copyField(
+        TransactionDetailField.transactionId,
+        transactionId,
+      );
+      await Future<void>.delayed(Duration.zero);
+      configuration = const WalletServiceConfiguration(
+        environment: BlockchainEnvironment.mainnet,
+        sdkNetwork: 'mainnet',
+        explorerBaseUrl: 'https://mempool.space',
+      );
+      container.invalidate(walletServiceConfigurationProvider);
+      await _waitFor(
+        () =>
+            container.read(provider).explorerUri.toString() ==
+            'https://mempool.space/tx/$transactionId',
+      );
+      final newCopyGate = Completer<AppResult<void>>();
+      clipboard.next = newCopyGate.future;
+      final newCopy = container
+          .read(provider.notifier)
+          .copyField(TransactionDetailField.paymentHash, 'payment-hash');
+
+      oldCopyGate.complete(const AppResult.success(null));
+      expect(await oldCopy, isNull);
+      expect(
+        container.read(provider).copyingField,
+        TransactionDetailField.paymentHash,
+      );
+      expect(haptics.intents, isEmpty);
+      newCopyGate.complete(const AppResult.success(null));
+      expect(await newCopy, isA<AppSuccess<void>>());
+
+      final oldExplorerGate = Completer<AppResult<void>>();
+      externalUris.next = oldExplorerGate.future;
+      final oldExplorer = container.read(provider.notifier).openExplorer();
+      await Future<void>.delayed(Duration.zero);
+      configuration = services;
+      container.invalidate(walletServiceConfigurationProvider);
+      await _waitFor(
+        () =>
+            container.read(provider).explorerUri.toString() ==
+            'https://mempool.space/signet/tx/$transactionId',
+      );
+      final newExplorerGate = Completer<AppResult<void>>();
+      externalUris.next = newExplorerGate.future;
+      final newExplorer = container.read(provider.notifier).openExplorer();
+
+      oldExplorerGate.complete(const AppResult.success(null));
+      expect(await oldExplorer, isNull);
+      expect(container.read(provider).openingExplorer, isTrue);
+      expect(haptics.intents, [HapticIntent.lightImpact]);
+      newExplorerGate.complete(const AppResult.success(null));
+      expect(await newExplorer, isA<AppSuccess<void>>());
+      expect(haptics.intents, [
+        HapticIntent.lightImpact,
+        HapticIntent.lightImpact,
+      ]);
+    },
+  );
+
   test('omits explorer behavior when deployment has no explorer', () async {
     final container = ProviderContainer(
       overrides: [
@@ -175,4 +259,12 @@ final class _ThrowingClipboardService implements ClipboardService {
   Future<AppResult<void>> writeText(String value) {
     throw StateError('private-invoice native detail');
   }
+}
+
+Future<void> _waitFor(bool Function() predicate) async {
+  for (var attempt = 0; attempt < 100; attempt += 1) {
+    if (predicate()) return;
+    await Future<void>.delayed(Duration.zero);
+  }
+  fail('Timed out waiting for transaction action state.');
 }

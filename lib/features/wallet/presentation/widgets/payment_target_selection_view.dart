@@ -61,12 +61,18 @@ final class _PaymentTargetLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppSkeletonizer(
-      enabled: true,
-      child: _PaymentTargetList(
-        capabilities: WalletPaymentTarget.values
-            .map(WalletPaymentCapability.unavailable)
-            .toList(growable: false),
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: 'Loading payment options',
+      excludeSemantics: true,
+      child: AppSkeletonizer(
+        enabled: true,
+        child: _PaymentTargetList(
+          capabilities: WalletPaymentTarget.values
+              .map(WalletPaymentCapability.unavailable)
+              .toList(growable: false),
+        ),
       ),
     );
   }

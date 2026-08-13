@@ -175,13 +175,14 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     }
     try {
       await context.pushNamed<void>(RouteNames.send);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      final failure = FailureMapper.from(error, stackTrace);
       ref.read(sendDestinationHandoffProvider.notifier).clear();
       if (mounted) {
         unawaited(context.haptics.trigger(HapticIntent.error));
         context.toasts.show(
           title: 'Send could not be opened',
-          message: 'Try again.',
+          message: failure.userMessage,
           variant: ToastVariant.failure,
         );
       }

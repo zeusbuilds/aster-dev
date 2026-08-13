@@ -11,8 +11,11 @@ part 'activity_view_model.g.dart';
 /// Owns one asset's real cross-rail activity and explicit refresh state.
 @riverpod
 class ActivityViewModel extends _$ActivityViewModel {
+  var _stateGeneration = 0;
+
   @override
   Future<ActivityState> build(WalletAssetKind kind) async {
+    _stateGeneration += 1;
     ref.watch(
       walletLifecycleViewModelProvider.select(
         (state) => state.foregroundGeneration,
@@ -28,6 +31,7 @@ class ActivityViewModel extends _$ActivityViewModel {
   /// Retries initial loading without overlapping an active operation.
   Future<void> retry() async {
     if (state.isLoading) return;
+    final generation = ++_stateGeneration;
     state = const AsyncLoading();
     if (ref.read(walletViewModelProvider).hasError) {
       await ref.read(walletViewModelProvider.notifier).reload();
@@ -39,18 +43,19 @@ class ActivityViewModel extends _$ActivityViewModel {
       }
       return _load(kind);
     });
-    if (ref.mounted) state = next;
+    if (ref.mounted && generation == _stateGeneration) state = next;
   }
 
   /// Synchronizes native state, then atomically replaces the visible feed.
   Future<bool> refresh() async {
     final current = state.value;
     if (current == null || current.refreshing) return false;
+    final generation = _stateGeneration;
     state = AsyncData(
       current.copyWith(refreshing: true, clearRefreshFailure: true),
     );
     final result = await _syncAndLoad(kind);
-    if (!ref.mounted) return result is AppSuccess<WalletActivityFeed>;
+    if (!ref.mounted || generation != _stateGeneration) return false;
     return switch (result) {
       AppSuccess<WalletActivityFeed>(:final value) => () {
         state = AsyncData(ActivityState(feed: value));

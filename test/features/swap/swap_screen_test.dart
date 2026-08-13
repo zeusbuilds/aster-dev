@@ -1,12 +1,18 @@
+import 'dart:async';
+import 'dart:ui' as ui;
+
 import 'package:aster/core/core.dart';
 import 'package:aster/features/swap/presentation/screens/screens.dart';
 import 'package:aster/features/swap/presentation/widgets/widgets.dart';
+import 'package:aster/features/wallet/domain/models/models.dart';
+import 'package:aster/features/wallet/presentation/view_model/view_models.dart';
 import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/payment_flow_harness.dart';
+import '../../support/presentation_fakes.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -45,6 +51,16 @@ void main() {
     await tester.tap(find.text('Bitcoin · On-chain'));
     await tester.pumpAndSettle();
     expect(find.byType(AssetSelectorSheet), findsOneWidget);
+    final selected = tester.getSemantics(
+      find.bySemanticsLabel('Bitcoin, On-chain'),
+    );
+    expect(selected.flagsCollection.isEnabled, ui.Tristate.isTrue);
+    expect(selected.flagsCollection.isSelected, ui.Tristate.isTrue);
+    expect(selected.flagsCollection.isInMutuallyExclusiveGroup, isTrue);
+    expect(
+      selected.getSemanticsData().hasAction(ui.SemanticsAction.tap),
+      false,
+    );
     expect(find.text('Bitcoin'), findsNWidgets(2));
     expect(find.text('USDT'), findsNWidgets(2));
     await tester.tap(find.text('Lightning').first);
@@ -59,6 +75,35 @@ void main() {
     expect(tester, meetsGuideline(androidTapTargetGuideline));
     expect(tester, meetsGuideline(labeledTapTargetGuideline));
     expect(tester, meetsGuideline(textContrastGuideline));
+  });
+
+  testWidgets('Swap loading exposes one truthful live node', (tester) async {
+    final gate = Completer<List<WalletPaymentCapability>>();
+    final haptics = RecordingHapticFeedbackService();
+    final container = ProviderContainer(
+      overrides: [
+        walletPaymentCapabilitiesProvider.overrideWith((ref) => gate.future),
+        hapticFeedbackServiceProvider.overrideWithValue(haptics),
+      ],
+    );
+    addTearDown(container.dispose);
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: AsterFeedbackScope(
+          haptics: haptics,
+          toasts: RecordingToastPresentationService(),
+          child: MaterialApp(theme: AppTheme.light(), home: const SwapScreen()),
+        ),
+      ),
+    );
+
+    expect(find.bySemanticsLabel('Loading swap options'), findsOneWidget);
+    expect(find.bySemanticsLabel('Bitcoin, On-chain'), findsNothing);
   });
 }
 

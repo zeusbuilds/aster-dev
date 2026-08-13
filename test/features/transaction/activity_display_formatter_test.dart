@@ -64,6 +64,15 @@ void main() {
     expect(formatter.timeLabel(null), 'Time unavailable');
   });
 
+  test('groups by local calendar date instead of elapsed duration', () {
+    final now = DateTime(2026, 3, 9, 0, 5);
+    final lateYesterday = DateTime(2026, 3, 8, 23, 55);
+    final older = DateTime(2026, 3, 7, 23, 59);
+
+    expect(formatter.groupLabel(lateYesterday, now), 'Yesterday');
+    expect(formatter.groupLabel(older, now), 'Mar 7, 2026');
+  });
+
   test('uses semantic labels and bounded identifiers', () {
     final activity = _activity(
       idCharacter: 'c',

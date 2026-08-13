@@ -14,13 +14,23 @@ part 'scan_view_model.g.dart';
 @riverpod
 class ScanViewModel extends _$ScanViewModel {
   late ScanSession _session;
+  ScanSession? _listenedSession;
+  void Function()? _sessionListener;
   var _operationRevision = 0;
 
   @override
   ScanState build(ScanPurpose purpose) {
     final session = ref.watch(scanSessionProvider(purpose));
+    final previousSession = _listenedSession;
+    final previousListener = _sessionListener;
+    if (previousSession != null && previousListener != null) {
+      previousSession.removeListener(previousListener);
+    }
+    _operationRevision += 1;
     _session = session;
     void synchronizeSession() => _synchronizeSession(session);
+    _listenedSession = session;
+    _sessionListener = synchronizeSession;
     session.addListener(synchronizeSession);
     ref.onDispose(() => session.removeListener(synchronizeSession));
     return _stateFromSession(session.snapshot);

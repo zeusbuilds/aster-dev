@@ -33,7 +33,9 @@ void main() {
       'lib/features/pay/presentation/screens/pay_screen.dart',
       "import '../../domain/model.dart';\n"
           'void render(Object error, StackTrace stackTrace) { '
-          'FailureMapper.from(error, stackTrace); }',
+          'FailureMapper.from(error, stackTrace); }\n'
+          'void guarded() { try {} catch (error, stackTrace) { '
+          'FailureMapper.from(error, stackTrace); } }',
     );
     _write(
       repository,
@@ -73,7 +75,8 @@ void main() {
           'void submit() { '
           'walletRepositoryProvider; clipboardServiceProvider; }\n'
           'void render(Object error) { '
-          'FailureMapper.from(error, StackTrace.current); }',
+          'FailureMapper.from(error, StackTrace.current); }\n'
+          'void discard() { try {} catch (_) {} }',
     );
     _write(repository, 'lib/broken.dart', "import 'unterminated.dart;");
 
@@ -91,6 +94,7 @@ void main() {
         contains('walletRepositoryProvider intent through a ViewModel'),
         contains('clipboardServiceProvider intent through a ViewModel'),
         contains('must pass the captured failure stack'),
+        contains('must capture and map thrown exceptions'),
         contains('parse error:'),
       ]),
     );

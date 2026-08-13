@@ -127,6 +127,7 @@ class _SendAddressScreenState extends ConsumerState<SendAddressScreen> {
                   ref.read(provider.notifier).updateDestination('');
                 },
                 onPaste: () => unawaited(_paste()),
+                onSubmitted: () => unawaited(_continue()),
                 onContinue: () => unawaited(_continue()),
               ),
               loading: () => _DestinationLoading(target: widget.target),
@@ -151,6 +152,7 @@ final class _DestinationBody extends StatelessWidget {
     required this.onChanged,
     required this.onClear,
     required this.onPaste,
+    required this.onSubmitted,
     required this.onContinue,
   });
 
@@ -159,6 +161,7 @@ final class _DestinationBody extends StatelessWidget {
   final ValueChanged<String> onChanged;
   final VoidCallback onClear;
   final VoidCallback onPaste;
+  final VoidCallback onSubmitted;
   final VoidCallback onContinue;
 
   @override
@@ -177,6 +180,7 @@ final class _DestinationBody extends StatelessWidget {
           onChanged: onChanged,
           onClear: onClear,
           onPaste: onPaste,
+          onSubmitted: onSubmitted,
         ),
         const Spacer(),
         CustomButton(

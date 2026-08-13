@@ -82,6 +82,46 @@ void main() {
     expect(harness.haptics.intents, contains(HapticIntent.lightImpact));
   });
 
+  testWidgets('mounted Activity advances its local calendar at midnight', (
+    tester,
+  ) async {
+    var now = DateTime(2026, 8, 12, 23, 59, 59, 998).toUtc();
+    final eventAt = DateTime(2026, 8, 12, 12).toUtc();
+    final engine = FakeWalletEngine()
+      ..activities = <WalletActivity>[
+        WalletActivity(
+          id: 'activity-${'c' * 64}',
+          source: WalletActivitySource.bitcoinTransaction,
+          operation: WalletActivityOperation.bitcoinReceive,
+          asset: WalletAsset.bitcoin,
+          rail: PaymentRail.onchain,
+          direction: WalletActivityDirection.received,
+          status: WalletActivityStatus.succeeded,
+          amount: WalletAmount.onchain(
+            assetId: WalletAsset.bitcoin.id,
+            units: 100,
+          ),
+          occurredAt: eventAt,
+          txid: 'c' * 64,
+        ),
+      ];
+    final harness = await _harness(engine: engine, clock: () => now);
+    addTearDown(() => _disposeHarness(tester, harness));
+
+    await _pump(
+      tester,
+      harness,
+      const TransactionListScreen(assetKind: WalletAssetKind.bitcoin),
+    );
+    await _pumpUntil(tester, () => find.text('Today').evaluate().isNotEmpty);
+
+    now = DateTime(2026, 8, 13, 0, 0, 0, 2).toUtc();
+    await tester.pump(const Duration(milliseconds: 5));
+
+    expect(find.text('Today'), findsNothing);
+    expect(find.text('Yesterday'), findsOneWidget);
+  });
+
   testWidgets('Details exposes available data, copy, and explorer actions', (
     tester,
   ) async {
@@ -107,6 +147,29 @@ void main() {
     expect(find.text('Received'), findsOneWidget);
     expect(find.text('3'), findsOneWidget);
     expect(find.text('Signet'), findsOneWidget);
+    expect(find.text('Confirmed'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(
+        RegExp(r'Bitcoin, Received, \+100 sats, Completed'),
+      ),
+      findsOneWidget,
+    );
+    final statusRow = find.ancestor(
+      of: find.text('Status'),
+      matching: find.byType(TransactionDetailRow),
+    );
+    expect(
+      find.descendant(of: statusRow, matching: find.byType(NumericText)),
+      findsOneWidget,
+    );
+    final transactionIdRow = find.ancestor(
+      of: find.text('Transaction ID'),
+      matching: find.byType(TransactionDetailRow),
+    );
+    expect(
+      find.descendant(of: transactionIdRow, matching: find.byType(NumericText)),
+      findsNothing,
+    );
 
     final copy = find.byTooltip('Copy Transaction ID');
     await tester.ensureVisible(copy);
@@ -117,6 +180,12 @@ void main() {
     );
     expect(copySemantics, findsOneWidget);
     expect(tester.widget<Semantics>(copySemantics).properties.onTap, isNotNull);
+    await tester.scrollUntilVisible(
+      copy,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
     await tester.tap(copy);
     await tester.pump();
     expect(harness.clipboard.text, 'a' * 64);
@@ -181,33 +250,73 @@ void main() {
               .loading,
     );
   });
+
+  testWidgets('Activity and details loading expose only truthful live nodes', (
+    tester,
+  ) async {
+    final engine = FakeWalletEngine()..activityGate = Completer<void>();
+    final harness = await _harness(engine: engine);
+    addTearDown(() => _disposeHarness(tester, harness));
+
+    await _pump(
+      tester,
+      harness,
+      const TransactionListScreen(assetKind: WalletAssetKind.bitcoin),
+    );
+    await _pumpUntil(tester, () => engine.calls.contains('activity'));
+    expect(find.bySemanticsLabel('Loading activity'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp(r'Sent|Received')), findsNothing);
+
+    await _pump(
+      tester,
+      harness,
+      TransactionDetailsScreen(
+        assetKind: WalletAssetKind.bitcoin,
+        activityId: _onchainActivity().id,
+      ),
+    );
+    expect(
+      find.bySemanticsLabel('Loading transaction details'),
+      findsOneWidget,
+    );
+    expect(find.text('Transaction ID'), findsNothing);
+
+    engine.activityGate!.complete();
+  });
 }
 
 Future<PaymentFlowTestHarness> _harness({
   Map<String, Object> preferenceValues = const {},
+  FakeWalletEngine? engine,
+  UtcClock? clock,
 }) {
   const services = WalletServiceConfiguration(
     environment: BlockchainEnvironment.signet,
     sdkNetwork: 'utexo',
     explorerBaseUrl: 'https://mempool.space/signet',
   );
-  final engine = FakeWalletEngine()
-    ..balance = _bitcoinBalance()
-    ..networkStatus = WalletNetworkStatus(
-      environment: BlockchainEnvironment.signet,
-      blockHeight: 102,
-      nodePublicKey:
-          '020000000000000000000000000000000000000000000000000000000000000000',
-      channelCount: 0,
-      usableChannelCount: 0,
-      peerCount: 0,
-    )
-    ..activities = <WalletActivity>[_lightningActivity(), _onchainActivity()];
+  final selectedEngine = engine ?? FakeWalletEngine();
+  selectedEngine.balance ??= _bitcoinBalance();
+  selectedEngine.networkStatus ??= WalletNetworkStatus(
+    environment: BlockchainEnvironment.signet,
+    blockHeight: 102,
+    nodePublicKey:
+        '020000000000000000000000000000000000000000000000000000000000000000',
+    channelCount: 0,
+    usableChannelCount: 0,
+    peerCount: 0,
+  );
+  if (selectedEngine.activities.isEmpty) {
+    selectedEngine.activities = <WalletActivity>[
+      _lightningActivity(),
+      _onchainActivity(),
+    ];
+  }
   return PaymentFlowTestHarness.create(
-    engine: engine,
+    engine: selectedEngine,
     services: services,
     preferenceValues: preferenceValues,
-    clock: () => DateTime.utc(2026, 8, 12, 12),
+    clock: clock ?? () => DateTime.utc(2026, 8, 12, 12),
   );
 }
 

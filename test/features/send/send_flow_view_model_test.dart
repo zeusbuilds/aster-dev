@@ -121,6 +121,43 @@ void main() {
     expect(engine.calls, isNot(contains('estimateFeeRate')));
   });
 
+  test('suppresses overlapping destination validation', () async {
+    const route = PaymentRoute(
+      asset: WalletAsset.bitcoin,
+      rail: PaymentRail.lightning,
+    );
+    final gate = Completer<void>();
+    final engine = FakeWalletEngine()
+      ..balance = _balance(onchainSpendable: 0, lightningSpendable: 5000)
+      ..decodeInvoiceGate = gate
+      ..decodedInvoice = WalletPaymentPreview(
+        route: route,
+        encodedDestination: 'lnbcrt1invoice',
+        displayDestination: 'lnbcrt1invoice',
+      );
+    final harness = await PaymentFlowTestHarness.create(engine: engine);
+    addTearDown(harness.dispose);
+    final provider = sendFlowViewModelProvider(
+      WalletPaymentTarget.bitcoinLightning,
+    );
+    final subscription = harness.container.listen(provider, (_, _) {});
+    addTearDown(subscription.close);
+    await harness.container.read(provider.future);
+    final notifier = harness.container.read(provider.notifier);
+    notifier.updateDestination('lnbcrt1invoice');
+
+    final first = notifier.validateDestination();
+    await Future<void>.delayed(Duration.zero);
+    expect(await notifier.validateDestination(), isFalse);
+    expect(
+      engine.calls.where((call) => call == 'decodeInvoice:start'),
+      hasLength(1),
+    );
+
+    gate.complete();
+    expect(await first, isTrue);
+  });
+
   test(
     'stale fee and insufficient funds fail before native mutation',
     () async {

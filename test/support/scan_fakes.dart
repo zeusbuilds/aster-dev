@@ -32,6 +32,21 @@ final class FakeScanSession extends ChangeNotifier implements ScanSession {
   var closeCalls = 0;
   var _closed = false;
   ValueChanged<ScanPayload>? _onCaptured;
+  final Set<VoidCallback> _observedListeners = <VoidCallback>{};
+
+  int get listenerCount => _observedListeners.length;
+
+  @override
+  void addListener(VoidCallback listener) {
+    _observedListeners.add(listener);
+    super.addListener(listener);
+  }
+
+  @override
+  void removeListener(VoidCallback listener) {
+    _observedListeners.remove(listener);
+    super.removeListener(listener);
+  }
 
   @override
   ScanSessionSnapshot get snapshot => current;
@@ -116,6 +131,7 @@ final class FakeScanSession extends ChangeNotifier implements ScanSession {
     if (_closed) return const AppResult.success(null);
     _closed = true;
     closeCalls += 1;
+    _observedListeners.clear();
     super.dispose();
     return const AppResult.success(null);
   }

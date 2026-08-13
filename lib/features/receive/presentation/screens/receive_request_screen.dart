@@ -331,13 +331,19 @@ final class _RequestLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppSkeletonizer(
-      enabled: true,
-      child: Squircle(
-        borderRadius: context.radii.sheet,
-        child: AspectRatio(
-          aspectRatio: 1,
-          child: ColoredBox(color: context.appColors.surfaceSubtle),
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: 'Loading payment request',
+      excludeSemantics: true,
+      child: AppSkeletonizer(
+        enabled: true,
+        child: Squircle(
+          borderRadius: context.radii.sheet,
+          child: AspectRatio(
+            aspectRatio: 1,
+            child: ColoredBox(color: context.appColors.surfaceSubtle),
+          ),
         ),
       ),
     );

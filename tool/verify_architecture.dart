@@ -194,12 +194,23 @@ ArchitectureVerification verifyArchitecture(Directory repositoryRoot) {
 
     if (_isFeaturePresentation(sourcePath)) {
       final syntheticStacks = <MethodInvocation>[];
+      final discardedExceptions = <CatchClause>[];
       parsed.unit.accept(_SyntheticFailureStackCollector(syntheticStacks));
+      parsed.unit.accept(
+        _DiscardedPresentationExceptionCollector(discardedExceptions),
+      );
       for (final invocation in syntheticStacks) {
         final line = parsed.lineInfo.getLocation(invocation.offset).lineNumber;
         failures.add(
           '$sourcePath:$line: feature presentation must pass the captured '
           'failure stack instead of replacing it with StackTrace.current.',
+        );
+      }
+      for (final clause in discardedExceptions) {
+        final line = parsed.lineInfo.getLocation(clause.offset).lineNumber;
+        failures.add(
+          '$sourcePath:$line: feature presentation must capture and map '
+          'thrown exceptions instead of discarding them with catch (_).',
         );
       }
     }
@@ -275,5 +286,18 @@ final class _SyntheticFailureStackCollector extends RecursiveAstVisitor<void> {
       invocations.add(node);
     }
     super.visitMethodInvocation(node);
+  }
+}
+
+final class _DiscardedPresentationExceptionCollector
+    extends RecursiveAstVisitor<void> {
+  _DiscardedPresentationExceptionCollector(this.clauses);
+
+  final List<CatchClause> clauses;
+
+  @override
+  void visitCatchClause(CatchClause node) {
+    if (node.exceptionParameter?.name.lexeme == '_') clauses.add(node);
+    super.visitCatchClause(node);
   }
 }

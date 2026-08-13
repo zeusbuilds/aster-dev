@@ -15,6 +15,7 @@ class SendAddressCard extends StatelessWidget {
     required ValueChanged<String> onChanged,
     required VoidCallback onClear,
     required VoidCallback onPaste,
+    required VoidCallback onSubmitted,
     this.failureMessage,
     this.pasting = false,
   }) : _behavior = _SendAddressCardBehavior(
@@ -22,6 +23,7 @@ class SendAddressCard extends StatelessWidget {
          onChanged: onChanged,
          onClear: onClear,
          onPaste: onPaste,
+         onSubmitted: onSubmitted,
        );
 
   /// Inert content skeleton with the same responsive geometry as the form.
@@ -89,6 +91,13 @@ class SendAddressCard extends StatelessWidget {
                   isDense: true,
                 ),
                 onChanged: _behavior?.onChanged,
+                onSubmitted: enabled
+                    ? (value) {
+                        if (value.trim().isNotEmpty) {
+                          _behavior?.onSubmitted();
+                        }
+                      }
+                    : null,
               ),
               if (failureMessage case final message?) ...[
                 SizedBox(height: context.spacing.sm),
@@ -150,10 +159,12 @@ final class _SendAddressCardBehavior {
     required this.onChanged,
     required this.onClear,
     required this.onPaste,
+    required this.onSubmitted,
   });
 
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
   final VoidCallback onClear;
   final VoidCallback onPaste;
+  final VoidCallback onSubmitted;
 }

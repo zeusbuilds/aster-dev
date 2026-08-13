@@ -123,6 +123,97 @@ void main() {
     expect(tester, meetsGuideline(textContrastGuideline));
   });
 
+  testWidgets('payment target loading exposes one truthful live node', (
+    tester,
+  ) async {
+    final harness = await PaymentFlowTestHarness.create();
+    addTearDown(() => _disposeHarness(tester, harness));
+    await _pumpWidget(
+      tester,
+      harness,
+      PaymentTargetSelectionView(
+        capabilities: const AsyncLoading(),
+        onSelected: (_) {},
+        onRetry: () {},
+      ),
+    );
+
+    expect(find.bySemanticsLabel('Loading payment options'), findsOneWidget);
+    expect(find.bySemanticsLabel('Bitcoin on-chain payment'), findsNothing);
+    expect(find.bySemanticsLabel('Bitcoin Lightning payment'), findsNothing);
+  });
+
+  testWidgets('Send destination Done action validates and advances', (
+    tester,
+  ) async {
+    final harness = await PaymentFlowTestHarness.create();
+    addTearDown(() => _disposeHarness(tester, harness));
+    final router = GoRouter(
+      initialLocation: '/send/bitcoin-onchain/address',
+      routes: [
+        GoRoute(
+          path: RoutePaths.sendAddress,
+          name: RouteNames.sendAddress,
+          builder: (context, state) => const SendAddressScreen(
+            target: WalletPaymentTarget.bitcoinOnchain,
+          ),
+        ),
+        GoRoute(
+          path: RoutePaths.sendAmount,
+          name: RouteNames.sendAmount,
+          builder: (context, state) => const Text('Amount step'),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await _pumpRouter(tester, harness, router);
+    final destinationFieldFinder = find.byWidgetPredicate(
+      (widget) => widget is TextField && widget.enabled == true,
+    );
+    await _pumpUntil(
+      tester,
+      () => destinationFieldFinder.evaluate().isNotEmpty,
+    );
+
+    final emptyEditable = find.descendant(
+      of: destinationFieldFinder,
+      matching: find.byType(EditableText),
+    );
+    tester
+        .state<EditableTextState>(emptyEditable)
+        .performAction(TextInputAction.done);
+    await _pumpFrames(tester);
+    expect(destinationFieldFinder, findsOneWidget);
+
+    const address = 'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn';
+    await tester.enterText(destinationFieldFinder, address);
+    await tester.pump();
+    final destinationField = tester.widget<TextField>(destinationFieldFinder);
+    expect(destinationField.textInputAction, TextInputAction.done);
+    expect(destinationField.onSubmitted, isNotNull);
+    expect(
+      harness.container
+          .read(sendFlowViewModelProvider(WalletPaymentTarget.bitcoinOnchain))
+          .requireValue
+          .destination,
+      address,
+    );
+    final editable = find.descendant(
+      of: destinationFieldFinder,
+      matching: find.byType(EditableText),
+    );
+    tester
+        .state<EditableTextState>(editable)
+        .performAction(TextInputAction.done);
+    await _pumpFrames(tester);
+    await _pumpUntil(
+      tester,
+      () => find.text('Amount step').evaluate().isNotEmpty,
+    );
+
+    expect(find.text('Amount step'), findsOneWidget);
+  });
+
   testWidgets('send loading surfaces preserve compact 2x geometry', (
     tester,
   ) async {
@@ -402,6 +493,32 @@ void main() {
     );
 
     expect(harness.engine.createdReceiveAmount?.units, 100000000);
+  });
+
+  testWidgets('Receive request loading exposes no fabricated request', (
+    tester,
+  ) async {
+    final engine = FakeWalletEngine()..createReceiveGate = Completer<void>();
+    final harness = await PaymentFlowTestHarness.create(engine: engine);
+    addTearDown(() => _disposeHarness(tester, harness));
+    await _pumpWidget(
+      tester,
+      harness,
+      const ReceiveRequestScreen(target: WalletPaymentTarget.bitcoinOnchain),
+    );
+    await _pumpUntil(
+      tester,
+      () => engine.calls.contains('createReceiveRequest:start'),
+    );
+
+    expect(find.bySemanticsLabel('Loading payment request'), findsOneWidget);
+    expect(find.byType(PrettyQrView), findsNothing);
+
+    engine.createReceiveGate!.complete();
+    await _pumpUntil(
+      tester,
+      () => find.byType(PrettyQrView).evaluate().isNotEmpty,
+    );
   });
 
   testWidgets('Send amount stays loading until one real mutation completes', (

@@ -122,21 +122,27 @@ class _SwapLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppSkeletonizer(
-      enabled: true,
-      child: Column(
-        children: [
-          for (var index = 0; index < 2; index += 1) ...[
-            Squircle(
-              padding: EdgeInsets.all(context.spacing.xl),
-              child: Text(
-                index == 0 ? 'Bitcoin · On-chain' : 'Bitcoin · Lightning',
-                style: context.type.title,
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: 'Loading swap options',
+      excludeSemantics: true,
+      child: AppSkeletonizer(
+        enabled: true,
+        child: Column(
+          children: [
+            for (var index = 0; index < 2; index += 1) ...[
+              Squircle(
+                padding: EdgeInsets.all(context.spacing.xl),
+                child: Text(
+                  index == 0 ? 'Bitcoin · On-chain' : 'Bitcoin · Lightning',
+                  style: context.type.title,
+                ),
               ),
-            ),
-            if (index == 0) SizedBox(height: context.spacing.sm),
+              if (index == 0) SizedBox(height: context.spacing.sm),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

@@ -12,11 +12,18 @@ part 'transaction_details_actions_view_model.g.dart';
 @riverpod
 class TransactionDetailsActionsViewModel
     extends _$TransactionDetailsActionsViewModel {
+  var _stateGeneration = 0;
+  var _copyRevision = 0;
+  var _explorerRevision = 0;
+
   @override
   TransactionDetailsOperationState build(
     String activityId,
     String? transactionId,
   ) {
+    _stateGeneration += 1;
+    _copyRevision += 1;
+    _explorerRevision += 1;
     final configuration = ref.watch(walletServiceConfigurationProvider);
     return TransactionDetailsOperationState(
       explorerUri: transactionId == null
@@ -34,11 +41,17 @@ class TransactionDetailsActionsViewModel
     String value,
   ) async {
     if (state.copyingField != null) return null;
+    final generation = _stateGeneration;
+    final revision = ++_copyRevision;
     state = state.beginCopy(field);
     final result = await _guard(() {
       return ref.read(clipboardServiceProvider).writeText(value);
     });
-    if (!ref.mounted) return null;
+    if (!ref.mounted ||
+        generation != _stateGeneration ||
+        revision != _copyRevision) {
+      return null;
+    }
     state = state.completeCopy();
     _emitResultHaptic(result, success: HapticIntent.lightImpact);
     return result;
@@ -51,11 +64,17 @@ class TransactionDetailsActionsViewModel
   Future<AppResult<void>?> openExplorer() async {
     final uri = state.explorerUri;
     if (uri == null || state.openingExplorer) return null;
+    final generation = _stateGeneration;
+    final revision = ++_explorerRevision;
     state = state.beginExplorer();
     final result = await _guard(() {
       return ref.read(externalUriServiceProvider).open(uri);
     });
-    if (!ref.mounted) return null;
+    if (!ref.mounted ||
+        generation != _stateGeneration ||
+        revision != _explorerRevision) {
+      return null;
+    }
     state = state.completeExplorer();
     _emitResultHaptic(result, success: HapticIntent.lightImpact);
     return result;

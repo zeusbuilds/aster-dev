@@ -189,6 +189,51 @@ void main() {
     expect(session.activeValues.last, isTrue);
   });
 
+  testWidgets('launcher route failure is mapped, cleared, and resumed', (
+    tester,
+  ) async {
+    final session = FakeScanSession();
+    final router = GoRouter(
+      initialLocation: RoutePaths.scan,
+      routes: [
+        GoRoute(
+          path: RoutePaths.scan,
+          name: RouteNames.scan,
+          builder: (context, state) =>
+              const ScanScreen(purpose: ScanPurpose.sendLauncher),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    final harness = _ScanWidgetHarness(
+      session: session,
+      router: router,
+      purpose: ScanPurpose.sendLauncher,
+    );
+    addTearDown(harness.dispose);
+
+    await tester.pumpWidget(harness.app);
+    harness.activateScanTab();
+    await tester.pump();
+    session.emitCamera('lightning:invoice');
+    await tester.pumpAndSettle();
+
+    expect(harness.container.read(sendDestinationHandoffProvider), isNull);
+    expect(harness.toasts.messages, hasLength(1));
+    expect(harness.toasts.messages.single.title, 'Send could not be opened');
+    expect(
+      harness.toasts.messages.single.message,
+      isNot(contains(RouteNames.send)),
+    );
+    expect(session.activeValues, contains(false));
+    expect(session.activeValues.last, isTrue);
+    expect(session.resetCaptureCalls, 1);
+    expect(harness.haptics.intents, [
+      HapticIntent.lightImpact,
+      HapticIntent.error,
+    ]);
+  });
+
   testWidgets('manual launcher opens Send without carrying a stale payload', (
     tester,
   ) async {

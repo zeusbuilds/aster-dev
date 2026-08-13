@@ -10,14 +10,16 @@ class TransactionDetailRow extends StatelessWidget {
     required this.label,
     required this.value,
     this.amount = false,
+    this.identifier = false,
     this.onCopy,
     this.copying = false,
     this.copyEnabled = true,
-  });
+  }) : assert(!amount || !identifier);
 
   final String label;
   final String value;
   final bool amount;
+  final bool identifier;
   final VoidCallback? onCopy;
   final bool copying;
   final bool copyEnabled;
@@ -51,10 +53,17 @@ class TransactionDetailRow extends StatelessWidget {
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
             )
-          else
+          else if (identifier)
             Text(
               value,
               style: context.type.addressSmall,
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
+            )
+          else
+            NumericText(
+              value,
+              style: context.type.rowValue,
               maxLines: 4,
               overflow: TextOverflow.ellipsis,
             ),

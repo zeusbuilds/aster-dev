@@ -141,8 +141,8 @@ final class ActivityDisplayFormatter {
     if (occurredAt == null) return 'Date unavailable';
     final local = occurredAt.toLocal();
     final localNow = now.toLocal();
-    final day = DateTime(local.year, local.month, local.day);
-    final today = DateTime(localNow.year, localNow.month, localNow.day);
+    final day = DateTime.utc(local.year, local.month, local.day);
+    final today = DateTime.utc(localNow.year, localNow.month, localNow.day);
     final difference = today.difference(day).inDays;
     if (difference == 0) return 'Today';
     if (difference == 1) return 'Yesterday';

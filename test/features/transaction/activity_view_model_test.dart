@@ -77,6 +77,37 @@ void main() {
       expect(engine.calls.where((call) => call == 'activity'), hasLength(2));
     },
   );
+
+  test(
+    'stale refresh cannot overwrite a rebuilt provider generation',
+    () async {
+      final engine = _engine();
+      final harness = await PaymentFlowTestHarness.create(engine: engine);
+      addTearDown(harness.dispose);
+      final provider = activityViewModelProvider(WalletAssetKind.bitcoin);
+      final subscription = harness.container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      await harness.container.read(provider.future);
+      final staleNotifier = harness.container.read(provider.notifier);
+      engine.syncGate = Completer<void>();
+
+      final staleRefresh = staleNotifier.refresh();
+      await _waitFor(() => engine.calls.contains('sync'));
+      engine.activities = <WalletActivity>[
+        _activity(idCharacter: 'b', units: 222),
+      ];
+      harness.container.invalidate(provider);
+      await Future<void>.delayed(Duration.zero);
+
+      engine.syncError = TimeoutException('stale private sync failure');
+      engine.syncGate!.complete();
+      expect(await staleRefresh, isFalse);
+      final rebuilt = await harness.container.read(provider.future);
+
+      expect(rebuilt.feed.activities.single.id, 'activity-${'b' * 64}');
+      expect(rebuilt.refreshFailure, isNull);
+    },
+  );
 }
 
 FakeWalletEngine _engine() {
@@ -91,21 +122,31 @@ FakeWalletEngine _engine() {
       usableChannelCount: 0,
       peerCount: 0,
     );
-  engine.activities = <WalletActivity>[
-    WalletActivity(
-      id: 'activity-${'a' * 64}',
-      source: WalletActivitySource.bitcoinTransaction,
-      operation: WalletActivityOperation.bitcoinReceive,
-      asset: WalletAsset.bitcoin,
-      rail: PaymentRail.onchain,
-      direction: WalletActivityDirection.received,
-      status: WalletActivityStatus.succeeded,
-      amount: WalletAmount.onchain(assetId: WalletAsset.bitcoin.id, units: 100),
-      occurredAt: DateTime.utc(2026, 8, 11),
-      txid: 'a' * 64,
-    ),
-  ];
+  engine.activities = <WalletActivity>[_activity(idCharacter: 'a', units: 100)];
   return engine;
+}
+
+WalletActivity _activity({required String idCharacter, required int units}) {
+  return WalletActivity(
+    id: 'activity-${idCharacter * 64}',
+    source: WalletActivitySource.bitcoinTransaction,
+    operation: WalletActivityOperation.bitcoinReceive,
+    asset: WalletAsset.bitcoin,
+    rail: PaymentRail.onchain,
+    direction: WalletActivityDirection.received,
+    status: WalletActivityStatus.succeeded,
+    amount: WalletAmount.onchain(assetId: WalletAsset.bitcoin.id, units: units),
+    occurredAt: DateTime.utc(2026, 8, 11),
+    txid: idCharacter * 64,
+  );
+}
+
+Future<void> _waitFor(bool Function() predicate) async {
+  for (var attempt = 0; attempt < 100; attempt += 1) {
+    if (predicate()) return;
+    await Future<void>.delayed(Duration.zero);
+  }
+  fail('Timed out waiting for asynchronous Activity state.');
 }
 
 WalletBalance _bitcoinBalance() {

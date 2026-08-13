@@ -131,6 +131,7 @@ class _DetailsBody extends ConsumerWidget {
             children: [
               Semantics(
                 label:
+                    '${formatter.assetTitle(record.asset.kind)}, '
                     '${formatter.activityTitle(record)}, '
                     '${valuesVisible ? amount ?? 'Amount unavailable' : 'Amount hidden'}, '
                     '${formatter.statusLabel(record.status)}',
@@ -174,6 +175,7 @@ class _DetailsBody extends ConsumerWidget {
                         label: entries[index].label,
                         value: entries[index].value,
                         amount: entries[index].amount,
+                        identifier: entries[index].identifier,
                         copying:
                             actions.copyingField == entries[index].copyField,
                         copyEnabled: actions.copyingField == null,
@@ -291,6 +293,9 @@ class _DetailsBody extends ConsumerWidget {
         _DetailEntry('Last updated', formatter.dateTimeLabel(record.updatedAt)),
       );
     }
+    if (record.confirmedAt case final value?) {
+      entries.add(_DetailEntry('Confirmed', formatter.dateTimeLabel(value)));
+    }
     final confirmations = feed.confirmationsFor(record);
     if (confirmations != null) {
       entries.add(
@@ -307,6 +312,7 @@ class _DetailsBody extends ConsumerWidget {
           formatter.compactIdentifier(value),
           copyField: TransactionDetailField.transactionId,
           copyValue: value,
+          identifier: true,
         ),
       );
     }
@@ -317,6 +323,7 @@ class _DetailsBody extends ConsumerWidget {
           formatter.compactIdentifier(value),
           copyField: TransactionDetailField.paymentHash,
           copyValue: value,
+          identifier: true,
         ),
       );
     }
@@ -327,6 +334,7 @@ class _DetailsBody extends ConsumerWidget {
           formatter.compactIdentifier(value),
           copyField: TransactionDetailField.invoice,
           copyValue: value,
+          identifier: true,
         ),
       );
     }
@@ -337,6 +345,7 @@ class _DetailsBody extends ConsumerWidget {
           formatter.compactIdentifier(value),
           copyField: TransactionDetailField.recipient,
           copyValue: value,
+          identifier: true,
         ),
       );
     }
@@ -347,6 +356,7 @@ class _DetailsBody extends ConsumerWidget {
           formatter.compactIdentifier(value),
           copyField: TransactionDetailField.payeePublicKey,
           copyValue: value,
+          identifier: true,
         ),
       );
     }
@@ -370,6 +380,7 @@ class _DetailsBody extends ConsumerWidget {
           formatter.compactIdentifier(value),
           copyField: TransactionDetailField.receiveOutpoint,
           copyValue: value,
+          identifier: true,
         ),
       );
     }
@@ -380,6 +391,7 @@ class _DetailsBody extends ConsumerWidget {
           formatter.compactIdentifier(value),
           copyField: TransactionDetailField.changeOutpoint,
           copyValue: value,
+          identifier: true,
         ),
       );
     }
@@ -406,13 +418,16 @@ class _DetailEntry {
     this.label,
     this.value, {
     this.amount = false,
+    this.identifier = false,
     this.copyField,
     this.copyValue,
-  }) : assert((copyField == null) == (copyValue == null));
+  }) : assert(!amount || !identifier),
+       assert((copyField == null) == (copyValue == null));
 
   final String label;
   final String value;
   final bool amount;
+  final bool identifier;
   final TransactionDetailField? copyField;
   final String? copyValue;
 }
@@ -511,7 +526,11 @@ class _DetailsLoadingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ExcludeSemantics(
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: 'Loading transaction details',
+      excludeSemantics: true,
       child: AppSkeletonizer(
         enabled: true,
         child: SingleChildScrollView(

@@ -123,7 +123,8 @@ class _AssetTargetItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final enabled = capability.isAvailable && !selected && !conflictsWithOther;
+    final available = capability.isAvailable && !conflictsWithOther;
+    final enabled = available && !selected;
     final target = capability.target;
 
     void select() {
@@ -138,10 +139,12 @@ class _AssetTargetItem extends StatelessWidget {
         : target.railLabel;
     return Semantics(
       button: true,
-      enabled: enabled,
+      enabled: available,
       selected: selected,
+      inMutuallyExclusiveGroup: true,
       label: target.semanticLabel,
       value: selected ? 'Selected' : status,
+      onTap: enabled ? select : null,
       excludeSemantics: true,
       child: Opacity(
         opacity: enabled || selected ? 1 : context.stateLayers.disabled,

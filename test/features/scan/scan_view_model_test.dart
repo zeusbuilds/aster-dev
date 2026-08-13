@@ -350,6 +350,43 @@ void main() {
     );
   });
 
+  test(
+    'rebuild transfers exactly one listener to the current session',
+    () async {
+      final first = FakeScanSession();
+      final second = FakeScanSession();
+      var session = first;
+      final purpose = ScanPurpose.sendLauncher;
+      final container = ProviderContainer(
+        overrides: [
+          scanSessionProvider(purpose).overrideWith((ref) => session),
+          hapticFeedbackServiceProvider.overrideWithValue(
+            RecordingHapticFeedbackService(),
+          ),
+        ],
+      );
+      final provider = scanViewModelProvider(purpose);
+      final subscription = container.listen(
+        provider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      expect(first.listenerCount, 1);
+
+      session = second;
+      container.invalidate(scanSessionProvider(purpose));
+      await _waitFor(
+        () => first.listenerCount == 0 && second.listenerCount == 1,
+      );
+
+      expect(first.listenerCount, 0);
+      expect(second.listenerCount, 1);
+      subscription.close();
+      container.dispose();
+      expect(second.listenerCount, 0);
+    },
+  );
+
   test('navigation pause blocks controls and reports stop failure', () async {
     final session = FakeScanSession();
     final haptics = RecordingHapticFeedbackService();
@@ -393,4 +430,12 @@ void main() {
     expect(container.read(provider).failure?.code, 'scan_camera_stop_failed');
     expect(haptics.intents.last, HapticIntent.error);
   });
+}
+
+Future<void> _waitFor(bool Function() predicate) async {
+  for (var attempt = 0; attempt < 100; attempt += 1) {
+    if (predicate()) return;
+    await Future<void>.delayed(Duration.zero);
+  }
+  fail('Timed out waiting for Scan session ownership.');
 }

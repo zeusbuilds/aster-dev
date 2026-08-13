@@ -16,7 +16,7 @@ import '../view_model/view_models.dart';
 import '../widgets/widgets.dart';
 
 /// Real cross-rail Activity for one product asset.
-class TransactionListScreen extends ConsumerWidget {
+class TransactionListScreen extends ConsumerStatefulWidget {
   const TransactionListScreen({super.key, required this.assetKind});
 
   final WalletAssetKind assetKind;
@@ -24,10 +24,62 @@ class TransactionListScreen extends ConsumerWidget {
   static final _formatter = ActivityDisplayFormatter();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TransactionListScreen> createState() =>
+      _TransactionListScreenState();
+}
+
+class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
+    with WidgetsBindingObserver {
+  static const _calendarBoundaryEpsilon = Duration(milliseconds: 1);
+
+  Timer? _calendarTimer;
+  late DateTime _now;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _now = ref.read(utcClockProvider)().toUtc();
+    _scheduleCalendarBoundary(_now);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshCalendarClock();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _calendarTimer?.cancel();
+    super.dispose();
+  }
+
+  void _refreshCalendarClock() {
+    final now = ref.read(utcClockProvider)().toUtc();
+    if (_now != now) setState(() => _now = now);
+    _scheduleCalendarBoundary(now);
+  }
+
+  void _scheduleCalendarBoundary(DateTime now) {
+    _calendarTimer?.cancel();
+    final localNow = now.toLocal();
+    final nextLocalDay = DateTime(
+      localNow.year,
+      localNow.month,
+      localNow.day + 1,
+    );
+    final delay = nextLocalDay.difference(localNow);
+    _calendarTimer = Timer(delay + _calendarBoundaryEpsilon, () {
+      if (mounted) _refreshCalendarClock();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final assetKind = widget.assetKind;
     final activity = ref.watch(activityViewModelProvider(assetKind));
     final settings = ref.watch(settingsViewModelProvider);
-    final now = ref.watch(utcClockProvider)().toUtc();
 
     Future<void> refresh() async {
       final notifier = ref.read(activityViewModelProvider(assetKind).notifier);
@@ -54,7 +106,8 @@ class TransactionListScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: context.colorScheme.surface,
       appBar: CustomAppBar(
-        title: '${_formatter.assetTitle(assetKind)} Activity',
+        title:
+            '${TransactionListScreen._formatter.assetTitle(assetKind)} Activity',
         leadingIcon: true,
         centerTitle: false,
       ),
@@ -66,8 +119,8 @@ class TransactionListScreen extends ConsumerWidget {
             activity: activity,
             settings: settings,
             assetKind: assetKind,
-            now: now,
-            formatter: _formatter,
+            now: _now,
+            formatter: TransactionListScreen._formatter,
           ),
         ),
       ),
@@ -303,7 +356,11 @@ class _ActivityLoadingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ExcludeSemantics(
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: 'Loading activity',
+      excludeSemantics: true,
       child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
