@@ -172,7 +172,6 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
     return ReceiveFlowState(
       route: route,
       bitcoinUnit: bitcoinUnit,
-      currencyCode: settingsSnapshot.preferences.currencyCode,
       request: request,
       amountText: '',
       amountInput: _amountCodec.parse(

@@ -50,13 +50,24 @@ class _AssetsSectionState extends ConsumerState<AssetsSection> {
     _marketExpiryTimer?.cancel();
     if (snapshot == null) return;
     final now = ref.read(utcClockProvider)().toUtc();
-    final remaining = snapshot.expiresAt.difference(now);
-    _marketExpiryTimer = Timer(
-      remaining.isNegative ? Duration.zero : remaining,
-      () {
-        if (mounted) setState(() {});
-      },
-    );
+    final expiries = <DateTime>[
+      snapshot.currentBitcoinPrice.expiresAt,
+      if (snapshot.currentUsdtPrice case final price?) price.expiresAt,
+    ]..sort();
+    DateTime? nextExpiry;
+    for (final expiry in expiries) {
+      if (expiry.isAfter(now)) {
+        nextExpiry = expiry;
+        break;
+      }
+    }
+    if (nextExpiry == null) return;
+    final remaining = nextExpiry.difference(now);
+    _marketExpiryTimer = Timer(remaining + const Duration(milliseconds: 1), () {
+      if (!mounted) return;
+      setState(() {});
+      _scheduleMarketExpiry(snapshot);
+    });
   }
 
   @override
@@ -166,6 +177,12 @@ class _AssetsBody extends ConsumerWidget {
     final settingsState = settings.requireValue;
     final preferences = settingsState.snapshot.preferences;
     final marketSnapshot = market.value;
+    final marketRetryable = _marketRetryable(
+      market: market,
+      currencyCode: preferences.currencyCode,
+      hasUsdt: homeState.portfolio.usdt != null,
+      now: now,
+    );
     final displays = <HomeAssetDisplay>[
       _formatter.format(
         balance: homeState.portfolio.bitcoin,
@@ -189,6 +206,7 @@ class _AssetsBody extends ConsumerWidget {
           AssetRow.loaded(
             display: displays[index],
             balancesVisible: preferences.balancesVisible,
+            fiatLoading: market.isLoading,
             onTap: () {
               unawaited(context.haptics.trigger(HapticIntent.lightImpact));
               unawaited(
@@ -207,8 +225,35 @@ class _AssetsBody extends ConsumerWidget {
           if (displays.isNotEmpty) SizedBox(height: context.spacing.lg),
           const _UnconfiguredUsdtRow(),
         ],
+        if (marketRetryable) ...[
+          SizedBox(height: context.spacing.lg),
+          CustomButton.compact(
+            text: 'Retry fiat quote',
+            hapticIntent: null,
+            onTap: () =>
+                ref.read(bitcoinMarketViewModelProvider.notifier).retry(),
+          ),
+        ],
       ],
     );
+  }
+
+  static bool _marketRetryable({
+    required AsyncValue<BitcoinMarketSnapshot> market,
+    required String currencyCode,
+    required bool hasUsdt,
+    required DateTime now,
+  }) {
+    if (market.isLoading) return false;
+    if (market case AsyncError(:final error, :final stackTrace)) {
+      return _failure(error, stackTrace).retryable;
+    }
+    final snapshot = market.value;
+    if (snapshot == null || snapshot.quoteCurrency.code != currencyCode) {
+      return true;
+    }
+    if (!snapshot.currentBitcoinPrice.isCurrentAt(now)) return true;
+    return hasUsdt && !(snapshot.currentUsdtPrice?.isCurrentAt(now) ?? false);
   }
 
   static AppFailure _failure(Object error, StackTrace stackTrace) =>

@@ -35,6 +35,11 @@ app-owned HTTP passes through `ResilientHttpClient`. Public destinations and
 service endpoints reject credentials and unsafe host/scheme forms. Mutation
 requests are not retried without a real idempotency contract.
 
+Third-party market credentials are never compiled into the app. Release market
+requests require a deployment-owned HTTPS proxy; direct provider hosts and
+credential-bearing endpoint values fail closed. The proxy is infrastructure,
+not a place to forward wallet, payment, or user identity data.
+
 Errors exposed outside adapters are typed, bounded, and redacted. Production
 logs contain stable codes only and never raw native/network payloads. Android
 release builds use R8 to remove dependency `android.util.Log` calls; debug and

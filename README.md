@@ -16,6 +16,9 @@ eligible for a funds-bearing mainnet release.
   or security decisions.
 - RGB USDT stays unavailable unless a deployment supplies a validated asset ID
   and precision for the selected environment.
+- Release market estimates stay unavailable unless a deployment supplies an
+  approved UTEXO-owned market proxy. CoinGecko's keyless pool is development
+  only and no third-party API secret is embedded in the mobile binary.
 - Swap has no execution backend and never simulates a quote or success.
 
 The complete, evidence-backed status is maintained in
@@ -33,7 +36,8 @@ The wallet models asset, payment rail, and chain environment separately:
 Amounts are integers in sats, millisats, or RGB smallest units. Ticker strings
 and floating-point values are never monetary authority. Presentation combines
 supported rails for portfolio and activity views while repositories preserve
-their source identity.
+their source identity. Fiat estimates use the selected ISO currency's integer
+minor units and display their currency code to avoid ambiguous symbols.
 
 ## Architecture
 

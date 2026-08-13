@@ -119,6 +119,11 @@ ResilientHttpClient resilientHttpClient(Ref ref) {
 }
 
 @riverpod
+MarketDataConfiguration marketDataConfiguration(Ref ref) {
+  return MarketDataConfiguration.fromEnvironment();
+}
+
+@riverpod
 WalletServiceConfiguration walletServiceConfiguration(Ref ref) {
   return WalletServiceConfiguration.fromEnvironment()..validate();
 }

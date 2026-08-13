@@ -17,6 +17,7 @@ class AssetRow extends StatelessWidget {
     required this.balancesVisible,
     this.onTap,
     this.loading = false,
+    this.fiatLoading = false,
   });
 
   factory AssetRow.loading({
@@ -32,7 +33,7 @@ class AssetRow extends StatelessWidget {
       availableText: kind == WalletAssetKind.bitcoin
           ? '0.00000000 BTC'
           : '0.000000 USDT',
-      fiatContext: 'USD estimate unavailable',
+      fiatContext: 'Fiat estimate',
       balancesVisible: true,
       loading: true,
     );
@@ -42,6 +43,7 @@ class AssetRow extends StatelessWidget {
     Key? key,
     required HomeAssetDisplay display,
     required bool balancesVisible,
+    bool fiatLoading = false,
     VoidCallback? onTap,
   }) {
     return AssetRow(
@@ -52,6 +54,7 @@ class AssetRow extends StatelessWidget {
       availableText: display.available.text,
       fiatContext: display.fiatContext,
       balancesVisible: balancesVisible,
+      fiatLoading: fiatLoading,
       onTap: onTap,
     );
   }
@@ -64,6 +67,7 @@ class AssetRow extends StatelessWidget {
   final bool balancesVisible;
   final VoidCallback? onTap;
   final bool loading;
+  final bool fiatLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -72,7 +76,8 @@ class AssetRow extends StatelessWidget {
         ? '$title balance loading'
         : hidden
         ? '$title balance hidden'
-        : '$title total $totalText, available $availableText, $fiatContext';
+        : '$title total $totalText, available $availableText, '
+              '${fiatLoading ? 'fiat estimate loading' : fiatContext}';
     return Semantics(
       button: onTap != null,
       enabled: onTap != null,
@@ -119,13 +124,16 @@ class AssetRow extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
-                            child: Text(
-                              hidden ? 'Balance hidden' : fiatContext,
-                              style: context.type.assetMeta.copyWith(
-                                color: context.appColors.textSecondary,
+                            child: AppSkeletonizer(
+                              enabled: loading || (fiatLoading && !hidden),
+                              child: Text(
+                                hidden ? 'Balance hidden' : fiatContext,
+                                style: context.type.assetMeta.copyWith(
+                                  color: context.appColors.textSecondary,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           SizedBox(width: context.spacing.md),

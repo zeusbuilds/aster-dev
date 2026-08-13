@@ -6,9 +6,25 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   final now = DateTime.utc(2026, 8, 11, 12);
-  final market = BitcoinMarketSnapshot(
-    currentUsdCents: 10000000,
-    currentObservedAt: now,
+  final usdMarket = BitcoinMarketSnapshot(
+    quoteCurrency: MarketQuoteCurrency(
+      code: 'USD',
+      symbol: r'$',
+      minorUnitDigits: 2,
+    ),
+    currentBitcoinPrice: FiatMarketPrice(minorUnits: 10000000, observedAt: now),
+    currentUsdtPrice: FiatMarketPrice(minorUnits: 100, observedAt: now),
+    currentSource: BitcoinPriceSource.spot,
+    history: const [],
+  );
+  final eurMarket = BitcoinMarketSnapshot(
+    quoteCurrency: MarketQuoteCurrency(
+      code: 'EUR',
+      symbol: '€',
+      minorUnitDigits: 2,
+    ),
+    currentBitcoinPrice: FiatMarketPrice(minorUnits: 9000000, observedAt: now),
+    currentUsdtPrice: FiatMarketPrice(minorUnits: 92, observedAt: now),
     currentSource: BitcoinPriceSource.spot,
     history: const [],
   );
@@ -19,15 +35,15 @@ void main() {
       bitcoinUnit: BitcoinUnit.sats,
       currencyCode: 'USD',
       now: now,
-      bitcoinMarket: market,
+      bitcoinMarket: usdMarket,
     );
 
     expect(display.total.text, '1,001.5 sats');
     expect(display.available.text, '901.25 sats');
-    expect(display.fiatContext, r'$1.00 estimated');
+    expect(display.fiatContext, r'$1.00 USD estimated');
   });
 
-  test('never relabels missing or stale quote currency as USD', () {
+  test('formats a selected non-USD quote without relabeling it', () {
     final formatter = HomeAssetDisplayFormatter();
     expect(
       formatter
@@ -36,7 +52,23 @@ void main() {
             bitcoinUnit: BitcoinUnit.bitcoin,
             currencyCode: 'EUR',
             now: now,
-            bitcoinMarket: market,
+            bitcoinMarket: eurMarket,
+          )
+          .fiatContext,
+      '€0.90 EUR estimated',
+    );
+  });
+
+  test('rejects mismatched and stale selected-currency quotes', () {
+    final formatter = HomeAssetDisplayFormatter();
+    expect(
+      formatter
+          .format(
+            balance: _bitcoinBalance(),
+            bitcoinUnit: BitcoinUnit.bitcoin,
+            currencyCode: 'EUR',
+            now: now,
+            bitcoinMarket: usdMarket,
           )
           .fiatContext,
       'EUR estimate unavailable',
@@ -47,26 +79,26 @@ void main() {
             balance: _bitcoinBalance(),
             bitcoinUnit: BitcoinUnit.bitcoin,
             currencyCode: 'USD',
-            now: market.expiresAt,
-            bitcoinMarket: market,
+            now: usdMarket.expiresAt,
+            bitcoinMarket: usdMarket,
           )
           .fiatContext,
       'USD estimate unavailable',
     );
   });
 
-  test('formats configured USDT in contract units and labels face value', () {
+  test('formats configured USDT from its independent live fiat quote', () {
     final display = HomeAssetDisplayFormatter().format(
       balance: _usdtBalance(),
       bitcoinUnit: BitcoinUnit.sats,
       currencyCode: 'USD',
       now: now,
-      bitcoinMarket: market,
+      bitcoinMarket: usdMarket,
     );
 
     expect(display.total.text, '125 USDT');
     expect(display.available.text, '110 USDT');
-    expect(display.fiatContext, r'$125.00 face value');
+    expect(display.fiatContext, r'$125.00 USD estimated');
   });
 }
 

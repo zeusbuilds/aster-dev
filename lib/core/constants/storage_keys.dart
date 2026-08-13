@@ -1,38 +1,5 @@
-/// Storage key constants for SharedPreferences and SecureStorage
-class StorageKeys {
-  StorageKeys._();
-
-  // Preferences
-  /// Key for storing theme preference
-  static const String theme = 'theme';
-
-  /// Key for storing language code preference
-  static const String languageCode = 'language_code';
-
-  /// Key for storing onboarding completion status
-  static const String isOnboardingComplete = 'is_onboarding_complete';
-
-  /// Key for storing balance visibility preference
-  static const String isBalanceHidden = 'balance_hidden';
-
-  // Settings
-  /// Key for storing selected currency
-  static const String selectedCurrency = 'selected_currency';
-
-  /// Key for storing enabled currencies list
-  static const String enabledCurrencies = 'enabled_currencies';
-
-  /// Key for storing block explorer preference
-  static const String blockExplorer = 'block_explorer';
-
-  /// Key for storing electrum server preference
-  static const String electrumServer = 'electrum_server';
-
-  // Feature Flags
-  /// Key for storing feature flags
-  static const String featureFlags = 'feature_flags';
-
-  // Wallet storage keys
+/// Versioned keys retained for wallet ownership and recovery detection.
+abstract final class StorageKeys {
   /// Unreleased pre-ownership registry retained only for recovery detection.
   static const String legacyWalletRegistryV2 = 'utexo_wallet_registry_v2';
 

@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import 'package:remixicon/remixicon.dart';
 import 'package:unicons/unicons.dart';
 
@@ -11,6 +10,7 @@ import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
 import '../../../market/domain/models/models.dart';
 import '../../../market/presentation/view_model/view_models.dart';
+import '../../../settings/presentation/view_model/view_models.dart';
 import 'candle_chart.dart';
 
 /// Bitcoin market card backed by injected repository state.
@@ -22,6 +22,7 @@ class PriceCard extends ConsumerStatefulWidget {
 }
 
 class _PriceCardState extends ConsumerState<PriceCard> {
+  static final _fiatFormatter = FiatAmountFormatter();
   Timer? _expiryTimer;
 
   @override
@@ -45,17 +46,27 @@ class _PriceCardState extends ConsumerState<PriceCard> {
     if (snapshot == null) return;
     final now = ref.read(utcClockProvider)().toUtc();
     final remaining = snapshot.expiresAt.difference(now);
-    _expiryTimer = Timer(remaining.isNegative ? Duration.zero : remaining, () {
-      if (mounted) setState(() {});
-    });
+    _expiryTimer = Timer(
+      (remaining.isNegative ? Duration.zero : remaining) +
+          const Duration(milliseconds: 1),
+      () {
+        if (mounted) setState(() {});
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final market = ref.watch(bitcoinMarketViewModelProvider);
+    final selectedQuote = ref.watch(selectedMarketQuoteCurrencyProvider);
+    final selectedCurrency = selectedQuote.value;
     final now = ref.watch(utcClockProvider)().toUtc();
     final rawSnapshot = market.value;
-    final snapshot = rawSnapshot?.isCurrentAt(now) == true ? rawSnapshot : null;
+    final snapshot =
+        rawSnapshot?.quoteCurrency == selectedCurrency &&
+            rawSnapshot?.isCurrentAt(now) == true
+        ? rawSnapshot
+        : null;
     final chartData = snapshot?.history;
     final change = snapshot?.changeBasisPoints;
     final colors = context.appColors;
@@ -109,7 +120,7 @@ class _PriceCardState extends ConsumerState<PriceCard> {
                       fit: BoxFit.scaleDown,
                       alignment: Alignment.centerRight,
                       child: NumericText(
-                        _formatUsd(snapshot?.currentUsdCents),
+                        _formatPrice(snapshot),
                         style: type.brandAmount,
                         maxLines: 1,
                       ),
@@ -143,26 +154,64 @@ class _PriceCardState extends ConsumerState<PriceCard> {
                   ),
                 ],
               ),
+              Text(
+                'Powered by CoinGecko',
+                style: type.brandMetric.copyWith(
+                  color: colors.onBrandArt.withValues(
+                    alpha: effects.chartContentOpacity,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
-        switch (market) {
-          AsyncLoading<BitcoinMarketSnapshot>() => const CandleChart(
+        switch ((selectedQuote, market)) {
+          (AsyncLoading<MarketQuoteCurrency>(), _) => const CandleChart(
             data: null,
             isSkeleton: true,
           ),
-          AsyncError<BitcoinMarketSnapshot>() => _MarketUnavailable(
-            message: 'Price data unavailable',
-            onRetry: () =>
-                ref.read(bitcoinMarketViewModelProvider.notifier).retry(),
+          (
+            AsyncError<MarketQuoteCurrency>(:final error, :final stackTrace),
+            _,
+          ) =>
+            _MarketUnavailable(
+              message: _failure(error, stackTrace).userMessage,
+              onRetry: _failure(error, stackTrace).retryable
+                  ? () => ref.read(settingsViewModelProvider.notifier).retry()
+                  : null,
+            ),
+          (_, AsyncLoading<BitcoinMarketSnapshot>()) => const CandleChart(
+            data: null,
+            isSkeleton: true,
           ),
-          AsyncData<BitcoinMarketSnapshot>() when chartData?.isEmpty ?? true =>
+          (
+            _,
+            AsyncError<BitcoinMarketSnapshot>(:final error, :final stackTrace),
+          ) =>
+            _MarketUnavailable(
+              message: _failure(error, stackTrace).userMessage,
+              onRetry: _failure(error, stackTrace).retryable
+                  ? () => ref
+                        .read(bitcoinMarketViewModelProvider.notifier)
+                        .retry()
+                  : null,
+            ),
+          (_, AsyncData<BitcoinMarketSnapshot>()) when snapshot == null =>
+            _MarketUnavailable(
+              message: rawSnapshot?.quoteCurrency == selectedCurrency
+                  ? 'Market quote expired'
+                  : 'Market quote unavailable',
+              onRetry: () =>
+                  ref.read(bitcoinMarketViewModelProvider.notifier).retry(),
+            ),
+          (_, AsyncData<BitcoinMarketSnapshot>())
+              when chartData?.isEmpty ?? true =>
             _MarketUnavailable(
               message: '24-hour chart unavailable',
               onRetry: () =>
                   ref.read(bitcoinMarketViewModelProvider.notifier).retry(),
             ),
-          AsyncData<BitcoinMarketSnapshot>() => CandleChart(
+          (_, AsyncData<BitcoinMarketSnapshot>()) => CandleChart(
             data: chartData,
             isSkeleton: false,
           ),
@@ -171,9 +220,14 @@ class _PriceCardState extends ConsumerState<PriceCard> {
     );
   }
 
-  static String _formatUsd(int? cents) {
-    if (cents == null) return '';
-    return '\$${NumberFormat('#,##0').format(cents ~/ 100)}';
+  static String _formatPrice(BitcoinMarketSnapshot? snapshot) {
+    if (snapshot == null) return '';
+    return _fiatFormatter.format(
+      minorUnits: snapshot.currentBitcoinPrice.minorUnits,
+      symbol: snapshot.quoteCurrency.symbol,
+      code: snapshot.quoteCurrency.code,
+      minorUnitDigits: snapshot.quoteCurrency.minorUnitDigits,
+    );
   }
 
   static String _formatBasisPoints(int? basisPoints) {
@@ -181,13 +235,18 @@ class _PriceCardState extends ConsumerState<PriceCard> {
     final absolute = basisPoints.abs();
     return '${absolute ~/ 100}.${(absolute % 100) ~/ 10}%';
   }
+
+  static AppFailure _failure(Object error, StackTrace stackTrace) =>
+      error is AppFailureException
+      ? error.failure
+      : FailureMapper.from(error, stackTrace);
 }
 
 class _MarketUnavailable extends StatelessWidget {
   const _MarketUnavailable({required this.message, required this.onRetry});
 
   final String message;
-  final VoidCallback onRetry;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -197,8 +256,10 @@ class _MarketUnavailable extends StatelessWidget {
       child: Column(
         children: [
           Text(message, style: context.type.brandMetric),
-          SizedBox(height: spacing.md),
-          CustomButton.compact(text: 'Retry', onTap: onRetry),
+          if (onRetry case final retry?) ...[
+            SizedBox(height: spacing.md),
+            CustomButton.compact(text: 'Retry', onTap: retry),
+          ],
         ],
       ),
     );

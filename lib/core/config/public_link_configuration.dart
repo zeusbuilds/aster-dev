@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-import '../errors/app_failure.dart';
+import 'public_https_uri_policy.dart';
 
 /// Deployment-owned public destinations exposed from the application.
 enum PublicLinkDestination {
@@ -63,7 +63,7 @@ final class PublicLinkConfiguration {
     );
   }
 
-  static const maximumUriCharacters = 2048;
+  static const maximumUriCharacters = PublicHttpsUriPolicy.maximumCharacters;
 
   /// Contact Support URL, or `null` when omitted from this build.
   final Uri? contactSupport;
@@ -87,7 +87,7 @@ final class PublicLinkConfiguration {
   void validate() {
     for (final destination in PublicLinkDestination.values) {
       final uri = uriFor(destination);
-      if (uri != null) _validatePublicUri(uri);
+      if (uri != null) PublicHttpsUriPolicy.validate(uri);
     }
   }
 
@@ -106,57 +106,5 @@ final class PublicLinkConfiguration {
 
 Uri? _parseOptionalPublicUri(String raw) {
   if (raw.isEmpty) return null;
-  if (raw != raw.trim() ||
-      raw.length > PublicLinkConfiguration.maximumUriCharacters ||
-      raw.contains(RegExp(r'\s'))) {
-    throw const AppConfigurationException();
-  }
-  final uri = Uri.tryParse(raw);
-  if (uri == null) throw const AppConfigurationException();
-  _validatePublicUri(uri);
-  return uri;
+  return PublicHttpsUriPolicy.parse(raw);
 }
-
-void _validatePublicUri(Uri uri) {
-  final raw = uri.toString();
-  if (raw.isEmpty ||
-      raw != raw.trim() ||
-      raw.length > PublicLinkConfiguration.maximumUriCharacters ||
-      raw.contains(RegExp(r'\s')) ||
-      uri.scheme.toLowerCase() != 'https' ||
-      !_isPublicHost(uri.host) ||
-      uri.userInfo.isNotEmpty ||
-      uri.query.isNotEmpty ||
-      uri.fragment.isNotEmpty ||
-      (uri.hasPort && (uri.port < 1 || uri.port > 65535))) {
-    throw const AppConfigurationException();
-  }
-}
-
-bool _isPublicHost(String value) {
-  final host = value.toLowerCase();
-  if (host.isEmpty ||
-      !host.contains('.') ||
-      host.startsWith('.') ||
-      host.endsWith('.') ||
-      host.contains(':') ||
-      _ipv4Literal.hasMatch(host)) {
-    return false;
-  }
-  return !_nonPublicSuffixes.any(
-    (suffix) => host == suffix || host.endsWith('.$suffix'),
-  );
-}
-
-final _ipv4Literal = RegExp(r'^\d{1,3}(?:\.\d{1,3}){3}$');
-
-const _nonPublicSuffixes = <String>{
-  'example',
-  'home',
-  'internal',
-  'invalid',
-  'lan',
-  'local',
-  'localhost',
-  'test',
-};

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../shared/formatting/bitcoin_unit.dart';
+import '../../../../shared/formatting/fiat_amount_formatter.dart';
 import '../../domain/models/models.dart';
 
 /// Numeric and unit spans for one exact wallet amount.
@@ -40,7 +41,7 @@ final class WalletAmountDisplayFormatter {
     final numeric = remainder == BigInt.zero
         ? groupedWhole
         : '$groupedWhole${_integer.symbols.DECIMAL_SEP}'
-              '${remainder.toString().padLeft(precision, '0').replaceFirst(_trailingZeros, '')}';
+              '${_localizeDigits(remainder.toString().padLeft(precision, '0').replaceFirst(_trailingZeros, ''))}';
     return FormattedWalletAmount(
       numeric: numeric,
       unit: route.asset.kind == WalletAssetKind.bitcoin
@@ -58,45 +59,55 @@ final class WalletAmountDisplayFormatter {
   }
 
   static final _trailingZeros = RegExp(r'0+$');
+
+  String _localizeDigits(String value) {
+    final zero = _integer.symbols.ZERO_DIGIT.codeUnitAt(0);
+    if (zero == 0x30) return value;
+    return String.fromCharCodes(
+      value.codeUnits.map((digit) => zero + digit - 0x30),
+    );
+  }
 }
 
-/// Exact USD estimate used only when a truthful USD source is available.
-abstract final class WalletUsdEstimate {
-  /// Converts canonical route units to cents, rounded to the nearest cent.
-  ///
-  /// Bitcoin requires a real [bitcoinPriceCents]. RGB USDT uses its USD face
-  /// denomination rather than claiming a live exchange-market price.
-  static int? cents({
+/// Exact fiat estimate used only when a truthful asset quote is available.
+abstract final class WalletFiatEstimate {
+  /// Converts canonical route units to fiat minor units with half-up rounding.
+  static int? minorUnits({
     required int units,
     required PaymentRoute route,
-    int? bitcoinPriceCents,
+    required int? assetPriceMinorUnits,
   }) {
     if (units < 0 || units > WalletAmount.maxNativeUnits) {
       throw ArgumentError.value(units, 'units');
     }
-    final (priceCents, precision) = switch (route.asset.kind) {
-      WalletAssetKind.bitcoin => (
-        bitcoinPriceCents,
-        route.rail == PaymentRail.onchain ? 8 : 11,
-      ),
-      WalletAssetKind.usdt => (100, route.asset.precision),
+    final precision = switch (route.asset.kind) {
+      WalletAssetKind.bitcoin => route.rail == PaymentRail.onchain ? 8 : 11,
+      WalletAssetKind.usdt => route.asset.precision,
     };
-    if (priceCents == null || priceCents < 0) return null;
+    if (assetPriceMinorUnits == null || assetPriceMinorUnits <= 0) return null;
     final denominator = WalletAmountDisplayFormatter._powerOfTen(precision);
-    final numerator = BigInt.from(units) * BigInt.from(priceCents);
+    final numerator = BigInt.from(units) * BigInt.from(assetPriceMinorUnits);
     final rounded = (numerator + denominator ~/ BigInt.two) ~/ denominator;
     if (rounded > BigInt.from(WalletAmount.maxNativeUnits)) return null;
     return rounded.toInt();
   }
 
-  /// Formats non-negative USD cents without converting through `double`.
-  static String formatCents(int cents, {String? locale}) {
-    if (cents < 0 || cents > WalletAmount.maxNativeUnits) {
-      throw ArgumentError.value(cents, 'cents');
+  /// Formats exact fiat [minorUnits] without converting through `double`.
+  static String formatMinorUnits({
+    required int minorUnits,
+    required String symbol,
+    required String code,
+    required int minorUnitDigits,
+    String? locale,
+  }) {
+    if (minorUnits < 0 || minorUnits > WalletAmount.maxNativeUnits) {
+      throw ArgumentError.value(minorUnits, 'minorUnits');
     }
-    final integer = NumberFormat.decimalPattern(locale);
-    final whole = cents ~/ 100;
-    final fraction = cents.remainder(100).toString().padLeft(2, '0');
-    return '\$${integer.format(whole)}.$fraction';
+    return FiatAmountFormatter(locale: locale).format(
+      minorUnits: minorUnits,
+      symbol: symbol,
+      code: code,
+      minorUnitDigits: minorUnitDigits,
+    );
   }
 }

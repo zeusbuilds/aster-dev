@@ -79,20 +79,28 @@ final class HomeAssetDisplayFormatter {
     required DateTime now,
     required BitcoinMarketSnapshot? market,
   }) {
-    if (currencyCode != 'USD') return '$currencyCode estimate unavailable';
-    if (route.asset.kind == WalletAssetKind.bitcoin &&
-        !(market?.isCurrentAt(now) ?? false)) {
-      return 'USD estimate unavailable';
+    if (market == null || market.quoteCurrency.code != currencyCode) {
+      return '$currencyCode estimate unavailable';
     }
-    final cents = WalletUsdEstimate.cents(
+    final price = switch (route.asset.kind) {
+      WalletAssetKind.bitcoin => market.currentBitcoinPrice,
+      WalletAssetKind.usdt => market.currentUsdtPrice,
+    };
+    if (!(price?.isCurrentAt(now) ?? false)) {
+      return '$currencyCode estimate unavailable';
+    }
+    final minorUnits = WalletFiatEstimate.minorUnits(
       units: totalUnits,
       route: route,
-      bitcoinPriceCents: market?.currentUsdCents,
+      assetPriceMinorUnits: price?.minorUnits,
     );
-    if (cents == null) return 'USD estimate unavailable';
-    final formatted = WalletUsdEstimate.formatCents(cents);
-    return route.asset.kind == WalletAssetKind.usdt
-        ? '$formatted face value'
-        : '$formatted estimated';
+    if (minorUnits == null) return '$currencyCode estimate unavailable';
+    final formatted = WalletFiatEstimate.formatMinorUnits(
+      minorUnits: minorUnits,
+      symbol: market.quoteCurrency.symbol,
+      code: market.quoteCurrency.code,
+      minorUnitDigits: market.quoteCurrency.minorUnitDigits,
+    );
+    return '$formatted estimated';
   }
 }

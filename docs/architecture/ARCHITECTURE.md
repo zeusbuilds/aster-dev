@@ -96,6 +96,12 @@ retry with bounded exponential backoff and jitter. Mutations never retry without
 a real idempotency contract. Native operation timeout and quarantine behavior
 remain SDK-owned so Dart cannot release serialization while native work runs.
 
+Market data is a typed repository boundary. Bitcoin and Tether quotes carry one
+selected ISO identity, integer minor units, provider timestamps, bounded
+freshness, and explicit unavailable state. Debug/profile may use CoinGecko's
+keyless pool; release mode makes no request without an approved UTEXO-owned
+proxy because a mobile binary cannot protect a provider credential.
+
 ## Routing
 
 GoRouter routes carry stable public identifiers, never secret or native

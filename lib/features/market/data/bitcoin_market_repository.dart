@@ -1,36 +1,70 @@
+import '../../../core/config/config.dart';
 import '../../../core/errors/errors.dart';
 import '../../../core/network/network.dart';
 import '../domain/models/models.dart';
 
-/// Fetches truthful Bitcoin/USD market data through the shared HTTP policy.
+/// Fetches truthful Bitcoin and Tether fiat data through shared HTTP policy.
 final class BitcoinMarketRepository {
-  BitcoinMarketRepository(this._http, {DateTime Function()? clock})
-    : _clock = clock ?? _utcNow;
+  BitcoinMarketRepository(
+    this._http,
+    this._configuration, {
+    DateTime Function()? clock,
+  }) : _clock = clock ?? _utcNow;
 
-  static const _baseUrl = 'https://api.coingecko.com/api/v3';
+  static const _cacheLifetime = Duration(minutes: 1);
+  static const _maximumChartPoints = 24;
+  static const _maximumCachedCurrencies = 4;
   final ResilientHttpClient _http;
+  final MarketDataConfiguration _configuration;
   final DateTime Function() _clock;
+  final Map<MarketQuoteCurrency, _CachedMarketSnapshot> _cache = {};
 
+  /// Loads one selected-currency snapshot, preserving typed transport and
+  /// protocol failures and never substituting synthetic monetary values.
   Future<AppResult<BitcoinMarketSnapshot>> fetch({
+    required MarketQuoteCurrency currency,
     NetworkCancellationToken? cancellation,
+    bool forceRefresh = false,
   }) async {
+    if (_configuration.baseUri == null) {
+      return const AppResult.failure(
+        AppFailure(
+          code: 'market_service_unconfigured',
+          kind: AppFailureKind.configuration,
+          userMessage: 'Market data is not configured for this build.',
+          retryable: false,
+        ),
+      );
+    }
     final now = _clock().toUtc();
+    final cached = _cache[currency];
+    if (!forceRefresh &&
+        cached != null &&
+        now.isBefore(cached.cachedAt.add(_cacheLifetime)) &&
+        cached.snapshot.isCurrentAt(now)) {
+      return AppResult.success(cached.snapshot);
+    }
     final from = now.subtract(const Duration(hours: 24));
-    final historyUri = Uri.parse('$_baseUrl/coins/bitcoin/market_chart/range')
+    final historyUri = _configuration
+        .endpoint('coins/bitcoin/market_chart/range')
         .replace(
           queryParameters: {
-            'vs_currency': 'usd',
+            'vs_currency': currency.providerCode,
             'from': '${from.millisecondsSinceEpoch ~/ 1000}',
             'to': '${now.millisecondsSinceEpoch ~/ 1000}',
+            'precision': 'full',
           },
         );
-    final currentUri = Uri.parse('$_baseUrl/simple/price').replace(
-      queryParameters: {
-        'ids': 'bitcoin',
-        'vs_currencies': 'usd',
-        'include_last_updated_at': 'true',
-      },
-    );
+    final currentUri = _configuration
+        .endpoint('simple/price')
+        .replace(
+          queryParameters: {
+            'ids': 'bitcoin,tether',
+            'vs_currencies': currency.providerCode,
+            'include_last_updated_at': 'true',
+            'precision': 'full',
+          },
+        );
 
     final (historyResult, currentResult) = await (
       _http.get(historyUri, cancellation: cancellation),
@@ -44,6 +78,7 @@ final class BitcoinMarketRepository {
         try {
           history = _decodeHistory(
             value,
+            currency: currency,
             earliest: from.subtract(const Duration(hours: 1)),
             latest: now.add(BitcoinMarketSnapshot.maximumFutureSkew),
           );
@@ -54,49 +89,80 @@ final class BitcoinMarketRepository {
         historyFailure = failure;
     }
 
-    int? currentUsdCents;
-    DateTime? currentObservedAt;
+    FiatMarketPrice? currentBitcoinPrice;
+    FiatMarketPrice? currentUsdtPrice;
     var currentSource = BitcoinPriceSource.spot;
     AppFailure? currentFailure;
     switch (currentResult) {
       case AppSuccess<HttpPayload>(:final value):
+        Map<String, Object?>? decoded;
         try {
-          final current = _decodeCurrentPrice(value);
-          if (!_isCurrent(current.observedAt, now)) {
-            throw const FormatException('Current price timestamp is stale.');
-          }
-          currentUsdCents = current.usdCents;
-          currentObservedAt = current.observedAt;
+          decoded = _decodeCurrentPayload(value);
         } catch (error, stackTrace) {
           currentFailure = _invalidPayload(error, stackTrace);
+        }
+        try {
+          if (decoded == null) break;
+          final bitcoin = _decodeAssetPrice(
+            decoded,
+            assetId: 'bitcoin',
+            currency: currency,
+          );
+          if (!_isCurrent(bitcoin.observedAt, now)) {
+            throw const FormatException('Current price timestamp is stale.');
+          }
+          currentBitcoinPrice = bitcoin;
+        } catch (error, stackTrace) {
+          currentFailure = _invalidPayload(error, stackTrace);
+        }
+        try {
+          if (decoded == null) break;
+          final tether = _decodeAssetPrice(
+            decoded,
+            assetId: 'tether',
+            currency: currency,
+          );
+          if (_isCurrent(tether.observedAt, now)) {
+            currentUsdtPrice = tether;
+          }
+        } on FormatException {
+          // Each provider asset is optional at this boundary. A malformed or
+          // stale Tether observation must not erase independently valid BTC.
+        } on ArgumentError {
+          // Provider-controlled timestamps and values can also violate the
+          // validated domain constructors without invalidating Bitcoin data.
         }
       case AppFailureResult<HttpPayload>(:final failure):
         currentFailure = failure;
     }
 
     final historyFallback = history.lastOrNull;
-    if (currentUsdCents == null &&
+    if (currentBitcoinPrice == null &&
         historyFallback != null &&
         _isCurrent(historyFallback.timestamp, now)) {
-      currentUsdCents = historyFallback.usdCents;
-      currentObservedAt = historyFallback.timestamp;
+      currentBitcoinPrice = FiatMarketPrice(
+        minorUnits: historyFallback.fiatMinorUnits,
+        observedAt: historyFallback.timestamp,
+      );
       currentSource = BitcoinPriceSource.historyFallback;
     }
-    if (currentUsdCents == null || currentObservedAt == null) {
+    if (currentBitcoinPrice == null) {
       return AppResult.failure(currentFailure ?? historyFailure!);
     }
-    return AppResult.success(
-      BitcoinMarketSnapshot(
-        currentUsdCents: currentUsdCents,
-        currentObservedAt: currentObservedAt,
-        currentSource: currentSource,
-        history: history,
-      ),
+    final snapshot = BitcoinMarketSnapshot(
+      quoteCurrency: currency,
+      currentBitcoinPrice: currentBitcoinPrice,
+      currentUsdtPrice: currentUsdtPrice,
+      currentSource: currentSource,
+      history: history,
     );
+    _cacheSnapshot(snapshot, now);
+    return AppResult.success(snapshot);
   }
 
   static List<BitcoinPricePoint> _decodeHistory(
     HttpPayload payload, {
+    required MarketQuoteCurrency currency,
     required DateTime earliest,
     required DateTime latest,
   }) {
@@ -138,46 +204,83 @@ final class BitcoinMarketRepository {
       }
       byTimestamp[milliseconds] = BitcoinPricePoint(
         timestamp: timestamp,
-        usdCents: _toMinorUnits(rawPrice, precision: 2),
+        fiatMinorUnits: _toMinorUnits(
+          rawPrice,
+          precision: currency.minorUnitDigits,
+        ),
       );
     }
     final points = byTimestamp.values.toList()
       ..sort((left, right) => left.timestamp.compareTo(right.timestamp));
-    return List<BitcoinPricePoint>.unmodifiable(points);
+    return List<BitcoinPricePoint>.unmodifiable(_sampleHistory(points));
   }
 
-  static ({int usdCents, DateTime observedAt}) _decodeCurrentPrice(
-    HttpPayload payload,
+  static List<BitcoinPricePoint> _sampleHistory(
+    List<BitcoinPricePoint> points,
   ) {
+    if (points.length <= _maximumChartPoints) return points;
+    final lastIndex = points.length - 1;
+    return List<BitcoinPricePoint>.generate(_maximumChartPoints, (index) {
+      final sourceIndex = (index * lastIndex / (_maximumChartPoints - 1))
+          .round();
+      return points[sourceIndex];
+    }, growable: false);
+  }
+
+  static Map<String, Object?> _decodeCurrentPayload(HttpPayload payload) {
     final decoded = payload.decodeJson();
     if (decoded is! Map<String, Object?>) {
       throw const FormatException('Expected a current-price object.');
     }
-    final bitcoin = decoded['bitcoin'];
-    if (bitcoin is! Map<String, Object?> ||
-        bitcoin['usd'] is! num ||
-        bitcoin['last_updated_at'] is! num) {
-      throw const FormatException('Current Bitcoin/USD price is missing.');
+    return decoded;
+  }
+
+  static FiatMarketPrice _decodeAssetPrice(
+    Map<String, Object?> decoded, {
+    required String assetId,
+    required MarketQuoteCurrency currency,
+  }) {
+    final asset = decoded[assetId];
+    final rawPrice = asset is Map<String, Object?>
+        ? asset[currency.providerCode]
+        : null;
+    final rawUpdatedAt = asset is Map<String, Object?>
+        ? asset['last_updated_at']
+        : null;
+    if (rawPrice is! num || rawUpdatedAt is! num) {
+      throw FormatException(
+        'Current $assetId/${currency.code} price is missing.',
+      );
     }
-    final rawTimestamp = bitcoin['last_updated_at']! as num;
-    if (!rawTimestamp.isFinite ||
-        rawTimestamp.isNegative ||
-        rawTimestamp != rawTimestamp.toInt()) {
+    if (!rawUpdatedAt.isFinite ||
+        rawUpdatedAt.isNegative ||
+        rawUpdatedAt != rawUpdatedAt.toInt()) {
       throw const FormatException('Current price timestamp is invalid.');
     }
     final observedAt = DateTime.fromMillisecondsSinceEpoch(
-      rawTimestamp.toInt() * 1000,
+      rawUpdatedAt.toInt() * 1000,
       isUtc: true,
     );
-    return (
-      usdCents: _toMinorUnits(bitcoin['usd']! as num, precision: 2),
+    return FiatMarketPrice(
+      minorUnits: _toMinorUnits(rawPrice, precision: currency.minorUnitDigits),
       observedAt: observedAt,
     );
   }
 
+  void _cacheSnapshot(BitcoinMarketSnapshot snapshot, DateTime cachedAt) {
+    _cache.remove(snapshot.quoteCurrency);
+    _cache[snapshot.quoteCurrency] = _CachedMarketSnapshot(
+      snapshot: snapshot,
+      cachedAt: cachedAt,
+    );
+    while (_cache.length > _maximumCachedCurrencies) {
+      _cache.remove(_cache.keys.first);
+    }
+  }
+
   static int _toMinorUnits(num value, {required int precision}) {
-    if (!value.isFinite || value.isNegative) {
-      throw const FormatException('Price must be finite and non-negative.');
+    if (!value.isFinite || value <= 0) {
+      throw const FormatException('Price must be finite and positive.');
     }
     final match = RegExp(r'^(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$')
         .firstMatch(value.toString());
@@ -193,7 +296,7 @@ final class BitcoinMarketRepository {
             final divisor = BigInt.from(10).pow(-shift);
             return (digits + (divisor ~/ BigInt.two)) ~/ divisor;
           }();
-    if (result > BigInt.from(0x7fffffffffffffff)) {
+    if (result <= BigInt.zero || result > BigInt.from(0x7fffffffffffffff)) {
       throw const FormatException('Price exceeds supported bounds.');
     }
     return result.toInt();
@@ -217,4 +320,11 @@ final class BitcoinMarketRepository {
       stackTrace: stackTrace,
     );
   }
+}
+
+final class _CachedMarketSnapshot {
+  const _CachedMarketSnapshot({required this.snapshot, required this.cachedAt});
+
+  final BitcoinMarketSnapshot snapshot;
+  final DateTime cachedAt;
 }

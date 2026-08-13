@@ -24,6 +24,7 @@ void main() {
     expect(initial, isA<AppSuccess<SettingsSnapshot>>());
     final initialSnapshot = (initial as AppSuccess<SettingsSnapshot>).value;
     expect(initialSnapshot.preferences, AppPreferences.defaults);
+    expect(initialSnapshot.currencies.map((item) => item.code), ['EUR', 'USD']);
 
     expect(
       await repository.selectCurrency('EUR'),
@@ -58,6 +59,7 @@ void main() {
     await repository.load();
 
     final currency = await repository.selectCurrency('BTC');
+    final unsupportedFiat = await repository.selectCurrency('ALL');
     final region = await repository.selectRegion('ZZ');
 
     expect(currency, isA<AppFailureResult<SettingsSnapshot>>());
@@ -66,6 +68,7 @@ void main() {
       AppFailureKind.validation,
     );
     expect(region, isA<AppFailureResult<SettingsSnapshot>>());
+    expect(unsupportedFiat, isA<AppFailureResult<SettingsSnapshot>>());
     expect(
       (region as AppFailureResult<SettingsSnapshot>).failure.kind,
       AppFailureKind.validation,
@@ -98,7 +101,7 @@ void main() {
 
     expect(result, isA<AppSuccess<SettingsSnapshot>>());
     final snapshot = (result as AppSuccess<SettingsSnapshot>).value;
-    expect(snapshot.currencies.length, greaterThan(80));
+    expect(snapshot.currencies, hasLength(43));
     expect(snapshot.regions.length, greaterThan(200));
     expect(
       snapshot.currencies.map((item) => item.code).toSet().length,
@@ -106,6 +109,47 @@ void main() {
     );
     expect(snapshot.selectedCurrency.code, 'USD');
     expect(snapshot.selectedRegion.code, 'US');
+    expect(
+      snapshot.currencies.every(
+        (item) => FiatCurrencyPolicy.supportsMarketQuote(item.code),
+      ),
+      isTrue,
+    );
+    expect(
+      snapshot.currencies
+          .singleWhere((item) => item.code == 'JPY')
+          .minorUnitDigits,
+      0,
+    );
+    expect(
+      snapshot.currencies
+          .singleWhere((item) => item.code == 'KWD')
+          .minorUnitDigits,
+      3,
+    );
+  });
+
+  test('repairs a stored currency removed by the quote policy', () async {
+    SharedPreferences.setMockInitialValues({
+      'utexo.settings.v1.currency': 'ALL',
+      'utexo.settings.v1.region': 'US',
+      'utexo.settings.v1.bitcoin_unit': 'btc',
+      'utexo.settings.v1.balances_visible': true,
+    });
+    final shared = await SharedPreferences.getInstance();
+    final repository = SettingsRepository(
+      PreferencesService(shared),
+      _validCatalog(),
+    );
+
+    final result = await repository.load();
+
+    expect(result, isA<AppSuccess<SettingsSnapshot>>());
+    expect(
+      (result as AppSuccess<SettingsSnapshot>).value.preferences.currencyCode,
+      'USD',
+    );
+    expect(shared.getString('utexo.settings.v1.currency'), 'USD');
   });
 
   test('serializes concurrent preference writes', () async {
@@ -137,7 +181,8 @@ _MemoryAssetBundle _validCatalog() => _MemoryAssetBundle({
 const _currencies = '''
 [
   {"name":"United States Dollar","symbol":"\$","code":"USD","countryCode":"US"},
-  {"name":"Euro","symbol":"€","code":"EUR","countryCode":"DE"}
+  {"name":"Euro","symbol":"€","code":"EUR","countryCode":"DE"},
+  {"name":"Albanian Lek","symbol":"L","code":"ALL","countryCode":"AL"}
 ]
 ''';
 

@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../../../../core/errors/errors.dart';
 import '../../../../core/storage/preferences_service.dart';
 import '../../../../shared/formatting/bitcoin_unit.dart';
+import '../../../../shared/formatting/fiat_currency_policy.dart';
 import '../../domain/models/models.dart';
 
 /// Owns validated settings catalogs and serialized non-secret preferences.
@@ -194,9 +195,17 @@ final class SettingsRepository {
       'assets/data/currencies.json',
     );
     final regionSource = await _assets.loadString('assets/data/countries.json');
-    final currencies = _deduplicateCurrencies(
-      _decodeList(currencySource, limit: 256, decode: FiatCurrency.fromJson),
-    )..sort((a, b) => a.name.compareTo(b.name));
+    final currencies =
+        _deduplicateCurrencies(
+              _decodeList(
+                currencySource,
+                limit: 256,
+                decode: FiatCurrency.fromJson,
+              ),
+            )
+            .where((item) => FiatCurrencyPolicy.supportsMarketQuote(item.code))
+            .toList()
+          ..sort((a, b) => a.name.compareTo(b.name));
     final regions = _decodeList(
       regionSource,
       limit: 512,

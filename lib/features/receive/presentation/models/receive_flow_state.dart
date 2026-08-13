@@ -13,7 +13,6 @@ final class ReceiveFlowState {
   ReceiveFlowState({
     required this.route,
     required this.bitcoinUnit,
-    required this.currencyCode,
     required this.request,
     required this.amountText,
     required this.amountInput,
@@ -26,9 +25,6 @@ final class ReceiveFlowState {
         'amountInput',
         'Parsed text must match editable text.',
       );
-    }
-    if (!RegExp(r'^[A-Z]{3}$').hasMatch(currencyCode)) {
-      throw ArgumentError.value(currencyCode, 'currencyCode');
     }
     if (request.route != route) {
       throw ArgumentError.value(request, 'request', 'Route mismatch.');
@@ -44,7 +40,6 @@ final class ReceiveFlowState {
 
   final PaymentRoute route;
   final BitcoinUnit bitcoinUnit;
-  final String currencyCode;
   final WalletReceiveRequest request;
 
   /// Pending sheet input; [request] remains the currently encoded QR value.
@@ -74,7 +69,6 @@ final class ReceiveFlowState {
     return ReceiveFlowState(
       route: route,
       bitcoinUnit: bitcoinUnit,
-      currencyCode: currencyCode,
       request: request ?? this.request,
       amountText: amountText ?? this.amountText,
       amountInput: amountInput ?? this.amountInput,
@@ -92,7 +86,6 @@ final class ReceiveFlowState {
       other is ReceiveFlowState &&
       other.route == route &&
       other.bitcoinUnit == bitcoinUnit &&
-      other.currencyCode == currencyCode &&
       other.request == request &&
       other.amountText == amountText &&
       other.amountInput == amountInput &&
@@ -103,7 +96,6 @@ final class ReceiveFlowState {
   int get hashCode => Object.hash(
     route,
     bitcoinUnit,
-    currencyCode,
     request,
     amountText,
     amountInput,

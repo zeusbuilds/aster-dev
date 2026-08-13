@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:aster/core/core.dart';
 import 'package:aster/features/home/presentation/screens/screens.dart';
 import 'package:aster/features/home/presentation/widgets/widgets.dart';
+import 'package:aster/features/market/domain/models/models.dart';
 import 'package:aster/features/settings/domain/models/models.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:aster/shared/shared.dart';
@@ -40,7 +41,8 @@ void main() {
     );
 
     expect(find.text('Available 901.25 sats'), findsOneWidget);
-    expect(find.text(r'$1.00 estimated'), findsOneWidget);
+    expect(find.text(r'$1.00 USD estimated'), findsOneWidget);
+    expect(find.text('Powered by CoinGecko'), findsOneWidget);
     expect(find.text('Unavailable on this network'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Hide balances'));
@@ -90,6 +92,100 @@ void main() {
     expect(tester, meetsGuideline(androidTapTargetGuideline));
     expect(tester, meetsGuideline(labeledTapTargetGuideline));
     expect(tester, meetsGuideline(textContrastGuideline));
+  });
+
+  testWidgets('fiat loading preserves loaded crypto balances', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: const Scaffold(
+          body: AssetRow(
+            kind: WalletAssetKind.bitcoin,
+            title: 'Bitcoin',
+            totalText: '1,001 sats',
+            availableText: '900 sats',
+            fiatContext: 'USD estimate unavailable',
+            balancesVisible: true,
+            fiatLoading: true,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('1,001 sats'), findsOneWidget);
+    expect(
+      tester
+          .widgetList<AppSkeletonizer>(find.byType(AppSkeletonizer))
+          .map((widget) => widget.enabled),
+      [false, true, false],
+    );
+    expect(
+      find.bySemanticsLabel(
+        'Bitcoin total 1,001 sats, available 900 sats, '
+        'fiat estimate loading',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Home advances through independent asset quote expiries', (
+    tester,
+  ) async {
+    var clockNow = DateTime.utc(2026, 8, 11, 12);
+    final bitcoinObservedAt = clockNow.subtract(
+      BitcoinMarketSnapshot.maximumCurrentAge - const Duration(seconds: 3),
+    );
+    final usdtObservedAt = clockNow.subtract(
+      BitcoinMarketSnapshot.maximumCurrentAge - const Duration(seconds: 1),
+    );
+    const assetConfiguration = RgbAssetConfiguration(
+      contractId: 'contract-id',
+      precision: 2,
+    );
+    final usdt = WalletAsset.rgbUsdt(
+      assetId: assetConfiguration.contractId,
+      precision: assetConfiguration.precision,
+    );
+    final engine = FakeWalletEngine()
+      ..balances[WalletAsset.bitcoin.id] = _bitcoinBalance()
+      ..balances[usdt.id] = _usdtBalance(usdt);
+    final httpClient = _marketClientWithAssetTimestamps(
+      now: clockNow,
+      bitcoinObservedAt: bitcoinObservedAt,
+      usdtObservedAt: usdtObservedAt,
+    );
+    final harness = await PaymentFlowTestHarness.create(
+      engine: engine,
+      clock: () => clockNow,
+      httpClient: httpClient,
+      services: const WalletServiceConfiguration(
+        environment: BlockchainEnvironment.regtest,
+        sdkNetwork: 'regtest',
+        usdtAsset: assetConfiguration,
+      ),
+    );
+    addTearDown(httpClient.close);
+    addTearDown(() => _disposeHarness(tester, harness));
+
+    await _pump(tester, harness, const HomeScreen());
+    await _pumpUntil(
+      tester,
+      () => find.text(r'$125.00 USD estimated').evaluate().isNotEmpty,
+    );
+    expect(find.text(r'$1.00 USD estimated'), findsOneWidget);
+    expect(find.text('Retry fiat quote'), findsNothing);
+
+    clockNow = clockNow.add(const Duration(seconds: 2));
+    await tester.pump(const Duration(seconds: 2));
+    expect(find.text(r'$1.00 USD estimated'), findsOneWidget);
+    expect(find.text('USD estimate unavailable'), findsOneWidget);
+    expect(find.text('Retry fiat quote'), findsOneWidget);
+
+    clockNow = clockNow.add(const Duration(seconds: 2));
+    await tester.pump(const Duration(seconds: 2));
+    expect(find.text(r'$1.00 USD estimated'), findsNothing);
+    expect(find.text('USD estimate unavailable'), findsNWidgets(2));
+    expect(find.text('Market quote expired'), findsOneWidget);
   });
 
   testWidgets('Home Send shortcut opens the target selector', (tester) async {
@@ -194,6 +290,47 @@ ResilientHttpClient _marketClient(DateTime now) {
   );
 }
 
+ResilientHttpClient _marketClientWithAssetTimestamps({
+  required DateTime now,
+  required DateTime bitcoinObservedAt,
+  required DateTime usdtObservedAt,
+}) {
+  return ResilientHttpClient(
+    client: MockClient((request) async {
+      if (request.url.path.endsWith('/range')) {
+        return http.Response(
+          jsonEncode({
+            'prices': [
+              [
+                now
+                    .subtract(const Duration(minutes: 20))
+                    .millisecondsSinceEpoch,
+                99000,
+              ],
+              [bitcoinObservedAt.millisecondsSinceEpoch, 100000],
+            ],
+          }),
+          200,
+        );
+      }
+      return http.Response(
+        jsonEncode({
+          'bitcoin': {
+            'usd': 100000,
+            'last_updated_at': bitcoinObservedAt.millisecondsSinceEpoch ~/ 1000,
+          },
+          'tether': {
+            'usd': 1,
+            'last_updated_at': usdtObservedAt.millisecondsSinceEpoch ~/ 1000,
+          },
+        }),
+        200,
+      );
+    }),
+    retryPolicy: RetryPolicy(maxAttempts: 1),
+  );
+}
+
 WalletBalance _bitcoinBalance() {
   WalletAmount onchain(int units) =>
       WalletAmount.onchain(assetId: WalletAsset.bitcoin.id, units: units);
@@ -207,6 +344,23 @@ WalletBalance _bitcoinBalance() {
     onchainLocked: onchain(100),
     lightningOwned: lightning(1500),
     lightningSpendable: lightning(1250),
+    lightningReceivable: lightning(0),
+  );
+}
+
+WalletBalance _usdtBalance(WalletAsset asset) {
+  WalletAmount onchain(int units) =>
+      WalletAmount.onchain(assetId: asset.id, units: units);
+  WalletAmount lightning(int units) =>
+      WalletAmount.lightning(assetId: asset.id, units: units);
+  return WalletBalance(
+    asset: asset,
+    onchainSettled: onchain(10000),
+    onchainFuture: onchain(10000),
+    onchainSpendable: onchain(9000),
+    onchainLocked: onchain(1000),
+    lightningOwned: lightning(2500),
+    lightningSpendable: lightning(2000),
     lightningReceivable: lightning(0),
   );
 }

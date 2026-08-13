@@ -201,6 +201,34 @@ deployment identity values and must be supplied together. When either is
 missing, the app keeps both USDT rails visible but unavailable; it never infers
 an asset contract or decimal precision from the `USDT` ticker.
 
+## Market Data Configuration
+
+Debug and profile builds use CoinGecko's keyless public API when no market
+endpoint is supplied. That pool is intended for testing and prototyping, is
+dynamically rate-limited, and is not a production reliability contract. The UI
+retains the required `Powered by CoinGecko` attribution. See CoinGecko's
+[keyless API policy](https://docs.coingecko.com/docs/keyless-public-api) and
+[API terms](https://www.coingecko.com/en/api_terms).
+
+Release builds fail closed unless `UTEXO_MARKET_API_BASE_URL` identifies a
+deployment-owned public HTTPS proxy that preserves the required CoinGecko API
+paths. The proxy owner must hold the appropriate data/API rights, keep provider
+credentials server-side, enforce its own abuse and availability policy, and
+return no user-specific or secret data. Direct CoinGecko hosts, insecure or
+private hosts, credentials, query strings, and fragments are rejected. Never
+place a CoinGecko or proxy API key in `--dart-define`; mobile binaries cannot
+protect it.
+
+Example non-secret release identity:
+
+```sh
+--dart-define=UTEXO_MARKET_API_BASE_URL=https://market.utexo.example/api/v3
+```
+
+The `.example` hostname above is documentation only and is deliberately
+rejected at runtime. A release owner must substitute the real approved public
+host.
+
 Settings support, legal, and social destinations are optional deployment
 configuration. Omitted values render as disabled actions; the app never ships
 a guessed URL or enabled no-op command.

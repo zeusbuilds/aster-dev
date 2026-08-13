@@ -121,7 +121,10 @@ Bitcoin and RGB are asset protocols; on-chain and Lightning are payment rails;
 mainnet, signet, and regtest are chain environments. These are separate types.
 RGB USDT identity is its immutable contract ID, never the `USDT` ticker.
 Amounts use integer sats, millisats, or RGB smallest units. Fiat market data is
-converted to integer cents at the repository boundary.
+converted to the selected ISO currency's integer minor units at the repository
+boundary. Bitcoin and Tether prices are independently validated so one partial
+provider value cannot manufacture or erase the other. Market service and
+attribution policy are app-owned and do not cross the SDK boundary.
 
 The app reads the environment-specific USDT contract through
 `UTEXO_USDT_ASSET_ID` and its integer precision through

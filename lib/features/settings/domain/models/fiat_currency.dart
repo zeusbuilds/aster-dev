@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../../shared/formatting/fiat_currency_policy.dart';
+
 /// Validated ISO 4217 currency metadata used by settings and fiat displays.
 @immutable
 final class FiatCurrency {
@@ -36,6 +38,13 @@ final class FiatCurrency {
   final String symbol;
   final String code;
   final String countryCode;
+
+  /// ISO 4217 minor-unit precision used for exact integer fiat values.
+  ///
+  /// Codes not listed in the zero- or three-decimal groups use the standard
+  /// two decimal places. The catalog accepts only ISO-shaped codes, while the
+  /// market boundary separately limits which currencies can be quoted.
+  int get minorUnitDigits => FiatCurrencyPolicy.minorUnitDigits(code);
 
   @override
   bool operator ==(Object other) =>

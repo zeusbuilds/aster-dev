@@ -12,6 +12,71 @@ void main() {
     },
   );
 
+  test('market data is keyless only outside release builds', () {
+    final development = MarketDataConfiguration.resolve(
+      configuredBase: '',
+      releaseMode: false,
+    );
+    final release = MarketDataConfiguration.resolve(
+      configuredBase: '',
+      releaseMode: true,
+    );
+
+    expect(development.access, MarketDataAccess.developmentKeyless);
+    expect(
+      development.endpoint('simple/price').toString(),
+      'https://api.coingecko.com/api/v3/simple/price',
+    );
+    expect(release.access, MarketDataAccess.unavailable);
+    expect(release.baseUri, isNull);
+    expect(
+      () => release.endpoint('simple/price'),
+      throwsA(isA<AppConfigurationException>()),
+    );
+  });
+
+  test('market release configuration accepts only an owned public proxy', () {
+    final configuration = MarketDataConfiguration.resolve(
+      configuredBase: 'https://market.utexo.com/coingecko/v3',
+      releaseMode: true,
+    );
+
+    expect(configuration.access, MarketDataAccess.deploymentProxy);
+    expect(
+      configuration.endpoint('simple/price').toString(),
+      'https://market.utexo.com/coingecko/v3/simple/price',
+    );
+    expect(
+      () => configuration.endpoint('../secret'),
+      throwsA(isA<AppConfigurationException>()),
+    );
+  });
+
+  test('market release configuration rejects unsafe and direct API bases', () {
+    for (final base in [
+      'http://market.utexo.com/api/v3',
+      'https://token@market.utexo.com/api/v3',
+      'https://market.utexo.com/api/v3?token=secret',
+      'https://127.0.0.1/api/v3',
+      'https://market.internal/api/v3',
+      'https://market..utexo.com/api/v3',
+      'https://-market.utexo.com/api/v3',
+      'https://market.utexo.com/%2e%2e/private',
+      'https://market.utexo.com/api//v3',
+      'https://api.coingecko.com/api/v3',
+      'https://pro-api.coingecko.com/api/v3',
+    ]) {
+      expect(
+        () => MarketDataConfiguration.resolve(
+          configuredBase: base,
+          releaseMode: true,
+        ),
+        throwsA(isA<AppConfigurationException>()),
+        reason: base,
+      );
+    }
+  });
+
   test('rejects insecure non-loopback service endpoints', () {
     const configuration = WalletServiceConfiguration(
       environment: BlockchainEnvironment.mainnet,

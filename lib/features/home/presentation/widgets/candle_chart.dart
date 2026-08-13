@@ -133,7 +133,7 @@ class _CandleChartState extends State<CandleChart>
         : items;
 
     final prices = last24Items
-        .map((point) => point.usdCents.toDouble())
+        .map((point) => point.fiatMinorUnits.toDouble())
         .toList(growable: false);
     _minPrice = prices.min;
     _maxPrice = prices.max;
@@ -407,8 +407,8 @@ class _CandleChartState extends State<CandleChart>
     final bars = <_CandleData>[];
 
     for (int i = 0; i < items.length; i++) {
-      final price = items[i].usdCents.toDouble();
-      final prevPrice = i > 0 ? items[i - 1].usdCents.toDouble() : price;
+      final price = items[i].fiatMinorUnits.toDouble();
+      final prevPrice = i > 0 ? items[i - 1].fiatMinorUnits.toDouble() : price;
 
       bars.add(_CandleData(open: prevPrice, close: price));
     }

@@ -22,6 +22,8 @@ from a clean worktree and record commands/results in the production tracker.
       universal `app-release.apk`
 - [ ] Android install/launch smoke on the recorded ABI/API
 - [ ] package IDs, entitlements, backup policy, signing, and release metadata
+- [ ] approved `UTEXO_MARKET_API_BASE_URL`, provider license/attribution, proxy
+      availability, and server-side credential ownership
 - [ ] artifact sizes and SHA-256 digests recorded
 
 ## Product And Security

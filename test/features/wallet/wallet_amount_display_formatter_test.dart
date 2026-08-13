@@ -54,7 +54,7 @@ void main() {
     );
   });
 
-  test('formats deployment-precision RGB and USD estimates exactly', () {
+  test('formats deployment-precision RGB and fiat estimates exactly', () {
     final usdt = PaymentRoute(
       asset: WalletAsset.rgbUsdt(assetId: 'rgb-usdt', precision: 6),
       rail: PaymentRail.lightning,
@@ -65,14 +65,47 @@ void main() {
           .text,
       '1.234567 USDT',
     );
-    expect(WalletUsdEstimate.cents(units: 1234567, route: usdt), 123);
     expect(
-      WalletUsdEstimate.formatCents(6500000, locale: 'en_US'),
-      '\$65,000.00',
+      WalletFiatEstimate.minorUnits(
+        units: 1234567,
+        route: usdt,
+        assetPriceMinorUnits: 100,
+      ),
+      123,
+    );
+    expect(
+      WalletFiatEstimate.formatMinorUnits(
+        minorUnits: 6500000,
+        symbol: r'$',
+        code: 'USD',
+        minorUnitDigits: 2,
+        locale: 'en_US',
+      ),
+      '\$65,000.00 USD',
+    );
+    expect(
+      WalletFiatEstimate.formatMinorUnits(
+        minorUnits: 65000,
+        symbol: '¥',
+        code: 'JPY',
+        minorUnitDigits: 0,
+        locale: 'en_US',
+      ),
+      '¥65,000 JPY',
+    );
+    expect(
+      WalletFiatEstimate.formatMinorUnits(
+        minorUnits: 6500,
+        symbol: 'kr',
+        code: 'SEK',
+        minorUnitDigits: 2,
+        locale: 'sv',
+      ),
+      '65,00\u00a0kr SEK',
     );
   });
 
-  test('uses satoshi and millisatoshi denominators for BTC USD estimates', () {
+  test('uses satoshi and millisatoshi denominators for BTC fiat estimates', () {
     const onchain = PaymentRoute(
       asset: WalletAsset.bitcoin,
       rail: PaymentRail.onchain,
@@ -82,20 +115,70 @@ void main() {
       rail: PaymentRail.lightning,
     );
     expect(
-      WalletUsdEstimate.cents(
+      WalletFiatEstimate.minorUnits(
         units: 100000000,
         route: onchain,
-        bitcoinPriceCents: 6500000,
+        assetPriceMinorUnits: 6500000,
       ),
       6500000,
     );
     expect(
-      WalletUsdEstimate.cents(
+      WalletFiatEstimate.minorUnits(
         units: 100000000000,
         route: lightning,
-        bitcoinPriceCents: 6500000,
+        assetPriceMinorUnits: 6500000,
       ),
       6500000,
     );
+  });
+
+  test('rejects fiat formatting with an incorrect ISO precision', () {
+    expect(
+      () => WalletFiatEstimate.formatMinorUnits(
+        minorUnits: 6500,
+        symbol: '¥',
+        code: 'JPY',
+        minorUnitDigits: 2,
+      ),
+      throwsArgumentError,
+    );
+  });
+
+  test('does not convert against a non-positive market quote', () {
+    const route = PaymentRoute(
+      asset: WalletAsset.bitcoin,
+      rail: PaymentRail.onchain,
+    );
+
+    expect(
+      WalletFiatEstimate.minorUnits(
+        units: 100000000,
+        route: route,
+        assetPriceMinorUnits: 0,
+      ),
+      isNull,
+    );
+  });
+
+  test('localizes exact fractional digits without floating-point math', () {
+    const route = PaymentRoute(
+      asset: WalletAsset.bitcoin,
+      rail: PaymentRail.onchain,
+    );
+
+    expect(
+      WalletAmountDisplayFormatter(locale: 'ar_EG')
+          .format(
+            units: 125000000,
+            route: route,
+            bitcoinUnit: BitcoinUnit.bitcoin,
+          )
+          .numeric,
+      '١٫٢٥',
+    );
+    final fiat = FiatAmountFormatter(locale: 'ar_EG')
+        .format(minorUnits: 125, symbol: r'$', code: 'USD', minorUnitDigits: 2);
+    expect(fiat, contains('١٫٢٥'));
+    expect(fiat, isNot(contains('1.25')));
   });
 }

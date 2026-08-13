@@ -267,12 +267,96 @@ void main() {
       await tester.tap(find.descendant(of: keypad, matching: find.text(digit)));
       await tester.pump();
     }
-    await _pumpUntil(tester, () => find.text('≈ \$0.07').evaluate().isNotEmpty);
+    await _pumpUntil(
+      tester,
+      () => find.text('≈ \$0.07 USD').evaluate().isNotEmpty,
+    );
 
     clockNow = clockNow.add(const Duration(seconds: 2));
     await tester.pump(const Duration(seconds: 2));
 
     expect(find.text('USD quote unavailable'), findsOneWidget);
+  });
+
+  testWidgets('USDT send never presents zero fiat without a Tether quote', (
+    tester,
+  ) async {
+    final now = DateTime.utc(2026, 8, 11, 12);
+    const assetConfiguration = RgbAssetConfiguration(
+      contractId: 'contract-id',
+      precision: 2,
+    );
+    const services = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.regtest,
+      sdkNetwork: 'regtest',
+      usdtAsset: assetConfiguration,
+    );
+    final asset = WalletAsset.rgbUsdt(
+      assetId: assetConfiguration.contractId,
+      precision: assetConfiguration.precision,
+    );
+    final engine = FakeWalletEngine()
+      ..balances[asset.id] = _assetBalance(asset, spendable: 10000)
+      ..feeEstimate = WalletFeeRateEstimate(
+        targetBlocks: 6,
+        satsPerVbyte: 2,
+        observedAt: now,
+      );
+    final transport = ResilientHttpClient(
+      client: MockClient((request) async {
+        if (request.url.path.endsWith('/range')) {
+          return http.Response('{"prices":[]}', 200);
+        }
+        return http.Response(
+          jsonEncode({
+            'bitcoin': {
+              'usd': 65000,
+              'last_updated_at': now.millisecondsSinceEpoch ~/ 1000,
+            },
+          }),
+          200,
+        );
+      }),
+      retryPolicy: RetryPolicy(maxAttempts: 1),
+      clock: () => now,
+    );
+    addTearDown(transport.close);
+    final harness = await PaymentFlowTestHarness.create(
+      engine: engine,
+      services: services,
+      httpClient: transport,
+      clock: () => now,
+    );
+    addTearDown(() => _disposeHarness(tester, harness));
+    final provider = sendFlowViewModelProvider(WalletPaymentTarget.usdtOnchain);
+    final subscription = harness.container.listen(
+      provider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    await tester.runAsync(() => harness.container.read(provider.future));
+    final notifier = harness.container.read(provider.notifier);
+    notifier.updateDestination('rgb-destination');
+    expect(await tester.runAsync(notifier.validateDestination), isTrue);
+
+    await _pumpWidget(
+      tester,
+      harness,
+      const SendAmountScreen(target: WalletPaymentTarget.usdtOnchain),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byType(AsterNumericKeypad).evaluate().isNotEmpty,
+    );
+    await _pumpUntil(
+      tester,
+      () => find.text('USD quote unavailable').evaluate().isNotEmpty,
+    );
+
+    expect(find.text('USD quote unavailable'), findsOneWidget);
+    expect(find.text(r'$0.00 USD'), findsNothing);
+    expect(find.text('Retry fiat quote'), findsOneWidget);
   });
 
   testWidgets('Receive renders real request, copies it, and applies amount', (
@@ -560,6 +644,23 @@ WalletBalance _bitcoinBalance(int spendable) {
       WalletAmount.lightning(assetId: WalletAsset.bitcoin.id, units: units);
   return WalletBalance(
     asset: WalletAsset.bitcoin,
+    onchainSettled: onchain(spendable),
+    onchainFuture: onchain(spendable),
+    onchainSpendable: onchain(spendable),
+    onchainLocked: onchain(0),
+    lightningOwned: lightning(0),
+    lightningSpendable: lightning(0),
+    lightningReceivable: lightning(0),
+  );
+}
+
+WalletBalance _assetBalance(WalletAsset asset, {required int spendable}) {
+  WalletAmount onchain(int units) =>
+      WalletAmount.onchain(assetId: asset.id, units: units);
+  WalletAmount lightning(int units) =>
+      WalletAmount.lightning(assetId: asset.id, units: units);
+  return WalletBalance(
+    asset: asset,
     onchainSettled: onchain(spendable),
     onchainFuture: onchain(spendable),
     onchainSpendable: onchain(spendable),

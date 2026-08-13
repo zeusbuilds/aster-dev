@@ -40,20 +40,16 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
       flowProvider,
       (previous, next) => _scheduleDeadline(
         next.value,
-        widget.target.assetKind == WalletAssetKind.bitcoin
-            ? ref.read(bitcoinMarketViewModelProvider).value
-            : null,
+        ref.read(bitcoinMarketViewModelProvider).value,
       ),
       fireImmediately: true,
     );
-    if (widget.target.assetKind == WalletAssetKind.bitcoin) {
-      ref.listenManual(
-        bitcoinMarketViewModelProvider,
-        (previous, next) =>
-            _scheduleDeadline(ref.read(flowProvider).value, next.value),
-        fireImmediately: true,
-      );
-    }
+    ref.listenManual(
+      bitcoinMarketViewModelProvider,
+      (previous, next) =>
+          _scheduleDeadline(ref.read(flowProvider).value, next.value),
+      fireImmediately: true,
+    );
   }
 
   @override
@@ -67,6 +63,10 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) return;
     setState(() => _now = ref.read(utcClockProvider)());
+    _scheduleDeadline(
+      ref.read(sendFlowViewModelProvider(widget.target)).value,
+      ref.read(bitcoinMarketViewModelProvider).value,
+    );
   }
 
   void _scheduleDeadline(SendFlowState? state, BitcoinMarketSnapshot? market) {
@@ -81,7 +81,11 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
     if (fee != null) {
       deadlines.add(fee.observedAt.add(WalletFeeRateEstimate.maximumAge));
     }
-    if (market != null) deadlines.add(market.expiresAt);
+    final marketPrice = switch (state.route.asset.kind) {
+      WalletAssetKind.bitcoin => market?.currentBitcoinPrice,
+      WalletAssetKind.usdt => market?.currentUsdtPrice,
+    };
+    if (marketPrice != null) deadlines.add(marketPrice.expiresAt);
     deadlines.sort();
     if (deadlines.isEmpty) return;
     final now = ref.read(utcClockProvider)();
@@ -97,6 +101,7 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
     _deadlineTimer = Timer(delay + const Duration(milliseconds: 1), () {
       if (!mounted) return;
       setState(() => _now = ref.read(utcClockProvider)());
+      _scheduleDeadline(state, market);
     });
   }
 
@@ -127,9 +132,7 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
   Widget build(BuildContext context) {
     final provider = sendFlowViewModelProvider(widget.target);
     final flow = ref.watch(provider);
-    final market = widget.target.assetKind == WalletAssetKind.bitcoin
-        ? ref.watch(bitcoinMarketViewModelProvider)
-        : null;
+    final market = ref.watch(bitcoinMarketViewModelProvider);
     return Scaffold(
       backgroundColor: context.colorScheme.surface,
       appBar: CustomAppBar(
@@ -165,7 +168,7 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
                         unawaited(ref.read(provider.notifier).refreshBalance()),
                     onRefreshFee: () =>
                         unawaited(ref.read(provider.notifier).refreshFee()),
-                    onRetryQuote: market?.hasError ?? false
+                    onRetryQuote: _marketRetryable(state, market, _now)
                         ? () => ref
                               .read(bitcoinMarketViewModelProvider.notifier)
                               .retry()
@@ -184,6 +187,29 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
       ),
     );
   }
+
+  static bool _marketRetryable(
+    SendFlowState state,
+    AsyncValue<BitcoinMarketSnapshot> market,
+    DateTime now,
+  ) {
+    if (market.isLoading) return false;
+    if (market case AsyncError(:final error, :final stackTrace)) {
+      final failure = error is AppFailureException
+          ? error.failure
+          : FailureMapper.from(error, stackTrace);
+      return failure.retryable;
+    }
+    final snapshot = market.value;
+    if (snapshot == null || snapshot.quoteCurrency.code != state.currencyCode) {
+      return true;
+    }
+    final price = switch (state.route.asset.kind) {
+      WalletAssetKind.bitcoin => snapshot.currentBitcoinPrice,
+      WalletAssetKind.usdt => snapshot.currentUsdtPrice,
+    };
+    return !(price?.isCurrentAt(now) ?? false);
+  }
 }
 
 final class _AmountBody extends StatelessWidget {
@@ -200,7 +226,7 @@ final class _AmountBody extends StatelessWidget {
 
   final SendFlowState state;
   final DateTime now;
-  final AsyncValue<BitcoinMarketSnapshot>? market;
+  final AsyncValue<BitcoinMarketSnapshot> market;
   final ValueChanged<String> onAmountChanged;
   final VoidCallback onRefreshBalance;
   final VoidCallback onRefreshFee;
@@ -278,7 +304,8 @@ final class _AmountBody extends StatelessWidget {
                       if (onRetryQuote case final retry?) ...[
                         SizedBox(height: context.spacing.sm),
                         CustomButton.compact(
-                          text: 'Retry USD quote',
+                          text: 'Retry fiat quote',
+                          enabled: !state.isBusy,
                           hapticIntent: null,
                           onTap: retry,
                         ),
@@ -340,30 +367,47 @@ final class _AmountBody extends StatelessWidget {
 
   String _fiatText(
     SendFlowState state,
-    AsyncValue<BitcoinMarketSnapshot>? market,
+    AsyncValue<BitcoinMarketSnapshot> market,
     DateTime now,
   ) {
-    if (state.currencyCode != 'USD') {
+    final units = state.amountInput.units;
+    if (market.isLoading) {
+      return '${state.currencyCode} quote loading';
+    }
+    final snapshot = market.value;
+    if (snapshot == null || snapshot.quoteCurrency.code != state.currencyCode) {
       return '${state.currencyCode} quote unavailable';
     }
-    final units = state.amountInput.units;
-    if (units == null) return '\$0.00';
-    final snapshot = market?.value;
-    final price =
-        state.route.asset.kind == WalletAssetKind.bitcoin &&
-            (snapshot?.isCurrentAt(now) ?? false)
-        ? snapshot!.currentUsdCents
-        : null;
-    final cents = WalletUsdEstimate.cents(
+    final price = switch (state.route.asset.kind) {
+      WalletAssetKind.bitcoin => snapshot.currentBitcoinPrice,
+      WalletAssetKind.usdt => snapshot.currentUsdtPrice,
+    };
+    if (!(price?.isCurrentAt(now) ?? false)) {
+      return '${state.currencyCode} quote unavailable';
+    }
+    if (units == null) {
+      return WalletFiatEstimate.formatMinorUnits(
+        minorUnits: 0,
+        symbol: snapshot.quoteCurrency.symbol,
+        code: snapshot.quoteCurrency.code,
+        minorUnitDigits: snapshot.quoteCurrency.minorUnitDigits,
+      );
+    }
+    final minorUnits = WalletFiatEstimate.minorUnits(
       units: units,
       route: state.route,
-      bitcoinPriceCents: price,
+      assetPriceMinorUnits: price?.minorUnits,
     );
-    if (cents == null) return 'USD quote unavailable';
-    final value = WalletUsdEstimate.formatCents(cents);
-    return state.route.asset.kind == WalletAssetKind.usdt
-        ? '$value face value'
-        : '≈ $value';
+    if (minorUnits == null) {
+      return '${state.currencyCode} quote unavailable';
+    }
+    final value = WalletFiatEstimate.formatMinorUnits(
+      minorUnits: minorUnits,
+      symbol: snapshot.quoteCurrency.symbol,
+      code: snapshot.quoteCurrency.code,
+      minorUnitDigits: snapshot.quoteCurrency.minorUnitDigits,
+    );
+    return '≈ $value';
   }
 
   static String? _amountMessage(SendFlowState state) {

@@ -1,6 +1,8 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/core.dart';
+import '../../../settings/presentation/models/models.dart';
+import '../../../settings/presentation/view_model/view_models.dart';
 import '../../data/data.dart';
 import '../../domain/models/models.dart';
 
@@ -10,35 +12,62 @@ part 'bitcoin_market_view_model.g.dart';
 BitcoinMarketRepository bitcoinMarketRepository(Ref ref) {
   return BitcoinMarketRepository(
     ref.watch(resilientHttpClientProvider),
+    ref.watch(marketDataConfigurationProvider),
     clock: ref.watch(utcClockProvider),
   );
+}
+
+/// Maps the persisted settings selection to the market provider contract.
+@riverpod
+Future<MarketQuoteCurrency> selectedMarketQuoteCurrency(Ref ref) async {
+  final settings = await ref.watch(settingsViewModelProvider.future);
+  return _quoteCurrency(settings);
 }
 
 /// Owns initial-load and retry state for the Bitcoin market card.
 @riverpod
 class BitcoinMarketViewModel extends _$BitcoinMarketViewModel {
   NetworkCancellationToken? _activeRequest;
+  var _stateGeneration = 0;
 
   @override
-  Future<BitcoinMarketSnapshot> build() {
+  Future<BitcoinMarketSnapshot> build() async {
+    _stateGeneration += 1;
+    _activeRequest?.cancel();
     ref.onDispose(() => _activeRequest?.cancel());
-    return _fetch();
+    final currency = await ref.watch(
+      selectedMarketQuoteCurrencyProvider.future,
+    );
+    return _fetch(currency);
   }
 
   Future<void> retry() async {
     if (state.isLoading) return;
+    final generation = ++_stateGeneration;
     state = const AsyncLoading();
-    final next = await AsyncValue.guard(_fetch);
-    if (ref.mounted) state = next;
+    final next = await AsyncValue.guard(() async {
+      final currency = await ref.read(
+        selectedMarketQuoteCurrencyProvider.future,
+      );
+      return _fetch(currency, forceRefresh: true);
+    });
+    if (ref.mounted && generation == _stateGeneration) state = next;
   }
 
-  Future<BitcoinMarketSnapshot> _fetch() async {
+  Future<BitcoinMarketSnapshot> _fetch(
+    MarketQuoteCurrency currency, {
+    bool forceRefresh = false,
+  }) async {
     _activeRequest?.cancel();
     final cancellation = NetworkCancellationToken();
     _activeRequest = cancellation;
     final repository = ref.read(bitcoinMarketRepositoryProvider);
     try {
-      final result = await repository.fetch(cancellation: cancellation);
+      final result = await repository.fetch(
+        currency: currency,
+        cancellation: cancellation,
+        forceRefresh: forceRefresh,
+      );
       return switch (result) {
         AppSuccess<BitcoinMarketSnapshot>(:final value) => value,
         AppFailureResult<BitcoinMarketSnapshot>(:final failure) =>
@@ -48,4 +77,13 @@ class BitcoinMarketViewModel extends _$BitcoinMarketViewModel {
       if (identical(_activeRequest, cancellation)) _activeRequest = null;
     }
   }
+}
+
+MarketQuoteCurrency _quoteCurrency(SettingsState state) {
+  final selected = state.snapshot.selectedCurrency;
+  return MarketQuoteCurrency(
+    code: selected.code,
+    symbol: selected.symbol,
+    minorUnitDigits: selected.minorUnitDigits,
+  );
 }

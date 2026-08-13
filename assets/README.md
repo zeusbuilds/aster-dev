@@ -16,8 +16,11 @@ pass visual and platform-build review.
 
 The fiat catalog intentionally maps USD to US and EC, XPF to NC and PF, and
 EUR to the EU pseudo-region used by `circle_flags`. Runtime selection is keyed
-by the unique currency code and keeps the first curated presentation entry;
-the associated region catalog remains 249 unique two-letter entries.
+by the unique currency code and keeps the first curated presentation entry.
+Settings exposes the reviewed 43-code intersection supported by the app's
+typed market contract; unsupported catalog entries remain asset provenance,
+not selectable dead options. The associated region catalog remains 249 unique
+two-letter entries.
 
 The BIP39 word list and bundled font files have their own pinned source and
 checksum records in `data/README.md` and `fonts/README.md`.
