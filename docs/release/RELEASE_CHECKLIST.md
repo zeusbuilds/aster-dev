@@ -17,7 +17,9 @@ from a clean worktree and record commands/results in the production tracker.
 
 - [ ] clean iOS build and XCTest
 - [ ] iOS install/launch smoke on the recorded simulator/device
-- [ ] clean Android release APK/AAB build and native tests
+- [ ] clean Android release AAB or `make android-release-apks` build and native tests
+- [ ] direct APK artifacts contain exactly one ABI; never distribute the
+      universal `app-release.apk`
 - [ ] Android install/launch smoke on the recorded ABI/API
 - [ ] package IDs, entitlements, backup policy, signing, and release metadata
 - [ ] artifact sizes and SHA-256 digests recorded
