@@ -95,6 +95,52 @@ void main() {
     expect(_location(router), RoutePaths.send);
   });
 
+  testWidgets('a direct Settings child Back returns to Settings', (
+    tester,
+  ) async {
+    tester.binding.platformDispatcher.defaultRouteNameTestValue =
+        '${RoutePaths.settings}/${RoutePaths.walletSelection}';
+    addTearDown(
+      tester.binding.platformDispatcher.clearDefaultRouteNameTestValue,
+    );
+    final (harness, transport) = await _createActiveHarness();
+    addTearDown(transport.close);
+    addTearDown(() => _disposeHarness(tester, harness));
+
+    final router = await _pumpRouter(tester, harness);
+    expect(
+      _location(router),
+      '${RoutePaths.settings}/${RoutePaths.walletSelection}',
+    );
+
+    await tester.tap(find.bySemanticsLabel('Back'));
+    await _pumpFrames(tester);
+    expect(_location(router), RoutePaths.settings);
+  });
+
+  testWidgets('a direct network child Back returns to Advanced Settings', (
+    tester,
+  ) async {
+    tester.binding.platformDispatcher.defaultRouteNameTestValue =
+        '${RoutePaths.advancedSettingsLocation}/${RoutePaths.networkConfiguration}';
+    addTearDown(
+      tester.binding.platformDispatcher.clearDefaultRouteNameTestValue,
+    );
+    final (harness, transport) = await _createActiveHarness();
+    addTearDown(transport.close);
+    addTearDown(() => _disposeHarness(tester, harness));
+
+    final router = await _pumpRouter(tester, harness);
+    expect(
+      _location(router),
+      '${RoutePaths.advancedSettingsLocation}/${RoutePaths.networkConfiguration}',
+    );
+
+    await tester.tap(find.bySemanticsLabel('Back'));
+    await _pumpFrames(tester);
+    expect(_location(router), RoutePaths.advancedSettingsLocation);
+  });
+
   testWidgets('an invalid Activity asset slug returns to the wallet shell', (
     tester,
   ) async {

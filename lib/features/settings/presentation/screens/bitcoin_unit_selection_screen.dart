@@ -21,7 +21,11 @@ class BitcoinUnitSelectionScreen extends ConsumerWidget {
     final settings = ref.watch(settingsViewModelProvider);
     return Scaffold(
       backgroundColor: context.colorScheme.surface,
-      appBar: const CustomAppBar(title: 'Bitcoin Unit', leadingIcon: true),
+      appBar: const CustomAppBar(
+        title: 'Bitcoin Unit',
+        leadingIcon: true,
+        fallbackLocation: RoutePaths.settings,
+      ),
       body: settings.when(
         skipLoadingOnRefresh: false,
         loading: () => const Center(

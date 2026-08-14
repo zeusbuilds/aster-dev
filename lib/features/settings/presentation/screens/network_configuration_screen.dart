@@ -18,6 +18,7 @@ class NetworkConfigurationScreen extends ConsumerWidget {
       appBar: const CustomAppBar(
         title: 'Network Configuration',
         leadingIcon: true,
+        fallbackLocation: RoutePaths.advancedSettingsLocation,
       ),
       body: configuration.when(
         loading: () => const Center(

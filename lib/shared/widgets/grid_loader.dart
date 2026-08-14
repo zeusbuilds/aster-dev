@@ -49,11 +49,15 @@ enum GridLoaderColorStyle {
 /// The widget is drawn with a single [CustomPainter] for performance and uses
 /// only opacity animations (no scaling), so it stays pixel-perfect inside
 /// tightly constrained layouts like buttons.
+///
+/// Generic instances use the theme primary color for contrast on app surfaces.
+/// Consumers on dark or branded surfaces must request [GridLoaderColorStyle.white]
+/// or an explicit custom color.
 class GridLoader extends StatefulWidget {
   const GridLoader({
     super.key,
     this.style = GridLoaderStyle.breathingGrid,
-    this.colorStyle = GridLoaderColorStyle.white,
+    this.colorStyle = GridLoaderColorStyle.themePrimary,
     this.size = GridLoaderSize.small,
     this.color,
     this.semanticLabel,

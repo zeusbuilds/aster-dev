@@ -1,54 +1,55 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-
-import 'package:ming_cute_icons/ming_cute_icons.dart';
 
 import '../../../../shared/shared.dart';
 import '../../domain/models/models.dart';
 
-/// Widget representing a single wallet option in the wallet selection list
-///
-/// Shows wallet name, ID, and selection indicator
+/// Accessible single-choice row for one non-secret wallet profile.
 class WalletSelectOptionRow extends StatelessWidget {
-  /// The wallet model to display
-  final WalletProfile wallet;
-
-  /// Callback when the row is tapped
-  final VoidCallback? onTap;
-
-  /// Whether this wallet is currently selected.
-  final bool selected;
-
   const WalletSelectOptionRow({
     super.key,
     required this.wallet,
-    this.onTap,
     required this.selected,
+    required this.enabled,
+    this.loading = false,
+    this.onTap,
   });
+
+  final WalletProfile wallet;
+
+  /// Whether this is the current wallet.
+  final bool selected;
+
+  /// Whether the wallet choice set is available.
+  ///
+  /// A selected wallet remains enabled but has no tap action. An in-flight
+  /// switch disables every choice until the repository returns.
+  final bool enabled;
+
+  /// Whether this row owns the current wallet-switch operation.
+  final bool loading;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.appColors;
     final spacing = context.spacing;
     final icons = context.icons;
-    final type = context.type;
-
-    void select() {
-      unawaited(context.haptics.trigger(HapticIntent.selection));
-      onTap?.call();
-    }
+    final effectiveOnTap = enabled && !selected && !loading ? onTap : null;
 
     return Semantics(
+      container: true,
       button: true,
-      enabled: onTap != null,
+      enabled: enabled,
       selected: selected,
+      inMutuallyExclusiveGroup: true,
       label: '${wallet.name}, ${wallet.displayId}',
+      value: loading ? 'Switching' : null,
+      liveRegion: loading,
+      onTap: effectiveOnTap,
       excludeSemantics: true,
       child: Material(
-        color: colors.transparentSurface,
+        color: context.appColors.transparentSurface,
         child: InkWell(
-          onTap: onTap == null ? null : select,
+          onTap: effectiveOnTap,
           child: Padding(
             padding: EdgeInsets.symmetric(
               horizontal: spacing.screenPadding,
@@ -59,20 +60,32 @@ class WalletSelectOptionRow extends StatelessWidget {
                 AsterSelectionIndicator(selected: selected),
                 SizedBox(width: spacing.lg),
                 Expanded(
-                  child: Text(
-                    wallet.name,
-                    style: type.rowTitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        wallet.name,
+                        style: context.type.rowTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        wallet.displayId,
+                        style: context.type.supportingMeta,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
                 ),
-                SizedBox(width: spacing.xxxl),
-                Text(wallet.displayId, style: type.rowValue, maxLines: 1),
-                SizedBox(width: spacing.md),
-                Icon(
-                  MingCuteIcons.mgc_edit_2_line,
-                  size: icons.sm,
-                  color: colors.textTertiary,
+                SizedBox(width: spacing.lg),
+                SizedBox.square(
+                  dimension: icons.md,
+                  child: loading
+                      ? const GridLoader(
+                          colorStyle: GridLoaderColorStyle.themePrimary,
+                        )
+                      : null,
                 ),
               ],
             ),

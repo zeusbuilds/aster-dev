@@ -20,7 +20,11 @@ class CurrencySelectionScreen extends ConsumerWidget {
     final settings = ref.watch(settingsViewModelProvider);
     return Scaffold(
       backgroundColor: context.colorScheme.surface,
-      appBar: const CustomAppBar(title: 'Select Currency', leadingIcon: true),
+      appBar: const CustomAppBar(
+        title: 'Select Currency',
+        leadingIcon: true,
+        fallbackLocation: RoutePaths.settings,
+      ),
       body: settings.when(
         skipLoadingOnRefresh: false,
         data: (state) => _CurrencyList(state: state),

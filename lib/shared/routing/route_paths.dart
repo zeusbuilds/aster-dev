@@ -33,6 +33,9 @@ class RoutePaths {
   static const String advancedSettings = 'advanced';
   static const String networkConfiguration = 'network-configuration';
 
+  /// Concrete parent location for nested Advanced Settings routes.
+  static const String advancedSettingsLocation = '$settings/$advancedSettings';
+
   /// Concrete Send destination location for a validated payment-target slug.
   static String sendAddressFor(String paymentTarget) {
     return '$send/${Uri.encodeComponent(paymentTarget)}/address';

@@ -20,7 +20,11 @@ class CountrySelectionScreen extends ConsumerWidget {
     final settings = ref.watch(settingsViewModelProvider);
     return Scaffold(
       backgroundColor: context.colorScheme.surface,
-      appBar: const CustomAppBar(title: 'Select Region', leadingIcon: true),
+      appBar: const CustomAppBar(
+        title: 'Select Region',
+        leadingIcon: true,
+        fallbackLocation: RoutePaths.settings,
+      ),
       body: settings.when(
         skipLoadingOnRefresh: false,
         data: (state) => _RegionList(state: state),

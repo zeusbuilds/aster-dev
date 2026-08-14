@@ -13,7 +13,11 @@ class AdvancedSettingsScreen extends StatelessWidget {
     final spacing = context.spacing;
     return Scaffold(
       backgroundColor: context.colorScheme.surface,
-      appBar: const CustomAppBar(title: 'Advanced', leadingIcon: true),
+      appBar: const CustomAppBar(
+        title: 'Advanced',
+        leadingIcon: true,
+        fallbackLocation: RoutePaths.settings,
+      ),
       body: SafeArea(
         top: false,
         child: ListView(

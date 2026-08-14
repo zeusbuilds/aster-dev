@@ -411,6 +411,15 @@ void main() {
     );
   });
 
+  testWidgets('generic loaders default to a surface-visible theme color', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_themedHarness(const GridLoader()));
+
+    final loader = tester.widget<GridLoader>(find.byType(GridLoader));
+    expect(loader.colorStyle, GridLoaderColorStyle.themePrimary);
+  });
+
   testWidgets('bottom navigation indicator stays centered on each slot', (
     tester,
   ) async {

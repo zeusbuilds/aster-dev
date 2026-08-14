@@ -19,6 +19,13 @@ class WalletViewModel extends _$WalletViewModel {
     if (ref.mounted) state = next;
   }
 
+  /// Clears a transient switch failure after presentation consumes it.
+  void clearOperationFailure() {
+    final current = state.value;
+    if (current == null || current.operationFailure == null) return;
+    state = AsyncData(current.copyWith(operationFailure: null));
+  }
+
   /// Publishes the exact registry returned by a successful repository commit.
   /// This avoids a second read and prevents onboarding from navigating on an
   /// optimistic or independently reconstructed wallet state.
