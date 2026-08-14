@@ -96,10 +96,11 @@ class _AssetsSectionState extends ConsumerState<AssetsSection> {
           .read(settingsViewModelProvider)
           .value
           ?.operationFailure;
+      if (failure == null) return;
       unawaited(context.haptics.trigger(HapticIntent.error));
       context.toasts.show(
         title: 'Could not update balance visibility',
-        message: failure?.userMessage,
+        message: failure.userMessage,
         variant: ToastVariant.failure,
       );
       ref.read(settingsViewModelProvider.notifier).clearOperationFailure();

@@ -233,7 +233,14 @@ class _PriceCardState extends ConsumerState<PriceCard> {
   static String _formatBasisPoints(int? basisPoints) {
     if (basisPoints == null) return '';
     final absolute = basisPoints.abs();
-    return '${absolute ~/ 100}.${(absolute % 100) ~/ 10}%';
+    final wholePercent = absolute ~/ 100;
+    final hundredths = absolute % 100;
+    final fraction = switch (hundredths) {
+      0 => '0',
+      _ when hundredths % 10 == 0 => '${hundredths ~/ 10}',
+      _ => hundredths.toString().padLeft(2, '0'),
+    };
+    return '$wholePercent.$fraction%';
   }
 
   static String _headerSemantics({

@@ -44,12 +44,16 @@ final class PaymentFlowTestHarness {
       sdkNetwork: 'regtest',
     ),
     Map<String, Object> preferenceValues = const {},
+    PreferencesService Function(SharedPreferences preferences)?
+    preferenceServiceBuilder,
     ResilientHttpClient? httpClient,
     UtcClock? clock,
   }) async {
     SharedPreferences.setMockInitialValues(preferenceValues);
     final preferences = await SharedPreferences.getInstance();
-    final preferenceService = PreferencesService(preferences);
+    final preferenceService =
+        preferenceServiceBuilder?.call(preferences) ??
+        PreferencesService(preferences);
     final effectiveClock = clock ?? () => DateTime.now().toUtc();
     final selectedEngine = engine ?? FakeWalletEngine();
     final runtime = WalletRuntime(

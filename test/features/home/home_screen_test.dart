@@ -6,6 +6,7 @@ import 'package:aster/features/home/presentation/screens/screens.dart';
 import 'package:aster/features/home/presentation/widgets/widgets.dart';
 import 'package:aster/features/market/domain/models/models.dart';
 import 'package:aster/features/settings/domain/models/models.dart';
+import 'package:aster/features/settings/presentation/view_model/view_models.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
@@ -68,6 +69,56 @@ void main() {
       isFalse,
     );
   });
+
+  testWidgets(
+    'Home suppresses false feedback from a stale visibility completion',
+    (tester) async {
+      final now = DateTime.utc(2026, 8, 11, 12);
+      final preferencesWrite = Completer<void>();
+      final releaseWrite = Completer<void>();
+      final httpClient = _marketClient(now);
+      final harness = await PaymentFlowTestHarness.create(
+        clock: () => now,
+        httpClient: httpClient,
+        preferenceValues: const {'utexo.settings.v1.balances_visible': true},
+        preferenceServiceBuilder: (preferences) =>
+            _BlockingVisibilityPreferencesService(
+              preferences,
+              writeStarted: preferencesWrite,
+              releaseWrite: releaseWrite,
+            ),
+      );
+      addTearDown(httpClient.close);
+      addTearDown(() => _disposeHarness(tester, harness));
+      await _pump(tester, harness, const HomeScreen());
+      final enabledVisibilityButton = find.byWidgetPredicate(
+        (widget) =>
+            widget is AsterIconButton &&
+            widget.tooltip == 'Hide balances' &&
+            widget.onPressed != null,
+      );
+      await _pumpUntil(
+        tester,
+        () => enabledVisibilityButton.evaluate().isNotEmpty,
+      );
+
+      final visibilityButton = tester.widget<AsterIconButton>(
+        enabledVisibilityButton,
+      );
+      visibilityButton.onPressed!();
+      await preferencesWrite.future;
+      harness.container.invalidate(settingsViewModelProvider);
+      await tester.pump();
+      releaseWrite.complete();
+      await _pumpUntil(
+        tester,
+        () => find.byTooltip('Show balances').evaluate().isNotEmpty,
+      );
+
+      expect(harness.haptics.intents, isEmpty);
+      expect(harness.toasts.messages, isEmpty);
+    },
+  );
 
   testWidgets('Home remains scrollable and accessible at 2x text scale', (
     tester,
@@ -271,7 +322,7 @@ void main() {
       _currentResponse(observedAt: observed, bitcoinPrice: 100000),
     );
     const loadedLabel =
-        r'Bitcoin price $100,000.00 USD. up 1.0% over 24 hours. '
+        r'Bitcoin price $100,000.00 USD. up 1.01% over 24 hours. '
         'Powered by CoinGecko.';
     await _pumpUntil(
       tester,
@@ -280,18 +331,42 @@ void main() {
 
     expect(tester.getSize(find.byType(PriceCard)), loadingSize);
     final percentage = find.byWidgetPredicate(
-      (widget) => widget is NumericText && widget.text == '1.0%',
+      (widget) => widget is NumericText && widget.text == '1.01%',
     );
     expect(percentage, findsOneWidget);
     final richText = tester.widget<Text>(
       find.descendant(of: percentage, matching: find.byType(Text)),
     );
     final spans = (richText.textSpan! as TextSpan).children!.cast<TextSpan>();
-    expect(spans.map((span) => span.text), ['1.0', '%']);
+    expect(spans.map((span) => span.text), ['1.01', '%']);
     expect(spans.map((span) => span.style?.fontFamily), [
       'Public Sans',
       'DM Sans',
     ]);
+  });
+
+  testWidgets('market header preserves exact basis-point precision', (
+    tester,
+  ) async {
+    final now = DateTime.utc(2026, 8, 11, 12);
+    final httpClient = _marketClient(
+      now,
+      firstPrice: 100000,
+      bitcoinPrice: 100190,
+    );
+    final harness = await PaymentFlowTestHarness.create(
+      clock: () => now,
+      httpClient: httpClient,
+    );
+    addTearDown(httpClient.close);
+    addTearDown(() => _disposeHarness(tester, harness));
+    await _pump(tester, harness, const HomeScreen());
+
+    await _pumpUntil(tester, () => find.text('0.19%').evaluate().isNotEmpty);
+    expect(
+      find.bySemanticsLabel(RegExp(r'up 0\.19% over 24 hours')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('market header announces falling and unavailable prices', (
@@ -309,7 +384,7 @@ void main() {
     );
     await _pump(tester, fallingHarness, const HomeScreen());
     const fallingLabel =
-        r'Bitcoin price $98,000.00 USD. down 1.0% over 24 hours. '
+        r'Bitcoin price $98,000.00 USD. down 1.01% over 24 hours. '
         'Powered by CoinGecko.';
     await _pumpUntil(
       tester,
@@ -590,4 +665,24 @@ Future<void> _disposeHarness(
   final disposal = harness.dispose();
   await tester.pump();
   await disposal;
+}
+
+final class _BlockingVisibilityPreferencesService extends PreferencesService {
+  _BlockingVisibilityPreferencesService(
+    super.preferences, {
+    required this.writeStarted,
+    required this.releaseWrite,
+  });
+
+  final Completer<void> writeStarted;
+  final Completer<void> releaseWrite;
+
+  @override
+  Future<void> setBool(String key, bool value) async {
+    if (key == 'utexo.settings.v1.balances_visible') {
+      if (!writeStarted.isCompleted) writeStarted.complete();
+      await releaseWrite.future;
+    }
+    return super.setBool(key, value);
+  }
 }
