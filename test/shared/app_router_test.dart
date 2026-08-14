@@ -4,6 +4,7 @@ import 'package:aster/core/core.dart';
 import 'package:aster/features/onboarding/presentation/screens/screens.dart';
 import 'package:aster/features/onboarding/presentation/view_model/view_models.dart';
 import 'package:aster/features/onboarding/presentation/widgets/widgets.dart';
+import 'package:aster/features/skeleton/presentation/widgets/bottom_nav.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:aster/features/wallet/presentation/view_model/wallet_view_model.dart';
 import 'package:aster/shared/shared.dart';
@@ -69,7 +70,7 @@ void main() {
     expect(find.text('Send'), findsWidgets);
   });
 
-  testWidgets('an invalid Activity asset slug returns to wallet home', (
+  testWidgets('an invalid Activity asset slug returns to the wallet shell', (
     tester,
   ) async {
     tester.binding.platformDispatcher.defaultRouteNameTestValue =
@@ -83,7 +84,8 @@ void main() {
 
     final router = await _pumpRouter(tester, harness);
 
-    expect(_location(router), RoutePaths.home);
+    expect(_location(router), RoutePaths.skeleton);
+    expect(find.byType(BottomNav), findsOneWidget);
   });
 
   testWidgets('a malformed Activity ID returns to the matching asset list', (

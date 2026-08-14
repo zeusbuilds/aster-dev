@@ -31,9 +31,9 @@ class _CandleChartState extends State<CandleChart>
   double _loadingAnimationProgress = 0;
 
   List<_CandleData>? _candles;
-  double? _minPrice;
-  double? _maxPrice;
-  double? _priceRange;
+  int? _minPrice;
+  int? _maxPrice;
+  int? _priceRange;
 
   @override
   void initState() {
@@ -133,7 +133,7 @@ class _CandleChartState extends State<CandleChart>
         : items;
 
     final prices = last24Items
-        .map((point) => point.fiatMinorUnits.toDouble())
+        .map((point) => point.fiatMinorUnits)
         .toList(growable: false);
     _minPrice = prices.min;
     _maxPrice = prices.max;
@@ -397,7 +397,7 @@ class _CandleChartState extends State<CandleChart>
     );
   }
 
-  double _priceToY(double price, double height) {
+  double _priceToY(int price, double height) {
     if (_priceRange == null || _priceRange == 0) return height / 2;
     final normalized = (price - _minPrice!) / _priceRange!;
     return height - (normalized * height);
@@ -407,8 +407,8 @@ class _CandleChartState extends State<CandleChart>
     final bars = <_CandleData>[];
 
     for (int i = 0; i < items.length; i++) {
-      final price = items[i].fiatMinorUnits.toDouble();
-      final prevPrice = i > 0 ? items[i - 1].fiatMinorUnits.toDouble() : price;
+      final price = items[i].fiatMinorUnits;
+      final prevPrice = i > 0 ? items[i - 1].fiatMinorUnits : price;
 
       bars.add(_CandleData(open: prevPrice, close: price));
     }
@@ -454,6 +454,6 @@ class _CandleWidget extends StatelessWidget {
 class _CandleData {
   const _CandleData({required this.open, required this.close});
 
-  final double open;
-  final double close;
+  final int open;
+  final int close;
 }

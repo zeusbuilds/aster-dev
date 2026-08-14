@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:aster/core/core.dart';
 import 'package:aster/features/home/presentation/screens/screens.dart';
+import 'package:aster/features/home/presentation/widgets/candle_chart.dart';
 import 'package:aster/features/home/presentation/widgets/widgets.dart';
 import 'package:aster/features/market/domain/models/models.dart';
 import 'package:aster/features/settings/domain/models/models.dart';
@@ -449,6 +450,54 @@ void main() {
     expect(resizedNoise.width, inInclusiveRange(1, 1600));
     expect(resizedNoise.height, isNull);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('chart preserves integer deltas above double precision', (
+    tester,
+  ) async {
+    final now = DateTime.utc(2026, 8, 14, 12);
+    const maximumSignedInteger = 0x7fffffffffffffff;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Scaffold(
+          body: CandleChart(
+            isSkeleton: false,
+            data: [
+              BitcoinPricePoint(
+                timestamp: now.subtract(const Duration(hours: 1)),
+                fiatMinorUnits: maximumSignedInteger - 1,
+              ),
+              BitcoinPricePoint(
+                timestamp: now,
+                fiatMinorUnits: maximumSignedInteger,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final candleBoxes = tester
+        .widgetList<SizedBox>(
+          find.descendant(
+            of: find.byType(CandleChart),
+            matching: find.byType(SizedBox),
+          ),
+        )
+        .where(
+          (box) =>
+              (box.width ?? 0) > 0 &&
+              (box.height ?? 0) > 0 &&
+              box.width != double.infinity,
+        )
+        .toList(growable: false);
+
+    expect(candleBoxes, hasLength(2));
+    expect(
+      candleBoxes.last.height,
+      greaterThan(candleBoxes.first.height! * 10),
+    );
   });
 }
 

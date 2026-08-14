@@ -1,11 +1,46 @@
+import 'dart:async';
+
 import 'package:aster/core/bootstrap/app_loader.dart';
 import 'package:aster/core/errors/errors.dart';
+import 'package:aster/shared/theme/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('startup splash owns semantics until the app is revealed', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final initialization = Completer<ProviderContainer>();
+    await tester.pumpWidget(
+      AppLoader(
+        initialize: () => initialization.future,
+        child: const MaterialApp(home: Text('Ready')),
+      ),
+    );
+
+    expect(find.bySemanticsLabel('Opening UTEXO'), findsOneWidget);
+    expect(find.bySemanticsLabel('Ready'), findsNothing);
+
+    initialization.complete(ProviderContainer());
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Ready'), findsOneWidget);
+    expect(find.bySemanticsLabel('Opening UTEXO'), findsOneWidget);
+    expect(find.bySemanticsLabel('Ready'), findsNothing);
+
+    const motion = AsterMotion();
+    await tester.pump(motion.bootstrapRevealDelay);
+    await tester.pump();
+    await tester.pumpAndSettle(motion.splashRevealDuration);
+    expect(find.bySemanticsLabel('Opening UTEXO'), findsNothing);
+    expect(find.bySemanticsLabel('Ready'), findsOneWidget);
+    semantics.dispose();
+  });
+
   testWidgets('shows redacted bootstrap failure and can recover on retry', (
     tester,
   ) async {

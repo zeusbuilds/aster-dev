@@ -19,13 +19,21 @@ class AnimatedSplashScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return RepaintBoundary(
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          _Background(controller: controller),
-          _Foreground(controller: controller),
-        ],
+    return BlockSemantics(
+      child: Semantics(
+        container: true,
+        liveRegion: true,
+        label: 'Opening UTEXO',
+        excludeSemantics: true,
+        child: RepaintBoundary(
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              _Background(controller: controller),
+              _Foreground(controller: controller),
+            ],
+          ),
+        ),
       ),
     );
   }

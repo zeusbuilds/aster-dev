@@ -16,16 +16,27 @@ class SplashScreen extends StatelessWidget {
     final gradients = context.gradients;
     final metrics = context.metrics;
 
-    return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: gradients.splashBackdrop.toLinearGradient(),
-        ),
-        child: Center(
-          child: SvgPicture.asset(
-            'assets/brand/utexo-mark.svg',
-            width: metrics.splashLogoWidth,
-            colorFilter: ColorFilter.mode(colors.onBrandArt, BlendMode.srcIn),
+    return BlockSemantics(
+      child: Semantics(
+        container: true,
+        liveRegion: true,
+        label: 'Opening wallet',
+        excludeSemantics: true,
+        child: Scaffold(
+          body: Container(
+            decoration: BoxDecoration(
+              gradient: gradients.splashBackdrop.toLinearGradient(),
+            ),
+            child: Center(
+              child: SvgPicture.asset(
+                'assets/brand/utexo-mark.svg',
+                width: metrics.splashLogoWidth,
+                colorFilter: ColorFilter.mode(
+                  colors.onBrandArt,
+                  BlendMode.srcIn,
+                ),
+              ),
+            ),
           ),
         ),
       ),

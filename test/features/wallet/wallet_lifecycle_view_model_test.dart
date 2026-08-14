@@ -171,6 +171,7 @@ void main() {
 
     await pump(const WalletLifecycleState(obscured: true, transitioning: true));
     expect(find.byType(SplashScreen), findsOneWidget);
+    expect(find.bySemanticsLabel('Opening wallet'), findsOneWidget);
     expect(find.text('1 BTC'), findsNothing);
     expect(
       find.bySemanticsLabel(RegExp('Sensitive wallet balance')),

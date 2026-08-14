@@ -108,11 +108,9 @@ class BottomNav extends ConsumerWidget {
                             destination: _destinations[index],
                             selected: selectedIndex == index,
                             ordinal: index.toDouble(),
-                            onTap: selectedIndex == index
-                                ? null
-                                : () => ref
-                                      .read(skeletonIndexProvider.notifier)
-                                      .setIndex(index),
+                            onSelect: () => ref
+                                .read(skeletonIndexProvider.notifier)
+                                .setIndex(index),
                           ),
                         ),
                     ],
@@ -151,33 +149,35 @@ class _NavItem extends StatelessWidget {
     required this.destination,
     required this.selected,
     required this.ordinal,
-    required this.onTap,
+    required this.onSelect,
   });
 
   final _NavDestination destination;
   final bool selected;
   final double ordinal;
-  final VoidCallback? onTap;
+  final VoidCallback onSelect;
 
   @override
   Widget build(BuildContext context) {
     void select() {
+      if (selected) return;
       unawaited(context.haptics.trigger(HapticIntent.selection));
-      onTap?.call();
+      onSelect();
     }
 
     return Semantics(
       key: ValueKey('bottom-nav-${destination.label.toLowerCase()}'),
       button: true,
       selected: selected,
-      enabled: onTap != null,
+      enabled: true,
       label: destination.label,
       sortKey: OrdinalSortKey(ordinal),
+      onTap: select,
       excludeSemantics: true,
       child: Material(
         color: context.appColors.transparentSurface,
         child: InkWell(
-          onTap: onTap == null ? null : select,
+          onTap: select,
           child: Center(
             child: Icon(
               selected ? destination.selectedIcon : destination.icon,

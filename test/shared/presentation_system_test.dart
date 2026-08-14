@@ -9,6 +9,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:remixicon/remixicon.dart';
 
+import '../support/presentation_fakes.dart';
+
 void main() {
   testWidgets('theme extensions fail fast outside an Aster theme root', (
     tester,
@@ -422,6 +424,40 @@ void main() {
       closeTo(tester.getCenter(scan).dx, 0.1),
     );
   });
+
+  testWidgets(
+    'selected navigation remains enabled without duplicate feedback',
+    (tester) async {
+      final haptics = RecordingHapticFeedbackService();
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            home: AsterFeedbackScope(
+              haptics: haptics,
+              toasts: _NoopToasts(),
+              child: const Scaffold(body: Stack(children: [BottomNav()])),
+            ),
+          ),
+        ),
+      );
+
+      final home = find.byKey(const ValueKey('bottom-nav-home'));
+      final scan = find.byKey(const ValueKey('bottom-nav-scan'));
+      final selected = tester.getSemantics(home).getSemanticsData();
+      expect(selected.flagsCollection.isSelected, ui.Tristate.isTrue);
+      expect(selected.flagsCollection.isEnabled, ui.Tristate.isTrue);
+      expect(selected.hasAction(ui.SemanticsAction.tap), isTrue);
+
+      await tester.tap(home);
+      await tester.pump();
+      expect(haptics.intents, isEmpty);
+
+      await tester.tap(scan);
+      await tester.pumpAndSettle();
+      expect(haptics.intents, [HapticIntent.selection]);
+    },
+  );
 
   test('app-shell selection rejects impossible destination indices', () {
     final container = ProviderContainer();

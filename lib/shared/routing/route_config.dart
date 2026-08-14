@@ -186,7 +186,7 @@ class RouteConfig {
               state.pathParameters[RoutePaths.assetKindParameter],
             ) ==
             null
-        ? RoutePaths.home
+        ? RoutePaths.skeleton
         : null;
   }
 
@@ -194,7 +194,7 @@ class RouteConfig {
     final kind = WalletAssetKind.tryParse(
       state.pathParameters[RoutePaths.assetKindParameter],
     );
-    if (kind == null) return RoutePaths.home;
+    if (kind == null) return RoutePaths.skeleton;
     final activityId = state.pathParameters[RoutePaths.activityIdParameter];
     return WalletActivity.isValidId(activityId)
         ? null
