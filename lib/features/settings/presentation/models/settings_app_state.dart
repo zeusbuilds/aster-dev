@@ -34,7 +34,7 @@ final class SettingsAppState {
   /// Whether a metadata retry is currently active.
   final bool metadataLoading;
 
-  /// Invalid deployment-link configuration, retained for diagnostics.
+  /// Redacted invalid deployment-link configuration shown persistently in UI.
   final AppFailure? linkConfigurationFailure;
 
   /// Link launch currently awaiting its platform result.

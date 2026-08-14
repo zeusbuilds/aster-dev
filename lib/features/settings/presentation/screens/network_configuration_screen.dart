@@ -5,6 +5,7 @@ import '../../../../core/errors/errors.dart';
 import '../../../../shared/shared.dart';
 import '../models/models.dart';
 import '../view_model/view_models.dart';
+import '../widgets/widgets.dart';
 
 /// Displays validated, non-secret network configuration and live node health.
 class NetworkConfigurationScreen extends ConsumerWidget {
@@ -24,8 +25,8 @@ class NetworkConfigurationScreen extends ConsumerWidget {
         loading: () => const Center(
           child: GridLoader(semanticLabel: 'Loading network configuration'),
         ),
-        error: (error, stackTrace) => _NetworkLoadFailure(
-          message: FailureMapper.from(error, stackTrace).userMessage,
+        error: (error, stackTrace) => SettingsLoadFailure(
+          failure: FailureMapper.from(error, stackTrace),
           onRetry: () => ref.invalidate(networkConfigurationViewModelProvider),
         ),
         data: (state) => _NetworkConfigurationContent(state: state),
@@ -112,21 +113,26 @@ class _NetworkConfigurationContent extends ConsumerWidget {
           ),
           if (state.healthFailure != null) ...[
             SizedBox(height: spacing.lg),
-            Text(
-              state.healthFailure!.userMessage,
-              style: context.type.errorMessage,
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                state.healthFailure!.userMessage,
+                style: context.type.errorMessage,
+              ),
             ),
-            SizedBox(height: spacing.md),
-            CustomButton(
-              text: 'Retry health check',
-              variant: ButtonVariant.secondary,
-              loading: state.refreshing,
-              onTap: state.refreshing
-                  ? null
-                  : () => ref
-                        .read(networkConfigurationViewModelProvider.notifier)
-                        .retryHealth(),
-            ),
+            if (state.healthFailure!.retryable) ...[
+              SizedBox(height: spacing.md),
+              CustomButton(
+                text: 'Retry health check',
+                variant: ButtonVariant.secondary,
+                loading: state.refreshing,
+                onTap: state.refreshing
+                    ? null
+                    : () => ref
+                          .read(networkConfigurationViewModelProvider.notifier)
+                          .retryHealth(),
+              ),
+            ],
           ],
         ],
       ),
@@ -193,34 +199,6 @@ class _ConfigurationRow extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _NetworkLoadFailure extends StatelessWidget {
-  const _NetworkLoadFailure({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.all(context.spacing.screenPadding),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              message,
-              style: context.type.errorMessage,
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: context.spacing.xxl),
-            CustomButton(text: 'Retry', onTap: onRetry),
           ],
         ),
       ),

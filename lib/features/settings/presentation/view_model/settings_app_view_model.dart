@@ -89,7 +89,14 @@ class SettingsAppViewModel extends _$SettingsAppViewModel {
     } catch (error, stackTrace) {
       return (
         values: const <SettingsExternalLink>{},
-        failure: FailureMapper.from(error, stackTrace),
+        failure: AppFailure(
+          code: 'settings_link_configuration_invalid',
+          kind: AppFailureKind.configuration,
+          userMessage: 'Public links are unavailable in this build.',
+          retryable: false,
+          cause: FailureMapper.diagnosticCause(error),
+          stackTrace: stackTrace,
+        ),
       );
     }
   }

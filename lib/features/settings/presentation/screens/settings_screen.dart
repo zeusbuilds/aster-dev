@@ -33,7 +33,7 @@ class SettingsScreen extends ConsumerWidget {
         ? FailureMapper.from(
             walletState.error!,
             walletState.stackTrace ?? StackTrace.current,
-          ).userMessage
+          )
         : null;
     final walletLoading = walletState.isLoading;
     final settingsState = settings.value;
@@ -42,7 +42,7 @@ class SettingsScreen extends ConsumerWidget {
         ? FailureMapper.from(
             settings.error!,
             settings.stackTrace ?? StackTrace.current,
-          ).userMessage
+          )
         : null;
     final settingsEnabled = settingsState != null && !settingsState.isSaving;
 
@@ -81,15 +81,23 @@ class SettingsScreen extends ConsumerWidget {
             ),
             if (walletFailure != null) ...[
               SizedBox(height: spacing.md),
-              Text(walletFailure, style: type.errorMessage),
-              SizedBox(height: spacing.sm),
-              CustomButton.compact(
-                text: 'Retry wallet',
-                variant: ButtonVariant.secondary,
-                onTap: () => unawaited(
-                  ref.read(walletViewModelProvider.notifier).reload(),
+              Semantics(
+                liveRegion: true,
+                child: Text(
+                  walletFailure.userMessage,
+                  style: type.errorMessage,
                 ),
               ),
+              if (walletFailure.retryable) ...[
+                SizedBox(height: spacing.sm),
+                CustomButton.compact(
+                  text: 'Retry wallet',
+                  variant: ButtonVariant.secondary,
+                  onTap: () => unawaited(
+                    ref.read(walletViewModelProvider.notifier).reload(),
+                  ),
+                ),
+              ],
             ],
             SizedBox(height: spacing.xxl),
 
@@ -188,14 +196,22 @@ class SettingsScreen extends ConsumerWidget {
             ),
             if (settingsFailure != null) ...[
               SizedBox(height: spacing.md),
-              Text(settingsFailure, style: type.errorMessage),
-              SizedBox(height: spacing.sm),
-              CustomButton(
-                text: 'Retry settings',
-                variant: ButtonVariant.secondary,
-                onTap: () =>
-                    ref.read(settingsViewModelProvider.notifier).retry(),
+              Semantics(
+                liveRegion: true,
+                child: Text(
+                  settingsFailure.userMessage,
+                  style: type.errorMessage,
+                ),
               ),
+              if (settingsFailure.retryable) ...[
+                SizedBox(height: spacing.sm),
+                CustomButton(
+                  text: 'Retry settings',
+                  variant: ButtonVariant.secondary,
+                  onTap: () =>
+                      ref.read(settingsViewModelProvider.notifier).retry(),
+                ),
+              ],
             ],
             SizedBox(height: spacing.xxl),
 

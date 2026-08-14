@@ -262,6 +262,93 @@ void main() {
   });
 
   test(
+    'import coalesces complete phrase edits to the latest pending checksum',
+    () async {
+      final harness = await OnboardingTestHarness.create();
+      addTearDown(harness.dispose);
+      final subscription = harness.container.listen(
+        importWalletViewModelProvider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      await harness.container.read(importWalletViewModelProvider.future);
+      final notifier = harness.container.read(
+        importWalletViewModelProvider.notifier,
+      );
+      final validationGate = Completer<void>();
+      harness.keyGenerator.validationGate = validationGate;
+
+      notifier.updateWords(0, validTestMnemonicWords);
+      await _waitFor(() => harness.keyGenerator.validatedMnemonics.length == 1);
+      notifier.updateWord(11, 'ability');
+      notifier.updateWord(11, 'able');
+      await Future<void>.delayed(Duration.zero);
+
+      expect(harness.keyGenerator.validatedMnemonics, [validTestMnemonic]);
+      expect(
+        harness.container
+            .read(importWalletViewModelProvider)
+            .requireValue
+            .checksumStatus,
+        MnemonicChecksumStatus.checking,
+      );
+
+      validationGate.complete();
+      await _waitFor(() => harness.keyGenerator.validationCompletionCount == 2);
+
+      expect(harness.keyGenerator.validatedMnemonics, [
+        validTestMnemonic,
+        '${validTestMnemonicWords.take(11).join(' ')} able',
+      ]);
+      expect(
+        harness.container
+            .read(importWalletViewModelProvider)
+            .requireValue
+            .checksumStatus,
+        MnemonicChecksumStatus.valid,
+      );
+    },
+  );
+
+  test(
+    'import drops pending checksum work when the phrase becomes incomplete',
+    () async {
+      final harness = await OnboardingTestHarness.create();
+      addTearDown(harness.dispose);
+      final subscription = harness.container.listen(
+        importWalletViewModelProvider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      await harness.container.read(importWalletViewModelProvider.future);
+      final notifier = harness.container.read(
+        importWalletViewModelProvider.notifier,
+      );
+      final validationGate = Completer<void>();
+      harness.keyGenerator.validationGate = validationGate;
+
+      notifier.updateWords(0, validTestMnemonicWords);
+      await _waitFor(() => harness.keyGenerator.validatedMnemonics.length == 1);
+      notifier.updateWord(11, 'ability');
+      notifier.updateWord(11, 'notaword');
+
+      validationGate.complete();
+      await _waitFor(() => harness.keyGenerator.validationCompletionCount == 1);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(harness.keyGenerator.validatedMnemonics, [validTestMnemonic]);
+      final state = harness.container
+          .read(importWalletViewModelProvider)
+          .requireValue;
+      expect(state.wordStatuses.last, MnemonicWordStatus.invalid);
+      expect(state.checksumStatus, MnemonicChecksumStatus.incomplete);
+      expect(state.canSubmit, isFalse);
+    },
+  );
+
+  test(
     'import retries a transient checksum failure exactly on demand',
     () async {
       final harness = await OnboardingTestHarness.create(

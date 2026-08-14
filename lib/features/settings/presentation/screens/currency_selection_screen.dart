@@ -29,8 +29,8 @@ class CurrencySelectionScreen extends ConsumerWidget {
         skipLoadingOnRefresh: false,
         data: (state) => _CurrencyList(state: state),
         loading: () => const _CurrencyLoading(),
-        error: (error, stackTrace) => _SettingsLoadFailure(
-          message: FailureMapper.from(error, stackTrace).userMessage,
+        error: (error, stackTrace) => SettingsLoadFailure(
+          failure: FailureMapper.from(error, stackTrace),
           onRetry: () => ref.read(settingsViewModelProvider.notifier).retry(),
         ),
       ),
@@ -46,7 +46,7 @@ class _CurrencyList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedCode = state.snapshot.preferences.currencyCode;
-    final saving = state.operation == SettingsOperation.currency;
+    final saving = state.isSaving;
     return Stack(
       children: [
         SafeArea(
@@ -69,7 +69,7 @@ class _CurrencyList extends ConsumerWidget {
             },
           ),
         ),
-        if (saving) const _SettingsSavingIndicator(),
+        if (saving) const SettingsSavingIndicator(),
       ],
     );
   }
@@ -126,50 +126,6 @@ class _CurrencyLoading extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _SettingsLoadFailure extends StatelessWidget {
-  const _SettingsLoadFailure({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Center(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.all(context.spacing.screenPadding),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                message,
-                style: context.type.errorMessage,
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: context.spacing.xxl),
-              CustomButton(text: 'Retry', onTap: onRetry),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SettingsSavingIndicator extends StatelessWidget {
-  const _SettingsSavingIndicator();
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      liveRegion: true,
-      label: 'Saving preference',
-      child: const LinearProgressIndicator(),
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:aster/core/bootstrap/app_bootstrap.dart';
 import 'package:aster/core/core.dart';
 import 'package:aster/features/settings/data/repository/repository.dart';
 import 'package:aster/features/settings/presentation/view_model/view_models.dart';
@@ -121,6 +122,14 @@ void main() {
     );
     addTearDown(firstHarness.dispose);
     addTearDown(secondHarness.dispose);
+    firstHarness.engine.networkStatusError = const AppFailureException(
+      AppFailure(
+        code: 'node_temporarily_unavailable',
+        kind: AppFailureKind.unavailable,
+        userMessage: 'Node health is temporarily unavailable.',
+        retryable: true,
+      ),
+    );
     secondHarness.engine.networkStatus = WalletNetworkStatus(
       environment: BlockchainEnvironment.regtest,
       blockHeight: 101,
@@ -132,7 +141,7 @@ void main() {
     );
     var repository = firstHarness.repository;
     final container = ProviderContainer(
-      retry: (retryCount, error) => null,
+      retry: applicationProviderRetryPolicy,
       overrides: [
         walletRepositoryProvider.overrideWith((ref) async => repository),
         walletServiceConfigurationProvider.overrideWithValue(services),
@@ -148,6 +157,15 @@ void main() {
       container.dispose();
     });
     await container.read(networkConfigurationViewModelProvider.future);
+    expect(
+      container
+          .read(networkConfigurationViewModelProvider)
+          .requireValue
+          .healthFailure
+          ?.retryable,
+      isTrue,
+    );
+    firstHarness.engine.networkStatusError = null;
     final gate = Completer<void>();
     firstHarness.engine.networkStatusGate = gate;
     final staleRetry = container
@@ -178,6 +196,89 @@ void main() {
           .status
           ?.blockHeight,
       101,
+    );
+  });
+
+  test('terminal settings load failure rejects explicit retry', () async {
+    var repositoryReads = 0;
+    final container = ProviderContainer(
+      retry: applicationProviderRetryPolicy,
+      overrides: [
+        settingsRepositoryProvider.overrideWith((ref) {
+          repositoryReads += 1;
+          throw const AppFailureException(
+            AppFailure(
+              code: 'settings_configuration_invalid',
+              kind: AppFailureKind.configuration,
+              userMessage: 'Settings are not configured.',
+              retryable: false,
+            ),
+          );
+        }),
+      ],
+    );
+    final subscription = container.listen(
+      settingsViewModelProvider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(() {
+      subscription.close();
+      container.dispose();
+    });
+    await _waitFor(() => container.read(settingsViewModelProvider).hasError);
+
+    await container.read(settingsViewModelProvider.notifier).retry();
+
+    expect(repositoryReads, 1);
+    expect(container.read(settingsViewModelProvider).hasError, isTrue);
+  });
+
+  test('terminal network health failure rejects explicit retry', () async {
+    const services = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.regtest,
+      sdkNetwork: 'regtest',
+    );
+    final harness = await PaymentFlowTestHarness.create(services: services);
+    addTearDown(harness.dispose);
+    harness.engine.networkStatusError = const AppFailureException(
+      AppFailure(
+        code: 'node_configuration_invalid',
+        kind: AppFailureKind.configuration,
+        userMessage: 'Node health is not configured.',
+        retryable: false,
+      ),
+    );
+    final container = ProviderContainer(
+      retry: applicationProviderRetryPolicy,
+      overrides: [
+        walletRepositoryProvider.overrideWith(
+          (ref) async => harness.repository,
+        ),
+        walletServiceConfigurationProvider.overrideWithValue(services),
+      ],
+    );
+    final subscription = container.listen(
+      networkConfigurationViewModelProvider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(() {
+      subscription.close();
+      container.dispose();
+    });
+    final state = await container.read(
+      networkConfigurationViewModelProvider.future,
+    );
+    expect(state.healthFailure?.retryable, isFalse);
+
+    await container
+        .read(networkConfigurationViewModelProvider.notifier)
+        .retryHealth();
+
+    expect(
+      harness.engine.calls.where((call) => call == 'networkStatus'),
+      hasLength(1),
     );
   });
 }

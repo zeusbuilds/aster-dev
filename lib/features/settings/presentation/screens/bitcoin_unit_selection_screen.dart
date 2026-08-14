@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/errors/errors.dart';
 import '../../../../shared/shared.dart';
-import '../models/models.dart';
 import '../view_model/view_models.dart';
 import '../widgets/widgets.dart';
 
@@ -31,13 +30,13 @@ class BitcoinUnitSelectionScreen extends ConsumerWidget {
         loading: () => const Center(
           child: GridLoader(semanticLabel: 'Loading Bitcoin units'),
         ),
-        error: (error, stackTrace) => _UnitLoadFailure(
-          message: FailureMapper.from(error, stackTrace).userMessage,
+        error: (error, stackTrace) => SettingsLoadFailure(
+          failure: FailureMapper.from(error, stackTrace),
           onRetry: () => ref.read(settingsViewModelProvider.notifier).retry(),
         ),
         data: (state) {
           final selected = state.snapshot.preferences.bitcoinUnit;
-          final saving = state.operation == SettingsOperation.bitcoinUnit;
+          final saving = state.isSaving;
           return Stack(
             children: [
               SafeArea(
@@ -60,12 +59,7 @@ class BitcoinUnitSelectionScreen extends ConsumerWidget {
                   },
                 ),
               ),
-              if (saving)
-                Semantics(
-                  liveRegion: true,
-                  label: 'Saving preference',
-                  child: LinearProgressIndicator(),
-                ),
+              if (saving) const SettingsSavingIndicator(),
             ],
           );
         },
@@ -96,33 +90,5 @@ class BitcoinUnitSelectionScreen extends ConsumerWidget {
       variant: ToastVariant.failure,
     );
     ref.read(settingsViewModelProvider.notifier).clearOperationFailure();
-  }
-}
-
-class _UnitLoadFailure extends StatelessWidget {
-  const _UnitLoadFailure({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.all(context.spacing.screenPadding),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              message,
-              style: context.type.errorMessage,
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: context.spacing.xxl),
-            CustomButton(text: 'Retry', onTap: onRetry),
-          ],
-        ),
-      ),
-    );
   }
 }

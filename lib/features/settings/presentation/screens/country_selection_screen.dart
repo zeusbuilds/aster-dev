@@ -29,8 +29,8 @@ class CountrySelectionScreen extends ConsumerWidget {
         skipLoadingOnRefresh: false,
         data: (state) => _RegionList(state: state),
         loading: () => const _RegionLoading(),
-        error: (error, stackTrace) => _RegionLoadFailure(
-          message: FailureMapper.from(error, stackTrace).userMessage,
+        error: (error, stackTrace) => SettingsLoadFailure(
+          failure: FailureMapper.from(error, stackTrace),
           onRetry: () => ref.read(settingsViewModelProvider.notifier).retry(),
         ),
       ),
@@ -46,7 +46,7 @@ class _RegionList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedCode = state.snapshot.preferences.regionCode;
-    final saving = state.operation == SettingsOperation.region;
+    final saving = state.isSaving;
     return Stack(
       children: [
         SafeArea(
@@ -67,12 +67,7 @@ class _RegionList extends ConsumerWidget {
             },
           ),
         ),
-        if (saving)
-          Semantics(
-            liveRegion: true,
-            label: 'Saving preference',
-            child: LinearProgressIndicator(),
-          ),
+        if (saving) const SettingsSavingIndicator(),
       ],
     );
   }
@@ -121,37 +116,6 @@ class _RegionLoading extends StatelessWidget {
           itemBuilder: (context, index) => CountrySelectOptionRow(
             country: Region(name: 'Loading region', code: 'US'),
             selected: false,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RegionLoadFailure extends StatelessWidget {
-  const _RegionLoadFailure({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Center(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.all(context.spacing.screenPadding),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                message,
-                style: context.type.errorMessage,
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: context.spacing.xxl),
-              CustomButton(text: 'Retry', onTap: onRetry),
-            ],
           ),
         ),
       ),

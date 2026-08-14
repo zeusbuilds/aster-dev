@@ -190,6 +190,15 @@ void main() {
     expect(state.metadata?.version, '4.0.0');
     expect(state.availableLinks, isEmpty);
     expect(state.linkConfigurationFailure?.kind, AppFailureKind.configuration);
+    expect(
+      state.linkConfigurationFailure?.code,
+      'settings_link_configuration_invalid',
+    );
+    expect(
+      state.linkConfigurationFailure?.userMessage,
+      'Public links are unavailable in this build.',
+    );
+    expect(state.linkConfigurationFailure?.retryable, isFalse);
   });
 
   test('stale metadata retry cannot overwrite a dependency rebuild', () async {

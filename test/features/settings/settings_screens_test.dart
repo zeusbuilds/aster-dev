@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' as ui;
 
+import 'package:aster/core/bootstrap/app_bootstrap.dart';
 import 'package:aster/core/core.dart';
 import 'package:aster/features/settings/data/repository/repository.dart';
 import 'package:aster/features/settings/domain/models/models.dart';
@@ -114,6 +115,104 @@ void main() {
     await _pumpPendingSelection(tester, screen: const CountrySelectionScreen());
     expect(find.bySemanticsLabel('Loading regions'), findsOneWidget);
     expect(find.bySemanticsLabel('Loading region'), findsNothing);
+  });
+
+  for (final retryable in [true, false]) {
+    for (final scenario in const [
+      (name: 'currency', screen: CurrencySelectionScreen()),
+      (name: 'region', screen: CountrySelectionScreen()),
+      (name: 'Bitcoin unit', screen: BitcoinUnitSelectionScreen()),
+    ]) {
+      testWidgets(
+        '${scenario.name} load ${retryable ? 'shows' : 'hides'} retry',
+        (tester) async {
+          final failure = AppFailure(
+            code: retryable
+                ? 'settings_temporarily_unavailable'
+                : 'settings_configuration_invalid',
+            kind: retryable
+                ? AppFailureKind.unavailable
+                : AppFailureKind.configuration,
+            userMessage: retryable
+                ? 'Settings are temporarily unavailable.'
+                : 'Settings are not configured.',
+            retryable: retryable,
+          );
+          await tester.pumpWidget(
+            ProviderScope(
+              retry: applicationProviderRetryPolicy,
+              overrides: [
+                settingsViewModelProvider.overrideWith(
+                  () => _FailingSettingsViewModel(failure),
+                ),
+              ],
+              child: MaterialApp(
+                theme: AppTheme.light(),
+                home: scenario.screen,
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          expect(find.text(failure.userMessage), findsOneWidget);
+          expect(find.text('Retry'), retryable ? findsOneWidget : findsNothing);
+        },
+      );
+    }
+  }
+
+  testWidgets('all choice screens honor a foreign preference save', (
+    tester,
+  ) async {
+    final state = SettingsState(
+      snapshot: SettingsSnapshot(
+        preferences: AppPreferences.defaults,
+        currencies: [
+          FiatCurrency(
+            name: 'United States Dollar',
+            symbol: r'$',
+            code: 'USD',
+            countryCode: 'US',
+          ),
+        ],
+        regions: [Region(name: 'United States', code: 'US')],
+      ),
+      operation: SettingsOperation.balanceVisibility,
+    );
+    final scenarios = <({Widget screen, Finder option})>[
+      (
+        screen: const CurrencySelectionScreen(),
+        option: find.bySemanticsLabel(r'United States Dollar, $ USD'),
+      ),
+      (
+        screen: const CountrySelectionScreen(),
+        option: find.bySemanticsLabel('United States'),
+      ),
+      (
+        screen: const BitcoinUnitSelectionScreen(),
+        option: find.bySemanticsLabel(RegExp(r'^Bitcoin,')),
+      ),
+    ];
+
+    for (final scenario in scenarios) {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            settingsViewModelProvider.overrideWith(
+              () => _StaticSettingsViewModel(state),
+            ),
+          ],
+          child: MaterialApp(theme: AppTheme.light(), home: scenario.screen),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      final semantics = tester.getSemantics(scenario.option).getSemanticsData();
+      expect(semantics.flagsCollection.isEnabled, ui.Tristate.isFalse);
+      expect(semantics.hasAction(ui.SemanticsAction.tap), isFalse);
+      expect(find.bySemanticsLabel('Saving preference'), findsOneWidget);
+    }
   });
 
   testWidgets('region and currency rows expose available choice semantics', (
@@ -262,6 +361,82 @@ void main() {
     expect(find.text('https://explorer.example.com/regtest'), findsOneWidget);
   });
 
+  for (final retryable in [true, false]) {
+    testWidgets('network load ${retryable ? 'shows' : 'hides'} retry', (
+      tester,
+    ) async {
+      final failure = AppFailure(
+        code: retryable
+            ? 'network_temporarily_unavailable'
+            : 'network_configuration_invalid',
+        kind: retryable
+            ? AppFailureKind.unavailable
+            : AppFailureKind.configuration,
+        userMessage: retryable
+            ? 'Network configuration is temporarily unavailable.'
+            : 'Network configuration is invalid.',
+        retryable: retryable,
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          retry: applicationProviderRetryPolicy,
+          overrides: [
+            networkConfigurationViewModelProvider.overrideWith(
+              () => _FailingNetworkConfigurationViewModel(failure),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            home: const NetworkConfigurationScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text(failure.userMessage), findsOneWidget);
+      expect(find.text('Retry'), retryable ? findsOneWidget : findsNothing);
+    });
+  }
+
+  testWidgets('terminal network health failure has no retry action', (
+    tester,
+  ) async {
+    const configuration = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.regtest,
+      sdkNetwork: 'regtest',
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          networkConfigurationViewModelProvider.overrideWith(
+            () => _StaticNetworkConfigurationViewModel(
+              const NetworkConfigurationState(
+                configuration: configuration,
+                healthFailure: AppFailure(
+                  code: 'network_configuration_invalid',
+                  kind: AppFailureKind.configuration,
+                  userMessage: 'Network configuration is invalid.',
+                  retryable: false,
+                ),
+              ),
+            ),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const NetworkConfigurationScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final failure = find.text('Network configuration is invalid.');
+    await tester.scrollUntilVisible(failure, 300);
+    await tester.pump();
+    expect(failure, findsOneWidget);
+    expect(find.text('Retry health check'), findsNothing);
+  });
+
   testWidgets('advanced disclosures are disabled without auth policy', (
     tester,
   ) async {
@@ -357,6 +532,65 @@ void main() {
     expect(find.text('Wallet information is unavailable.'), findsOneWidget);
     expect(find.text('Retry wallet'), findsOneWidget);
     expect(find.text('Main'), findsNothing);
+  });
+
+  testWidgets('terminal wallet and settings failures expose no retry action', (
+    tester,
+  ) async {
+    final wallet = Completer<WalletState>();
+    const walletFailure = AppFailure(
+      code: 'wallet_configuration_invalid',
+      kind: AppFailureKind.configuration,
+      userMessage: 'Wallet information is not configured.',
+      retryable: false,
+    );
+    const settingsFailure = AppFailure(
+      code: 'settings_configuration_invalid',
+      kind: AppFailureKind.configuration,
+      userMessage: 'App settings are not configured.',
+      retryable: false,
+    );
+    await _pumpSettingsScreen(
+      tester,
+      walletFuture: wallet.future,
+      appRepository: _appRepository(),
+      settingsViewModelFactory: () =>
+          _FailingSettingsViewModel(settingsFailure),
+    );
+    wallet.completeError(
+      const AppFailureException(walletFailure),
+      StackTrace.current,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text(walletFailure.userMessage), findsOneWidget);
+    expect(find.text(settingsFailure.userMessage), findsOneWidget);
+    expect(find.text('Retry wallet'), findsNothing);
+    expect(find.text('Retry settings'), findsNothing);
+  });
+
+  testWidgets('malformed public links expose a persistent release failure', (
+    tester,
+  ) async {
+    await _pumpSettingsScreen(
+      tester,
+      walletFuture: Future.value(WalletState(activeWallet: _walletProfile)),
+      appRepository: _appRepository(),
+      linkConfiguration: PublicLinkConfiguration(
+        contactSupport: Uri.parse('http://support.example.com'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final failure = find.text('Public links are unavailable in this build.');
+    await tester.scrollUntilVisible(failure, 300);
+    await tester.pump();
+
+    expect(failure, findsOneWidget);
+    expect(find.text('Retry'), findsNothing);
+    final support = tester.getSemantics(
+      find.byKey(const ValueKey('settings-link-contactSupport')),
+    );
+    expect(support.flagsCollection.isEnabled, ui.Tristate.isFalse);
   });
 
   testWidgets('configured public link reports a bounded launch failure', (
@@ -504,6 +738,7 @@ Future<void> _pumpSettingsScreen(
   ToastPresentationService? toasts,
   TextScaler textScaler = TextScaler.noScaling,
   PublicLinkConfiguration linkConfiguration = const PublicLinkConfiguration(),
+  SettingsViewModel Function()? settingsViewModelFactory,
 }) async {
   SharedPreferences.setMockInitialValues({});
   final settingsRepository = SettingsRepository(
@@ -516,9 +751,12 @@ Future<void> _pumpSettingsScreen(
         walletViewModelProvider.overrideWith(
           () => _TestWalletViewModel(walletFuture),
         ),
-        settingsRepositoryProvider.overrideWith(
-          (ref) async => settingsRepository,
-        ),
+        if (settingsViewModelFactory case final factory?)
+          settingsViewModelProvider.overrideWith(factory)
+        else
+          settingsRepositoryProvider.overrideWith(
+            (ref) async => settingsRepository,
+          ),
         settingsAppRepositoryProvider.overrideWithValue(appRepository),
         publicLinkConfigurationProvider.overrideWithValue(linkConfiguration),
       ],
@@ -588,6 +826,38 @@ final class _StaticNetworkConfigurationViewModel
 
   @override
   Future<NetworkConfigurationState> build() async => value;
+}
+
+final class _FailingNetworkConfigurationViewModel
+    extends NetworkConfigurationViewModel {
+  _FailingNetworkConfigurationViewModel(this.failure);
+
+  final AppFailure failure;
+
+  @override
+  Future<NetworkConfigurationState> build() {
+    return Future.error(AppFailureException(failure), StackTrace.current);
+  }
+}
+
+final class _StaticSettingsViewModel extends SettingsViewModel {
+  _StaticSettingsViewModel(this.value);
+
+  final SettingsState value;
+
+  @override
+  Future<SettingsState> build() async => value;
+}
+
+final class _FailingSettingsViewModel extends SettingsViewModel {
+  _FailingSettingsViewModel(this.failure);
+
+  final AppFailure failure;
+
+  @override
+  Future<SettingsState> build() {
+    return Future.error(AppFailureException(failure), StackTrace.current);
+  }
 }
 
 final class _MetadataService implements AppMetadataService {

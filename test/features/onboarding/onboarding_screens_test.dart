@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 
+import 'package:aster/core/bootstrap/app_bootstrap.dart';
 import 'package:aster/core/core.dart';
+import 'package:aster/features/onboarding/presentation/models/models.dart';
 import 'package:aster/features/onboarding/presentation/screens/screens.dart';
 import 'package:aster/features/onboarding/presentation/view_model/view_models.dart';
 import 'package:aster/features/onboarding/presentation/widgets/widgets.dart';
@@ -94,6 +96,91 @@ void main() {
     expect(tester, meetsGuideline(textContrastGuideline));
     await _disposeHarness(tester, harness);
   });
+
+  for (final retryable in [true, false]) {
+    testWidgets(
+      'create ${retryable ? 'shows' : 'hides'} retry for its typed failure',
+      (tester) async {
+        final harness = await OnboardingTestHarness.create(
+          generationError: AppFailureException(
+            AppFailure(
+              code: retryable
+                  ? 'mnemonic_generation_unavailable'
+                  : 'mnemonic_generation_disabled',
+              kind: retryable
+                  ? AppFailureKind.unavailable
+                  : AppFailureKind.configuration,
+              userMessage: retryable
+                  ? 'Recovery phrase generation is temporarily unavailable.'
+                  : 'Recovery phrase generation is not configured.',
+              retryable: retryable,
+            ),
+          ),
+        );
+        addTearDown(() => _disposeHarness(tester, harness));
+
+        await _pumpScreen(
+          tester,
+          harness,
+          const OnboardingCreateWalletScreen(),
+        );
+
+        expect(
+          find.text(
+            retryable
+                ? 'Recovery phrase generation is temporarily unavailable.'
+                : 'Recovery phrase generation is not configured.',
+          ),
+          findsOneWidget,
+        );
+        expect(find.text('Retry'), retryable ? findsOneWidget : findsNothing);
+        expect(find.text('Back'), findsOneWidget);
+      },
+    );
+  }
+
+  for (final retryable in [true, false]) {
+    testWidgets(
+      'import ${retryable ? 'shows' : 'hides'} retry for its typed failure',
+      (tester) async {
+        final failure = AppFailure(
+          code: retryable
+              ? 'word_list_temporarily_unavailable'
+              : 'word_list_invalid',
+          kind: retryable
+              ? AppFailureKind.unavailable
+              : AppFailureKind.configuration,
+          userMessage: retryable
+              ? 'Recovery phrase words are temporarily unavailable.'
+              : 'Recovery phrase words are not configured.',
+          retryable: retryable,
+        );
+
+        await tester.pumpWidget(
+          ProviderScope(
+            retry: applicationProviderRetryPolicy,
+            overrides: [
+              importWalletViewModelProvider.overrideWith(
+                () => _FailingImportWalletViewModel(failure),
+              ),
+            ],
+            child: MaterialApp(
+              theme: AppTheme.light(),
+              home: OnboardingShell(
+                child: const OnboardingImportWalletScreen(),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump();
+
+        expect(find.text(failure.userMessage), findsOneWidget);
+        expect(find.text('Retry'), retryable ? findsOneWidget : findsNothing);
+        expect(find.text('Back'), findsOneWidget);
+      },
+    );
+  }
 
   testWidgets('import distributes a normalized 12-word phrase paste', (
     tester,
@@ -430,6 +517,17 @@ void main() {
       expect(tester, meetsGuideline(labeledTapTargetGuideline));
       expect(tester, meetsGuideline(textContrastGuideline));
     });
+  }
+}
+
+final class _FailingImportWalletViewModel extends ImportWalletViewModel {
+  _FailingImportWalletViewModel(this.failure);
+
+  final AppFailure failure;
+
+  @override
+  Future<ImportWalletState> build() {
+    return Future.error(AppFailureException(failure), StackTrace.current);
   }
 }
 

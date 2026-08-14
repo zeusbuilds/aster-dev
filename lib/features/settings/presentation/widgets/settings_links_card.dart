@@ -65,6 +65,7 @@ class SettingsLinksCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final openingLink = state?.openingLink;
+    final configurationFailure = state?.linkConfigurationFailure;
     final rows = <Widget>[];
     for (var index = 0; index < _links.length; index++) {
       final descriptor = _links[index];
@@ -92,9 +93,25 @@ class SettingsLinksCard extends StatelessWidget {
       }
     }
 
-    return Squircle(
-      padding: EdgeInsets.symmetric(vertical: context.spacing.xs),
-      child: Column(children: rows),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (configurationFailure != null) ...[
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              configurationFailure.userMessage,
+              style: context.type.errorMessage,
+              textAlign: TextAlign.center,
+            ),
+          ),
+          SizedBox(height: context.spacing.md),
+        ],
+        Squircle(
+          padding: EdgeInsets.symmetric(vertical: context.spacing.xs),
+          child: Column(children: rows),
+        ),
+      ],
     );
   }
 }

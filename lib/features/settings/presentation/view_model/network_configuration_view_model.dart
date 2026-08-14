@@ -20,7 +20,11 @@ class NetworkConfigurationViewModel extends _$NetworkConfigurationViewModel {
   /// Refreshes health while preserving the last confirmed status.
   Future<void> retryHealth() async {
     final current = state.value;
-    if (current == null || current.refreshing) return;
+    if (current == null ||
+        current.refreshing ||
+        current.healthFailure?.retryable != true) {
+      return;
+    }
     final generation = _stateGeneration;
     state = AsyncData(current.copyWith(refreshing: true));
     final result = await _readNetworkStatus();

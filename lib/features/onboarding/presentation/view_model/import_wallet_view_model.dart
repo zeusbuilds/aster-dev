@@ -19,6 +19,8 @@ class ImportWalletViewModel extends _$ImportWalletViewModel {
 
   late Bip39WordList _wordList;
   var _validationRevision = 0;
+  ({String mnemonic, int revision})? _pendingValidation;
+  Future<void>? _validationDrain;
 
   @override
   Future<ImportWalletState> build() async {
@@ -83,7 +85,9 @@ class ImportWalletViewModel extends _$ImportWalletViewModel {
     );
     state = AsyncData(next);
     if (next.allWordsKnown) {
-      unawaited(_validateChecksum(next.mnemonic, revision));
+      unawaited(_scheduleChecksum(next.mnemonic, revision));
+    } else {
+      _pendingValidation = null;
     }
   }
 
@@ -106,7 +110,7 @@ class ImportWalletViewModel extends _$ImportWalletViewModel {
       return;
     }
     final revision = ++_validationRevision;
-    await _validateChecksum(current.mnemonic, revision);
+    await _scheduleChecksum(current.mnemonic, revision);
   }
 
   /// Provisions only after every word and the SDK checksum are valid.
@@ -139,15 +143,44 @@ class ImportWalletViewModel extends _$ImportWalletViewModel {
     };
   }
 
-  Future<void> _validateChecksum(String mnemonic, int revision) async {
+  Future<void> _scheduleChecksum(String mnemonic, int revision) {
     final current = state.value;
-    if (current == null || current.submitting) return;
+    if (current == null || current.submitting) return Future.value();
     state = AsyncData(
       current.copyWith(
         checksumStatus: MnemonicChecksumStatus.checking,
         failure: null,
       ),
     );
+    _pendingValidation = (mnemonic: mnemonic, revision: revision);
+    final active = _validationDrain;
+    if (active != null) return active;
+
+    final completion = Completer<void>();
+    final drain = completion.future;
+    _validationDrain = drain;
+    unawaited(_drainChecksumQueue(drain, completion));
+    return drain;
+  }
+
+  Future<void> _drainChecksumQueue(
+    Future<void> drain,
+    Completer<void> completion,
+  ) async {
+    try {
+      while (ref.mounted) {
+        final request = _pendingValidation;
+        if (request == null) break;
+        _pendingValidation = null;
+        await _validateChecksum(request.mnemonic, request.revision);
+      }
+    } finally {
+      if (identical(_validationDrain, drain)) _validationDrain = null;
+      if (!completion.isCompleted) completion.complete();
+    }
+  }
+
+  Future<void> _validateChecksum(String mnemonic, int revision) async {
     final result = await _validateMnemonic(mnemonic);
     if (!ref.mounted || revision != _validationRevision) return;
     final latest = state.value;

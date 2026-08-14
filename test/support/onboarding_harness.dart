@@ -60,6 +60,7 @@ final class OnboardingTestHarness {
   String get clipboardText => readClipboard();
 
   static Future<OnboardingTestHarness> create({
+    Object? generationError,
     Object? validationError,
     Completer<void>? clipboardWriteGate,
     ResilientHttpClient? httpClient,
@@ -79,6 +80,7 @@ final class OnboardingTestHarness {
     );
     final keyGenerator = FakeWalletKeyGenerator()
       ..generatedMnemonic = validTestMnemonic
+      ..generationError = generationError
       ..validationError = validationError;
     final repository = WalletRepository(
       WalletProfileStore(

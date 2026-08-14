@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../shared/shared.dart';
 import 'onboarding_text_action.dart';
 
-/// Branded loading or recoverable-error state used by onboarding routes.
+/// Branded loading or failure state used by onboarding routes.
 class OnboardingStatusPanel extends StatelessWidget {
   const OnboardingStatusPanel.loading({
     super.key,
@@ -17,10 +17,13 @@ class OnboardingStatusPanel extends StatelessWidget {
     super.key,
     required this.title,
     required this.message,
-    required this.primaryLabel,
-    required this.onPrimary,
+    this.primaryLabel,
+    this.onPrimary,
     required this.onBack,
-  });
+  }) : assert(
+         (primaryLabel == null) == (onPrimary == null),
+         'The primary action label and callback must be supplied together.',
+       );
 
   final String? title;
   final String message;
@@ -63,12 +66,12 @@ class OnboardingStatusPanel extends StatelessWidget {
               style: context.type.brandBody,
               textAlign: TextAlign.center,
             ),
-            if (onPrimary case final action?) ...[
+            if (primaryLabel case final label? when onPrimary != null) ...[
               SizedBox(height: context.spacing.xxl),
               CustomButton(
-                text: primaryLabel!,
+                text: label,
                 variant: ButtonVariant.translucent,
-                onTap: action,
+                onTap: onPrimary,
               ),
             ],
             if (onBack case final action?) ...[

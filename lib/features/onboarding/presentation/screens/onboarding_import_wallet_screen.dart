@@ -81,17 +81,24 @@ class _OnboardingImportWalletScreenState
           child: switch (asyncState) {
             AsyncData<ImportWalletState>(:final value) => _buildContent(value),
             AsyncError<ImportWalletState>(:final error, :final stackTrace) =>
-              OnboardingStatusPanel.failure(
-                title: 'Recovery phrase unavailable',
-                message: FailureMapper.from(error, stackTrace).userMessage,
-                primaryLabel: 'Retry',
-                onPrimary: () => ref.invalidate(importWalletViewModelProvider),
-                onBack: () => _returnToWelcome(context),
-              ),
+              _buildFailure(error, stackTrace),
             _ => const OnboardingStatusPanel.loading(),
           },
         ),
       ),
+    );
+  }
+
+  Widget _buildFailure(Object error, StackTrace stackTrace) {
+    final failure = FailureMapper.from(error, stackTrace);
+    return OnboardingStatusPanel.failure(
+      title: 'Recovery phrase unavailable',
+      message: failure.userMessage,
+      primaryLabel: failure.retryable ? 'Retry' : null,
+      onPrimary: failure.retryable
+          ? () => ref.invalidate(importWalletViewModelProvider)
+          : null,
+      onBack: () => _returnToWelcome(context),
     );
   }
 

@@ -28,19 +28,31 @@ class OnboardingCreateWalletScreen extends ConsumerWidget {
             AsyncData<CreateWalletState>(:final value) when !value.completed =>
               _CreateWalletContent(state: value),
             AsyncError<CreateWalletState>(:final error, :final stackTrace) =>
-              OnboardingStatusPanel.failure(
-                title: 'Wallet could not be prepared',
-                message: FailureMapper.from(error, stackTrace).userMessage,
-                primaryLabel: 'Retry',
-                onPrimary: () => ref.invalidate(createWalletViewModelProvider),
-                onBack: () => _returnToWelcome(context),
-              ),
+              _buildFailure(context, ref, error, stackTrace),
             _ => const OnboardingStatusPanel.loading(
               message: 'Generating your recovery phrase...',
             ),
           },
         ),
       ),
+    );
+  }
+
+  Widget _buildFailure(
+    BuildContext context,
+    WidgetRef ref,
+    Object error,
+    StackTrace stackTrace,
+  ) {
+    final failure = FailureMapper.from(error, stackTrace);
+    return OnboardingStatusPanel.failure(
+      title: 'Wallet could not be prepared',
+      message: failure.userMessage,
+      primaryLabel: failure.retryable ? 'Retry' : null,
+      onPrimary: failure.retryable
+          ? () => ref.invalidate(createWalletViewModelProvider)
+          : null,
+      onBack: () => _returnToWelcome(context),
     );
   }
 }
