@@ -6,6 +6,21 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../support/wallet_fakes.dart';
 
 void main() {
+  test('composition exposes one resolved and validated service object', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    final configuration = container.read(walletServiceConfigurationProvider);
+
+    expect(configuration.environment, BlockchainEnvironment.regtest);
+    expect(configuration.sdkNetwork, 'regtest');
+    expect(configuration.indexerUrl, 'http://127.0.0.1:3002');
+    expect(
+      configuration.rgbTransportProxy,
+      'rpcs://proxy.iriswallet.com/0.2/json-rpc',
+    );
+  });
+
   test('wallet repository remains mounted across async composition', () async {
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();

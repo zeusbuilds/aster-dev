@@ -50,10 +50,20 @@ final class ReceiveFlowState {
 
   bool get isBusy => operation != null;
   bool get isGenerating => operation == ReceiveFlowOperation.generatingRequest;
+  bool get amountUsesSupportedGranularity {
+    if (amountText.isEmpty) return true;
+    final units = amountInput.units;
+    if (units == null) return false;
+    return route.target != WalletPaymentTarget.bitcoinLightning ||
+        units % WalletAmount.millisatoshisPerSatoshi == 0;
+  }
+
   bool get hasPendingAmountChange {
     final appliedUnits = request.amount?.units;
     if (amountText.isEmpty) return appliedUnits != null;
-    return amountInput.isValid && amountInput.units != appliedUnits;
+    return amountInput.isValid &&
+        amountUsesSupportedGranularity &&
+        amountInput.units != appliedUnits;
   }
 
   bool get canApplyAmount => !isBusy && hasPendingAmountChange;

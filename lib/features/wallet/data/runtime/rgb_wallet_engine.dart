@@ -10,6 +10,42 @@ import '../../domain/validation/validation.dart';
 import '../validation/validation.dart';
 import 'wallet_engine.dart';
 
+/// Resolves explicit deployment overrides and immutable-SDK endpoint defaults.
+///
+/// Composition must use the returned object for both runtime creation and
+/// Settings presentation. This prevents the SDK adapter from contacting a
+/// fallback endpoint that the app has neither validated nor disclosed.
+abstract final class RgbWalletServiceConfigurationResolver {
+  static const _utexoSignetLspBaseUrl = 'https://lsp-signet.utexo.com';
+
+  static WalletServiceConfiguration resolve(
+    WalletServiceConfiguration configured,
+  ) {
+    configured.validate();
+    final defaults = getNetworkDefaults(configured.sdkNetwork);
+    final indexerUrl = configured.indexerUrl ?? defaults?.indexerUrl;
+    final rgbTransportProxy =
+        configured.rgbTransportProxy ?? defaults?.proxyEndpoint;
+    if (indexerUrl == null || rgbTransportProxy == null) {
+      throw const AppConfigurationException();
+    }
+    final resolved = WalletServiceConfiguration(
+      environment: configured.environment,
+      sdkNetwork: configured.sdkNetwork,
+      indexerUrl: indexerUrl,
+      rgbTransportProxy: rgbTransportProxy,
+      lspBaseUrl:
+          configured.lspBaseUrl ??
+          (configured.sdkNetwork == 'utexo' ? _utexoSignetLspBaseUrl : null),
+      vssUrl: configured.vssUrl,
+      explorerBaseUrl: configured.explorerBaseUrl,
+      usdtAsset: configured.usdtAsset,
+    );
+    resolved.validate();
+    return resolved;
+  }
+}
+
 /// Stable-public-API adapter for `rgb_sdk_flutter`.
 final class RgbWalletEngineFactory implements WalletEngineFactory {
   const RgbWalletEngineFactory()
@@ -38,6 +74,9 @@ final class RgbWalletEngineFactory implements WalletEngineFactory {
   @override
   WalletEngine create(WalletEngineConfiguration configuration) {
     final services = configuration.services..validate();
+    if (services.indexerUrl == null || services.rgbTransportProxy == null) {
+      throw const AppConfigurationException();
+    }
     final wallet = _sdk.wallet(
       config: UtexoWalletConfig(
         storageDirPath: configuration.storageDirectory,
@@ -50,19 +89,12 @@ final class RgbWalletEngineFactory implements WalletEngineFactory {
     return RgbWalletEngine(
       wallet,
       services,
-      _unlockConfiguration(services),
+      UtexoUnlockConfig(
+        indexerUrl: services.indexerUrl,
+        proxyEndpoint: services.rgbTransportProxy,
+      ),
       clock: utcClock,
       bitcoinAddresses: _bitcoinAddresses,
-    );
-  }
-
-  static UtexoUnlockConfig _unlockConfiguration(
-    WalletServiceConfiguration services,
-  ) {
-    final defaults = getNetworkDefaults(services.sdkNetwork);
-    return UtexoUnlockConfig(
-      indexerUrl: services.indexerUrl ?? defaults?.indexerUrl,
-      proxyEndpoint: services.rgbTransportProxy ?? defaults?.proxyEndpoint,
     );
   }
 }

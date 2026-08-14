@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../../core/validation/validation.dart';
 import '../validation/validation.dart';
 import 'wallet_amount.dart';
 import 'wallet_asset.dart';
@@ -282,15 +283,7 @@ void _requireUtc(DateTime? value, String field) {
 
 void _requireOptionalDisplayText(String? value, String field, int maxLength) {
   if (value == null) return;
-  if (value != value.trim() ||
-      value.length > maxLength ||
-      _unsafeDisplayCharacters.hasMatch(value)) {
+  if (!DisplayTextPolicy.isSafe(value, maximumCharacters: maxLength)) {
     throw ArgumentError.value(value, field, 'Unsafe display text.');
   }
 }
-
-final _unsafeDisplayCharacters = RegExp(
-  r'[\u0000-\u001f\u007f-\u009f\u00ad\u061c\u070f\u180e'
-  r'\u200b-\u200f\u2028\u2029\u202a-\u202e\u2060-\u206f'
-  r'\ufeff\ufff9-\ufffb]',
-);

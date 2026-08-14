@@ -46,6 +46,8 @@ void main() {
     const localServices = WalletServiceConfiguration(
       environment: BlockchainEnvironment.regtest,
       sdkNetwork: 'regtest',
+      indexerUrl: 'http://127.0.0.1:50002',
+      rgbTransportProxy: 'http://127.0.0.1:3001',
       vssUrl: 'http://127.0.0.1:3200',
     );
     final factory = RgbWalletEngineFactory.withSdk(sdk);
@@ -64,6 +66,57 @@ void main() {
             as UtexoWalletConfig;
     expect(config.vssUrl, localServices.vssUrl);
     expect(config.vssAllowHttp, isTrue);
+  });
+
+  test('resolves and validates immutable SDK endpoint defaults once', () {
+    const configured = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.signet,
+      sdkNetwork: 'utexo',
+      explorerBaseUrl: 'https://mempool.space/signet',
+    );
+
+    final resolved = RgbWalletServiceConfigurationResolver.resolve(configured);
+
+    expect(resolved.indexerUrl, 'https://esplora-api.utexo.com');
+    expect(resolved.rgbTransportProxy, 'rpcs://rgb-proxy.utexo.com/json-rpc');
+    expect(resolved.lspBaseUrl, 'https://lsp-signet.utexo.com');
+    expect(resolved.explorerBaseUrl, configured.explorerBaseUrl);
+    expect(resolved.environment, configured.environment);
+    expect(resolved.sdkNetwork, configured.sdkNetwork);
+  });
+
+  test('effective endpoint resolution preserves every explicit override', () {
+    const configured = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.regtest,
+      sdkNetwork: 'regtest',
+      indexerUrl: 'http://127.0.0.1:50002',
+      rgbTransportProxy: 'http://127.0.0.1:3001/json-rpc',
+      lspBaseUrl: 'http://127.0.0.1:3100',
+      vssUrl: 'http://127.0.0.1:3200',
+    );
+
+    final resolved = RgbWalletServiceConfigurationResolver.resolve(configured);
+
+    expect(resolved.indexerUrl, configured.indexerUrl);
+    expect(resolved.rgbTransportProxy, configured.rgbTransportProxy);
+    expect(resolved.lspBaseUrl, configured.lspBaseUrl);
+    expect(resolved.vssUrl, configured.vssUrl);
+  });
+
+  test('factory rejects unresolved endpoint configuration', () {
+    final sdk = MockRgbSdkFlutter();
+    final factory = RgbWalletEngineFactory.withSdk(sdk);
+
+    expect(
+      () => factory.create(
+        const WalletEngineConfiguration(
+          storageDirectory: '/wallet',
+          services: services,
+        ),
+      ),
+      throwsA(isA<AppConfigurationException>()),
+    );
+    verifyNever(() => sdk.wallet(config: any(named: 'config')));
   });
 
   test('initializes and unlocks through the stable wallet facade', () async {

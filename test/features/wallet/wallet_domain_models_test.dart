@@ -348,6 +348,71 @@ void main() {
     expect(() => profile('Main\u202eWallet'), throwsArgumentError);
     expect(() => profile('Main\u2028Wallet'), throwsArgumentError);
     expect(() => profile('Main\u061cWallet'), throwsArgumentError);
+    expect(() => profile('Main\u200bWallet'), throwsArgumentError);
+    expect(() => profile('Main\u2060Wallet'), throwsArgumentError);
+    expect(() => profile('Main\u3000Wallet'), throwsArgumentError);
+    expect(
+      () => profile('Main${String.fromCharCode(0xd800)}Wallet'),
+      throwsArgumentError,
+    );
+    expect(
+      () => profile('Main${String.fromCharCode(0xe0001)}Wallet'),
+      throwsArgumentError,
+    );
+    expect(profile('Jos\u00e9 Wallet').name, 'Jos\u00e9 Wallet');
+  });
+
+  test('human payment and native labels share one Unicode safety policy', () {
+    const route = PaymentRoute(
+      asset: WalletAsset.bitcoin,
+      rail: PaymentRail.lightning,
+    );
+    final unsafeValues = <String>[
+      'hidden\u200btext',
+      'reversed\u202etext',
+      'joined\u2060text',
+      'wide\u3000space',
+    ];
+
+    for (final value in unsafeValues) {
+      expect(
+        () => WalletPaymentPreview(
+          route: route,
+          encodedDestination: 'lnbcrt1invoice',
+          displayDestination: 'lnbcrt1invoice',
+          recipientLabel: value,
+        ),
+        throwsArgumentError,
+        reason: value.codeUnits.toString(),
+      );
+      expect(
+        () => WalletActivity(
+          id: 'activity-${'a' * 64}',
+          source: WalletActivitySource.rgbTransfer,
+          operation: WalletActivityOperation.rgbReceive,
+          asset: WalletAsset.rgbUsdt(
+            assetId: 'rgb:configured-usdt',
+            precision: 6,
+          ),
+          rail: PaymentRail.onchain,
+          direction: WalletActivityDirection.received,
+          status: WalletActivityStatus.pending,
+          transferIndex: 1,
+          transportEndpointCount: 1,
+          transportTypes: [value],
+        ),
+        throwsArgumentError,
+        reason: value.codeUnits.toString(),
+      );
+    }
+
+    final preview = WalletPaymentPreview(
+      route: route,
+      encodedDestination: 'lnbcrt1invoice',
+      displayDestination: 'lnbcrt1invoice',
+      recipientLabel: 'Jos\u00e9 Wallet',
+    );
+    expect(preview.recipientLabel, 'Jos\u00e9 Wallet');
   });
 
   test('wallet public keys reject whitespace and unbounded native values', () {

@@ -121,6 +121,58 @@ void main() {
     expect(engine.calls, isNot(contains('estimateFeeRate')));
   });
 
+  test(
+    'amountless Bitcoin Lightning rejects fractional sats before mutation',
+    () async {
+      const route = PaymentRoute(
+        asset: WalletAsset.bitcoin,
+        rail: PaymentRail.lightning,
+      );
+      final engine = FakeWalletEngine()
+        ..balance = _balance(onchainSpendable: 0, lightningSpendable: 5000)
+        ..decodedInvoice = WalletPaymentPreview(
+          route: route,
+          encodedDestination: 'lnbcrt1amountless',
+          displayDestination: 'lnbcrt1amountless',
+        );
+      final harness = await PaymentFlowTestHarness.create(engine: engine);
+      addTearDown(harness.dispose);
+      final provider = sendFlowViewModelProvider(
+        WalletPaymentTarget.bitcoinLightning,
+      );
+      final subscription = harness.container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      await harness.container.read(provider.future);
+      final notifier = harness.container.read(provider.notifier);
+
+      notifier.updateDestination('lnbcrt1amountless');
+      expect(await notifier.validateDestination(), isTrue);
+      notifier.updateAmount('0.00000001001');
+      final fractional = harness.container.read(provider).requireValue;
+      expect(fractional.amountInput.units, 1001);
+      expect(fractional.amountUsesSupportedGranularity, isFalse);
+      expect(fractional.canSubmitAt(DateTime.now().toUtc()), isFalse);
+
+      expect(await notifier.submit(), isFalse);
+      expect(
+        harness.container.read(provider).requireValue.failure?.code,
+        'payment_amount_requires_whole_satoshis',
+      );
+      expect(engine.calls, isNot(contains('sendPayment:start')));
+
+      notifier.updateAmount('0.00000002');
+      expect(
+        harness.container
+            .read(provider)
+            .requireValue
+            .amountUsesSupportedGranularity,
+        isTrue,
+      );
+      expect(await notifier.submit(), isTrue);
+      expect(engine.sentPaymentCommand?.amount.units, 2000);
+    },
+  );
+
   test('suppresses overlapping destination validation', () async {
     const route = PaymentRoute(
       asset: WalletAsset.bitcoin,

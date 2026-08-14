@@ -38,6 +38,9 @@ final class WalletAmount {
   /// Largest amount that can cross the SDK's signed 64-bit native boundary.
   static const int maxNativeUnits = 0x7fffffffffffffff;
 
+  /// Number of Lightning millisatoshis in one Bitcoin satoshi.
+  static const int millisatoshisPerSatoshi = 1000;
+
   factory WalletAmount.onchain({
     required WalletAssetId assetId,
     required int units,
@@ -75,13 +78,13 @@ final class WalletAmount {
 
   /// Whole asset-smallest units, rounding down only for millisatoshis.
   int get wholeAssetUnits => switch (unit) {
-    WalletAmountUnit.millisatoshi => units ~/ 1000,
+    WalletAmountUnit.millisatoshi => units ~/ millisatoshisPerSatoshi,
     WalletAmountUnit.satoshi || WalletAmountUnit.assetAtomic => units,
   };
 
   /// Sub-satoshi remainder for Bitcoin Lightning, otherwise zero.
   int get subSatoshiRemainder => switch (unit) {
-    WalletAmountUnit.millisatoshi => units % 1000,
+    WalletAmountUnit.millisatoshi => units % millisatoshisPerSatoshi,
     WalletAmountUnit.satoshi || WalletAmountUnit.assetAtomic => 0,
   };
 

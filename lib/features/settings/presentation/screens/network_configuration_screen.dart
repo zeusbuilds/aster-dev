@@ -73,6 +73,10 @@ class _NetworkConfigurationContent extends ConsumerWidget {
                 label: 'VSS',
                 value: _publicEndpoint(configuration.vssUrl),
               ),
+              _ConfigurationRow(
+                label: 'Explorer',
+                value: _publicEndpoint(configuration.explorerBaseUrl),
+              ),
             ],
           ),
           SizedBox(height: spacing.xxl),
@@ -129,9 +133,7 @@ class _NetworkConfigurationContent extends ConsumerWidget {
   static String _publicEndpoint(String? raw) {
     if (raw == null) return 'Not configured';
     final withScheme = raw.contains('://') ? raw : 'tcp://$raw';
-    final uri = Uri.parse(withScheme);
-    final port = uri.hasPort ? ':${uri.port}' : '';
-    return '${uri.scheme}://${uri.host}$port';
+    return Uri.parse(withScheme).toString();
   }
 }
 

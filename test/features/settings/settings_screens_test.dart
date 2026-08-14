@@ -210,6 +210,11 @@ void main() {
     const configuration = WalletServiceConfiguration(
       environment: BlockchainEnvironment.regtest,
       sdkNetwork: 'regtest',
+      indexerUrl: 'http://127.0.0.1:50002/api',
+      rgbTransportProxy: 'http://127.0.0.1:3001/json-rpc',
+      lspBaseUrl: 'http://127.0.0.1:3100',
+      vssUrl: 'http://127.0.0.1:3200',
+      explorerBaseUrl: 'https://explorer.example.com/regtest',
     );
     await tester.pumpWidget(
       ProviderScope(
@@ -249,6 +254,12 @@ void main() {
     expect(retry.value, 'Loading');
     expect(retry.flagsCollection.isEnabled, ui.Tristate.isFalse);
     expect(find.text('Status'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('https://explorer.example.com/regtest'),
+      300,
+    );
+    expect(find.text('http://127.0.0.1:3001/json-rpc'), findsOneWidget);
+    expect(find.text('https://explorer.example.com/regtest'), findsOneWidget);
   });
 
   testWidgets('advanced disclosures are disabled without auth policy', (

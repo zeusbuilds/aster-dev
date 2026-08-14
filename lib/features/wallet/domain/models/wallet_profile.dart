@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../../core/config/app_environment.dart';
+import '../../../../core/validation/validation.dart';
 
 /// Durable state of one wallet profile transaction.
 enum WalletProfileState {
@@ -45,17 +46,9 @@ final class WalletProfile {
     }
   }
 
-  static final _unsafeDisplayCharacters = RegExp(
-    r'[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f'
-    r'\u2028\u2029\u202a-\u202e\u2066-\u2069]',
-  );
-
   /// Whether [value] is safe to persist and render as a wallet name.
   static bool isValidName(String value) =>
-      value.isNotEmpty &&
-      value == value.trim() &&
-      value.length <= 64 &&
-      !_unsafeDisplayCharacters.hasMatch(value);
+      DisplayTextPolicy.isSafe(value, maximumCharacters: 64);
 
   /// App-generated opaque identifier unrelated to mnemonic or key material.
   final String id;

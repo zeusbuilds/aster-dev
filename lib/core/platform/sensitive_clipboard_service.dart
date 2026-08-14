@@ -89,7 +89,9 @@ final class PlatformSensitiveClipboardService
     if (expected == null) return const AppResult<void>.success(null);
     try {
       final current = await _reader();
-      if (current != null && _constantTimeEquals(_digest(current), expected)) {
+      if (current != null &&
+          current.length <= maximumSecretCharacters &&
+          _constantTimeEquals(_digest(current), expected)) {
         await _writer('');
       }
       if (identical(_leasedDigest, expected)) _leasedDigest = null;

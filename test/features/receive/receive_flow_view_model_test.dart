@@ -121,6 +121,34 @@ void main() {
     expect(harness.engine.calls, hasLength(callsBefore));
   });
 
+  test(
+    'Bitcoin Lightning invoice amount requires whole satoshis before native',
+    () async {
+      final harness = await PaymentFlowTestHarness.create();
+      addTearDown(harness.dispose);
+      final provider = receiveFlowViewModelProvider(
+        WalletPaymentTarget.bitcoinLightning,
+      );
+      final subscription = harness.container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      await harness.container.read(provider.future);
+      final notifier = harness.container.read(provider.notifier);
+      final callsBefore = harness.engine.calls.length;
+
+      notifier.updateAmount('0.00000001001');
+      final fractional = harness.container.read(provider).requireValue;
+      expect(fractional.amountInput.units, 1001);
+      expect(fractional.amountUsesSupportedGranularity, isFalse);
+      expect(fractional.canApplyAmount, isFalse);
+      expect(await notifier.applyAmount(), isFalse);
+      expect(harness.engine.calls, hasLength(callsBefore));
+
+      notifier.updateAmount('0.00000002');
+      expect(await notifier.applyAmount(), isTrue);
+      expect(harness.engine.createdReceiveAmount?.units, 2000);
+    },
+  );
+
   test('copy and share use injectable platform boundaries', () async {
     final harness = await PaymentFlowTestHarness.create();
     addTearDown(harness.dispose);

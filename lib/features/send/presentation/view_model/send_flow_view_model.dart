@@ -417,6 +417,14 @@ class SendFlowViewModel extends _$SendFlowViewModel {
         retryable: false,
       );
     }
+    if (!state.amountUsesSupportedGranularity) {
+      return const AppFailure(
+        code: 'payment_amount_requires_whole_satoshis',
+        kind: AppFailureKind.validation,
+        userMessage: 'Enter a whole-satoshi Lightning amount.',
+        retryable: false,
+      );
+    }
     if (!state.hasSufficientBalance) {
       return const AppFailure(
         code: 'payment_balance_insufficient',

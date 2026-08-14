@@ -67,13 +67,23 @@ The app reads non-secret service settings from compile-time defines:
 | `UTEXO_RGB_PROXY_URL` | Optional RGB transport proxy override |
 | `UTEXO_LSP_URL` | Optional LSP base URL |
 | `UTEXO_VSS_URL` | Optional VSS base URL |
+| `UTEXO_EXPLORER_URL` | Optional public transaction explorer base |
 
 Credentials and bearer tokens must never be supplied with `--dart-define`;
-those values are recoverable from the application binary. Missing explicit
-endpoints use pinned SDK network defaults. Plain HTTP is accepted only for
-loopback development endpoints. Regtest validation rejects host ports `18443`,
-`50001`, and `3000`, which belong to the protected external performance-lab
-stack documented in `docs/DEVELOPMENT.md`.
+those values are recoverable from the application binary. At composition,
+`RgbWalletServiceConfigurationResolver` fills missing indexer and RGB transport
+values from the immutable SDK's public network-default contract and fills the
+same UTEXO signet LSP default used by that pinned SDK. The resolved object is
+then validated once and shared unchanged by the runtime and the read-only
+Network Configuration screen. Settings therefore reports the complete public
+endpoint, including a meaningful path, that the wallet will actually contact.
+An explicit define always wins. Advancing the SDK pin requires rerunning the
+exact default-resolution tests and reviewing this endpoint inventory.
+
+Plain HTTP is accepted only for loopback development endpoints. Regtest
+validation rejects host ports `18443`, `50001`, and `3000`, which belong to the
+protected external performance-lab stack documented in
+`docs/DEVELOPMENT.md`.
 
 The product-facing network is `mainnet`, `signet`, or `regtest`. The SDK's
 `utexo` service profile is an implementation detail used for UTEXO-hosted

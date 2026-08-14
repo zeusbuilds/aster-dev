@@ -1,6 +1,7 @@
 import 'package:aster/core/bootstrap/app_loader.dart';
 import 'package:aster/core/errors/errors.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -34,6 +35,36 @@ void main() {
     expect(
       find.text('Wallet data could not be opened safely.'),
       findsOneWidget,
+    );
+    final failureContext = tester.element(
+      find.text('Wallet could not be opened'),
+    );
+    final surface = Theme.of(failureContext).colorScheme.surface;
+    final systemStyles = tester
+        .widgetList<AnnotatedRegion<SystemUiOverlayStyle>>(
+          find.byType(AnnotatedRegion<SystemUiOverlayStyle>),
+        )
+        .map((region) => region.value);
+    expect(
+      systemStyles,
+      contains(
+        isA<SystemUiOverlayStyle>()
+            .having(
+              (style) => style.systemNavigationBarColor,
+              'navigation bar color',
+              surface,
+            )
+            .having(
+              (style) => style.systemNavigationBarIconBrightness,
+              'navigation icon brightness',
+              Brightness.dark,
+            )
+            .having(
+              (style) => style.statusBarIconBrightness,
+              'status icon brightness',
+              Brightness.dark,
+            ),
+      ),
     );
 
     await tester.tap(find.text('Retry'));

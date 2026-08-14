@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../../core/validation/validation.dart';
 import '../validation/validation.dart';
 import 'wallet_amount.dart';
 import 'wallet_asset.dart';
@@ -421,10 +422,7 @@ void _requireEncoded(String? value, String field) {
 }
 
 void _requireDisplayValue(String value, String field) {
-  if (value.isEmpty ||
-      value != value.trim() ||
-      value.length > 64 ||
-      value.contains(RegExp(r'[\u0000-\u001f\u007f]'))) {
+  if (!DisplayTextPolicy.isSafe(value, maximumCharacters: 64)) {
     throw ArgumentError.value(value, field, 'Invalid display value.');
   }
 }

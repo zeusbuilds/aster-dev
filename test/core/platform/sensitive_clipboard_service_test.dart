@@ -37,6 +37,32 @@ void main() {
     expect(clipboard, 'user replacement');
   });
 
+  test(
+    'oversized replacement releases the lease without erasing content',
+    () async {
+      var clipboard = '';
+      final service = PlatformSensitiveClipboardService(
+        reader: () async => clipboard,
+        writer: (text) async => clipboard = text,
+      );
+      addTearDown(service.dispose);
+
+      await service.copySensitive('secret phrase');
+      clipboard =
+          'x' * (PlatformSensitiveClipboardService.maximumSecretCharacters + 1);
+
+      expect(await service.clearSensitive(), isA<AppSuccess<void>>());
+      expect(
+        clipboard.length,
+        PlatformSensitiveClipboardService.maximumSecretCharacters + 1,
+      );
+
+      clipboard = 'secret phrase';
+      await service.clearSensitive();
+      expect(clipboard, 'secret phrase');
+    },
+  );
+
   test('serializes an expiring lease ahead of a newer copy', () async {
     var clipboard = '';
     final readGate = Completer<void>();

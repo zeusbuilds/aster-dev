@@ -102,6 +102,14 @@ final class SendFlowState {
   bool get isBusy => operation != null;
   bool get hasValidatedDestination => preview != null;
   bool get amountIsLocked => preview?.amount != null;
+  bool get amountUsesSupportedGranularity {
+    final units = amountInput.units;
+    if (units == null) return false;
+    return route.target != WalletPaymentTarget.bitcoinLightning ||
+        amountIsLocked ||
+        units % WalletAmount.millisatoshisPerSatoshi == 0;
+  }
+
   bool get hasSufficientBalance {
     final units = amountInput.units;
     return units != null && units <= availableUnits;
@@ -119,6 +127,7 @@ final class SendFlowState {
         result != null ||
         preview == null ||
         !amountInput.isValid ||
+        !amountUsesSupportedGranularity ||
         !hasSufficientBalance ||
         isExpiredAt(now)) {
       return false;

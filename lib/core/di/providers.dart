@@ -125,7 +125,9 @@ MarketDataConfiguration marketDataConfiguration(Ref ref) {
 
 @riverpod
 WalletServiceConfiguration walletServiceConfiguration(Ref ref) {
-  return WalletServiceConfiguration.fromEnvironment()..validate();
+  return RgbWalletServiceConfigurationResolver.resolve(
+    WalletServiceConfiguration.fromEnvironment(),
+  );
 }
 
 @riverpod

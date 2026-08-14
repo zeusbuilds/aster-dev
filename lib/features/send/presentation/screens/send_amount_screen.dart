@@ -423,6 +423,9 @@ final class _AmountBody extends StatelessWidget {
         null => null,
       };
     }
+    if (!state.amountUsesSupportedGranularity) {
+      return 'Enter a whole-satoshi Lightning amount.';
+    }
     if (!state.hasSufficientBalance) {
       return 'The available balance is too low for this amount.';
     }

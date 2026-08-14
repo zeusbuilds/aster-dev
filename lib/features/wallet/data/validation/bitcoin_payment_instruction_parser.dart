@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../../core/config/app_environment.dart';
 import '../../../../core/errors/errors.dart';
+import '../../../../core/validation/validation.dart';
 import '../../domain/models/models.dart';
 import '../../domain/validation/validation.dart';
 
@@ -201,9 +202,7 @@ final class BitcoinPaymentInstructionParser
 
   static String? _displayText(String? value, int maximumLength) {
     if (value == null || value.isEmpty) return null;
-    if (value != value.trim() ||
-        value.length > maximumLength ||
-        _unsafeDisplayCharacters.hasMatch(value)) {
+    if (!DisplayTextPolicy.isSafe(value, maximumCharacters: maximumLength)) {
       throw _DestinationRejection(_invalidDestination());
     }
     return value;
@@ -547,18 +546,10 @@ final class _DestinationRejection implements Exception {
 
 void _requireOptionalDisplayText(String? value, String field, int maxLength) {
   if (value == null) return;
-  if (value != value.trim() ||
-      value.length > maxLength ||
-      _unsafeDisplayCharacters.hasMatch(value)) {
+  if (!DisplayTextPolicy.isSafe(value, maximumCharacters: maxLength)) {
     throw ArgumentError.value(value, field);
   }
 }
-
-final _unsafeDisplayCharacters = RegExp(
-  r'[\u0000-\u001f\u007f-\u009f\u00ad\u061c\u070f\u180e'
-  r'\u200b-\u200f\u2028\u2029\u202a-\u202e\u2060-\u206f'
-  r'\ufeff\ufff9-\ufffb]',
-);
 
 const _generalInstructionKeys = <String>{'amount', 'label', 'message', 'pop'};
 const _standardInstructionKeys = <String>{

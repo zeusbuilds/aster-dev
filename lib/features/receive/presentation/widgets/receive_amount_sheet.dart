@@ -120,6 +120,11 @@ final class _AmountSheetBody extends StatelessWidget {
       WalletAmountInputIssue.outOfRange => 'This amount is too large.',
       WalletAmountInputIssue.empty || null => null,
     };
+    final amountMessage =
+        issue ??
+        (!state.amountUsesSupportedGranularity
+            ? 'Enter a whole-satoshi Lightning amount.'
+            : null);
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: context.spacing.screenPadding),
       child: Column(
@@ -155,7 +160,7 @@ final class _AmountSheetBody extends StatelessWidget {
               ],
             ),
           ),
-          if (issue case final message?) ...[
+          if (amountMessage case final message?) ...[
             SizedBox(height: context.spacing.sm),
             Text(
               message,

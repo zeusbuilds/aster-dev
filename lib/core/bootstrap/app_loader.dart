@@ -194,46 +194,56 @@ class _BootstrapFailureView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final themedSpacing = context.spacing;
-    return Material(
-      color: context.colorScheme.surface,
-      child: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.all(themedSpacing.screenPadding),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.lock_outline,
-                  size: context.icons.xl,
-                  color: context.appColors.danger,
-                ),
-                SizedBox(height: themedSpacing.lg),
-                Text(
-                  'Wallet could not be opened',
-                  style: context.type.title,
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: themedSpacing.sm),
-                Text(
-                  failure.userMessage,
-                  style: context.textTheme.bodyMedium,
-                  textAlign: TextAlign.center,
-                ),
-                if (failure.retryable) ...[
-                  SizedBox(height: themedSpacing.xxl),
-                  ValueListenableBuilder<bool>(
-                    valueListenable: retrying,
-                    builder: (context, loading, _) {
-                      return CustomButton(
-                        text: 'Retry',
-                        loading: loading,
-                        onTap: loading ? null : onRetry,
-                      );
-                    },
+    final surface = context.colorScheme.surface;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: context.appColors.transparentSurface,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+        systemNavigationBarColor: surface,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+      child: Material(
+        color: surface,
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.all(themedSpacing.screenPadding),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.lock_outline,
+                    size: context.icons.xl,
+                    color: context.appColors.danger,
                   ),
+                  SizedBox(height: themedSpacing.lg),
+                  Text(
+                    'Wallet could not be opened',
+                    style: context.type.title,
+                    textAlign: TextAlign.center,
+                  ),
+                  SizedBox(height: themedSpacing.sm),
+                  Text(
+                    failure.userMessage,
+                    style: context.textTheme.bodyMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                  if (failure.retryable) ...[
+                    SizedBox(height: themedSpacing.xxl),
+                    ValueListenableBuilder<bool>(
+                      valueListenable: retrying,
+                      builder: (context, loading, _) {
+                        return CustomButton(
+                          text: 'Retry',
+                          loading: loading,
+                          onTap: loading ? null : onRetry,
+                        );
+                      },
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),
