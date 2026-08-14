@@ -24,7 +24,9 @@ class BitcoinUnitSelectionScreen extends ConsumerWidget {
       appBar: const CustomAppBar(title: 'Bitcoin Unit', leadingIcon: true),
       body: settings.when(
         skipLoadingOnRefresh: false,
-        loading: () => const Center(child: GridLoader()),
+        loading: () => const Center(
+          child: GridLoader(semanticLabel: 'Loading Bitcoin units'),
+        ),
         error: (error, stackTrace) => _UnitLoadFailure(
           message: FailureMapper.from(error, stackTrace).userMessage,
           onRetry: () => ref.read(settingsViewModelProvider.notifier).retry(),

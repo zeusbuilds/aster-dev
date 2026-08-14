@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -24,13 +25,21 @@ class ToastHost extends ConsumerStatefulWidget {
   ConsumerState<ToastHost> createState() => _ToastHostState();
 }
 
-class _ToastHostState extends ConsumerState<ToastHost> {
+class _ToastHostState extends ConsumerState<ToastHost>
+    with WidgetsBindingObserver {
   Timer? _dismissTimer;
+  Stopwatch? _visibilityStopwatch;
+  Duration? _remainingVisibility;
   int? _scheduledMessageId;
+  late bool _isForeground;
 
   @override
   void initState() {
     super.initState();
+    final lifecycleState = WidgetsBinding.instance.lifecycleState;
+    _isForeground =
+        lifecycleState == null || lifecycleState == AppLifecycleState.resumed;
+    WidgetsBinding.instance.addObserver(this);
     ref.listenManual<ToastQueueState>(
       toastControllerProvider,
       (_, next) => _schedule(next.current),
@@ -40,18 +49,77 @@ class _ToastHostState extends ConsumerState<ToastHost> {
 
   void _schedule(ToastMessage? message) {
     if (_scheduledMessageId == message?.id) return;
-    _dismissTimer?.cancel();
+    _cancelCountdown();
     _scheduledMessageId = message?.id;
     if (message == null) return;
-    _dismissTimer = Timer(message.duration, () {
-      if (!mounted) return;
-      ref.read(toastControllerProvider.notifier).dismissCurrent(id: message.id);
-    });
+    _remainingVisibility = message.duration;
+    _startCountdown();
+  }
+
+  void _startCountdown() {
+    final id = _scheduledMessageId;
+    final remaining = _remainingVisibility;
+    if (!_isForeground ||
+        id == null ||
+        remaining == null ||
+        _dismissTimer != null) {
+      return;
+    }
+
+    _visibilityStopwatch = GestureBinding.instance.samplingClock.stopwatch()
+      ..start();
+    _dismissTimer = Timer(remaining, () => _completeCountdown(id));
+  }
+
+  void _pauseCountdown() {
+    final timer = _dismissTimer;
+    final stopwatch = _visibilityStopwatch;
+    final remaining = _remainingVisibility;
+    if (timer == null || stopwatch == null || remaining == null) return;
+
+    timer.cancel();
+    _dismissTimer = null;
+    stopwatch.stop();
+    final elapsed = stopwatch.elapsed;
+    _visibilityStopwatch = null;
+    _remainingVisibility = elapsed >= remaining
+        ? Duration.zero
+        : remaining - elapsed;
+  }
+
+  void _completeCountdown(int id) {
+    _dismissTimer = null;
+    _visibilityStopwatch?.stop();
+    _visibilityStopwatch = null;
+    _remainingVisibility = Duration.zero;
+    if (!mounted || !_isForeground || _scheduledMessageId != id) return;
+    ref.read(toastControllerProvider.notifier).dismissCurrent(id: id);
+  }
+
+  void _cancelCountdown() {
+    _dismissTimer?.cancel();
+    _dismissTimer = null;
+    _visibilityStopwatch?.stop();
+    _visibilityStopwatch = null;
+    _remainingVisibility = null;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final isForeground = state == AppLifecycleState.resumed;
+    if (_isForeground == isForeground) return;
+    _isForeground = isForeground;
+    if (isForeground) {
+      _startCountdown();
+    } else {
+      _pauseCountdown();
+    }
   }
 
   @override
   void dispose() {
-    _dismissTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    _cancelCountdown();
     super.dispose();
   }
 

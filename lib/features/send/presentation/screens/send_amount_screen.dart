@@ -139,6 +139,7 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
         title: 'Send ${widget.target.assetLabel}',
         leadingIcon: true,
         centerTitle: false,
+        fallbackLocation: RoutePaths.sendAddressFor(widget.target.slug),
       ),
       body: SafeArea(
         top: false,

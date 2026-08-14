@@ -392,6 +392,25 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('standalone loaders announce progress and embedded ones do not', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _themedHarness(const GridLoader(semanticLabel: 'Loading wallet details')),
+    );
+    expect(find.bySemanticsLabel('Loading wallet details'), findsOneWidget);
+
+    await tester.pumpWidget(_themedHarness(const GridLoader()));
+    expect(find.bySemanticsLabel('Loading wallet details'), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byType(GridLoader),
+        matching: find.byType(ExcludeSemantics),
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('bottom navigation indicator stays centered on each slot', (
     tester,
   ) async {
@@ -506,6 +525,42 @@ void main() {
     await tester.pump(const Duration(milliseconds: 101));
     await tester.pump();
     expect(find.text('Second'), findsNothing);
+  });
+
+  testWidgets('toast visibility time pauses while the app is inactive', (
+    tester,
+  ) async {
+    addTearDown(() {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    });
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          hapticFeedbackServiceProvider.overrideWithValue(
+            NoopHapticFeedbackService(),
+          ),
+        ],
+        child: const _ToastHarness(),
+      ),
+    );
+
+    await tester.tap(find.text('Show'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 40));
+    expect(find.text('First'), findsOneWidget);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('First'), findsOneWidget);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 59));
+    expect(find.text('First'), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 2));
+    expect(find.text('First'), findsNothing);
+    expect(find.text('Second'), findsOneWidget);
   });
 }
 

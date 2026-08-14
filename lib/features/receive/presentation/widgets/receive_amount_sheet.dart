@@ -83,7 +83,9 @@ class ReceiveAmountSheet extends ConsumerWidget {
                   _apply(context, ref, ref.read(provider.notifier)),
                 ),
               ),
-              loading: () => const Center(child: GridLoader()),
+              loading: () => const Center(
+                child: GridLoader(semanticLabel: 'Loading amount editor'),
+              ),
               error: (error, stackTrace) => _SheetFailure(
                 failure: error is AppFailureException
                     ? error.failure

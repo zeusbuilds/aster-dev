@@ -198,7 +198,7 @@ class RouteConfig {
     final activityId = state.pathParameters[RoutePaths.activityIdParameter];
     return WalletActivity.isValidId(activityId)
         ? null
-        : '/transactions/${kind.slug}';
+        : RoutePaths.transactionListFor(kind.slug);
   }
 
   static String? _invalidPaymentTargetRedirect(

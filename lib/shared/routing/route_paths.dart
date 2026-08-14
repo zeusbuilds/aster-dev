@@ -32,4 +32,14 @@ class RoutePaths {
   static const String bitcoinUnitSelection = 'bitcoin-unit-selection';
   static const String advancedSettings = 'advanced';
   static const String networkConfiguration = 'network-configuration';
+
+  /// Concrete Send destination location for a validated payment-target slug.
+  static String sendAddressFor(String paymentTarget) {
+    return '$send/${Uri.encodeComponent(paymentTarget)}/address';
+  }
+
+  /// Concrete Activity-list location for a validated asset-kind slug.
+  static String transactionListFor(String assetKind) {
+    return '/transactions/${Uri.encodeComponent(assetKind)}';
+  }
 }

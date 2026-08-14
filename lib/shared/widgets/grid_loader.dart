@@ -50,6 +50,15 @@ enum GridLoaderColorStyle {
 /// only opacity animations (no scaling), so it stays pixel-perfect inside
 /// tightly constrained layouts like buttons.
 class GridLoader extends StatefulWidget {
+  const GridLoader({
+    super.key,
+    this.style = GridLoaderStyle.breathingGrid,
+    this.colorStyle = GridLoaderColorStyle.white,
+    this.size = GridLoaderSize.small,
+    this.color,
+    this.semanticLabel,
+  });
+
   final GridLoaderStyle style;
   final GridLoaderColorStyle colorStyle;
   final GridLoaderSize size;
@@ -57,13 +66,11 @@ class GridLoader extends StatefulWidget {
   /// Custom color when [colorStyle] is [GridLoaderColorStyle.custom].
   final Color? color;
 
-  const GridLoader({
-    super.key,
-    this.style = GridLoaderStyle.breathingGrid,
-    this.colorStyle = GridLoaderColorStyle.white,
-    this.size = GridLoaderSize.small,
-    this.color,
-  });
+  /// Live-region label when this loader owns a standalone loading state.
+  ///
+  /// Leave this null when an enclosing control or screen already owns loading
+  /// semantics; an unlabeled loader is explicitly decorative.
+  final String? semanticLabel;
 
   @override
   State<GridLoader> createState() => _GridLoaderState();
@@ -126,7 +133,7 @@ class _GridLoaderState extends State<GridLoader>
     final gridHeight = _gridLoaderRows * squareSize;
     final effects = context.effects;
 
-    return SizedBox(
+    final paintedLoader = SizedBox(
       width: gridWidth,
       height: gridHeight,
       child: AnimatedBuilder(
@@ -149,6 +156,17 @@ class _GridLoaderState extends State<GridLoader>
           );
         },
       ),
+    );
+    final semanticLabel = widget.semanticLabel;
+    if (semanticLabel == null) {
+      return ExcludeSemantics(child: paintedLoader);
+    }
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: semanticLabel,
+      excludeSemantics: true,
+      child: paintedLoader,
     );
   }
 }

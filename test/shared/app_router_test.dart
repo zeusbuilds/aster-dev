@@ -68,6 +68,31 @@ void main() {
 
     expect(_location(router), RoutePaths.send);
     expect(find.text('Send'), findsWidgets);
+
+    await tester.tap(find.bySemanticsLabel('Back'));
+    await _pumpFrames(tester);
+    expect(_location(router), RoutePaths.skeleton);
+    expect(find.byType(BottomNav), findsOneWidget);
+  });
+
+  testWidgets('a direct Send destination Back returns to target selection', (
+    tester,
+  ) async {
+    tester.binding.platformDispatcher.defaultRouteNameTestValue =
+        '/send/bitcoin-onchain/address';
+    addTearDown(
+      tester.binding.platformDispatcher.clearDefaultRouteNameTestValue,
+    );
+    final (harness, transport) = await _createActiveHarness();
+    addTearDown(transport.close);
+    addTearDown(() => _disposeHarness(tester, harness));
+
+    final router = await _pumpRouter(tester, harness);
+    expect(_location(router), '/send/bitcoin-onchain/address');
+
+    await tester.tap(find.bySemanticsLabel('Back'));
+    await _pumpFrames(tester);
+    expect(_location(router), RoutePaths.send);
   });
 
   testWidgets('an invalid Activity asset slug returns to the wallet shell', (
@@ -123,6 +148,10 @@ void main() {
 
       expect(_location(router), '/transactions/bitcoin/$activityId');
       expect(find.text('Transaction details'), findsOneWidget);
+
+      await tester.tap(find.bySemanticsLabel('Back'));
+      await _pumpFrames(tester);
+      expect(_location(router), '/transactions/bitcoin');
     },
   );
 

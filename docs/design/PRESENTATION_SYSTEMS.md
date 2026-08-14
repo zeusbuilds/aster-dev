@@ -18,7 +18,9 @@ operation is active. A disabled or loading control emits no haptic.
 
 Transient feedback goes through `context.toasts`. The Riverpod controller owns
 a bounded, deduplicated FIFO queue; the single `ToastHost` owns animation and
-timer lifecycle. Do not create `OverlayEntry`, static toast globals, or feature
+visible-time lifecycle. The host pauses a toast's remaining display budget while
+the application is not resumed, so queued outcomes cannot expire unseen in the
+background. Do not create `OverlayEntry`, static toast globals, or feature
 timers.
 
 - `success`: a transient operation actually completed.

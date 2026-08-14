@@ -36,6 +36,7 @@ class TransactionDetailsScreen extends ConsumerWidget {
         title: 'Transaction details',
         leadingIcon: true,
         centerTitle: false,
+        fallbackLocation: RoutePaths.transactionListFor(assetKind.slug),
       ),
       body: SafeArea(
         top: false,

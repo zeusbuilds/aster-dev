@@ -151,6 +151,7 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
         title: 'Receive ${widget.target.assetLabel}',
         leadingIcon: true,
         centerTitle: false,
+        fallbackLocation: RoutePaths.receive,
       ),
       body: SafeArea(
         top: false,

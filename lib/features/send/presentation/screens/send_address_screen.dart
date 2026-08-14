@@ -103,6 +103,7 @@ class _SendAddressScreenState extends ConsumerState<SendAddressScreen> {
           title: 'Send ${widget.target.assetLabel}',
           leadingIcon: true,
           centerTitle: false,
+          fallbackLocation: RoutePaths.send,
           action: AsterIconButton(
             onPressed: busy ? null : () => unawaited(_openScan()),
             icon: MingCuteIcons.mgc_scan_line,
