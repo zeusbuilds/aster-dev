@@ -130,10 +130,7 @@ class ScanViewModel extends _$ScanViewModel {
     state = state.copyWith(operation: ScanOperation.selectingGallery);
     final paused = await session.setActive(false);
     if (!_isCurrentOperation(session, revision)) {
-      return switch (paused) {
-        AppSuccess<void>() => AppResult.failure(_operationUnavailableFailure()),
-        AppFailureResult<void>(:final failure) => AppResult.failure(failure),
-      };
+      return AppResult.failure(_operationUnavailableFailure());
     }
     if (paused case AppFailureResult<void>(:final failure)) {
       if (ref.mounted) {
@@ -142,7 +139,9 @@ class ScanViewModel extends _$ScanViewModel {
       return AppResult.failure(failure);
     }
     final result = await session.pickAndAnalyzeGallery();
-    if (!_isCurrentOperation(session, revision)) return result;
+    if (!_isCurrentOperation(session, revision)) {
+      return AppResult.failure(_operationUnavailableFailure());
+    }
     switch (result) {
       case AppSuccess<ScanGalleryOutcome>(:final value):
         final captured = value is ScanGalleryCaptured;
@@ -192,7 +191,9 @@ class ScanViewModel extends _$ScanViewModel {
       failure: null,
     );
     final result = await session.setActive(false);
-    if (!_isCurrentOperation(session, revision)) return result;
+    if (!_isCurrentOperation(session, revision)) {
+      return AppResult.failure(_operationUnavailableFailure());
+    }
     switch (result) {
       case AppSuccess<void>():
         return result;
@@ -215,10 +216,11 @@ class ScanViewModel extends _$ScanViewModel {
       );
     }
     final result = await session.setActive(true);
-    if (_isCurrentOperation(session, revision)) {
-      if (result case AppFailureResult<void>(:final failure)) {
-        _applyOperationFailure(failure);
-      }
+    if (!_isCurrentOperation(session, revision)) {
+      return AppResult.failure(_operationUnavailableFailure());
+    }
+    if (result case AppFailureResult<void>(:final failure)) {
+      _applyOperationFailure(failure);
     }
     return result;
   }
@@ -230,9 +232,7 @@ class ScanViewModel extends _$ScanViewModel {
     final revision = ++_operationRevision;
     state = state.copyWith(operation: ScanOperation.restarting, failure: null);
     final result = await session.restart();
-    if (!_isCurrentOperation(session, revision)) {
-      return result is AppSuccess<void>;
-    }
+    if (!_isCurrentOperation(session, revision)) return false;
     return switch (result) {
       AppSuccess<void>() => () {
         state = state.copyWith(operation: null, failure: null);

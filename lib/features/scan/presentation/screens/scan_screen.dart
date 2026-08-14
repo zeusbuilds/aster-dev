@@ -52,6 +52,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
             return;
         }
       case AppFailureResult<ScanGalleryOutcome>(:final failure):
+        if (failure.code == 'scan_operation_unavailable') return;
         context.toasts.show(
           title: failure.kind == AppFailureKind.unsupported
               ? 'Image scanning unavailable'
@@ -161,10 +162,16 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     if (_navigationInFlight) return;
     setState(() => _navigationInFlight = true);
     final viewModel = ref.read(scanViewModelProvider(widget.purpose).notifier);
+    final destinationHandoff = ref.read(
+      sendDestinationHandoffProvider.notifier,
+    );
     final paused = await viewModel.pauseForNavigation();
-    if (!mounted) return;
+    if (!mounted) {
+      destinationHandoff.clear();
+      return;
+    }
     if (paused case AppFailureResult<void>(:final failure)) {
-      ref.read(sendDestinationHandoffProvider.notifier).clear();
+      destinationHandoff.clear();
       setState(() => _navigationInFlight = false);
       context.toasts.show(
         title: 'Scanner could not pause',
@@ -177,7 +184,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       await context.pushNamed<void>(RouteNames.send);
     } catch (error, stackTrace) {
       final failure = FailureMapper.from(error, stackTrace);
-      ref.read(sendDestinationHandoffProvider.notifier).clear();
+      destinationHandoff.clear();
       if (mounted) {
         unawaited(context.haptics.trigger(HapticIntent.error));
         context.toasts.show(

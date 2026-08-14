@@ -17,7 +17,9 @@ final class FakeScanSession extends ChangeNotifier implements ScanSession {
   AppResult<void>? zoomResult;
   AppResult<void>? restartResult;
   Completer<AppResult<void>>? torchGate;
+  Completer<AppResult<void>>? activeGate;
   Completer<AppResult<void>>? zoomGate;
+  Completer<AppResult<void>>? restartGate;
   double? reportedZoomScale;
   AppResult<ScanGalleryOutcome> galleryResult = const AppResult.success(
     ScanGalleryCancelled(),
@@ -79,6 +81,8 @@ final class FakeScanSession extends ChangeNotifier implements ScanSession {
   @override
   Future<AppResult<void>> setActive(bool active) async {
     activeValues.add(active);
+    final gate = activeGate;
+    if (gate != null) return gate.future;
     return activeResult ?? const AppResult.success(null);
   }
 
@@ -117,6 +121,8 @@ final class FakeScanSession extends ChangeNotifier implements ScanSession {
   @override
   Future<AppResult<void>> restart() async {
     restartCalls += 1;
+    final gate = restartGate;
+    if (gate != null) return gate.future;
     return restartResult ?? const AppResult.success(null);
   }
 

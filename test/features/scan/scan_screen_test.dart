@@ -468,6 +468,82 @@ void main() {
     ]);
   });
 
+  testWidgets('discarded launcher clears its staged destination', (
+    tester,
+  ) async {
+    final session = FakeScanSession();
+    final router = _launcherRouter();
+    addTearDown(router.dispose);
+    final harness = _ScanWidgetHarness(
+      session: session,
+      router: router,
+      purpose: ScanPurpose.sendLauncher,
+    );
+    addTearDown(harness.dispose);
+
+    await tester.pumpWidget(harness.app);
+    harness.activateScanTab();
+    await tester.pumpAndSettle();
+    final pauseGate = Completer<AppResult<void>>();
+    session.activeGate = pauseGate;
+
+    session.emitCamera('lightning:invoice');
+    await tester.pump();
+
+    expect(harness.container.read(sendDestinationHandoffProvider), isNotNull);
+    expect(session.activeValues.last, isFalse);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    pauseGate.complete(const AppResult.success(null));
+    await tester.pump();
+
+    expect(harness.container.read(sendDestinationHandoffProvider), isNull);
+    expect(find.text('Send target selection'), findsNothing);
+  });
+
+  testWidgets('replaced gallery session cannot navigate with stale data', (
+    tester,
+  ) async {
+    final first = FakeScanSession()
+      ..galleryGate = Completer<AppResult<ScanGalleryOutcome>>();
+    final second = FakeScanSession();
+    var session = first;
+    final router = _launcherRouter();
+    addTearDown(router.dispose);
+    final harness = _ScanWidgetHarness(
+      session: first,
+      sessionBuilder: () => session,
+      router: router,
+      purpose: ScanPurpose.sendLauncher,
+    );
+    addTearDown(harness.dispose);
+
+    await tester.pumpWidget(harness.app);
+    harness.activateScanTab();
+    await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsLabel('Choose a QR image'));
+    await tester.pump();
+
+    session = second;
+    harness.container.invalidate(scanSessionProvider(ScanPurpose.sendLauncher));
+    await tester.pump();
+    first.galleryGate!.complete(
+      AppResult.success(
+        ScanGalleryCaptured(
+          ScanPayload.parse(
+            'lightning:obsolete',
+            source: ScanCaptureSource.gallery,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Send target selection'), findsNothing);
+    expect(harness.container.read(sendDestinationHandoffProvider), isNull);
+    expect(harness.toasts.messages, isEmpty);
+  });
+
   testWidgets('retryable camera failure remains usable on a compact phone', (
     tester,
   ) async {
@@ -571,12 +647,14 @@ final class _ScanWidgetHarness {
     required FakeScanSession session,
     required GoRouter router,
     ScanPurpose purpose = ScanPurpose.destinationPicker,
+    ScanSession Function()? sessionBuilder,
   }) {
     final haptics = RecordingHapticFeedbackService();
     return _ScanWidgetHarness._(
       session: session,
       router: router,
       purpose: purpose,
+      sessionBuilder: sessionBuilder,
       haptics: haptics,
       toasts: RecordingToastPresentationService(),
     );
@@ -586,11 +664,13 @@ final class _ScanWidgetHarness {
     required this.session,
     required this.router,
     required this.purpose,
+    ScanSession Function()? sessionBuilder,
     required this.haptics,
     required this.toasts,
   }) : container = ProviderContainer(
          overrides: [
-           scanSessionProvider(purpose).overrideWithValue(session),
+           scanSessionProvider(purpose)
+               .overrideWith((ref) => sessionBuilder?.call() ?? session),
            scanWalletIdentityProvider.overrideWith(
              (ref) async => const ScanWalletIdentity(
                name: 'Primary wallet',

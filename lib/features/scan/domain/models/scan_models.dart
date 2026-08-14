@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../../core/validation/validation.dart';
+
 /// Why a Scan surface is active.
 ///
 /// A persistent launcher cannot return a value to a caller, while a destination
@@ -16,9 +18,10 @@ enum ScanCaptureSource { camera, gallery }
 @immutable
 final class ScanPayload {
   ScanPayload.parse(String raw, {required this.source}) : value = raw.trim() {
-    if (value.isEmpty ||
-        value.length > maximumCharacters ||
-        _unsafeCharacters.hasMatch(value)) {
+    if (!ProtocolTextPolicy.isVisibleAscii(
+      value,
+      maximumCharacters: maximumCharacters,
+    )) {
       throw const InvalidScanPayloadException();
     }
   }
@@ -69,9 +72,3 @@ final class ScanGalleryCaptured extends ScanGalleryOutcome {
 
   final ScanPayload payload;
 }
-
-final _unsafeCharacters = RegExp(
-  r'[\u0000-\u001f\u007f-\u009f\u00ad\u061c\u070f\u180e'
-  r'\u200b-\u200f\u2028\u2029\u202a-\u202e\u2060-\u206f'
-  r'\ufeff\ufff9-\ufffb]',
-);

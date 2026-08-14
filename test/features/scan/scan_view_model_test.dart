@@ -387,6 +387,115 @@ void main() {
     },
   );
 
+  test('session replacement suppresses an obsolete gallery capture', () async {
+    final first = FakeScanSession()
+      ..galleryGate = Completer<AppResult<ScanGalleryOutcome>>();
+    final second = FakeScanSession();
+    var session = first;
+    final purpose = ScanPurpose.sendLauncher;
+    final haptics = RecordingHapticFeedbackService();
+    final container = ProviderContainer(
+      overrides: [
+        scanSessionProvider(purpose).overrideWith((ref) => session),
+        hapticFeedbackServiceProvider.overrideWithValue(haptics),
+      ],
+    );
+    addTearDown(container.dispose);
+    final provider = scanViewModelProvider(purpose);
+    final subscription = container.listen(
+      provider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+
+    final gallery = container.read(provider.notifier).scanGallery();
+    await Future<void>.delayed(Duration.zero);
+    session = second;
+    container.invalidate(scanSessionProvider(purpose));
+    await _waitFor(() => first.listenerCount == 0 && second.listenerCount == 1);
+    first.galleryGate!.complete(
+      AppResult.success(
+        ScanGalleryCaptured(
+          ScanPayload.parse(
+            'lightning:obsolete',
+            source: ScanCaptureSource.gallery,
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      await gallery,
+      isA<AppFailureResult<ScanGalleryOutcome>>().having(
+        (value) => value.failure.code,
+        'code',
+        'scan_operation_unavailable',
+      ),
+    );
+    expect(container.read(provider).captureLocked, isFalse);
+    expect(haptics.intents, isEmpty);
+  });
+
+  test('session replacement invalidates native command completions', () async {
+    final first = FakeScanSession();
+    final second = FakeScanSession();
+    var session = first;
+    final purpose = ScanPurpose.sendLauncher;
+    final container = ProviderContainer(
+      overrides: [
+        scanSessionProvider(purpose).overrideWith((ref) => session),
+        hapticFeedbackServiceProvider.overrideWithValue(
+          RecordingHapticFeedbackService(),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    final provider = scanViewModelProvider(purpose);
+    final subscription = container.listen(
+      provider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+
+    first.activeGate = Completer<AppResult<void>>();
+    final paused = container.read(provider.notifier).pauseForNavigation();
+    await Future<void>.delayed(Duration.zero);
+    session = second;
+    container.invalidate(scanSessionProvider(purpose));
+    await _waitFor(() => first.listenerCount == 0 && second.listenerCount == 1);
+    first.activeGate!.complete(const AppResult.success(null));
+    expect(
+      await paused,
+      isA<AppFailureResult<void>>().having(
+        (value) => value.failure.code,
+        'code',
+        'scan_operation_unavailable',
+      ),
+    );
+
+    second.current = second.current.copyWith(
+      failure: const AppFailure(
+        code: 'scan_camera_failed',
+        kind: AppFailureKind.unavailable,
+        userMessage: 'The camera could not be started.',
+        retryable: true,
+      ),
+    );
+    second.replaceSnapshot(second.current);
+    second.restartGate = Completer<AppResult<void>>();
+    final restarted = container.read(provider.notifier).retryCamera();
+    await Future<void>.delayed(Duration.zero);
+    final third = FakeScanSession();
+    session = third;
+    container.invalidate(scanSessionProvider(purpose));
+    await _waitFor(() => second.listenerCount == 0 && third.listenerCount == 1);
+    second.restartGate!.complete(const AppResult.success(null));
+    expect(await restarted, isFalse);
+    expect(container.read(provider).failure, isNull);
+  });
+
   test('navigation pause blocks controls and reports stop failure', () async {
     final session = FakeScanSession();
     final haptics = RecordingHapticFeedbackService();

@@ -25,6 +25,19 @@ void main() {
       ),
       throwsA(isA<InvalidScanPayloadException>()),
     );
+    for (final unsafe in <String>[
+      'lightning:inv\u00f3ice',
+      'lightning:invoice\u{e0001}',
+      'lightning:invoice\ufdd0',
+      'lightning:invoice\u00a0suffix',
+      'lightning:invoice${String.fromCharCode(0xd800)}',
+      'lightning:invoice with-space',
+    ]) {
+      expect(
+        () => ScanPayload.parse(unsafe, source: ScanCaptureSource.gallery),
+        throwsA(isA<InvalidScanPayloadException>()),
+      );
+    }
     expect(
       () => ScanPayload.parse(
         'x' * (ScanPayload.maximumCharacters + 1),
