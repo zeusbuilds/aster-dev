@@ -34,6 +34,20 @@ void main() {
         'send_destination_handoff_invalid',
       ),
     );
+    for (final unsafe in <String>[
+      'lnbcrt1invoice\u200bhidden',
+      'lnbcrt1invoice\u202ereversed',
+      'lnbcrt1invoic\u00e9',
+    ]) {
+      expect(
+        handoff.stage(unsafe),
+        isA<AppFailureResult<void>>().having(
+          (result) => result.failure.code,
+          'code',
+          'send_destination_handoff_invalid',
+        ),
+      );
+    }
   });
 
   test(

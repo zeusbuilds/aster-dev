@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../validation/validation.dart';
 import 'wallet_amount.dart';
 import 'wallet_asset.dart';
 import 'wallet_fee.dart';
@@ -261,20 +262,14 @@ void _requireRouteAmount(PaymentRoute route, WalletAmount amount) {
 }
 
 void _requireEncoded(String value, String field) {
-  if (value.isEmpty ||
-      value != value.trim() ||
-      value.length > 8192 ||
-      value.contains(RegExp(r'[\u0000-\u001f\u007f]'))) {
+  if (!WalletProtocolText.isEncodedValue(value)) {
     throw ArgumentError.value(value, field, 'Invalid encoded payment value.');
   }
 }
 
 void _requireOptionalIdentifier(String? value, String field) {
   if (value == null) return;
-  if (value.isEmpty ||
-      value != value.trim() ||
-      value.length > 1024 ||
-      value.contains(RegExp(r'\s'))) {
+  if (!WalletProtocolText.isIdentifier(value)) {
     throw ArgumentError.value(value, field, 'Invalid payment identifier.');
   }
 }

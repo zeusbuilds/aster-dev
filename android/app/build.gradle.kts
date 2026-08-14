@@ -25,6 +25,14 @@ android {
     }
 
     buildTypes {
+        getByName("debug") {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
+        getByName("profile") {
+            applicationIdSuffix = ".profile"
+            versionNameSuffix = "-profile"
+        }
         release {
             // Candidate artifacts are intentionally unsigned. The release
             // pipeline must sign them with the approved key and verify its

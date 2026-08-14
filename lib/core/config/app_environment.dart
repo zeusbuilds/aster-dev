@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../errors/app_failure.dart';
+import '../validation/validation.dart';
 
 /// Bitcoin chain environment, independent from asset and payment rail.
 enum BlockchainEnvironment {
@@ -35,10 +36,10 @@ final class RgbAssetConfiguration {
   final int precision;
 
   void validate() {
-    if (contractId.isEmpty ||
-        contractId != contractId.trim() ||
-        contractId.length > 512 ||
-        contractId.contains(RegExp(r'\s'))) {
+    if (!ProtocolTextPolicy.isVisibleAscii(
+      contractId,
+      maximumCharacters: 512,
+    )) {
       throw const AppConfigurationException();
     }
     if (precision < 0 || precision > 18) {

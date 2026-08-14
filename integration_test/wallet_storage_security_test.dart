@@ -2,12 +2,27 @@ import 'dart:io';
 
 import 'package:aster/core/storage/storage.dart';
 import 'package:aster/features/wallet/data/storage/storage.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('non-release builds use isolated application storage identity', (
+    tester,
+  ) async {
+    final package = await PackageInfo.fromPlatform();
+    final expectedSuffix = kReleaseMode
+        ? ''
+        : kProfileMode
+        ? '.profile'
+        : '.debug';
+
+    expect(package.packageName, 'com.example.asterdev$expectedSuffix');
+  });
 
   testWidgets('secure wallet namespace round-trips without destructive reset', (
     tester,

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../../core/config/app_environment.dart';
+import '../validation/validation.dart';
 
 /// Validated app-owned node and chain status.
 @immutable
@@ -67,10 +68,7 @@ final class WalletPublicKeys {
   }
 
   static bool _isValidPublicKey(String value) =>
-      value.isNotEmpty &&
-      value.length <= 512 &&
-      value == value.trim() &&
-      !value.contains(RegExp(r'\s'));
+      WalletProtocolText.isIdentifier(value, maximumCharacters: 512);
 
   final String bitcoin;
   final String rgb;

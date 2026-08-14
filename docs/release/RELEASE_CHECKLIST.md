@@ -27,6 +27,8 @@ from a clean worktree and record commands/results in the production tracker.
 - [ ] public app version/build number and upgrade policy are approved
 - [ ] Android APK/AAB artifacts are unsigned candidates or match the approved
       `UTEXO_RELEASE_CERT_SHA256`; debug-signed artifacts are rejected
+- [ ] every directly distributed APK verifies with Signature Scheme v2 or v3;
+      v1/JAR-only signatures are rejected
 - [ ] AAB requests `PAGE_ALIGNMENT_16K`, every 64-bit native library has 16 KiB
       ELF LOAD alignment, split APK ZIP alignment passes, and a 16 KiB runtime
       smoke passes without compatibility mode

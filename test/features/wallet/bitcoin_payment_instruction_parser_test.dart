@@ -348,6 +348,7 @@ void main() {
       'bitcoin:1BoatSLRHtKNngkdXEeobR76b53LETtpyT?label=a=b',
       'bitcoin:1BoatSLRHtKNngkdXEeobR76b53LETtpyT?label=Main Wallet',
       'bitcoin:1BoatSLRHtKNngkdXEeobR76b53LETtpyT?label=Jos\u00e9',
+      'bitcoin:1BoatSLRHtKNngkdXEeobR76b53LETtpyT?future%E2%80%AE=value',
     ];
 
     for (final value in values) {

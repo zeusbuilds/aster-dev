@@ -611,6 +611,34 @@ void main() {
     );
   });
 
+  test('rejects invisible Unicode in a native receive request', () async {
+    final wallet = MockUtexoWallet();
+    when(
+      () =>
+          wallet.createLightningInvoice(amountSats: null, expirySeconds: 3600),
+    ).thenAnswer(
+      (_) async =>
+          const LightningReceiveRequest(lnInvoice: 'lnbcrt1invoice\u200b'),
+    );
+    final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
+    const route = PaymentRoute(
+      asset: WalletAsset.bitcoin,
+      rail: PaymentRail.lightning,
+    );
+
+    await expectLater(
+      engine.createReceiveRequest(route),
+      throwsA(
+        isA<NativeProtocolException>().having(
+          (error) => error.field,
+          'field',
+          'LightningReceiveRequest.lnInvoice',
+        ),
+      ),
+    );
+    verifyNever(() => wallet.decodeLnInvoice(any()));
+  });
+
   test('creates, verifies, and pays Bitcoin Lightning invoices', () async {
     final createdAt = DateTime.utc(2026, 8, 11, 10);
     final timestamp = createdAt.millisecondsSinceEpoch ~/ 1000;
@@ -950,7 +978,7 @@ void main() {
     },
   );
 
-  test('rejects malformed native payment identifiers and indexes', () async {
+  test('rejects deceptive Unicode in native payment identifiers', () async {
     final createdAt = DateTime.utc(2026, 8, 11, 10);
     final wallet = MockUtexoWallet();
     when(() => wallet.decodeLnInvoice('lnbcrt1malformed')).thenAnswer(
@@ -958,7 +986,7 @@ void main() {
         amtMsat: 1000,
         expirySec: 3600,
         timestamp: createdAt.millisecondsSinceEpoch ~/ 1000,
-        paymentHash: 'invalid payment hash',
+        paymentHash: 'payment\u202ehash',
         paymentSecret: 'not-retained',
         network: 'regtest',
       ),
@@ -969,7 +997,7 @@ void main() {
         address: 'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn',
         feeRate: 1,
       ),
-    ).thenAnswer((_) async => ' invalid-txid ');
+    ).thenAnswer((_) async => 'invalid\u200btxid');
     final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
     const lightningRoute = PaymentRoute(
       asset: WalletAsset.bitcoin,

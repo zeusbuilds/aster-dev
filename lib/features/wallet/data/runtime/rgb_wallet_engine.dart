@@ -6,6 +6,7 @@ import 'package:rgb_sdk_flutter/rgb_sdk_flutter.dart';
 import '../../../../core/config/app_environment.dart';
 import '../../../../core/errors/app_failure.dart';
 import '../../domain/models/models.dart';
+import '../../domain/validation/validation.dart';
 import '../validation/validation.dart';
 import 'wallet_engine.dart';
 
@@ -653,16 +654,10 @@ final class RgbWalletEngine implements WalletEngine {
   }
 
   static bool _isValidPaymentValue(String value) =>
-      value.isNotEmpty &&
-      value == value.trim() &&
-      value.length <= 8192 &&
-      !value.contains(RegExp(r'[\u0000-\u0020\u007f]'));
+      WalletProtocolText.isEncodedValue(value);
 
   static String _nativeIdentifier(String value, String field) {
-    if (value.isEmpty ||
-        value != value.trim() ||
-        value.length > 1024 ||
-        value.contains(RegExp(r'\s'))) {
+    if (!WalletProtocolText.isIdentifier(value)) {
       throw NativeProtocolException(
         'Native wallet returned a malformed payment identifier.',
         field: field,

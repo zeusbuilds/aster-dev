@@ -267,8 +267,17 @@ void main() {
         precision: 19,
       ),
     );
+    const deceptiveId = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.regtest,
+      sdkNetwork: 'regtest',
+      usdtAsset: RgbAssetConfiguration(
+        contractId: 'rgb:usdt\u202econtract',
+        precision: 6,
+      ),
+    );
 
     expect(malformedId.validate, throwsA(isA<AppConfigurationException>()));
+    expect(deceptiveId.validate, throwsA(isA<AppConfigurationException>()));
     expect(
       malformedPrecision.validate,
       throwsA(isA<AppConfigurationException>()),

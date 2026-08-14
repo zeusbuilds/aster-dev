@@ -43,6 +43,15 @@ Android release APK and AAB verification rejects every signed candidate unless
 approved fingerprint configured, only unsigned candidate artifacts pass; they
 are build evidence and cannot be distributed.
 
+Directly distributed signed APKs must also use APK Signature Scheme v2 or v3.
+JAR/v1-only signing is rejected even when its certificate fingerprint matches.
+The local fault matrix uses only the disposable Android debug key and never
+produces a release artifact:
+
+```sh
+make verify-android-apk-signature-policy
+```
+
 The same release verifiers inspect every packaged ELF LOAD segment and the APK
 ZIP alignment. The AAB gate also parses `BundleConfig.pb` with the exact
 Bundletool/protobuf versions resolved by AGP and requires
@@ -59,11 +68,26 @@ Run the app-owned iOS storage/file-policy integration contract with:
 make ios-storage-test IOS_SIMULATOR_ID=<simulator-udid>
 ```
 
+Run the equivalent Android contract with the release-preserving wrapper:
+
+```sh
+make android-storage-test ANDROID_DEVICE_ID=<emulator-or-device-id>
+```
+
+Do not invoke raw `flutter drive` for Android integration. Flutter 3.47 does
+not account for the build-type application-ID suffix when stopping the app and
+can target the unsuffixed release package. The wrapper keeps Flutter from
+stopping the app, force-stops only `com.example.asterdev.debug`, verifies the
+actual APK identity, and proves any pre-existing release package is unchanged.
+It never uninstalls either package or erases developer state.
+
 Use this target instead of invoking the iOS integration test directly. Flutter
 temporarily points ignored iOS build settings at a disposable test listener;
-the owned wrapper preserves the test result and restores the ordinary
-`lib/main.dart` simulator target on every exit so later Xcode builds remain
-reproducible.
+the owned wrapper preserves the test result, proves the unsuffixed candidate
+bundle path is unchanged, and restores the ordinary `lib/main.dart` simulator
+target on every exit so later Xcode builds remain reproducible. The in-process
+integration assertion proves the transient test bundle uses `.debug`; Flutter
+may remove that test bundle after execution.
 
 ## Profile Performance Gate
 

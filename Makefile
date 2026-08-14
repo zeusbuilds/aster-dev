@@ -1,4 +1,4 @@
-.PHONY: shell bootstrap clean build watch run test ios-storage-test format format-check analyze docs verify verify-architecture verify-barrels verify-generated lint android-release-bundle android-release-apks verify-android-release-bundle verify-android-release-apks fvm-setup help
+.PHONY: shell bootstrap clean build watch run test ios-storage-test android-storage-test format format-check analyze docs verify verify-architecture verify-barrels verify-generated lint android-release-bundle android-release-apks verify-android-release-bundle verify-android-release-apks verify-android-apk-signature-policy fvm-setup help
 
 # Default target
 help:
@@ -12,6 +12,7 @@ help:
 	@echo "  make run       - Run Flutter app"
 	@echo "  make test      - Run Flutter tests"
 	@echo "  make ios-storage-test IOS_SIMULATOR_ID=<id> - Run iOS storage integration tests safely"
+	@echo "  make android-storage-test ANDROID_DEVICE_ID=<id> - Run Android storage integration tests safely"
 	@echo "  make format    - Format Dart code"
 	@echo "  make format-check - Verify Dart formatting without changing files"
 	@echo "  make analyze   - Run static analysis"
@@ -25,6 +26,7 @@ help:
 	@echo "  make android-release-apks - Build and verify ABI-split release APKs"
 	@echo "  make verify-android-release-bundle - Verify the existing Play Store bundle"
 	@echo "  make verify-android-release-apks - Verify existing ABI-split APKs"
+	@echo "  make verify-android-apk-signature-policy - Fault-test APK signature policy"
 
 # Enter Nix development environment
 shell:
@@ -68,6 +70,9 @@ test:
 # disposable listener target. The wrapper restores lib/main.dart on every exit.
 ios-storage-test:
 	./scripts/run-ios-integration-test.sh integration_test/wallet_storage_security_test.dart "$(IOS_SIMULATOR_ID)"
+
+android-storage-test:
+	./scripts/run-android-integration-test.sh integration_test/wallet_storage_security_test.dart "$(ANDROID_DEVICE_ID)"
 
 # Format Dart code
 format:
@@ -132,6 +137,9 @@ verify-android-release-bundle:
 
 verify-android-release-apks:
 	./scripts/verify-android-release-apks.sh
+
+verify-android-apk-signature-policy:
+	./scripts/test-android-apk-signature-policy.sh
 
 # One-time FVM setup for this project
 fvm-setup:

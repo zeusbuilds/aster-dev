@@ -69,4 +69,16 @@ final class RunnerTests: XCTestCase {
     XCTAssertNil(transport["NSAllowsArbitraryLoadsForMedia"])
     XCTAssertNil(transport["NSAllowsArbitraryLoadsInWebContent"])
   }
+
+  func testBuiltMetadataDeclaresOnlyTheSupportedPhoneFamily() {
+    XCTAssertEqual(
+      runnerBundle.object(forInfoDictionaryKey: "UIDeviceFamily") as? [Int],
+      [1]
+    )
+    XCTAssertNil(
+      runnerBundle.object(
+        forInfoDictionaryKey: "UISupportedInterfaceOrientations~ipad"
+      )
+    )
+  }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../validation/validation.dart';
 import 'wallet_amount.dart';
 import 'wallet_asset.dart';
 import 'wallet_balance.dart';
@@ -407,20 +408,14 @@ void _requireOptionalNonNegative(int? value, String field) {
 
 void _requireIdentifier(String? value, String field) {
   if (value == null) return;
-  if (value.isEmpty ||
-      value != value.trim() ||
-      value.length > 1024 ||
-      value.contains(RegExp(r'\s'))) {
+  if (!WalletProtocolText.isIdentifier(value)) {
     throw ArgumentError.value(value, field, 'Invalid identifier.');
   }
 }
 
 void _requireEncoded(String? value, String field) {
   if (value == null) return;
-  if (value.isEmpty ||
-      value != value.trim() ||
-      value.length > 8192 ||
-      value.contains(RegExp(r'[\u0000-\u001f\u007f]'))) {
+  if (!WalletProtocolText.isEncodedValue(value)) {
     throw ArgumentError.value(value, field, 'Invalid encoded value.');
   }
 }

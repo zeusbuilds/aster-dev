@@ -3,6 +3,7 @@ import 'dart:async';
 import '../../../../core/config/app_environment.dart';
 import '../../../../core/errors/errors.dart';
 import '../../domain/models/models.dart';
+import '../../domain/validation/validation.dart';
 import '../runtime/runtime.dart';
 import '../storage/storage.dart';
 import '../validation/validation.dart';
@@ -837,10 +838,7 @@ final class WalletRepository implements WalletLifecycleRepository {
   }
 
   static bool _isValidPaymentString(String value) =>
-      value.isNotEmpty &&
-      value == value.trim() &&
-      value.length <= 8192 &&
-      !value.contains(RegExp(r'[\u0000-\u0020\u007f]'));
+      WalletProtocolText.isEncodedValue(value);
 
   static AppFailure _invalidAmountFailure() => const AppFailure(
     code: 'payment_amount_invalid',

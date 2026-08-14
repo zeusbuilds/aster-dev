@@ -220,6 +220,34 @@ void main() {
     expect(harness.engine.calls, isNot(contains('decodeInvoice:start')));
   });
 
+  test('rejects invisible Unicode before an RGB native preview', () async {
+    const configured = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.regtest,
+      sdkNetwork: 'regtest',
+      usdtAsset: RgbAssetConfiguration(
+        contractId: 'rgb:configured-usdt',
+        precision: 6,
+      ),
+    );
+    final harness = await _createActiveRepository(services: configured);
+    addTearDown(harness.runtime.dispose);
+
+    final result = await harness.repository.previewPayment(
+      WalletPaymentTarget.usdtLightning,
+      'rgb:invoice\u202e',
+    );
+
+    expect(
+      result,
+      isA<AppFailureResult<WalletPaymentPreview>>().having(
+        (failure) => failure.failure.code,
+        'code',
+        'payment_destination_invalid',
+      ),
+    );
+    expect(harness.engine.calls, isNot(contains('decodeInvoice:start')));
+  });
+
   test('extracts BIP321 Lightning before native preview validation', () async {
     final harness = await _createActiveRepository();
     addTearDown(harness.runtime.dispose);

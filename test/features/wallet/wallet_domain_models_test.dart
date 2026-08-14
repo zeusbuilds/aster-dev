@@ -1,5 +1,6 @@
 import 'package:aster/core/core.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
+import 'package:aster/features/wallet/domain/validation/validation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _nodePublicKey =
@@ -135,6 +136,79 @@ void main() {
       throwsArgumentError,
     );
   });
+
+  test(
+    'protocol text accepts visible ASCII and rejects deceptive wire data',
+    () {
+      expect(
+        WalletProtocolText.isEncodedValue(
+          'bitcoin:address?message=Payment%20for%20order%231',
+        ),
+        isTrue,
+      );
+      expect(WalletProtocolText.isIdentifier('txid:0'), isTrue);
+
+      for (final value in <String>[
+        '',
+        ' invoice',
+        'invoice ',
+        'invoice\nnext',
+        'invoice\u007f',
+        'invoice\u200bhidden',
+        'invoice\u202ereversed',
+        'invoic\u00e9',
+      ]) {
+        expect(
+          WalletProtocolText.isEncodedValue(value),
+          isFalse,
+          reason: value.codeUnits.toString(),
+        );
+        expect(
+          WalletProtocolText.isIdentifier(value),
+          isFalse,
+          reason: value.codeUnits.toString(),
+        );
+      }
+      expect(
+        WalletProtocolText.isEncodedValue(
+          'a' * (WalletProtocolText.maximumEncodedCharacters + 1),
+        ),
+        isFalse,
+      );
+      expect(
+        WalletProtocolText.isIdentifier(
+          'a' * (WalletProtocolText.maximumIdentifierCharacters + 1),
+        ),
+        isFalse,
+      );
+
+      const route = PaymentRoute(
+        asset: WalletAsset.bitcoin,
+        rail: PaymentRail.lightning,
+      );
+      expect(
+        () => WalletPaymentPreview(
+          route: route,
+          encodedDestination: 'lnbcrt1invoice\u202e',
+          displayDestination: 'lnbcrt1invoice',
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => WalletActivity(
+          id: 'activity-${'f' * 64}',
+          source: WalletActivitySource.lightningPayment,
+          operation: WalletActivityOperation.lightningPayment,
+          asset: WalletAsset.bitcoin,
+          rail: PaymentRail.lightning,
+          direction: WalletActivityDirection.received,
+          status: WalletActivityStatus.pending,
+          paymentHash: 'payment\u200bhash',
+        ),
+        throwsArgumentError,
+      );
+    },
+  );
 
   test('onchain commands require typed fees and Lightning forbids them', () {
     final observedAt = DateTime.utc(2026, 8, 11, 10);
@@ -283,6 +357,14 @@ void main() {
     );
     expect(
       () => WalletPublicKeys(bitcoin: 'a' * 513, rgb: 'tpub-rgb'),
+      throwsArgumentError,
+    );
+    expect(
+      () => WalletPublicKeys(bitcoin: 'tpub\u200bhidden', rgb: 'tpub-rgb'),
+      throwsArgumentError,
+    );
+    expect(
+      () => WalletAsset.rgbUsdt(assetId: 'rgb:contract\u202e', precision: 6),
       throwsArgumentError,
     );
   });

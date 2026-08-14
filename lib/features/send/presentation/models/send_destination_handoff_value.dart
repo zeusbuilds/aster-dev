@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../wallet/domain/validation/validation.dart';
+
 /// One bounded, memory-only destination staged by the persistent Scan tab.
 ///
 /// The value is consumed once after a selected Send target loads successfully.
@@ -7,9 +9,10 @@ import 'package:flutter/foundation.dart';
 @immutable
 final class SendDestinationHandoffValue {
   SendDestinationHandoffValue(String raw) : value = raw.trim() {
-    if (value.isEmpty ||
-        value.length > maximumCharacters ||
-        _unsafeCharacters.hasMatch(value)) {
+    if (!WalletProtocolText.isEncodedValue(
+      value,
+      maximumCharacters: maximumCharacters,
+    )) {
       throw const InvalidSendDestinationHandoffException();
     }
   }
@@ -36,9 +39,3 @@ final class InvalidSendDestinationHandoffException implements Exception {
   @override
   String toString() => 'InvalidSendDestinationHandoffException';
 }
-
-final _unsafeCharacters = RegExp(
-  r'[\u0000-\u001f\u007f-\u009f\u00ad\u061c\u070f\u180e'
-  r'\u200b-\u200f\u2028\u2029\u202a-\u202e\u2060-\u206f'
-  r'\ufeff\ufff9-\ufffb]',
-);

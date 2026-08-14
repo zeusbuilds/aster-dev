@@ -188,6 +188,22 @@ commit. For temporary SDK development only, see
 `docs/architecture/SDK_INTEGRATION.md`. Never commit a path dependency or a
 `dependency_overrides` entry.
 
+## Local Application Identity
+
+Non-release builds are intentionally separate installed applications and own
+separate sandbox, preferences, secure-storage, and wallet-directory state:
+
+| Mode | Android application ID / iOS bundle ID |
+| --- | --- |
+| Debug | `com.example.asterdev.debug` |
+| Profile | `com.example.asterdev.profile` |
+| Release candidate | `com.example.asterdev` |
+
+The base release identifier is still provisional under DEC-006. Preserve the
+suffix contract when the release owner supplies its final identifier. Never
+remove a release candidate to work around `INSTALL_FAILED_VERSION_DOWNGRADE`;
+use the isolated Debug or Profile package instead.
+
 ## Wallet Service Configuration
 
 The default build is regtest and cannot become mainnet accidentally. Optional

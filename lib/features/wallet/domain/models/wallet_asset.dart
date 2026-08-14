@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../validation/validation.dart';
+
 /// Payment rail used to move an asset.
 enum PaymentRail { onchain, lightning }
 
@@ -35,17 +37,14 @@ final class WalletAssetId {
     : this._(WalletAssetProtocol.bitcoin, 'bitcoin');
 
   factory WalletAssetId.rgb(String contractId) {
-    final normalized = contractId.trim();
-    if (normalized.isEmpty ||
-        normalized.length > 512 ||
-        normalized.contains(RegExp(r'\s'))) {
+    if (!WalletProtocolText.isIdentifier(contractId, maximumCharacters: 512)) {
       throw ArgumentError.value(
         contractId,
         'contractId',
-        'Must be a non-empty contract ID without whitespace.',
+        'Must be a bounded visible-ASCII contract ID.',
       );
     }
-    return WalletAssetId._(WalletAssetProtocol.rgb, normalized);
+    return WalletAssetId._(WalletAssetProtocol.rgb, contractId);
   }
 
   final WalletAssetProtocol protocol;

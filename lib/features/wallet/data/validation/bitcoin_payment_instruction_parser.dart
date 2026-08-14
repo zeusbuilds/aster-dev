@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../../../../core/config/app_environment.dart';
 import '../../../../core/errors/errors.dart';
 import '../../domain/models/models.dart';
+import '../../domain/validation/validation.dart';
 
 /// Validates and canonicalizes a plain Bitcoin address for one environment.
 ///
@@ -162,9 +163,7 @@ final class BitcoinPaymentInstructionParser
         } on FormatException {
           throw _DestinationRejection(_invalidDestination());
         }
-        if (key.isEmpty ||
-            key.length > 128 ||
-            key.contains(RegExp(r'[\u0000-\u0020\u007f]'))) {
+        if (!WalletProtocolText.isIdentifier(key, maximumCharacters: 128)) {
           throw _DestinationRejection(_invalidDestination());
         }
         if (key.startsWith('req-')) {
@@ -211,10 +210,10 @@ final class BitcoinPaymentInstructionParser
   }
 
   static bool _isValidInstructionInput(String value) =>
-      value.isNotEmpty &&
-      value == value.trim() &&
-      value.length <= _maximumInputLength &&
-      value.codeUnits.every((unit) => unit >= 0x21 && unit <= 0x7e);
+      WalletProtocolText.isEncodedValue(
+        value,
+        maximumCharacters: _maximumInputLength,
+      );
 
   static String _resolveOnchainAddress(
     _PaymentUri uri,
