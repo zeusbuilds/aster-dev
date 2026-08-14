@@ -54,14 +54,18 @@ final class ArchitectureVerification {
   const ArchitectureVerification({
     required this.sourceCount,
     required this.importCount,
+    required this.exportCount,
     required this.failures,
   });
 
   /// Number of non-generated Dart files examined under `lib/`.
   final int sourceCount;
 
-  /// Number of import directives examined.
+  /// Number of import URIs examined, including conditional alternatives.
   final int importCount;
+
+  /// Number of export URIs examined, including conditional alternatives.
+  final int exportCount;
 
   /// Deterministically sorted policy or parse failures.
   final List<String> failures;
@@ -83,7 +87,7 @@ void main() {
 
   stdout.writeln(
     'Architecture policy verified across ${result.sourceCount} Dart sources '
-    'and ${result.importCount} imports.',
+    'and ${result.importCount} imports / ${result.exportCount} exports.',
   );
 }
 
@@ -98,6 +102,7 @@ ArchitectureVerification verifyArchitecture(Directory repositoryRoot) {
     return const ArchitectureVerification(
       sourceCount: 0,
       importCount: 0,
+      exportCount: 0,
       failures: ['Missing lib directory. Run this tool from the repo root.'],
     );
   }
@@ -112,6 +117,7 @@ ArchitectureVerification verifyArchitecture(Directory repositoryRoot) {
   final failures = <String>[];
   final featureSet = FeatureSet.latestLanguageVersion();
   var importCount = 0;
+  var exportCount = 0;
 
   for (final source in sources) {
     final sourcePath = _relative(root, source);
@@ -124,12 +130,14 @@ ArchitectureVerification verifyArchitecture(Directory repositoryRoot) {
       final line = parsed.lineInfo.getLocation(error.offset).lineNumber;
       failures.add('$sourcePath:$line: parse error: ${error.message}');
     }
-    for (final directive
-        in parsed.unit.directives.whereType<ImportDirective>()) {
-      final uri = directive.uri.stringValue;
-      if (uri == null) continue;
-      importCount += 1;
-      final line = parsed.lineInfo.getLocation(directive.offset).lineNumber;
+    for (final dependency in _dependencyUris(parsed.unit)) {
+      final uri = dependency.uri;
+      if (dependency.isExport) {
+        exportCount += 1;
+      } else {
+        importCount += 1;
+      }
+      final line = parsed.lineInfo.getLocation(dependency.offset).lineNumber;
       final package = _packageName(uri);
 
       if (package == 'rgb_sdk_flutter' && !_sdkOwners.contains(sourcePath)) {
@@ -219,8 +227,56 @@ ArchitectureVerification verifyArchitecture(Directory repositoryRoot) {
   return ArchitectureVerification(
     sourceCount: sources.length,
     importCount: importCount,
+    exportCount: exportCount,
     failures: List<String>.unmodifiable(failures..sort()),
   );
+}
+
+Iterable<_DependencyUri> _dependencyUris(CompilationUnit unit) sync* {
+  for (final directive in unit.directives) {
+    switch (directive) {
+      case ImportDirective():
+        final uri = directive.uri.stringValue;
+        if (uri != null) {
+          yield _DependencyUri(
+            uri: uri,
+            offset: directive.uri.offset,
+            isExport: false,
+          );
+        }
+        for (final configuration in directive.configurations) {
+          final configuredUri = configuration.uri.stringValue;
+          if (configuredUri != null) {
+            yield _DependencyUri(
+              uri: configuredUri,
+              offset: configuration.uri.offset,
+              isExport: false,
+            );
+          }
+        }
+      case ExportDirective():
+        final uri = directive.uri.stringValue;
+        if (uri != null) {
+          yield _DependencyUri(
+            uri: uri,
+            offset: directive.uri.offset,
+            isExport: true,
+          );
+        }
+        for (final configuration in directive.configurations) {
+          final configuredUri = configuration.uri.stringValue;
+          if (configuredUri != null) {
+            yield _DependencyUri(
+              uri: configuredUri,
+              offset: configuration.uri.offset,
+              isExport: true,
+            );
+          }
+        }
+      default:
+        break;
+    }
+  }
 }
 
 String? _repositoryTarget(Directory root, File source, String uri) {
@@ -258,6 +314,18 @@ bool _isOwnedDartSource(String path) =>
 
 String _relative(Directory root, File file) =>
     file.absolute.path.substring(root.path.length + 1);
+
+final class _DependencyUri {
+  const _DependencyUri({
+    required this.uri,
+    required this.offset,
+    required this.isExport,
+  });
+
+  final String uri;
+  final int offset;
+  final bool isExport;
+}
 
 final class _SimpleIdentifierCollector extends RecursiveAstVisitor<void> {
   _SimpleIdentifierCollector(this.names);

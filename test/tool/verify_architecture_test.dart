@@ -53,6 +53,42 @@ void main() {
     expect(result.passed, isTrue, reason: result.failures.join('\n'));
     expect(result.sourceCount, 6);
     expect(result.importCount, 5);
+    expect(result.exportCount, 0);
+  });
+
+  test('applies ownership and layer policy to every export URI', () {
+    _write(
+      repository,
+      'lib/features/pay/domain/domain.dart',
+      "export '../data/repository.dart';\n"
+          "export 'model.dart' if (dart.library.io) "
+          "'package:rgb_sdk_flutter/rgb_sdk_flutter.dart';",
+    );
+    _write(repository, 'lib/features/pay/domain/model.dart', 'class Model {}');
+    _write(
+      repository,
+      'lib/features/pay/data/repository.dart',
+      'class Repository {}',
+    );
+    _write(
+      repository,
+      'lib/features/pay/presentation/screens/pay_screen.dart',
+      "export 'package:http/http.dart';",
+    );
+
+    final result = verifyArchitecture(repository);
+
+    expect(result.passed, isFalse);
+    expect(result.importCount, 0);
+    expect(result.exportCount, 4);
+    expect(
+      result.failures,
+      containsAll(<Matcher>[
+        contains('domain code must not depend on'),
+        contains('rgb_sdk_flutter may be imported only'),
+        contains('package:http is infrastructure'),
+      ]),
+    );
   });
 
   test('reports every layer, SDK, plugin, and parse violation', () {
@@ -105,6 +141,7 @@ void main() {
 
     expect(result.passed, isFalse);
     expect(result.sourceCount, 0);
+    expect(result.exportCount, 0);
     expect(result.failures.single, contains('Missing lib directory'));
   });
 }

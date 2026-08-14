@@ -1,12 +1,57 @@
 import 'dart:io';
 
+import 'package:analyzer/dart/analysis/features.dart';
+import 'package:analyzer/dart/analysis/utilities.dart';
+import 'package:analyzer/dart/ast/ast.dart';
+
+/// Result of checking one repository tree against the barrel policy.
+final class BarrelVerification {
+  const BarrelVerification({
+    required this.sourceCount,
+    required this.barrelCount,
+    required this.failures,
+  });
+
+  /// Number of non-generated Dart sources examined under `lib/`.
+  final int sourceCount;
+
+  /// Number of sources containing at least one export directive.
+  final int barrelCount;
+
+  /// Deterministically sorted parse or policy failures.
+  final List<String> failures;
+
+  /// Whether every examined source satisfies the policy.
+  bool get passed => failures.isEmpty;
+}
+
 /// Verifies the repository's boundary-only barrel export policy.
 void main() {
-  final sourceRoot = Directory('lib').absolute;
-  if (!sourceRoot.existsSync()) {
-    stderr.writeln('Missing lib directory. Run this tool from the repo root.');
+  final result = verifyBarrelExports(Directory.current);
+  if (!result.passed) {
+    for (final failure in result.failures) {
+      stderr.writeln(failure);
+    }
     exitCode = 1;
     return;
+  }
+
+  stdout.writeln(
+    'Barrel policy verified for ${result.barrelCount} boundaries and '
+    '${result.sourceCount} Dart sources.',
+  );
+}
+
+/// Checks owned Dart sources beneath [repositoryRoot].
+BarrelVerification verifyBarrelExports(Directory repositoryRoot) {
+  final root = repositoryRoot.absolute;
+  final sourceRoot = Directory('${root.path}/lib');
+  if (!sourceRoot.existsSync()) {
+    return const BarrelVerification(
+      sourceCount: 0,
+      barrelCount: 0,
+      failures: ['Missing lib directory. Run this tool from the repo root.'],
+    );
   }
 
   final sources =
@@ -21,7 +66,7 @@ void main() {
   final failures = <String>[];
 
   for (final file in sources) {
-    final parsed = _parseDirectives(file);
+    final parsed = _parseDirectives(root, file, failures);
     directives[file.absolute.path] = parsed;
     if (parsed.exports.isEmpty) continue;
 
@@ -35,7 +80,7 @@ void main() {
         : '$directoryName.dart';
     if (_basename(path) != expectedName) {
       failures.add(
-        '${_relative(path)}: barrel must be named $expectedName for its '
+        '${_relative(root, path)}: barrel must be named $expectedName for its '
         '$directoryName boundary.',
       );
     }
@@ -45,30 +90,41 @@ void main() {
         .toList();
     final sortedUris = [...exportUris]..sort();
     if (!_sameOrder(exportUris, sortedUris)) {
-      failures.add('${_relative(path)}: exports must be sorted by URI.');
+      failures.add('${_relative(root, path)}: exports must be sorted by URI.');
     }
     if (exportUris.toSet().length != exportUris.length) {
-      failures.add('${_relative(path)}: duplicate export directive.');
+      failures.add('${_relative(root, path)}: duplicate export directive.');
     }
 
     for (final export in parsed.exports) {
+      final owner = _relative(root, path);
+      if (export.isConditional) {
+        failures.add(
+          '$owner:${export.line}: conditional barrel exports are prohibited.',
+        );
+      }
       if (!_isRelativeUri(export.uri)) {
         failures.add(
-          '${_relative(path)}:${export.line}: barrels may export only '
-          'relative repository sources.',
+          '$owner:${export.line}: barrels may export only relative repository '
+          'sources.',
         );
         continue;
       }
       if (_isForbiddenExport(export.uri)) {
         failures.add(
-          '${_relative(path)}:${export.line}: generated or private source '
-          'must not be exported.',
+          '$owner:${export.line}: generated or private source must not be '
+          'exported.',
         );
       }
       final target = _resolve(file, export.uri);
-      if (!File(target).existsSync()) {
+      if (!_isWithinSourceRoot(sourceRoot, target)) {
         failures.add(
-          '${_relative(path)}:${export.line}: missing export ${export.uri}.',
+          '$owner:${export.line}: export ${export.uri} escapes the lib '
+          'boundary.',
+        );
+      } else if (!target.endsWith('.dart') || !File(target).existsSync()) {
+        failures.add(
+          '$owner:${export.line}: missing Dart export ${export.uri}.',
         );
       }
     }
@@ -82,30 +138,23 @@ void main() {
       if (barrels.contains(target) &&
           file.parent.absolute.path == File(target).parent.absolute.path) {
         failures.add(
-          '${_relative(file.path)}:${import.line}: a source must not import '
-          'its own directory barrel ${import.uri}.',
+          '${_relative(root, file.path)}:${import.line}: a source must not '
+          'import its own directory barrel ${import.uri}.',
         );
       }
     }
   }
 
-  _findBarrelCycles(barrels, directives, failures);
-
-  if (failures.isNotEmpty) {
-    for (final failure in failures..sort()) {
-      stderr.writeln(failure);
-    }
-    exitCode = 1;
-    return;
-  }
-
-  stdout.writeln(
-    'Barrel policy verified for ${barrels.length} boundaries and '
-    '${sources.length} Dart sources.',
+  _findBarrelCycles(root, barrels, directives, failures);
+  return BarrelVerification(
+    sourceCount: sources.length,
+    barrelCount: barrels.length,
+    failures: List<String>.unmodifiable(failures..sort()),
   );
 }
 
 void _findBarrelCycles(
+  Directory root,
   Set<String> barrels,
   Map<String, _Directives> directives,
   List<String> failures,
@@ -119,7 +168,7 @@ void _findBarrelCycles(
       final cycle = [
         ...path.sublist(cycleStart),
         barrel,
-      ].map(_relative).join(' -> ');
+      ].map((path) => _relative(root, path)).join(' -> ');
       failures.add('Barrel export cycle: $cycle.');
       return;
     }
@@ -140,19 +189,62 @@ void _findBarrelCycles(
   }
 }
 
-_Directives _parseDirectives(File file) {
+_Directives _parseDirectives(Directory root, File file, List<String> failures) {
   final imports = <_Directive>[];
   final exports = <_Directive>[];
-  final pattern = RegExp(r'''^\s*(import|export)\s+['"]([^'"]+)['"]''');
-  final lines = file.readAsLinesSync();
-  for (var index = 0; index < lines.length; index++) {
-    final match = pattern.firstMatch(lines[index]);
-    if (match == null) continue;
-    final directive = _Directive(uri: match.group(2)!, line: index + 1);
-    if (match.group(1) == 'import') {
-      imports.add(directive);
-    } else {
-      exports.add(directive);
+  final parsed = parseFile(
+    path: file.path,
+    featureSet: FeatureSet.latestLanguageVersion(),
+    throwIfDiagnostics: false,
+  );
+  for (final error in parsed.errors) {
+    final line = parsed.lineInfo.getLocation(error.offset).lineNumber;
+    failures.add(
+      '${_relative(root, file.path)}:$line: parse error: ${error.message}',
+    );
+  }
+  for (final directive in parsed.unit.directives) {
+    switch (directive) {
+      case ImportDirective():
+        final uri = directive.uri.stringValue;
+        if (uri != null) {
+          imports.add(
+            _Directive(
+              uri: uri,
+              line: parsed.lineInfo
+                  .getLocation(directive.uri.offset)
+                  .lineNumber,
+            ),
+          );
+        }
+        for (final configuration in directive.configurations) {
+          final configuredUri = configuration.uri.stringValue;
+          if (configuredUri != null) {
+            imports.add(
+              _Directive(
+                uri: configuredUri,
+                line: parsed.lineInfo
+                    .getLocation(configuration.uri.offset)
+                    .lineNumber,
+              ),
+            );
+          }
+        }
+      case ExportDirective():
+        final uri = directive.uri.stringValue;
+        if (uri != null) {
+          exports.add(
+            _Directive(
+              uri: uri,
+              line: parsed.lineInfo
+                  .getLocation(directive.uri.offset)
+                  .lineNumber,
+              isConditional: directive.configurations.isNotEmpty,
+            ),
+          );
+        }
+      default:
+        break;
     }
   }
   return _Directives(imports: imports, exports: exports);
@@ -183,11 +275,16 @@ String _resolve(File owner, String relativeUri) {
   return File.fromUri(owner.parent.uri.resolve(relativeUri)).absolute.path;
 }
 
-String _relative(String path) {
-  final root = Directory.current.absolute.path;
+bool _isWithinSourceRoot(Directory sourceRoot, String path) {
+  final rootPath = sourceRoot.absolute.path;
+  return path.startsWith('$rootPath${Platform.pathSeparator}');
+}
+
+String _relative(Directory root, String path) {
+  final rootPath = root.absolute.path;
   final absolute = File(path).absolute.path;
-  return absolute.startsWith('$root/')
-      ? absolute.substring(root.length + 1)
+  return absolute.startsWith('$rootPath/')
+      ? absolute.substring(rootPath.length + 1)
       : absolute;
 }
 
@@ -209,8 +306,13 @@ final class _Directives {
 }
 
 final class _Directive {
-  const _Directive({required this.uri, required this.line});
+  const _Directive({
+    required this.uri,
+    required this.line,
+    this.isConditional = false,
+  });
 
   final String uri;
   final int line;
+  final bool isConditional;
 }
