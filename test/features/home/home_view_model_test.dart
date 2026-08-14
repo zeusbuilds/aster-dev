@@ -92,6 +92,33 @@ void main() {
     },
   );
 
+  test('terminal initial portfolio failure cannot be retried', () async {
+    final engine = FakeWalletEngine()
+      ..balance = _bitcoinBalance()
+      ..balanceError = StateError('terminal wallet state');
+    final harness = await PaymentFlowTestHarness.create(engine: engine);
+    addTearDown(harness.dispose);
+    final subscription = harness.container.listen(
+      homeViewModelProvider,
+      (_, _) {},
+    );
+    addTearDown(subscription.close);
+
+    await expectLater(
+      harness.container.read(homeViewModelProvider.future),
+      throwsA(isA<AppFailureException>()),
+    );
+    engine.balanceError = null;
+
+    await harness.container.read(homeViewModelProvider.notifier).retry();
+
+    expect(
+      harness.container.read(homeViewModelProvider),
+      isA<AsyncError<HomeState>>(),
+    );
+    expect(engine.calls.where((call) => call == 'balance'), hasLength(1));
+  });
+
   test('reloads the read-only portfolio after a confirmed resume', () async {
     final engine = FakeWalletEngine()..balance = _bitcoinBalance();
     final harness = await PaymentFlowTestHarness.create(engine: engine);

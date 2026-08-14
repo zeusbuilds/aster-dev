@@ -5,6 +5,7 @@ import 'package:aster/features/receive/presentation/models/models.dart';
 import 'package:aster/features/receive/presentation/view_model/view_models.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:aster/shared/feedback/feedback.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rgb_sdk_flutter/rgb_sdk_flutter.dart';
 
@@ -148,6 +149,64 @@ void main() {
       expect(harness.engine.createdReceiveAmount?.units, 2000);
     },
   );
+
+  test('retryable initial request failure can recover explicitly', () async {
+    final engine = FakeWalletEngine()
+      ..createReceiveError = TimeoutException('temporary request timeout');
+    final harness = await PaymentFlowTestHarness.create(engine: engine);
+    addTearDown(harness.dispose);
+    final provider = receiveFlowViewModelProvider(
+      WalletPaymentTarget.bitcoinOnchain,
+    );
+    final subscription = harness.container.listen(provider, (_, _) {});
+    addTearDown(subscription.close);
+
+    await expectLater(
+      harness.container.read(provider.future),
+      throwsA(isA<AppFailureException>()),
+    );
+    engine.createReceiveError = null;
+
+    await harness.container.read(provider.notifier).retry();
+
+    expect(
+      harness.container.read(provider),
+      isA<AsyncData<ReceiveFlowState>>(),
+    );
+    expect(
+      engine.calls.where((call) => call == 'createReceiveRequest:start'),
+      hasLength(2),
+    );
+  });
+
+  test('terminal initial request failure cannot be retried', () async {
+    final engine = FakeWalletEngine()
+      ..createReceiveError = StateError('terminal request state');
+    final harness = await PaymentFlowTestHarness.create(engine: engine);
+    addTearDown(harness.dispose);
+    final provider = receiveFlowViewModelProvider(
+      WalletPaymentTarget.bitcoinOnchain,
+    );
+    final subscription = harness.container.listen(provider, (_, _) {});
+    addTearDown(subscription.close);
+
+    await expectLater(
+      harness.container.read(provider.future),
+      throwsA(isA<AppFailureException>()),
+    );
+    engine.createReceiveError = null;
+
+    await harness.container.read(provider.notifier).retry();
+
+    expect(
+      harness.container.read(provider),
+      isA<AsyncError<ReceiveFlowState>>(),
+    );
+    expect(
+      engine.calls.where((call) => call == 'createReceiveRequest:start'),
+      hasLength(1),
+    );
+  });
 
   test('copy and share use injectable platform boundaries', () async {
     final harness = await PaymentFlowTestHarness.create();

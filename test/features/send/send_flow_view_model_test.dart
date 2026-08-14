@@ -6,6 +6,7 @@ import 'package:aster/features/send/presentation/view_model/view_models.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:aster/features/wallet/presentation/view_model/view_models.dart';
 import 'package:aster/shared/feedback/feedback.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rgb_sdk_flutter/rgb_sdk_flutter.dart';
 
@@ -298,6 +299,54 @@ void main() {
       expect(harness.haptics.intents, [HapticIntent.error]);
     },
   );
+
+  test('retryable initial Send failure can recover explicitly', () async {
+    final engine = FakeWalletEngine()
+      ..balance = _balance(onchainSpendable: 1000, lightningSpendable: 0)
+      ..balanceError = TimeoutException('temporary balance timeout');
+    final harness = await PaymentFlowTestHarness.create(engine: engine);
+    addTearDown(harness.dispose);
+    final provider = sendFlowViewModelProvider(
+      WalletPaymentTarget.bitcoinOnchain,
+    );
+    final subscription = harness.container.listen(provider, (_, _) {});
+    addTearDown(subscription.close);
+
+    await expectLater(
+      harness.container.read(provider.future),
+      throwsA(isA<AppFailureException>()),
+    );
+    engine.balanceError = null;
+
+    await harness.container.read(provider.notifier).retry();
+
+    expect(harness.container.read(provider), isA<AsyncData<SendFlowState>>());
+    expect(engine.calls.where((call) => call == 'balance'), hasLength(2));
+  });
+
+  test('terminal initial Send failure cannot be retried', () async {
+    final engine = FakeWalletEngine()
+      ..balance = _balance(onchainSpendable: 1000, lightningSpendable: 0)
+      ..balanceError = StateError('terminal balance state');
+    final harness = await PaymentFlowTestHarness.create(engine: engine);
+    addTearDown(harness.dispose);
+    final provider = sendFlowViewModelProvider(
+      WalletPaymentTarget.bitcoinOnchain,
+    );
+    final subscription = harness.container.listen(provider, (_, _) {});
+    addTearDown(subscription.close);
+
+    await expectLater(
+      harness.container.read(provider.future),
+      throwsA(isA<AppFailureException>()),
+    );
+    engine.balanceError = null;
+
+    await harness.container.read(provider.notifier).retry();
+
+    expect(harness.container.read(provider), isA<AsyncError<SendFlowState>>());
+    expect(engine.calls.where((call) => call == 'balance'), hasLength(1));
+  });
 
   test(
     'payment capability provider preserves all four stable choices',

@@ -1,5 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../../core/core.dart';
 import '../../../wallet/domain/models/models.dart';
 import '../../../wallet/presentation/view_model/view_models.dart';
 import '../models/models.dart';
@@ -17,8 +18,13 @@ class SwapViewModel extends _$SwapViewModel {
     return _initialState(capabilities);
   }
 
+  /// Retries capability loading only when the typed failure permits replay.
   void retry() {
     if (state.isLoading) return;
+    if (state case AsyncError(:final error, :final stackTrace)
+        when !FailureMapper.from(error, stackTrace).retryable) {
+      return;
+    }
     ref.invalidate(walletPaymentCapabilitiesProvider);
     ref.invalidateSelf();
   }

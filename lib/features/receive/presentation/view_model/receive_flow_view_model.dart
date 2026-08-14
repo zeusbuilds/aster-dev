@@ -27,6 +27,10 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
   /// Retries initial route resolution and request generation.
   Future<void> retry() async {
     if (state.isLoading) return;
+    if (state case AsyncError(:final error, :final stackTrace)
+        when !FailureMapper.from(error, stackTrace).retryable) {
+      return;
+    }
     state = const AsyncLoading();
     final next = await AsyncValue.guard(_load);
     if (ref.mounted) state = next;

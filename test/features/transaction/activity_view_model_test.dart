@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:aster/core/core.dart';
+import 'package:aster/features/transaction/presentation/models/models.dart';
 import 'package:aster/features/transaction/presentation/view_model/view_models.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/payment_flow_harness.dart';
@@ -77,6 +79,26 @@ void main() {
       expect(engine.calls.where((call) => call == 'activity'), hasLength(2));
     },
   );
+
+  test('terminal initial activity failure cannot be retried', () async {
+    final engine = _engine()..activityError = StateError('terminal feed state');
+    final harness = await PaymentFlowTestHarness.create(engine: engine);
+    addTearDown(harness.dispose);
+    final provider = activityViewModelProvider(WalletAssetKind.bitcoin);
+    final subscription = harness.container.listen(provider, (_, _) {});
+    addTearDown(subscription.close);
+
+    await expectLater(
+      harness.container.read(provider.future),
+      throwsA(isA<AppFailureException>()),
+    );
+    engine.activityError = null;
+
+    await harness.container.read(provider.notifier).retry();
+
+    expect(harness.container.read(provider), isA<AsyncError<ActivityState>>());
+    expect(engine.calls.where((call) => call == 'activity'), hasLength(1));
+  });
 
   test(
     'stale refresh cannot overwrite a rebuilt provider generation',

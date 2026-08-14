@@ -28,6 +28,10 @@ class SendFlowViewModel extends _$SendFlowViewModel {
   /// Retries loading route metadata, display settings, balance, and fee state.
   Future<void> retry() async {
     if (state.isLoading) return;
+    if (state case AsyncError(:final error, :final stackTrace)
+        when !FailureMapper.from(error, stackTrace).retryable) {
+      return;
+    }
     state = const AsyncLoading();
     final next = await AsyncValue.guard(_load);
     if (ref.mounted) state = next;

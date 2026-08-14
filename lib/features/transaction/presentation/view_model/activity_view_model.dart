@@ -31,6 +31,10 @@ class ActivityViewModel extends _$ActivityViewModel {
   /// Retries initial loading without overlapping an active operation.
   Future<void> retry() async {
     if (state.isLoading) return;
+    if (state case AsyncError(:final error, :final stackTrace)
+        when !FailureMapper.from(error, stackTrace).retryable) {
+      return;
+    }
     final generation = ++_stateGeneration;
     state = const AsyncLoading();
     if (ref.read(walletViewModelProvider).hasError) {

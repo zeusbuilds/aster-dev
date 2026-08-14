@@ -41,8 +41,13 @@ class BitcoinMarketViewModel extends _$BitcoinMarketViewModel {
     return _fetch(currency);
   }
 
+  /// Force-refreshes loaded data or retries a retryable initial failure.
   Future<void> retry() async {
     if (state.isLoading) return;
+    if (state case AsyncError(:final error, :final stackTrace)
+        when !FailureMapper.from(error, stackTrace).retryable) {
+      return;
+    }
     final generation = ++_stateGeneration;
     state = const AsyncLoading();
     final next = await AsyncValue.guard(() async {
