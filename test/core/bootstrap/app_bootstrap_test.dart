@@ -4,11 +4,69 @@ import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:aster/features/wallet/presentation/view_model/wallet_view_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/onboarding_harness.dart';
 import '../../support/wallet_fakes.dart';
 
 void main() {
+  test('production container never retries provider build failures', () async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    final container = createApplicationProviderContainer(preferences);
+    addTearDown(container.dispose);
+    var builds = 0;
+    final failingProvider = FutureProvider<int>((ref) async {
+      builds += 1;
+      throw const AppFailureException(
+        AppFailure(
+          code: 'test_non_retryable_failure',
+          kind: AppFailureKind.validation,
+          userMessage: 'Test failure.',
+          retryable: false,
+        ),
+      );
+    });
+    final subscription = container.listen(
+      failingProvider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+
+    expect(container.retry, same(applicationProviderRetryPolicy));
+    expect(
+      ProviderContainer.defaultRetry(
+        0,
+        const AppFailureException(
+          AppFailure(
+            code: 'test_default_retry',
+            kind: AppFailureKind.validation,
+            userMessage: 'Test failure.',
+            retryable: false,
+          ),
+        ),
+      ),
+      const Duration(milliseconds: 200),
+    );
+    await expectLater(
+      container.read(failingProvider.future),
+      throwsA(isA<AppFailureException>()),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+
+    expect(builds, 1);
+  });
+
+  test('bootstrap rejects a container with implicit retry', () async {
+    final container = ProviderContainer();
+
+    await expectLater(
+      bootstrapApplicationContainer(container),
+      throwsA(isA<ArgumentError>()),
+    );
+  });
+
   test('preloads authoritative wallet state before returning', () async {
     final harness = await OnboardingTestHarness.create();
     addTearDown(harness.dispose);
@@ -25,6 +83,7 @@ void main() {
     () async {
       final engine = FakeWalletEngine();
       final container = ProviderContainer(
+        retry: applicationProviderRetryPolicy,
         overrides: [
           walletEngineFactoryProvider.overrideWithValue(
             FakeWalletEngineFactory([engine]),
@@ -70,6 +129,7 @@ void main() {
         ),
       );
     final container = ProviderContainer(
+      retry: applicationProviderRetryPolicy,
       overrides: [
         walletEngineFactoryProvider.overrideWithValue(
           FakeWalletEngineFactory([engine]),

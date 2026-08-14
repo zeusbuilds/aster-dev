@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:aster/core/bootstrap/app_bootstrap.dart';
 import 'package:aster/core/core.dart';
 import 'package:aster/features/onboarding/data/repository/repository.dart';
 import 'package:aster/features/wallet/data/repository/repository.dart';
@@ -101,7 +102,7 @@ final class OnboardingTestHarness {
     final haptics = RecordingHapticFeedbackService();
     final toasts = RecordingToastPresentationService();
     final container = ProviderContainer(
-      retry: (retryCount, error) => null,
+      retry: applicationProviderRetryPolicy,
       overrides: [
         walletRepositoryProvider.overrideWith((ref) async => repository),
         bip39WordListRepositoryProvider.overrideWithValue(

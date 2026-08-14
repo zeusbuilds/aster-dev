@@ -44,6 +44,10 @@ cross-feature contract; it is not a holding area for convenient utilities.
 - Widgets do not start asynchronous initialization from `build`.
 - Overlapping mutations are rejected or serialized at their owning boundary.
 - Provider overrides supply tests with app-owned fakes, not production fixtures.
+- The production container disables Riverpod's timer-based provider-build
+  retry. Failed providers remain in their typed error state until an explicit
+  ViewModel retry command or a deliberate dependency invalidation rebuilds
+  them.
 
 ## Native Wallet Ownership
 
@@ -95,6 +99,9 @@ App-owned HTTP uses one abortable operation budget. Only idempotent GET requests
 retry with bounded exponential backoff and jitter. Mutations never retry without
 a real idempotency contract. Native operation timeout and quarantine behavior
 remain SDK-owned so Dart cannot release serialization while native work runs.
+Provider builds never retry automatically, so generic framework behavior cannot
+bypass typed retryability, unknown-outcome, request-generation, or publication
+generation contracts.
 
 Market data is a typed repository boundary. Bitcoin and Tether quotes carry one
 selected ISO identity, integer minor units, provider timestamps, bounded

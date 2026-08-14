@@ -6,14 +6,28 @@ import '../../features/wallet/presentation/view_model/wallet_view_model.dart';
 import '../di/providers.dart';
 import '../errors/errors.dart';
 
+/// Production policy that keeps provider-build retry under app ownership.
+///
+/// Dependency changes may still rebuild providers. A failed build remains in
+/// its typed error state until a ViewModel retry command or deliberate
+/// invalidation runs; Riverpod never repeats it on a timer.
+Duration? applicationProviderRetryPolicy(int _, Object _) => null;
+
 /// Creates and fully bootstraps the application provider container.
 ///
-/// This function owns [container] on failure. It attempts awaited native
-/// runtime cleanup before disposing Riverpod and never returns a partially
-/// initialized container.
+/// [container] must use [applicationProviderRetryPolicy]. This function owns
+/// the container on failure, attempts awaited native runtime cleanup before
+/// disposing Riverpod, and never returns a partially initialized container.
 Future<ProviderContainer> bootstrapApplicationContainer(
   ProviderContainer container,
 ) async {
+  if (!identical(container.retry, applicationProviderRetryPolicy)) {
+    container.dispose();
+    throw ArgumentError(
+      'Application bootstrap requires the explicit provider retry policy.',
+    );
+  }
+
   WalletRepository? repository;
   try {
     final resolvedRepository = await container.read(
@@ -58,17 +72,25 @@ Future<ProviderContainer> bootstrapApplicationContainer(
   }
 }
 
+/// Creates the production Riverpod composition root.
+ProviderContainer createApplicationProviderContainer(
+  SharedPreferences sharedPreferences,
+) {
+  return ProviderContainer(
+    retry: applicationProviderRetryPolicy,
+    overrides: [
+      sharedPreferencesProvider.overrideWith((ref) => sharedPreferences),
+    ],
+  );
+}
+
 /// Creates the production container with an already-resolved preferences
 /// instance so startup never creates two competing preference owners.
 Future<ProviderContainer> bootstrapApplication(
   SharedPreferences sharedPreferences,
 ) {
   return bootstrapApplicationContainer(
-    ProviderContainer(
-      overrides: [
-        sharedPreferencesProvider.overrideWith((ref) => sharedPreferences),
-      ],
-    ),
+    createApplicationProviderContainer(sharedPreferences),
   );
 }
 

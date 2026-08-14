@@ -24,6 +24,13 @@ Mutation retries are intentionally absent. Sends, payments, wallet creation,
 imports, and channel operations must not retry until the concrete API offers a
 real idempotency contract and the app supplies its key.
 
+Riverpod's default timer-based provider-build retry is disabled at the
+production composition root. An initial provider failure remains visible until
+an explicit ViewModel retry command or a deliberate dependency invalidation
+runs. Bootstrap, mnemonic generation, Receive request creation, and other state
+machines therefore retain ownership of whether repeating work is safe; only the
+HTTP GET policy above retries automatically.
+
 ## Failure And Privacy
 
 Repositories return `AppResult<T>`. `AppFailure` carries a stable code,
