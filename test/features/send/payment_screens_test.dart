@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:aster/core/core.dart';
 import 'package:aster/features/market/domain/models/models.dart';
 import 'package:aster/features/receive/presentation/screens/screens.dart';
+import 'package:aster/features/receive/presentation/view_model/view_models.dart';
 import 'package:aster/features/receive/presentation/widgets/widgets.dart';
 import 'package:aster/features/send/presentation/screens/screens.dart';
 import 'package:aster/features/send/presentation/view_model/view_models.dart';
@@ -520,6 +521,70 @@ void main() {
       () => find.byType(PrettyQrView).evaluate().isNotEmpty,
     );
   });
+
+  testWidgets(
+    'Receive unknown generation outcome disables mutation but preserves old QR actions',
+    (tester) async {
+      final engine = FakeWalletEngine();
+      final harness = await PaymentFlowTestHarness.create(engine: engine);
+      addTearDown(() => _disposeHarness(tester, harness));
+      final provider = receiveFlowViewModelProvider(
+        WalletPaymentTarget.bitcoinOnchain,
+      );
+      await _pumpWidget(
+        tester,
+        harness,
+        const ReceiveRequestScreen(target: WalletPaymentTarget.bitcoinOnchain),
+      );
+      await _pumpUntil(
+        tester,
+        () => find.byType(PrettyQrView).evaluate().isNotEmpty,
+      );
+      engine.createReceiveError = const AppFailureException(
+        AppFailure(
+          code: 'wallet_operation_outcome_unknown',
+          kind: AppFailureKind.timeout,
+          userMessage: 'Check wallet status before generating another request.',
+          retryable: false,
+          outcomeUnknown: true,
+        ),
+      );
+      expect(
+        await tester.runAsync(
+          harness.container.read(provider.notifier).regenerate,
+        ),
+        isFalse,
+      );
+      await tester.pump();
+
+      final copy = tester.widget<CustomButton>(
+        find.widgetWithText(CustomButton, 'Copy'),
+      );
+      expect(copy.enabled, isTrue);
+      await tester.scrollUntilVisible(
+        find.text('Generate new request'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      final rows = tester.widgetList<AsterOptionRow>(
+        find.byType(AsterOptionRow),
+      );
+      AsterOptionRow row(String title) =>
+          rows.singleWhere((candidate) => candidate.title == title);
+
+      expect(row('Set amount').onTap, isNull);
+      expect(row('Generate new request').onTap, isNull);
+      expect(row('Share').onTap, isNotNull);
+      expect(
+        find.text('Check wallet status before generating another request.'),
+        findsOneWidget,
+      );
+      expect(
+        engine.calls.where((call) => call == 'createReceiveRequest:start'),
+        hasLength(2),
+      );
+    },
+  );
 
   testWidgets('Send amount stays loading until one real mutation completes', (
     tester,

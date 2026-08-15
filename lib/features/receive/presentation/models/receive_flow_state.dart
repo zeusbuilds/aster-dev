@@ -7,6 +7,39 @@ import '../../../wallet/domain/models/models.dart';
 /// Mutually exclusive request work owned by one route-scoped Receive flow.
 enum ReceiveFlowOperation { generatingRequest, copyingRequest, sharingRequest }
 
+/// A retained Receive failure together with the operation that produced it.
+///
+/// Copy and share failures are transient presentation results and are never
+/// retained here. Request-generation provenance prevents a successful
+/// read-only action from erasing a terminal or outcome-unknown native failure.
+@immutable
+final class ReceiveFlowFailure {
+  ReceiveFlowFailure({required this.operation, required this.failure}) {
+    if (operation != ReceiveFlowOperation.generatingRequest) {
+      throw ArgumentError.value(
+        operation,
+        'operation',
+        'Only request-generation failures may be retained.',
+      );
+    }
+  }
+
+  final ReceiveFlowOperation operation;
+  final AppFailure failure;
+
+  /// Whether changing the amount creates a safely distinct request command.
+  bool get allowsAmountEdit => !failure.outcomeUnknown;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ReceiveFlowFailure &&
+      other.operation == operation &&
+      other.failure == failure;
+
+  @override
+  int get hashCode => Object.hash(operation, failure);
+}
+
 /// Typed state for one asset-and-rail Receive flow.
 @immutable
 final class ReceiveFlowState {
@@ -17,7 +50,7 @@ final class ReceiveFlowState {
     required this.amountText,
     required this.amountInput,
     this.operation,
-    this.failure,
+    this.retainedFailure,
   }) {
     if (amountInput.text != amountText) {
       throw ArgumentError.value(
@@ -33,8 +66,11 @@ final class ReceiveFlowState {
     if (appliedAmount != null && appliedAmount.assetId != route.asset.id) {
       throw ArgumentError.value(request, 'request', 'Asset mismatch.');
     }
-    if (operation != null && failure != null) {
-      throw ArgumentError('Active work cannot retain a previous failure.');
+    if (operation == ReceiveFlowOperation.generatingRequest &&
+        retainedFailure != null) {
+      throw ArgumentError(
+        'Request generation cannot retain a previous generation failure.',
+      );
     }
   }
 
@@ -46,10 +82,26 @@ final class ReceiveFlowState {
   final String amountText;
   final WalletAmountInput amountInput;
   final ReceiveFlowOperation? operation;
-  final AppFailure? failure;
+  final ReceiveFlowFailure? retainedFailure;
+
+  AppFailure? get failure => retainedFailure?.failure;
 
   bool get isBusy => operation != null;
   bool get isGenerating => operation == ReceiveFlowOperation.generatingRequest;
+  bool get requiresReconciliation => failure?.outcomeUnknown ?? false;
+  bool get canReadRequest => !isBusy;
+  bool get canEditAmount =>
+      !isBusy && (retainedFailure == null || retainedFailure!.allowsAmountEdit);
+
+  /// Whether the same request-generation command may start again.
+  bool get canRegenerate {
+    if (isBusy) return false;
+    final retained = retainedFailure;
+    return retained == null ||
+        (retained.operation == ReceiveFlowOperation.generatingRequest &&
+            retained.failure.retryable);
+  }
+
   bool get amountUsesSupportedGranularity {
     if (amountText.isEmpty) return true;
     final units = amountInput.units;
@@ -66,7 +118,7 @@ final class ReceiveFlowState {
         amountInput.units != appliedUnits;
   }
 
-  bool get canApplyAmount => !isBusy && hasPendingAmountChange;
+  bool get canApplyAmount => canRegenerate && hasPendingAmountChange;
   bool isExpiredAt(DateTime now) => request.isExpiredAt(now);
 
   ReceiveFlowState copyWith({
@@ -74,7 +126,7 @@ final class ReceiveFlowState {
     String? amountText,
     WalletAmountInput? amountInput,
     Object? operation = _unchanged,
-    Object? failure = _unchanged,
+    Object? retainedFailure = _unchanged,
   }) {
     return ReceiveFlowState(
       route: route,
@@ -85,9 +137,9 @@ final class ReceiveFlowState {
       operation: identical(operation, _unchanged)
           ? this.operation
           : operation as ReceiveFlowOperation?,
-      failure: identical(failure, _unchanged)
-          ? this.failure
-          : failure as AppFailure?,
+      retainedFailure: identical(retainedFailure, _unchanged)
+          ? this.retainedFailure
+          : retainedFailure as ReceiveFlowFailure?,
     );
   }
 
@@ -100,7 +152,7 @@ final class ReceiveFlowState {
       other.amountText == amountText &&
       other.amountInput == amountInput &&
       other.operation == operation &&
-      other.failure == failure;
+      other.retainedFailure == retainedFailure;
 
   @override
   int get hashCode => Object.hash(
@@ -110,7 +162,7 @@ final class ReceiveFlowState {
     amountText,
     amountInput,
     operation,
-    failure,
+    retainedFailure,
   );
 }
 

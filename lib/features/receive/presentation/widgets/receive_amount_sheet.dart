@@ -127,6 +127,7 @@ final class _AmountSheetBody extends StatelessWidget {
         (!state.amountUsesSupportedGranularity
             ? 'Enter a whole-satoshi Lightning amount.'
             : null);
+    final visibleMessage = amountMessage ?? state.failure?.userMessage;
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: context.spacing.screenPadding),
       child: Column(
@@ -162,7 +163,7 @@ final class _AmountSheetBody extends StatelessWidget {
               ],
             ),
           ),
-          if (amountMessage case final message?) ...[
+          if (visibleMessage case final message?) ...[
             SizedBox(height: context.spacing.sm),
             Text(
               message,
@@ -176,7 +177,7 @@ final class _AmountSheetBody extends StatelessWidget {
             child: SingleChildScrollView(
               child: AsterNumericKeypad(
                 value: state.amountText,
-                enabled: !state.isBusy,
+                enabled: state.canEditAmount,
                 allowDecimal:
                     codec.displayPrecision(state.route, state.bitcoinUnit) > 0,
                 onChanged: onChanged,

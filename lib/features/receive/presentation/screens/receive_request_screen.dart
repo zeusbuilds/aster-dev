@@ -168,12 +168,9 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
               onCopy: () => unawaited(_copy()),
               onShare: () => unawaited(_share()),
               onRegenerate: () => unawaited(_regenerate()),
-              onSetAmount: () {
-                ref.read(provider.notifier).clearFailure();
-                unawaited(
-                  ReceiveAmountSheet.show(context, target: widget.target),
-                );
-              },
+              onSetAmount: () => unawaited(
+                ReceiveAmountSheet.show(context, target: widget.target),
+              ),
             ),
             loading: () => const _RequestLoading(),
             error: (error, stackTrace) => _RequestFailure(
@@ -273,7 +270,7 @@ final class _RequestBody extends StatelessWidget {
                 text: 'Copy',
                 prefixIcon: MingCuteIcons.mgc_copy_2_line,
                 loading: state.operation == ReceiveFlowOperation.copyingRequest,
-                enabled: !state.isBusy && !expired,
+                enabled: state.canReadRequest && !expired,
                 hapticIntent: null,
                 onTap: onCopy,
               ),
@@ -289,7 +286,7 @@ final class _RequestBody extends StatelessWidget {
                 title: 'Set amount',
                 details: appliedAmount?.text,
                 prefixIcon: MingCuteIcons.mgc_edit_2_line,
-                onTap: state.isBusy ? null : onSetAmount,
+                onTap: state.canEditAmount ? onSetAmount : null,
               ),
               const AsterDivider.inset(),
               AsterOptionRow(
@@ -297,7 +294,7 @@ final class _RequestBody extends StatelessWidget {
                 details: state.isGenerating ? 'Generating' : null,
                 prefixIcon: MingCuteIcons.mgc_refresh_2_line,
                 hapticIntent: null,
-                onTap: state.isBusy ? null : onRegenerate,
+                onTap: state.canRegenerate ? onRegenerate : null,
               ),
               const AsterDivider.inset(),
               AsterOptionRow(
@@ -307,7 +304,7 @@ final class _RequestBody extends StatelessWidget {
                     : null,
                 prefixIcon: MingCuteIcons.mgc_share_forward_line,
                 hapticIntent: null,
-                onTap: state.isBusy || expired ? null : onShare,
+                onTap: state.canReadRequest && !expired ? onShare : null,
               ),
             ],
           ),

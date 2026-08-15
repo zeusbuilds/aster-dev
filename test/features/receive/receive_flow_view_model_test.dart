@@ -208,6 +208,190 @@ void main() {
     );
   });
 
+  test('terminal generation failure needs a distinct amount before new native work', () async {
+    final engine = FakeWalletEngine();
+    final harness = await PaymentFlowTestHarness.create(engine: engine);
+    addTearDown(harness.dispose);
+    final provider = receiveFlowViewModelProvider(
+      WalletPaymentTarget.bitcoinOnchain,
+    );
+    final subscription = harness.container.listen(
+      provider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    await harness.container.read(provider.future);
+    final notifier = harness.container.read(provider.notifier);
+    engine.createReceiveError = StateError('terminal request state');
+
+    expect(await notifier.regenerate(), isFalse);
+
+    final failed = harness.container.read(provider).requireValue;
+    expect(failed.failure?.retryable, isFalse);
+    expect(failed.canRegenerate, isFalse);
+    expect(failed.canEditAmount, isTrue);
+    expect(
+      engine.calls.where((call) => call == 'createReceiveRequest:start'),
+      hasLength(2),
+    );
+    engine.createReceiveError = null;
+
+    await notifier.retry();
+    expect(await notifier.regenerate(), isFalse);
+    expect(await notifier.copyRequest(), isA<AppSuccess<void>>());
+    expect(await notifier.shareRequest(), isA<AppSuccess<ShareDisposition>>());
+    expect(harness.container.read(provider).requireValue, failed);
+    expect(
+      engine.calls.where((call) => call == 'createReceiveRequest:start'),
+      hasLength(2),
+    );
+
+    notifier.updateAmount('0.000001');
+    final edited = harness.container.read(provider).requireValue;
+    expect(edited.failure, isNull);
+    expect(edited.canApplyAmount, isTrue);
+    expect(await notifier.applyAmount(), isTrue);
+    expect(
+      engine.calls.where((call) => call == 'createReceiveRequest:start'),
+      hasLength(3),
+    );
+  });
+
+  test(
+    'retryable generation failure permits only explicit same-operation retry',
+    () async {
+      final engine = FakeWalletEngine();
+      final harness = await PaymentFlowTestHarness.create(engine: engine);
+      addTearDown(harness.dispose);
+      final provider = receiveFlowViewModelProvider(
+        WalletPaymentTarget.bitcoinOnchain,
+      );
+      final subscription = harness.container.listen(
+        provider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      await harness.container.read(provider.future);
+      final notifier = harness.container.read(provider.notifier);
+      engine.createReceiveError = TimeoutException('temporary request timeout');
+
+      expect(await notifier.regenerate(), isFalse);
+
+      final failed = harness.container.read(provider).requireValue;
+      expect(failed.failure?.retryable, isTrue);
+      expect(failed.canRegenerate, isTrue);
+      engine.createReceiveError = null;
+
+      await notifier.retry();
+      expect(harness.container.read(provider).requireValue, failed);
+      expect(
+        engine.calls.where((call) => call == 'createReceiveRequest:start'),
+        hasLength(2),
+      );
+      expect(await notifier.regenerate(), isTrue);
+      expect(harness.container.read(provider).requireValue.failure, isNull);
+      expect(
+        engine.calls.where((call) => call == 'createReceiveRequest:start'),
+        hasLength(3),
+      );
+    },
+  );
+
+  test(
+    'outcome-unknown generation quarantines every request mutation',
+    () async {
+      final engine = FakeWalletEngine();
+      final harness = await PaymentFlowTestHarness.create(engine: engine);
+      addTearDown(harness.dispose);
+      final provider = receiveFlowViewModelProvider(
+        WalletPaymentTarget.bitcoinLightning,
+      );
+      final subscription = harness.container.listen(
+        provider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      await harness.container.read(provider.future);
+      final notifier = harness.container.read(provider.notifier);
+      engine.createReceiveError = const RlnOperationTimeoutException(
+        operation: 'rlnCreateInvoice',
+        timeout: Duration(minutes: 2),
+      );
+
+      expect(await notifier.regenerate(), isFalse);
+
+      final failed = harness.container.read(provider).requireValue;
+      expect(failed.requiresReconciliation, isTrue);
+      expect(failed.canRegenerate, isFalse);
+      expect(failed.canEditAmount, isFalse);
+      expect(failed.canReadRequest, isTrue);
+      engine.createReceiveError = null;
+
+      expect(await notifier.copyRequest(), isA<AppSuccess<void>>());
+      expect(
+        await notifier.shareRequest(),
+        isA<AppSuccess<ShareDisposition>>(),
+      );
+      notifier.updateAmount('0.00000002');
+      await notifier.retry();
+      expect(await notifier.applyAmount(), isFalse);
+      expect(await notifier.regenerate(), isFalse);
+
+      expect(harness.container.read(provider).requireValue, failed);
+      expect(
+        engine.calls.where((call) => call == 'createReceiveRequest:start'),
+        hasLength(2),
+      );
+    },
+  );
+
+  test(
+    'copy and share failures never become request-generation failures',
+    () async {
+      final harness = await PaymentFlowTestHarness.create();
+      addTearDown(harness.dispose);
+      final provider = receiveFlowViewModelProvider(
+        WalletPaymentTarget.bitcoinOnchain,
+      );
+      final subscription = harness.container.listen(
+        provider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      await harness.container.read(provider.future);
+      final notifier = harness.container.read(provider.notifier);
+      const readOnlyFailure = AppFailure(
+        code: 'platform_action_failed',
+        kind: AppFailureKind.unavailable,
+        userMessage: 'The platform action could not be completed.',
+        retryable: false,
+      );
+      harness.clipboard.writeFailure = readOnlyFailure;
+      harness.share.result = AppResult.failure(readOnlyFailure);
+
+      expect(await notifier.copyRequest(), isA<AppFailureResult<void>>());
+      expect(
+        await notifier.shareRequest(),
+        isA<AppFailureResult<ShareDisposition>>(),
+      );
+
+      final state = harness.container.read(provider).requireValue;
+      expect(state.failure, isNull);
+      expect(state.canRegenerate, isTrue);
+      expect(await notifier.regenerate(), isTrue);
+      expect(
+        harness.engine.calls.where(
+          (call) => call == 'createReceiveRequest:start',
+        ),
+        hasLength(2),
+      );
+    },
+  );
+
   test('copy and share use injectable platform boundaries', () async {
     final harness = await PaymentFlowTestHarness.create();
     addTearDown(harness.dispose);

@@ -26,11 +26,14 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
 
   /// Retries initial route resolution and request generation.
   Future<void> retry() async {
-    if (state.isLoading) return;
-    if (state case AsyncError(:final error, :final stackTrace)
-        when !FailureMapper.from(error, stackTrace).retryable) {
-      return;
-    }
+    final failure = switch (state) {
+      AsyncError(:final error, :final stackTrace) => FailureMapper.from(
+        error,
+        stackTrace,
+      ),
+      _ => null,
+    };
+    if (failure == null || !failure.retryable) return;
     state = const AsyncLoading();
     final next = await AsyncValue.guard(_load);
     if (ref.mounted) state = next;
@@ -39,13 +42,13 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
   /// Updates pending amount-sheet input without regenerating on every key.
   void updateAmount(String value) {
     final current = state.value;
-    if (current == null || current.isBusy) return;
+    if (current == null || !current.canEditAmount) return;
     if (value == current.amountText) return;
     state = AsyncData(
       current.copyWith(
         amountText: value,
         amountInput: _parseAmount(value, current),
-        failure: null,
+        retainedFailure: null,
       ),
     );
   }
@@ -61,7 +64,7 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
   /// Generates a new address or invoice while preserving the applied amount.
   Future<bool> regenerate() async {
     final current = state.value;
-    if (current == null || current.isBusy) return false;
+    if (current == null || !current.canRegenerate) return false;
     return _generate(
       current,
       amountUnits: current.request.amount?.units,
@@ -72,22 +75,17 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
   /// Copies the currently encoded request through the app platform boundary.
   Future<AppResult<void>> copyRequest() async {
     final current = state.value;
-    if (current == null || current.isBusy) {
+    if (current == null || !current.canReadRequest) {
       return AppResult.failure(_operationUnavailableFailure());
     }
     state = AsyncData(
-      current.copyWith(
-        operation: ReceiveFlowOperation.copyingRequest,
-        failure: null,
-      ),
+      current.copyWith(operation: ReceiveFlowOperation.copyingRequest),
     );
     final result = await ref
         .read(clipboardServiceProvider)
         .writeText(current.request.encodedRequest);
     if (!ref.mounted) return result;
-    state = AsyncData(
-      current.copyWith(operation: null, failure: _failureOf(result)),
-    );
+    state = AsyncData(current.copyWith(operation: null));
     unawaited(
       ref
           .read(hapticFeedbackServiceProvider)
@@ -105,14 +103,11 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
     ShareOrigin? origin,
   }) async {
     final current = state.value;
-    if (current == null || current.isBusy) {
+    if (current == null || !current.canReadRequest) {
       return AppResult.failure(_operationUnavailableFailure());
     }
     state = AsyncData(
-      current.copyWith(
-        operation: ReceiveFlowOperation.sharingRequest,
-        failure: null,
-      ),
+      current.copyWith(operation: ReceiveFlowOperation.sharingRequest),
     );
     final result = await ref
         .read(shareServiceProvider)
@@ -122,23 +117,13 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
           origin: origin,
         );
     if (!ref.mounted) return result;
-    state = AsyncData(
-      current.copyWith(operation: null, failure: _failureOf(result)),
-    );
+    state = AsyncData(current.copyWith(operation: null));
     if (result case AppFailureResult<ShareDisposition>()) {
       unawaited(
         ref.read(hapticFeedbackServiceProvider).trigger(HapticIntent.error),
       );
     }
     return result;
-  }
-
-  void clearFailure() {
-    final current = state.value;
-    if (current == null || current.failure == null || current.isBusy) {
-      return;
-    }
-    state = AsyncData(current.copyWith(failure: null));
   }
 
   Future<ReceiveFlowState> _load() async {
@@ -194,7 +179,7 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
     state = AsyncData(
       previous.copyWith(
         operation: ReceiveFlowOperation.generatingRequest,
-        failure: null,
+        retainedFailure: null,
       ),
     );
     final result = await _walletOperation(
@@ -218,7 +203,7 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
             amountText: amountText,
             amountInput: _parseAmount(amountText, previous),
             operation: null,
-            failure: null,
+            retainedFailure: null,
           ),
         );
         if (emitSuccessHaptic) {
@@ -231,7 +216,15 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
         return true;
       }(),
       AppFailureResult<WalletReceiveRequest>(:final failure) => () {
-        state = AsyncData(previous.copyWith(operation: null, failure: failure));
+        state = AsyncData(
+          previous.copyWith(
+            operation: null,
+            retainedFailure: ReceiveFlowFailure(
+              operation: ReceiveFlowOperation.generatingRequest,
+              failure: failure,
+            ),
+          ),
+        );
         unawaited(
           ref.read(hapticFeedbackServiceProvider).trigger(HapticIntent.error),
         );
@@ -265,9 +258,4 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
     userMessage: 'Wait for the current payment action to finish.',
     retryable: false,
   );
-
-  static AppFailure? _failureOf<T>(AppResult<T> result) => switch (result) {
-    AppSuccess<T>() => null,
-    AppFailureResult<T>(:final failure) => failure,
-  };
 }
