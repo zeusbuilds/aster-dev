@@ -123,16 +123,22 @@ void main() {
       'lib/features/pay/domain/domain_state.dart',
       'final class DomainState {}',
     );
+    _write(
+      repository,
+      'lib/shared/feedback/missing_shared_state.dart',
+      '@immutable\nfinal class MissingSharedState {}',
+    );
 
     final result = verifyArchitecture(repository);
 
     expect(result.passed, isFalse);
-    expect(result.failures, hasLength(2));
+    expect(result.failures, hasLength(3));
     expect(
       result.failures,
       containsAll(<Matcher>[
         contains('MissingEqualityState must declare operator =='),
         contains('MissingHashState must declare hashCode'),
+        contains('MissingSharedState must declare operator == and hashCode'),
       ]),
     );
   });

@@ -83,6 +83,55 @@ void main() {
       expect(() => state.pending.clear(), throwsUnsupportedError);
     });
 
+    test('message and queue values compare by complete content', () {
+      final currentA = ToastMessage(
+        id: 1,
+        title: 'Current',
+        message: 'Details',
+        variant: ToastVariant.info,
+        duration: const Duration(seconds: 2),
+      );
+      final currentB = ToastMessage(
+        id: 1,
+        title: 'Current',
+        message: 'Details',
+        variant: ToastVariant.info,
+        duration: const Duration(seconds: 2),
+      );
+      final pendingA = ToastMessage(
+        id: 2,
+        title: 'Pending',
+        variant: ToastVariant.warning,
+        duration: const Duration(seconds: 3),
+      );
+      final pendingB = ToastMessage(
+        id: 2,
+        title: 'Pending',
+        variant: ToastVariant.warning,
+        duration: const Duration(seconds: 3),
+      );
+      final stateA = ToastQueueState(current: currentA, pending: [pendingA]);
+      final stateB = ToastQueueState(current: currentB, pending: [pendingB]);
+
+      expect(currentA, currentB);
+      expect(currentA.hashCode, currentB.hashCode);
+      expect(stateA, stateB);
+      expect(stateA.hashCode, stateB.hashCode);
+      expect(
+        currentA,
+        isNot(
+          ToastMessage(
+            id: 1,
+            title: 'Current',
+            message: 'Details',
+            variant: ToastVariant.info,
+            duration: const Duration(seconds: 3),
+          ),
+        ),
+      );
+      expect(stateA, isNot(ToastQueueState(current: currentA)));
+    });
+
     test('normalizes, deduplicates, bounds, and drains FIFO messages', () {
       expect(
         controller.show(

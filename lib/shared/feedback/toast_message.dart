@@ -27,6 +27,18 @@ final class ToastMessage {
         message == other.message &&
         variant == other.variant;
   }
+
+  @override
+  bool operator ==(Object other) =>
+      other is ToastMessage &&
+      other.id == id &&
+      other.title == title &&
+      other.message == message &&
+      other.variant == variant &&
+      other.duration == duration;
+
+  @override
+  int get hashCode => Object.hash(id, title, message, variant, duration);
 }
 
 /// Current toast plus the bounded FIFO waiting behind it.
@@ -49,6 +61,15 @@ final class ToastQueueState {
       pending: pending ?? this.pending,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      other is ToastQueueState &&
+      other.current == current &&
+      listEquals(other.pending, pending);
+
+  @override
+  int get hashCode => Object.hash(current, Object.hashAll(pending));
 }
 
 /// Narrow command interface exposed to non-Riverpod presentation widgets.

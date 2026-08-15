@@ -223,32 +223,34 @@ ArchitectureVerification verifyArchitecture(Directory repositoryRoot) {
       }
     }
 
-    if (_isPresentationModel(sourcePath)) {
-      for (final declaration
-          in parsed.unit.declarations.whereType<ClassDeclaration>()) {
-        final className = declaration.namePart.typeName.lexeme;
-        if (!className.endsWith('State')) continue;
-        final methods = declaration.body.members.whereType<MethodDeclaration>();
-        final hasEquality = methods.any(
-          (method) => method.isOperator && method.name.lexeme == '==',
-        );
-        final hasHashCode = methods.any(
-          (method) => method.isGetter && method.name.lexeme == 'hashCode',
-        );
-        if (hasEquality && hasHashCode) continue;
+    for (final declaration
+        in parsed.unit.declarations.whereType<ClassDeclaration>()) {
+      final className = declaration.namePart.typeName.lexeme;
+      final isOwnedState =
+          className.endsWith('State') &&
+          (_isPresentationModel(sourcePath) ||
+              _hasImmutableAnnotation(declaration));
+      if (!isOwnedState) continue;
+      final methods = declaration.body.members.whereType<MethodDeclaration>();
+      final hasEquality = methods.any(
+        (method) => method.isOperator && method.name.lexeme == '==',
+      );
+      final hasHashCode = methods.any(
+        (method) => method.isGetter && method.name.lexeme == 'hashCode',
+      );
+      if (hasEquality && hasHashCode) continue;
 
-        final missing = <String>[
-          if (!hasEquality) 'operator ==',
-          if (!hasHashCode) 'hashCode',
-        ].join(' and ');
-        final line = parsed.lineInfo
-            .getLocation(declaration.namePart.typeName.offset)
-            .lineNumber;
-        failures.add(
-          '$sourcePath:$line: presentation state $className must declare '
-          '$missing so Riverpod can suppress equal publications.',
-        );
-      }
+      final missing = <String>[
+        if (!hasEquality) 'operator ==',
+        if (!hasHashCode) 'hashCode',
+      ].join(' and ');
+      final line = parsed.lineInfo
+          .getLocation(declaration.namePart.typeName.offset)
+          .lineNumber;
+      failures.add(
+        '$sourcePath:$line: app state $className must declare $missing so '
+        'Riverpod and other listeners can suppress equal publications.',
+      );
     }
   }
 
@@ -334,6 +336,13 @@ bool _isFeaturePresentation(String path) =>
 
 bool _isPresentationModel(String path) =>
     _isFeaturePresentation(path) && path.contains('/presentation/models/');
+
+bool _hasImmutableAnnotation(ClassDeclaration declaration) {
+  return declaration.metadata.any((annotation) {
+    final name = annotation.name.toSource();
+    return name == 'immutable' || name.endsWith('.immutable');
+  });
+}
 
 bool _isViewModel(String path) => path.contains('/presentation/view_model/');
 
