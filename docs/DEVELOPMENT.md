@@ -111,7 +111,7 @@ verifies the production tracker inventory.
 - `make verify-architecture` - Verify dependency and adapter boundaries directly
 - `make verify-design-system` - Verify semantic UI token boundaries directly
 - `make verify-barrels` - Verify barrel boundaries directly
-- `make lint` - Run all non-mutating pre-commit quality gates
+- `make lint` - Run all pre-commit gates; ignored generated sources may refresh
 
 ### CI (GitHub Actions)
 

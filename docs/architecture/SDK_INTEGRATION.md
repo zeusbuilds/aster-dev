@@ -53,8 +53,13 @@ fails. Creation first persists a `provisioning` profile, then commits it as
 `ready` only after native activation succeeds. Bootstrap rolls back interrupted
 transactions before opening the selected ready wallet. App pause, resume, and
 detach transitions enter through the repository mutation queue so they cannot
-split native provisioning from its metadata commit. Resume reconciles a failed
-in-memory transition against the durable active profile.
+split native provisioning from its metadata commit. Resume may reopen a
+suspended owner or recover a known-safe retryable lifecycle failure against the
+durable active profile. It cannot clear a reconciliation-required failure:
+`WalletRuntime` preserves the first such failure and blocks normal queued work
+until a successful rollback for the owning wallet or successful disposal
+completes. An unknown native outcome is the strongest subset of this contract,
+not the only reason reconciliation can be required.
 
 ## Runtime Configuration
 

@@ -35,6 +35,13 @@ app-owned HTTP passes through `ResilientHttpClient`. Public destinations and
 service endpoints reject credentials and unsafe host/scheme forms. Mutation
 requests are not retried without a real idempotency contract.
 
+A wallet failure that retains or cannot prove consistency of a native handle,
+directory, credential, or registry record is marked `requiresReconciliation`.
+The runtime preserves the first exact failure and rejects subsequent wallet
+mutation, including work already queued. Unknown mutation outcome is a stricter
+subset of this state. Audit cannot clear or replace the failure; only successful
+same-wallet rollback or runtime disposal can release the quarantine.
+
 Third-party market credentials are never compiled into the app. Release market
 requests require a deployment-owned HTTPS proxy; direct provider hosts and
 credential-bearing endpoint values fail closed. The proxy is infrastructure,

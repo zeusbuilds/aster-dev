@@ -34,8 +34,14 @@ HTTP GET policy above retries automatically.
 ## Failure And Privacy
 
 Repositories return `AppResult<T>`. `AppFailure` carries a stable code,
-category, retryability, optional retry delay, and internal cause. Presentation
-uses only its redacted user message. Response bodies, SDK error payloads,
+category, retryability, optional retry delay, internal cause,
+`requiresReconciliation`, and `outcomeUnknown`. The latter is a strict subset:
+a known retained or inconsistent wallet resource can require reconciliation
+even when the original mutation outcome is known. Reconciliation-required
+failures are always non-retryable and globally quarantine wallet mutation until
+the owning recovery path succeeds. Presentation uses only the redacted user
+message and complete reconciliation flag; it must not infer safety from support
+codes or test only `outcomeUnknown`. Response bodies, SDK error payloads,
 invoices, seeds, tokens, and wallet paths are not logged or rendered.
 
 Successful HTTP bodies are bounded to 1 MiB before decoding. Reachability is

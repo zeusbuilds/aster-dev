@@ -9,7 +9,7 @@ must stay true when read without implementation details.
 - lifecycle ownership and disposal requirements
 - units, precision, normalization, and ordering
 - side effects and mutation serialization
-- failure, retry, cancellation, and unknown-outcome behavior
+- failure, retry, cancellation, reconciliation, and unknown-outcome behavior
 - security/privacy invariants
 - non-obvious platform or SDK constraints
 
@@ -25,7 +25,8 @@ files are never manually documented.
 /// Sends [amount] in the target's integer smallest unit.
 ///
 /// The mutation is serialized with lifecycle operations and is never retried
-/// automatically. A failure may have an unknown native outcome.
+/// automatically. A reconciliation-required failure quarantines later wallet
+/// mutation; an unknown native outcome is the strongest subset of that state.
 Future<AppResult<PaymentReceipt>> send(PaymentCommand command);
 ```
 

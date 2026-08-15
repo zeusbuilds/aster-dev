@@ -92,16 +92,28 @@ fail closed.
 
 Repositories and ViewModels expose sealed `AppResult<T>` values. `AppFailure`
 contains a stable category, code, retryability, optional retry delay, user-safe
-message, and bounded diagnostic cause. Raw exception text, response bodies,
-native payloads, paths, payment material, and secrets are not UI or log data.
+message, bounded diagnostic cause, and explicit reconciliation state. Every
+`outcomeUnknown` failure requires reconciliation, but known failures may also
+require it when owned native handles, directories, credentials, or registry
+records were deliberately retained or left inconsistent. Raw exception text,
+response bodies, native payloads, paths, payment material, and secrets are not
+UI or log data.
+
+`WalletRuntime` latches the first reconciliation-required failure inside its
+serialization queue, including against work that was already waiting. Normal
+wallet and lifecycle operations then receive that exact failure; an audit may
+inspect state but cannot replace it. Only a successful rollback for the wallet
+that owns the failed provision, or successful runtime disposal, clears the
+quarantine. Presentation must disable mutation and must never offer Retry for
+such a failure.
 
 App-owned HTTP uses one abortable operation budget. Only idempotent GET requests
 retry with bounded exponential backoff and jitter. Mutations never retry without
-a real idempotency contract. Native operation timeout and quarantine behavior
-remain SDK-owned so Dart cannot release serialization while native work runs.
+a real idempotency contract. Non-cancellable native-call timeout quarantine
+remains SDK-owned so Dart cannot release serialization while native work runs.
 Provider builds never retry automatically, so generic framework behavior cannot
-bypass typed retryability, unknown-outcome, request-generation, or publication
-generation contracts.
+bypass typed retryability, reconciliation, unknown-outcome,
+request-generation, or publication-generation contracts.
 
 Market data is a typed repository boundary. Bitcoin and Tether quotes carry one
 selected ISO identity, integer minor units, provider timestamps, bounded
