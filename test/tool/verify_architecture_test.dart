@@ -143,6 +143,39 @@ void main() {
     );
   });
 
+  test('requires presentation to consume the full reconciliation contract', () {
+    _write(
+      repository,
+      'lib/features/pay/presentation/models/pay_model.dart',
+      'bool blocksPayment(dynamic failure) => '
+          'failure.requiresReconciliation == true;',
+    );
+    _write(
+      repository,
+      'lib/features/pay/presentation/screens/pay_screen.dart',
+      'bool blocksPayment(dynamic failure) => failure.outcomeUnknown == true;',
+    );
+    _write(
+      repository,
+      'lib/features/pay/presentation/view_model/pay_view_model.dart',
+      'bool blocksPayment(dynamic failure) => failure.outcomeUnknown == true;',
+    );
+
+    final result = verifyArchitecture(repository);
+
+    expect(result.passed, isFalse);
+    expect(result.failures, hasLength(2));
+    expect(
+      result.failures,
+      everyElement(
+        allOf(
+          contains('feature presentation must use requiresReconciliation'),
+          contains('diagnostic outcomeUnknown subset'),
+        ),
+      ),
+    );
+  });
+
   test('reports every layer, SDK, plugin, and parse violation', () {
     _write(
       repository,

@@ -368,7 +368,17 @@ void main() {
           .isEnabled,
       ui.Tristate.isFalse,
     );
-    expect(find.text('Back'), findsOneWidget);
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('Back'))
+          .flagsCollection
+          .isEnabled,
+      ui.Tristate.isFalse,
+    );
+    expect(
+      tester.widget<PopScope<dynamic>>(find.byType(PopScope)).canPop,
+      isFalse,
+    );
   });
 
   testWidgets('create keeps Copy but disables unknown-outcome provisioning', (
@@ -410,6 +420,124 @@ void main() {
           .flagsCollection
           .isEnabled,
       ui.Tristate.isTrue,
+    );
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('Back'))
+          .flagsCollection
+          .isEnabled,
+      ui.Tristate.isFalse,
+    );
+    expect(
+      tester.widget<PopScope<dynamic>>(find.byType(PopScope)).canPop,
+      isFalse,
+    );
+  });
+
+  testWidgets('import freezes navigation after known retained resources', (
+    tester,
+  ) async {
+    final harness = await OnboardingTestHarness.create();
+    addTearDown(() => _disposeHarness(tester, harness));
+    await _pumpScreen(tester, harness, const OnboardingImportWalletScreen());
+    final notifier = harness.container.read(
+      importWalletViewModelProvider.notifier,
+    );
+    notifier.updateWords(0, validTestMnemonicWords);
+    await _pumpUntil(
+      tester,
+      () =>
+          harness.container
+              .read(importWalletViewModelProvider)
+              .value
+              ?.canSubmit ==
+          true,
+    );
+    harness.engine.initializeError = const AppFailureException(
+      AppFailure(
+        code: 'wallet_setup_reconciliation_required',
+        kind: AppFailureKind.storage,
+        userMessage: 'Restart before continuing wallet setup.',
+        retryable: false,
+        requiresReconciliation: true,
+      ),
+    );
+
+    expect(await notifier.submit(), isFalse);
+    await tester.pump();
+
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('recovery-word-1')))
+          .readOnly,
+      isTrue,
+    );
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('Continue'))
+          .flagsCollection
+          .isEnabled,
+      ui.Tristate.isFalse,
+    );
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('Back'))
+          .flagsCollection
+          .isEnabled,
+      ui.Tristate.isFalse,
+    );
+    expect(
+      tester.widget<PopScope<dynamic>>(find.byType(PopScope)).canPop,
+      isFalse,
+    );
+  });
+
+  testWidgets('create preserves copy but freezes known retained navigation', (
+    tester,
+  ) async {
+    final harness = await OnboardingTestHarness.create();
+    addTearDown(() => _disposeHarness(tester, harness));
+    await _pumpScreen(tester, harness, const OnboardingCreateWalletScreen());
+    final notifier = harness.container.read(
+      createWalletViewModelProvider.notifier,
+    );
+    harness.engine.initializeError = const AppFailureException(
+      AppFailure(
+        code: 'wallet_setup_reconciliation_required',
+        kind: AppFailureKind.storage,
+        userMessage: 'Restart before continuing wallet setup.',
+        retryable: false,
+        requiresReconciliation: true,
+      ),
+    );
+
+    expect(await notifier.submit(), isFalse);
+    await tester.pump();
+
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('Continue'))
+          .flagsCollection
+          .isEnabled,
+      ui.Tristate.isFalse,
+    );
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('Copy recovery phrase'))
+          .flagsCollection
+          .isEnabled,
+      ui.Tristate.isTrue,
+    );
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('Back'))
+          .flagsCollection
+          .isEnabled,
+      ui.Tristate.isFalse,
+    );
+    expect(
+      tester.widget<PopScope<dynamic>>(find.byType(PopScope)).canPop,
+      isFalse,
     );
   });
 

@@ -36,8 +36,8 @@ final class ImportWalletState {
   final bool submitting;
   final AppFailure? failure;
 
-  /// Whether native provisioning may have committed and input must stay frozen.
-  bool get requiresReconciliation => failure?.outcomeUnknown ?? false;
+  /// Whether retained or uncertain wallet resources require frozen input.
+  bool get requiresReconciliation => failure?.requiresReconciliation ?? false;
 
   bool get allWordsKnown =>
       words.every((word) => word.isNotEmpty) &&

@@ -66,6 +66,13 @@ class WalletViewModel extends _$WalletViewModel {
         return true;
       }(),
       AppFailureResult<WalletRegistry>(:final failure) => () {
+        if (failure.requiresReconciliation) {
+          state = AsyncError(
+            AppFailureException(failure),
+            failure.stackTrace ?? StackTrace.current,
+          );
+          return false;
+        }
         state = AsyncData(
           current.copyWith(switchingWalletId: null, operationFailure: failure),
         );

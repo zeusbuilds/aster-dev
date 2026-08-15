@@ -34,6 +34,9 @@ final class CreateWalletState {
   /// Whether the route still owns a phrase that can be copied safely.
   bool get canCopy => !copying && !submitting && !completed;
 
+  /// Whether retained or uncertain wallet resources require reconciliation.
+  bool get requiresReconciliation => failure?.requiresReconciliation ?? false;
+
   /// Whether provisioning may start or explicitly retry a known-safe failure.
   bool get canSubmit => canCopy && (failure == null || failure!.retryable);
 

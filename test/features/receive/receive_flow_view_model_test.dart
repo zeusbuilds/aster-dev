@@ -349,6 +349,60 @@ void main() {
   );
 
   test(
+    'known retained request state quarantines every request mutation',
+    () async {
+      final engine = FakeWalletEngine();
+      final harness = await PaymentFlowTestHarness.create(engine: engine);
+      addTearDown(harness.dispose);
+      final provider = receiveFlowViewModelProvider(
+        WalletPaymentTarget.bitcoinLightning,
+      );
+      final subscription = harness.container.listen(
+        provider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      await harness.container.read(provider.future);
+      final notifier = harness.container.read(provider.notifier);
+      engine.createReceiveError = const AppFailureException(
+        AppFailure(
+          code: 'wallet_request_reconciliation_required',
+          kind: AppFailureKind.storage,
+          userMessage: 'Restart before creating another request.',
+          retryable: false,
+          requiresReconciliation: true,
+        ),
+      );
+
+      expect(await notifier.regenerate(), isFalse);
+
+      final failed = harness.container.read(provider).requireValue;
+      expect(failed.failure?.requiresReconciliation, isTrue);
+      expect(failed.failure?.outcomeUnknown, isFalse);
+      expect(failed.requiresReconciliation, isTrue);
+      expect(failed.canRegenerate, isFalse);
+      expect(failed.canEditAmount, isFalse);
+      expect(failed.canReadRequest, isTrue);
+      engine.createReceiveError = null;
+      final callsAfterFailure = List<String>.of(engine.calls);
+
+      expect(await notifier.copyRequest(), isA<AppSuccess<void>>());
+      expect(
+        await notifier.shareRequest(),
+        isA<AppSuccess<ShareDisposition>>(),
+      );
+      notifier.updateAmount('0.00000002');
+      await notifier.retry();
+      expect(await notifier.applyAmount(), isFalse);
+      expect(await notifier.regenerate(), isFalse);
+
+      expect(harness.container.read(provider).requireValue, failed);
+      expect(engine.calls, callsAfterFailure);
+    },
+  );
+
+  test(
     'copy and share failures never become request-generation failures',
     () async {
       final harness = await PaymentFlowTestHarness.create();

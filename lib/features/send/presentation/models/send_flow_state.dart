@@ -35,12 +35,13 @@ final class SendFlowFailure {
   final AppFailure failure;
 
   bool get allowsDestinationEdit =>
-      !failure.outcomeUnknown &&
+      !failure.requiresReconciliation &&
       (operation == SendFlowOperation.validatingDestination ||
           operation == SendFlowOperation.submitting);
 
   bool get allowsAmountEdit =>
-      !failure.outcomeUnknown && operation == SendFlowOperation.submitting;
+      !failure.requiresReconciliation &&
+      operation == SendFlowOperation.submitting;
 
   @override
   bool operator ==(Object other) =>
@@ -149,7 +150,7 @@ final class SendFlowState {
   }
 
   bool get isBusy => operation != null;
-  bool get requiresReconciliation => failure?.outcomeUnknown ?? false;
+  bool get requiresReconciliation => failure?.requiresReconciliation ?? false;
   bool get canEditPayment =>
       !isBusy && result == null && !requiresReconciliation;
   bool get canChangeDestination =>

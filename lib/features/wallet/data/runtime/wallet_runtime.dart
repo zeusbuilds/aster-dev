@@ -16,6 +16,8 @@ enum WalletRuntimePhase {
   disposed,
 }
 
+enum _ReconciliationAccess { blocked, audit, rollback, disposal }
+
 /// Observable state for the single app-owned native wallet runtime.
 final class WalletRuntimeSnapshot {
   const WalletRuntimeSnapshot({
@@ -43,7 +45,9 @@ final class WalletRuntimeSnapshot {
 ///
 /// All engine access is serialized with lifecycle transitions. This keeps
 /// wallet switching, suspension, native cleanup, and repository operations
-/// ordered even when multiple ViewModels issue work concurrently.
+/// ordered even when multiple ViewModels issue work concurrently. A
+/// reconciliation-required result quarantines subsequent work in the same
+/// queue; only explicit audit, rollback, and disposal paths may bypass it.
 final class WalletRuntime {
   WalletRuntime(
     this._engineFactory,
@@ -67,6 +71,7 @@ final class WalletRuntime {
   );
   bool _disposing = false;
   Future<AppResult<void>>? _disposeInFlight;
+  String? _reconciliationRollbackWalletId;
 
   WalletRuntimeSnapshot get snapshot => _snapshot;
   Stream<WalletRuntimeSnapshot> get states => _states.stream;
@@ -92,7 +97,7 @@ final class WalletRuntime {
           failure,
         ),
       };
-    });
+    }, reconciliationWalletId: profile.id);
   }
 
   Future<AppResult<void>> provision({
@@ -100,129 +105,138 @@ final class WalletRuntime {
     required String mnemonic,
     required String databasePassword,
   }) {
-    return _enqueue(() async {
-      if (profile.state != WalletProfileState.provisioning) {
-        return AppResult.failure(_profileStateFailure(profile));
-      }
-      if (profile.environment != _services.environment) {
-        return AppResult.failure(_networkMismatchFailure());
-      }
-      final storageToken = profile.storageToken;
-      late final String storageDirectory;
-      try {
-        storageDirectory = await _directories.create(
-          profile.id,
-          storageToken: storageToken,
-        );
-      } catch (error, stackTrace) {
-        return AppResult.failure(
-          FailureMapper.from(
-            error,
-            stackTrace,
-            fallbackCode: 'wallet_directory_create_failed',
-          ),
-        );
-      }
-
-      final writeResult = await _secrets.write(
-        profile.id,
-        WalletSecret(
-          databasePassword: databasePassword,
-          mnemonic: mnemonic,
-          storageToken: storageToken,
-        ),
-      );
-      if (writeResult case AppFailureResult<void>(:final failure)) {
-        if (failure.outcomeUnknown) {
-          return AppResult.failure(
-            AppFailure(
-              code: 'wallet_provision_rollback_failed',
-              kind: AppFailureKind.storage,
-              userMessage:
-                  'Wallet setup and credential storage could not be confirmed. '
-                  'Restart the app before continuing.',
-              retryable: false,
-              outcomeUnknown: true,
-              cause: failure,
-            ),
-          );
+    return _enqueue(
+      () async {
+        if (profile.state != WalletProfileState.provisioning) {
+          return AppResult.failure(_profileStateFailure(profile));
         }
-        try {
-          await _directories.remove(profile.id, storageToken: storageToken);
-          return AppResult.failure(failure);
-        } catch (cleanupError, cleanupStackTrace) {
-          final cleanupFailure = FailureMapper.from(
-            cleanupError,
-            cleanupStackTrace,
-            fallbackCode: 'wallet_directory_cleanup_failed',
-          );
-          return AppResult.failure(
-            AppFailure(
-              code: 'wallet_provision_rollback_failed',
-              kind: AppFailureKind.storage,
-              userMessage:
-                  'Wallet setup failed and local cleanup needs attention.',
-              retryable: false,
-              outcomeUnknown:
-                  failure.outcomeUnknown || cleanupFailure.outcomeUnknown,
-              cause: <AppFailure>[failure, cleanupFailure],
-              stackTrace: cleanupStackTrace,
-            ),
-          );
+        if (profile.environment != _services.environment) {
+          return AppResult.failure(_networkMismatchFailure());
         }
-      }
-
-      final activation = await _activateReplacingUnsafe(
-        profile,
-        WalletSecret(
-          databasePassword: databasePassword,
-          mnemonic: mnemonic,
-          storageToken: storageToken,
-        ),
-        initializeMnemonic: mnemonic,
-        storageDirectory: storageDirectory,
-      );
-      if (activation is AppSuccess<void>) return activation;
-
-      if (_activeProfile?.id == profile.id && _engine != null) {
-        return AppResult.failure(
-          _provisionRollbackFailure(activation, const []),
-        );
-      }
-
-      final cleanupFailures = <AppFailure>[];
-      final secretCleanup = await _secrets.delete(
-        profile.id,
-        storageToken: storageToken,
-      );
-      if (secretCleanup case AppFailureResult<void>(:final failure)) {
-        cleanupFailures.add(failure);
-      } else {
+        final storageToken = profile.storageToken;
+        late final String storageDirectory;
         try {
-          await _directories.remove(profile.id, storageToken: storageToken);
+          storageDirectory = await _directories.create(
+            profile.id,
+            storageToken: storageToken,
+          );
         } catch (error, stackTrace) {
-          cleanupFailures.add(
+          return AppResult.failure(
             FailureMapper.from(
               error,
               stackTrace,
-              fallbackCode: 'wallet_directory_cleanup_failed',
+              fallbackCode: 'wallet_directory_create_failed',
             ),
           );
         }
-      }
-      if (cleanupFailures.isNotEmpty) {
-        final failure = _provisionRollbackFailure(activation, cleanupFailures);
-        _emit(
-          WalletRuntimeSnapshot(
-            phase: WalletRuntimePhase.failed,
-            failure: failure,
+
+        final writeResult = await _secrets.write(
+          profile.id,
+          WalletSecret(
+            databasePassword: databasePassword,
+            mnemonic: mnemonic,
+            storageToken: storageToken,
           ),
         );
-        return AppResult.failure(failure);
-      }
-      _emit(const WalletRuntimeSnapshot(phase: WalletRuntimePhase.inactive));
-      return activation;
-    });
+        if (writeResult case AppFailureResult<void>(:final failure)) {
+          if (failure.outcomeUnknown) {
+            return AppResult.failure(
+              AppFailure(
+                code: 'wallet_provision_rollback_failed',
+                kind: AppFailureKind.storage,
+                userMessage:
+                    'Wallet setup and credential storage could not be confirmed. '
+                    'Restart the app before continuing.',
+                retryable: false,
+                requiresReconciliation: true,
+                outcomeUnknown: true,
+                cause: failure,
+              ),
+            );
+          }
+          try {
+            await _directories.remove(profile.id, storageToken: storageToken);
+            return AppResult.failure(failure);
+          } catch (cleanupError, cleanupStackTrace) {
+            final cleanupFailure = FailureMapper.from(
+              cleanupError,
+              cleanupStackTrace,
+              fallbackCode: 'wallet_directory_cleanup_failed',
+            );
+            return AppResult.failure(
+              AppFailure(
+                code: 'wallet_provision_rollback_failed',
+                kind: AppFailureKind.storage,
+                userMessage:
+                    'Wallet setup failed and local cleanup needs attention.',
+                retryable: false,
+                requiresReconciliation: true,
+                outcomeUnknown:
+                    failure.outcomeUnknown || cleanupFailure.outcomeUnknown,
+                cause: <AppFailure>[failure, cleanupFailure],
+                stackTrace: cleanupStackTrace,
+              ),
+            );
+          }
+        }
+
+        final activation = await _activateReplacingUnsafe(
+          profile,
+          WalletSecret(
+            databasePassword: databasePassword,
+            mnemonic: mnemonic,
+            storageToken: storageToken,
+          ),
+          initializeMnemonic: mnemonic,
+          storageDirectory: storageDirectory,
+        );
+        if (activation is AppSuccess<void>) return activation;
+
+        if (_activeProfile?.id == profile.id && _engine != null) {
+          return AppResult.failure(
+            _provisionRollbackFailure(activation, const []),
+          );
+        }
+
+        final cleanupFailures = <AppFailure>[];
+        final secretCleanup = await _secrets.delete(
+          profile.id,
+          storageToken: storageToken,
+        );
+        if (secretCleanup case AppFailureResult<void>(:final failure)) {
+          cleanupFailures.add(failure);
+        } else {
+          try {
+            await _directories.remove(profile.id, storageToken: storageToken);
+          } catch (error, stackTrace) {
+            cleanupFailures.add(
+              FailureMapper.from(
+                error,
+                stackTrace,
+                fallbackCode: 'wallet_directory_cleanup_failed',
+              ),
+            );
+          }
+        }
+        if (cleanupFailures.isNotEmpty) {
+          final failure = _provisionRollbackFailure(
+            activation,
+            cleanupFailures,
+          );
+          _emit(
+            WalletRuntimeSnapshot(
+              phase: WalletRuntimePhase.failed,
+              failure: failure,
+            ),
+          );
+          return AppResult.failure(failure);
+        }
+        _emit(const WalletRuntimeSnapshot(phase: WalletRuntimePhase.inactive));
+        return activation;
+      },
+      reconciliationWalletId: profile.id,
+      reconciliationRollbackWalletId: profile.id,
+    );
   }
 
   Future<AppResult<void>> switchTo(WalletProfile profile) {
@@ -250,7 +264,7 @@ final class WalletRuntime {
           failure,
         ),
       };
-    });
+    }, reconciliationWalletId: profile.id);
   }
 
   Future<AppResult<T>> run<T>(
@@ -323,6 +337,12 @@ final class WalletRuntime {
 
   Future<AppResult<void>> resume() {
     return _enqueue(() async {
+      if (_snapshot case WalletRuntimeSnapshot(
+        phase: WalletRuntimePhase.failed,
+        failure: final failure?,
+      )) {
+        return AppResult.failure(failure);
+      }
       final engine = _engine;
       final profile = _activeProfile;
       if (engine == null || profile == null) {
@@ -383,6 +403,7 @@ final class WalletRuntime {
             kind: AppFailureKind.storage,
             userMessage: 'The wallet could not be reopened or cleaned up.',
             retryable: false,
+            requiresReconciliation: true,
             outcomeUnknown:
                 reinitializeFailure.outcomeUnknown || failure.outcomeUnknown,
             cause: <Object>[reinitializeFailure, failure],
@@ -403,14 +424,18 @@ final class WalletRuntime {
         final outcomeUnknown =
             reinitializeFailure.outcomeUnknown ||
             recoveryFailure.outcomeUnknown;
+        final requiresReconciliation =
+            reinitializeFailure.requiresReconciliation ||
+            recoveryFailure.requiresReconciliation;
         final combined = AppFailure(
           code: 'wallet_resume_recovery_failed',
           kind: AppFailureKind.unavailable,
-          userMessage: outcomeUnknown
+          userMessage: requiresReconciliation
               ? 'The wallet state could not be confirmed. Restart the app '
                     'before continuing.'
               : 'The wallet could not be reopened. Try again.',
-          retryable: !outcomeUnknown,
+          retryable: !requiresReconciliation,
+          requiresReconciliation: requiresReconciliation,
           outcomeUnknown: outcomeUnknown,
           cause: <AppFailure>[reinitializeFailure, recoveryFailure],
           stackTrace: stackTrace,
@@ -469,58 +494,66 @@ final class WalletRuntime {
     String walletId, {
     required String storageToken,
   }) {
-    return _enqueue(() async {
-      final failures = <AppFailure>[];
-      if (_activeProfile?.id == walletId) {
-        final destroy = await _destroyCurrentUnsafe();
-        if (destroy case AppFailureResult<void>(:final failure)) {
+    return _enqueue(
+      () async {
+        final failures = <AppFailure>[];
+        if (_activeProfile?.id == walletId) {
+          final destroy = await _destroyCurrentUnsafe();
+          if (destroy case AppFailureResult<void>(:final failure)) {
+            return AppResult.failure(
+              AppFailure(
+                code: 'wallet_rollback_failed',
+                kind: AppFailureKind.storage,
+                userMessage: 'Local wallet cleanup did not complete.',
+                retryable: false,
+                requiresReconciliation: true,
+                outcomeUnknown: failure.outcomeUnknown,
+                cause: failure,
+              ),
+            );
+          }
+        }
+        final secret = await _secrets.delete(
+          walletId,
+          storageToken: storageToken,
+        );
+        if (secret case AppFailureResult<void>(:final failure)) {
           return AppResult.failure(
             AppFailure(
               code: 'wallet_rollback_failed',
               kind: AppFailureKind.storage,
               userMessage: 'Local wallet cleanup did not complete.',
               retryable: false,
+              requiresReconciliation: true,
               outcomeUnknown: failure.outcomeUnknown,
               cause: failure,
             ),
           );
         }
-      }
-      final secret = await _secrets.delete(
-        walletId,
-        storageToken: storageToken,
-      );
-      if (secret case AppFailureResult<void>(:final failure)) {
-        return AppResult.failure(
-          AppFailure(
-            code: 'wallet_rollback_failed',
-            kind: AppFailureKind.storage,
-            userMessage: 'Local wallet cleanup did not complete.',
-            retryable: false,
-            outcomeUnknown: failure.outcomeUnknown,
-            cause: failure,
-          ),
-        );
-      }
-      try {
-        await _directories.remove(walletId, storageToken: storageToken);
-      } catch (error, stackTrace) {
-        failures.add(FailureMapper.from(error, stackTrace));
-      }
-      if (failures.isNotEmpty) {
-        return AppResult.failure(
-          AppFailure(
-            code: 'wallet_rollback_failed',
-            kind: AppFailureKind.storage,
-            userMessage: 'Local wallet cleanup did not complete.',
-            retryable: false,
-            outcomeUnknown: failures.any((failure) => failure.outcomeUnknown),
-            cause: List<AppFailure>.unmodifiable(failures),
-          ),
-        );
-      }
-      return const AppResult.success(null);
-    });
+        try {
+          await _directories.remove(walletId, storageToken: storageToken);
+        } catch (error, stackTrace) {
+          failures.add(FailureMapper.from(error, stackTrace));
+        }
+        if (failures.isNotEmpty) {
+          return AppResult.failure(
+            AppFailure(
+              code: 'wallet_rollback_failed',
+              kind: AppFailureKind.storage,
+              userMessage: 'Local wallet cleanup did not complete.',
+              retryable: false,
+              requiresReconciliation: true,
+              outcomeUnknown: failures.any((failure) => failure.outcomeUnknown),
+              cause: List<AppFailure>.unmodifiable(failures),
+            ),
+          );
+        }
+        return const AppResult.success(null);
+      },
+      reconciliationAccess: _ReconciliationAccess.rollback,
+      reconciliationWalletId: walletId,
+      reconciliationRollbackWalletId: walletId,
+    );
   }
 
   /// Reconciles durable registry ownership against directories and secrets.
@@ -566,20 +599,24 @@ final class WalletRuntime {
           ),
         );
       }
-    });
+    }, reconciliationAccess: _ReconciliationAccess.audit);
   }
 
   Future<AppResult<void>> dispose() {
     final inFlight = _disposeInFlight;
     if (inFlight != null) return inFlight;
     _disposing = true;
-    final disposal = _enqueue(() async {
-      final result = await _destroyCurrentUnsafe();
-      if (result is AppFailureResult<void>) return result;
-      _emit(const WalletRuntimeSnapshot(phase: WalletRuntimePhase.disposed));
-      await _states.close();
-      return result;
-    }, allowDisposing: true);
+    final disposal = _enqueue(
+      () async {
+        final result = await _destroyCurrentUnsafe();
+        if (result is AppFailureResult<void>) return result;
+        _emit(const WalletRuntimeSnapshot(phase: WalletRuntimePhase.disposed));
+        await _states.close();
+        return result;
+      },
+      allowDisposing: true,
+      reconciliationAccess: _ReconciliationAccess.disposal,
+    );
     _disposeInFlight = disposal;
     unawaited(
       disposal.then((result) {
@@ -613,6 +650,15 @@ final class WalletRuntime {
         case AppSuccess<WalletSecret>(:final value):
           previousSecret = value;
         case AppFailureResult<WalletSecret>(:final failure):
+          if (failure.requiresReconciliation) {
+            _emit(
+              WalletRuntimeSnapshot(
+                phase: WalletRuntimePhase.failed,
+                walletId: previousProfile.id,
+                failure: failure,
+              ),
+            );
+          }
           return AppResult.failure(failure);
       }
     }
@@ -641,6 +687,7 @@ final class WalletRuntime {
         kind: AppFailureKind.storage,
         userMessage: 'Neither wallet could be opened safely.',
         retryable: false,
+        requiresReconciliation: true,
         outcomeUnknown:
             activationFailure.outcomeUnknown || rollback.failure.outcomeUnknown,
         cause: <Object>[activation, rollback],
@@ -715,6 +762,7 @@ final class WalletRuntime {
           kind: AppFailureKind.storage,
           userMessage: 'The wallet could not be opened or cleaned up safely.',
           retryable: false,
+          requiresReconciliation: true,
           outcomeUnknown:
               activationFailure.outcomeUnknown || cleanupFailure.outcomeUnknown,
           cause: <AppFailure>[activationFailure, cleanupFailure],
@@ -755,7 +803,27 @@ final class WalletRuntime {
       _emit(const WalletRuntimeSnapshot(phase: WalletRuntimePhase.inactive));
       return const AppResult.success(null);
     } catch (error, stackTrace) {
-      return _runtimeFailure(error, stackTrace, walletId: _activeProfile?.id);
+      final cause = FailureMapper.from(error, stackTrace);
+      final failure = AppFailure(
+        code: 'wallet_native_cleanup_failed',
+        kind: AppFailureKind.storage,
+        userMessage:
+            'The wallet could not be closed safely. Restart the app before '
+            'continuing.',
+        retryable: false,
+        requiresReconciliation: true,
+        outcomeUnknown: cause.outcomeUnknown,
+        cause: cause,
+        stackTrace: stackTrace,
+      );
+      _emit(
+        WalletRuntimeSnapshot(
+          phase: WalletRuntimePhase.failed,
+          walletId: _activeProfile?.id,
+          failure: failure,
+        ),
+      );
+      return AppResult.failure(failure);
     }
   }
 
@@ -802,6 +870,7 @@ final class WalletRuntime {
         'Stored wallet resources do not match. Recover the wallet before '
         'continuing.',
     retryable: false,
+    requiresReconciliation: true,
   );
 
   static AppFailure _provisionRollbackFailure(
@@ -817,6 +886,7 @@ final class WalletRuntime {
       kind: AppFailureKind.storage,
       userMessage: 'Wallet setup failed and local cleanup needs attention.',
       retryable: false,
+      requiresReconciliation: true,
       outcomeUnknown:
           activationUnknown ||
           cleanupFailures.any((failure) => failure.outcomeUnknown),
@@ -832,6 +902,9 @@ final class WalletRuntime {
   Future<AppResult<T>> _enqueue<T>(
     Future<AppResult<T>> Function() operation, {
     bool allowDisposing = false,
+    _ReconciliationAccess reconciliationAccess = _ReconciliationAccess.blocked,
+    String? reconciliationWalletId,
+    String? reconciliationRollbackWalletId,
   }) {
     if ((_disposing && !allowDisposing) ||
         _snapshot.phase == WalletRuntimePhase.disposed) {
@@ -848,14 +921,107 @@ final class WalletRuntime {
     }
     final completer = Completer<AppResult<T>>();
     _tail = _tail.then((_) async {
+      // Check inside the queue so work scheduled before a failing operation
+      // cannot begin after that operation establishes reconciliation state.
+      final retainedSnapshot = switch (_snapshot) {
+        final snapshot
+            when snapshot.phase == WalletRuntimePhase.failed &&
+                snapshot.failure?.requiresReconciliation == true =>
+          snapshot,
+        _ => null,
+      };
+      final retainedFailure = retainedSnapshot?.failure;
+      if (retainedFailure != null) {
+        final canRun = switch (reconciliationAccess) {
+          _ReconciliationAccess.blocked => false,
+          _ReconciliationAccess.audit || _ReconciliationAccess.disposal => true,
+          _ReconciliationAccess.rollback =>
+            _reconciliationRollbackWalletId != null &&
+                _reconciliationRollbackWalletId ==
+                    reconciliationRollbackWalletId,
+        };
+        if (!canRun) {
+          completer.complete(AppResult.failure(retainedFailure));
+          return;
+        }
+      }
       try {
-        completer.complete(await operation());
-      } catch (error, stackTrace) {
-        completer.complete(
-          AppResult.failure(FailureMapper.from(error, stackTrace)),
+        final result = await operation();
+        _settleReconciliation(
+          result,
+          retainedSnapshot: retainedSnapshot,
+          access: reconciliationAccess,
+          reconciliationWalletId: reconciliationWalletId,
+          reconciliationRollbackWalletId: reconciliationRollbackWalletId,
         );
+        completer.complete(result);
+      } catch (error, stackTrace) {
+        final result = AppResult<T>.failure(
+          FailureMapper.from(error, stackTrace),
+        );
+        _settleReconciliation(
+          result,
+          retainedSnapshot: retainedSnapshot,
+          access: reconciliationAccess,
+          reconciliationWalletId: reconciliationWalletId,
+          reconciliationRollbackWalletId: reconciliationRollbackWalletId,
+        );
+        completer.complete(result);
       }
     });
     return completer.future;
+  }
+
+  /// Retains the first public failure until its owned recovery completes.
+  void _settleReconciliation<T>(
+    AppResult<T> result, {
+    required WalletRuntimeSnapshot? retainedSnapshot,
+    required _ReconciliationAccess access,
+    required String? reconciliationWalletId,
+    required String? reconciliationRollbackWalletId,
+  }) {
+    if (retainedSnapshot != null) {
+      if (result is AppSuccess<T> &&
+          (access == _ReconciliationAccess.rollback ||
+              access == _ReconciliationAccess.disposal)) {
+        _reconciliationRollbackWalletId = null;
+        if (access == _ReconciliationAccess.rollback) {
+          _emit(
+            _engine != null && _activeProfile != null
+                ? WalletRuntimeSnapshot(
+                    phase: WalletRuntimePhase.active,
+                    walletId: _activeProfile!.id,
+                  )
+                : const WalletRuntimeSnapshot(
+                    phase: WalletRuntimePhase.inactive,
+                  ),
+          );
+        }
+        return;
+      }
+
+      // Audit and failed recovery attempts may return their own diagnostics,
+      // but they cannot replace the failure that established quarantine.
+      if (!identical(_snapshot, retainedSnapshot)) _emit(retainedSnapshot);
+      return;
+    }
+
+    if (result case AppFailureResult<T>(:final failure)
+        when failure.requiresReconciliation) {
+      _reconciliationRollbackWalletId = reconciliationRollbackWalletId;
+      _emit(
+        WalletRuntimeSnapshot(
+          phase: WalletRuntimePhase.failed,
+          walletId:
+              (_snapshot.phase == WalletRuntimePhase.failed
+                  ? _snapshot.walletId
+                  : null) ??
+              reconciliationWalletId ??
+              _activeProfile?.id ??
+              _snapshot.walletId,
+          failure: failure,
+        ),
+      );
+    }
   }
 }

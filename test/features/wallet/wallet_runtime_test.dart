@@ -218,6 +218,7 @@ void main() {
     expect(result, isA<AppFailureResult<void>>());
     final failure = (result as AppFailureResult<void>).failure;
     expect(failure.code, 'wallet_resume_recovery_failed');
+    expect(failure.requiresReconciliation, isTrue);
     expect(failure.outcomeUnknown, isTrue);
     expect(failure.retryable, isFalse);
     expect(failure.userMessage, contains('Restart'));
@@ -230,6 +231,64 @@ void main() {
     expect(initial.calls, containsAllInOrder(['reinitialize', 'destroy']));
     expect(recovery.calls, containsAllInOrder(['initialize', 'destroy']));
     expect(runtime.snapshot.phase, WalletRuntimePhase.failed);
+
+    final repeated = await runtime.resume();
+    expect(repeated, isA<AppFailureResult<void>>());
+    expect((repeated as AppFailureResult<void>).failure, failure);
+    expect(initial.calls.where((call) => call == 'reinitialize'), hasLength(1));
+    expect(recovery.calls.where((call) => call == 'initialize'), hasLength(1));
+  });
+
+  test('known recovery reconciliation prevents resume replay', () async {
+    final initial = FakeWalletEngine();
+    final recovery = FakeWalletEngine()
+      ..initializeError = const AppFailureException(
+        AppFailure(
+          code: 'test_recovery_reconciliation_required',
+          kind: AppFailureKind.storage,
+          userMessage: 'Test recovery requires reconciliation.',
+          retryable: false,
+          requiresReconciliation: true,
+        ),
+      );
+    final runtime = WalletRuntime(
+      FakeWalletEngineFactory([initial, recovery]),
+      FakeWalletDirectoryManager(),
+      WalletSecretStore(MemorySecureStore()),
+      services,
+    );
+    addTearDown(runtime.dispose);
+    await runtime.provision(
+      profile: profile(firstId),
+      mnemonic: 'mnemonic words',
+      databasePassword: 'password',
+    );
+    await runtime.suspend();
+    initial.reinitializeError = StateError('injected reinit failure');
+
+    final result = await runtime.resume();
+
+    expect(result, isA<AppFailureResult<void>>());
+    final failure = (result as AppFailureResult<void>).failure;
+    expect(failure.code, 'wallet_resume_recovery_failed');
+    expect(failure.requiresReconciliation, isTrue);
+    expect(failure.outcomeUnknown, isFalse);
+    expect(failure.retryable, isFalse);
+    expect(failure.userMessage, contains('Restart'));
+    final causes = failure.cause! as List<AppFailure>;
+    expect(causes, hasLength(2));
+    expect(causes.first.requiresReconciliation, isFalse);
+    expect(causes.last.code, 'test_recovery_reconciliation_required');
+    expect(causes.last.requiresReconciliation, isTrue);
+    expect(initial.calls, containsAllInOrder(['reinitialize', 'destroy']));
+    expect(recovery.calls, containsAllInOrder(['initialize', 'destroy']));
+    expect(runtime.snapshot.phase, WalletRuntimePhase.failed);
+
+    final repeated = await runtime.resume();
+    expect(repeated, isA<AppFailureResult<void>>());
+    expect((repeated as AppFailureResult<void>).failure, failure);
+    expect(initial.calls.where((call) => call == 'reinitialize'), hasLength(1));
+    expect(recovery.calls.where((call) => call == 'initialize'), hasLength(1));
   });
 
   test('resume cleanup preserves an unknown native outcome', () async {
@@ -267,6 +326,7 @@ void main() {
     expect(result, isA<AppFailureResult<void>>());
     final failure = (result as AppFailureResult<void>).failure;
     expect(failure.code, 'wallet_resume_cleanup_failed');
+    expect(failure.requiresReconciliation, isTrue);
     expect(failure.outcomeUnknown, isTrue);
     expect(failure.retryable, isFalse);
   });
@@ -349,7 +409,9 @@ void main() {
       );
 
       expect(result, isA<AppFailureResult<void>>());
-      expect((result as AppFailureResult<void>).failure.outcomeUnknown, isTrue);
+      final failure = (result as AppFailureResult<void>).failure;
+      expect(failure.requiresReconciliation, isTrue);
+      expect(failure.outcomeUnknown, isTrue);
       expect(rawSecrets.values, hasLength(1));
       expect(directories.storageTokens, contains(firstId));
       expect(directories.removed, isEmpty);
@@ -387,6 +449,7 @@ void main() {
       expect(result, isA<AppFailureResult<void>>());
       final failure = (result as AppFailureResult<void>).failure;
       expect(failure.code, 'wallet_provision_rollback_failed');
+      expect(failure.requiresReconciliation, isTrue);
       expect(failure.outcomeUnknown, isTrue);
       expect(failure.retryable, isFalse);
       final causes = failure.cause! as List<AppFailure>;
@@ -425,10 +488,11 @@ void main() {
     );
 
     expect(result, isA<AppFailureResult<void>>());
-    expect(
-      (result as AppFailureResult<void>).failure.code,
-      'wallet_provision_rollback_failed',
-    );
+    final failure = (result as AppFailureResult<void>).failure;
+    expect(failure.code, 'wallet_provision_rollback_failed');
+    expect(failure.requiresReconciliation, isTrue);
+    expect(failure.outcomeUnknown, isFalse);
+    expect(failure.retryable, isFalse);
     expect(rawSecrets.values, hasLength(1));
     expect(directories.storageTokens, contains(firstId));
     expect(directories.removed, isEmpty);
@@ -486,10 +550,12 @@ void main() {
 
     expect(provision, isA<AppFailureResult<void>>());
     expect(suspend, isA<AppFailureResult<void>>());
-    expect(
-      (suspend as AppFailureResult<void>).failure.code,
-      'wallet_activation_cleanup_failed',
-    );
+    final provisionFailure = (provision as AppFailureResult<void>).failure;
+    final suspendFailure = (suspend as AppFailureResult<void>).failure;
+    expect(provisionFailure.code, 'wallet_provision_rollback_failed');
+    expect(provisionFailure.requiresReconciliation, isTrue);
+    expect(suspendFailure, provisionFailure);
+    expect(runtime.snapshot.failure, provisionFailure);
     expect(runtime.snapshot.phase, WalletRuntimePhase.failed);
     expect(engine.calls, isNot(contains('shutdown')));
   });
@@ -502,8 +568,9 @@ void main() {
       final engine = FakeWalletEngine()
         ..initializeError = StateError('native init failed')
         ..destroyError = StateError('native destroy failed');
+      final replacement = FakeWalletEngine();
       final runtime = WalletRuntime(
-        FakeWalletEngineFactory([engine]),
+        FakeWalletEngineFactory([engine, replacement]),
         directories,
         WalletSecretStore(rawSecrets),
         services,
@@ -520,10 +587,10 @@ void main() {
       );
 
       expect(result, isA<AppFailureResult<void>>());
-      expect(
-        (result as AppFailureResult<void>).failure.code,
-        'wallet_provision_rollback_failed',
-      );
+      final failure = (result as AppFailureResult<void>).failure;
+      expect(failure.code, 'wallet_provision_rollback_failed');
+      expect(failure.requiresReconciliation, isTrue);
+      expect(failure.outcomeUnknown, isFalse);
       expect(rawSecrets.values, hasLength(1));
       expect(directories.removed, isEmpty);
 
@@ -534,6 +601,18 @@ void main() {
       );
       expect(rawSecrets.values, isEmpty);
       expect(directories.removed, [firstId]);
+      expect(runtime.snapshot.phase, WalletRuntimePhase.inactive);
+
+      expect(
+        await runtime.provision(
+          profile: profile(secondId),
+          mnemonic: 'replacement mnemonic',
+          databasePassword: 'replacement-password',
+        ),
+        isA<AppSuccess<void>>(),
+      );
+      expect(runtime.snapshot.walletId, secondId);
+      expect(replacement.calls, contains('initialize'));
     },
   );
 
@@ -571,6 +650,7 @@ void main() {
     expect(result, isA<AppFailureResult<void>>());
     final failure = (result as AppFailureResult<void>).failure;
     expect(failure.code, 'wallet_rollback_failed');
+    expect(failure.requiresReconciliation, isTrue);
     expect(failure.outcomeUnknown, isTrue);
     expect(failure.retryable, isFalse);
     final causes = failure.cause! as List<AppFailure>;
@@ -620,6 +700,58 @@ void main() {
       expect(runtime.snapshot.phase, WalletRuntimePhase.active);
       expect(runtime.snapshot.walletId, firstId);
       rawSecrets.readErrors.clear();
+    },
+  );
+
+  test(
+    'attributes active-wallet reconciliation before a switch to its owner',
+    () async {
+      final rawSecrets = MemorySecureStore();
+      final secretStore = WalletSecretStore(rawSecrets);
+      final active = FakeWalletEngine();
+      final runtime = WalletRuntime(
+        FakeWalletEngineFactory([active]),
+        FakeWalletDirectoryManager(),
+        secretStore,
+        services,
+      );
+      addTearDown(runtime.dispose);
+      await runtime.provision(
+        profile: profile(firstId),
+        mnemonic: 'first mnemonic',
+        databasePassword: 'first-password',
+      );
+      expect(
+        await secretStore.delete(firstId, storageToken: firstToken),
+        isA<AppSuccess<void>>(),
+      );
+      expect(
+        await secretStore.write(
+          secondId,
+          const WalletSecret(
+            databasePassword: 'second-password',
+            mnemonic: 'second mnemonic',
+            storageToken: secondToken,
+          ),
+        ),
+        isA<AppSuccess<void>>(),
+      );
+
+      final result = await runtime.switchTo(
+        profile(secondId, state: WalletProfileState.ready),
+      );
+
+      expect(result, isA<AppFailureResult<void>>());
+      final failure = (result as AppFailureResult<void>).failure;
+      expect(failure.code, 'wallet_secret_missing');
+      expect(failure.requiresReconciliation, isTrue);
+      expect(runtime.snapshot.phase, WalletRuntimePhase.failed);
+      expect(runtime.snapshot.walletId, firstId);
+      expect(runtime.snapshot.failure, same(failure));
+      expect(active.calls, isNot(contains('destroy')));
+
+      final blocked = await runtime.sync();
+      expect((blocked as AppFailureResult<void>).failure, same(failure));
     },
   );
 
@@ -775,6 +907,87 @@ void main() {
     },
   );
 
+  test(
+    'reconciliation failure quarantines queued mutations but permits disposal',
+    () async {
+      final engine = FakeWalletEngine();
+      final replacement = FakeWalletEngine();
+      final directories = FakeWalletDirectoryManager();
+      final runtime = WalletRuntime(
+        FakeWalletEngineFactory([engine, replacement]),
+        directories,
+        WalletSecretStore(MemorySecureStore()),
+        services,
+      );
+      await runtime.provision(
+        profile: profile(firstId),
+        mnemonic: 'mnemonic words',
+        databasePassword: 'password',
+      );
+      var secondOperationCalls = 0;
+      const retained = AppFailure(
+        code: 'test_reconciliation_required',
+        kind: AppFailureKind.storage,
+        userMessage: 'Test state requires reconciliation.',
+        retryable: false,
+        requiresReconciliation: true,
+      );
+
+      final first = runtime.run<void>(
+        (_) => throw const AppFailureException(retained),
+      );
+      final queued = runtime.run<void>((_) async {
+        secondOperationCalls += 1;
+      });
+
+      final firstResult = await first;
+      final queuedResult = await queued;
+      expect((firstResult as AppFailureResult<void>).failure, same(retained));
+      expect((queuedResult as AppFailureResult<void>).failure, same(retained));
+      expect(secondOperationCalls, 0);
+      expect(runtime.snapshot.phase, WalletRuntimePhase.failed);
+      expect(runtime.snapshot.failure, same(retained));
+
+      final unrelatedRollback = await runtime.rollbackProvision(
+        secondId,
+        storageToken: secondToken,
+      );
+      expect(
+        (unrelatedRollback as AppFailureResult<void>).failure,
+        same(retained),
+      );
+      expect(directories.removed, isNot(contains(secondId)));
+
+      final audit = await runtime.verifyStorage(const []);
+      expect(audit, isA<AppFailureResult<void>>());
+      expect(
+        (audit as AppFailureResult<void>).failure.code,
+        isNot(retained.code),
+      );
+      expect(runtime.snapshot.failure, same(retained));
+
+      final switched = await runtime.switchTo(
+        profile(secondId, state: WalletProfileState.ready),
+      );
+      expect((switched as AppFailureResult<void>).failure, same(retained));
+      expect(replacement.calls, isEmpty);
+
+      engine.destroyError = StateError('injected cleanup failure');
+      final failedDisposal = await runtime.dispose();
+      expect(failedDisposal, isA<AppFailureResult<void>>());
+      expect(
+        (failedDisposal as AppFailureResult<void>).failure.code,
+        'wallet_native_cleanup_failed',
+      );
+      expect(runtime.snapshot.failure, same(retained));
+
+      engine.destroyError = null;
+      expect(await runtime.dispose(), isA<AppSuccess<void>>());
+      expect(engine.calls, contains('destroy'));
+      expect(runtime.snapshot.phase, WalletRuntimePhase.disposed);
+    },
+  );
+
   test('operations fail through AppResult once disposal starts', () async {
     final runtime = WalletRuntime(
       FakeWalletEngineFactory(const []),
@@ -810,10 +1023,20 @@ void main() {
     engine.destroyError = StateError('injected cleanup failure');
 
     final failed = await runtime.dispose();
+    expect(failed, isA<AppFailureResult<void>>());
+    final failure = (failed as AppFailureResult<void>).failure;
+    expect(failure.code, 'wallet_native_cleanup_failed');
+    expect(failure.requiresReconciliation, isTrue);
+    expect(failure.outcomeUnknown, isFalse);
+    expect(failure.retryable, isFalse);
+    expect(runtime.snapshot.failure, same(failure));
+
+    final blocked = await runtime.sync();
+    expect((blocked as AppFailureResult<void>).failure, same(failure));
+
     engine.destroyError = null;
     final recovered = await runtime.dispose();
 
-    expect(failed, isA<AppFailureResult<void>>());
     expect(recovered, isA<AppSuccess<void>>());
     expect(runtime.snapshot.phase, WalletRuntimePhase.disposed);
     expect(engine.calls.where((call) => call == 'destroy'), hasLength(2));

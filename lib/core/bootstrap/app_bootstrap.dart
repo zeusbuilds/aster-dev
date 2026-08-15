@@ -61,6 +61,7 @@ Future<ProviderContainer> bootstrapApplicationContainer(
               'Wallet startup and cleanup did not complete safely. Restart '
               'the app before trying again.',
           retryable: false,
+          requiresReconciliation: true,
           outcomeUnknown:
               bootstrapFailure.outcomeUnknown || failure.outcomeUnknown,
           cause: <AppFailure>[bootstrapFailure, failure],

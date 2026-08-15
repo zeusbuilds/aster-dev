@@ -66,6 +66,7 @@ abstract final class FailureMapper {
         code: 'stored_data_invalid',
         kind: AppFailureKind.storage,
         message: 'Stored wallet information could not be read safely.',
+        requiresReconciliation: true,
         error: error,
         stackTrace: stackTrace,
       );
@@ -99,6 +100,7 @@ abstract final class FailureMapper {
         code: 'wallet_recovery_required',
         kind: AppFailureKind.storage,
         message: 'Restore this wallet with its recovery phrase to continue.',
+        requiresReconciliation: true,
         error: error,
         stackTrace: stackTrace,
       );
@@ -117,6 +119,7 @@ abstract final class FailureMapper {
         code: 'wallet_filesystem_failed',
         kind: AppFailureKind.storage,
         message: 'Local wallet data could not be accessed safely.',
+        requiresReconciliation: true,
         error: error,
         stackTrace: stackTrace,
       );
@@ -444,6 +447,7 @@ abstract final class FailureMapper {
     required Object error,
     required StackTrace stackTrace,
     bool retryable = false,
+    bool requiresReconciliation = false,
     bool outcomeUnknown = false,
   }) {
     return AppFailure(
@@ -451,6 +455,7 @@ abstract final class FailureMapper {
       kind: kind,
       userMessage: message,
       retryable: retryable,
+      requiresReconciliation: requiresReconciliation,
       outcomeUnknown: outcomeUnknown,
       cause: diagnosticCause(error),
       stackTrace: stackTrace,

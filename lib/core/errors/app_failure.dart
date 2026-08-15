@@ -30,14 +30,16 @@ final class AppFailure {
     required this.kind,
     required this.userMessage,
     required bool retryable,
+    bool requiresReconciliation = false,
     this.outcomeUnknown = false,
     this.retryAfter,
     this.cause,
     this.stackTrace,
-  }) : retryable = retryable && !outcomeUnknown,
+  }) : requiresReconciliation = requiresReconciliation || outcomeUnknown,
+       retryable = retryable && !requiresReconciliation && !outcomeUnknown,
        assert(
-         !outcomeUnknown || !retryable,
-         'An outcome-unknown mutation cannot be safely retryable.',
+         !(requiresReconciliation || outcomeUnknown) || !retryable,
+         'A reconciliation-required failure cannot be safely retryable.',
        );
 
   /// Stable, non-secret support code.
@@ -48,14 +50,24 @@ final class AppFailure {
 
   /// Whether presentation may safely offer the same operation again.
   ///
-  /// Unknown mutation outcomes always force this to false, including in
+  /// Reconciliation-required failures always force this to false, including in
   /// optimized builds where assertions are disabled.
   final bool retryable;
 
+  /// Whether wallet state must be reconciled before another mutation.
+  ///
+  /// This includes known failures that deliberately retain native handles,
+  /// directories, credentials, or registry records. Every [outcomeUnknown]
+  /// failure is reconciliation-required, but the inverse is not necessarily
+  /// true.
+  final bool requiresReconciliation;
+
   /// Whether an interrupted mutation may still have completed underneath.
   ///
-  /// Presentation must direct the user to reconcile wallet state before
-  /// offering another attempt when this is true.
+  /// This is the strongest reconciliation state: the operation may still be
+  /// running or may already have committed. Presentation must not infer that
+  /// known retained resources set this flag; use [requiresReconciliation] for
+  /// the complete mutation lock.
   final bool outcomeUnknown;
   final Duration? retryAfter;
 
@@ -74,6 +86,7 @@ final class AppFailure {
       other.kind == kind &&
       other.userMessage == userMessage &&
       other.retryable == retryable &&
+      other.requiresReconciliation == requiresReconciliation &&
       other.outcomeUnknown == outcomeUnknown &&
       other.retryAfter == retryAfter;
 
@@ -83,6 +96,7 @@ final class AppFailure {
     kind,
     userMessage,
     retryable,
+    requiresReconciliation,
     outcomeUnknown,
     retryAfter,
   );

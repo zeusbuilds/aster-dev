@@ -74,6 +74,7 @@ final class LegacyWalletSeedMigrationGuard
                 'A wallet from an earlier app version needs to be recovered '
                 'before you can continue.',
             retryable: false,
+            requiresReconciliation: true,
           ),
         );
       }

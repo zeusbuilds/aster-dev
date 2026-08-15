@@ -381,6 +381,64 @@ void main() {
     );
   });
 
+  test('known retained send state quarantines every route command', () async {
+    final engine = FakeWalletEngine()
+      ..balance = _balance(onchainSpendable: 1000, lightningSpendable: 0)
+      ..feeEstimate = WalletFeeRateEstimate(
+        targetBlocks: 6,
+        satsPerVbyte: 2,
+        observedAt: DateTime.now().toUtc(),
+      )
+      ..sendPaymentError = const AppFailureException(
+        AppFailure(
+          code: 'wallet_payment_reconciliation_required',
+          kind: AppFailureKind.storage,
+          userMessage: 'Restart before continuing wallet payments.',
+          retryable: false,
+          requiresReconciliation: true,
+        ),
+      );
+    final harness = await PaymentFlowTestHarness.create(engine: engine);
+    addTearDown(harness.dispose);
+    final provider = sendFlowViewModelProvider(
+      WalletPaymentTarget.bitcoinOnchain,
+    );
+    final subscription = harness.container.listen(
+      provider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    await harness.container.read(provider.future);
+    final notifier = harness.container.read(provider.notifier);
+    const destination = 'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn';
+    notifier.updateDestination(destination);
+    expect(await notifier.validateDestination(), isTrue);
+    notifier.updateAmount('0.000001');
+
+    expect(await notifier.submit(), isFalse);
+    final failed = harness.container.read(provider).requireValue;
+    expect(failed.failure?.requiresReconciliation, isTrue);
+    expect(failed.failure?.outcomeUnknown, isFalse);
+    expect(failed.requiresReconciliation, isTrue);
+    expect(failed.canEditPayment, isFalse);
+    final callsAfterFailure = List<String>.of(engine.calls);
+
+    notifier.updateDestination('mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfo');
+    notifier.updateAmount('0.000002');
+    expect(await notifier.validateDestination(), isFalse);
+    expect(await notifier.refreshBalance(), isFalse);
+    expect(await notifier.refreshFee(), isFalse);
+    expect(await notifier.submit(), isFalse);
+
+    expect(harness.container.read(provider).requireValue, failed);
+    expect(engine.calls, callsAfterFailure);
+    expect(
+      engine.calls.where((call) => call == 'sendPayment:start'),
+      hasLength(1),
+    );
+  });
+
   test(
     'terminal submit failure cannot be laundered by another operation',
     () async {

@@ -201,12 +201,27 @@ ArchitectureVerification verifyArchitecture(Directory repositoryRoot) {
     }
 
     if (_isFeaturePresentation(sourcePath)) {
+      final diagnosticOutcomeReferences = <SimpleIdentifier>[];
       final syntheticStacks = <MethodInvocation>[];
       final discardedExceptions = <CatchClause>[];
+      parsed.unit.accept(
+        _NamedIdentifierCollector(
+          'outcomeUnknown',
+          diagnosticOutcomeReferences,
+        ),
+      );
       parsed.unit.accept(_SyntheticFailureStackCollector(syntheticStacks));
       parsed.unit.accept(
         _DiscardedPresentationExceptionCollector(discardedExceptions),
       );
+      for (final reference in diagnosticOutcomeReferences) {
+        final line = parsed.lineInfo.getLocation(reference.offset).lineNumber;
+        failures.add(
+          '$sourcePath:$line: feature presentation must use '
+          'requiresReconciliation rather than branch on the diagnostic '
+          'outcomeUnknown subset.',
+        );
+      }
       for (final invocation in syntheticStacks) {
         final line = parsed.lineInfo.getLocation(invocation.offset).lineNumber;
         failures.add(
@@ -375,6 +390,19 @@ final class _SimpleIdentifierCollector extends RecursiveAstVisitor<void> {
   @override
   void visitSimpleIdentifier(SimpleIdentifier node) {
     names.add(node.name);
+    super.visitSimpleIdentifier(node);
+  }
+}
+
+final class _NamedIdentifierCollector extends RecursiveAstVisitor<void> {
+  _NamedIdentifierCollector(this.name, this.references);
+
+  final String name;
+  final List<SimpleIdentifier> references;
+
+  @override
+  void visitSimpleIdentifier(SimpleIdentifier node) {
+    if (node.name == name) references.add(node);
     super.visitSimpleIdentifier(node);
   }
 }

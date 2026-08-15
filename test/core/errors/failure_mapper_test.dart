@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:aster/core/core.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rgb_sdk_flutter/rgb_sdk_flutter.dart';
@@ -55,6 +57,8 @@ void main() {
     expect(failure.code, 'stored_data_invalid');
     expect(failure.kind, AppFailureKind.storage);
     expect(failure.retryable, isFalse);
+    expect(failure.requiresReconciliation, isTrue);
+    expect(failure.outcomeUnknown, isFalse);
   });
 
   test('marks an unconfirmed durable replacement as outcome unknown', () {
@@ -66,6 +70,7 @@ void main() {
     expect(failure.code, 'durable_storage_commit_unknown');
     expect(failure.kind, AppFailureKind.storage);
     expect(failure.retryable, isFalse);
+    expect(failure.requiresReconciliation, isTrue);
     expect(failure.outcomeUnknown, isTrue);
     expect(failure.userMessage, isNot(contains('injected failure')));
   });
@@ -79,6 +84,23 @@ void main() {
     expect(failure.code, 'wallet_recovery_required');
     expect(failure.kind, AppFailureKind.storage);
     expect(failure.retryable, isFalse);
+    expect(failure.requiresReconciliation, isTrue);
+    expect(failure.outcomeUnknown, isFalse);
+  });
+
+  test('requires reconciliation after a wallet filesystem failure', () {
+    final failure = FailureMapper.from(
+      const FileSystemException('private filesystem detail', '/secret/path'),
+      StackTrace.current,
+    );
+
+    expect(failure.code, 'wallet_filesystem_failed');
+    expect(failure.kind, AppFailureKind.storage);
+    expect(failure.retryable, isFalse);
+    expect(failure.requiresReconciliation, isTrue);
+    expect(failure.outcomeUnknown, isFalse);
+    expect(failure.userMessage, isNot(contains('/secret/path')));
+    expect(failure.cause.toString(), isNot(contains('/secret/path')));
   });
 
   test('classifies generic malformed external data as protocol failure', () {
@@ -117,7 +139,17 @@ void main() {
     expect(failure.userMessage, isNot(contains('private details')));
   });
 
-  test('rejects retryable failures when a mutation outcome is unknown', () {
+  test('rejects retryable failures whenever reconciliation is required', () {
+    expect(
+      () => AppFailure(
+        code: 'unsafe_known_retry',
+        kind: AppFailureKind.storage,
+        userMessage: 'Reconcile before continuing.',
+        retryable: true,
+        requiresReconciliation: true,
+      ),
+      throwsAssertionError,
+    );
     expect(
       () => AppFailure(
         code: 'unsafe_retry',
@@ -129,6 +161,13 @@ void main() {
       throwsAssertionError,
     );
 
+    const retained = AppFailure(
+      code: 'known_retained_resources',
+      kind: AppFailureKind.storage,
+      userMessage: 'Reconcile before continuing.',
+      retryable: false,
+      requiresReconciliation: true,
+    );
     const failure = AppFailure(
       code: 'safe_unknown_outcome',
       kind: AppFailureKind.timeout,
@@ -136,7 +175,12 @@ void main() {
       retryable: false,
       outcomeUnknown: true,
     );
+    expect(retained.requiresReconciliation, isTrue);
+    expect(retained.outcomeUnknown, isFalse);
     expect(failure.retryable, isFalse);
+    expect(failure.requiresReconciliation, isTrue);
+    expect(failure.outcomeUnknown, isTrue);
+    expect(retained, isNot(failure));
   });
 
   test('preserves distinct LSP timeout and rate-limit semantics', () {
@@ -156,6 +200,7 @@ void main() {
     expect(timeout.code, 'lsp_liquidity_timeout');
     expect(timeout.kind, AppFailureKind.timeout);
     expect(timeout.retryable, isFalse);
+    expect(timeout.requiresReconciliation, isTrue);
     expect(timeout.outcomeUnknown, isTrue);
     expect(rateLimit.code, 'lsp_rate_limited');
     expect(rateLimit.kind, AppFailureKind.rateLimited);
@@ -178,6 +223,7 @@ void main() {
     expect(failure.code, 'wallet_operation_outcome_unknown');
     expect(failure.kind, AppFailureKind.timeout);
     expect(failure.retryable, isFalse);
+    expect(failure.requiresReconciliation, isTrue);
     expect(failure.outcomeUnknown, isTrue);
     expect(failure.userMessage, isNot(contains('rlnSendPayment')));
   });
@@ -195,6 +241,7 @@ void main() {
     expect(failure.code, 'payment_outcome_unknown');
     expect(failure.kind, AppFailureKind.protocol);
     expect(failure.retryable, isFalse);
+    expect(failure.requiresReconciliation, isTrue);
     expect(failure.outcomeUnknown, isTrue);
     expect(failure.cause, diagnostic);
     expect(failure.userMessage, isNot(contains('sendBtc')));

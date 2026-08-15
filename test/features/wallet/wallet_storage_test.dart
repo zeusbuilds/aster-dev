@@ -141,10 +141,10 @@ void main() {
       final result = await store.delete(firstId, storageToken: firstToken);
 
       expect(result, isA<AppFailureResult<void>>());
-      expect(
-        (result as AppFailureResult<void>).failure.code,
-        'stored_data_invalid',
-      );
+      final failure = (result as AppFailureResult<void>).failure;
+      expect(failure.code, 'stored_data_invalid');
+      expect(failure.requiresReconciliation, isTrue);
+      expect(failure.outcomeUnknown, isFalse);
       expect(raw.values, hasLength(1));
     },
   );
@@ -173,10 +173,10 @@ void main() {
       ) as AppSuccess<WalletSecret>).value;
 
       expect(duplicate, isA<AppFailureResult<void>>());
-      expect(
-        (duplicate as AppFailureResult<void>).failure.code,
-        'wallet_secret_already_exists',
-      );
+      final failure = (duplicate as AppFailureResult<void>).failure;
+      expect(failure.code, 'wallet_secret_already_exists');
+      expect(failure.requiresReconciliation, isTrue);
+      expect(failure.outcomeUnknown, isFalse);
       expect(retained.databasePassword, original.databasePassword);
       expect(retained.mnemonic, original.mnemonic);
     },
@@ -195,10 +195,10 @@ void main() {
     final result = await store.delete(firstId, storageToken: secondToken);
 
     expect(result, isA<AppFailureResult<void>>());
-    expect(
-      (result as AppFailureResult<void>).failure.code,
-      'wallet_secret_ownership_unverified',
-    );
+    final failure = (result as AppFailureResult<void>).failure;
+    expect(failure.code, 'wallet_secret_ownership_unverified');
+    expect(failure.requiresReconciliation, isTrue);
+    expect(failure.outcomeUnknown, isFalse);
     expect(raw.values, hasLength(1));
   });
 
@@ -217,11 +217,15 @@ void main() {
       final deletion = await store.delete(firstId, storageToken: firstToken);
 
       expect(read, isA<AppFailureResult<WalletSecret>>());
-      expect(
-        (read as AppFailureResult<WalletSecret>).failure.code,
-        'wallet_recovery_required',
-      );
+      final readFailure = (read as AppFailureResult<WalletSecret>).failure;
+      expect(readFailure.code, 'wallet_recovery_required');
+      expect(readFailure.requiresReconciliation, isTrue);
+      expect(readFailure.outcomeUnknown, isFalse);
       expect(deletion, isA<AppFailureResult<void>>());
+      expect(
+        (deletion as AppFailureResult<void>).failure.requiresReconciliation,
+        isTrue,
+      );
       expect(raw.values, hasLength(1));
       final inventory = await store.walletIds();
       expect(inventory, isA<AppFailureResult<Set<String>>>());
@@ -412,10 +416,10 @@ void main() {
       final result = await store.read();
 
       expect(result, isA<AppFailureResult<WalletRegistry>>());
-      expect(
-        (result as AppFailureResult<WalletRegistry>).failure.code,
-        'stored_data_invalid',
-      );
+      final failure = (result as AppFailureResult<WalletRegistry>).failure;
+      expect(failure.code, 'stored_data_invalid');
+      expect(failure.requiresReconciliation, isTrue);
+      expect(failure.outcomeUnknown, isFalse);
       expect(documents.document, encoded);
     },
   );
@@ -483,10 +487,10 @@ void main() {
     final result = await store.read();
 
     expect(result, isA<AppFailureResult<WalletRegistry>>());
-    expect(
-      (result as AppFailureResult<WalletRegistry>).failure.code,
-      'wallet_recovery_required',
-    );
+    final failure = (result as AppFailureResult<WalletRegistry>).failure;
+    expect(failure.code, 'wallet_recovery_required');
+    expect(failure.requiresReconciliation, isTrue);
+    expect(failure.outcomeUnknown, isFalse);
     expect(documents.document, isNull);
     expect(
       preferences.getString(StorageKeys.legacyWalletRegistryV2),
@@ -761,10 +765,10 @@ void main() {
       final result = await preflight.verify();
 
       expect(result, isA<AppFailureResult<void>>());
-      expect(
-        (result as AppFailureResult<void>).failure.code,
-        'wallet_recovery_required',
-      );
+      final failure = (result as AppFailureResult<void>).failure;
+      expect(failure.code, 'wallet_recovery_required');
+      expect(failure.requiresReconciliation, isTrue);
+      expect(failure.outcomeUnknown, isFalse);
     },
   );
 
@@ -776,10 +780,10 @@ void main() {
     final result = await preflight.verify();
 
     expect(result, isA<AppFailureResult<void>>());
-    expect(
-      (result as AppFailureResult<void>).failure.code,
-      'wallet_recovery_required',
-    );
+    final failure = (result as AppFailureResult<void>).failure;
+    expect(failure.code, 'wallet_recovery_required');
+    expect(failure.requiresReconciliation, isTrue);
+    expect(failure.outcomeUnknown, isFalse);
     expect(source.values, {'wallet_seed_0123456789ABCDEF': 'secret words'});
   });
 

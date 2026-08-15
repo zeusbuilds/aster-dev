@@ -187,6 +187,54 @@ void main() {
   );
 
   test(
+    'escalates an unreconciled switch to a persistent root access error',
+    () async {
+      final target = FakeWalletEngine();
+      final rollback = FakeWalletEngine()
+        ..initializeError = StateError('injected rollback activation failure');
+      final harness = await _createHarness(
+        seedWalletProfiles: true,
+        engines: [target, rollback],
+      );
+      final subscription = harness.container.listen(
+        walletViewModelProvider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(() async {
+        subscription.close();
+        await harness.dispose();
+      });
+      await harness.container.read(walletViewModelProvider.future);
+      harness.documents.writeError = StateError(
+        'injected active-wallet persistence failure',
+      );
+      final notifier = harness.container.read(walletViewModelProvider.notifier);
+
+      expect(await notifier.switchWallet(_secondWalletId), isFalse);
+
+      final failed = harness.container.read(walletViewModelProvider);
+      expect(failed, isA<AsyncError<WalletState>>());
+      final mapped = FailureMapper.from(
+        failed.error!,
+        failed.stackTrace ?? StackTrace.current,
+      );
+      expect(mapped.code, 'wallet_switch_commit_failed');
+      expect(mapped.requiresReconciliation, isTrue);
+      expect(mapped.outcomeUnknown, isFalse);
+      final targetCalls = List<String>.of(target.calls);
+      final rollbackCalls = List<String>.of(rollback.calls);
+
+      expect(await notifier.switchWallet(_firstWalletId), isFalse);
+      notifier.clearOperationFailure();
+
+      expect(harness.container.read(walletViewModelProvider), same(failed));
+      expect(target.calls, targetCalls);
+      expect(rollback.calls, rollbackCalls);
+    },
+  );
+
+  test(
     'rejects adopting a committed registry without an active wallet',
     () async {
       final harness = await _createHarness();

@@ -142,6 +142,7 @@ final class WalletRepository implements WalletLifecycleRepository {
             userMessage:
                 'An interrupted wallet setup could not be cleaned up safely.',
             retryable: false,
+            requiresReconciliation: true,
             outcomeUnknown: failure.outcomeUnknown,
             cause: failure,
           ),
@@ -156,6 +157,7 @@ final class WalletRepository implements WalletLifecycleRepository {
             userMessage:
                 'An interrupted wallet setup could not be cleaned up safely.',
             retryable: false,
+            requiresReconciliation: true,
             outcomeUnknown: failure.outcomeUnknown,
             cause: failure,
           ),
@@ -328,8 +330,7 @@ final class WalletRepository implements WalletLifecycleRepository {
       databasePassword: databasePassword,
     );
     if (provision case AppFailureResult<void>(:final failure)) {
-      if (failure.outcomeUnknown ||
-          failure.code == 'wallet_provision_rollback_failed') {
+      if (failure.requiresReconciliation) {
         return AppResult.failure(failure);
       }
       final removal = await _profiles.remove(profile.id);
@@ -342,6 +343,7 @@ final class WalletRepository implements WalletLifecycleRepository {
             userMessage:
                 'Wallet setup failed and its transaction record remains.',
             retryable: false,
+            requiresReconciliation: true,
             outcomeUnknown:
                 failure.outcomeUnknown || removalFailure.outcomeUnknown,
             cause: <Object>[failure, removalFailure],
@@ -357,9 +359,9 @@ final class WalletRepository implements WalletLifecycleRepository {
     }
     final registrationFailure =
         (registration as AppFailureResult<WalletRegistry>).failure;
-    if (registrationFailure.outcomeUnknown) {
+    if (registrationFailure.requiresReconciliation) {
       return AppResult.failure(
-        await _quarantineAfterUnknownCommit(registrationFailure),
+        await _quarantineAfterCommitFailure(registrationFailure),
       );
     }
     final rollback = await _runtime.rollbackProvision(
@@ -374,6 +376,7 @@ final class WalletRepository implements WalletLifecycleRepository {
           userMessage:
               'Wallet setup could not be committed or rolled back safely.',
           retryable: false,
+          requiresReconciliation: true,
           outcomeUnknown:
               registrationFailure.outcomeUnknown || failure.outcomeUnknown,
           cause: <Object>[registrationFailure, failure],
@@ -394,6 +397,7 @@ final class WalletRepository implements WalletLifecycleRepository {
           userMessage:
               'Wallet setup could not be committed or rolled back safely.',
           retryable: false,
+          requiresReconciliation: true,
           outcomeUnknown:
               registrationFailure.outcomeUnknown ||
               _outcomeUnknown(removal) ||
@@ -444,9 +448,9 @@ final class WalletRepository implements WalletLifecycleRepository {
 
     final persistenceFailure =
         (persisted as AppFailureResult<WalletRegistry>).failure;
-    if (persistenceFailure.outcomeUnknown) {
+    if (persistenceFailure.requiresReconciliation) {
       return AppResult.failure(
-        await _quarantineAfterUnknownCommit(persistenceFailure),
+        await _quarantineAfterCommitFailure(persistenceFailure),
       );
     }
 
@@ -461,6 +465,7 @@ final class WalletRepository implements WalletLifecycleRepository {
           kind: AppFailureKind.storage,
           userMessage: 'The selected wallet could not be saved safely.',
           retryable: false,
+          requiresReconciliation: true,
           outcomeUnknown:
               persistenceFailure.outcomeUnknown || failure.outcomeUnknown,
           cause: <Object>[persistenceFailure, failure],
@@ -470,9 +475,10 @@ final class WalletRepository implements WalletLifecycleRepository {
     return persisted;
   }
 
-  Future<AppFailure> _quarantineAfterUnknownCommit(AppFailure failure) async {
+  Future<AppFailure> _quarantineAfterCommitFailure(AppFailure failure) async {
     final quarantine = await _runtime.dispose();
     if (quarantine is AppSuccess<void>) return failure;
+    final quarantineFailure = (quarantine as AppFailureResult<void>).failure;
     return AppFailure(
       code: 'wallet_commit_quarantine_failed',
       kind: AppFailureKind.storage,
@@ -480,8 +486,10 @@ final class WalletRepository implements WalletLifecycleRepository {
           'A wallet change and cleanup could not be confirmed. Restart the '
           'app before continuing.',
       retryable: false,
-      outcomeUnknown: true,
-      cause: <Object>[failure, (quarantine as AppFailureResult<void>).failure],
+      requiresReconciliation: true,
+      outcomeUnknown:
+          failure.outcomeUnknown || quarantineFailure.outcomeUnknown,
+      cause: <AppFailure>[failure, quarantineFailure],
     );
   }
 
@@ -757,14 +765,19 @@ final class WalletRepository implements WalletLifecycleRepository {
   @override
   Future<AppResult<void>> suspend() => _enqueueOperation(_runtime.suspend);
 
-  /// Resumes the native owner, reconciling a failed runtime with the durable
-  /// active profile rather than trusting partially transitioned memory state.
+  /// Resumes the native owner and recovers only a known-safe runtime failure
+  /// from the durable active profile.
   @override
   Future<AppResult<void>> resume() => _enqueueOperation(_resumeUnsafe);
 
   Future<AppResult<void>> _resumeUnsafe() async {
     final resumed = await _runtime.resume();
     if (resumed is AppSuccess<void>) return resumed;
+    if (resumed case AppFailureResult<void>(
+      failure: AppFailure(requiresReconciliation: true),
+    )) {
+      return resumed;
+    }
 
     final registryResult = await _profiles.read();
     if (registryResult case AppFailureResult<WalletRegistry>(:final failure)) {

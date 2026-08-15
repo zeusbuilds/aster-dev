@@ -735,10 +735,9 @@ void main() {
       );
 
       expect(result, isA<AppFailureResult<WalletRegistry>>());
-      expect(
-        (result as AppFailureResult<WalletRegistry>).failure.outcomeUnknown,
-        isTrue,
-      );
+      final failure = (result as AppFailureResult<WalletRegistry>).failure;
+      expect(failure.requiresReconciliation, isTrue);
+      expect(failure.outcomeUnknown, isTrue);
       expect(rawSecrets.values, hasLength(1));
       expect(directories.storageTokens, contains(walletId));
       expect(directories.removed, isEmpty);
@@ -785,10 +784,9 @@ void main() {
         (await profileStore.read() as AppSuccess<WalletRegistry>).value;
 
     expect(result, isA<AppFailureResult<WalletRegistry>>());
-    expect(
-      (result as AppFailureResult<WalletRegistry>).failure.outcomeUnknown,
-      isTrue,
-    );
+    final failure = (result as AppFailureResult<WalletRegistry>).failure;
+    expect(failure.requiresReconciliation, isTrue);
+    expect(failure.outcomeUnknown, isTrue);
     expect(staged.provisioningProfiles, hasLength(1));
     expect(rawSecrets.values, hasLength(1));
     expect(directories.storageTokens, contains(walletId));
@@ -803,6 +801,153 @@ void main() {
     expect(rawSecrets.values, isEmpty);
     expect(directories.storageTokens, isEmpty);
   });
+
+  test(
+    'stages known retained resources for typed startup reconciliation',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final preferences = await SharedPreferences.getInstance();
+      final profileStore = WalletProfileStore(
+        MemoryWalletRegistryDocumentStore(),
+        PreferencesService(preferences),
+      );
+      final rawSecrets = MemorySecureStore()
+        ..writeError = StateError('injected credential write failure');
+      final directories = FakeWalletDirectoryManager()
+        ..removeError = StateError('injected directory cleanup failure');
+      final runtime = WalletRuntime(
+        FakeWalletEngineFactory(const []),
+        directories,
+        WalletSecretStore(rawSecrets),
+        services,
+      );
+      final repository = WalletRepository(
+        profileStore,
+        runtime,
+        FakeWalletKeyGenerator(),
+        FakeWalletIdentityGenerator(walletId: walletId),
+        services,
+        const SuccessfulLegacyWalletSeedPreflight(),
+      );
+      addTearDown(repository.dispose);
+
+      final result = await repository.createFromMnemonic(
+        mnemonic: mnemonic,
+        name: 'Main Wallet',
+      );
+      final staged =
+          (await profileStore.read() as AppSuccess<WalletRegistry>).value;
+
+      expect(result, isA<AppFailureResult<WalletRegistry>>());
+      final failure = (result as AppFailureResult<WalletRegistry>).failure;
+      expect(failure.code, 'wallet_provision_rollback_failed');
+      expect(failure.requiresReconciliation, isTrue);
+      expect(failure.outcomeUnknown, isFalse);
+      expect(failure.retryable, isFalse);
+      expect(staged.provisioningProfiles, hasLength(1));
+      expect(rawSecrets.values, isEmpty);
+      expect(directories.storageTokens, contains(walletId));
+
+      rawSecrets.writeError = null;
+      directories.removeError = null;
+      expect(await repository.bootstrap(), isA<AppSuccess<WalletRegistry>>());
+      final recovered =
+          (await profileStore.read() as AppSuccess<WalletRegistry>).value;
+      expect(recovered.profiles, isEmpty);
+      expect(rawSecrets.values, isEmpty);
+      expect(directories.storageTokens, isEmpty);
+      expect(runtime.snapshot.phase, WalletRuntimePhase.inactive);
+      expect(runtime.snapshot.failure, isNull);
+    },
+  );
+
+  test('quarantines a known reconciliation-required commit failure', () async {
+    final profileStore = _FailingRegistrationStore(
+      requiresReconciliation: true,
+    );
+    final rawSecrets = MemorySecureStore();
+    final directories = FakeWalletDirectoryManager();
+    final engine = FakeWalletEngine();
+    final runtime = WalletRuntime(
+      FakeWalletEngineFactory([engine]),
+      directories,
+      WalletSecretStore(rawSecrets),
+      services,
+    );
+    addTearDown(runtime.dispose);
+    final repository = WalletRepository(
+      profileStore,
+      runtime,
+      FakeWalletKeyGenerator(),
+      FakeWalletIdentityGenerator(walletId: walletId),
+      services,
+      const SuccessfulLegacyWalletSeedPreflight(),
+    );
+
+    final result = await repository.createFromMnemonic(
+      mnemonic: mnemonic,
+      name: 'Main Wallet',
+    );
+
+    expect(result, isA<AppFailureResult<WalletRegistry>>());
+    final failure = (result as AppFailureResult<WalletRegistry>).failure;
+    expect(failure.code, 'test_registration_failed');
+    expect(failure.requiresReconciliation, isTrue);
+    expect(failure.outcomeUnknown, isFalse);
+    expect(profileStore.snapshot.provisioningProfiles, hasLength(1));
+    expect(rawSecrets.values, hasLength(1));
+    expect(directories.storageTokens, contains(walletId));
+    expect(directories.removed, isEmpty);
+    expect(engine.calls, contains('destroy'));
+    expect(runtime.snapshot.phase, WalletRuntimePhase.disposed);
+  });
+
+  test(
+    'known commit and cleanup failures stay known while quarantined',
+    () async {
+      final profileStore = _FailingRegistrationStore(
+        requiresReconciliation: true,
+      );
+      final engine = FakeWalletEngine()
+        ..destroyError = StateError('injected known cleanup failure');
+      final runtime = WalletRuntime(
+        FakeWalletEngineFactory([engine]),
+        FakeWalletDirectoryManager(),
+        WalletSecretStore(MemorySecureStore()),
+        services,
+      );
+      addTearDown(() async {
+        engine.destroyError = null;
+        await runtime.dispose();
+      });
+      final repository = WalletRepository(
+        profileStore,
+        runtime,
+        FakeWalletKeyGenerator(),
+        FakeWalletIdentityGenerator(walletId: walletId),
+        services,
+        const SuccessfulLegacyWalletSeedPreflight(),
+      );
+
+      final result = await repository.createFromMnemonic(
+        mnemonic: mnemonic,
+        name: 'Main Wallet',
+      );
+
+      expect(result, isA<AppFailureResult<WalletRegistry>>());
+      final failure = (result as AppFailureResult<WalletRegistry>).failure;
+      expect(failure.code, 'wallet_commit_quarantine_failed');
+      expect(failure.requiresReconciliation, isTrue);
+      expect(failure.outcomeUnknown, isFalse);
+      expect(failure.retryable, isFalse);
+      final causes = failure.cause! as List<AppFailure>;
+      expect(causes, hasLength(2));
+      expect(causes.first.code, 'test_registration_failed');
+      expect(causes.last.code, 'wallet_native_cleanup_failed');
+      expect(runtime.snapshot.phase, WalletRuntimePhase.failed);
+      expect(runtime.snapshot.failure?.code, 'wallet_native_cleanup_failed');
+    },
+  );
 
   test('stages uncertain directory creation for startup recovery', () async {
     SharedPreferences.setMockInitialValues({});
@@ -843,6 +988,7 @@ void main() {
     expect(result, isA<AppFailureResult<WalletRegistry>>());
     final failure = (result as AppFailureResult<WalletRegistry>).failure;
     expect(failure.code, 'durable_storage_commit_unknown');
+    expect(failure.requiresReconciliation, isTrue);
     expect(failure.outcomeUnknown, isTrue);
     expect(staged.provisioningProfiles, hasLength(1));
     expect(directories.storageTokens[walletId], storageToken);
@@ -1150,6 +1296,78 @@ void main() {
   );
 
   test(
+    'resume never launders reconciliation through durable-profile recovery',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final preferences = await SharedPreferences.getInstance();
+      final profileStore = WalletProfileStore(
+        MemoryWalletRegistryDocumentStore(),
+        PreferencesService(preferences),
+      );
+      final active = FakeWalletEngine();
+      final failedRecovery = FakeWalletEngine()
+        ..initializeError = StateError('injected recovery failure');
+      final forbiddenRecovery = FakeWalletEngine();
+      final runtime = WalletRuntime(
+        FakeWalletEngineFactory([active, failedRecovery, forbiddenRecovery]),
+        FakeWalletDirectoryManager(),
+        WalletSecretStore(MemorySecureStore()),
+        services,
+      );
+      addTearDown(runtime.dispose);
+      final repository = WalletRepository(
+        profileStore,
+        runtime,
+        FakeWalletKeyGenerator(),
+        FakeWalletIdentityGenerator(walletId: walletId),
+        services,
+        const SuccessfulLegacyWalletSeedPreflight(),
+      );
+      expect(
+        await repository.createFromMnemonic(
+          mnemonic: mnemonic,
+          name: 'Main Wallet',
+        ),
+        isA<AppSuccess<WalletRegistry>>(),
+      );
+      active.reinitializeError = const AppFailureException(
+        AppFailure(
+          code: 'test_resume_reconciliation_required',
+          kind: AppFailureKind.storage,
+          userMessage: 'Test resume requires reconciliation.',
+          retryable: false,
+          requiresReconciliation: true,
+        ),
+      );
+      expect(await repository.suspend(), isA<AppSuccess<void>>());
+
+      final result = await repository.resume();
+
+      expect(result, isA<AppFailureResult<void>>());
+      final failure = (result as AppFailureResult<void>).failure;
+      expect(failure.code, 'wallet_resume_recovery_failed');
+      expect(failure.requiresReconciliation, isTrue);
+      expect(failure.outcomeUnknown, isFalse);
+      expect(failure.retryable, isFalse);
+      expect(forbiddenRecovery.calls, isEmpty);
+      expect(runtime.snapshot.phase, WalletRuntimePhase.failed);
+
+      final repeated = await repository.resume();
+      expect(repeated, isA<AppFailureResult<void>>());
+      expect((repeated as AppFailureResult<void>).failure, failure);
+      expect(forbiddenRecovery.calls, isEmpty);
+      expect(
+        active.calls.where((call) => call == 'reinitialize'),
+        hasLength(1),
+      );
+      expect(
+        failedRecovery.calls.where((call) => call == 'initialize'),
+        hasLength(1),
+      );
+    },
+  );
+
+  test(
     'quarantines a switched runtime when selection commit is unknown',
     () async {
       final now = DateTime.utc(2026, 8, 8);
@@ -1380,8 +1598,12 @@ Future<_ActiveRepositoryHarness> _createActiveRepository({
 }
 
 final class _FailingRegistrationStore implements WalletProfilePersistence {
-  _FailingRegistrationStore({this.outcomeUnknown = false});
+  _FailingRegistrationStore({
+    this.requiresReconciliation = false,
+    this.outcomeUnknown = false,
+  });
 
+  final bool requiresReconciliation;
   final bool outcomeUnknown;
   var snapshot = WalletRegistry(profiles: const [], activeWalletId: null);
 
@@ -1404,6 +1626,7 @@ final class _FailingRegistrationStore implements WalletProfilePersistence {
           kind: AppFailureKind.storage,
           userMessage: 'Could not save wallet.',
           retryable: false,
+          requiresReconciliation: requiresReconciliation,
           outcomeUnknown: outcomeUnknown,
         ),
       );

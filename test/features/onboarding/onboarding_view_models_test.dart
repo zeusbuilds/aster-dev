@@ -288,6 +288,61 @@ void main() {
     );
   });
 
+  test(
+    'import freezes a known retained-resource provisioning result',
+    () async {
+      final harness = await OnboardingTestHarness.create();
+      addTearDown(harness.dispose);
+      final subscription = harness.container.listen(
+        importWalletViewModelProvider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      await harness.container.read(importWalletViewModelProvider.future);
+      final notifier = harness.container.read(
+        importWalletViewModelProvider.notifier,
+      );
+      notifier.updateWords(0, validTestMnemonicWords);
+      await _waitFor(
+        () =>
+            harness.container
+                .read(importWalletViewModelProvider)
+                .value
+                ?.canSubmit ==
+            true,
+      );
+      harness.engine.initializeError = const AppFailureException(
+        AppFailure(
+          code: 'wallet_setup_reconciliation_required',
+          kind: AppFailureKind.storage,
+          userMessage: 'Restart before continuing wallet setup.',
+          retryable: false,
+          requiresReconciliation: true,
+        ),
+      );
+
+      expect(await notifier.submit(), isFalse);
+      final failed = harness.container
+          .read(importWalletViewModelProvider)
+          .requireValue;
+      expect(failed.failure?.requiresReconciliation, isTrue);
+      expect(failed.failure?.outcomeUnknown, isFalse);
+      expect(failed.canSubmit, isFalse);
+      final callsAfterFailure = List<String>.of(harness.engine.calls);
+
+      notifier.updateWords(0, List<String>.filled(12, 'ability'));
+      await notifier.retryChecksum();
+      expect(await notifier.submit(), isFalse);
+
+      expect(
+        harness.container.read(importWalletViewModelProvider).requireValue,
+        failed,
+      );
+      expect(harness.engine.calls, callsAfterFailure);
+    },
+  );
+
   test('import ignores a stale checksum result after input changes', () async {
     final harness = await OnboardingTestHarness.create();
     addTearDown(harness.dispose);
@@ -623,6 +678,49 @@ void main() {
         harness.engine.calls.where((call) => call == 'initialize'),
         hasLength(1),
       );
+    },
+  );
+
+  test(
+    'create blocks known retained-resource replay but keeps phrase copy',
+    () async {
+      final harness = await OnboardingTestHarness.create();
+      addTearDown(harness.dispose);
+      final subscription = harness.container.listen(
+        createWalletViewModelProvider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      await harness.container.read(createWalletViewModelProvider.future);
+      final notifier = harness.container.read(
+        createWalletViewModelProvider.notifier,
+      );
+      harness.engine.initializeError = const AppFailureException(
+        AppFailure(
+          code: 'wallet_setup_reconciliation_required',
+          kind: AppFailureKind.storage,
+          userMessage: 'Restart before continuing wallet setup.',
+          retryable: false,
+          requiresReconciliation: true,
+        ),
+      );
+
+      expect(await notifier.submit(), isFalse);
+      final failed = harness.container
+          .read(createWalletViewModelProvider)
+          .requireValue;
+      expect(failed.failure?.requiresReconciliation, isTrue);
+      expect(failed.failure?.outcomeUnknown, isFalse);
+      expect(failed.canSubmit, isFalse);
+      expect(failed.canCopy, isTrue);
+      final callsAfterFailure = List<String>.of(harness.engine.calls);
+
+      expect(await notifier.copyMnemonic(), isA<AppSuccess<void>>());
+      expect(await notifier.submit(), isFalse);
+
+      expect(harness.clipboardText, validTestMnemonic);
+      expect(harness.engine.calls, callsAfterFailure);
     },
   );
 }

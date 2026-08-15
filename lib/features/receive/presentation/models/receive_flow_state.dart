@@ -11,7 +11,7 @@ enum ReceiveFlowOperation { generatingRequest, copyingRequest, sharingRequest }
 ///
 /// Copy and share failures are transient presentation results and are never
 /// retained here. Request-generation provenance prevents a successful
-/// read-only action from erasing a terminal or outcome-unknown native failure.
+/// read-only action from erasing a terminal or reconciliation-required failure.
 @immutable
 final class ReceiveFlowFailure {
   ReceiveFlowFailure({required this.operation, required this.failure}) {
@@ -28,7 +28,7 @@ final class ReceiveFlowFailure {
   final AppFailure failure;
 
   /// Whether changing the amount creates a safely distinct request command.
-  bool get allowsAmountEdit => !failure.outcomeUnknown;
+  bool get allowsAmountEdit => !failure.requiresReconciliation;
 
   @override
   bool operator ==(Object other) =>
@@ -88,7 +88,7 @@ final class ReceiveFlowState {
 
   bool get isBusy => operation != null;
   bool get isGenerating => operation == ReceiveFlowOperation.generatingRequest;
-  bool get requiresReconciliation => failure?.outcomeUnknown ?? false;
+  bool get requiresReconciliation => failure?.requiresReconciliation ?? false;
   bool get canReadRequest => !isBusy;
   bool get canEditAmount =>
       !isBusy && (retainedFailure == null || retainedFailure!.allowsAmountEdit);

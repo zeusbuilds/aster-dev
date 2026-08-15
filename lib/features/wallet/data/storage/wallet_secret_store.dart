@@ -83,6 +83,7 @@ final class WalletSecretStore {
             kind: AppFailureKind.conflict,
             userMessage: 'Wallet credentials already exist on this device.',
             retryable: false,
+            requiresReconciliation: true,
           ),
         );
       }
@@ -126,6 +127,7 @@ final class WalletSecretStore {
             kind: AppFailureKind.notFound,
             userMessage: 'Wallet credentials are missing from this device.',
             retryable: false,
+            requiresReconciliation: true,
           ),
         );
       }
@@ -319,5 +321,6 @@ final class WalletSecretStore {
     kind: AppFailureKind.conflict,
     userMessage: 'Wallet credential ownership could not be verified.',
     retryable: false,
+    requiresReconciliation: true,
   );
 }

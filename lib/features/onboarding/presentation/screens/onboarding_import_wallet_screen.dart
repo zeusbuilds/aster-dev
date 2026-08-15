@@ -70,10 +70,12 @@ class _OnboardingImportWalletScreenState
         );
       }
     });
-    final submitting = asyncState.value?.submitting ?? false;
+    final value = asyncState.value;
+    final navigationLocked =
+        value != null && (value.submitting || value.requiresReconciliation);
 
     return PopScope(
-      canPop: !submitting,
+      canPop: !navigationLocked,
       child: Scaffold(
         backgroundColor: context.appColors.transparentSurface,
         resizeToAvoidBottomInset: true,
@@ -161,7 +163,7 @@ class _OnboardingImportWalletScreenState
                 spacing.md * (ImportWalletState.wordsPerPage - 1),
             child: PageView.builder(
               controller: _pageController,
-              physics: state.submitting
+              physics: state.submitting || state.requiresReconciliation
                   ? const NeverScrollableScrollPhysics()
                   : const PageScrollPhysics(),
               itemCount:
@@ -248,7 +250,7 @@ class _OnboardingImportWalletScreenState
                 ),
                 OnboardingTextAction(
                   label: 'Back',
-                  enabled: !state.submitting,
+                  enabled: !state.submitting && !state.requiresReconciliation,
                   onPressed: () => _returnToWelcome(context),
                 ),
               ],
@@ -285,7 +287,7 @@ class _OnboardingImportWalletScreenState
   }
 
   Future<void> _handleSubmitted(int index, ImportWalletState state) async {
-    if (state.submitting) return;
+    if (state.submitting || state.requiresReconciliation) return;
     if (index == ImportWalletState.wordCount - 1) {
       if (state.canSubmit) {
         FocusScope.of(context).unfocus();

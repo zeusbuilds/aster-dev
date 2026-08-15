@@ -18,9 +18,11 @@ class OnboardingCreateWalletScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncState = ref.watch(createWalletViewModelProvider);
-    final submitting = asyncState.value?.submitting ?? false;
+    final value = asyncState.value;
+    final navigationLocked =
+        value != null && (value.submitting || value.requiresReconciliation);
     return PopScope(
-      canPop: !submitting,
+      canPop: !navigationLocked,
       child: Scaffold(
         backgroundColor: context.appColors.transparentSurface,
         body: SafeArea(
@@ -142,7 +144,7 @@ class _CreateWalletContent extends ConsumerWidget {
                 ),
                 OnboardingTextAction(
                   label: 'Back',
-                  enabled: !state.submitting,
+                  enabled: !state.submitting && !state.requiresReconciliation,
                   onPressed: () => _returnToWelcome(context),
                 ),
               ],

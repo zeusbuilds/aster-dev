@@ -154,11 +154,63 @@ void main() {
     await expectLater(
       bootstrapApplicationContainer(container),
       throwsA(
-        isA<AppFailureException>().having(
-          (error) => error.failure.outcomeUnknown,
-          'outcomeUnknown',
-          isTrue,
+        isA<AppFailureException>()
+            .having(
+              (error) => error.failure.requiresReconciliation,
+              'requiresReconciliation',
+              isTrue,
+            )
+            .having(
+              (error) => error.failure.outcomeUnknown,
+              'outcomeUnknown',
+              isTrue,
+            ),
+      ),
+    );
+
+    expect(engine.calls, containsAllInOrder(['initialize', 'destroy']));
+  });
+
+  test('requires reconciliation when bootstrap cleanup fails known', () async {
+    final engine = FakeWalletEngine()
+      ..destroyError = StateError('injected known destroy failure');
+    final container = ProviderContainer(
+      retry: applicationProviderRetryPolicy,
+      overrides: [
+        walletEngineFactoryProvider.overrideWithValue(
+          FakeWalletEngineFactory([engine]),
         ),
+        walletDirectoryManagerProvider.overrideWith(
+          (ref) async => FakeWalletDirectoryManager(),
+        ),
+        secureStorageServiceProvider.overrideWithValue(MemorySecureStore()),
+        walletServiceConfigurationProvider.overrideWithValue(_services),
+        walletRepositoryProvider.overrideWith((ref) async {
+          final runtime = await ref.read(walletRuntimeProvider.future);
+          await runtime.provision(
+            profile: _profile,
+            mnemonic: 'mnemonic words',
+            databasePassword: 'password',
+          );
+          throw StateError('Injected repository construction failure.');
+        }),
+      ],
+    );
+
+    await expectLater(
+      bootstrapApplicationContainer(container),
+      throwsA(
+        isA<AppFailureException>()
+            .having(
+              (error) => error.failure.requiresReconciliation,
+              'requiresReconciliation',
+              isTrue,
+            )
+            .having(
+              (error) => error.failure.outcomeUnknown,
+              'outcomeUnknown',
+              isFalse,
+            ),
       ),
     );
 
