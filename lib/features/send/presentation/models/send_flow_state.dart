@@ -13,6 +13,45 @@ enum SendFlowOperation {
   submitting,
 }
 
+/// A retained Send failure together with the operation that produced it.
+///
+/// Keeping provenance prevents a successful, unrelated operation from
+/// laundering a terminal failure. The owning operation is the only operation
+/// that may be retried without first changing the relevant payment input.
+@immutable
+final class SendFlowFailure {
+  SendFlowFailure({required this.operation, required this.failure}) {
+    if (operation == SendFlowOperation.readingClipboard ||
+        operation == SendFlowOperation.refreshingFee) {
+      throw ArgumentError.value(
+        operation,
+        'operation',
+        'Clipboard and fee failures use dedicated presentation contracts.',
+      );
+    }
+  }
+
+  final SendFlowOperation operation;
+  final AppFailure failure;
+
+  bool get allowsDestinationEdit =>
+      !failure.outcomeUnknown &&
+      (operation == SendFlowOperation.validatingDestination ||
+          operation == SendFlowOperation.submitting);
+
+  bool get allowsAmountEdit =>
+      !failure.outcomeUnknown && operation == SendFlowOperation.submitting;
+
+  @override
+  bool operator ==(Object other) =>
+      other is SendFlowFailure &&
+      other.operation == operation &&
+      other.failure == failure;
+
+  @override
+  int get hashCode => Object.hash(operation, failure);
+}
+
 /// Typed state for one asset-and-rail Send flow.
 ///
 /// Destination text remains route-scoped and is deliberately omitted from
@@ -32,7 +71,7 @@ final class SendFlowState {
     this.feeEstimate,
     this.feeFailure,
     this.operation,
-    this.failure,
+    this.retainedFailure,
     this.result,
   }) {
     if (amountInput.text != amountText) {
@@ -70,14 +109,16 @@ final class SendFlowState {
     if (feeEstimate != null && feeFailure != null) {
       throw ArgumentError('Fee data cannot be successful and failed.');
     }
-    if (operation != null && failure != null) {
+    if (operation != null && retainedFailure != null) {
       throw ArgumentError('Active work cannot retain a previous failure.');
     }
     final completed = result;
     if (completed != null &&
         (completed.route != route ||
             completed.amount.units != amountInput.units ||
-            operation != null)) {
+            operation != null ||
+            retainedFailure != null ||
+            feeFailure != null)) {
       throw ArgumentError.value(completed, 'result', 'Result mismatch.');
     }
   }
@@ -96,10 +137,41 @@ final class SendFlowState {
   final WalletFeeRateEstimate? feeEstimate;
   final AppFailure? feeFailure;
   final SendFlowOperation? operation;
-  final AppFailure? failure;
+  final SendFlowFailure? retainedFailure;
   final WalletSendResult? result;
 
+  AppFailure? get failure => retainedFailure?.failure;
+
+  /// Returns a retained failure only to the surface that owns it.
+  AppFailure? failureFor(SendFlowOperation owner) {
+    final retained = retainedFailure;
+    return retained?.operation == owner ? retained?.failure : null;
+  }
+
   bool get isBusy => operation != null;
+  bool get requiresReconciliation => failure?.outcomeUnknown ?? false;
+  bool get canEditPayment =>
+      !isBusy && result == null && !requiresReconciliation;
+  bool get canChangeDestination =>
+      canEditPayment &&
+      (retainedFailure == null || retainedFailure!.allowsDestinationEdit);
+  bool get canChangeAmount =>
+      canEditPayment &&
+      (retainedFailure == null || retainedFailure!.allowsAmountEdit);
+  bool get canReadClipboard => canChangeDestination;
+
+  /// Whether [candidate] may start without changing payment input first.
+  bool canStart(SendFlowOperation candidate) {
+    if (!canEditPayment) return false;
+    final retained = retainedFailure;
+    return retained == null ||
+        (retained.operation == candidate && retained.failure.retryable);
+  }
+
+  bool get canRefreshFee =>
+      route.rail == PaymentRail.onchain &&
+      canStart(SendFlowOperation.refreshingFee) &&
+      (feeFailure == null || feeFailure!.retryable);
   bool get hasValidatedDestination => preview != null;
   bool get amountIsLocked => preview?.amount != null;
   bool get amountUsesSupportedGranularity {
@@ -123,8 +195,12 @@ final class SendFlowState {
   bool isExpiredAt(DateTime now) => preview?.isExpiredAt(now) ?? false;
 
   bool canSubmitAt(DateTime now) {
+    final retained = retainedFailure;
     if (isBusy ||
         result != null ||
+        (retained != null &&
+            (retained.operation != SendFlowOperation.submitting ||
+                !retained.failure.retryable)) ||
         preview == null ||
         !amountInput.isValid ||
         !amountUsesSupportedGranularity ||
@@ -146,7 +222,7 @@ final class SendFlowState {
     Object? feeEstimate = _unchanged,
     Object? feeFailure = _unchanged,
     Object? operation = _unchanged,
-    Object? failure = _unchanged,
+    Object? retainedFailure = _unchanged,
     Object? result = _unchanged,
   }) {
     return SendFlowState(
@@ -169,9 +245,9 @@ final class SendFlowState {
       operation: identical(operation, _unchanged)
           ? this.operation
           : operation as SendFlowOperation?,
-      failure: identical(failure, _unchanged)
-          ? this.failure
-          : failure as AppFailure?,
+      retainedFailure: identical(retainedFailure, _unchanged)
+          ? this.retainedFailure
+          : retainedFailure as SendFlowFailure?,
       result: identical(result, _unchanged)
           ? this.result
           : result as WalletSendResult?,
@@ -192,7 +268,7 @@ final class SendFlowState {
       other.feeEstimate == feeEstimate &&
       other.feeFailure == feeFailure &&
       other.operation == operation &&
-      other.failure == failure &&
+      other.retainedFailure == retainedFailure &&
       other.result == result;
 
   @override
@@ -208,7 +284,7 @@ final class SendFlowState {
     feeEstimate,
     feeFailure,
     operation,
-    failure,
+    retainedFailure,
     result,
   );
 }

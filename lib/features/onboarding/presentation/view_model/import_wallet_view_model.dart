@@ -50,6 +50,7 @@ class ImportWalletViewModel extends _$ImportWalletViewModel {
     final current = state.value;
     if (current == null ||
         current.submitting ||
+        current.requiresReconciliation ||
         startIndex < 0 ||
         startIndex >= ImportWalletState.wordCount ||
         inputs.isEmpty) {

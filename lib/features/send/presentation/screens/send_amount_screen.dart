@@ -248,6 +248,9 @@ final class _AmountBody extends StatelessWidget {
     final inputMessage = _amountMessage(state);
     final fee = state.feeEstimate;
     final feeStale = fee?.isStaleAt(now) ?? false;
+    final balanceFailure = state.failureFor(
+      SendFlowOperation.refreshingBalance,
+    );
     final submitting = state.operation == SendFlowOperation.submitting;
     final canSubmit = state.canSubmitAt(now);
 
@@ -291,33 +294,47 @@ final class _AmountBody extends StatelessWidget {
                           ),
                           textAlign: TextAlign.center,
                         ),
-                        SizedBox(height: context.spacing.sm),
-                        CustomButton.compact(
-                          text: 'Refresh fee',
-                          loading:
-                              state.operation ==
-                              SendFlowOperation.refreshingFee,
-                          enabled: !state.isBusy,
-                          hapticIntent: null,
-                          onTap: onRefreshFee,
-                        ),
+                        if (state.feeFailure?.retryable != false) ...[
+                          SizedBox(height: context.spacing.sm),
+                          CustomButton.compact(
+                            text: 'Refresh fee',
+                            loading:
+                                state.operation ==
+                                SendFlowOperation.refreshingFee,
+                            enabled: state.canRefreshFee,
+                            hapticIntent: null,
+                            onTap: onRefreshFee,
+                          ),
+                        ],
                       ],
                       if (onRetryQuote case final retry?) ...[
                         SizedBox(height: context.spacing.sm),
                         CustomButton.compact(
                           text: 'Retry fiat quote',
-                          enabled: !state.isBusy,
+                          enabled: state.canEditPayment,
                           hapticIntent: null,
                           onTap: retry,
                         ),
                       ],
                       SizedBox(height: context.spacing.sm),
+                      if (balanceFailure case final failure?) ...[
+                        Text(
+                          failure.userMessage,
+                          style: context.type.errorMessage.copyWith(
+                            color: context.appColors.danger,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        SizedBox(height: context.spacing.sm),
+                      ],
                       CustomButton.compact(
                         text: 'Refresh balance',
                         loading:
                             state.operation ==
                             SendFlowOperation.refreshingBalance,
-                        enabled: !state.isBusy,
+                        enabled: state.canStart(
+                          SendFlowOperation.refreshingBalance,
+                        ),
                         hapticIntent: null,
                         onTap: onRefreshBalance,
                       ),
@@ -349,7 +366,7 @@ final class _AmountBody extends StatelessWidget {
         SizedBox(height: context.spacing.md),
         AsterNumericKeypad(
           value: state.amountText,
-          enabled: !state.isBusy && !state.amountIsLocked,
+          enabled: state.canChangeAmount && !state.amountIsLocked,
           allowDecimal:
               inputCodec.displayPrecision(state.route, state.bitcoinUnit) > 0,
           onChanged: onAmountChanged,
@@ -412,7 +429,9 @@ final class _AmountBody extends StatelessWidget {
   }
 
   static String? _amountMessage(SendFlowState state) {
-    if (state.failure case final failure?) return failure.userMessage;
+    if (state.failureFor(SendFlowOperation.submitting) case final failure?) {
+      return failure.userMessage;
+    }
     if (!state.amountInput.isValid) {
       return switch (state.amountInput.issue) {
         WalletAmountInputIssue.empty => null,

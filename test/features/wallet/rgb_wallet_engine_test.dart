@@ -664,6 +664,110 @@ void main() {
     );
   });
 
+  test(
+    'preserves pre-native rejection and quarantines native facade failures',
+    () async {
+      final address = _regtestAddress();
+      final amount = WalletAmount.onchain(
+        assetId: WalletAsset.bitcoin.id,
+        units: 1,
+      );
+      const route = PaymentRoute(
+        asset: WalletAsset.bitcoin,
+        rail: PaymentRail.onchain,
+      );
+      final command = WalletSendCommand(
+        route: route,
+        destination: address,
+        amount: amount,
+        feeRate: _feeRate(1),
+      );
+      final rejectedWallet = MockUtexoWallet();
+      when(
+        () => rejectedWallet.sendBtc(amount: 1, address: address, feeRate: 1),
+      ).thenThrow(
+        const WalletValidationException(
+          'Native preflight rejected the amount.',
+          field: 'amount',
+        ),
+      );
+      final ambiguousWallet = MockUtexoWallet();
+      when(
+        () => ambiguousWallet.sendBtc(amount: 1, address: address, feeRate: 1),
+      ).thenThrow(const NetworkError('secret transport payload'));
+      final rejectedNativeWallet = MockUtexoWallet();
+      when(
+        () => rejectedNativeWallet.sendBtc(
+          amount: 1,
+          address: address,
+          feeRate: 1,
+        ),
+      ).thenThrow(const BadRequestError('secret native rejection payload'));
+
+      await expectLater(
+        RgbWalletEngine(
+          rejectedWallet,
+          services,
+          UtexoUnlockConfig(),
+        ).sendPayment(command),
+        throwsA(isA<WalletValidationException>()),
+      );
+      await expectLater(
+        RgbWalletEngine(
+          ambiguousWallet,
+          services,
+          UtexoUnlockConfig(),
+        ).sendPayment(command),
+        throwsA(
+          isA<WalletMutationOutcomeUnknownException>()
+              .having(
+                (error) => error.diagnostic.sourceType,
+                'source type',
+                'NetworkError',
+              )
+              .having(
+                (error) => error.toString(),
+                'redacted marker',
+                isNot(contains('secret')),
+              ),
+        ),
+      );
+      await expectLater(
+        RgbWalletEngine(
+          rejectedNativeWallet,
+          services,
+          UtexoUnlockConfig(),
+        ).sendPayment(command),
+        throwsA(
+          isA<WalletMutationOutcomeUnknownException>()
+              .having(
+                (error) => error.diagnostic.sourceType,
+                'source type',
+                'BadRequestError',
+              )
+              .having(
+                (error) => error.toString(),
+                'redacted marker',
+                isNot(contains('secret')),
+              ),
+        ),
+      );
+      verify(
+        () => rejectedWallet.sendBtc(amount: 1, address: address, feeRate: 1),
+      ).called(1);
+      verify(
+        () => ambiguousWallet.sendBtc(amount: 1, address: address, feeRate: 1),
+      ).called(1);
+      verify(
+        () => rejectedNativeWallet.sendBtc(
+          amount: 1,
+          address: address,
+          feeRate: 1,
+        ),
+      ).called(1);
+    },
+  );
+
   test('rejects invisible Unicode in a native receive request', () async {
     final wallet = MockUtexoWallet();
     when(
@@ -1031,7 +1135,7 @@ void main() {
     },
   );
 
-  test('rejects deceptive Unicode in native payment identifiers', () async {
+  test('quarantines malformed post-send Bitcoin identifiers', () async {
     final createdAt = DateTime.utc(2026, 8, 11, 10);
     final wallet = MockUtexoWallet();
     when(() => wallet.decodeLnInvoice('lnbcrt1malformed')).thenAnswer(
@@ -1077,8 +1181,132 @@ void main() {
           feeRate: _feeRate(1),
         ),
       ),
-      throwsA(isA<NativeProtocolException>()),
+      throwsA(
+        isA<WalletMutationOutcomeUnknownException>().having(
+          (error) => error.diagnostic.context,
+          'diagnostic context',
+          'sendBtc.txid',
+        ),
+      ),
     );
+    verify(
+      () => wallet.sendBtc(
+        amount: 1,
+        address: 'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn',
+        feeRate: 1,
+      ),
+    ).called(1);
+  });
+
+  test('quarantines malformed RGB and Lightning success responses', () async {
+    const assetId = 'rgb:configured-usdt';
+    const configuredServices = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.regtest,
+      sdkNetwork: 'regtest',
+      usdtAsset: RgbAssetConfiguration(contractId: assetId, precision: 6),
+    );
+    final asset = WalletAsset.rgbUsdt(assetId: assetId, precision: 6);
+    final rgbRoute = PaymentRoute(asset: asset, rail: PaymentRail.onchain);
+    final rgbAmount = WalletAmount.onchain(assetId: asset.id, units: 1);
+    final rgbWallet = MockUtexoWallet();
+    when(() => rgbWallet.decodeRgbInvoice('rgb:send')).thenAnswer(
+      (_) async => CoreInvoiceData(
+        invoice: 'rgb:send',
+        recipientId: 'rgb-recipient',
+        assetId: assetId,
+        network: 'regtest',
+        assignment: const Assignment(type: 'Fungible', amount: 1),
+        expirationTimestamp: 1786446000,
+        transportEndpoints: const <String>[],
+      ),
+    );
+    when(() => rgbWallet.onchainSend(any())).thenAnswer(
+      (_) async =>
+          const OnchainSendResponse(txid: 'rgb-txid', batchTransferIdx: -1),
+    );
+    final rgbEngine = RgbWalletEngine(
+      rgbWallet,
+      configuredServices,
+      UtexoUnlockConfig(),
+      clock: () => DateTime.utc(2026, 8, 11, 10),
+    );
+
+    final lightningWallet = MockUtexoWallet();
+    when(() => lightningWallet.decodeLnInvoice('lnbcrt1send')).thenAnswer(
+      (_) async => DecodedLightningInvoice(
+        amtMsat: 1000,
+        expirySec: 3600,
+        timestamp: DateTime.utc(2026, 8, 11, 10).millisecondsSinceEpoch ~/ 1000,
+        paymentHash: 'payment-hash',
+        paymentSecret: 'not-retained',
+        network: 'regtest',
+      ),
+    );
+    when(
+      () => lightningWallet.payLightningInvoice(
+        lnInvoice: 'lnbcrt1send',
+        amount: null,
+        assetId: null,
+        assetAmount: null,
+      ),
+    ).thenAnswer(
+      (_) async => const LightningSendRequest(txid: 'invalid\u200bhash'),
+    );
+    final lightningEngine = RgbWalletEngine(
+      lightningWallet,
+      services,
+      UtexoUnlockConfig(),
+      clock: () => DateTime.utc(2026, 8, 11, 10),
+    );
+
+    await expectLater(
+      rgbEngine.sendPayment(
+        WalletSendCommand(
+          route: rgbRoute,
+          destination: 'rgb:send',
+          amount: rgbAmount,
+          feeRate: _feeRate(1),
+        ),
+      ),
+      throwsA(
+        isA<WalletMutationOutcomeUnknownException>().having(
+          (error) => error.diagnostic.context,
+          'RGB diagnostic context',
+          'OnchainSendResponse.batchTransferIdx',
+        ),
+      ),
+    );
+    await expectLater(
+      lightningEngine.sendPayment(
+        WalletSendCommand(
+          route: const PaymentRoute(
+            asset: WalletAsset.bitcoin,
+            rail: PaymentRail.lightning,
+          ),
+          destination: 'lnbcrt1send',
+          amount: WalletAmount.lightning(
+            assetId: WalletAsset.bitcoin.id,
+            units: 1000,
+          ),
+        ),
+      ),
+      throwsA(
+        isA<WalletMutationOutcomeUnknownException>().having(
+          (error) => error.diagnostic.context,
+          'Lightning diagnostic context',
+          'LightningSendRequest.txid',
+        ),
+      ),
+    );
+    verify(() => rgbWallet.onchainSend(any())).called(1);
+    verify(
+      () => lightningWallet.payLightningInvoice(
+        lnInvoice: 'lnbcrt1send',
+        amount: null,
+        assetId: null,
+        assetAmount: null,
+      ),
+    ).called(1);
   });
 
   test(

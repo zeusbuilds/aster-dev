@@ -319,6 +319,100 @@ void main() {
     );
   });
 
+  testWidgets('import freezes phrase input after an unknown setup outcome', (
+    tester,
+  ) async {
+    final harness = await OnboardingTestHarness.create();
+    addTearDown(() => _disposeHarness(tester, harness));
+    await _pumpScreen(tester, harness, const OnboardingImportWalletScreen());
+    final notifier = harness.container.read(
+      importWalletViewModelProvider.notifier,
+    );
+    notifier.updateWords(0, validTestMnemonicWords);
+    await _pumpUntil(
+      tester,
+      () =>
+          harness.container
+              .read(importWalletViewModelProvider)
+              .value
+              ?.canSubmit ==
+          true,
+    );
+    harness.engine.initializeError = const AppFailureException(
+      AppFailure(
+        code: 'wallet_setup_outcome_unknown',
+        kind: AppFailureKind.timeout,
+        userMessage: 'Restart before continuing wallet setup.',
+        retryable: false,
+        outcomeUnknown: true,
+      ),
+    );
+
+    expect(await notifier.submit(), isFalse);
+    await tester.pump();
+
+    expect(
+      find.text('Restart before continuing wallet setup.'),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('recovery-word-1')))
+          .readOnly,
+      isTrue,
+    );
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('Continue'))
+          .flagsCollection
+          .isEnabled,
+      ui.Tristate.isFalse,
+    );
+    expect(find.text('Back'), findsOneWidget);
+  });
+
+  testWidgets('create keeps Copy but disables unknown-outcome provisioning', (
+    tester,
+  ) async {
+    final harness = await OnboardingTestHarness.create();
+    addTearDown(() => _disposeHarness(tester, harness));
+    await _pumpScreen(tester, harness, const OnboardingCreateWalletScreen());
+    final notifier = harness.container.read(
+      createWalletViewModelProvider.notifier,
+    );
+    harness.engine.initializeError = const AppFailureException(
+      AppFailure(
+        code: 'wallet_setup_outcome_unknown',
+        kind: AppFailureKind.timeout,
+        userMessage: 'Restart before continuing wallet setup.',
+        retryable: false,
+        outcomeUnknown: true,
+      ),
+    );
+
+    expect(await notifier.submit(), isFalse);
+    await tester.pump();
+
+    expect(
+      find.text('Restart before continuing wallet setup.'),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('Continue'))
+          .flagsCollection
+          .isEnabled,
+      ui.Tristate.isFalse,
+    );
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('Copy recovery phrase'))
+          .flagsCollection
+          .isEnabled,
+      ui.Tristate.isTrue,
+    );
+  });
+
   testWidgets('import keeps loading on the current screen until commit', (
     tester,
   ) async {

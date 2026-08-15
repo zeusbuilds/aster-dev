@@ -177,7 +177,7 @@ class _OnboardingImportWalletScreenState
                     statuses: state.wordStatuses.sublist(start, end),
                     startIndex: start,
                     fieldHeight: wordFieldHeight,
-                    enabled: !state.submitting,
+                    enabled: !state.submitting && !state.requiresReconciliation,
                     canSubmit: state.canSubmit,
                     onChanged: _handleWordInput,
                     onSubmitted: (index) =>

@@ -36,6 +36,9 @@ final class ImportWalletState {
   final bool submitting;
   final AppFailure? failure;
 
+  /// Whether native provisioning may have committed and input must stay frozen.
+  bool get requiresReconciliation => failure?.outcomeUnknown ?? false;
+
   bool get allWordsKnown =>
       words.every((word) => word.isNotEmpty) &&
       wordStatuses.every((status) => status == MnemonicWordStatus.valid);
@@ -43,7 +46,8 @@ final class ImportWalletState {
   bool get canSubmit =>
       !submitting &&
       allWordsKnown &&
-      checksumStatus == MnemonicChecksumStatus.valid;
+      checksumStatus == MnemonicChecksumStatus.valid &&
+      (failure == null || failure!.retryable);
 
   String get mnemonic => words.join(' ');
 

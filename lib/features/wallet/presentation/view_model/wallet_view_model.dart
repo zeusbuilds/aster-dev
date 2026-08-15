@@ -12,8 +12,13 @@ class WalletViewModel extends _$WalletViewModel {
   @override
   Future<WalletState> build() => _loadWallets();
 
+  /// Reloads known state or retries an initial failure only when replay is safe.
   Future<void> reload() async {
     if (state.isLoading || state.value?.switchingWalletId != null) return;
+    if (state case AsyncError(:final error, :final stackTrace)
+        when !FailureMapper.from(error, stackTrace).retryable) {
+      return;
+    }
     state = const AsyncLoading();
     final next = await AsyncValue.guard(_loadWallets);
     if (ref.mounted) state = next;

@@ -122,6 +122,20 @@ final class FailureDiagnostic {
   int get hashCode => Object.hash(sourceType, sourceCode, statusCode, context);
 }
 
+/// Redacted marker for a payment whose native mutation outcome is ambiguous.
+///
+/// The original exception is reduced to [diagnostic] before this marker crosses
+/// the wallet adapter boundary. Presentation must reconcile wallet activity and
+/// must not offer the same route-scoped payment again.
+final class WalletMutationOutcomeUnknownException implements Exception {
+  const WalletMutationOutcomeUnknownException(this.diagnostic);
+
+  final FailureDiagnostic diagnostic;
+
+  @override
+  String toString() => 'WalletMutationOutcomeUnknownException';
+}
+
 /// Non-secret marker for invalid compile-time or runtime service settings.
 final class AppConfigurationException implements Exception {
   const AppConfigurationException();

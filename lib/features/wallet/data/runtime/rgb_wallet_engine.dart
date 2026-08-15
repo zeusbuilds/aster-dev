@@ -5,6 +5,7 @@ import 'package:rgb_sdk_flutter/rgb_sdk_flutter.dart';
 
 import '../../../../core/config/app_environment.dart';
 import '../../../../core/errors/app_failure.dart';
+import '../../../../core/errors/failure_mapper.dart';
 import '../../domain/models/models.dart';
 import '../../domain/validation/validation.dart';
 import '../validation/validation.dart';
@@ -555,41 +556,68 @@ final class RgbWalletEngine implements WalletEngine {
         field: 'destination',
       );
     }
-    final txid = await _wallet.sendBtc(
-      amount: command.amount.units,
-      address: address,
-      feeRate: command.feeRate!.satsPerVbyte.toDouble(),
-    );
-    return WalletSendResult(
-      route: command.route,
-      amount: command.amount,
-      referenceId: _nativeIdentifier(txid, 'sendBtc.txid'),
-      status: WalletPaymentStatus.pending,
-    );
+    return _runPaymentMutation(() async {
+      final txid = await _wallet.sendBtc(
+        amount: command.amount.units,
+        address: address,
+        feeRate: command.feeRate!.satsPerVbyte.toDouble(),
+      );
+      return WalletSendResult(
+        route: command.route,
+        amount: command.amount,
+        referenceId: _nativeIdentifier(txid, 'sendBtc.txid'),
+        status: WalletPaymentStatus.pending,
+      );
+    });
+  }
+
+  Future<T> _runPaymentMutation<T>(Future<T> Function() operation) async {
+    try {
+      return await operation();
+    } catch (error, stackTrace) {
+      if (_isConfirmedPaymentRejection(error)) rethrow;
+      Error.throwWithStackTrace(
+        WalletMutationOutcomeUnknownException(
+          FailureMapper.diagnosticCause(error),
+        ),
+        stackTrace,
+      );
+    }
+  }
+
+  static bool _isConfirmedPaymentRejection(Object error) {
+    return error is WalletValidationException ||
+        (error is UnsupportedWalletFeatureException && error.cause == null) ||
+        error is AppConfigurationException;
   }
 
   Future<WalletSendResult> _sendRgb(WalletSendCommand command) async {
     final preview = await _decodeRgbInvoice(command.route, command.destination);
     _requireMatchingAmount(preview, command.amount);
     _requireNotExpired(preview);
-    final response = await _wallet.onchainSend(
-      RgbSendRequest(
-        invoice: command.destination,
-        assetId: command.route.asset.id.value,
-        amount: command.amount.units,
-        feeRate: command.feeRate!.satsPerVbyte.toDouble(),
-      ),
-    );
-    return WalletSendResult(
-      route: command.route,
-      amount: command.amount,
-      referenceId: _nativeIdentifier(response.txid, 'OnchainSendResponse.txid'),
-      status: WalletPaymentStatus.pending,
-      batchTransferIndex: _optionalNativeIndex(
-        response.batchTransferIdx,
-        'OnchainSendResponse.batchTransferIdx',
-      ),
-    );
+    return _runPaymentMutation(() async {
+      final response = await _wallet.onchainSend(
+        RgbSendRequest(
+          invoice: command.destination,
+          assetId: command.route.asset.id.value,
+          amount: command.amount.units,
+          feeRate: command.feeRate!.satsPerVbyte.toDouble(),
+        ),
+      );
+      return WalletSendResult(
+        route: command.route,
+        amount: command.amount,
+        referenceId: _nativeIdentifier(
+          response.txid,
+          'OnchainSendResponse.txid',
+        ),
+        status: WalletPaymentStatus.pending,
+        batchTransferIndex: _optionalNativeIndex(
+          response.batchTransferIdx,
+          'OnchainSendResponse.batchTransferIdx',
+        ),
+      );
+    });
   }
 
   Future<WalletSendResult> _sendLightning(WalletSendCommand command) async {
@@ -608,23 +636,25 @@ final class RgbWalletEngine implements WalletEngine {
         field: 'amount',
       );
     }
-    final response = await _wallet.payLightningInvoice(
-      lnInvoice: command.destination,
-      amount: isBitcoin && preview.amount == null
-          ? command.amount.wholeAssetUnits
-          : null,
-      assetId: isBitcoin ? null : command.route.asset.id.value,
-      assetAmount: isBitcoin ? null : command.amount.units,
-    );
-    return WalletSendResult(
-      route: command.route,
-      amount: command.amount,
-      referenceId: _nativeIdentifier(
-        response.txid,
-        'LightningSendRequest.txid',
-      ),
-      status: _paymentStatus(response.status),
-    );
+    return _runPaymentMutation(() async {
+      final response = await _wallet.payLightningInvoice(
+        lnInvoice: command.destination,
+        amount: isBitcoin && preview.amount == null
+            ? command.amount.wholeAssetUnits
+            : null,
+        assetId: isBitcoin ? null : command.route.asset.id.value,
+        assetAmount: isBitcoin ? null : command.amount.units,
+      );
+      return WalletSendResult(
+        route: command.route,
+        amount: command.amount,
+        referenceId: _nativeIdentifier(
+          response.txid,
+          'LightningSendRequest.txid',
+        ),
+        status: _paymentStatus(response.status),
+      );
+    });
   }
 
   void _requireConfiguredRoute(PaymentRoute route) {

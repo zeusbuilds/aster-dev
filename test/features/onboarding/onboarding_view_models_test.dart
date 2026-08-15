@@ -232,6 +232,62 @@ void main() {
     },
   );
 
+  test('import quarantines an outcome-unknown provisioning result', () async {
+    final harness = await OnboardingTestHarness.create();
+    addTearDown(harness.dispose);
+    final subscription = harness.container.listen(
+      importWalletViewModelProvider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    await harness.container.read(importWalletViewModelProvider.future);
+    final notifier = harness.container.read(
+      importWalletViewModelProvider.notifier,
+    );
+    notifier.updateWords(0, validTestMnemonicWords);
+    await _waitFor(
+      () =>
+          harness.container
+              .read(importWalletViewModelProvider)
+              .value
+              ?.canSubmit ==
+          true,
+    );
+    harness.engine.initializeError = const AppFailureException(
+      AppFailure(
+        code: 'wallet_setup_outcome_unknown',
+        kind: AppFailureKind.timeout,
+        userMessage: 'Restart before continuing wallet setup.',
+        retryable: false,
+        outcomeUnknown: true,
+      ),
+    );
+
+    expect(await notifier.submit(), isFalse);
+    final failed = harness.container
+        .read(importWalletViewModelProvider)
+        .requireValue;
+    expect(failed.requiresReconciliation, isTrue);
+    expect(failed.canSubmit, isFalse);
+    expect(failed.words, validTestMnemonicWords);
+    final callsAfterFailure = List<String>.of(harness.engine.calls);
+
+    notifier.updateWord(11, 'ability');
+    await notifier.retryChecksum();
+    expect(await notifier.submit(), isFalse);
+
+    final quarantined = harness.container
+        .read(importWalletViewModelProvider)
+        .requireValue;
+    expect(quarantined, failed);
+    expect(harness.engine.calls, callsAfterFailure);
+    expect(
+      harness.engine.calls.where((call) => call == 'initialize'),
+      hasLength(1),
+    );
+  });
+
   test('import ignores a stale checksum result after input changes', () async {
     final harness = await OnboardingTestHarness.create();
     addTearDown(harness.dispose);
@@ -523,6 +579,52 @@ void main() {
     expect(harness.haptics.intents, contains(HapticIntent.error));
     expect(harness.engine.calls, containsAllInOrder(['initialize', 'destroy']));
   });
+
+  test(
+    'create blocks outcome-unknown replay but keeps phrase copy available',
+    () async {
+      final harness = await OnboardingTestHarness.create();
+      addTearDown(harness.dispose);
+      final subscription = harness.container.listen(
+        createWalletViewModelProvider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      await harness.container.read(createWalletViewModelProvider.future);
+      final notifier = harness.container.read(
+        createWalletViewModelProvider.notifier,
+      );
+      harness.engine.initializeError = const AppFailureException(
+        AppFailure(
+          code: 'wallet_setup_outcome_unknown',
+          kind: AppFailureKind.timeout,
+          userMessage: 'Restart before continuing wallet setup.',
+          retryable: false,
+          outcomeUnknown: true,
+        ),
+      );
+
+      expect(await notifier.submit(), isFalse);
+      final failed = harness.container
+          .read(createWalletViewModelProvider)
+          .requireValue;
+      expect(failed.canSubmit, isFalse);
+      expect(failed.canCopy, isTrue);
+      expect(failed.words, validTestMnemonicWords);
+      final callsAfterFailure = List<String>.of(harness.engine.calls);
+
+      expect(await notifier.copyMnemonic(), isA<AppSuccess<void>>());
+      expect(await notifier.submit(), isFalse);
+
+      expect(harness.clipboardText, validTestMnemonic);
+      expect(harness.engine.calls, callsAfterFailure);
+      expect(
+        harness.engine.calls.where((call) => call == 'initialize'),
+        hasLength(1),
+      );
+    },
+  );
 }
 
 Future<void> _waitFor(bool Function() predicate) async {

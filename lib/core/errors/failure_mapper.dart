@@ -9,6 +9,9 @@ import 'app_failure.dart';
 abstract final class FailureMapper {
   /// Reduces an exception to bounded metadata that cannot retain payload text.
   static FailureDiagnostic diagnosticCause(Object error) {
+    if (error is WalletMutationOutcomeUnknownException) {
+      return error.diagnostic;
+    }
     if (error is AppFailureException) {
       return FailureDiagnostic(
         sourceType: 'AppFailureException',
@@ -74,6 +77,18 @@ abstract final class FailureMapper {
         message:
             'A wallet change could not be confirmed safely. Restart the app '
             'before continuing.',
+        outcomeUnknown: true,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+    if (error is WalletMutationOutcomeUnknownException) {
+      return _failure(
+        code: 'payment_outcome_unknown',
+        kind: AppFailureKind.protocol,
+        message:
+            'The payment could not be confirmed. Check Activity before '
+            'sending again.',
         outcomeUnknown: true,
         error: error,
         stackTrace: stackTrace,

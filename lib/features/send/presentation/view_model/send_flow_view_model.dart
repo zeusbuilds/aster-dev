@@ -40,7 +40,7 @@ class SendFlowViewModel extends _$SendFlowViewModel {
   /// Invalidates a prior preview whenever destination text changes.
   void updateDestination(String value) {
     final current = state.value;
-    if (current == null || current.isBusy || current.result != null) return;
+    if (current == null || !current.canChangeDestination) return;
     if (value == current.destination) return;
     state = AsyncData(
       current.copyWith(
@@ -48,7 +48,7 @@ class SendFlowViewModel extends _$SendFlowViewModel {
         preview: null,
         amountText: '',
         amountInput: _parseAmount('', current),
-        failure: null,
+        retainedFailure: null,
       ),
     );
   }
@@ -56,13 +56,13 @@ class SendFlowViewModel extends _$SendFlowViewModel {
   /// Reads a bounded non-secret payment destination from the clipboard.
   Future<AppResult<String>> pasteDestination() async {
     final current = state.value;
-    if (current == null || current.isBusy || current.result != null) {
+    if (current == null || !current.canReadClipboard) {
       return AppResult.failure(_operationUnavailableFailure());
     }
     state = AsyncData(
       current.copyWith(
         operation: SendFlowOperation.readingClipboard,
-        failure: null,
+        retainedFailure: null,
       ),
     );
     final result = await ref.read(clipboardServiceProvider).readText();
@@ -81,7 +81,7 @@ class SendFlowViewModel extends _$SendFlowViewModel {
             amountText: '',
             amountInput: _parseAmount('', current),
             operation: null,
-            failure: null,
+            retainedFailure: null,
           ),
         );
         unawaited(
@@ -105,15 +105,14 @@ class SendFlowViewModel extends _$SendFlowViewModel {
   Future<bool> validateDestination() async {
     final current = state.value;
     if (current == null ||
-        current.isBusy ||
-        current.result != null ||
+        !current.canStart(SendFlowOperation.validatingDestination) ||
         current.destination.isEmpty) {
       return false;
     }
     state = AsyncData(
       current.copyWith(
         operation: SendFlowOperation.validatingDestination,
-        failure: null,
+        retainedFailure: null,
       ),
     );
     final result = await _walletOperation(
@@ -128,6 +127,7 @@ class SendFlowViewModel extends _$SendFlowViewModel {
       AppFailureResult<WalletPaymentPreview>(:final failure) => _fail(
         current,
         failure,
+        failedOperation: SendFlowOperation.validatingDestination,
         emitErrorHaptic: true,
       ),
     };
@@ -136,10 +136,7 @@ class SendFlowViewModel extends _$SendFlowViewModel {
   /// Updates exact amount state without invoking native code per key press.
   void updateAmount(String value) {
     final current = state.value;
-    if (current == null ||
-        current.isBusy ||
-        current.result != null ||
-        current.amountIsLocked) {
+    if (current == null || !current.canChangeAmount || current.amountIsLocked) {
       return;
     }
     if (value == current.amountText) return;
@@ -147,7 +144,7 @@ class SendFlowViewModel extends _$SendFlowViewModel {
       current.copyWith(
         amountText: value,
         amountInput: _parseAmount(value, current),
-        failure: null,
+        retainedFailure: null,
       ),
     );
   }
@@ -155,13 +152,14 @@ class SendFlowViewModel extends _$SendFlowViewModel {
   /// Refreshes the selected rail's available balance.
   Future<bool> refreshBalance() async {
     final current = state.value;
-    if (current == null || current.isBusy || current.result != null) {
+    if (current == null ||
+        !current.canStart(SendFlowOperation.refreshingBalance)) {
       return false;
     }
     state = AsyncData(
       current.copyWith(
         operation: SendFlowOperation.refreshingBalance,
-        failure: null,
+        retainedFailure: null,
       ),
     );
     final result = await _walletOperation(
@@ -171,7 +169,11 @@ class SendFlowViewModel extends _$SendFlowViewModel {
     return switch (result) {
       AppSuccess<WalletBalance>(:final value) => () {
         state = AsyncData(
-          current.copyWith(balance: value, operation: null, failure: null),
+          current.copyWith(
+            balance: value,
+            operation: null,
+            retainedFailure: null,
+          ),
         );
         unawaited(
           ref
@@ -183,6 +185,7 @@ class SendFlowViewModel extends _$SendFlowViewModel {
       AppFailureResult<WalletBalance>(:final failure) => _fail(
         current,
         failure,
+        failedOperation: SendFlowOperation.refreshingBalance,
         emitErrorHaptic: true,
       ),
     };
@@ -191,17 +194,14 @@ class SendFlowViewModel extends _$SendFlowViewModel {
   /// Refreshes the display quote. The repository still owns the send-time fee.
   Future<bool> refreshFee() async {
     final current = state.value;
-    if (current == null ||
-        current.isBusy ||
-        current.result != null ||
-        current.route.rail != PaymentRail.onchain) {
+    if (current == null || !current.canRefreshFee) {
       return false;
     }
     state = AsyncData(
       current.copyWith(
         operation: SendFlowOperation.refreshingFee,
         feeFailure: null,
-        failure: null,
+        retainedFailure: null,
       ),
     );
     final result = await _walletOperation(
@@ -215,7 +215,7 @@ class SendFlowViewModel extends _$SendFlowViewModel {
             feeEstimate: value,
             feeFailure: null,
             operation: null,
-            failure: null,
+            retainedFailure: null,
           ),
         );
         unawaited(
@@ -244,20 +244,40 @@ class SendFlowViewModel extends _$SendFlowViewModel {
   /// Submits exactly once and leaves navigation to the observing screen.
   Future<bool> submit() async {
     final current = state.value;
-    if (current == null || current.isBusy || current.result != null) {
+    if (current == null || !current.canStart(SendFlowOperation.submitting)) {
       return false;
     }
     final now = ref.read(utcClockProvider)();
     if (!current.canSubmitAt(now)) {
+      if (current.feeFailure != null) return false;
+      final failure = _submissionFailure(current, now);
+      if (failure.code == 'payment_fee_refresh_required') {
+        state = AsyncData(
+          current.copyWith(
+            feeEstimate: null,
+            feeFailure: failure,
+            retainedFailure: null,
+          ),
+        );
+        return false;
+      }
       state = AsyncData(
-        current.copyWith(failure: _submissionFailure(current, now)),
+        current.copyWith(
+          retainedFailure: SendFlowFailure(
+            operation: SendFlowOperation.submitting,
+            failure: failure,
+          ),
+        ),
       );
       return false;
     }
     final preview = current.preview!;
     final units = current.amountInput.units!;
     state = AsyncData(
-      current.copyWith(operation: SendFlowOperation.submitting, failure: null),
+      current.copyWith(
+        operation: SendFlowOperation.submitting,
+        retainedFailure: null,
+      ),
     );
     final result = await _walletOperation(
       (repository) => repository.sendPayment(
@@ -270,7 +290,11 @@ class SendFlowViewModel extends _$SendFlowViewModel {
     return switch (result) {
       AppSuccess<WalletSendResult>(:final value) => () {
         state = AsyncData(
-          current.copyWith(result: value, operation: null, failure: null),
+          current.copyWith(
+            result: value,
+            operation: null,
+            retainedFailure: null,
+          ),
         );
         unawaited(
           ref.read(hapticFeedbackServiceProvider).trigger(HapticIntent.success),
@@ -280,15 +304,10 @@ class SendFlowViewModel extends _$SendFlowViewModel {
       AppFailureResult<WalletSendResult>(:final failure) => _fail(
         current,
         failure,
+        failedOperation: SendFlowOperation.submitting,
         emitErrorHaptic: true,
       ),
     };
-  }
-
-  void clearFailure() {
-    final current = state.value;
-    if (current == null || current.failure == null || current.isBusy) return;
-    state = AsyncData(current.copyWith(failure: null));
   }
 
   Future<SendFlowState> _load() async {
@@ -354,7 +373,11 @@ class SendFlowViewModel extends _$SendFlowViewModel {
 
   bool _acceptPreview(SendFlowState previous, WalletPaymentPreview preview) {
     if (preview.isExpiredAt(ref.read(utcClockProvider)())) {
-      return _fail(previous, _expiredRequestFailure());
+      return _fail(
+        previous,
+        _expiredRequestFailure(),
+        failedOperation: SendFlowOperation.validatingDestination,
+      );
     }
     final encodedAmount = preview.amount;
     final amountText = encodedAmount == null
@@ -370,7 +393,7 @@ class SendFlowViewModel extends _$SendFlowViewModel {
         amountText: amountText,
         amountInput: _parseAmount(amountText, previous),
         operation: null,
-        failure: null,
+        retainedFailure: null,
       ),
     );
     return true;
@@ -398,9 +421,18 @@ class SendFlowViewModel extends _$SendFlowViewModel {
   bool _fail(
     SendFlowState previous,
     AppFailure failure, {
+    required SendFlowOperation failedOperation,
     bool emitErrorHaptic = false,
   }) {
-    state = AsyncData(previous.copyWith(operation: null, failure: failure));
+    state = AsyncData(
+      previous.copyWith(
+        operation: null,
+        retainedFailure: SendFlowFailure(
+          operation: failedOperation,
+          failure: failure,
+        ),
+      ),
+    );
     if (emitErrorHaptic) {
       unawaited(
         ref.read(hapticFeedbackServiceProvider).trigger(HapticIntent.error),

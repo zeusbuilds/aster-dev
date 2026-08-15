@@ -182,6 +182,25 @@ void main() {
     expect(failure.userMessage, isNot(contains('rlnSendPayment')));
   });
 
+  test('maps a redacted post-send marker to reconciliation-only failure', () {
+    const diagnostic = FailureDiagnostic(
+      sourceType: 'NativeProtocolException',
+      sourceCode: 'NATIVE_PROTOCOL_ERROR',
+      context: 'sendBtc.txid',
+    );
+    const marker = WalletMutationOutcomeUnknownException(diagnostic);
+
+    final failure = FailureMapper.from(marker, StackTrace.current);
+
+    expect(failure.code, 'payment_outcome_unknown');
+    expect(failure.kind, AppFailureKind.protocol);
+    expect(failure.retryable, isFalse);
+    expect(failure.outcomeUnknown, isTrue);
+    expect(failure.cause, diagnostic);
+    expect(failure.userMessage, isNot(contains('sendBtc')));
+    expect(marker.toString(), isNot(contains('sendBtc')));
+  });
+
   test('does not collapse terminal or experimental SDK failures', () {
     final settlement = FailureMapper.from(
       const LspSettlementException(

@@ -664,6 +664,210 @@ void main() {
     );
     expect(harness.toasts.messages.last.title, 'Payment submitted');
   });
+
+  testWidgets('unknown payment outcome disables every Send route control', (
+    tester,
+  ) async {
+    final transport = ResilientHttpClient(
+      client: MockClient((request) async => http.Response('{}', 503)),
+      retryPolicy: RetryPolicy(maxAttempts: 1),
+    );
+    addTearDown(transport.close);
+    final engine = FakeWalletEngine()
+      ..balance = _bitcoinBalance(1000)
+      ..feeEstimate = WalletFeeRateEstimate(
+        targetBlocks: 6,
+        satsPerVbyte: 2,
+        observedAt: DateTime.now().toUtc(),
+      )
+      ..sendPaymentError = const AppFailureException(
+        AppFailure(
+          code: 'wallet_operation_outcome_unknown',
+          kind: AppFailureKind.timeout,
+          userMessage:
+              'The wallet did not confirm the operation in time. Check its '
+              'status before trying again.',
+          retryable: false,
+          outcomeUnknown: true,
+        ),
+      );
+    final harness = await PaymentFlowTestHarness.create(
+      engine: engine,
+      httpClient: transport,
+    );
+    addTearDown(() => _disposeHarness(tester, harness));
+    final provider = sendFlowViewModelProvider(
+      WalletPaymentTarget.bitcoinOnchain,
+    );
+    final subscription = harness.container.listen(
+      provider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    await tester.runAsync(() => harness.container.read(provider.future));
+    final notifier = harness.container.read(provider.notifier);
+    notifier.updateDestination('mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn');
+    expect(await tester.runAsync(notifier.validateDestination), isTrue);
+    notifier.updateAmount('0.000001');
+
+    await _pumpWidget(
+      tester,
+      harness,
+      const SendAmountScreen(target: WalletPaymentTarget.bitcoinOnchain),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byType(AsterNumericKeypad).evaluate().isNotEmpty,
+    );
+    expect(await tester.runAsync(notifier.submit), isFalse);
+    await _pumpFrames(tester);
+
+    final sendButton = find.byWidgetPredicate(
+      (widget) => widget is CustomButton && widget.text == 'Send',
+    );
+    expect(tester.widget<CustomButton>(sendButton).enabled, isFalse);
+    expect(
+      tester
+          .widget<AsterNumericKeypad>(find.byType(AsterNumericKeypad))
+          .enabled,
+      isFalse,
+    );
+    final refreshBalance = find.byWidgetPredicate(
+      (widget) => widget is CustomButton && widget.text == 'Refresh balance',
+    );
+    expect(tester.widget<CustomButton>(refreshBalance).enabled, isFalse);
+    final retryQuote = find.byWidgetPredicate(
+      (widget) => widget is CustomButton && widget.text == 'Retry fiat quote',
+    );
+    expect(retryQuote, findsOneWidget);
+    expect(tester.widget<CustomButton>(retryQuote).enabled, isFalse);
+    expect(
+      find.text(
+        'The wallet did not confirm the operation in time. Check its status '
+        'before trying again.',
+      ),
+      findsOneWidget,
+    );
+
+    await _pumpWidget(
+      tester,
+      harness,
+      const SendAddressScreen(target: WalletPaymentTarget.bitcoinOnchain),
+    );
+    await tester.pump();
+
+    expect(tester.widget<TextField>(find.byType(TextField)).enabled, isFalse);
+    final continueButton = find.byWidgetPredicate(
+      (widget) => widget is CustomButton && widget.text == 'Continue',
+    );
+    expect(tester.widget<CustomButton>(continueButton).enabled, isFalse);
+    expect(
+      engine.calls.where((call) => call == 'sendPayment:start'),
+      hasLength(1),
+    );
+  });
+
+  testWidgets('terminal fee failure exposes no unsafe direct retry', (
+    tester,
+  ) async {
+    final engine = FakeWalletEngine()
+      ..balance = _bitcoinBalance(1000)
+      ..feeEstimate = WalletFeeRateEstimate(
+        targetBlocks: 6,
+        satsPerVbyte: 2,
+        observedAt: DateTime.now().toUtc(),
+      );
+    final harness = await PaymentFlowTestHarness.create(engine: engine);
+    addTearDown(() => _disposeHarness(tester, harness));
+    final provider = sendFlowViewModelProvider(
+      WalletPaymentTarget.bitcoinOnchain,
+    );
+    final subscription = harness.container.listen(provider, (_, _) {});
+    addTearDown(subscription.close);
+    await tester.runAsync(() => harness.container.read(provider.future));
+    final notifier = harness.container.read(provider.notifier);
+    notifier.updateDestination('mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn');
+    expect(await tester.runAsync(notifier.validateDestination), isTrue);
+    notifier.updateAmount('0.000001');
+    engine.feeEstimateError = StateError('terminal fee state');
+    expect(await tester.runAsync(notifier.refreshFee), isFalse);
+    final failureMessage = harness.container
+        .read(provider)
+        .requireValue
+        .feeFailure!
+        .userMessage;
+
+    await _pumpWidget(
+      tester,
+      harness,
+      const SendAmountScreen(target: WalletPaymentTarget.bitcoinOnchain),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byType(AsterNumericKeypad).evaluate().isNotEmpty,
+    );
+    await _pumpFrames(tester);
+
+    expect(find.text(failureMessage), findsOneWidget);
+    expect(find.text('Refresh fee'), findsNothing);
+    final sendButton = find.byWidgetPredicate(
+      (widget) => widget is CustomButton && widget.text == 'Send',
+    );
+    expect(tester.widget<CustomButton>(sendButton).enabled, isFalse);
+  });
+
+  testWidgets('balance failure renders beside its own retry control', (
+    tester,
+  ) async {
+    final engine = FakeWalletEngine()
+      ..balance = _bitcoinBalance(1000)
+      ..feeEstimate = WalletFeeRateEstimate(
+        targetBlocks: 6,
+        satsPerVbyte: 2,
+        observedAt: DateTime.now().toUtc(),
+      );
+    final harness = await PaymentFlowTestHarness.create(engine: engine);
+    addTearDown(() => _disposeHarness(tester, harness));
+    final provider = sendFlowViewModelProvider(
+      WalletPaymentTarget.bitcoinOnchain,
+    );
+    final subscription = harness.container.listen(provider, (_, _) {});
+    addTearDown(subscription.close);
+    await tester.runAsync(() => harness.container.read(provider.future));
+    final notifier = harness.container.read(provider.notifier);
+    notifier.updateDestination('mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn');
+    expect(await tester.runAsync(notifier.validateDestination), isTrue);
+    notifier.updateAmount('0.000001');
+    engine.balanceError = TimeoutException('temporary balance timeout');
+    expect(await tester.runAsync(notifier.refreshBalance), isFalse);
+    final failureMessage = harness.container
+        .read(provider)
+        .requireValue
+        .failure!
+        .userMessage;
+
+    await _pumpWidget(
+      tester,
+      harness,
+      const SendAmountScreen(target: WalletPaymentTarget.bitcoinOnchain),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byType(AsterNumericKeypad).evaluate().isNotEmpty,
+    );
+    await _pumpFrames(tester);
+
+    expect(
+      tester.widget<SendCard>(find.byType(SendCard)).validationMessage,
+      isNull,
+    );
+    expect(find.text(failureMessage), findsOneWidget);
+    final refreshBalance = find.byWidgetPredicate(
+      (widget) => widget is CustomButton && widget.text == 'Refresh balance',
+    );
+    expect(tester.widget<CustomButton>(refreshBalance).enabled, isTrue);
+  });
 }
 
 Future<void> _pumpRouter(

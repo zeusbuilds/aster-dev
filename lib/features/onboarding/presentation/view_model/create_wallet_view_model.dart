@@ -33,7 +33,7 @@ class CreateWalletViewModel extends _$CreateWalletViewModel {
   /// Copies the phrase under a bounded matching-content clipboard lease.
   Future<AppResult<void>> copyMnemonic() async {
     final current = state.value;
-    if (current == null || current.copying || !current.canSubmit) {
+    if (current == null || !current.canCopy) {
       return AppResult.failure(
         const AppFailure(
           code: 'clipboard_action_unavailable',

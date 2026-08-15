@@ -31,7 +31,11 @@ final class CreateWalletState {
   final bool completed;
   final AppFailure? failure;
 
-  bool get canSubmit => !copying && !submitting && !completed;
+  /// Whether the route still owns a phrase that can be copied safely.
+  bool get canCopy => !copying && !submitting && !completed;
+
+  /// Whether provisioning may start or explicitly retry a known-safe failure.
+  bool get canSubmit => canCopy && (failure == null || failure!.retryable);
 
   String get mnemonic => words.join(' ');
 

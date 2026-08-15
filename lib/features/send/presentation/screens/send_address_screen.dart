@@ -93,7 +93,7 @@ class _SendAddressScreenState extends ConsumerState<SendAddressScreen> {
     });
     final flow = ref.watch(provider);
     final current = flow.value;
-    final busy = current?.isBusy ?? false;
+    final controlsEnabled = current?.canChangeDestination ?? false;
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
@@ -105,7 +105,7 @@ class _SendAddressScreenState extends ConsumerState<SendAddressScreen> {
           centerTitle: false,
           fallbackLocation: RoutePaths.send,
           action: AsterIconButton(
-            onPressed: busy ? null : () => unawaited(_openScan()),
+            onPressed: controlsEnabled ? () => unawaited(_openScan()) : null,
             icon: MingCuteIcons.mgc_scan_line,
             tooltip: 'Scan ${widget.target.destinationLabel.toLowerCase()}',
           ),
@@ -175,9 +175,11 @@ final class _DestinationBody extends StatelessWidget {
         SendAddressCard(
           target: state.route.target,
           controller: controller,
-          enabled: !state.isBusy,
+          enabled: state.canChangeDestination,
           pasting: pasting,
-          failureMessage: state.failure?.userMessage,
+          failureMessage: state
+              .failureFor(SendFlowOperation.validatingDestination)
+              ?.userMessage,
           onChanged: onChanged,
           onClear: onClear,
           onPaste: onPaste,
@@ -187,7 +189,9 @@ final class _DestinationBody extends StatelessWidget {
         CustomButton(
           text: 'Continue',
           loading: validating,
-          enabled: !state.isBusy && state.destination.trim().isNotEmpty,
+          enabled:
+              state.canStart(SendFlowOperation.validatingDestination) &&
+              state.destination.trim().isNotEmpty,
           hapticIntent: null,
           onTap: onContinue,
         ),
