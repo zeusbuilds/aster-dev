@@ -48,7 +48,7 @@ class WalletUnavailableScreen extends StatelessWidget {
                   SizedBox(height: context.spacing.sm),
                   Text(
                     failure.userMessage,
-                    style: context.textTheme.bodyMedium,
+                    style: context.type.statusMessage,
                     textAlign: TextAlign.center,
                   ),
                   if (canRetry) ...[

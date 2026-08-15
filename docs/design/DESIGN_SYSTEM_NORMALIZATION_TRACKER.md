@@ -44,6 +44,10 @@ generic opacity ramps are forbidden outside theme/token implementations.
 An opacity is a token only when it represents a reusable state or authored
 effect. Mathematical interpolation inside a painter may remain local.
 
+When an opacity widget requires explicit endpoints, use
+`context.stateLayers.visible` and `context.stateLayers.hidden`; never introduce
+an `opacity10`-style ramp.
+
 ## Typography
 
 DM Sans is the UI font. Public Sans is used only for numeric spans. Feature UI
@@ -96,12 +100,20 @@ semantics.
 
 ## Verification
 
-The Phase 3 presentation-system implementation is verified by strict analysis
-and the full widget/unit suite. Repository-wide feature completion, platform
-visual QA, accessibility traversal, and physical haptic tuning remain governed
-by the production tracker.
+`dart run tool/verify_design_system.dart` parses every repository-owned screen,
+page, and widget. It rejects direct `TextTheme`/`TextStyle` decisions, raw
+colors and alpha, raw reusable geometry, gradients, shadows, rounded-rectangle
+surfaces, and legacy token access. Positive and adversarial fixtures protect
+the validator itself, and `make verify` runs it locally, in pre-commit, and in
+CI.
 
-Useful guard searches:
+Theme/token implementations are intentional owners. Local custom-painter
+coordinate math and non-visual deadline arithmetic are reviewed as code rather
+than misclassified as reusable design decisions. Repository-wide feature
+completion, platform visual QA, accessibility traversal, and physical haptic
+tuning remain governed by the production tracker.
+
+These searches are supplemental diagnostics, not the enforcement boundary:
 
 ```sh
 rg -n "context\\.colors|context\\.radius|spacing\\.spacing[0-9]+|radius\\.radius[0-9]+" lib
@@ -111,5 +123,5 @@ rg -n "package:haptic_feedback|Haptics\\." lib --glob '*.dart'
 rg -n "MediaQuery\\.(paddingOf|viewPaddingOf|viewInsetsOf)" lib/features --glob '*.dart'
 ```
 
-Expected matches must be reviewed, not blindly counted: theme definitions,
-custom-painter math, and the platform haptic adapter are intentional owners.
+Expected matches still require review: theme definitions, custom-painter math,
+and the platform haptic adapter are intentional owners.

@@ -147,7 +147,9 @@ class _AssetTargetItem extends StatelessWidget {
       onTap: enabled ? select : null,
       excludeSemantics: true,
       child: Opacity(
-        opacity: enabled || selected ? 1 : context.stateLayers.disabled,
+        opacity: enabled || selected
+            ? context.stateLayers.visible
+            : context.stateLayers.disabled,
         child: InkWell(
           onTap: enabled ? select : null,
           child: ConstrainedBox(

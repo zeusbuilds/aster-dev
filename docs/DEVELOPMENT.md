@@ -97,8 +97,8 @@ From the project root:
 
 After this, each `git commit` verifies formatting, regenerates ignored
 generated sources, runs analysis with every diagnostic fatal, validates fresh
-Dart API documentation and barrel boundaries, and verifies the production
-tracker inventory.
+Dart API documentation, architecture, design-system and barrel boundaries, and
+verifies the production tracker inventory.
 
 ### Manual commands
 
@@ -107,7 +107,9 @@ tracker inventory.
 - `make analyze` - Run static analysis with warnings and infos fatal
 - `make docs` - Generate fresh API docs and fail on warnings or broken links
 - `make verify-generated` - Regenerate ignored generated Dart sources
-- `make verify` - Verify barrel policy and tracker inventory
+- `make verify` - Verify architecture, design-system, barrel, and tracker policy
+- `make verify-architecture` - Verify dependency and adapter boundaries directly
+- `make verify-design-system` - Verify semantic UI token boundaries directly
 - `make verify-barrels` - Verify barrel boundaries directly
 - `make lint` - Run all non-mutating pre-commit quality gates
 
@@ -122,6 +124,7 @@ On push to `main` and on pull requests, the **Dart** workflow runs:
 - `dart run tool/verify_dartdoc.dart`
 - `dart run tool/verify_barrel_exports.dart`
 - `dart run tool/verify_architecture.dart`
+- `dart run tool/verify_design_system.dart`
 - `dart run tool/verify_production_tracker.dart`
 
 Fix failures locally with `make format`, `make lint`, and `make test`, then
@@ -143,6 +146,8 @@ commit and push again.
 - `make docs`       - Generate and validate fresh Dart API docs
 - `make verify-generated` - Regenerate ignored generated Dart sources
 - `make verify`     - Verify repository invariants
+- `make verify-architecture` - Verify dependency and adapter boundaries
+- `make verify-design-system` - Verify semantic UI token boundaries
 - `make verify-barrels` - Verify barrel boundaries
 - `make lint`       - Run all pre-commit quality gates
 - `make help`       - Show all available commands

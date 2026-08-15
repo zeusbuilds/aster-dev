@@ -25,13 +25,21 @@ void main() {
     const radii = AsterRadii();
     const icons = AsterIconography();
     const metrics = AsterComponentMetrics();
+    const art = AsterArt();
+    const stateLayers = AsterStateLayers();
 
     expect(spacing.screenPadding, 20);
     expect(spacing.sectionGap, 24);
     expect(spacing.md, 12);
 
     expect(radii.card, 24);
+    expect(radii.sheet, 28);
+    expect(radii.button, 18);
     expect(radii.input, 12);
+    expect(radii.badge, 8);
+    expect(radii.checkbox, 4);
+    expect(radii.snackbar, 12);
+    expect(radii.floatingActionButton, 16);
 
     expect(icons.xxs, 12);
     expect(icons.md, 24);
@@ -40,6 +48,9 @@ void main() {
     expect(metrics.flagSize, 32);
     expect(metrics.selectionIndicatorSize, 16);
     expect(metrics.paymentTargetTileMinHeight, 64);
+    expect(art.onboardingIconTileRadius, 4);
+    expect(stateLayers.visible, 1);
+    expect(stateLayers.hidden, 0);
   });
 
   test(

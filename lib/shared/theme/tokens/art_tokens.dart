@@ -17,6 +17,7 @@ class AsterArt extends ThemeExtension<AsterArt> {
     this.onboardingIconHighlightRow = 1,
     this.onboardingIconHighlightColumn = 3,
     this.onboardingIconGridGap = 6,
+    this.onboardingIconTileRadius = 4,
     this.onboardingIndicatorExpansionFactor = 4,
     this.splashLineInitialHeight = 8.5,
     this.splashLineMaximumHeight = 50,
@@ -37,6 +38,7 @@ class AsterArt extends ThemeExtension<AsterArt> {
   final int onboardingIconHighlightRow;
   final int onboardingIconHighlightColumn;
   final double onboardingIconGridGap;
+  final double onboardingIconTileRadius;
   final double onboardingIndicatorExpansionFactor;
   final double splashLineInitialHeight;
   final double splashLineMaximumHeight;
@@ -58,6 +60,7 @@ class AsterArt extends ThemeExtension<AsterArt> {
     int? onboardingIconHighlightRow,
     int? onboardingIconHighlightColumn,
     double? onboardingIconGridGap,
+    double? onboardingIconTileRadius,
     double? onboardingIndicatorExpansionFactor,
     double? splashLineInitialHeight,
     double? splashLineMaximumHeight,
@@ -83,6 +86,8 @@ class AsterArt extends ThemeExtension<AsterArt> {
           onboardingIconHighlightColumn ?? this.onboardingIconHighlightColumn,
       onboardingIconGridGap:
           onboardingIconGridGap ?? this.onboardingIconGridGap,
+      onboardingIconTileRadius:
+          onboardingIconTileRadius ?? this.onboardingIconTileRadius,
       onboardingIndicatorExpansionFactor:
           onboardingIndicatorExpansionFactor ??
           this.onboardingIndicatorExpansionFactor,
@@ -146,6 +151,11 @@ class AsterArt extends ThemeExtension<AsterArt> {
       onboardingIconGridGap: _lerp(
         onboardingIconGridGap,
         other.onboardingIconGridGap,
+        t,
+      ),
+      onboardingIconTileRadius: _lerp(
+        onboardingIconTileRadius,
+        other.onboardingIconTileRadius,
         t,
       ),
       onboardingIndicatorExpansionFactor: _lerp(

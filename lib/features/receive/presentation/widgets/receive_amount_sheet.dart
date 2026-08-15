@@ -213,7 +213,7 @@ final class _SheetFailure extends StatelessWidget {
         children: [
           Text(
             failure.userMessage,
-            style: context.textTheme.bodyMedium,
+            style: context.type.statusMessage,
             textAlign: TextAlign.center,
           ),
           if (failure.retryable) ...[

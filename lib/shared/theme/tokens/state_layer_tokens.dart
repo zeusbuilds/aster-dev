@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 @immutable
 class AsterStateLayers extends ThemeExtension<AsterStateLayers> {
   const AsterStateLayers({
+    this.visible = 1,
+    this.hidden = 0,
     this.disabled = 0.5,
     this.translucentSurface = 0.8,
     this.primaryOverlay = 0.12,
@@ -15,6 +17,8 @@ class AsterStateLayers extends ThemeExtension<AsterStateLayers> {
     this.pressedOverlay = 0.12,
   });
 
+  final double visible;
+  final double hidden;
   final double disabled;
   final double translucentSurface;
   final double primaryOverlay;
@@ -24,6 +28,8 @@ class AsterStateLayers extends ThemeExtension<AsterStateLayers> {
 
   @override
   AsterStateLayers copyWith({
+    double? visible,
+    double? hidden,
     double? disabled,
     double? translucentSurface,
     double? primaryOverlay,
@@ -32,6 +38,8 @@ class AsterStateLayers extends ThemeExtension<AsterStateLayers> {
     double? pressedOverlay,
   }) {
     return AsterStateLayers(
+      visible: visible ?? this.visible,
+      hidden: hidden ?? this.hidden,
       disabled: disabled ?? this.disabled,
       translucentSurface: translucentSurface ?? this.translucentSurface,
       primaryOverlay: primaryOverlay ?? this.primaryOverlay,
@@ -45,6 +53,8 @@ class AsterStateLayers extends ThemeExtension<AsterStateLayers> {
   AsterStateLayers lerp(ThemeExtension<AsterStateLayers>? other, double t) {
     if (other is! AsterStateLayers) return this;
     return AsterStateLayers(
+      visible: _lerp(visible, other.visible, t),
+      hidden: _lerp(hidden, other.hidden, t),
       disabled: _lerp(disabled, other.disabled, t),
       translucentSurface: _lerp(
         translucentSurface,

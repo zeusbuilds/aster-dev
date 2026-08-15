@@ -48,7 +48,9 @@ class ScanControlButton extends StatelessWidget {
           highlightShape: BoxShape.circle,
           radius: metrics.minTouchTarget / 2,
           child: Opacity(
-            opacity: enabled || loading ? 1 : stateLayers.disabled,
+            opacity: enabled || loading
+                ? stateLayers.visible
+                : stateLayers.disabled,
             child: SizedBox(
               width: metrics.minTouchTarget,
               height: metrics.minTouchTarget,

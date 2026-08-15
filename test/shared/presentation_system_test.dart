@@ -131,6 +131,16 @@ void main() {
     );
   });
 
+  test('neutral status typography preserves the Material body contract', () {
+    final theme = AppTheme.light();
+    final roles = theme.extension<AsterTypeRoles>()!;
+
+    expect(roles.statusMessage.fontFamily, 'DM Sans');
+    expect(roles.statusMessage.fontSize, theme.textTheme.bodyMedium!.fontSize);
+    expect(roles.statusMessage.fontWeight, FontWeight.w400);
+    expect(roles.statusMessage.color, theme.colorScheme.onSurface);
+  });
+
   testWidgets('squircle resolves its default border from the active theme', (
     tester,
   ) async {

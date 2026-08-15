@@ -63,13 +63,13 @@ class _CenterTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final radius = context.radii;
+    final art = context.art;
     final spacing = context.spacing;
     final colors = context.appColors;
 
     return Squircle(
       padding: EdgeInsets.all(spacing.sm),
-      borderRadius: radius.xs,
+      borderRadius: art.onboardingIconTileRadius,
       borderColor: colors.transparentSurface,
       borderWidth: 0,
       color: context.colorScheme.surface,
@@ -86,13 +86,13 @@ class _GlassTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final radius = context.radii;
+    final art = context.art;
     final colors = context.appColors;
     final effects = context.effects;
     final strokes = context.strokes;
 
     return Squircle(
-      borderRadius: radius.xs,
+      borderRadius: art.onboardingIconTileRadius,
       borderColor: outlined
           ? context.colorScheme.surface.withValues(
               alpha: effects.brandGlassBorderOpacity,

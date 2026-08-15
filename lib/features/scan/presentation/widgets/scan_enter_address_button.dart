@@ -36,7 +36,7 @@ class ScanEnterAddressButton extends StatelessWidget {
         child: InkWell(
           onTap: enabled ? activate : null,
           child: Opacity(
-            opacity: enabled ? 1 : stateLayers.disabled,
+            opacity: enabled ? stateLayers.visible : stateLayers.disabled,
             child: Padding(
               padding: EdgeInsets.symmetric(vertical: spacing.md),
               child: Row(

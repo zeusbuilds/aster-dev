@@ -226,7 +226,7 @@ class _BootstrapFailureView extends StatelessWidget {
                   SizedBox(height: themedSpacing.sm),
                   Text(
                     failure.userMessage,
-                    style: context.textTheme.bodyMedium,
+                    style: context.type.statusMessage,
                     textAlign: TextAlign.center,
                   ),
                   if (failure.retryable) ...[

@@ -48,7 +48,9 @@ class PaymentTargetTile extends StatelessWidget {
       onTap: enabled ? select : null,
       excludeSemantics: true,
       child: Opacity(
-        opacity: configured ? 1 : context.stateLayers.disabled,
+        opacity: configured
+            ? context.stateLayers.visible
+            : context.stateLayers.disabled,
         child: Material(
           color: context.colorScheme.surface,
           shape: shape,

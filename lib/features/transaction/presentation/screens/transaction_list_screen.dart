@@ -289,7 +289,7 @@ class _ActivityFailureView extends ConsumerWidget {
                 SizedBox(height: context.spacing.lg),
                 Text(
                   failure.userMessage,
-                  style: context.textTheme.bodyMedium,
+                  style: context.type.statusMessage,
                   textAlign: TextAlign.center,
                 ),
                 if (failure.retryable) ...[

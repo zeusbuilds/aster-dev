@@ -111,7 +111,9 @@ class _CustomButtonState extends State<CustomButton> {
             side: side,
           );
     final isEnabled = _isInteractive;
-    final opacity = widget.loading || isEnabled ? 1.0 : stateLayers.disabled;
+    final opacity = widget.loading || isEnabled
+        ? stateLayers.visible
+        : stateLayers.disabled;
     final effectiveDuration = context.motionPolicy.duration(
       motion.buttonPressDuration,
     );

@@ -150,7 +150,7 @@ class _ScanFailureStatus extends StatelessWidget {
           children: [
             Text(
               failure.userMessage,
-              style: context.textTheme.bodyMedium?.copyWith(
+              style: context.type.statusMessage.copyWith(
                 color: context.appColors.onScan,
               ),
               textAlign: TextAlign.center,

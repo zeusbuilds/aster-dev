@@ -22,10 +22,9 @@ class AsterTypeRoles extends ThemeExtension<AsterTypeRoles> {
     required this.rowValue,
     required this.rowMeta,
     required this.rowMetaStrong,
-    required this.bodyStrong,
+    required this.statusMessage,
     required this.amountLarge,
     required this.amountInline,
-    required this.amountSmall,
     required this.assetTitle,
     required this.assetValue,
     required this.assetMeta,
@@ -66,10 +65,9 @@ class AsterTypeRoles extends ThemeExtension<AsterTypeRoles> {
   final TextStyle rowValue;
   final TextStyle rowMeta;
   final TextStyle rowMetaStrong;
-  final TextStyle bodyStrong;
+  final TextStyle statusMessage;
   final TextStyle amountLarge;
   final TextStyle amountInline;
-  final TextStyle amountSmall;
   final TextStyle assetTitle;
   final TextStyle assetValue;
   final TextStyle assetMeta;
@@ -177,9 +175,9 @@ class AsterTypeRoles extends ThemeExtension<AsterTypeRoles> {
         FontWeight.w600,
         colors.textSecondary,
       ),
-      bodyStrong: role(
-        textTheme.bodyLarge,
-        FontWeight.w600,
+      statusMessage: role(
+        textTheme.bodyMedium,
+        FontWeight.w400,
         colorScheme.onSurface,
       ),
       amountLarge: role(
@@ -191,11 +189,6 @@ class AsterTypeRoles extends ThemeExtension<AsterTypeRoles> {
         textTheme.bodyMedium,
         FontWeight.w600,
         colorScheme.onSurface,
-      ),
-      amountSmall: role(
-        textTheme.bodySmall,
-        FontWeight.w500,
-        colors.textSecondary,
       ),
       assetTitle: role(
         textTheme.bodyLarge,
@@ -309,51 +302,6 @@ class AsterTypeRoles extends ThemeExtension<AsterTypeRoles> {
     );
   }
 
-  static const fallback = AsterTypeRoles(
-    appBarTitle: TextStyle(fontWeight: FontWeight.w600),
-    buttonLabel: TextStyle(fontWeight: FontWeight.w600),
-    compactButtonLabel: TextStyle(fontWeight: FontWeight.w500),
-    sectionLabel: TextStyle(fontWeight: FontWeight.w600),
-    sectionTitle: TextStyle(fontWeight: FontWeight.w700),
-    title: TextStyle(fontWeight: FontWeight.w600),
-    rowTitle: TextStyle(fontWeight: FontWeight.w500),
-    rowTitleStrong: TextStyle(fontWeight: FontWeight.w600),
-    rowValue: TextStyle(fontWeight: FontWeight.w600),
-    rowMeta: TextStyle(fontWeight: FontWeight.w500),
-    rowMetaStrong: TextStyle(fontWeight: FontWeight.w600),
-    bodyStrong: TextStyle(fontWeight: FontWeight.w600),
-    amountLarge: TextStyle(fontWeight: FontWeight.w700),
-    amountInline: TextStyle(fontWeight: FontWeight.w600),
-    amountSmall: TextStyle(fontWeight: FontWeight.w500),
-    assetTitle: TextStyle(fontWeight: FontWeight.w600),
-    assetValue: TextStyle(fontWeight: FontWeight.w500),
-    assetMeta: TextStyle(fontWeight: FontWeight.w500),
-    brandHero: TextStyle(fontWeight: FontWeight.w600),
-    brandTitle: TextStyle(fontWeight: FontWeight.w500),
-    brandAmount: TextStyle(fontWeight: FontWeight.w500),
-    brandMetric: TextStyle(fontWeight: FontWeight.w600),
-    brandBody: TextStyle(),
-    brandAction: TextStyle(fontWeight: FontWeight.w600),
-    toastTitle: TextStyle(fontWeight: FontWeight.w600),
-    toastMessage: TextStyle(),
-    badgeLabel: TextStyle(fontWeight: FontWeight.w600),
-    supportingMeta: TextStyle(),
-    errorMessage: TextStyle(fontWeight: FontWeight.w500),
-    versionLabel: TextStyle(),
-    addressLabel: TextStyle(fontWeight: FontWeight.w600),
-    address: TextStyle(fontWeight: FontWeight.w500),
-    addressHint: TextStyle(fontWeight: FontWeight.w500),
-    addressSmall: TextStyle(fontWeight: FontWeight.w500),
-    keypadNumber: TextStyle(fontWeight: FontWeight.w600),
-    marketLabel: TextStyle(fontWeight: FontWeight.w500),
-    marketTitle: TextStyle(fontWeight: FontWeight.w600),
-    marketTip: TextStyle(fontWeight: FontWeight.w600),
-    scanControl: TextStyle(fontWeight: FontWeight.w600),
-    scanCta: TextStyle(fontWeight: FontWeight.w500),
-    scanHeaderTitle: TextStyle(fontWeight: FontWeight.w600),
-    scanWalletId: TextStyle(),
-  );
-
   @override
   AsterTypeRoles copyWith({
     TextStyle? appBarTitle,
@@ -367,10 +315,9 @@ class AsterTypeRoles extends ThemeExtension<AsterTypeRoles> {
     TextStyle? rowValue,
     TextStyle? rowMeta,
     TextStyle? rowMetaStrong,
-    TextStyle? bodyStrong,
+    TextStyle? statusMessage,
     TextStyle? amountLarge,
     TextStyle? amountInline,
-    TextStyle? amountSmall,
     TextStyle? assetTitle,
     TextStyle? assetValue,
     TextStyle? assetMeta,
@@ -411,10 +358,9 @@ class AsterTypeRoles extends ThemeExtension<AsterTypeRoles> {
       rowValue: rowValue ?? this.rowValue,
       rowMeta: rowMeta ?? this.rowMeta,
       rowMetaStrong: rowMetaStrong ?? this.rowMetaStrong,
-      bodyStrong: bodyStrong ?? this.bodyStrong,
+      statusMessage: statusMessage ?? this.statusMessage,
       amountLarge: amountLarge ?? this.amountLarge,
       amountInline: amountInline ?? this.amountInline,
-      amountSmall: amountSmall ?? this.amountSmall,
       assetTitle: assetTitle ?? this.assetTitle,
       assetValue: assetValue ?? this.assetValue,
       assetMeta: assetMeta ?? this.assetMeta,
@@ -464,10 +410,9 @@ class AsterTypeRoles extends ThemeExtension<AsterTypeRoles> {
       rowValue: TextStyle.lerp(rowValue, other.rowValue, t)!,
       rowMeta: TextStyle.lerp(rowMeta, other.rowMeta, t)!,
       rowMetaStrong: TextStyle.lerp(rowMetaStrong, other.rowMetaStrong, t)!,
-      bodyStrong: TextStyle.lerp(bodyStrong, other.bodyStrong, t)!,
+      statusMessage: TextStyle.lerp(statusMessage, other.statusMessage, t)!,
       amountLarge: TextStyle.lerp(amountLarge, other.amountLarge, t)!,
       amountInline: TextStyle.lerp(amountInline, other.amountInline, t)!,
-      amountSmall: TextStyle.lerp(amountSmall, other.amountSmall, t)!,
       assetTitle: TextStyle.lerp(assetTitle, other.assetTitle, t)!,
       assetValue: TextStyle.lerp(assetValue, other.assetValue, t)!,
       assetMeta: TextStyle.lerp(assetMeta, other.assetMeta, t)!,

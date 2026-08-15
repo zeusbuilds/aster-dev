@@ -36,7 +36,9 @@ class AsterSelectionIndicator extends StatelessWidget {
         child: AnimatedOpacity(
           duration: duration,
           curve: context.motion.fastEase,
-          opacity: selected ? 1 : 0,
+          opacity: selected
+              ? context.stateLayers.visible
+              : context.stateLayers.hidden,
           child: Icon(
             Icons.check_rounded,
             color: context.colorScheme.onPrimary,

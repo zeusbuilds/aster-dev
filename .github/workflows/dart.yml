@@ -52,5 +52,8 @@ jobs:
       - name: Verify architecture boundaries
         run: dart run tool/verify_architecture.dart
 
+      - name: Verify design-system boundaries
+        run: dart run tool/verify_design_system.dart
+
       - name: Verify tracker inventory
         run: dart run tool/verify_production_tracker.dart

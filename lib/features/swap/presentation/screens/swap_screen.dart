@@ -100,7 +100,7 @@ class _SwapContent extends ConsumerWidget {
                     Expanded(
                       child: Text(
                         'Swap execution is not available in this build.',
-                        style: context.textTheme.bodyMedium,
+                        style: context.type.statusMessage,
                       ),
                     ),
                   ],
@@ -162,7 +162,7 @@ class _SwapFailure extends StatelessWidget {
         children: [
           Text(
             failure.userMessage,
-            style: context.textTheme.bodyMedium,
+            style: context.type.statusMessage,
             textAlign: TextAlign.center,
           ),
           if (failure.retryable) ...[

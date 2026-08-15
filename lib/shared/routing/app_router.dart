@@ -57,11 +57,11 @@ class ErrorScreen extends StatelessWidget {
               color: colors.danger,
             ),
             SizedBox(height: spacing.lg),
-            Text('Route Error', style: context.textTheme.headlineSmall),
+            Text('Route Error', style: context.type.title),
             SizedBox(height: spacing.sm),
             Text(
               'This page is unavailable.',
-              style: context.textTheme.bodyMedium,
+              style: context.type.statusMessage,
               textAlign: TextAlign.center,
             ),
             SizedBox(height: spacing.xxl),

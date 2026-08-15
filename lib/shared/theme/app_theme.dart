@@ -158,7 +158,7 @@ class AppTheme {
           color: scheme.onInverseSurface,
         ),
         shape: RoundedSuperellipseBorder(
-          borderRadius: BorderRadius.circular(_radii.md),
+          borderRadius: BorderRadius.circular(_radii.snackbar),
         ),
         behavior: SnackBarBehavior.floating,
       ),
@@ -205,7 +205,7 @@ class AppTheme {
           width: _strokes.focusBorder,
         ),
         shape: RoundedSuperellipseBorder(
-          borderRadius: BorderRadius.circular(_radii.xs),
+          borderRadius: BorderRadius.circular(_radii.checkbox),
         ),
       ),
       radioTheme: RadioThemeData(
@@ -272,7 +272,7 @@ class AppTheme {
         foregroundColor: scheme.onPrimary,
         elevation: 0,
         shape: RoundedSuperellipseBorder(
-          borderRadius: BorderRadius.circular(_radii.lg),
+          borderRadius: BorderRadius.circular(_radii.floatingActionButton),
         ),
       ),
       tooltipTheme: TooltipThemeData(

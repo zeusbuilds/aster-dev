@@ -159,7 +159,9 @@ final class _NumericKey extends StatelessWidget {
       onLongPress: enabled ? onLongPress : null,
       excludeSemantics: true,
       child: Opacity(
-        opacity: enabled ? 1 : context.stateLayers.disabled,
+        opacity: enabled
+            ? context.stateLayers.visible
+            : context.stateLayers.disabled,
         child: Material(
           color: context.appColors.surfaceSubtle,
           shape: shape,

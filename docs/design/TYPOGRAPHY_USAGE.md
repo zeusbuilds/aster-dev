@@ -74,8 +74,10 @@ Avoid feature-level `fontSize`, `fontWeight`, `letterSpacing`, and raw
 repeatable typographic decision.
 
 Common support roles include `toastMessage`, `supportingMeta`, `errorMessage`,
-`versionLabel`, `scanCta`, and `scanWalletId`. Use these instead of reaching
-back into `context.textTheme` for captions, error states, and secondary labels.
+`statusMessage`, `versionLabel`, `scanCta`, and `scanWalletId`. Use
+`statusMessage` for neutral failure, unavailable, and empty-state body copy;
+use the more specific roles when their semantic emphasis differs. Never reach
+back into `context.textTheme` from feature UI.
 
 ## Spacing
 
@@ -112,6 +114,11 @@ Squircle(borderRadius: context.radii.card, child: child);
 - `context.radii`: corner decisions.
 - `context.spacing`: layout gaps and padding only.
 
+Radius roles name components, not a generic size ramp: `card`, `sheet`,
+`button`, `input`, `badge`, `checkbox`, `snackbar`, and
+`floatingActionButton`. Add another role only when a repeated component shape
+cannot truthfully use one of these decisions.
+
 Examples of component metrics include flag sizes, wallet avatar size, brand mark
 size, selection indicators, keypad sizing, sheet handles, and minimum touch
 targets. Use `context.icons.xxs` for tiny trend arrows rather than borrowing a
@@ -126,10 +133,18 @@ State-layer opacity belongs in `context.stateLayers`:
 
 ```dart
 Opacity(
-  opacity: context.stateLayers.disabled,
+  opacity: enabled
+      ? context.stateLayers.visible
+      : context.stateLayers.disabled,
   child: child,
 );
 ```
+
+`visible` and `hidden` are the only neutral endpoints and exist for APIs such
+as `Opacity`/`AnimatedOpacity` that require both states. They are not the start
+of a numeric opacity ramp. Custom-painter interpolation may retain local zero
+and one endpoints because those values are rendering math rather than product
+state treatment.
 
 Visual treatments that are not interaction states belong in `context.effects`:
 brand glass, scan scrims, art noise, market tile treatment, and similar
@@ -194,3 +209,5 @@ AmountText(value, style: context.type.rowValue);
 
 Keep primitives inside the theme implementation. Product screens should express
 what the UI means, not how many pixels or alpha points it happens to use today.
+`make verify-design-system` enforces this boundary with an analyzer-AST policy;
+its isolated fixtures must change with any deliberate policy change.
