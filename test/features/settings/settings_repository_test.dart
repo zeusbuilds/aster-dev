@@ -92,6 +92,32 @@ void main() {
     expect(failure.cause.toString(), isNot(contains('mnemonic material')));
   });
 
+  test('preserves catalog failure origin and retries after failure', () async {
+    final preferences = PreferencesService(
+      await SharedPreferences.getInstance(),
+    );
+    final assets = _FailOnceCatalogAssetBundle({
+      'assets/data/currencies.json': _currencies,
+      'assets/data/countries.json': _regions,
+    });
+    final repository = SettingsRepository(preferences, assets);
+
+    final failed = await repository.load();
+
+    expect(failed, isA<AppFailureResult<SettingsSnapshot>>());
+    final failure = (failed as AppFailureResult<SettingsSnapshot>).failure;
+    expect(
+      failure.stackTrace.toString(),
+      contains('_FailOnceCatalogAssetBundle.loadString'),
+    );
+    expect(assets.currencyLoadCount, 1);
+
+    final recovered = await repository.load();
+
+    expect(recovered, isA<AppSuccess<SettingsSnapshot>>());
+    expect(assets.currencyLoadCount, 2);
+  });
+
   test('production catalogs satisfy repository invariants', () async {
     final preferences = PreferencesService(
       await SharedPreferences.getInstance(),
@@ -247,6 +273,35 @@ final class _MemoryAssetBundle extends CachingAssetBundle {
     if (source == null) throw StateError('Missing test asset.');
     final bytes = Uint8List.fromList(utf8.encode(source));
     return ByteData.sublistView(bytes);
+  }
+}
+
+final class _FailOnceCatalogAssetBundle extends CachingAssetBundle {
+  _FailOnceCatalogAssetBundle(this.sources);
+
+  final Map<String, String> sources;
+  var currencyLoadCount = 0;
+  var _shouldFail = true;
+
+  @override
+  Future<String> loadString(String key, {bool cache = true}) async {
+    if (key == 'assets/data/currencies.json') {
+      currencyLoadCount += 1;
+      if (_shouldFail) {
+        _shouldFail = false;
+        throw const FormatException('Transient catalog read failure.');
+      }
+    }
+    final source = sources[key];
+    if (source == null) throw StateError('Missing test asset.');
+    return source;
+  }
+
+  @override
+  Future<ByteData> load(String key) async {
+    final source = sources[key];
+    if (source == null) throw StateError('Missing test asset.');
+    return ByteData.sublistView(Uint8List.fromList(utf8.encode(source)));
   }
 }
 

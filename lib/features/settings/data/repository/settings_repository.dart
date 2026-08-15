@@ -184,10 +184,16 @@ final class SettingsRepository {
   }
 
   Future<_SettingsCatalog> _loadCatalog() {
-    return _catalogFuture ??= _readCatalog().catchError((Object error) {
+    return _catalogFuture ??= _readCatalogWithFailureReset();
+  }
+
+  Future<_SettingsCatalog> _readCatalogWithFailureReset() async {
+    try {
+      return await _readCatalog();
+    } catch (_) {
       _catalogFuture = null;
-      throw error;
-    });
+      rethrow;
+    }
   }
 
   Future<_SettingsCatalog> _readCatalog() async {
