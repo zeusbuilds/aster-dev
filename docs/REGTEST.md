@@ -18,6 +18,8 @@ The app has no committed regtest stack today. If one is introduced, it must:
 6. provide health checks and deterministic funded/unfunded setup
 7. clean up only resources labeled as owned by that app project
 
-`AppEnvironment` rejects the protected ports for loopback and Android emulator
-host aliases. Regtest evidence must record the exact configuration without
-recording RPC, LSP, VSS, or proxy credentials.
+`AppEnvironment` accepts only canonical endpoint hosts and rejects the
+protected ports for loopback, expanded or IPv4-mapped IPv6 loopback, and the
+Android emulator host alias. Legacy numeric aliases such as `127.1` are
+rejected before resolver or native-SDK use. Regtest evidence must record the
+exact configuration without recording RPC, LSP, VSS, or proxy credentials.

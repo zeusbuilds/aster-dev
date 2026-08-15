@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../errors/app_failure.dart';
 import '../validation/validation.dart';
+import 'host_address_policy.dart';
 
 /// Bitcoin chain environment, independent from asset and payment rail.
 enum BlockchainEnvironment {
@@ -70,6 +71,9 @@ final class WalletServiceConfiguration {
     this.explorerBaseUrl,
     this.usdtAsset,
   });
+
+  /// Maximum serialized length of any endpoint crossing the native boundary.
+  static const maximumEndpointCharacters = 2048;
 
   /// Reads compile-time configuration without embedding credentials.
   ///
@@ -162,7 +166,7 @@ final class WalletServiceConfiguration {
     }
     final uri = Uri.parse(value);
     return uri.scheme.toLowerCase() == 'http' &&
-        (_isLoopback(uri.host) || uri.host == '10.0.2.2');
+        (HostAddressPolicy.isLoopback(uri.host) || uri.host == '10.0.2.2');
   }
 
   /// Validates URL policy before any native wallet is created.
@@ -206,7 +210,7 @@ final class WalletServiceConfiguration {
     BlockchainEnvironment environment,
   ) {
     if (raw == null) return;
-    if (raw != raw.trim() || raw.isEmpty || raw.contains(RegExp(r'\s'))) {
+    if (!_isSafeEndpointWireValue(raw)) {
       throw const AppConfigurationException();
     }
     final hasExplicitScheme = raw.contains('://');
@@ -216,6 +220,7 @@ final class WalletServiceConfiguration {
     final uri = Uri.tryParse(hasExplicitScheme ? raw : 'tcp://$raw');
     if (uri == null ||
         uri.host.isEmpty ||
+        !HostAddressPolicy.isCanonicalEndpointHost(uri.host) ||
         uri.userInfo.isNotEmpty ||
         uri.query.isNotEmpty ||
         uri.fragment.isNotEmpty) {
@@ -223,7 +228,7 @@ final class WalletServiceConfiguration {
     }
     final developmentHost =
         environment == BlockchainEnvironment.regtest &&
-        (_isLoopback(uri.host) || uri.host == '10.0.2.2');
+        (HostAddressPolicy.isLoopback(uri.host) || uri.host == '10.0.2.2');
     if (developmentHost &&
         uri.hasPort &&
         _protectedDevelopmentPorts.contains(uri.port)) {
@@ -254,11 +259,21 @@ final class WalletServiceConfiguration {
     }
   }
 
-  static bool _isLoopback(String host) {
-    final normalized = host.toLowerCase();
-    return normalized == 'localhost' ||
-        normalized == '127.0.0.1' ||
-        normalized == '::1';
+  static bool _isSafeEndpointWireValue(String value) {
+    if (!ProtocolTextPolicy.isVisibleAscii(
+      value,
+      maximumCharacters: maximumEndpointCharacters,
+    )) {
+      return false;
+    }
+    try {
+      return ProtocolTextPolicy.isVisibleAscii(
+        Uri.decodeFull(value),
+        maximumCharacters: maximumEndpointCharacters,
+      );
+    } on FormatException {
+      return false;
+    }
   }
 
   /// Ports owned by the unrelated `rgb-lightning-node-perf-lab` project.

@@ -85,9 +85,13 @@ endpoint, including a meaningful path, that the wallet will actually contact.
 An explicit define always wins. Advancing the SDK pin requires rerunning the
 exact default-resolution tests and reviewing this endpoint inventory.
 
-Plain HTTP is accepted only for loopback development endpoints. Regtest
-validation rejects host ports `18443`, `50001`, and `3000`, which belong to the
-protected external performance-lab stack documented in
+Each resolved endpoint is bounded to 2,048 visible-ASCII characters and must
+use a canonical DNS, IPv4, or IPv6 host. Malformed DNS labels, encoded control
+text, and resolver-dependent numeric aliases such as `127.1` fail before any
+native wallet is created. Plain HTTP is accepted only for canonical loopback
+development endpoints. Regtest validation recognizes expanded and
+IPv4-mapped IPv6 loopback and rejects host ports `18443`, `50001`, and `3000`,
+which belong to the protected external performance-lab stack documented in
 `docs/DEVELOPMENT.md`.
 
 The product-facing network is `mainnet`, `signet`, or `regtest`. The SDK's

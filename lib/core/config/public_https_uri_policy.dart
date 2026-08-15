@@ -1,4 +1,5 @@
 import '../errors/app_failure.dart';
+import 'host_address_policy.dart';
 
 /// Shared fail-closed policy for deployment-owned public HTTPS destinations.
 abstract final class PublicHttpsUriPolicy {
@@ -47,13 +48,7 @@ abstract final class PublicHttpsUriPolicy {
 
   static bool _isPublicHost(String value) {
     final host = value.toLowerCase();
-    if (host.isEmpty ||
-        host.length > 253 ||
-        !host.contains('.') ||
-        host.startsWith('.') ||
-        host.endsWith('.') ||
-        host.contains(':') ||
-        _ipv4Literal.hasMatch(host)) {
+    if (!HostAddressPolicy.isCanonicalDnsName(host)) {
       return false;
     }
     if (_nonPublicSuffixes.any(
@@ -61,18 +56,9 @@ abstract final class PublicHttpsUriPolicy {
     )) {
       return false;
     }
-    return host.split('.').every(_isValidDnsLabel);
+    return true;
   }
 
-  static bool _isValidDnsLabel(String label) =>
-      label.isNotEmpty &&
-      label.length <= 63 &&
-      _dnsLabel.hasMatch(label) &&
-      !label.startsWith('-') &&
-      !label.endsWith('-');
-
-  static final _ipv4Literal = RegExp(r'^\d{1,3}(?:\.\d{1,3}){3}$');
-  static final _dnsLabel = RegExp(r'^[a-z0-9-]+$');
   static final _unsafeDecodedCharacters = RegExp(
     r'[\u0000-\u0020\u007f-\u009f\u202a-\u202e\u2066-\u2069]',
   );

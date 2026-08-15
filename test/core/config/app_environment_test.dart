@@ -58,6 +58,12 @@ void main() {
       'https://token@market.utexo.com/api/v3',
       'https://market.utexo.com/api/v3?token=secret',
       'https://127.0.0.1/api/v3',
+      'https://127.1/api/v3',
+      'https://127.0.1/api/v3',
+      'https://0x7f.0.0.1/api/v3',
+      'https://0177.0.0.1/api/v3',
+      'https://2130706433/api/v3',
+      'https://0x7f000001/api/v3',
       'https://market.internal/api/v3',
       'https://market..utexo.com/api/v3',
       'https://-market.utexo.com/api/v3',
@@ -153,6 +159,15 @@ void main() {
       'tcp://127.0.0.1:50001',
       'http://localhost:3000',
       'http://10.0.2.2:18443',
+      'ssl://127.1:50001',
+      'https://127.0.1:3000',
+      'https://0x7f.0.0.1:18443',
+      'ssl://2130706433:50001',
+      'https://0x7f000001:3000',
+      'ssl://[0:0:0:0:0:0:0:1]:50001',
+      'https://[::ffff:127.0.0.1]:3000',
+      'https://[::127.0.0.1]:18443',
+      'https://[::ffff:7f00:1]:3000',
     ]) {
       expect(
         () => WalletServiceConfiguration(
@@ -164,6 +179,68 @@ void main() {
         reason: endpoint,
       );
     }
+  });
+
+  test('bounds and canonicalizes every wallet service endpoint', () {
+    const prefix = 'https://vss.example.com/';
+    final boundary = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.mainnet,
+      sdkNetwork: 'mainnet',
+      vssUrl:
+          prefix +
+          ('a' *
+              (WalletServiceConfiguration.maximumEndpointCharacters -
+                  prefix.length)),
+    );
+    expect(boundary.validate, returnsNormally);
+
+    final invalidEndpoints = <String>[
+      '${boundary.vssUrl}a',
+      'https://-vss.example.com',
+      'https://vss-.example.com',
+      'https://vss..example.com',
+      'https://vss_example.com',
+      'https://vss.example.123',
+      'https://vss.example.com/hidden\u202evalue',
+      'https://vss.example.com/hidden%0Avalue',
+      'https://vss.example.com/hidden%E2%80%AEvalue',
+      'https://127.01.0.1',
+      'https://127.0.0.1.',
+      'https://localhost.',
+    ];
+    for (final endpoint in invalidEndpoints) {
+      expect(
+        () => WalletServiceConfiguration(
+          environment: BlockchainEnvironment.mainnet,
+          sdkNetwork: 'mainnet',
+          vssUrl: endpoint,
+        ).validate(),
+        throwsA(isA<AppConfigurationException>()),
+        reason: endpoint,
+      );
+    }
+  });
+
+  test('accepts canonical DNS, IPv4, and IPv6 service hosts', () {
+    const dns = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.mainnet,
+      sdkNetwork: 'mainnet',
+      vssUrl: 'https://vss.example.com/path',
+    );
+    const ipv4 = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.mainnet,
+      sdkNetwork: 'mainnet',
+      vssUrl: 'https://192.0.2.1/path',
+    );
+    const ipv6 = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.mainnet,
+      sdkNetwork: 'mainnet',
+      vssUrl: 'https://[2001:db8::1]/path',
+    );
+
+    expect(dns.validate, returnsNormally);
+    expect(ipv4.validate, returnsNormally);
+    expect(ipv6.validate, returnsNormally);
   });
 
   test('accepts the SDK local and secure Electrum endpoint forms', () {
@@ -367,6 +444,22 @@ void main() {
       ),
       PublicLinkConfiguration(
         contactSupport: Uri.parse('https://127.0.0.1/help'),
+      ),
+      PublicLinkConfiguration(contactSupport: Uri.parse('https://127.1/help')),
+      PublicLinkConfiguration(
+        contactSupport: Uri.parse('https://127.0.1/help'),
+      ),
+      PublicLinkConfiguration(
+        contactSupport: Uri.parse('https://0x7f.0.0.1/help'),
+      ),
+      PublicLinkConfiguration(
+        contactSupport: Uri.parse('https://0177.0.0.1/help'),
+      ),
+      PublicLinkConfiguration(
+        contactSupport: Uri.parse('https://2130706433/help'),
+      ),
+      PublicLinkConfiguration(
+        contactSupport: Uri.parse('https://0x7f000001/help'),
       ),
       PublicLinkConfiguration(
         contactSupport: Uri.parse('https://support.internal/help'),

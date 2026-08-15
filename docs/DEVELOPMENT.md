@@ -266,7 +266,8 @@ a guessed URL or enabled no-op command.
 
 Each configured destination must be a bounded public HTTPS URL without
 embedded credentials, a query, or a fragment. Literal IPs, localhost,
-single-label intranet hosts, and reserved non-public suffixes are rejected.
+single-label intranet hosts, legacy numeric address aliases such as `127.1`,
+and reserved non-public suffixes are rejected.
 These values are compiled into the application and must never contain secrets.
 Settings obtains the installed version and build number from platform package
 metadata; release code must not hardcode that display value.

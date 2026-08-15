@@ -32,7 +32,9 @@ inside the narrowest asynchronous scope; release references deterministically.
 
 All native wallet calls pass through the serialized `WalletRuntime`. All
 app-owned HTTP passes through `ResilientHttpClient`. Public destinations and
-service endpoints reject credentials and unsafe host/scheme forms. Mutation
+service endpoints reject credentials and unsafe host/scheme forms. Service
+values are bounded visible ASCII, use canonical DNS/IP syntax, and reject
+resolver-dependent numeric aliases before crossing the native bridge. Mutation
 requests are not retried without a real idempotency contract.
 
 A wallet failure that retains or cannot prove consistency of a native handle,
