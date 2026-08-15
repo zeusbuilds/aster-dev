@@ -29,6 +29,16 @@ final class HomeState {
           : refreshFailure as AppFailure?,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      other is HomeState &&
+      other.portfolio == portfolio &&
+      other.refreshing == refreshing &&
+      other.refreshFailure == refreshFailure;
+
+  @override
+  int get hashCode => Object.hash(portfolio, refreshing, refreshFailure);
 }
 
 const _unset = Object();

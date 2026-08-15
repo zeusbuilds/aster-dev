@@ -35,6 +35,15 @@ final class RgbAssetConfiguration {
   /// Decimal precision used to format integer asset-smallest units.
   final int precision;
 
+  @override
+  bool operator ==(Object other) =>
+      other is RgbAssetConfiguration &&
+      other.contractId == contractId &&
+      other.precision == precision;
+
+  @override
+  int get hashCode => Object.hash(contractId, precision);
+
   void validate() {
     if (!ProtocolTextPolicy.isVisibleAscii(
       contractId,
@@ -117,6 +126,30 @@ final class WalletServiceConfiguration {
   /// `null` means the deployment has not configured USDT. Callers must expose
   /// that route as unavailable rather than substituting a ticker-derived ID.
   final RgbAssetConfiguration? usdtAsset;
+
+  @override
+  bool operator ==(Object other) =>
+      other is WalletServiceConfiguration &&
+      other.environment == environment &&
+      other.sdkNetwork == sdkNetwork &&
+      other.indexerUrl == indexerUrl &&
+      other.rgbTransportProxy == rgbTransportProxy &&
+      other.lspBaseUrl == lspBaseUrl &&
+      other.vssUrl == vssUrl &&
+      other.explorerBaseUrl == explorerBaseUrl &&
+      other.usdtAsset == usdtAsset;
+
+  @override
+  int get hashCode => Object.hash(
+    environment,
+    sdkNetwork,
+    indexerUrl,
+    rgbTransportProxy,
+    lspBaseUrl,
+    vssUrl,
+    explorerBaseUrl,
+    usdtAsset,
+  );
 
   /// Whether the validated VSS endpoint is an HTTP development endpoint.
   ///

@@ -21,6 +21,15 @@ final class AppBuildMetadata {
     return _isValidField(version, allowEmpty: false) &&
         _isValidField(buildNumber, allowEmpty: true);
   }
+
+  @override
+  bool operator ==(Object other) =>
+      other is AppBuildMetadata &&
+      other.version == version &&
+      other.buildNumber == buildNumber;
+
+  @override
+  int get hashCode => Object.hash(version, buildNumber);
 }
 
 /// Injectable package-metadata loader used by the platform adapter.

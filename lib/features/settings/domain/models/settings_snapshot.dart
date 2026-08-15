@@ -45,6 +45,20 @@ final class SettingsSnapshot {
     );
   }
 
+  @override
+  bool operator ==(Object other) =>
+      other is SettingsSnapshot &&
+      other.preferences == preferences &&
+      listEquals(other.currencies, currencies) &&
+      listEquals(other.regions, regions);
+
+  @override
+  int get hashCode => Object.hash(
+    preferences,
+    Object.hashAll(currencies),
+    Object.hashAll(regions),
+  );
+
   static void _validateCatalog<T>({
     required List<T> values,
     required String selectedCode,

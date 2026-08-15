@@ -35,6 +35,18 @@ final class NetworkConfigurationState {
       refreshing: refreshing ?? this.refreshing,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      other is NetworkConfigurationState &&
+      other.configuration == configuration &&
+      other.status == status &&
+      other.healthFailure == healthFailure &&
+      other.refreshing == refreshing;
+
+  @override
+  int get hashCode =>
+      Object.hash(configuration, status, healthFailure, refreshing);
 }
 
 const _unset = Object();

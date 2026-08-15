@@ -91,6 +91,52 @@ void main() {
     );
   });
 
+  test('requires complete value semantics on presentation state models', () {
+    _write(
+      repository,
+      'lib/features/pay/presentation/models/good_state.dart',
+      'final class GoodState {\n'
+          '  @override\n'
+          '  bool operator ==(Object other) => identical(this, other);\n'
+          '  @override\n'
+          '  int get hashCode => 0;\n'
+          '}',
+    );
+    _write(
+      repository,
+      'lib/features/pay/presentation/models/missing_equality_state.dart',
+      'final class MissingEqualityState {\n'
+          '  @override\n'
+          '  int get hashCode => 0;\n'
+          '}',
+    );
+    _write(
+      repository,
+      'lib/features/pay/presentation/models/missing_hash_state.dart',
+      'final class MissingHashState {\n'
+          '  @override\n'
+          '  bool operator ==(Object other) => identical(this, other);\n'
+          '}',
+    );
+    _write(
+      repository,
+      'lib/features/pay/domain/domain_state.dart',
+      'final class DomainState {}',
+    );
+
+    final result = verifyArchitecture(repository);
+
+    expect(result.passed, isFalse);
+    expect(result.failures, hasLength(2));
+    expect(
+      result.failures,
+      containsAll(<Matcher>[
+        contains('MissingEqualityState must declare operator =='),
+        contains('MissingHashState must declare hashCode'),
+      ]),
+    );
+  });
+
   test('reports every layer, SDK, plugin, and parse violation', () {
     _write(
       repository,

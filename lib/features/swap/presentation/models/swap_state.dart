@@ -33,4 +33,14 @@ final class SwapState {
       to: to ?? this.to,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      other is SwapState &&
+      listEquals(other.capabilities, capabilities) &&
+      other.from == from &&
+      other.to == to;
+
+  @override
+  int get hashCode => Object.hash(Object.hashAll(capabilities), from, to);
 }

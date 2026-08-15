@@ -118,4 +118,26 @@ final class SettingsAppState {
       openingLink: openingLink,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      other is SettingsAppState &&
+      setEquals(other.availableLinks, availableLinks) &&
+      other.metadata == metadata &&
+      other.metadataFailure == metadataFailure &&
+      other.metadataLoading == metadataLoading &&
+      other.linkConfigurationFailure == linkConfigurationFailure &&
+      other.openingLink == openingLink &&
+      other.operationFailure == operationFailure;
+
+  @override
+  int get hashCode => Object.hash(
+    Object.hashAllUnordered(availableLinks),
+    metadata,
+    metadataFailure,
+    metadataLoading,
+    linkConfigurationFailure,
+    openingLink,
+    operationFailure,
+  );
 }

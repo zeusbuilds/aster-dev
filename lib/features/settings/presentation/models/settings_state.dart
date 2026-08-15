@@ -36,6 +36,16 @@ final class SettingsState {
           : operationFailure as AppFailure?,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      other is SettingsState &&
+      other.snapshot == snapshot &&
+      other.operation == operation &&
+      other.operationFailure == operationFailure;
+
+  @override
+  int get hashCode => Object.hash(snapshot, operation, operationFailure);
 }
 
 const _unset = Object();
