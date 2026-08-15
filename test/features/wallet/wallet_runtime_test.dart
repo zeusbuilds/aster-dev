@@ -310,6 +310,50 @@ void main() {
     },
   );
 
+  test(
+    'uncertain directory cleanup after credential failure requires recovery',
+    () async {
+      final rawSecrets = MemorySecureStore()
+        ..writeError = StateError('injected credential write failure');
+      final directories = FakeWalletDirectoryManager()
+        ..removeError = DurableStorageCommitException([
+          StateError('injected ambiguous directory removal'),
+        ]);
+      final runtime = WalletRuntime(
+        FakeWalletEngineFactory(const []),
+        directories,
+        WalletSecretStore(rawSecrets),
+        services,
+      );
+      addTearDown(() async {
+        rawSecrets.writeError = null;
+        directories.removeError = null;
+        await runtime.rollbackProvision(firstId, storageToken: firstToken);
+        await runtime.dispose();
+      });
+
+      final result = await runtime.provision(
+        profile: profile(firstId),
+        mnemonic: 'mnemonic words',
+        databasePassword: 'password',
+      );
+
+      expect(result, isA<AppFailureResult<void>>());
+      final failure = (result as AppFailureResult<void>).failure;
+      expect(failure.code, 'wallet_provision_rollback_failed');
+      expect(failure.outcomeUnknown, isTrue);
+      expect(failure.retryable, isFalse);
+      final causes = failure.cause! as List<AppFailure>;
+      expect(causes, hasLength(2));
+      expect(causes.first.outcomeUnknown, isFalse);
+      expect(causes.last.code, 'durable_storage_commit_unknown');
+      expect(causes.last.outcomeUnknown, isTrue);
+      expect(rawSecrets.values, isEmpty);
+      expect(directories.storageTokens, contains(firstId));
+      expect(directories.removed, isEmpty);
+    },
+  );
+
   test('credential cleanup failure preserves its owned directory', () async {
     final rawSecrets = MemorySecureStore();
     final directories = FakeWalletDirectoryManager();
@@ -446,6 +490,51 @@ void main() {
       expect(directories.removed, [firstId]);
     },
   );
+
+  test('uncertain explicit rollback requires storage reconciliation', () async {
+    final rawSecrets = MemorySecureStore();
+    final directories = FakeWalletDirectoryManager();
+    final runtime = WalletRuntime(
+      FakeWalletEngineFactory([FakeWalletEngine()]),
+      directories,
+      WalletSecretStore(rawSecrets),
+      services,
+    );
+    addTearDown(() async {
+      directories.removeError = null;
+      await runtime.rollbackProvision(firstId, storageToken: firstToken);
+      await runtime.dispose();
+    });
+    expect(
+      await runtime.provision(
+        profile: profile(firstId),
+        mnemonic: 'mnemonic words',
+        databasePassword: 'password',
+      ),
+      isA<AppSuccess<void>>(),
+    );
+    directories.removeError = DurableStorageCommitException([
+      StateError('injected ambiguous directory removal'),
+    ]);
+
+    final result = await runtime.rollbackProvision(
+      firstId,
+      storageToken: firstToken,
+    );
+
+    expect(result, isA<AppFailureResult<void>>());
+    final failure = (result as AppFailureResult<void>).failure;
+    expect(failure.code, 'wallet_rollback_failed');
+    expect(failure.outcomeUnknown, isTrue);
+    expect(failure.retryable, isFalse);
+    final causes = failure.cause! as List<AppFailure>;
+    expect(causes, hasLength(1));
+    expect(causes.single.code, 'durable_storage_commit_unknown');
+    expect(causes.single.outcomeUnknown, isTrue);
+    expect(rawSecrets.values, isEmpty);
+    expect(directories.storageTokens, contains(firstId));
+    expect(directories.removed, isEmpty);
+  });
 
   test(
     'never destroys the active wallet when its rollback secret is unreadable',

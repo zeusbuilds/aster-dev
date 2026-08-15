@@ -151,6 +151,11 @@ final class WalletRuntime {
           await _directories.remove(profile.id, storageToken: storageToken);
           return AppResult.failure(failure);
         } catch (cleanupError, cleanupStackTrace) {
+          final cleanupFailure = FailureMapper.from(
+            cleanupError,
+            cleanupStackTrace,
+            fallbackCode: 'wallet_directory_cleanup_failed',
+          );
           return AppResult.failure(
             AppFailure(
               code: 'wallet_provision_rollback_failed',
@@ -158,10 +163,9 @@ final class WalletRuntime {
               userMessage:
                   'Wallet setup failed and local cleanup needs attention.',
               retryable: false,
-              cause: <Object>[
-                failure,
-                FailureMapper.from(cleanupError, cleanupStackTrace),
-              ],
+              outcomeUnknown:
+                  failure.outcomeUnknown || cleanupFailure.outcomeUnknown,
+              cause: <AppFailure>[failure, cleanupFailure],
               stackTrace: cleanupStackTrace,
             ),
           );
@@ -506,6 +510,7 @@ final class WalletRuntime {
             kind: AppFailureKind.storage,
             userMessage: 'Local wallet cleanup did not complete.',
             retryable: false,
+            outcomeUnknown: failures.any((failure) => failure.outcomeUnknown),
             cause: List<AppFailure>.unmodifiable(failures),
           ),
         );
