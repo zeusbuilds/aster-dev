@@ -23,7 +23,11 @@ class SettingsAppViewModel extends _$SettingsAppViewModel {
   /// Retries package metadata without disabling independently configured links.
   Future<void> retryMetadata() async {
     final current = state.value;
-    if (current == null || current.metadataLoading) return;
+    if (current == null ||
+        current.metadataLoading ||
+        current.metadataFailure?.retryable != true) {
+      return;
+    }
     final generation = _stateGeneration;
     state = AsyncData(current.beginMetadataLoad());
     final repository = ref.read(settingsAppRepositoryProvider);

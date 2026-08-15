@@ -166,6 +166,88 @@ void main() {
     expect(completed.openingLink, isNull);
   });
 
+  test('metadata retry rejects terminal and already-loaded states', () async {
+    final terminalResponses = <Future<AppResult<AppBuildMetadata>>>[
+      Future.value(
+        const AppResult.failure(
+          AppFailure(
+            code: 'metadata_configuration_invalid',
+            kind: AppFailureKind.configuration,
+            userMessage: 'Version metadata is unavailable in this build.',
+            retryable: false,
+          ),
+        ),
+      ),
+      Future.value(
+        const AppResult.success(
+          AppBuildMetadata(version: 'must-not-load', buildNumber: '2'),
+        ),
+      ),
+    ];
+    final terminalContainer = _container(
+      SettingsAppRepository(
+        _QueuedMetadataService(terminalResponses),
+        _ControlledExternalUriService(),
+      ),
+      const PublicLinkConfiguration(),
+    );
+    addTearDown(terminalContainer.dispose);
+
+    final terminal = await terminalContainer.read(
+      settingsAppViewModelProvider.future,
+    );
+    await terminalContainer
+        .read(settingsAppViewModelProvider.notifier)
+        .retryMetadata();
+
+    expect(terminal.metadataFailure?.retryable, isFalse);
+    expect(
+      terminalContainer
+          .read(settingsAppViewModelProvider)
+          .value
+          ?.metadataFailure
+          ?.code,
+      'metadata_configuration_invalid',
+    );
+    expect(terminalResponses, hasLength(1));
+
+    final loadedResponses = <Future<AppResult<AppBuildMetadata>>>[
+      Future.value(
+        const AppResult.success(
+          AppBuildMetadata(version: '1.0.0', buildNumber: '1'),
+        ),
+      ),
+      Future.value(
+        const AppResult.success(
+          AppBuildMetadata(version: 'must-not-load', buildNumber: '2'),
+        ),
+      ),
+    ];
+    final loadedContainer = _container(
+      SettingsAppRepository(
+        _QueuedMetadataService(loadedResponses),
+        _ControlledExternalUriService(),
+      ),
+      const PublicLinkConfiguration(),
+    );
+    addTearDown(loadedContainer.dispose);
+
+    await loadedContainer.read(settingsAppViewModelProvider.future);
+    await loadedContainer
+        .read(settingsAppViewModelProvider.notifier)
+        .retryMetadata();
+
+    expect(
+      loadedContainer
+          .read(settingsAppViewModelProvider)
+          .value
+          ?.metadata
+          ?.version,
+      '1.0.0',
+    );
+    expect(loadedResponses, hasLength(1));
+  });
+
   test('malformed link configuration cannot suppress app metadata', () async {
     final repository = SettingsAppRepository(
       _QueuedMetadataService([
