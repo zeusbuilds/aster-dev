@@ -328,7 +328,8 @@ final class WalletRepository implements WalletLifecycleRepository {
       databasePassword: databasePassword,
     );
     if (provision case AppFailureResult<void>(:final failure)) {
-      if (failure.code == 'wallet_provision_rollback_failed') {
+      if (failure.outcomeUnknown ||
+          failure.code == 'wallet_provision_rollback_failed') {
         return AppResult.failure(failure);
       }
       final removal = await _profiles.remove(profile.id);

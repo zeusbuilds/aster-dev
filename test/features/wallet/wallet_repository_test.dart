@@ -804,6 +804,57 @@ void main() {
     expect(directories.storageTokens, isEmpty);
   });
 
+  test('stages uncertain directory creation for startup recovery', () async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    final profileStore = WalletProfileStore(
+      MemoryWalletRegistryDocumentStore(),
+      PreferencesService(preferences),
+    );
+    final directories = FakeWalletDirectoryManager()
+      ..createError = DurableStorageCommitException([
+        StateError('injected marker response failure'),
+        StateError('injected directory rollback failure'),
+      ])
+      ..commitCreateBeforeError = true;
+    final runtime = WalletRuntime(
+      FakeWalletEngineFactory(const []),
+      directories,
+      WalletSecretStore(MemorySecureStore()),
+      services,
+    );
+    final repository = WalletRepository(
+      profileStore,
+      runtime,
+      FakeWalletKeyGenerator(),
+      FakeWalletIdentityGenerator(walletId: walletId),
+      services,
+      const SuccessfulLegacyWalletSeedPreflight(),
+    );
+    addTearDown(repository.dispose);
+
+    final result = await repository.createFromMnemonic(
+      mnemonic: mnemonic,
+      name: 'Main Wallet',
+    );
+    final staged =
+        (await profileStore.read() as AppSuccess<WalletRegistry>).value;
+
+    expect(result, isA<AppFailureResult<WalletRegistry>>());
+    final failure = (result as AppFailureResult<WalletRegistry>).failure;
+    expect(failure.code, 'durable_storage_commit_unknown');
+    expect(failure.outcomeUnknown, isTrue);
+    expect(staged.provisioningProfiles, hasLength(1));
+    expect(directories.storageTokens[walletId], storageToken);
+
+    directories.createError = null;
+    expect(await repository.bootstrap(), isA<AppSuccess<WalletRegistry>>());
+    final recovered =
+        (await profileStore.read() as AppSuccess<WalletRegistry>).value;
+    expect(recovered.profiles, isEmpty);
+    expect(directories.storageTokens, isEmpty);
+  });
+
   test('wallet ID collision cannot overwrite an existing wallet', () async {
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();

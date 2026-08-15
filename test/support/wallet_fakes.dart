@@ -179,12 +179,19 @@ final class FakeWalletDirectoryManager implements WalletDirectoryManager {
   final removed = <String>[];
   final storageTokens = <String, String>{};
   Object? createError;
+  bool commitCreateBeforeError = false;
   Object? openError;
   Object? removeError;
 
   @override
   Future<String> create(String walletId, {required String storageToken}) async {
-    if (createError case final Object error) throw error;
+    if (createError case final Object error) {
+      if (commitCreateBeforeError) {
+        created.add(walletId);
+        storageTokens[walletId] = storageToken;
+      }
+      throw error;
+    }
     created.add(walletId);
     storageTokens[walletId] = storageToken;
     return '/wallets/$walletId';

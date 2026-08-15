@@ -697,6 +697,44 @@ void main() {
     );
   });
 
+  test('wallet directory preserves an ambiguous marker rollback', () async {
+    final root = await Directory.systemTemp.createTemp('utexo-wallet-test-');
+    addTearDown(() => root.delete(recursive: true));
+    final security = MemoryWalletStorageSecurity()
+      ..replaceFailuresRemaining = 1;
+    final cleanupError = FileSystemException(
+      'Injected directory rollback failure.',
+    );
+    final manager = IoWalletDirectoryManager(
+      root.path,
+      security,
+      deleteDirectory: (_) async => throw cleanupError,
+    );
+
+    await expectLater(
+      manager.create(firstId, storageToken: firstToken),
+      throwsA(
+        isA<DurableStorageCommitException>()
+            .having((error) => error.causes, 'causes', hasLength(2))
+            .having(
+              (error) => error.causes.first,
+              'marker write failure',
+              isA<FileSystemException>(),
+            )
+            .having(
+              (error) => error.causes.last,
+              'directory rollback failure',
+              same(cleanupError),
+            ),
+      ),
+    );
+
+    expect(
+      await Directory('${root.path}${Platform.pathSeparator}$firstId').exists(),
+      isTrue,
+    );
+  });
+
   test(
     'legacy preflight rechecks an empty namespace on every startup',
     () async {

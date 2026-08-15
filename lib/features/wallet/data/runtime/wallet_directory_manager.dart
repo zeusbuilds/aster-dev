@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import '../../../../core/errors/app_failure.dart';
 import '../storage/wallet_storage_security.dart';
 
 /// Owns native wallet directories beneath one app-support root.
@@ -11,10 +12,15 @@ abstract interface class WalletDirectoryManager {
 }
 
 final class IoWalletDirectoryManager implements WalletDirectoryManager {
-  const IoWalletDirectoryManager(this.rootPath, this._security);
+  IoWalletDirectoryManager(
+    this.rootPath,
+    this._security, {
+    Future<void> Function(Directory)? deleteDirectory,
+  }) : _deleteDirectory = deleteDirectory ?? _deleteRecursively;
 
   final String rootPath;
   final WalletStorageSecurity _security;
+  final Future<void> Function(Directory) _deleteDirectory;
 
   @override
   Future<String> create(String walletId, {required String storageToken}) async {
@@ -28,13 +34,13 @@ final class IoWalletDirectoryManager implements WalletDirectoryManager {
         _ownershipFile(directory).path,
         storageToken,
       );
-    } catch (error) {
+    } catch (error, stackTrace) {
       try {
-        await directory.delete(recursive: true);
-      } on FileSystemException {
-        throw FileSystemException(
-          'Wallet directory ownership marker could not be created or rolled back.',
-          directory.path,
+        await _deleteDirectory(directory);
+      } catch (cleanupError) {
+        Error.throwWithStackTrace(
+          DurableStorageCommitException([error, cleanupError]),
+          stackTrace,
         );
       }
       rethrow;
@@ -66,7 +72,7 @@ final class IoWalletDirectoryManager implements WalletDirectoryManager {
     if (await directory.exists()) {
       await _security.verifyDirectory(directory.path);
       await _verifyOwnership(directory, storageToken);
-      await directory.delete(recursive: true);
+      await _deleteDirectory(directory);
     }
   }
 
@@ -102,6 +108,9 @@ final class IoWalletDirectoryManager implements WalletDirectoryManager {
 
   static File _ownershipFile(Directory directory) =>
       File('${directory.path}${Platform.pathSeparator}.utexo-storage-owner');
+
+  static Future<void> _deleteRecursively(Directory directory) =>
+      directory.delete(recursive: true);
 
   Future<void> _verifyOwnership(
     Directory directory,
