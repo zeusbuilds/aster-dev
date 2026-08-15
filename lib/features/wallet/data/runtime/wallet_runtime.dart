@@ -400,15 +400,19 @@ final class WalletRuntime {
         final recovery = await _activateUnsafe(profile, secret);
         if (recovery is AppSuccess<void>) return recovery;
         final recoveryFailure = (recovery as AppFailureResult<void>).failure;
+        final outcomeUnknown =
+            reinitializeFailure.outcomeUnknown ||
+            recoveryFailure.outcomeUnknown;
         final combined = AppFailure(
           code: 'wallet_resume_recovery_failed',
           kind: AppFailureKind.unavailable,
-          userMessage: 'The wallet could not be reopened. Try again.',
-          retryable: !recoveryFailure.outcomeUnknown,
-          outcomeUnknown:
-              reinitializeFailure.outcomeUnknown ||
-              recoveryFailure.outcomeUnknown,
-          cause: <Object>[reinitializeFailure, recovery],
+          userMessage: outcomeUnknown
+              ? 'The wallet state could not be confirmed. Restart the app '
+                    'before continuing.'
+              : 'The wallet could not be reopened. Try again.',
+          retryable: !outcomeUnknown,
+          outcomeUnknown: outcomeUnknown,
+          cause: <AppFailure>[reinitializeFailure, recoveryFailure],
           stackTrace: stackTrace,
         );
         _emit(

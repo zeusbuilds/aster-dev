@@ -186,6 +186,52 @@ void main() {
     expect(runtime.snapshot.phase, WalletRuntimePhase.active);
   });
 
+  test('unknown reinit and failed recovery require reconciliation', () async {
+    final initial = FakeWalletEngine();
+    final recovery = FakeWalletEngine()
+      ..initializeError = StateError('injected recovery failure');
+    final runtime = WalletRuntime(
+      FakeWalletEngineFactory([initial, recovery]),
+      FakeWalletDirectoryManager(),
+      WalletSecretStore(MemorySecureStore()),
+      services,
+    );
+    addTearDown(runtime.dispose);
+    await runtime.provision(
+      profile: profile(firstId),
+      mnemonic: 'mnemonic words',
+      databasePassword: 'password',
+    );
+    await runtime.suspend();
+    initial.reinitializeError = const AppFailureException(
+      AppFailure(
+        code: 'test_native_outcome_unknown',
+        kind: AppFailureKind.timeout,
+        userMessage: 'Test operation outcome is unknown.',
+        retryable: false,
+        outcomeUnknown: true,
+      ),
+    );
+
+    final result = await runtime.resume();
+
+    expect(result, isA<AppFailureResult<void>>());
+    final failure = (result as AppFailureResult<void>).failure;
+    expect(failure.code, 'wallet_resume_recovery_failed');
+    expect(failure.outcomeUnknown, isTrue);
+    expect(failure.retryable, isFalse);
+    expect(failure.userMessage, contains('Restart'));
+    final causes = failure.cause! as List<AppFailure>;
+    expect(causes, hasLength(2));
+    expect(causes.first.code, 'test_native_outcome_unknown');
+    expect(causes.first.outcomeUnknown, isTrue);
+    expect(causes.last.code, 'internal_state_violation');
+    expect(causes.last.outcomeUnknown, isFalse);
+    expect(initial.calls, containsAllInOrder(['reinitialize', 'destroy']));
+    expect(recovery.calls, containsAllInOrder(['initialize', 'destroy']));
+    expect(runtime.snapshot.phase, WalletRuntimePhase.failed);
+  });
+
   test('resume cleanup preserves an unknown native outcome', () async {
     final initial = FakeWalletEngine();
     final runtime = WalletRuntime(
