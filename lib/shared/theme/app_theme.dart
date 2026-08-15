@@ -19,8 +19,11 @@ class AppTheme {
   static const _stateLayers = AsterStateLayers();
   static final _gradients = AsterGradients.light;
   static const _art = AsterArt();
+  static final ThemeData _lightTheme = _buildLight();
 
-  static ThemeData light() {
+  static ThemeData light() => _lightTheme;
+
+  static ThemeData _buildLight() {
     final scheme = AsterColors.lightColorScheme();
     final textTheme = TypographySystem.buildTextTheme(
       onSurface: scheme.onSurface,

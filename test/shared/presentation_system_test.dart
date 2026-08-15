@@ -131,6 +131,10 @@ void main() {
     );
   });
 
+  test('light theme has stable identity across root rebuilds', () {
+    expect(identical(AppTheme.light(), AppTheme.light()), isTrue);
+  });
+
   test('neutral status typography preserves the Material body contract', () {
     final theme = AppTheme.light();
     final roles = theme.extension<AsterTypeRoles>()!;
