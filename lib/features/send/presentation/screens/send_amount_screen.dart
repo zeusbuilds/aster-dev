@@ -118,7 +118,7 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
         message: 'The wallet accepted the payment.',
         variant: ToastVariant.success,
       );
-      context.go(RoutePaths.skeleton);
+      context.go(RoutePaths.home);
       return;
     }
     final failure = ref.read(provider).value?.failure;

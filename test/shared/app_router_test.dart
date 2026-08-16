@@ -4,7 +4,7 @@ import 'package:aster/core/core.dart';
 import 'package:aster/features/onboarding/presentation/screens/screens.dart';
 import 'package:aster/features/onboarding/presentation/view_model/view_models.dart';
 import 'package:aster/features/onboarding/presentation/widgets/widgets.dart';
-import 'package:aster/features/skeleton/presentation/widgets/bottom_nav.dart';
+import 'package:aster/features/shell/presentation/widgets/bottom_nav.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:aster/features/wallet/presentation/view_model/wallet_view_model.dart';
 import 'package:aster/shared/shared.dart';
@@ -49,7 +49,32 @@ void main() {
 
     final router = await _pumpRouter(tester, harness);
 
-    expect(_location(router), RoutePaths.skeleton);
+    expect(_location(router), RoutePaths.home);
+    expect(find.byType(BottomNav), findsOneWidget);
+  });
+
+  testWidgets('the removed skeleton location recovers to canonical Home', (
+    tester,
+  ) async {
+    tester.binding.platformDispatcher.defaultRouteNameTestValue = '/skeleton';
+    addTearDown(
+      tester.binding.platformDispatcher.clearDefaultRouteNameTestValue,
+    );
+    final (harness, transport) = await _createActiveHarness();
+    addTearDown(transport.close);
+    addTearDown(() => _disposeHarness(tester, harness));
+
+    final router = await _pumpRouter(tester, harness);
+
+    expect(_location(router), '/skeleton');
+    expect(find.text('Route Error'), findsOneWidget);
+    expect(find.byType(BottomNav), findsNothing);
+
+    await tester.tap(find.text('Go to Home'));
+    await _pumpFrames(tester);
+
+    expect(_location(router), RoutePaths.home);
+    expect(find.byType(BottomNav), findsOneWidget);
   });
 
   testWidgets('an invalid payment target slug returns to target selection', (
@@ -71,7 +96,7 @@ void main() {
 
     await tester.tap(find.bySemanticsLabel('Back'));
     await _pumpFrames(tester);
-    expect(_location(router), RoutePaths.skeleton);
+    expect(_location(router), RoutePaths.home);
     expect(find.byType(BottomNav), findsOneWidget);
   });
 
@@ -155,7 +180,7 @@ void main() {
 
     final router = await _pumpRouter(tester, harness);
 
-    expect(_location(router), RoutePaths.skeleton);
+    expect(_location(router), RoutePaths.home);
     expect(find.byType(BottomNav), findsOneWidget);
   });
 
@@ -316,7 +341,7 @@ void main() {
     final currentRouter = harness.container.read(appRouterProvider);
 
     expect(currentRouter, same(router));
-    expect(_location(currentRouter), RoutePaths.skeleton);
+    expect(_location(currentRouter), RoutePaths.home);
   });
 }
 

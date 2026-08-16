@@ -39,8 +39,8 @@ class BottomNav extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    assert(_destinations.length == skeletonTabCount);
-    final selectedIndex = ref.watch(skeletonIndexProvider);
+    assert(_destinations.length == appShellTabCount);
+    final selectedIndex = ref.watch(appShellIndexProvider);
     final spacing = context.spacing;
     final metrics = context.metrics;
     final availableWidth = math.max(
@@ -109,7 +109,7 @@ class BottomNav extends ConsumerWidget {
                             selected: selectedIndex == index,
                             ordinal: index.toDouble(),
                             onSelect: () => ref
-                                .read(skeletonIndexProvider.notifier)
+                                .read(appShellIndexProvider.notifier)
                                 .setIndex(index),
                           ),
                         ),

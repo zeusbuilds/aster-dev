@@ -11,7 +11,7 @@ import 'route_paths.dart';
 
 part 'app_router.g.dart';
 
-/// App router provider
+/// Owns one fail-closed router for the current provider container.
 @riverpod
 GoRouter appRouter(Ref ref) {
   final refresh = _RouterRefreshNotifier();
@@ -36,7 +36,7 @@ final class _RouterRefreshNotifier extends ChangeNotifier {
   void notify() => notifyListeners();
 }
 
-/// Error screen for route errors
+/// Bounded recovery surface for malformed or unavailable locations.
 class ErrorScreen extends StatelessWidget {
   const ErrorScreen({super.key});
 
@@ -69,7 +69,7 @@ class ErrorScreen extends StatelessWidget {
               padding: EdgeInsets.symmetric(horizontal: spacing.screenPadding),
               child: CustomButton(
                 text: 'Go to Home',
-                onTap: () => context.go(RoutePaths.skeleton),
+                onTap: () => context.go(RoutePaths.home),
               ),
             ),
           ],

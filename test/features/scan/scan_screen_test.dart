@@ -10,7 +10,7 @@ import 'package:aster/features/scan/presentation/view_model/view_models.dart';
 import 'package:aster/features/scan/presentation/widgets/scan_control_button.dart';
 import 'package:aster/features/scan/presentation/widgets/widgets.dart';
 import 'package:aster/features/send/presentation/view_model/view_models.dart';
-import 'package:aster/features/skeleton/presentation/providers/providers.dart';
+import 'package:aster/features/shell/presentation/providers/providers.dart';
 import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -706,8 +706,8 @@ final class _ScanWidgetHarness {
 
   void activateScanTab() {
     container
-        .read(skeletonIndexProvider.notifier)
-        .setIndex(skeletonScanTabIndex);
+        .read(appShellIndexProvider.notifier)
+        .setIndex(appShellScanTabIndex);
   }
 
   Widget get app => UncontrolledProviderScope(

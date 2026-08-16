@@ -1,15 +1,14 @@
-/// Route path constants
+/// Canonical application locations and typed path builders.
 class RoutePaths {
   RoutePaths._();
 
-  // Splash & Auth
+  // Wallet access and onboarding.
   static const String splash = '/';
   static const String onboardingWelcome = '/onboarding-welcome';
   static const String onboardingCreateWallet = '/onboarding/create-wallet';
   static const String onboardingImportWallet = '/onboarding/import-wallet';
 
-  // Main
-  static const String skeleton = '/skeleton';
+  // Guarded wallet application.
   static const String home = '/home';
   static const String send = '/send';
   static const String paymentTargetParameter = 'paymentTarget';

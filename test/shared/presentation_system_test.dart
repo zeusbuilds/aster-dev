@@ -1,7 +1,7 @@
 import 'dart:ui' as ui;
 
-import 'package:aster/features/skeleton/presentation/providers/providers.dart';
-import 'package:aster/features/skeleton/presentation/widgets/bottom_nav.dart';
+import 'package:aster/features/shell/presentation/providers/providers.dart';
+import 'package:aster/features/shell/presentation/widgets/bottom_nav.dart';
 import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -505,18 +505,18 @@ void main() {
     final container = ProviderContainer();
     addTearDown(container.dispose);
     final subscription = container.listen<int>(
-      skeletonIndexProvider,
+      appShellIndexProvider,
       (_, _) {},
     );
     addTearDown(subscription.close);
-    final notifier = container.read(skeletonIndexProvider.notifier);
+    final notifier = container.read(appShellIndexProvider.notifier);
 
-    notifier.setIndex(skeletonTabCount - 1);
-    expect(container.read(skeletonIndexProvider), skeletonTabCount - 1);
+    notifier.setIndex(appShellTabCount - 1);
+    expect(container.read(appShellIndexProvider), appShellTabCount - 1);
 
     expect(() => notifier.setIndex(-1), throwsRangeError);
-    expect(() => notifier.setIndex(skeletonTabCount), throwsRangeError);
-    expect(container.read(skeletonIndexProvider), skeletonTabCount - 1);
+    expect(() => notifier.setIndex(appShellTabCount), throwsRangeError);
+    expect(container.read(appShellIndexProvider), appShellTabCount - 1);
   });
 
   testWidgets('toast host announces, dismisses, and advances its queue', (

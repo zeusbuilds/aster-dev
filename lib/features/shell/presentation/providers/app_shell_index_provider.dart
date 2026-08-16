@@ -1,18 +1,16 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-part 'skeleton_index_provider.g.dart';
+part 'app_shell_index_provider.g.dart';
 
 /// Number of stable destinations in the app shell.
-const int skeletonTabCount = 4;
+const int appShellTabCount = 4;
 
 /// Index of the Scan destination in the app shell.
-const int skeletonScanTabIndex = 1;
+const int appShellScanTabIndex = 1;
 
-/// Provider for managing the current bottom navigation index
-///
-/// Tracks which screen is currently active in the skeleton navigation
+/// Owns the selected destination in the persistent application shell.
 @riverpod
-class SkeletonIndex extends _$SkeletonIndex {
+class AppShellIndex extends _$AppShellIndex {
   @override
   int build() => 0;
 
@@ -20,8 +18,8 @@ class SkeletonIndex extends _$SkeletonIndex {
   ///
   /// Invalid indices fail synchronously and never mutate the current state.
   void setIndex(int index) {
-    if (index < 0 || index >= skeletonTabCount) {
-      throw RangeError.range(index, 0, skeletonTabCount - 1, 'index');
+    if (index < 0 || index >= appShellTabCount) {
+      throw RangeError.range(index, 0, appShellTabCount - 1, 'index');
     }
     state = index;
   }

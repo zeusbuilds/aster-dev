@@ -16,7 +16,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.centerTitle = true,
     this.leadingIconData,
     this.action,
-    this.fallbackLocation = RoutePaths.skeleton,
+    this.fallbackLocation = RoutePaths.home,
   });
 
   final String title;

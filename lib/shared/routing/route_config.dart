@@ -1,6 +1,5 @@
 import 'package:go_router/go_router.dart';
 
-import '../../features/home/presentation/screens/screens.dart';
 import '../../features/market/presentation/screens/screens.dart';
 import '../../features/onboarding/presentation/screens/screens.dart';
 import '../../features/receive/presentation/screens/screens.dart';
@@ -8,7 +7,7 @@ import '../../features/scan/domain/models/models.dart';
 import '../../features/scan/presentation/screens/screens.dart';
 import '../../features/send/presentation/screens/screens.dart';
 import '../../features/settings/presentation/screens/screens.dart';
-import '../../features/skeleton/presentation/screens/screens.dart';
+import '../../features/shell/presentation/screens/screens.dart';
 import '../../features/swap/presentation/screens/screens.dart';
 import '../../features/transaction/presentation/screens/screens.dart';
 import '../../features/wallet/domain/models/models.dart';
@@ -16,11 +15,11 @@ import '../../features/wallet/presentation/pages/pages.dart';
 import 'route_names.dart';
 import 'route_paths.dart';
 
-/// Route configuration
-class RouteConfig {
+/// Builds the guarded wallet route graph and validates typed path segments.
+abstract final class RouteConfig {
   RouteConfig._();
 
-  /// Creates routes list
+  /// Returns a fresh route graph for one [GoRouter] owner.
   static List<RouteBase> getRoutes() {
     return [
       GoRoute(
@@ -49,14 +48,9 @@ class RouteConfig {
         ],
       ),
       GoRoute(
-        path: RoutePaths.skeleton,
-        name: RouteNames.skeleton,
-        builder: (context, state) => const SkeletonScreen(),
-      ),
-      GoRoute(
         path: RoutePaths.home,
         name: RouteNames.home,
-        builder: (context, state) => const HomeScreen(),
+        builder: (context, state) => const AppShellScreen(),
       ),
       GoRoute(
         path: RoutePaths.send,
@@ -186,7 +180,7 @@ class RouteConfig {
               state.pathParameters[RoutePaths.assetKindParameter],
             ) ==
             null
-        ? RoutePaths.skeleton
+        ? RoutePaths.home
         : null;
   }
 
@@ -194,7 +188,7 @@ class RouteConfig {
     final kind = WalletAssetKind.tryParse(
       state.pathParameters[RoutePaths.assetKindParameter],
     );
-    if (kind == null) return RoutePaths.skeleton;
+    if (kind == null) return RoutePaths.home;
     final activityId = state.pathParameters[RoutePaths.activityIdParameter];
     return WalletActivity.isValidId(activityId)
         ? null

@@ -955,7 +955,7 @@ void main() {
           ),
         ),
         GoRoute(
-          path: RoutePaths.skeleton,
+          path: RoutePaths.home,
           builder: (context, state) => const Text('Wallet home'),
         ),
       ],

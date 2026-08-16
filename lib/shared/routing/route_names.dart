@@ -1,15 +1,14 @@
-/// Route name constants
+/// Stable names for navigation that does not depend on concrete URL strings.
 class RouteNames {
   RouteNames._();
 
-  // Splash & Auth
+  // Wallet access and onboarding.
   static const String splash = 'splash';
   static const String onboardingWelcome = 'onboardingWelcome';
   static const String onboardingCreateWallet = 'onboardingCreateWallet';
   static const String onboardingImportWallet = 'onboardingImportWallet';
 
-  // Main
-  static const String skeleton = 'skeleton';
+  // Guarded wallet application.
   static const String home = 'home';
   static const String send = 'send';
   static const String sendAddress = 'sendAddress';

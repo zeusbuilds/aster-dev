@@ -9,7 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
 import '../../../send/presentation/view_model/view_models.dart';
-import '../../../skeleton/presentation/providers/skeleton_index_provider.dart';
+import '../../../shell/presentation/providers/app_shell_index_provider.dart';
 import '../../domain/models/models.dart';
 import '../view_model/view_models.dart';
 import '../widgets/widgets.dart';
@@ -205,10 +205,10 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
   Widget build(BuildContext context) {
     final scanState = ref.watch(scanViewModelProvider(widget.purpose));
     final viewModel = ref.read(scanViewModelProvider(widget.purpose).notifier);
-    final skeletonIndex = ref.watch(skeletonIndexProvider);
+    final shellIndex = ref.watch(appShellIndexProvider);
     final shouldShowCamera =
         widget.purpose == ScanPurpose.destinationPicker ||
-        skeletonIndex == skeletonScanTabIndex;
+        shellIndex == appShellScanTabIndex;
     final walletIdentity = ref.watch(scanWalletIdentityProvider);
     final activeWallet = walletIdentity.value;
     final spacing = context.spacing;

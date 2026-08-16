@@ -30,7 +30,7 @@ void main() {
 
   test('empty registry can reach onboarding but never wallet routes', () {
     expect(
-      RouteGuards.redirect(location: RoutePaths.skeleton, walletState: empty),
+      RouteGuards.redirect(location: RoutePaths.home, walletState: empty),
       RoutePaths.onboardingWelcome,
     );
     expect(
@@ -59,7 +59,7 @@ void main() {
         location: RoutePaths.onboardingWelcome,
         walletState: active,
       ),
-      RoutePaths.skeleton,
+      RoutePaths.home,
     );
   });
 }

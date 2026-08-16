@@ -5,7 +5,7 @@ import 'route_paths.dart';
 
 /// Pure wallet-access redirect policy shared by GoRouter and unit tests.
 abstract final class RouteGuards {
-  /// Resolves access only from the durable wallet session state.
+  /// Resolves access from durable wallet state before any feature is built.
   static String? redirect({
     required String location,
     required AsyncValue<WalletState> walletState,
@@ -20,7 +20,7 @@ abstract final class RouteGuards {
       return onboarding ? null : RoutePaths.onboardingWelcome;
     }
     if (location == RoutePaths.splash || onboarding) {
-      return RoutePaths.skeleton;
+      return RoutePaths.home;
     }
     return null;
   }
