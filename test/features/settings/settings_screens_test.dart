@@ -260,6 +260,106 @@ void main() {
     }
   });
 
+  for (final scenario in const [
+    (name: 'currency', screen: CurrencySelectionScreen()),
+    (name: 'region', screen: CountrySelectionScreen()),
+    (name: 'Bitcoin unit', screen: BitcoinUnitSelectionScreen()),
+  ]) {
+    testWidgets('${scenario.name} save blocks same-frame Back and system pop', (
+      tester,
+    ) async {
+      final viewModel = _ControlledSettingsViewModel(_selectionState);
+      final router = GoRouter(
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (context, state) => const Text('Settings root'),
+          ),
+          GoRoute(
+            path: '/choice',
+            builder: (context, state) => scenario.screen,
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [settingsViewModelProvider.overrideWith(() => viewModel)],
+          child: MaterialApp.router(
+            theme: AppTheme.light(),
+            routerConfig: router,
+            builder: (context, child) => AsterFeedbackScope(
+              haptics: _RecordingHaptics(),
+              toasts: _RecordingToasts(),
+              child: child!,
+            ),
+          ),
+        ),
+      );
+      unawaited(router.push<Object?>('/choice'));
+      await tester.pumpAndSettle();
+
+      final back = tester.widget<AsterIconButton>(
+        find.byWidgetPredicate(
+          (widget) => widget is AsterIconButton && widget.tooltip == 'Back',
+        ),
+      );
+      final navigation = AsterNavigationScope.of(
+        tester.element(find.bySemanticsLabel('Back')),
+      );
+      expect(navigation.inFlight, isFalse);
+      expect(router.canPop(), isTrue);
+      expect(find.text('Settings root'), findsNothing);
+      switch (scenario.name) {
+        case 'currency':
+          tester
+              .widget<CurrencySelectOptionRow>(
+                find.byWidgetPredicate(
+                  (widget) =>
+                      widget is CurrencySelectOptionRow &&
+                      widget.currency.code == 'EUR',
+                ),
+              )
+              .onTap!();
+        case 'region':
+          tester
+              .widget<CountrySelectOptionRow>(
+                find.byWidgetPredicate(
+                  (widget) =>
+                      widget is CountrySelectOptionRow &&
+                      widget.country.code == 'DE',
+                ),
+              )
+              .onTap!();
+        case 'Bitcoin unit':
+          tester
+              .widget<SettingsChoiceRow>(
+                find.widgetWithText(SettingsChoiceRow, 'Satoshis'),
+              )
+              .onTap!();
+      }
+      expect(navigation.inFlight, isTrue);
+      expect(router.canPop(), isTrue);
+      back.onPressed!();
+      expect(router.canPop(), isTrue);
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+
+      expect(router.canPop(), isTrue);
+      expect(find.byType(scenario.screen.runtimeType), findsOneWidget);
+      expect(find.text('Settings root'), findsNothing);
+
+      viewModel.complete();
+      await tester.pump();
+      await tester.pump();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Settings root'), findsOneWidget);
+      expect(router.canPop(), isFalse);
+    });
+  }
+
   testWidgets('region and currency rows expose available choice semantics', (
     tester,
   ) async {
@@ -1080,6 +1180,55 @@ final class _StaticSettingsViewModel extends SettingsViewModel {
 
   @override
   Future<SettingsState> build() async => value;
+}
+
+final _selectionState = SettingsState(
+  snapshot: SettingsSnapshot(
+    preferences: AppPreferences.defaults,
+    currencies: [
+      FiatCurrency(
+        name: 'United States Dollar',
+        symbol: r'$',
+        code: 'USD',
+        countryCode: 'US',
+      ),
+      FiatCurrency(name: 'Euro', symbol: 'EUR', code: 'EUR', countryCode: 'DE'),
+    ],
+    regions: [
+      Region(name: 'United States', code: 'US'),
+      Region(name: 'Germany', code: 'DE'),
+    ],
+  ),
+);
+
+final class _ControlledSettingsViewModel extends SettingsViewModel {
+  _ControlledSettingsViewModel(this.initialState);
+
+  final SettingsState initialState;
+  final Completer<void> _gate = Completer<void>();
+
+  @override
+  Future<SettingsState> build() async => initialState;
+
+  @override
+  Future<bool> selectCurrency(String code) => _hold(SettingsOperation.currency);
+
+  @override
+  Future<bool> selectRegion(String code) => _hold(SettingsOperation.region);
+
+  @override
+  Future<bool> selectBitcoinUnit(BitcoinUnit unit) =>
+      _hold(SettingsOperation.bitcoinUnit);
+
+  Future<bool> _hold(SettingsOperation operation) async {
+    final current = state.requireValue;
+    state = AsyncData(current.copyWith(operation: operation));
+    await _gate.future;
+    if (ref.mounted) state = AsyncData(current);
+    return false;
+  }
+
+  void complete() => _gate.complete();
 }
 
 final class _FailingSettingsViewModel extends SettingsViewModel {

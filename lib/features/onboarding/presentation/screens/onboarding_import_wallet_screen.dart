@@ -71,27 +71,45 @@ class _OnboardingImportWalletScreenState
       }
     });
     final value = asyncState.value;
-    final navigationLocked =
-        value != null && (value.submitting || value.requiresReconciliation);
-
-    return PopScope(
-      canPop: !navigationLocked,
-      child: Scaffold(
-        backgroundColor: context.appColors.transparentSurface,
-        resizeToAvoidBottomInset: true,
-        body: SafeArea(
-          child: switch (asyncState) {
-            AsyncData<ImportWalletState>(:final value) => _buildContent(value),
-            AsyncError<ImportWalletState>(:final error, :final stackTrace) =>
-              _buildFailure(error, stackTrace),
-            _ => const OnboardingStatusPanel.loading(),
-          },
-        ),
+    return AsterNavigationScope(
+      child: Builder(
+        builder: (context) {
+          final navigation = AsterNavigationScope.of(context);
+          final navigationLocked =
+              navigation.inFlight ||
+              (value != null &&
+                  (value.submitting || value.requiresReconciliation));
+          return PopScope(
+            canPop: !navigationLocked,
+            child: Scaffold(
+              backgroundColor: context.appColors.transparentSurface,
+              resizeToAvoidBottomInset: true,
+              body: SafeArea(
+                child: switch (asyncState) {
+                  AsyncData<ImportWalletState>(:final value) => _buildContent(
+                    value,
+                    navigation,
+                  ),
+                  AsyncError<ImportWalletState>(
+                    :final error,
+                    :final stackTrace,
+                  ) =>
+                    _buildFailure(navigation, error, stackTrace),
+                  _ => const OnboardingStatusPanel.loading(),
+                },
+              ),
+            ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildFailure(Object error, StackTrace stackTrace) {
+  Widget _buildFailure(
+    AsterNavigationCommandOwner navigation,
+    Object error,
+    StackTrace stackTrace,
+  ) {
     final failure = FailureMapper.from(error, stackTrace);
     return OnboardingStatusPanel.failure(
       title: 'Recovery phrase unavailable',
@@ -100,11 +118,14 @@ class _OnboardingImportWalletScreenState
       onPrimary: failure.retryable
           ? () => ref.invalidate(importWalletViewModelProvider)
           : null,
-      onBack: () => _returnToWelcome(context),
+      onBack: () => _navigateToWelcome(context, navigation),
     );
   }
 
-  Widget _buildContent(ImportWalletState state) {
+  Widget _buildContent(
+    ImportWalletState state,
+    AsterNavigationCommandOwner navigation,
+  ) {
     final context = this.context;
     final spacing = context.spacing;
     final colors = context.appColors;
@@ -163,7 +184,10 @@ class _OnboardingImportWalletScreenState
                 spacing.md * (ImportWalletState.wordsPerPage - 1),
             child: PageView.builder(
               controller: _pageController,
-              physics: state.submitting || state.requiresReconciliation
+              physics:
+                  state.submitting ||
+                      state.requiresReconciliation ||
+                      navigation.inFlight
                   ? const NeverScrollableScrollPhysics()
                   : const PageScrollPhysics(),
               itemCount:
@@ -179,11 +203,14 @@ class _OnboardingImportWalletScreenState
                     statuses: state.wordStatuses.sublist(start, end),
                     startIndex: start,
                     fieldHeight: wordFieldHeight,
-                    enabled: !state.submitting && !state.requiresReconciliation,
+                    enabled:
+                        !state.submitting &&
+                        !state.requiresReconciliation &&
+                        !navigation.inFlight,
                     canSubmit: state.canSubmit,
                     onChanged: _handleWordInput,
                     onSubmitted: (index) =>
-                        unawaited(_handleSubmitted(index, state)),
+                        unawaited(_handleSubmitted(index, state, navigation)),
                   ),
                 );
               },
@@ -222,7 +249,8 @@ class _OnboardingImportWalletScreenState
             state: state,
             onRetry:
                 state.checksumStatus == MnemonicChecksumStatus.incomplete &&
-                    state.failure?.retryable == true
+                    state.failure?.retryable == true &&
+                    !navigation.inFlight
                 ? () => unawaited(
                     ref
                         .read(importWalletViewModelProvider.notifier)
@@ -243,15 +271,19 @@ class _OnboardingImportWalletScreenState
                 CustomButton(
                   text: 'Continue',
                   variant: ButtonVariant.translucent,
-                  enabled: state.canSubmit,
+                  enabled: state.canSubmit && !navigation.inFlight,
                   loading: state.submitting,
                   hapticIntent: null,
-                  onTap: () => unawaited(_submit()),
+                  onTap: () => unawaited(_submit(navigation)),
                 ),
                 OnboardingTextAction(
                   label: 'Back',
-                  enabled: !state.submitting && !state.requiresReconciliation,
-                  onPressed: () => _returnToWelcome(context),
+                  enabled:
+                      !state.submitting &&
+                      !state.requiresReconciliation &&
+                      !navigation.inFlight,
+                  hapticIntent: null,
+                  onPressed: () => _navigateToWelcome(context, navigation),
                 ),
               ],
             ),
@@ -286,12 +318,20 @@ class _OnboardingImportWalletScreenState
     if (mounted) _focusNodes[next].requestFocus();
   }
 
-  Future<void> _handleSubmitted(int index, ImportWalletState state) async {
-    if (state.submitting || state.requiresReconciliation) return;
+  Future<void> _handleSubmitted(
+    int index,
+    ImportWalletState state,
+    AsterNavigationCommandOwner navigation,
+  ) async {
+    if (state.submitting ||
+        state.requiresReconciliation ||
+        navigation.inFlight) {
+      return;
+    }
     if (index == ImportWalletState.wordCount - 1) {
       if (state.canSubmit) {
         FocusScope.of(context).unfocus();
-        await _submit();
+        await _submit(navigation);
       }
       return;
     }
@@ -320,10 +360,27 @@ class _OnboardingImportWalletScreenState
     );
   }
 
-  Future<void> _submit() async {
+  Future<void> _submit(AsterNavigationCommandOwner navigation) async {
     FocusScope.of(context).unfocus();
-    await ref.read(importWalletViewModelProvider.notifier).submit();
+    await navigation.run(
+      command: () => ref.read(importWalletViewModelProvider.notifier).submit(),
+      failureTitle: 'Wallet could not be imported',
+      hapticIntent: null,
+      blocksRoutePop: true,
+    );
   }
+}
+
+void _navigateToWelcome(
+  BuildContext context,
+  AsterNavigationCommandOwner navigation,
+) {
+  unawaited(
+    navigation.run(
+      command: () => _returnToWelcome(context),
+      failureTitle: 'Welcome screen could not open',
+    ),
+  );
 }
 
 void _returnToWelcome(BuildContext context) {

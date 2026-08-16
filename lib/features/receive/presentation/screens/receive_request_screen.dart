@@ -122,76 +122,103 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
     }
   }
 
-  Future<void> _regenerate() async {
-    final regenerated = await ref
-        .read(receiveFlowViewModelProvider(widget.target).notifier)
-        .regenerate();
-    if (!mounted) return;
-    if (regenerated) {
-      context.toasts.show(
-        title: 'New payment request ready',
-        variant: ToastVariant.success,
-      );
-      return;
-    }
-    final failure = ref
-        .read(receiveFlowViewModelProvider(widget.target))
-        .value
-        ?.failure;
-    if (failure != null) {
-      context.toasts.show(
-        title: 'Could not regenerate request',
-        message: failure.userMessage,
-        variant: ToastVariant.failure,
-      );
-    }
+  Future<void> _regenerate(AsterNavigationCommandOwner navigation) async {
+    await navigation.run(
+      command: () async {
+        final regenerated = await ref
+            .read(receiveFlowViewModelProvider(widget.target).notifier)
+            .regenerate();
+        if (!mounted) return;
+        if (regenerated) {
+          context.toasts.show(
+            title: 'New payment request ready',
+            variant: ToastVariant.success,
+          );
+          return;
+        }
+        final failure = ref
+            .read(receiveFlowViewModelProvider(widget.target))
+            .value
+            ?.failure;
+        if (failure != null) {
+          context.toasts.show(
+            title: 'Could not regenerate request',
+            message: failure.userMessage,
+            variant: ToastVariant.failure,
+          );
+        }
+      },
+      failureTitle: 'Payment request could not be regenerated',
+      hapticIntent: null,
+      blocksRoutePop: true,
+    );
+  }
+
+  Future<void> _showAmountSheet(
+    BuildContext context,
+    AsterNavigationCommandOwner navigation,
+  ) async {
+    await navigation.run(
+      command: () => ReceiveAmountSheet.show(context, target: widget.target),
+      failureTitle: 'Amount editor could not open',
+      hapticIntent: null,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final provider = receiveFlowViewModelProvider(widget.target);
     final flow = ref.watch(provider);
-    final generationOwnsRoute = flow.value?.isGenerating ?? false;
-    return PopScope(
-      canPop: !generationOwnsRoute,
-      child: Scaffold(
-        backgroundColor: context.colorScheme.surface,
-        appBar: CustomAppBar(
-          title: 'Receive ${widget.target.assetLabel}',
-          leadingIcon: true,
-          leadingEnabled: !generationOwnsRoute,
-          centerTitle: false,
-          fallbackLocation: RoutePaths.receive,
-        ),
-        body: SafeArea(
-          top: false,
-          minimum: EdgeInsets.only(bottom: context.spacing.lg),
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: context.spacing.screenPadding,
-            ),
-            child: flow.when(
-              skipLoadingOnRefresh: false,
-              data: (state) => _RequestBody(
-                state: state,
-                now: _now,
-                onCopy: () => unawaited(_copy()),
-                onShare: () => unawaited(_share()),
-                onRegenerate: () => unawaited(_regenerate()),
-                onSetAmount: () => unawaited(
-                  ReceiveAmountSheet.show(context, target: widget.target),
+    final durableGenerationOwnsRoute = flow.value?.isGenerating ?? false;
+    return AsterNavigationScope(
+      child: Builder(
+        builder: (context) {
+          final navigation = AsterNavigationScope.of(context);
+          final generationOwnsRoute =
+              durableGenerationOwnsRoute || navigation.inFlight;
+          return PopScope(
+            canPop: !generationOwnsRoute,
+            child: Scaffold(
+              backgroundColor: context.colorScheme.surface,
+              appBar: CustomAppBar(
+                title: 'Receive ${widget.target.assetLabel}',
+                leadingIcon: true,
+                leadingEnabled: !generationOwnsRoute,
+                centerTitle: false,
+                fallbackLocation: RoutePaths.receive,
+              ),
+              body: SafeArea(
+                top: false,
+                minimum: EdgeInsets.only(bottom: context.spacing.lg),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: context.spacing.screenPadding,
+                  ),
+                  child: flow.when(
+                    skipLoadingOnRefresh: false,
+                    data: (state) => _RequestBody(
+                      state: state,
+                      now: _now,
+                      commandsEnabled: !navigation.inFlight,
+                      onCopy: () => unawaited(_copy()),
+                      onShare: () => unawaited(_share()),
+                      onRegenerate: () => unawaited(_regenerate(navigation)),
+                      onSetAmount: () =>
+                          unawaited(_showAmountSheet(context, navigation)),
+                    ),
+                    loading: () => const _RequestLoading(),
+                    error: (error, stackTrace) => _RequestFailure(
+                      failure: error is AppFailureException
+                          ? error.failure
+                          : FailureMapper.from(error, stackTrace),
+                      onRetry: ref.read(provider.notifier).retry,
+                    ),
+                  ),
                 ),
               ),
-              loading: () => const _RequestLoading(),
-              error: (error, stackTrace) => _RequestFailure(
-                failure: error is AppFailureException
-                    ? error.failure
-                    : FailureMapper.from(error, stackTrace),
-                onRetry: ref.read(provider.notifier).retry,
-              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -201,6 +228,7 @@ final class _RequestBody extends StatelessWidget {
   _RequestBody({
     required this.state,
     required this.now,
+    required this.commandsEnabled,
     required this.onCopy,
     required this.onShare,
     required this.onRegenerate,
@@ -209,6 +237,7 @@ final class _RequestBody extends StatelessWidget {
 
   final ReceiveFlowState state;
   final DateTime now;
+  final bool commandsEnabled;
   final VoidCallback onCopy;
   final VoidCallback onShare;
   final VoidCallback onRegenerate;
@@ -274,7 +303,7 @@ final class _RequestBody extends StatelessWidget {
                   prefixIcon: MingCuteIcons.mgc_copy_2_line,
                   loading:
                       state.operation == ReceiveFlowOperation.copyingRequest,
-                  enabled: state.canReadRequest && !expired,
+                  enabled: commandsEnabled && state.canReadRequest && !expired,
                   hapticIntent: null,
                   onTap: onCopy,
                 ),
@@ -290,7 +319,9 @@ final class _RequestBody extends StatelessWidget {
                 title: 'Set amount',
                 details: appliedAmount?.text,
                 prefixIcon: MingCuteIcons.mgc_edit_2_line,
-                onTap: state.canEditAmount ? onSetAmount : null,
+                onTap: commandsEnabled && state.canEditAmount
+                    ? onSetAmount
+                    : null,
               ),
               if (request != null) ...[
                 const AsterDivider.inset(),
@@ -299,7 +330,9 @@ final class _RequestBody extends StatelessWidget {
                   details: state.isGenerating ? 'Generating' : null,
                   prefixIcon: MingCuteIcons.mgc_refresh_2_line,
                   hapticIntent: null,
-                  onTap: state.canRegenerate ? onRegenerate : null,
+                  onTap: commandsEnabled && state.canRegenerate
+                      ? onRegenerate
+                      : null,
                 ),
                 const AsterDivider.inset(),
                 AsterOptionRow(
@@ -310,7 +343,9 @@ final class _RequestBody extends StatelessWidget {
                       : null,
                   prefixIcon: MingCuteIcons.mgc_share_forward_line,
                   hapticIntent: null,
-                  onTap: state.canReadRequest && !expired ? onShare : null,
+                  onTap: commandsEnabled && state.canReadRequest && !expired
+                      ? onShare
+                      : null,
                 ),
               ],
             ],

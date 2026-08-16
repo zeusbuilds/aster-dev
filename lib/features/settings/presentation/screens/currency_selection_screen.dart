@@ -19,34 +19,45 @@ class CurrencySelectionScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsViewModelProvider);
     final saving = settings.value?.isSaving ?? false;
-    return PopScope(
-      canPop: !saving,
-      child: Scaffold(
-        backgroundColor: context.colorScheme.surface,
-        appBar: CustomAppBar(
-          title: 'Select Currency',
-          leadingIcon: true,
-          leadingEnabled: !saving,
-          fallbackLocation: RoutePaths.settings,
-        ),
-        body: settings.when(
-          skipLoadingOnRefresh: false,
-          data: (state) => _CurrencyList(state: state),
-          loading: () => const _CurrencyLoading(),
-          error: (error, stackTrace) => SettingsLoadFailure(
-            failure: FailureMapper.from(error, stackTrace),
-            onRetry: () => ref.read(settingsViewModelProvider.notifier).retry(),
-          ),
-        ),
+    return AsterNavigationScope(
+      child: Builder(
+        builder: (context) {
+          final navigation = AsterNavigationScope.of(context);
+          final navigationLocked = saving || navigation.inFlight;
+          return PopScope(
+            canPop: !navigationLocked,
+            child: Scaffold(
+              backgroundColor: context.colorScheme.surface,
+              appBar: CustomAppBar(
+                title: 'Select Currency',
+                leadingIcon: true,
+                leadingEnabled: !navigationLocked,
+                fallbackLocation: RoutePaths.settings,
+              ),
+              body: settings.when(
+                skipLoadingOnRefresh: false,
+                data: (state) =>
+                    _CurrencyList(state: state, navigation: navigation),
+                loading: () => const _CurrencyLoading(),
+                error: (error, stackTrace) => SettingsLoadFailure(
+                  failure: FailureMapper.from(error, stackTrace),
+                  onRetry: () =>
+                      ref.read(settingsViewModelProvider.notifier).retry(),
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
 }
 
 class _CurrencyList extends ConsumerWidget {
-  const _CurrencyList({required this.state});
+  const _CurrencyList({required this.state, required this.navigation});
 
   final SettingsState state;
+  final AsterNavigationCommandOwner navigation;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -65,10 +76,15 @@ class _CurrencyList extends ConsumerWidget {
               return CurrencySelectOptionRow(
                 currency: currency,
                 selected: selectedCode == currency.code,
-                onTap: saving
+                onTap: saving || navigation.inFlight
                     ? null
                     : () => unawaited(
-                        _selectCurrency(context, ref, currency.code),
+                        _selectCurrency(
+                          context,
+                          ref,
+                          navigation,
+                          currency.code,
+                        ),
                       ),
               );
             },
@@ -82,26 +98,36 @@ class _CurrencyList extends ConsumerWidget {
   Future<void> _selectCurrency(
     BuildContext context,
     WidgetRef ref,
+    AsterNavigationCommandOwner navigation,
     String code,
   ) async {
-    final saved = await ref
-        .read(settingsViewModelProvider.notifier)
-        .selectCurrency(code);
-    if (!context.mounted) return;
-    if (saved) {
-      unawaited(context.haptics.trigger(HapticIntent.selection));
-      context.pop();
-      return;
-    }
-    final failure = ref.read(settingsViewModelProvider).value?.operationFailure;
-    if (failure == null) return;
-    unawaited(context.haptics.trigger(HapticIntent.error));
-    context.toasts.show(
-      title: 'Currency not saved',
-      message: failure.userMessage,
-      variant: ToastVariant.failure,
+    var saved = false;
+    final accepted = await navigation.run(
+      command: () async {
+        saved = await ref
+            .read(settingsViewModelProvider.notifier)
+            .selectCurrency(code);
+        if (!context.mounted || saved) return;
+        final failure = ref
+            .read(settingsViewModelProvider)
+            .value
+            ?.operationFailure;
+        if (failure == null) return;
+        unawaited(context.haptics.trigger(HapticIntent.error));
+        context.toasts.show(
+          title: 'Currency not saved',
+          message: failure.userMessage,
+          variant: ToastVariant.failure,
+        );
+        ref.read(settingsViewModelProvider.notifier).clearOperationFailure();
+      },
+      failureTitle: 'Currency could not be saved',
+      hapticIntent: null,
+      blocksRoutePop: true,
     );
-    ref.read(settingsViewModelProvider.notifier).clearOperationFailure();
+    if (!accepted || !saved || !context.mounted) return;
+    unawaited(context.haptics.trigger(HapticIntent.selection));
+    context.pop();
   }
 }
 

@@ -19,54 +19,65 @@ class BitcoinUnitSelectionScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsViewModelProvider);
     final saving = settings.value?.isSaving ?? false;
-    return PopScope(
-      canPop: !saving,
-      child: Scaffold(
-        backgroundColor: context.colorScheme.surface,
-        appBar: CustomAppBar(
-          title: 'Bitcoin Unit',
-          leadingIcon: true,
-          leadingEnabled: !saving,
-          fallbackLocation: RoutePaths.settings,
-        ),
-        body: settings.when(
-          skipLoadingOnRefresh: false,
-          loading: () => const Center(
-            child: GridLoader(semanticLabel: 'Loading Bitcoin units'),
-          ),
-          error: (error, stackTrace) => SettingsLoadFailure(
-            failure: FailureMapper.from(error, stackTrace),
-            onRetry: () => ref.read(settingsViewModelProvider.notifier).retry(),
-          ),
-          data: (state) {
-            final selected = state.snapshot.preferences.bitcoinUnit;
-            return Stack(
-              children: [
-                SafeArea(
-                  top: false,
-                  child: ListView.separated(
-                    itemCount: BitcoinUnit.values.length,
-                    separatorBuilder: (context, index) =>
-                        const AsterDivider.inset(),
-                    itemBuilder: (context, index) {
-                      final unit = BitcoinUnit.values[index];
-                      return SettingsChoiceRow(
-                        title: unit.displayName,
-                        subtitle: BitcoinAmountFormatter(unit: unit)
-                            .format(_exampleSatoshis),
-                        selected: selected == unit,
-                        onTap: saving
-                            ? null
-                            : () => unawaited(_select(context, ref, unit)),
-                      );
-                    },
-                  ),
+    return AsterNavigationScope(
+      child: Builder(
+        builder: (context) {
+          final navigation = AsterNavigationScope.of(context);
+          final navigationLocked = saving || navigation.inFlight;
+          return PopScope(
+            canPop: !navigationLocked,
+            child: Scaffold(
+              backgroundColor: context.colorScheme.surface,
+              appBar: CustomAppBar(
+                title: 'Bitcoin Unit',
+                leadingIcon: true,
+                leadingEnabled: !navigationLocked,
+                fallbackLocation: RoutePaths.settings,
+              ),
+              body: settings.when(
+                skipLoadingOnRefresh: false,
+                loading: () => const Center(
+                  child: GridLoader(semanticLabel: 'Loading Bitcoin units'),
                 ),
-                if (saving) const SettingsSavingIndicator(),
-              ],
-            );
-          },
-        ),
+                error: (error, stackTrace) => SettingsLoadFailure(
+                  failure: FailureMapper.from(error, stackTrace),
+                  onRetry: () =>
+                      ref.read(settingsViewModelProvider.notifier).retry(),
+                ),
+                data: (state) {
+                  final selected = state.snapshot.preferences.bitcoinUnit;
+                  return Stack(
+                    children: [
+                      SafeArea(
+                        top: false,
+                        child: ListView.separated(
+                          itemCount: BitcoinUnit.values.length,
+                          separatorBuilder: (context, index) =>
+                              const AsterDivider.inset(),
+                          itemBuilder: (context, index) {
+                            final unit = BitcoinUnit.values[index];
+                            return SettingsChoiceRow(
+                              title: unit.displayName,
+                              subtitle: BitcoinAmountFormatter(unit: unit)
+                                  .format(_exampleSatoshis),
+                              selected: selected == unit,
+                              onTap: navigationLocked
+                                  ? null
+                                  : () => unawaited(
+                                      _select(context, ref, navigation, unit),
+                                    ),
+                            );
+                          },
+                        ),
+                      ),
+                      if (saving) const SettingsSavingIndicator(),
+                    ],
+                  );
+                },
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -74,25 +85,35 @@ class BitcoinUnitSelectionScreen extends ConsumerWidget {
   Future<void> _select(
     BuildContext context,
     WidgetRef ref,
+    AsterNavigationCommandOwner navigation,
     BitcoinUnit unit,
   ) async {
-    final saved = await ref
-        .read(settingsViewModelProvider.notifier)
-        .selectBitcoinUnit(unit);
-    if (!context.mounted) return;
-    if (saved) {
-      unawaited(context.haptics.trigger(HapticIntent.selection));
-      context.pop();
-      return;
-    }
-    final failure = ref.read(settingsViewModelProvider).value?.operationFailure;
-    if (failure == null) return;
-    unawaited(context.haptics.trigger(HapticIntent.error));
-    context.toasts.show(
-      title: 'Bitcoin unit not saved',
-      message: failure.userMessage,
-      variant: ToastVariant.failure,
+    var saved = false;
+    final accepted = await navigation.run(
+      command: () async {
+        saved = await ref
+            .read(settingsViewModelProvider.notifier)
+            .selectBitcoinUnit(unit);
+        if (!context.mounted || saved) return;
+        final failure = ref
+            .read(settingsViewModelProvider)
+            .value
+            ?.operationFailure;
+        if (failure == null) return;
+        unawaited(context.haptics.trigger(HapticIntent.error));
+        context.toasts.show(
+          title: 'Bitcoin unit not saved',
+          message: failure.userMessage,
+          variant: ToastVariant.failure,
+        );
+        ref.read(settingsViewModelProvider.notifier).clearOperationFailure();
+      },
+      failureTitle: 'Bitcoin unit could not be saved',
+      hapticIntent: null,
+      blocksRoutePop: true,
     );
-    ref.read(settingsViewModelProvider.notifier).clearOperationFailure();
+    if (!accepted || !saved || !context.mounted) return;
+    unawaited(context.haptics.trigger(HapticIntent.selection));
+    context.pop();
   }
 }

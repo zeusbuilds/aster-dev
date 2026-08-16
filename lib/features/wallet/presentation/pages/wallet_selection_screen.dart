@@ -16,80 +16,110 @@ class WalletSelectionScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final spacing = context.spacing;
     final walletState = ref.watch(walletViewModelProvider);
     final viewModel = ref.read(walletViewModelProvider.notifier);
 
-    return walletState.when(
-      loading: () => const _WalletSelectionScaffold(
-        child: Center(child: GridLoader(semanticLabel: 'Loading wallets')),
-      ),
-      error: (error, stackTrace) {
-        final failure = error is AppFailureException
-            ? error.failure
-            : FailureMapper.from(error, stackTrace);
-        return _WalletSelectionScaffold(
-          child: _WalletLoadFailure(
-            failure: failure,
-            onRetry: viewModel.reload,
-          ),
-        );
-      },
-      data: (data) {
-        final switchingWalletId = data.switchingWalletId;
-        return _WalletSelectionScaffold(
-          navigationLocked: switchingWalletId != null,
-          child: SafeArea(
-            top: false,
-            minimum: EdgeInsets.only(bottom: spacing.lg),
-            child: ListView.separated(
-              itemCount: data.wallets.length,
-              separatorBuilder: (context, index) => const AsterDivider.inset(),
-              itemBuilder: (context, index) {
-                final wallet = data.wallets[index];
-                final isSelected = data.activeWallet?.id == wallet.id;
-                final isSwitching = switchingWalletId == wallet.id;
-
-                return WalletSelectOptionRow(
-                  key: ValueKey('wallet-${wallet.id}'),
-                  wallet: wallet,
-                  selected: isSelected,
-                  enabled: switchingWalletId == null,
-                  loading: isSwitching,
-                  onTap: isSelected
-                      ? null
-                      : () => unawaited(_switchWallet(context, ref, wallet.id)),
-                );
-              },
+    return AsterNavigationScope(
+      child: Builder(
+        builder: (context) {
+          final navigation = AsterNavigationScope.of(context);
+          final spacing = context.spacing;
+          return walletState.when(
+            loading: () => const _WalletSelectionScaffold(
+              child: Center(
+                child: GridLoader(semanticLabel: 'Loading wallets'),
+              ),
             ),
-          ),
-        );
-      },
+            error: (error, stackTrace) {
+              final failure = error is AppFailureException
+                  ? error.failure
+                  : FailureMapper.from(error, stackTrace);
+              return _WalletSelectionScaffold(
+                navigationLocked: navigation.inFlight,
+                child: _WalletLoadFailure(
+                  failure: failure,
+                  onRetry: viewModel.reload,
+                ),
+              );
+            },
+            data: (data) {
+              final switchingWalletId = data.switchingWalletId;
+              final navigationLocked =
+                  switchingWalletId != null || navigation.inFlight;
+              return _WalletSelectionScaffold(
+                navigationLocked: navigationLocked,
+                child: SafeArea(
+                  top: false,
+                  minimum: EdgeInsets.only(bottom: spacing.lg),
+                  child: ListView.separated(
+                    itemCount: data.wallets.length,
+                    separatorBuilder: (context, index) =>
+                        const AsterDivider.inset(),
+                    itemBuilder: (context, index) {
+                      final wallet = data.wallets[index];
+                      final isSelected = data.activeWallet?.id == wallet.id;
+                      final isSwitching = switchingWalletId == wallet.id;
+
+                      return WalletSelectOptionRow(
+                        key: ValueKey('wallet-${wallet.id}'),
+                        wallet: wallet,
+                        selected: isSelected,
+                        enabled: !navigationLocked,
+                        loading: isSwitching,
+                        onTap: isSelected || navigationLocked
+                            ? null
+                            : () => unawaited(
+                                _switchWallet(
+                                  context,
+                                  ref,
+                                  navigation,
+                                  wallet.id,
+                                ),
+                              ),
+                      );
+                    },
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 
   Future<void> _switchWallet(
     BuildContext context,
     WidgetRef ref,
+    AsterNavigationCommandOwner navigation,
     String walletId,
   ) async {
     final viewModel = ref.read(walletViewModelProvider.notifier);
-    final switched = await viewModel.switchWallet(walletId);
-    if (!context.mounted) return;
-    if (switched) {
-      unawaited(context.haptics.trigger(HapticIntent.selection));
-      context.pop();
-      return;
-    }
-    final failure = ref.read(walletViewModelProvider).value?.operationFailure;
-    if (failure == null) return;
-    unawaited(context.haptics.trigger(HapticIntent.error));
-    context.toasts.show(
-      title: 'Wallet not switched',
-      message: failure.userMessage,
-      variant: ToastVariant.failure,
+    var switched = false;
+    final accepted = await navigation.run(
+      command: () async {
+        switched = await viewModel.switchWallet(walletId);
+        if (!context.mounted || switched) return;
+        final failure = ref
+            .read(walletViewModelProvider)
+            .value
+            ?.operationFailure;
+        if (failure == null) return;
+        unawaited(context.haptics.trigger(HapticIntent.error));
+        context.toasts.show(
+          title: 'Wallet not switched',
+          message: failure.userMessage,
+          variant: ToastVariant.failure,
+        );
+        viewModel.clearOperationFailure();
+      },
+      failureTitle: 'Wallet could not be switched',
+      hapticIntent: null,
+      blocksRoutePop: true,
     );
-    viewModel.clearOperationFailure();
+    if (!accepted || !switched || !context.mounted) return;
+    unawaited(context.haptics.trigger(HapticIntent.selection));
+    context.pop();
   }
 }
 

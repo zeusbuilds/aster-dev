@@ -19,34 +19,45 @@ class CountrySelectionScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsViewModelProvider);
     final saving = settings.value?.isSaving ?? false;
-    return PopScope(
-      canPop: !saving,
-      child: Scaffold(
-        backgroundColor: context.colorScheme.surface,
-        appBar: CustomAppBar(
-          title: 'Select Region',
-          leadingIcon: true,
-          leadingEnabled: !saving,
-          fallbackLocation: RoutePaths.settings,
-        ),
-        body: settings.when(
-          skipLoadingOnRefresh: false,
-          data: (state) => _RegionList(state: state),
-          loading: () => const _RegionLoading(),
-          error: (error, stackTrace) => SettingsLoadFailure(
-            failure: FailureMapper.from(error, stackTrace),
-            onRetry: () => ref.read(settingsViewModelProvider.notifier).retry(),
-          ),
-        ),
+    return AsterNavigationScope(
+      child: Builder(
+        builder: (context) {
+          final navigation = AsterNavigationScope.of(context);
+          final navigationLocked = saving || navigation.inFlight;
+          return PopScope(
+            canPop: !navigationLocked,
+            child: Scaffold(
+              backgroundColor: context.colorScheme.surface,
+              appBar: CustomAppBar(
+                title: 'Select Region',
+                leadingIcon: true,
+                leadingEnabled: !navigationLocked,
+                fallbackLocation: RoutePaths.settings,
+              ),
+              body: settings.when(
+                skipLoadingOnRefresh: false,
+                data: (state) =>
+                    _RegionList(state: state, navigation: navigation),
+                loading: () => const _RegionLoading(),
+                error: (error, stackTrace) => SettingsLoadFailure(
+                  failure: FailureMapper.from(error, stackTrace),
+                  onRetry: () =>
+                      ref.read(settingsViewModelProvider.notifier).retry(),
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
 }
 
 class _RegionList extends ConsumerWidget {
-  const _RegionList({required this.state});
+  const _RegionList({required this.state, required this.navigation});
 
   final SettingsState state;
+  final AsterNavigationCommandOwner navigation;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -65,9 +76,11 @@ class _RegionList extends ConsumerWidget {
               return CountrySelectOptionRow(
                 country: region,
                 selected: selectedCode == region.code,
-                onTap: saving
+                onTap: saving || navigation.inFlight
                     ? null
-                    : () => unawaited(_selectRegion(context, ref, region.code)),
+                    : () => unawaited(
+                        _selectRegion(context, ref, navigation, region.code),
+                      ),
               );
             },
           ),
@@ -80,26 +93,36 @@ class _RegionList extends ConsumerWidget {
   Future<void> _selectRegion(
     BuildContext context,
     WidgetRef ref,
+    AsterNavigationCommandOwner navigation,
     String code,
   ) async {
-    final saved = await ref
-        .read(settingsViewModelProvider.notifier)
-        .selectRegion(code);
-    if (!context.mounted) return;
-    if (saved) {
-      unawaited(context.haptics.trigger(HapticIntent.selection));
-      context.pop();
-      return;
-    }
-    final failure = ref.read(settingsViewModelProvider).value?.operationFailure;
-    if (failure == null) return;
-    unawaited(context.haptics.trigger(HapticIntent.error));
-    context.toasts.show(
-      title: 'Region not saved',
-      message: failure.userMessage,
-      variant: ToastVariant.failure,
+    var saved = false;
+    final accepted = await navigation.run(
+      command: () async {
+        saved = await ref
+            .read(settingsViewModelProvider.notifier)
+            .selectRegion(code);
+        if (!context.mounted || saved) return;
+        final failure = ref
+            .read(settingsViewModelProvider)
+            .value
+            ?.operationFailure;
+        if (failure == null) return;
+        unawaited(context.haptics.trigger(HapticIntent.error));
+        context.toasts.show(
+          title: 'Region not saved',
+          message: failure.userMessage,
+          variant: ToastVariant.failure,
+        );
+        ref.read(settingsViewModelProvider.notifier).clearOperationFailure();
+      },
+      failureTitle: 'Region could not be saved',
+      hapticIntent: null,
+      blocksRoutePop: true,
     );
-    ref.read(settingsViewModelProvider.notifier).clearOperationFailure();
+    if (!accepted || !saved || !context.mounted) return;
+    unawaited(context.haptics.trigger(HapticIntent.selection));
+    context.pop();
   }
 }
 

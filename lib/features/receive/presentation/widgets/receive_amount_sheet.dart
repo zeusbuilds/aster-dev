@@ -34,90 +34,123 @@ class ReceiveAmountSheet extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     ReceiveFlowViewModel notifier,
+    AsterNavigationCommandOwner navigation,
   ) async {
-    final applied = await notifier.applyAmount();
-    if (!context.mounted) return;
-    if (applied) {
-      Navigator.of(context).pop();
-      return;
-    }
-    final failure = ref
-        .read(receiveFlowViewModelProvider(target))
-        .value
-        ?.failure;
-    if (failure != null) {
-      context.toasts.show(
-        title: 'Amount not applied',
-        message: failure.userMessage,
-        variant: ToastVariant.failure,
-      );
-    }
+    var applied = false;
+    final accepted = await navigation.run(
+      command: () async {
+        applied = await notifier.applyAmount();
+        if (!context.mounted || applied) return;
+        final failure = ref
+            .read(receiveFlowViewModelProvider(target))
+            .value
+            ?.failure;
+        if (failure != null) {
+          context.toasts.show(
+            title: 'Amount not applied',
+            message: failure.userMessage,
+            variant: ToastVariant.failure,
+          );
+        }
+      },
+      failureTitle: 'Amount could not be applied',
+      hapticIntent: null,
+      blocksRoutePop: true,
+    );
+    if (!accepted || !applied || !context.mounted) return;
+    Navigator.of(context).pop();
+  }
+
+  void _close(BuildContext context, AsterNavigationCommandOwner navigation) {
+    unawaited(
+      navigation.run(
+        command: () => Navigator.of(context).pop(),
+        failureTitle: 'Amount editor could not close',
+        hapticIntent: null,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final provider = receiveFlowViewModelProvider(target);
     final flow = ref.watch(provider);
-    final generationOwnsRoute = flow.value?.isGenerating ?? false;
     final maxHeight =
         MediaQuery.sizeOf(context).height *
         context.metrics.sheetMaxHeightFactor;
 
-    return PopScope(
-      canPop: !generationOwnsRoute,
-      child: Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.viewInsetsOf(context).bottom,
-        ),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: maxHeight),
-          child: Squircle(
-            color: context.colorScheme.surface,
-            border: BorderRadius.vertical(
-              top: Radius.circular(context.radii.sheet),
-            ),
-            borderColor: context.appColors.transparentSurface,
-            borderWidth: 0,
-            padding: EdgeInsets.zero,
-            child: SafeArea(
-              top: false,
-              minimum: EdgeInsets.only(bottom: context.spacing.lg),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _AmountSheetHeader(
-                    onClose: generationOwnsRoute
-                        ? null
-                        : () => Navigator.of(context).pop(),
+    return AsterNavigationScope(
+      child: Builder(
+        builder: (context) {
+          final navigation = AsterNavigationScope.of(context);
+          final generationOwnsRoute =
+              (flow.value?.isGenerating ?? false) || navigation.inFlight;
+          return PopScope(
+            canPop: !generationOwnsRoute,
+            child: Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.viewInsetsOf(context).bottom,
+              ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: maxHeight),
+                child: Squircle(
+                  color: context.colorScheme.surface,
+                  border: BorderRadius.vertical(
+                    top: Radius.circular(context.radii.sheet),
                   ),
-                  Flexible(
-                    child: flow.when(
-                      skipLoadingOnRefresh: false,
-                      data: (value) => _AmountSheetBody(
-                        state: value,
-                        onChanged: ref.read(provider.notifier).updateAmount,
-                        onApply: () => unawaited(
-                          _apply(context, ref, ref.read(provider.notifier)),
+                  borderColor: context.appColors.transparentSurface,
+                  borderWidth: 0,
+                  padding: EdgeInsets.zero,
+                  child: SafeArea(
+                    top: false,
+                    minimum: EdgeInsets.only(bottom: context.spacing.lg),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _AmountSheetHeader(
+                          onClose: generationOwnsRoute
+                              ? null
+                              : () => _close(context, navigation),
                         ),
-                      ),
-                      loading: () => const Center(
-                        child: GridLoader(
-                          semanticLabel: 'Loading amount editor',
+                        Flexible(
+                          child: flow.when(
+                            skipLoadingOnRefresh: false,
+                            data: (value) => _AmountSheetBody(
+                              state: value,
+                              commandsEnabled: !navigation.inFlight,
+                              onChanged: ref
+                                  .read(provider.notifier)
+                                  .updateAmount,
+                              onApply: () => unawaited(
+                                _apply(
+                                  context,
+                                  ref,
+                                  ref.read(provider.notifier),
+                                  navigation,
+                                ),
+                              ),
+                            ),
+                            loading: () => const Center(
+                              child: GridLoader(
+                                semanticLabel: 'Loading amount editor',
+                              ),
+                            ),
+                            error: (error, stackTrace) => _SheetFailure(
+                              failure: error is AppFailureException
+                                  ? error.failure
+                                  : FailureMapper.from(error, stackTrace),
+                              onRetry: ref.read(provider.notifier).retry,
+                            ),
+                          ),
                         ),
-                      ),
-                      error: (error, stackTrace) => _SheetFailure(
-                        failure: error is AppFailureException
-                            ? error.failure
-                            : FailureMapper.from(error, stackTrace),
-                        onRetry: ref.read(provider.notifier).retry,
-                      ),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -160,11 +193,13 @@ final class _AmountSheetHeader extends StatelessWidget {
 final class _AmountSheetBody extends StatelessWidget {
   const _AmountSheetBody({
     required this.state,
+    required this.commandsEnabled,
     required this.onChanged,
     required this.onApply,
   });
 
   final ReceiveFlowState state;
+  final bool commandsEnabled;
   final ValueChanged<String> onChanged;
   final VoidCallback onApply;
 
@@ -228,7 +263,7 @@ final class _AmountSheetBody extends StatelessWidget {
             child: SingleChildScrollView(
               child: AsterNumericKeypad(
                 value: state.amountText,
-                enabled: state.canEditAmount,
+                enabled: commandsEnabled && state.canEditAmount,
                 allowDecimal:
                     codec.displayPrecision(state.route, state.bitcoinUnit) > 0,
                 onChanged: onChanged,
@@ -239,7 +274,7 @@ final class _AmountSheetBody extends StatelessWidget {
           CustomButton(
             text: submitLabel,
             loading: state.isGenerating,
-            enabled: state.canApplyAmount,
+            enabled: commandsEnabled && state.canApplyAmount,
             hapticIntent: null,
             onTap: onApply,
           ),

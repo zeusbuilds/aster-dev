@@ -19,23 +19,36 @@ class OnboardingCreateWalletScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncState = ref.watch(createWalletViewModelProvider);
     final value = asyncState.value;
-    final navigationLocked =
-        value != null && (value.submitting || value.requiresReconciliation);
-    return PopScope(
-      canPop: !navigationLocked,
-      child: Scaffold(
-        backgroundColor: context.appColors.transparentSurface,
-        body: SafeArea(
-          child: switch (asyncState) {
-            AsyncData<CreateWalletState>(:final value) when !value.completed =>
-              _CreateWalletContent(state: value),
-            AsyncError<CreateWalletState>(:final error, :final stackTrace) =>
-              _buildFailure(context, ref, error, stackTrace),
-            _ => const OnboardingStatusPanel.loading(
-              message: 'Generating your recovery phrase...',
+    return AsterNavigationScope(
+      child: Builder(
+        builder: (context) {
+          final navigation = AsterNavigationScope.of(context);
+          final navigationLocked =
+              navigation.inFlight ||
+              (value != null &&
+                  (value.submitting || value.requiresReconciliation));
+          return PopScope(
+            canPop: !navigationLocked,
+            child: Scaffold(
+              backgroundColor: context.appColors.transparentSurface,
+              body: SafeArea(
+                child: switch (asyncState) {
+                  AsyncData<CreateWalletState>(:final value)
+                      when !value.completed =>
+                    _CreateWalletContent(state: value, navigation: navigation),
+                  AsyncError<CreateWalletState>(
+                    :final error,
+                    :final stackTrace,
+                  ) =>
+                    _buildFailure(context, ref, navigation, error, stackTrace),
+                  _ => const OnboardingStatusPanel.loading(
+                    message: 'Generating your recovery phrase...',
+                  ),
+                },
+              ),
             ),
-          },
-        ),
+          );
+        },
       ),
     );
   }
@@ -43,6 +56,7 @@ class OnboardingCreateWalletScreen extends ConsumerWidget {
   Widget _buildFailure(
     BuildContext context,
     WidgetRef ref,
+    AsterNavigationCommandOwner navigation,
     Object error,
     StackTrace stackTrace,
   ) {
@@ -54,15 +68,16 @@ class OnboardingCreateWalletScreen extends ConsumerWidget {
       onPrimary: failure.retryable
           ? () => ref.invalidate(createWalletViewModelProvider)
           : null,
-      onBack: () => _returnToWelcome(context),
+      onBack: () => _navigateToWelcome(context, navigation),
     );
   }
 }
 
 class _CreateWalletContent extends ConsumerWidget {
-  const _CreateWalletContent({required this.state});
+  const _CreateWalletContent({required this.state, required this.navigation});
 
   final CreateWalletState state;
+  final AsterNavigationCommandOwner navigation;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -97,7 +112,7 @@ class _CreateWalletContent extends ConsumerWidget {
                   text: 'Copy recovery phrase',
                   prefixIcon: MingCuteIcons.mgc_copy_2_line,
                   variant: ButtonVariant.translucent,
-                  enabled: !state.submitting,
+                  enabled: state.canCopy && !navigation.inFlight,
                   loading: state.copying,
                   hapticIntent: null,
                   onTap: () => unawaited(_copy(context, ref)),
@@ -135,17 +150,19 @@ class _CreateWalletContent extends ConsumerWidget {
                 CustomButton(
                   text: 'Continue',
                   variant: ButtonVariant.translucent,
-                  enabled: state.canSubmit,
+                  enabled: state.canSubmit && !navigation.inFlight,
                   loading: state.submitting,
                   hapticIntent: null,
-                  onTap: () => unawaited(
-                    ref.read(createWalletViewModelProvider.notifier).submit(),
-                  ),
+                  onTap: () => unawaited(_submit(context, ref)),
                 ),
                 OnboardingTextAction(
                   label: 'Back',
-                  enabled: !state.submitting && !state.requiresReconciliation,
-                  onPressed: () => _returnToWelcome(context),
+                  enabled:
+                      !state.submitting &&
+                      !state.requiresReconciliation &&
+                      !navigation.inFlight,
+                  hapticIntent: null,
+                  onPressed: () => _navigateToWelcome(context, navigation),
                 ),
               ],
             ),
@@ -175,6 +192,27 @@ class _CreateWalletContent extends ConsumerWidget {
         );
     }
   }
+
+  Future<void> _submit(BuildContext context, WidgetRef ref) async {
+    await navigation.run(
+      command: () => ref.read(createWalletViewModelProvider.notifier).submit(),
+      failureTitle: 'Wallet could not be created',
+      hapticIntent: null,
+      blocksRoutePop: true,
+    );
+  }
+}
+
+void _navigateToWelcome(
+  BuildContext context,
+  AsterNavigationCommandOwner navigation,
+) {
+  unawaited(
+    navigation.run(
+      command: () => _returnToWelcome(context),
+      failureTitle: 'Welcome screen could not open',
+    ),
+  );
 }
 
 void _returnToWelcome(BuildContext context) {

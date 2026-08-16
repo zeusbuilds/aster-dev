@@ -485,6 +485,41 @@ void main() {
     },
   );
 
+  testWidgets(
+    'durable command blocks same-frame system pop until ownership releases',
+    (tester) async {
+      final gate = Completer<void>();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: _PopGuardRoot(gate: gate),
+        ),
+      );
+
+      await tester.tap(find.text('Open guarded route'));
+      await tester.pumpAndSettle();
+      expect(find.text('Guarded route'), findsOneWidget);
+
+      final mutate = tester.widget<CustomButton>(
+        find.widgetWithText(CustomButton, 'Start mutation'),
+      );
+      mutate.onTap!();
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+
+      expect(find.text('Guarded route'), findsOneWidget);
+      expect(find.text('Root route'), findsNothing);
+
+      gate.complete();
+      await tester.pump();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Guarded route'), findsNothing);
+      expect(find.text('Root route'), findsOneWidget);
+    },
+  );
+
   testWidgets('reduced motion leaves loaders settled', (tester) async {
     await tester.pumpWidget(
       _themedHarness(const GridLoader(), disableAnimations: true),
@@ -760,6 +795,74 @@ final class _NavigationHarness extends StatelessWidget {
                 ),
               ),
             ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+final class _PopGuardRoot extends StatelessWidget {
+  const _PopGuardRoot({required this.gate});
+
+  final Completer<void> gate;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Column(
+        children: [
+          const Text('Root route'),
+          TextButton(
+            onPressed: () {
+              unawaited(
+                Navigator.of(context).push<void>(
+                  MaterialPageRoute<void>(
+                    builder: (context) => _PopGuardRoute(gate: gate),
+                  ),
+                ),
+              );
+            },
+            child: const Text('Open guarded route'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+final class _PopGuardRoute extends StatelessWidget {
+  const _PopGuardRoute({required this.gate});
+
+  final Completer<void> gate;
+
+  @override
+  Widget build(BuildContext context) {
+    return AsterNavigationScope(
+      child: Builder(
+        builder: (context) {
+          final navigation = AsterNavigationScope.of(context);
+          return Scaffold(
+            body: Column(
+              children: [
+                const Text('Guarded route'),
+                CustomButton(
+                  text: 'Start mutation',
+                  enabled: !navigation.inFlight,
+                  hapticIntent: null,
+                  onTap: () {
+                    unawaited(
+                      navigation.run(
+                        command: () => gate.future,
+                        failureTitle: 'Mutation failed',
+                        hapticIntent: null,
+                        blocksRoutePop: true,
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
           );
         },
       ),

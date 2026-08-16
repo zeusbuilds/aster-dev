@@ -6,6 +6,7 @@ import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:aster/features/wallet/presentation/models/models.dart';
 import 'package:aster/features/wallet/presentation/pages/wallet_selection_screen.dart';
 import 'package:aster/features/wallet/presentation/view_model/wallet_view_model.dart';
+import 'package:aster/features/wallet/presentation/widgets/widgets.dart';
 import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -130,6 +131,45 @@ void main() {
     expect(harness.haptics.intents, [HapticIntent.selection]);
     expect(harness.toasts.messages, isEmpty);
   });
+
+  testWidgets(
+    'wallet switch blocks stale Back and system pop in its first frame',
+    (tester) async {
+      final viewModel = _ControlledWalletViewModel(_walletState);
+      final harness = await _pumpWalletSelection(tester, viewModel);
+      final walletRow = tester.widget<WalletSelectOptionRow>(
+        find.byKey(ValueKey('wallet-${_backupWallet.id}')),
+      );
+      final back = tester.widget<AsterIconButton>(
+        find.byWidgetPredicate(
+          (widget) => widget is AsterIconButton && widget.tooltip == 'Back',
+        ),
+      );
+      final navigation = AsterNavigationScope.of(
+        tester.element(find.bySemanticsLabel('Back')),
+      );
+
+      walletRow.onTap!();
+      expect(navigation.inFlight, isTrue);
+      expect(harness.router.canPop(), isTrue);
+      back.onPressed!();
+      expect(harness.router.canPop(), isTrue);
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+
+      expect(harness.router.canPop(), isTrue);
+      expect(find.byType(WalletSelectionScreen), findsOneWidget);
+      expect(viewModel.switchAttempts, 1);
+
+      viewModel.completeFailure(_switchFailure);
+      await _pumpFrames(tester);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(_location(harness.router), RoutePaths.settings);
+      expect(find.text('Settings root'), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'initial loading has one live label and compact rows do not overflow',

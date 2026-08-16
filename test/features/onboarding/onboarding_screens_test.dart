@@ -626,6 +626,129 @@ void main() {
     expect(harness.haptics.intents, contains(HapticIntent.success));
   });
 
+  testWidgets('create blocks stale Back and system pop while provisioning', (
+    tester,
+  ) async {
+    final harness = await OnboardingTestHarness.create();
+    addTearDown(() => _disposeHarness(tester, harness));
+    await harness.container.read(walletViewModelProvider.future);
+    final nativeGate = Completer<void>();
+    harness.engine.initializeGate = nativeGate;
+    final route = await _pumpOnboardingRoute(
+      tester,
+      harness,
+      path: RoutePaths.onboardingCreateWallet,
+      screen: const OnboardingCreateWalletScreen(),
+    );
+    addTearDown(route.router.dispose);
+    await _pumpUntil(
+      tester,
+      () => find.widgetWithText(CustomButton, 'Continue').evaluate().isNotEmpty,
+    );
+
+    final submit = tester.widget<CustomButton>(
+      find.widgetWithText(CustomButton, 'Continue'),
+    );
+    final back = tester.widget<OnboardingTextAction>(
+      find.widgetWithText(OnboardingTextAction, 'Back'),
+    );
+    final navigation = AsterNavigationScope.of(
+      tester.element(find.widgetWithText(OnboardingTextAction, 'Back')),
+    );
+    expect(route.router.canPop(), isTrue);
+    submit.onTap!();
+    expect(navigation.inFlight, isTrue);
+    expect(route.router.canPop(), isTrue);
+    back.onPressed();
+    expect(route.router.canPop(), isTrue);
+    await tester.binding.handlePopRoute();
+    expect(route.router.canPop(), isTrue);
+    await tester.pump();
+
+    expect(find.text('Secure your wallet'), findsOneWidget);
+    await _pumpUntil(tester, () => harness.engine.calls.contains('initialize'));
+
+    nativeGate.complete();
+    await _pumpUntil(
+      tester,
+      () =>
+          harness.container.read(walletViewModelProvider).value?.activeWallet !=
+          null,
+    );
+    await _pumpUntil(tester, () => !navigation.inFlight);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await route.completion;
+
+    expect(find.text('Welcome destination'), findsOneWidget);
+  });
+
+  testWidgets('import blocks stale Back and system pop while provisioning', (
+    tester,
+  ) async {
+    final harness = await OnboardingTestHarness.create();
+    addTearDown(() => _disposeHarness(tester, harness));
+    await harness.container.read(walletViewModelProvider.future);
+    final route = await _pumpOnboardingRoute(
+      tester,
+      harness,
+      path: RoutePaths.onboardingImportWallet,
+      screen: const OnboardingImportWalletScreen(),
+    );
+    addTearDown(route.router.dispose);
+    final notifier = harness.container.read(
+      importWalletViewModelProvider.notifier,
+    );
+    notifier.updateWords(0, validTestMnemonicWords);
+    await _pumpUntil(
+      tester,
+      () =>
+          harness.container
+              .read(importWalletViewModelProvider)
+              .value
+              ?.canSubmit ==
+          true,
+    );
+    final nativeGate = Completer<void>();
+    harness.engine.initializeGate = nativeGate;
+
+    final submit = tester.widget<CustomButton>(
+      find.widgetWithText(CustomButton, 'Continue'),
+    );
+    final back = tester.widget<OnboardingTextAction>(
+      find.widgetWithText(OnboardingTextAction, 'Back'),
+    );
+    final navigation = AsterNavigationScope.of(
+      tester.element(find.widgetWithText(OnboardingTextAction, 'Back')),
+    );
+    expect(route.router.canPop(), isTrue);
+    submit.onTap!();
+    expect(navigation.inFlight, isTrue);
+    expect(route.router.canPop(), isTrue);
+    back.onPressed();
+    expect(route.router.canPop(), isTrue);
+    await tester.binding.handlePopRoute();
+    expect(route.router.canPop(), isTrue);
+    await tester.pump();
+
+    expect(find.text('Import with recovery phrase'), findsOneWidget);
+    await _pumpUntil(tester, () => harness.engine.calls.contains('initialize'));
+
+    nativeGate.complete();
+    await _pumpUntil(
+      tester,
+      () =>
+          harness.container.read(walletViewModelProvider).value?.activeWallet !=
+          null,
+    );
+    await _pumpUntil(tester, () => !navigation.inFlight);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await route.completion;
+
+    expect(find.text('Welcome destination'), findsOneWidget);
+  });
+
   testWidgets('welcome mesh avoids backdrop capture and bounds image decode', (
     tester,
   ) async {
@@ -890,4 +1013,42 @@ Future<void> _pumpScreen(
   for (var frame = 0; frame < 10; frame += 1) {
     await tester.pump(const Duration(milliseconds: 20));
   }
+}
+
+Future<({GoRouter router, Future<Object?> completion})> _pumpOnboardingRoute(
+  WidgetTester tester,
+  OnboardingTestHarness harness, {
+  required String path,
+  required Widget screen,
+}) async {
+  final router = GoRouter(
+    initialLocation: RoutePaths.onboardingWelcome,
+    routes: [
+      GoRoute(
+        path: RoutePaths.onboardingWelcome,
+        builder: (context, state) => const Text('Welcome destination'),
+      ),
+      GoRoute(path: path, builder: (context, state) => screen),
+    ],
+  );
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: harness.container,
+      child: MaterialApp.router(
+        theme: AppTheme.light(),
+        routerConfig: router,
+        builder: (context, child) => AsterFeedbackScope(
+          haptics: harness.haptics,
+          toasts: harness.toasts,
+          child: OnboardingShell(child: child!),
+        ),
+      ),
+    ),
+  );
+  final completion = router.push<Object?>(path);
+  await _pumpUntil(
+    tester,
+    () => find.byType(screen.runtimeType).evaluate().isNotEmpty,
+  );
+  return (router: router, completion: completion);
 }

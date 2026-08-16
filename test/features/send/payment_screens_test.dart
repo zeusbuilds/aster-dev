@@ -921,7 +921,20 @@ void main() {
     );
     await tester.pump();
     harness.engine.createReceiveGate = Completer<void>();
-    await tester.tap(find.widgetWithText(CustomButton, 'Set amount'));
+    final apply = tester.widget<CustomButton>(
+      find.widgetWithText(CustomButton, 'Set amount'),
+    );
+    final staleClose = tester.widget<AsterIconButton>(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is AsterIconButton &&
+            widget.tooltip == 'Close amount editor',
+      ),
+    );
+    apply.onTap!();
+    staleClose.onPressed!();
+    await tester.binding.handlePopRoute();
+    await tester.pump();
     await _pumpUntil(
       tester,
       () =>
@@ -954,6 +967,91 @@ void main() {
 
     expect(harness.engine.createdReceiveAmount?.units, 100000000);
   });
+
+  testWidgets(
+    'Receive regeneration blocks stale Back and system pop in its first frame',
+    (tester) async {
+      final engine = FakeWalletEngine();
+      final harness = await PaymentFlowTestHarness.create(engine: engine);
+      addTearDown(() => _disposeHarness(tester, harness));
+      final provider = receiveFlowViewModelProvider(
+        WalletPaymentTarget.bitcoinOnchain,
+      );
+      final router = GoRouter(
+        initialLocation: RoutePaths.receive,
+        routes: [
+          GoRoute(
+            path: RoutePaths.receive,
+            builder: (context, state) => const Text('Receive root'),
+          ),
+          GoRoute(
+            path: RoutePaths.receiveRequest,
+            builder: (context, state) => const ReceiveRequestScreen(
+              target: WalletPaymentTarget.bitcoinOnchain,
+            ),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      await _pumpRouter(tester, harness, router);
+      final routeCompletion = router.push<Object?>(
+        '/receive/${WalletPaymentTarget.bitcoinOnchain.slug}',
+      );
+      await _pumpUntil(
+        tester,
+        () => find.byType(PrettyQrView).evaluate().isNotEmpty,
+      );
+      await tester.scrollUntilVisible(
+        find.text('Generate new request'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      engine.createReceiveGate = Completer<void>();
+      final regenerate = tester
+          .widgetList<AsterOptionRow>(find.byType(AsterOptionRow))
+          .singleWhere((row) => row.title == 'Generate new request');
+      final staleBack = tester.widget<AsterIconButton>(
+        find.byWidgetPredicate(
+          (widget) => widget is AsterIconButton && widget.tooltip == 'Back',
+        ),
+      );
+      final navigation = AsterNavigationScope.of(
+        tester.element(find.bySemanticsLabel('Back')),
+      );
+
+      regenerate.onTap!();
+      expect(navigation.inFlight, isTrue);
+      expect(router.canPop(), isTrue);
+      staleBack.onPressed!();
+      expect(router.canPop(), isTrue);
+      await tester.binding.handlePopRoute();
+      expect(router.canPop(), isTrue);
+      await tester.pump();
+      await _pumpUntil(
+        tester,
+        () => harness.container.read(provider).value?.isGenerating ?? false,
+      );
+
+      expect(find.byType(ReceiveRequestScreen), findsOneWidget);
+      expect(router.canPop(), isTrue);
+      expect(
+        engine.calls.where((call) => call == 'createReceiveRequest:start'),
+        hasLength(2),
+      );
+
+      engine.createReceiveGate!.complete();
+      await _pumpUntil(
+        tester,
+        () => !(harness.container.read(provider).value?.isGenerating ?? true),
+      );
+      await _pumpUntil(tester, () => !navigation.inFlight);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await routeCompletion;
+
+      expect(find.text('Receive root'), findsOneWidget);
+    },
+  );
 
   testWidgets('RGB Lightning Receive creates its first request from amount', (
     tester,
@@ -1367,7 +1465,18 @@ void main() {
       await tester.tap(find.descendant(of: keypad, matching: find.text(digit)));
       await tester.pump();
     }
-    await tester.tap(find.widgetWithText(CustomButton, 'Send'));
+    final initialSend = tester.widget<CustomButton>(
+      find.widgetWithText(CustomButton, 'Send'),
+    );
+    final staleBack = tester.widget<AsterIconButton>(
+      find.byWidgetPredicate(
+        (widget) => widget is AsterIconButton && widget.tooltip == 'Back',
+      ),
+    );
+    initialSend.onTap!();
+    staleBack.onPressed!();
+    await tester.binding.handlePopRoute();
+    await tester.pump();
     await _pumpFrames(tester);
 
     final sendButton = find.byWidgetPredicate(

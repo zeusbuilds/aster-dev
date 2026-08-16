@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/errors/errors.dart';
@@ -18,11 +19,14 @@ abstract interface class AsterNavigationCommandOwner {
   /// Ownership is acquired synchronously before tactile feedback and retained
   /// until the returned route future completes. Synchronous and asynchronous
   /// failures are reduced to an app-safe diagnostic and never escape as an
-  /// unobserved future.
+  /// unobserved future. Set [blocksRoutePop] for durable mutations whose result
+  /// must remain owned by the current route; the pop veto is published before
+  /// [command] starts, including within the initiating frame.
   Future<bool> run({
     required AsterNavigationCommand command,
     required String failureTitle,
     HapticIntent? hapticIntent = HapticIntent.lightImpact,
+    bool blocksRoutePop = false,
   });
 }
 
@@ -62,6 +66,7 @@ class AsterNavigationScope extends StatefulWidget {
 
 final class _AsterNavigationScopeState extends State<AsterNavigationScope>
     implements AsterNavigationCommandOwner {
+  final ValueNotifier<bool> _routeCanPop = ValueNotifier<bool>(true);
   bool _inFlight = false;
 
   @override
@@ -72,8 +77,10 @@ final class _AsterNavigationScopeState extends State<AsterNavigationScope>
     required AsterNavigationCommand command,
     required String failureTitle,
     HapticIntent? hapticIntent = HapticIntent.lightImpact,
+    bool blocksRoutePop = false,
   }) async {
     if (_inFlight || !mounted) return false;
+    if (blocksRoutePop) _routeCanPop.value = false;
     setState(() => _inFlight = true);
     if (hapticIntent case final intent?) {
       unawaited(context.haptics.trigger(intent));
@@ -102,8 +109,17 @@ final class _AsterNavigationScopeState extends State<AsterNavigationScope>
       }
       return false;
     } finally {
-      if (mounted) setState(() => _inFlight = false);
+      if (mounted) {
+        if (blocksRoutePop) _routeCanPop.value = true;
+        setState(() => _inFlight = false);
+      }
     }
+  }
+
+  @override
+  void dispose() {
+    _routeCanPop.dispose();
+    super.dispose();
   }
 
   @override
@@ -111,9 +127,68 @@ final class _AsterNavigationScopeState extends State<AsterNavigationScope>
     return _AsterNavigationInherited(
       owner: this,
       inFlight: _inFlight,
-      child: widget.child,
+      child: _AsterNavigationPopGuard(
+        canPopNotifier: _routeCanPop,
+        child: widget.child,
+      ),
     );
   }
+}
+
+final class _AsterNavigationPopGuard extends StatefulWidget {
+  const _AsterNavigationPopGuard({
+    required this.canPopNotifier,
+    required this.child,
+  });
+
+  final ValueListenable<bool> canPopNotifier;
+  final Widget child;
+
+  @override
+  State<_AsterNavigationPopGuard> createState() =>
+      _AsterNavigationPopGuardState();
+}
+
+final class _AsterNavigationPopGuardState
+    extends State<_AsterNavigationPopGuard>
+    implements PopEntry<Object?> {
+  ModalRoute<dynamic>? _route;
+
+  @override
+  ValueListenable<bool> get canPopNotifier => widget.canPopNotifier;
+
+  @override
+  void onPopInvoked(bool didPop) {}
+
+  @override
+  void onPopInvokedWithResult(bool didPop, Object? result) {}
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final nextRoute = ModalRoute.of(context);
+    if (identical(nextRoute, _route)) return;
+    _route?.unregisterPopEntry(this);
+    _route = nextRoute;
+    _route?.registerPopEntry(this);
+  }
+
+  @override
+  void didUpdateWidget(_AsterNavigationPopGuard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (identical(oldWidget.canPopNotifier, widget.canPopNotifier)) return;
+    _route?.unregisterPopEntry(this);
+    _route?.registerPopEntry(this);
+  }
+
+  @override
+  void dispose() {
+    _route?.unregisterPopEntry(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 final class _AsterNavigationInherited extends InheritedWidget {
