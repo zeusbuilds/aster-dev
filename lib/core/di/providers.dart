@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -15,6 +16,7 @@ import '../../features/wallet/data/runtime/runtime.dart';
 import '../../features/wallet/data/storage/storage.dart';
 import '../../features/wallet/data/validation/validation.dart';
 import '../config/config.dart';
+import '../errors/errors.dart';
 import '../network/network.dart';
 import '../platform/platform.dart';
 import '../storage/storage.dart';
@@ -107,8 +109,29 @@ ScanSessionFactory scanSessionFactory(Ref ref) {
 @riverpod
 ScanSession scanSession(Ref ref, ScanPurpose purpose) {
   final session = ref.watch(scanSessionFactoryProvider).create();
-  ref.onDispose(() => unawaited(session.close()));
+  ref.onDispose(() => unawaited(_closeScanSession(session)));
   return session;
+}
+
+Future<void> _closeScanSession(ScanSession session) async {
+  AppFailure? failure;
+  try {
+    final result = await session.close();
+    if (result case AppFailureResult<void>(failure: final closeFailure)) {
+      failure = closeFailure;
+    }
+  } catch (error, stackTrace) {
+    failure = FailureMapper.from(error, stackTrace);
+  }
+  if (failure == null) return;
+  FlutterError.reportError(
+    FlutterErrorDetails(
+      exception: AppFailureException(failure),
+      stack: failure.stackTrace,
+      library: 'UTEXO scan lifecycle',
+      context: ErrorDescription('while releasing a native scan session'),
+    ),
+  );
 }
 
 @Riverpod(keepAlive: true)

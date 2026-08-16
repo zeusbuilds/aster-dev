@@ -175,7 +175,7 @@ class _DetailsBody extends ConsumerWidget {
                       TransactionDetailRow(
                         label: entries[index].label,
                         value: entries[index].value,
-                        amount: entries[index].amount,
+                        monetary: entries[index].monetary,
                         identifier: entries[index].identifier,
                         copying:
                             actions.copyingField == entries[index].copyField,
@@ -276,7 +276,11 @@ class _DetailsBody extends ConsumerWidget {
     final amount = formatter.amountText(record, bitcoinUnit);
     if (amount != null) {
       entries.add(
-        _DetailEntry('Amount', valuesVisible ? amount : 'Hidden', amount: true),
+        _DetailEntry(
+          'Amount',
+          valuesVisible ? amount : 'Hidden',
+          monetary: true,
+        ),
       );
     }
     final fee = formatter.feeText(record, bitcoinUnit);
@@ -285,7 +289,7 @@ class _DetailsBody extends ConsumerWidget {
         _DetailEntry(
           'Network fee',
           valuesVisible ? fee : 'Hidden',
-          amount: true,
+          monetary: true,
         ),
       );
     }
@@ -299,12 +303,10 @@ class _DetailsBody extends ConsumerWidget {
     }
     final confirmations = feed.confirmationsFor(record);
     if (confirmations != null) {
-      entries.add(
-        _DetailEntry('Confirmations', confirmations.toString(), amount: true),
-      );
+      entries.add(_DetailEntry('Confirmations', confirmations.toString()));
     }
     if (record.confirmationHeight case final value?) {
-      entries.add(_DetailEntry('Block height', value.toString(), amount: true));
+      entries.add(_DetailEntry('Block height', value.toString()));
     }
     if (record.txid case final value?) {
       entries.add(
@@ -362,14 +364,10 @@ class _DetailsBody extends ConsumerWidget {
       );
     }
     if (record.transferIndex case final value?) {
-      entries.add(
-        _DetailEntry('Transfer index', value.toString(), amount: true),
-      );
+      entries.add(_DetailEntry('Transfer index', value.toString()));
     }
     if (record.batchTransferIndex case final value?) {
-      entries.add(
-        _DetailEntry('Batch transfer index', value.toString(), amount: true),
-      );
+      entries.add(_DetailEntry('Batch transfer index', value.toString()));
     }
     if (record.expiresAt case final value?) {
       entries.add(_DetailEntry('Expires', formatter.dateTimeLabel(value)));
@@ -418,16 +416,16 @@ class _DetailEntry {
   const _DetailEntry(
     this.label,
     this.value, {
-    this.amount = false,
+    this.monetary = false,
     this.identifier = false,
     this.copyField,
     this.copyValue,
-  }) : assert(!amount || !identifier),
+  }) : assert(!monetary || !identifier),
        assert((copyField == null) == (copyValue == null));
 
   final String label;
   final String value;
-  final bool amount;
+  final bool monetary;
   final bool identifier;
   final TransactionDetailField? copyField;
   final String? copyValue;

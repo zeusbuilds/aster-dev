@@ -16,6 +16,7 @@ final class FakeScanSession extends ChangeNotifier implements ScanSession {
   AppResult<void>? torchResult;
   AppResult<void>? zoomResult;
   AppResult<void>? restartResult;
+  AppResult<void>? closeResult;
   Completer<AppResult<void>>? torchGate;
   Completer<AppResult<void>>? activeGate;
   Completer<AppResult<void>>? zoomGate;
@@ -139,7 +140,7 @@ final class FakeScanSession extends ChangeNotifier implements ScanSession {
     closeCalls += 1;
     _observedListeners.clear();
     super.dispose();
-    return const AppResult.success(null);
+    return closeResult ?? const AppResult.success(null);
   }
 }
 

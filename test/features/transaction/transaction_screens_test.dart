@@ -80,10 +80,16 @@ void main() {
       () => find.byType(TransactionItem).evaluate().length == 2,
     );
     await tester.tap(find.byType(TransactionItem).first);
+    await tester.tap(find.byType(TransactionItem).first);
     await tester.pumpAndSettle();
 
     expect(find.text('Details ${_lightningActivity().id}'), findsOneWidget);
-    expect(harness.haptics.intents, contains(HapticIntent.lightImpact));
+    expect(harness.haptics.intents, [HapticIntent.lightImpact]);
+
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(find.text('Details ${_lightningActivity().id}'), findsNothing);
+    expect(find.byType(TransactionItem), findsNWidgets(2));
   });
 
   testWidgets('mounted Activity advances its local calendar at midnight', (
@@ -165,6 +171,26 @@ void main() {
     expect(
       find.descendant(of: statusRow, matching: find.byType(NumericText)),
       findsOneWidget,
+    );
+    final amountRow = find.ancestor(
+      of: find.text('Amount'),
+      matching: find.byType(TransactionDetailRow),
+    );
+    expect(
+      find.descendant(of: amountRow, matching: find.byType(AmountText)),
+      findsOneWidget,
+    );
+    final confirmationsRow = find.ancestor(
+      of: find.text('Confirmations'),
+      matching: find.byType(TransactionDetailRow),
+    );
+    expect(
+      find.descendant(of: confirmationsRow, matching: find.byType(NumericText)),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: confirmationsRow, matching: find.byType(AmountText)),
+      findsNothing,
     );
     final transactionIdRow = find.ancestor(
       of: find.text('Transaction ID'),
@@ -374,6 +400,24 @@ void main() {
     expect(
       tester.getSemantics(activityLoading).flagsCollection.isLiveRegion,
       isTrue,
+    );
+    expect(
+      find.byKey(const ValueKey('activity-loading-balance')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('activity-loading-heading')),
+      findsOneWidget,
+    );
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget.key is ValueKey<String> &&
+            (widget.key! as ValueKey<String>).value.startsWith(
+              'activity-loading-item-',
+            ),
+      ),
+      findsNWidgets(4),
     );
     expect(find.bySemanticsLabel(RegExp(r'Sent|Received')), findsNothing);
 

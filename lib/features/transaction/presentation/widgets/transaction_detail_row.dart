@@ -9,16 +9,18 @@ class TransactionDetailRow extends StatelessWidget {
     super.key,
     required this.label,
     required this.value,
-    this.amount = false,
+    this.monetary = false,
     this.identifier = false,
     this.onCopy,
     this.copying = false,
     this.copyEnabled = true,
-  }) : assert(!amount || !identifier);
+  }) : assert(!monetary || !identifier);
 
   final String label;
   final String value;
-  final bool amount;
+
+  /// Whether [value] is a monetary quantity rather than ordinary numeric text.
+  final bool monetary;
   final bool identifier;
   final VoidCallback? onCopy;
   final bool copying;
@@ -46,7 +48,7 @@ class TransactionDetailRow extends StatelessWidget {
             ],
           ),
           if (copy == null) SizedBox(height: context.spacing.xs),
-          if (amount)
+          if (monetary)
             AmountText(
               value,
               style: context.type.rowValue,

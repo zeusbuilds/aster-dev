@@ -34,6 +34,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
 
   Timer? _calendarTimer;
   late DateTime _now;
+  var _detailsNavigationInFlight = false;
 
   @override
   void initState() {
@@ -73,6 +74,40 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
     _calendarTimer = Timer(delay + _calendarBoundaryEpsilon, () {
       if (mounted) _refreshCalendarClock();
     });
+  }
+
+  Future<void> _openDetails(String activityId) async {
+    if (_detailsNavigationInFlight) return;
+    setState(() => _detailsNavigationInFlight = true);
+    unawaited(context.haptics.trigger(HapticIntent.lightImpact));
+    try {
+      await context.pushNamed<void>(
+        RouteNames.transactionDetails,
+        pathParameters: <String, String>{
+          RoutePaths.assetKindParameter: widget.assetKind.slug,
+          RoutePaths.activityIdParameter: activityId,
+        },
+      );
+    } catch (error, stackTrace) {
+      final failure = FailureMapper.from(error, stackTrace);
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: AppFailureException(failure),
+          stack: stackTrace,
+          library: 'UTEXO activity navigation',
+          context: ErrorDescription('while opening transaction details'),
+        ),
+      );
+      if (mounted) {
+        context.toasts.show(
+          title: 'Transaction details could not be opened',
+          message: failure.userMessage,
+          variant: ToastVariant.failure,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _detailsNavigationInFlight = false);
+    }
   }
 
   @override
@@ -126,6 +161,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
             assetKind: assetKind,
             now: _now,
             formatter: TransactionListScreen._formatter,
+            onOpenDetails: _detailsNavigationInFlight ? null : _openDetails,
           ),
         ),
       ),
@@ -140,6 +176,7 @@ class _ActivityBody extends StatelessWidget {
     required this.assetKind,
     required this.now,
     required this.formatter,
+    required this.onOpenDetails,
   });
 
   final AsyncValue<ActivityState> activity;
@@ -147,6 +184,7 @@ class _ActivityBody extends StatelessWidget {
   final WalletAssetKind assetKind;
   final DateTime now;
   final ActivityDisplayFormatter formatter;
+  final ValueChanged<String>? onOpenDetails;
 
   @override
   Widget build(BuildContext context) {
@@ -231,20 +269,9 @@ class _ActivityBody extends StatelessWidget {
                       bitcoinUnit: preferences.bitcoinUnit,
                       valuesVisible: preferences.balancesVisible,
                       formatter: formatter,
-                      onTap: () {
-                        unawaited(
-                          context.haptics.trigger(HapticIntent.lightImpact),
-                        );
-                        unawaited(
-                          context.pushNamed(
-                            RouteNames.transactionDetails,
-                            pathParameters: <String, String>{
-                              RoutePaths.assetKindParameter: assetKind.slug,
-                              RoutePaths.activityIdParameter: record.id,
-                            },
-                          ),
-                        );
-                      },
+                      onTap: onOpenDetails == null
+                          ? null
+                          : () => onOpenDetails!(record.id),
                     ),
                     SizedBox(height: context.spacing.md),
                   ],
@@ -369,55 +396,157 @@ class _ActivityLoadingView extends StatelessWidget {
       liveRegion: true,
       label: 'Loading activity',
       excludeSemantics: true,
-      child: CustomScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          SliverPadding(
-            padding: EdgeInsets.all(context.spacing.screenPadding),
-            sliver: SliverList.builder(
-              itemCount: 5,
-              itemBuilder: (context, index) => Padding(
-                padding: EdgeInsets.only(bottom: context.spacing.md),
-                child: AppSkeletonizer(
-                  enabled: true,
-                  child: Squircle(
-                    color: context.appColors.surfaceRaised,
-                    padding: EdgeInsets.all(context.spacing.lg),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: context.icons.xl,
-                          height: context.icons.xl,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: context.appColors.surfaceSubtle,
-                          ),
-                        ),
-                        SizedBox(width: context.spacing.md),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Activity loading',
-                                style: context.type.rowTitle,
-                              ),
-                              SizedBox(height: context.spacing.xs),
-                              Text(
-                                'Status loading',
-                                style: context.type.rowMeta,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+      child: AppSkeletonizer(
+        enabled: true,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(
+                context.spacing.screenPadding,
+                context.spacing.lg,
+                context.spacing.screenPadding,
+                context.spacing.none,
+              ),
+              sliver: const SliverToBoxAdapter(
+                child: _ActivityBalanceLoading(),
+              ),
+            ),
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(
+                context.spacing.screenPadding,
+                context.spacing.sectionGap,
+                context.spacing.screenPadding,
+                context.spacing.md,
+              ),
+              sliver: SliverToBoxAdapter(
+                child: Text(
+                  'Activity',
+                  key: const ValueKey('activity-loading-heading'),
+                  style: context.type.sectionTitle,
                 ),
               ),
             ),
+            SliverPadding(
+              padding: EdgeInsets.symmetric(
+                horizontal: context.spacing.screenPadding,
+              ),
+              sliver: SliverList.builder(
+                itemCount: 4,
+                itemBuilder: (context, index) => Padding(
+                  padding: EdgeInsets.only(bottom: context.spacing.md),
+                  child: _ActivityItemLoading(index: index),
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(child: SizedBox(height: context.spacing.xxl)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ActivityBalanceLoading extends StatelessWidget {
+  const _ActivityBalanceLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return Squircle(
+      key: const ValueKey('activity-loading-balance'),
+      color: context.appColors.surfaceRaised,
+      padding: EdgeInsets.all(context.spacing.lg),
+      child: Row(
+        children: [
+          Container(
+            width: context.icons.xl,
+            height: context.icons.xl,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: context.appColors.surfaceSubtle,
+            ),
+          ),
+          SizedBox(width: context.spacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Total balance', style: context.type.rowMeta),
+                SizedBox(height: context.spacing.xxs),
+                AmountText(
+                  '000 000 sats',
+                  style: context.type.amountInline,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                SizedBox(height: context.spacing.xs),
+                AmountText(
+                  'Available 000 000 sats',
+                  style: context.type.rowMeta,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ActivityItemLoading extends StatelessWidget {
+  const _ActivityItemLoading({required this.index});
+
+  final int index;
+
+  @override
+  Widget build(BuildContext context) {
+    return Squircle(
+      key: ValueKey('activity-loading-item-$index'),
+      color: context.appColors.surfaceRaised,
+      padding: EdgeInsets.zero,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: context.metrics.minTouchTarget),
+        child: Padding(
+          padding: EdgeInsets.all(context.spacing.lg),
+          child: Row(
+            children: [
+              Container(
+                width: context.icons.xl,
+                height: context.icons.xl,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: context.appColors.surfaceSubtle,
+                ),
+              ),
+              SizedBox(width: context.spacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Activity loading', style: context.type.rowTitle),
+                    SizedBox(height: context.spacing.xxs),
+                    NumericText(
+                      '00:00, Status loading',
+                      style: context.type.rowMeta,
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(width: context.spacing.sm),
+              Flexible(
+                child: AmountText(
+                  '000 sats',
+                  style: context.type.amountInline,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.end,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

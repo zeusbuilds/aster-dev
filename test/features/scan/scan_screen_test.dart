@@ -11,6 +11,9 @@ import 'package:aster/features/scan/presentation/widgets/scan_control_button.dar
 import 'package:aster/features/scan/presentation/widgets/widgets.dart';
 import 'package:aster/features/send/presentation/view_model/view_models.dart';
 import 'package:aster/features/shell/presentation/providers/providers.dart';
+import 'package:aster/features/wallet/domain/models/models.dart';
+import 'package:aster/features/wallet/presentation/models/models.dart';
+import 'package:aster/features/wallet/presentation/view_model/view_models.dart';
 import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -36,6 +39,82 @@ void main() {
     expect(loading, findsOneWidget);
     expect(tester.getSemantics(loading).flagsCollection.isLiveRegion, isTrue);
     expect(find.bySemanticsLabel(RegExp('Wallet unavailable')), findsNothing);
+  });
+
+  testWidgets('wallet identity failure stays visible and retries its owner', (
+    tester,
+  ) async {
+    const failure = AppFailure(
+      code: 'wallet_temporarily_unavailable',
+      kind: AppFailureKind.unavailable,
+      userMessage: 'Active wallet details are temporarily unavailable.',
+      retryable: true,
+    );
+    final walletViewModel = _RecoveringWalletViewModel(failure);
+    final session = FakeScanSession();
+    final router = _launcherRouter();
+    addTearDown(router.dispose);
+    final harness = _ScanWidgetHarness(
+      session: session,
+      router: router,
+      purpose: ScanPurpose.sendLauncher,
+      walletViewModel: walletViewModel,
+    );
+    addTearDown(harness.dispose);
+
+    await tester.pumpWidget(harness.app);
+    harness.activateScanTab();
+    await tester.pumpAndSettle();
+
+    final status = find.bySemanticsLabel(
+      'Active wallet unavailable, ${failure.userMessage}',
+    );
+    expect(status, findsOneWidget);
+    expect(tester.getSemantics(status).flagsCollection.isLiveRegion, isTrue);
+    expect(find.byKey(const ValueKey('fake-scan-camera')), findsOneWidget);
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('Retry active wallet'))
+          .getSemanticsData()
+          .hasAction(ui.SemanticsAction.tap),
+      isTrue,
+    );
+
+    await tester.tap(find.bySemanticsLabel('Retry active wallet'));
+    await tester.pumpAndSettle();
+
+    expect(walletViewModel.retryAttempts, 1);
+    expect(find.text('Primary wallet'), findsOneWidget);
+    expect(find.text(failure.userMessage), findsNothing);
+  });
+
+  testWidgets('terminal wallet identity failure exposes no false retry', (
+    tester,
+  ) async {
+    const failure = AppFailure(
+      code: 'wallet_configuration_invalid',
+      kind: AppFailureKind.configuration,
+      userMessage: 'Active wallet details cannot be loaded.',
+      retryable: false,
+    );
+    final session = FakeScanSession();
+    final router = _launcherRouter();
+    addTearDown(router.dispose);
+    final harness = _ScanWidgetHarness(
+      session: session,
+      router: router,
+      purpose: ScanPurpose.sendLauncher,
+      walletViewModel: _RecoveringWalletViewModel(failure),
+    );
+    addTearDown(harness.dispose);
+
+    await tester.pumpWidget(harness.app);
+    harness.activateScanTab();
+    await tester.pumpAndSettle();
+
+    expect(find.text(failure.userMessage), findsOneWidget);
+    expect(find.bySemanticsLabel('Retry active wallet'), findsNothing);
+    expect(find.byKey(const ValueKey('fake-scan-camera')), findsOneWidget);
   });
 
   testWidgets('disabled Scan controls expose a visible disabled state', (
@@ -664,6 +743,7 @@ final class _ScanWidgetHarness {
     required GoRouter router,
     ScanPurpose purpose = ScanPurpose.destinationPicker,
     ScanSession Function()? sessionBuilder,
+    WalletViewModel? walletViewModel,
   }) {
     final haptics = RecordingHapticFeedbackService();
     return _ScanWidgetHarness._(
@@ -671,6 +751,7 @@ final class _ScanWidgetHarness {
       router: router,
       purpose: purpose,
       sessionBuilder: sessionBuilder,
+      walletViewModel: walletViewModel,
       haptics: haptics,
       toasts: RecordingToastPresentationService(),
     );
@@ -681,18 +762,20 @@ final class _ScanWidgetHarness {
     required this.router,
     required this.purpose,
     ScanSession Function()? sessionBuilder,
+    WalletViewModel? walletViewModel,
     required this.haptics,
     required this.toasts,
   }) : container = ProviderContainer(
+         retry: (retryCount, error) => null,
          overrides: [
            scanSessionProvider(purpose)
                .overrideWith((ref) => sessionBuilder?.call() ?? session),
-           scanWalletIdentityProvider.overrideWith(
-             (ref) async => const ScanWalletIdentity(
-               name: 'Primary wallet',
-               displayId: 'ABCDEF 123456',
-             ),
-           ),
+           if (walletViewModel == null)
+             scanWalletIdentityViewModelProvider.overrideWith(
+               _FixedScanWalletIdentityViewModel.new,
+             )
+           else
+             walletViewModelProvider.overrideWith(() => walletViewModel),
            hapticFeedbackServiceProvider.overrideWithValue(haptics),
          ],
        );
@@ -721,3 +804,46 @@ final class _ScanWidgetHarness {
 
   void dispose() => container.dispose();
 }
+
+final class _FixedScanWalletIdentityViewModel
+    extends ScanWalletIdentityViewModel {
+  @override
+  Future<ScanWalletIdentity?> build() async => const ScanWalletIdentity(
+    name: 'Primary wallet',
+    displayId: 'ABCDEF 123456',
+  );
+}
+
+final class _RecoveringWalletViewModel extends WalletViewModel {
+  _RecoveringWalletViewModel(this.failure);
+
+  final AppFailure failure;
+  var retryAttempts = 0;
+
+  @override
+  Future<WalletState> build() async {
+    await Future<void>.delayed(Duration.zero);
+    throw AppFailureException(failure);
+  }
+
+  @override
+  Future<void> reload() async {
+    retryAttempts += 1;
+    state = AsyncData(_scanWalletState);
+  }
+}
+
+final _scanWalletProfile = WalletProfile(
+  id: '11111111111111111111111111111111',
+  name: 'Primary wallet',
+  createdAt: DateTime.utc(2026),
+  updatedAt: DateTime.utc(2026),
+  environment: BlockchainEnvironment.regtest,
+  state: WalletProfileState.ready,
+  storageToken: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+);
+
+final _scanWalletState = WalletState(
+  wallets: [_scanWalletProfile],
+  activeWallet: _scanWalletProfile,
+);

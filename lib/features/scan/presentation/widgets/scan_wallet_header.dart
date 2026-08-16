@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:remixicon/remixicon.dart';
 
 import '../../../../shared/shared.dart';
 
@@ -9,11 +10,15 @@ class ScanWalletHeader extends StatelessWidget {
     this.walletName,
     this.walletId,
     this.loading = false,
-  });
+    this.failureMessage,
+    this.onRetry,
+  }) : assert(failureMessage != null || onRetry == null);
 
   final String? walletName;
   final String? walletId;
   final bool loading;
+  final String? failureMessage;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -22,9 +27,14 @@ class ScanWalletHeader extends StatelessWidget {
     final type = context.type;
     final metrics = context.metrics;
 
+    final failure = failureMessage;
+    final hasFailure = failure != null;
     final name = walletName ?? 'Wallet unavailable';
+    final visibleWalletId = hasFailure ? null : walletId;
     final semanticLabel = loading
         ? 'Loading active wallet'
+        : hasFailure
+        ? 'Active wallet unavailable, $failure'
         : walletName == null
         ? name
         : walletId == null
@@ -32,9 +42,7 @@ class ScanWalletHeader extends StatelessWidget {
         : 'Active wallet, $name, ID $walletId';
     return Semantics(
       container: true,
-      liveRegion: loading,
-      label: semanticLabel,
-      excludeSemantics: true,
+      explicitChildNodes: true,
       child: AppSkeletonizer(
         enabled: loading,
         child: Column(
@@ -49,21 +57,52 @@ class ScanWalletHeader extends StatelessWidget {
                   alpha: effects.scanAvatarSurfaceOpacity,
                 ),
               ),
+              child: hasFailure
+                  ? Icon(
+                      RemixIcons.error_warning_line,
+                      size: context.icons.sm,
+                      color: context.colorScheme.surface,
+                    )
+                  : null,
             ),
             SizedBox(height: spacing.md),
-            Text(
-              loading ? 'Loading wallet' : name,
-              style: type.scanHeaderTitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Semantics(
+                    liveRegion: loading || hasFailure,
+                    label: semanticLabel,
+                    excludeSemantics: true,
+                    child: Text(
+                      loading ? 'Loading wallet' : failure ?? name,
+                      style: type.scanHeaderTitle,
+                      maxLines: hasFailure ? 2 : 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+                if (onRetry case final retry?) ...[
+                  SizedBox(width: spacing.xs),
+                  AsterIconButton(
+                    icon: RemixIcons.refresh_line,
+                    tooltip: 'Retry active wallet',
+                    color: context.colorScheme.surface,
+                    onPressed: retry,
+                  ),
+                ],
+              ],
             ),
-            if (walletId case final id?) ...[
+            if (visibleWalletId case final id?) ...[
               SizedBox(height: spacing.sm),
-              Text(
-                id,
-                style: type.scanWalletId,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              ExcludeSemantics(
+                child: Text(
+                  id,
+                  style: type.scanWalletId,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ],

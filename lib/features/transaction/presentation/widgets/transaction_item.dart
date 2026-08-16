@@ -12,14 +12,14 @@ class TransactionItem extends StatelessWidget {
     required this.activity,
     required this.bitcoinUnit,
     required this.valuesVisible,
-    required this.onTap,
+    this.onTap,
     required this.formatter,
   });
 
   final WalletActivity activity;
   final BitcoinUnit bitcoinUnit;
   final bool valuesVisible;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final ActivityDisplayFormatter formatter;
 
   @override
@@ -47,6 +47,7 @@ class TransactionItem extends StatelessWidget {
 
     return Semantics(
       button: true,
+      enabled: onTap != null,
       label:
           '$title${lightning ? ', Lightning' : ', on-chain'}, '
           '$amountLabel, $status, $time',
@@ -110,7 +111,7 @@ class TransactionItem extends StatelessWidget {
                             ],
                           ),
                           SizedBox(height: context.spacing.xxs),
-                          AmountText(
+                          NumericText(
                             '$time, $status',
                             style: context.type.rowMeta,
                             maxLines: 2,

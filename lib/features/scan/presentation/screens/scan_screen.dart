@@ -209,8 +209,15 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     final shouldShowCamera =
         widget.purpose == ScanPurpose.destinationPicker ||
         shellIndex == appShellScanTabIndex;
-    final walletIdentity = ref.watch(scanWalletIdentityProvider);
+    final walletIdentity = ref.watch(scanWalletIdentityViewModelProvider);
     final activeWallet = walletIdentity.value;
+    final walletFailure = switch (walletIdentity) {
+      AsyncError(:final error, :final stackTrace) =>
+        error is AppFailureException
+            ? error.failure
+            : FailureMapper.from(error, stackTrace),
+      _ => null,
+    };
     final spacing = context.spacing;
     final colors = context.appColors;
     final metrics = context.metrics;
@@ -278,10 +285,26 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                     left: spacing.screenPadding,
                     right: spacing.screenPadding,
                     height: metrics.scanHeaderExtent,
-                    child: ScanWalletHeader(
-                      walletName: activeWallet?.name,
-                      walletId: activeWallet?.displayId,
-                      loading: walletIdentity.isLoading,
+                    child: FocusTraversalOrder(
+                      order: const NumericFocusOrder(0),
+                      child: ScanWalletHeader(
+                        walletName: activeWallet?.name,
+                        walletId: activeWallet?.displayId,
+                        loading: walletIdentity.isLoading,
+                        failureMessage: walletFailure?.userMessage,
+                        onRetry:
+                            !walletIdentity.isLoading &&
+                                walletFailure?.retryable == true
+                            ? () => unawaited(
+                                ref
+                                    .read(
+                                      scanWalletIdentityViewModelProvider
+                                          .notifier,
+                                    )
+                                    .retry(),
+                              )
+                            : null,
+                      ),
                     ),
                   ),
                   Positioned(

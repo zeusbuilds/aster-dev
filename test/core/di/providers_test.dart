@@ -1,8 +1,11 @@
 import 'package:aster/core/core.dart';
+import 'package:aster/features/scan/domain/models/models.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../support/scan_fakes.dart';
 import '../../support/wallet_fakes.dart';
 
 void main() {
@@ -67,4 +70,56 @@ void main() {
     expect(bootstrap, isA<AppSuccess<Object?>>());
     expect(container.read(walletRepositoryProvider), isNotNull);
   });
+
+  test(
+    'scan-session disposal reports a redacted typed close failure',
+    () async {
+      final failure = AppFailure(
+        code: 'scan_cleanup_failed',
+        kind: AppFailureKind.unavailable,
+        userMessage: 'The scanner could not be released cleanly.',
+        retryable: false,
+        stackTrace: StackTrace.current,
+      );
+      final session = FakeScanSession()
+        ..closeResult = AppResult<void>.failure(failure);
+      final reported = <FlutterErrorDetails>[];
+      final previousHandler = FlutterError.onError;
+      FlutterError.onError = reported.add;
+      addTearDown(() => FlutterError.onError = previousHandler);
+      final container = ProviderContainer(
+        overrides: [
+          scanSessionFactoryProvider.overrideWithValue(
+            QueueScanSessionFactory([session]),
+          ),
+        ],
+      );
+      final subscription = container.listen(
+        scanSessionProvider(ScanPurpose.destinationPicker),
+        (_, _) {},
+        fireImmediately: true,
+      );
+
+      expect(
+        container.read(scanSessionProvider(ScanPurpose.destinationPicker)),
+        same(session),
+      );
+      subscription.close();
+      container.dispose();
+      await pumpEventQueue();
+
+      expect(session.closeCalls, 1);
+      expect(reported, hasLength(1));
+      expect(reported.single.exception, isA<AppFailureException>());
+      expect(
+        (reported.single.exception as AppFailureException).failure,
+        same(failure),
+      );
+      expect(
+        reported.single.exceptionAsString(),
+        'AppFailureException(scan_cleanup_failed)',
+      );
+      expect(reported.single.library, 'UTEXO scan lifecycle');
+    },
+  );
 }
