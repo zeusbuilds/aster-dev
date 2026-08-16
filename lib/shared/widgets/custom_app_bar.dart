@@ -13,6 +13,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     super.key,
     required this.title,
     this.leadingIcon = false,
+    this.leadingEnabled = true,
     this.centerTitle = true,
     this.leadingIconData,
     this.action,
@@ -21,6 +22,13 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   final String title;
   final bool leadingIcon;
+
+  /// Whether the rendered leading action may change routes.
+  ///
+  /// Mutation screens disable this while an uncancellable operation owns the
+  /// current route, in addition to guarding system Back with [PopScope].
+  final bool leadingEnabled;
+
   final bool centerTitle;
   final IconData? leadingIconData;
   final Widget? action;
@@ -54,7 +62,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
           ? AsterIconButton(
               icon: leadingIconData ?? RemixIcons.arrow_left_s_line,
               tooltip: 'Back',
-              onPressed: goBack,
+              onPressed: leadingEnabled ? goBack : null,
               iconSize: icons.sm,
             )
           : null,

@@ -144,39 +144,44 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
   Widget build(BuildContext context) {
     final provider = receiveFlowViewModelProvider(widget.target);
     final flow = ref.watch(provider);
-    return Scaffold(
-      backgroundColor: context.colorScheme.surface,
-      appBar: CustomAppBar(
-        title: 'Receive ${widget.target.assetLabel}',
-        leadingIcon: true,
-        centerTitle: false,
-        fallbackLocation: RoutePaths.receive,
-      ),
-      body: SafeArea(
-        top: false,
-        minimum: EdgeInsets.only(bottom: context.spacing.lg),
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: context.spacing.screenPadding,
-          ),
-          child: flow.when(
-            skipLoadingOnRefresh: false,
-            data: (state) => _RequestBody(
-              state: state,
-              now: _now,
-              onCopy: () => unawaited(_copy()),
-              onShare: () => unawaited(_share()),
-              onRegenerate: () => unawaited(_regenerate()),
-              onSetAmount: () => unawaited(
-                ReceiveAmountSheet.show(context, target: widget.target),
-              ),
+    final generationOwnsRoute = flow.value?.isGenerating ?? false;
+    return PopScope(
+      canPop: !generationOwnsRoute,
+      child: Scaffold(
+        backgroundColor: context.colorScheme.surface,
+        appBar: CustomAppBar(
+          title: 'Receive ${widget.target.assetLabel}',
+          leadingIcon: true,
+          leadingEnabled: !generationOwnsRoute,
+          centerTitle: false,
+          fallbackLocation: RoutePaths.receive,
+        ),
+        body: SafeArea(
+          top: false,
+          minimum: EdgeInsets.only(bottom: context.spacing.lg),
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: context.spacing.screenPadding,
             ),
-            loading: () => const _RequestLoading(),
-            error: (error, stackTrace) => _RequestFailure(
-              failure: error is AppFailureException
-                  ? error.failure
-                  : FailureMapper.from(error, stackTrace),
-              onRetry: ref.read(provider.notifier).retry,
+            child: flow.when(
+              skipLoadingOnRefresh: false,
+              data: (state) => _RequestBody(
+                state: state,
+                now: _now,
+                onCopy: () => unawaited(_copy()),
+                onShare: () => unawaited(_share()),
+                onRegenerate: () => unawaited(_regenerate()),
+                onSetAmount: () => unawaited(
+                  ReceiveAmountSheet.show(context, target: widget.target),
+                ),
+              ),
+              loading: () => const _RequestLoading(),
+              error: (error, stackTrace) => _RequestFailure(
+                failure: error is AppFailureException
+                    ? error.failure
+                    : FailureMapper.from(error, stackTrace),
+                onRetry: ref.read(provider.notifier).retry,
+              ),
             ),
           ),
         ),

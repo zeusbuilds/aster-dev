@@ -18,20 +18,25 @@ class CurrencySelectionScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsViewModelProvider);
-    return Scaffold(
-      backgroundColor: context.colorScheme.surface,
-      appBar: const CustomAppBar(
-        title: 'Select Currency',
-        leadingIcon: true,
-        fallbackLocation: RoutePaths.settings,
-      ),
-      body: settings.when(
-        skipLoadingOnRefresh: false,
-        data: (state) => _CurrencyList(state: state),
-        loading: () => const _CurrencyLoading(),
-        error: (error, stackTrace) => SettingsLoadFailure(
-          failure: FailureMapper.from(error, stackTrace),
-          onRetry: () => ref.read(settingsViewModelProvider.notifier).retry(),
+    final saving = settings.value?.isSaving ?? false;
+    return PopScope(
+      canPop: !saving,
+      child: Scaffold(
+        backgroundColor: context.colorScheme.surface,
+        appBar: CustomAppBar(
+          title: 'Select Currency',
+          leadingIcon: true,
+          leadingEnabled: !saving,
+          fallbackLocation: RoutePaths.settings,
+        ),
+        body: settings.when(
+          skipLoadingOnRefresh: false,
+          data: (state) => _CurrencyList(state: state),
+          loading: () => const _CurrencyLoading(),
+          error: (error, stackTrace) => SettingsLoadFailure(
+            failure: FailureMapper.from(error, stackTrace),
+            onRetry: () => ref.read(settingsViewModelProvider.notifier).retry(),
+          ),
         ),
       ),
     );

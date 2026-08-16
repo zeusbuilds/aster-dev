@@ -34,11 +34,14 @@ class HomeViewModel extends _$HomeViewModel {
 
   /// Retries an initial portfolio failure without overlapping an active load.
   Future<void> retry() async {
-    if (state.isLoading) return;
-    if (state case AsyncError(:final error, :final stackTrace)
-        when !FailureMapper.from(error, stackTrace).retryable) {
-      return;
-    }
+    final failure = switch (state) {
+      AsyncError(:final error, :final stackTrace) => FailureMapper.from(
+        error,
+        stackTrace,
+      ),
+      _ => null,
+    };
+    if (failure == null || !failure.retryable) return;
     final generation = ++_stateGeneration;
     state = const AsyncLoading();
     if (ref.read(walletViewModelProvider).hasError) {

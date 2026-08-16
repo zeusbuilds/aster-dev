@@ -82,9 +82,14 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
     final settings = ref.watch(settingsViewModelProvider);
 
     Future<void> refresh() async {
-      final notifier = ref.read(activityViewModelProvider(assetKind).notifier);
-      if (ref.read(activityViewModelProvider(assetKind)).value == null) {
+      final activityProvider = activityViewModelProvider(assetKind);
+      final notifier = ref.read(activityProvider.notifier);
+      if (ref.read(activityProvider).value == null) {
         await notifier.retry();
+        return;
+      }
+      if (ref.read(settingsViewModelProvider).value == null) {
+        await ref.read(settingsViewModelProvider.notifier).retry();
         return;
       }
       final completed = await notifier.refresh();

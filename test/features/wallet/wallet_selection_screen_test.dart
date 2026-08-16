@@ -67,6 +67,14 @@ void main() {
       expect(switching.flagsCollection.isEnabled, ui.Tristate.isFalse);
       expect(switching.value, 'Switching');
       expect(switching.hasAction(ui.SemanticsAction.tap), isFalse);
+      final blockedBack = tester
+          .getSemantics(find.bySemanticsLabel('Back'))
+          .getSemanticsData();
+      expect(blockedBack.flagsCollection.isEnabled, ui.Tristate.isFalse);
+      expect(blockedBack.hasAction(ui.SemanticsAction.tap), isFalse);
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+      expect(find.byType(WalletSelectionScreen), findsOneWidget);
 
       await tester.tap(
         find.bySemanticsLabel(_backupLabel),
@@ -90,6 +98,11 @@ void main() {
       expect(harness.toasts.messages.single.variant, ToastVariant.failure);
       expect(viewModel.state.value?.operationFailure, isNull);
       expect(find.byType(GridLoader), findsNothing);
+      final idleBack = tester
+          .getSemantics(find.bySemanticsLabel('Back'))
+          .getSemanticsData();
+      expect(idleBack.flagsCollection.isEnabled, ui.Tristate.isTrue);
+      expect(idleBack.hasAction(ui.SemanticsAction.tap), isTrue);
       semantics.dispose();
     },
   );

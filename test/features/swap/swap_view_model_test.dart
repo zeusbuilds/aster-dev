@@ -97,6 +97,37 @@ void main() {
     expect(attempts, 2);
   });
 
+  test('initial retry is inert for an already-loaded selection', () async {
+    var attempts = 0;
+    final container = ProviderContainer(
+      retry: (retryCount, error) => null,
+      overrides: [
+        walletPaymentCapabilitiesProvider.overrideWith((ref) async {
+          attempts += 1;
+          return _capabilities();
+        }),
+      ],
+    );
+    final transitions = <Object?>[];
+    final subscription = container.listen(
+      swapViewModelProvider,
+      (_, next) => transitions.add(next),
+      fireImmediately: true,
+    );
+    addTearDown(() {
+      subscription.close();
+      container.dispose();
+    });
+    await container.read(swapViewModelProvider.future);
+    transitions.clear();
+
+    container.read(swapViewModelProvider.notifier).retry();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(transitions, isEmpty);
+    expect(attempts, 1);
+  });
+
   test('terminal capability failure cannot be retried', () async {
     var attempts = 0;
     final container = ProviderContainer(

@@ -92,6 +92,24 @@ void main() {
     },
   );
 
+  test('initial retry is inert for an already-loaded portfolio', () async {
+    final engine = FakeWalletEngine()..balance = _bitcoinBalance();
+    final harness = await PaymentFlowTestHarness.create(engine: engine);
+    addTearDown(harness.dispose);
+    final subscription = harness.container.listen(
+      homeViewModelProvider,
+      (_, _) {},
+    );
+    addTearDown(subscription.close);
+    final initial = await harness.container.read(homeViewModelProvider.future);
+    final callsBefore = List<String>.of(engine.calls);
+
+    await harness.container.read(homeViewModelProvider.notifier).retry();
+
+    expect(harness.container.read(homeViewModelProvider).requireValue, initial);
+    expect(engine.calls, callsBefore);
+  });
+
   test('terminal initial portfolio failure cannot be retried', () async {
     final engine = FakeWalletEngine()
       ..balance = _bitcoinBalance()

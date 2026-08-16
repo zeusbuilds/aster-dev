@@ -20,11 +20,14 @@ class SwapViewModel extends _$SwapViewModel {
 
   /// Retries capability loading only when the typed failure permits replay.
   void retry() {
-    if (state.isLoading) return;
-    if (state case AsyncError(:final error, :final stackTrace)
-        when !FailureMapper.from(error, stackTrace).retryable) {
-      return;
-    }
+    final failure = switch (state) {
+      AsyncError(:final error, :final stackTrace) => FailureMapper.from(
+        error,
+        stackTrace,
+      ),
+      _ => null,
+    };
+    if (failure == null || !failure.retryable) return;
     ref.invalidate(walletPaymentCapabilitiesProvider);
     ref.invalidateSelf();
   }

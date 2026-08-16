@@ -38,6 +38,7 @@ class WalletSelectionScreen extends ConsumerWidget {
       data: (data) {
         final switchingWalletId = data.switchingWalletId;
         return _WalletSelectionScaffold(
+          navigationLocked: switchingWalletId != null,
           child: SafeArea(
             top: false,
             minimum: EdgeInsets.only(bottom: spacing.lg),
@@ -128,20 +129,28 @@ class _WalletLoadFailure extends StatelessWidget {
 }
 
 class _WalletSelectionScaffold extends StatelessWidget {
-  const _WalletSelectionScaffold({required this.child});
+  const _WalletSelectionScaffold({
+    required this.child,
+    this.navigationLocked = false,
+  });
 
   final Widget child;
+  final bool navigationLocked;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: context.colorScheme.surface,
-      appBar: const CustomAppBar(
-        title: 'Select Wallet',
-        leadingIcon: true,
-        fallbackLocation: RoutePaths.settings,
+    return PopScope(
+      canPop: !navigationLocked,
+      child: Scaffold(
+        backgroundColor: context.colorScheme.surface,
+        appBar: CustomAppBar(
+          title: 'Select Wallet',
+          leadingIcon: true,
+          leadingEnabled: !navigationLocked,
+          fallbackLocation: RoutePaths.settings,
+        ),
+        body: child,
       ),
-      body: child,
     );
   }
 }

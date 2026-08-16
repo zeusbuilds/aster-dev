@@ -249,6 +249,14 @@ void main() {
       expect(semantics.flagsCollection.isEnabled, ui.Tristate.isFalse);
       expect(semantics.hasAction(ui.SemanticsAction.tap), isFalse);
       expect(find.bySemanticsLabel('Saving preference'), findsOneWidget);
+      final back = tester
+          .getSemantics(find.bySemanticsLabel('Back'))
+          .getSemanticsData();
+      expect(back.flagsCollection.isEnabled, ui.Tristate.isFalse);
+      expect(back.hasAction(ui.SemanticsAction.tap), isFalse);
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+      expect(scenario.option, findsOneWidget);
     }
   });
 

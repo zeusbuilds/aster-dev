@@ -675,6 +675,13 @@ void main() {
     await tester.tap(find.text('Set amount').first);
     await _pumpFrames(tester);
     expect(find.byType(AsterNumericKeypad), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('Close amount editor'));
+    await _pumpUntil(
+      tester,
+      () => find.byType(ReceiveAmountSheet).evaluate().isEmpty,
+    );
+    await tester.tap(find.text('Set amount').first);
+    await _pumpFrames(tester);
     await tester.tap(
       find.descendant(
         of: find.byType(AsterNumericKeypad),
@@ -682,7 +689,33 @@ void main() {
       ),
     );
     await tester.pump();
+    harness.engine.createReceiveGate = Completer<void>();
     await tester.tap(find.widgetWithText(CustomButton, 'Set amount'));
+    await _pumpUntil(
+      tester,
+      () =>
+          harness.container
+              .read(
+                receiveFlowViewModelProvider(
+                  WalletPaymentTarget.bitcoinOnchain,
+                ),
+              )
+              .value
+              ?.isGenerating ??
+          false,
+    );
+    await tester.pump();
+    final close = find.bySemanticsLabel('Close amount editor');
+    final closeSemantics = tester.getSemantics(close).getSemanticsData();
+    expect(closeSemantics.flagsCollection.isEnabled, ui.Tristate.isFalse);
+    expect(closeSemantics.hasAction(ui.SemanticsAction.tap), isFalse);
+    await tester.tapAt(const Offset(8, 8));
+    await tester.binding.handlePopRoute();
+    await tester.drag(find.byType(ReceiveAmountSheet), const Offset(0, 400));
+    await _pumpFrames(tester);
+    expect(find.byType(ReceiveAmountSheet), findsOneWidget);
+
+    harness.engine.createReceiveGate!.complete();
     await _pumpUntil(
       tester,
       () => find.byType(ReceiveAmountSheet).evaluate().isEmpty,
@@ -797,6 +830,30 @@ void main() {
           .hasAction(ui.SemanticsAction.tap),
       isTrue,
     );
+  });
+
+  testWidgets('Receive amount editor supports compact 2x text', (tester) async {
+    final harness = await PaymentFlowTestHarness.create();
+    addTearDown(() => _disposeHarness(tester, harness));
+    await _pumpWidget(
+      tester,
+      harness,
+      const Align(
+        alignment: Alignment.bottomCenter,
+        child: ReceiveAmountSheet(target: WalletPaymentTarget.bitcoinOnchain),
+      ),
+      size: const Size(320, 568),
+      textScaler: const TextScaler.linear(2),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byType(AsterNumericKeypad).evaluate().isNotEmpty,
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(tester, meetsGuideline(androidTapTargetGuideline));
+    expect(tester, meetsGuideline(labeledTapTargetGuideline));
+    expect(tester, meetsGuideline(textContrastGuideline));
   });
 
   testWidgets(
@@ -986,6 +1043,15 @@ void main() {
       engine.calls.where((call) => call == 'sendPayment:start'),
       hasLength(1),
     );
+    final back = find.bySemanticsLabel('Back');
+    final backSemantics = tester.getSemantics(back).getSemanticsData();
+    expect(backSemantics.flagsCollection.isEnabled, ui.Tristate.isFalse);
+    expect(backSemantics.hasAction(ui.SemanticsAction.tap), isFalse);
+    await tester.tap(back);
+    await tester.binding.handlePopRoute();
+    await _pumpFrames(tester);
+    expect(sendButton, findsOneWidget);
+    expect(find.text('Wallet home'), findsNothing);
     await tester.tap(sendButton);
     await _pumpFrames(tester);
     expect(

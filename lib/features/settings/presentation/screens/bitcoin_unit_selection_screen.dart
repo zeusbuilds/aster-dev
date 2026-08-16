@@ -18,51 +18,55 @@ class BitcoinUnitSelectionScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsViewModelProvider);
-    return Scaffold(
-      backgroundColor: context.colorScheme.surface,
-      appBar: const CustomAppBar(
-        title: 'Bitcoin Unit',
-        leadingIcon: true,
-        fallbackLocation: RoutePaths.settings,
-      ),
-      body: settings.when(
-        skipLoadingOnRefresh: false,
-        loading: () => const Center(
-          child: GridLoader(semanticLabel: 'Loading Bitcoin units'),
+    final saving = settings.value?.isSaving ?? false;
+    return PopScope(
+      canPop: !saving,
+      child: Scaffold(
+        backgroundColor: context.colorScheme.surface,
+        appBar: CustomAppBar(
+          title: 'Bitcoin Unit',
+          leadingIcon: true,
+          leadingEnabled: !saving,
+          fallbackLocation: RoutePaths.settings,
         ),
-        error: (error, stackTrace) => SettingsLoadFailure(
-          failure: FailureMapper.from(error, stackTrace),
-          onRetry: () => ref.read(settingsViewModelProvider.notifier).retry(),
-        ),
-        data: (state) {
-          final selected = state.snapshot.preferences.bitcoinUnit;
-          final saving = state.isSaving;
-          return Stack(
-            children: [
-              SafeArea(
-                top: false,
-                child: ListView.separated(
-                  itemCount: BitcoinUnit.values.length,
-                  separatorBuilder: (context, index) =>
-                      const AsterDivider.inset(),
-                  itemBuilder: (context, index) {
-                    final unit = BitcoinUnit.values[index];
-                    return SettingsChoiceRow(
-                      title: unit.displayName,
-                      subtitle: BitcoinAmountFormatter(unit: unit)
-                          .format(_exampleSatoshis),
-                      selected: selected == unit,
-                      onTap: saving
-                          ? null
-                          : () => unawaited(_select(context, ref, unit)),
-                    );
-                  },
+        body: settings.when(
+          skipLoadingOnRefresh: false,
+          loading: () => const Center(
+            child: GridLoader(semanticLabel: 'Loading Bitcoin units'),
+          ),
+          error: (error, stackTrace) => SettingsLoadFailure(
+            failure: FailureMapper.from(error, stackTrace),
+            onRetry: () => ref.read(settingsViewModelProvider.notifier).retry(),
+          ),
+          data: (state) {
+            final selected = state.snapshot.preferences.bitcoinUnit;
+            return Stack(
+              children: [
+                SafeArea(
+                  top: false,
+                  child: ListView.separated(
+                    itemCount: BitcoinUnit.values.length,
+                    separatorBuilder: (context, index) =>
+                        const AsterDivider.inset(),
+                    itemBuilder: (context, index) {
+                      final unit = BitcoinUnit.values[index];
+                      return SettingsChoiceRow(
+                        title: unit.displayName,
+                        subtitle: BitcoinAmountFormatter(unit: unit)
+                            .format(_exampleSatoshis),
+                        selected: selected == unit,
+                        onTap: saving
+                            ? null
+                            : () => unawaited(_select(context, ref, unit)),
+                      );
+                    },
+                  ),
                 ),
-              ),
-              if (saving) const SettingsSavingIndicator(),
-            ],
-          );
-        },
+                if (saving) const SettingsSavingIndicator(),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

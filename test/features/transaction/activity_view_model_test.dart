@@ -80,6 +80,22 @@ void main() {
     },
   );
 
+  test('initial retry is inert for an already-loaded activity feed', () async {
+    final engine = _engine();
+    final harness = await PaymentFlowTestHarness.create(engine: engine);
+    addTearDown(harness.dispose);
+    final provider = activityViewModelProvider(WalletAssetKind.bitcoin);
+    final subscription = harness.container.listen(provider, (_, _) {});
+    addTearDown(subscription.close);
+    final initial = await harness.container.read(provider.future);
+    final callsBefore = List<String>.of(engine.calls);
+
+    await harness.container.read(provider.notifier).retry();
+
+    expect(harness.container.read(provider).requireValue, initial);
+    expect(engine.calls, callsBefore);
+  });
+
   test('terminal initial activity failure cannot be retried', () async {
     final engine = _engine()..activityError = StateError('terminal feed state');
     final harness = await PaymentFlowTestHarness.create(engine: engine);

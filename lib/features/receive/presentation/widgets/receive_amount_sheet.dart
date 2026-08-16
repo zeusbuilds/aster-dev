@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:remixicon/remixicon.dart';
 
 import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
@@ -22,6 +23,8 @@ class ReceiveAmountSheet extends ConsumerWidget {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      isDismissible: false,
+      enableDrag: false,
       backgroundColor: context.appColors.transparentSurface,
       builder: (context) => ReceiveAmountSheet(target: target),
     );
@@ -55,45 +58,99 @@ class ReceiveAmountSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final provider = receiveFlowViewModelProvider(target);
     final flow = ref.watch(provider);
+    final generationOwnsRoute = flow.value?.isGenerating ?? false;
     final maxHeight =
         MediaQuery.sizeOf(context).height *
         context.metrics.sheetMaxHeightFactor;
 
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: maxHeight),
-        child: Squircle(
-          color: context.colorScheme.surface,
-          border: BorderRadius.vertical(
-            top: Radius.circular(context.radii.sheet),
-          ),
-          borderColor: context.appColors.transparentSurface,
-          borderWidth: 0,
-          padding: EdgeInsets.zero,
-          child: SafeArea(
-            top: false,
-            minimum: EdgeInsets.only(bottom: context.spacing.lg),
-            child: flow.when(
-              skipLoadingOnRefresh: false,
-              data: (value) => _AmountSheetBody(
-                state: value,
-                onChanged: ref.read(provider.notifier).updateAmount,
-                onApply: () => unawaited(
-                  _apply(context, ref, ref.read(provider.notifier)),
-                ),
-              ),
-              loading: () => const Center(
-                child: GridLoader(semanticLabel: 'Loading amount editor'),
-              ),
-              error: (error, stackTrace) => _SheetFailure(
-                failure: error is AppFailureException
-                    ? error.failure
-                    : FailureMapper.from(error, stackTrace),
-                onRetry: ref.read(provider.notifier).retry,
+    return PopScope(
+      canPop: !generationOwnsRoute,
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: maxHeight),
+          child: Squircle(
+            color: context.colorScheme.surface,
+            border: BorderRadius.vertical(
+              top: Radius.circular(context.radii.sheet),
+            ),
+            borderColor: context.appColors.transparentSurface,
+            borderWidth: 0,
+            padding: EdgeInsets.zero,
+            child: SafeArea(
+              top: false,
+              minimum: EdgeInsets.only(bottom: context.spacing.lg),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _AmountSheetHeader(
+                    onClose: generationOwnsRoute
+                        ? null
+                        : () => Navigator.of(context).pop(),
+                  ),
+                  Flexible(
+                    child: flow.when(
+                      skipLoadingOnRefresh: false,
+                      data: (value) => _AmountSheetBody(
+                        state: value,
+                        onChanged: ref.read(provider.notifier).updateAmount,
+                        onApply: () => unawaited(
+                          _apply(context, ref, ref.read(provider.notifier)),
+                        ),
+                      ),
+                      loading: () => const Center(
+                        child: GridLoader(
+                          semanticLabel: 'Loading amount editor',
+                        ),
+                      ),
+                      error: (error, stackTrace) => _SheetFailure(
+                        failure: error is AppFailureException
+                            ? error.failure
+                            : FailureMapper.from(error, stackTrace),
+                        onRetry: ref.read(provider.notifier).retry,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+final class _AmountSheetHeader extends StatelessWidget {
+  const _AmountSheetHeader({required this.onClose});
+
+  final VoidCallback? onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: context.metrics.minTouchTarget + context.spacing.sm,
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: context.spacing.screenPadding,
+          right: context.spacing.sm,
+          top: context.spacing.sm,
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Text('Set amount', style: context.type.title),
+            Align(
+              alignment: Alignment.centerRight,
+              child: AsterIconButton(
+                icon: RemixIcons.close_line,
+                tooltip: 'Close amount editor',
+                onPressed: onClose,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -133,17 +190,6 @@ final class _AmountSheetBody extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(height: context.spacing.md),
-          SizedBox(
-            width: context.metrics.sheetHandleWidth,
-            height: context.metrics.sheetHandleHeight,
-            child: AsterPill(
-              color: context.colorScheme.surfaceContainerHigh,
-              child: const SizedBox.expand(),
-            ),
-          ),
-          SizedBox(height: context.spacing.lg),
-          Text('Set amount', style: context.type.title),
           SizedBox(height: context.spacing.lg),
           Squircle(
             borderRadius: context.radii.input,

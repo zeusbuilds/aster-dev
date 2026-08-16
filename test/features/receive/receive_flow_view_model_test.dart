@@ -446,6 +446,54 @@ void main() {
     },
   );
 
+  test('expired requests never cross copy or share boundaries', () async {
+    final now = DateTime.utc(2026, 8, 16, 12);
+    const route = PaymentRoute(
+      asset: WalletAsset.bitcoin,
+      rail: PaymentRail.lightning,
+    );
+    final engine = FakeWalletEngine()
+      ..createdReceiveRequest = WalletReceiveRequest(
+        route: route,
+        encodedRequest: 'expired-lightning-request',
+        displayValue: 'expired-lightning-request',
+        expiresAt: now,
+      );
+    final harness = await PaymentFlowTestHarness.create(
+      engine: engine,
+      clock: () => now,
+    );
+    addTearDown(harness.dispose);
+    final provider = receiveFlowViewModelProvider(
+      WalletPaymentTarget.bitcoinLightning,
+    );
+    final subscription = harness.container.listen(
+      provider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    await harness.container.read(provider.future);
+    final notifier = harness.container.read(provider.notifier);
+
+    final copy = await notifier.copyRequest();
+    final share = await notifier.shareRequest();
+
+    expect(copy, isA<AppFailureResult<void>>());
+    expect(share, isA<AppFailureResult<ShareDisposition>>());
+    expect(
+      (copy as AppFailureResult<void>).failure.code,
+      'payment_request_expired',
+    );
+    expect(
+      (share as AppFailureResult<ShareDisposition>).failure.code,
+      'payment_request_expired',
+    );
+    expect(harness.clipboard.text, isNull);
+    expect(harness.share.sharedText, isNull);
+    expect(harness.container.read(provider).requireValue.operation, isNull);
+  });
+
   test('copy and share use injectable platform boundaries', () async {
     final harness = await PaymentFlowTestHarness.create();
     addTearDown(harness.dispose);

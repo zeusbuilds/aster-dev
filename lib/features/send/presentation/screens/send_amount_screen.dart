@@ -136,55 +136,65 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
     final provider = sendFlowViewModelProvider(widget.target);
     final flow = ref.watch(provider);
     final market = ref.watch(bitcoinMarketViewModelProvider);
-    return Scaffold(
-      backgroundColor: context.colorScheme.surface,
-      appBar: CustomAppBar(
-        title: 'Send ${widget.target.assetLabel}',
-        leadingIcon: true,
-        centerTitle: false,
-        fallbackLocation: RoutePaths.sendAddressFor(widget.target.slug),
-      ),
-      body: SafeArea(
-        top: false,
-        minimum: EdgeInsets.only(bottom: context.spacing.lg),
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: context.spacing.screenPadding,
-          ),
-          child: flow.when(
-            skipLoadingOnRefresh: false,
-            data: (state) => state.preview == null
-                ? _MissingDestination(
-                    target: widget.target,
-                    onBack: () => context.goNamed(
-                      RouteNames.sendAddress,
-                      pathParameters: {
-                        RoutePaths.paymentTargetParameter: widget.target.slug,
-                      },
+    final submissionOwnsRoute = switch (flow.value) {
+      final state? =>
+        state.operation == SendFlowOperation.submitting || state.result != null,
+      null => false,
+    };
+    return PopScope(
+      canPop: !submissionOwnsRoute,
+      child: Scaffold(
+        backgroundColor: context.colorScheme.surface,
+        appBar: CustomAppBar(
+          title: 'Send ${widget.target.assetLabel}',
+          leadingIcon: true,
+          leadingEnabled: !submissionOwnsRoute,
+          centerTitle: false,
+          fallbackLocation: RoutePaths.sendAddressFor(widget.target.slug),
+        ),
+        body: SafeArea(
+          top: false,
+          minimum: EdgeInsets.only(bottom: context.spacing.lg),
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: context.spacing.screenPadding,
+            ),
+            child: flow.when(
+              skipLoadingOnRefresh: false,
+              data: (state) => state.preview == null
+                  ? _MissingDestination(
+                      target: widget.target,
+                      onBack: () => context.goNamed(
+                        RouteNames.sendAddress,
+                        pathParameters: {
+                          RoutePaths.paymentTargetParameter: widget.target.slug,
+                        },
+                      ),
+                    )
+                  : _AmountBody(
+                      state: state,
+                      now: _now,
+                      market: market,
+                      onAmountChanged: ref.read(provider.notifier).updateAmount,
+                      onRefreshBalance: () => unawaited(
+                        ref.read(provider.notifier).refreshBalance(),
+                      ),
+                      onRefreshFee: () =>
+                          unawaited(ref.read(provider.notifier).refreshFee()),
+                      onRetryQuote: _marketRetryable(state, market, _now)
+                          ? () => ref
+                                .read(bitcoinMarketViewModelProvider.notifier)
+                                .retry()
+                          : null,
+                      onSubmit: () => unawaited(_submit()),
                     ),
-                  )
-                : _AmountBody(
-                    state: state,
-                    now: _now,
-                    market: market,
-                    onAmountChanged: ref.read(provider.notifier).updateAmount,
-                    onRefreshBalance: () =>
-                        unawaited(ref.read(provider.notifier).refreshBalance()),
-                    onRefreshFee: () =>
-                        unawaited(ref.read(provider.notifier).refreshFee()),
-                    onRetryQuote: _marketRetryable(state, market, _now)
-                        ? () => ref
-                              .read(bitcoinMarketViewModelProvider.notifier)
-                              .retry()
-                        : null,
-                    onSubmit: () => unawaited(_submit()),
-                  ),
-            loading: () => _AmountLoading(target: widget.target),
-            error: (error, stackTrace) => _AmountFailure(
-              failure: error is AppFailureException
-                  ? error.failure
-                  : FailureMapper.from(error, stackTrace),
-              onRetry: ref.read(provider.notifier).retry,
+              loading: () => _AmountLoading(target: widget.target),
+              error: (error, stackTrace) => _AmountFailure(
+                failure: error is AppFailureException
+                    ? error.failure
+                    : FailureMapper.from(error, stackTrace),
+                onRetry: ref.read(provider.notifier).retry,
+              ),
             ),
           ),
         ),

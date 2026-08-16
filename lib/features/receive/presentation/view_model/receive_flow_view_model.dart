@@ -75,8 +75,11 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
   /// Copies the currently encoded request through the app platform boundary.
   Future<AppResult<void>> copyRequest() async {
     final current = state.value;
-    if (current == null || !current.canReadRequest) {
+    if (current == null) {
       return AppResult.failure(_operationUnavailableFailure());
+    }
+    if (_requestReadFailure(current) case final failure?) {
+      return AppResult.failure(failure);
     }
     state = AsyncData(
       current.copyWith(operation: ReceiveFlowOperation.copyingRequest),
@@ -103,8 +106,11 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
     ShareOrigin? origin,
   }) async {
     final current = state.value;
-    if (current == null || !current.canReadRequest) {
+    if (current == null) {
       return AppResult.failure(_operationUnavailableFailure());
+    }
+    if (_requestReadFailure(current) case final failure?) {
+      return AppResult.failure(failure);
     }
     state = AsyncData(
       current.copyWith(operation: ReceiveFlowOperation.sharingRequest),
@@ -252,10 +258,27 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
     }
   }
 
+  AppFailure? _requestReadFailure(ReceiveFlowState current) {
+    if (!current.canReadRequest) {
+      return _operationUnavailableFailure();
+    }
+    if (current.isExpiredAt(ref.read(utcClockProvider)())) {
+      return _requestExpiredFailure;
+    }
+    return null;
+  }
+
   static AppFailure _operationUnavailableFailure() => const AppFailure(
     code: 'payment_operation_in_progress',
     kind: AppFailureKind.conflict,
     userMessage: 'Wait for the current payment action to finish.',
+    retryable: false,
+  );
+
+  static const _requestExpiredFailure = AppFailure(
+    code: 'payment_request_expired',
+    kind: AppFailureKind.validation,
+    userMessage: 'This payment request has expired. Generate a new request.',
     retryable: false,
   );
 }

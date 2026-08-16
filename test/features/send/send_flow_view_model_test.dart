@@ -676,6 +676,30 @@ void main() {
     expect(engine.calls.where((call) => call == 'balance'), hasLength(2));
   });
 
+  test('initial retry is inert for an already-loaded Send form', () async {
+    final engine = FakeWalletEngine()
+      ..balance = _balance(onchainSpendable: 1000, lightningSpendable: 0);
+    final harness = await PaymentFlowTestHarness.create(engine: engine);
+    addTearDown(harness.dispose);
+    final provider = sendFlowViewModelProvider(
+      WalletPaymentTarget.bitcoinOnchain,
+    );
+    final subscription = harness.container.listen(provider, (_, _) {});
+    addTearDown(subscription.close);
+    await harness.container.read(provider.future);
+    final notifier = harness.container.read(provider.notifier);
+    notifier.updateDestination('pending recipient input');
+    final callsBefore = List<String>.of(engine.calls);
+
+    await notifier.retry();
+
+    expect(
+      harness.container.read(provider).requireValue.destination,
+      'pending recipient input',
+    );
+    expect(engine.calls, callsBefore);
+  });
+
   test('terminal initial Send failure cannot be retried', () async {
     final engine = FakeWalletEngine()
       ..balance = _balance(onchainSpendable: 1000, lightningSpendable: 0)

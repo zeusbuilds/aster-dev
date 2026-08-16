@@ -234,6 +234,42 @@ void main() {
     expect(container.read(settingsViewModelProvider).hasError, isTrue);
   });
 
+  test('initial retry is inert for already-loaded settings', () async {
+    SharedPreferences.setMockInitialValues({
+      'utexo.settings.v1.currency': 'USD',
+      'utexo.settings.v1.region': 'US',
+      'utexo.settings.v1.bitcoin_unit': 'btc',
+      'utexo.settings.v1.balances_visible': true,
+    });
+    final repository = SettingsRepository(
+      PreferencesService(await SharedPreferences.getInstance()),
+      _CatalogAssetBundle(),
+    );
+    final container = ProviderContainer(
+      overrides: [
+        settingsRepositoryProvider.overrideWith((ref) async => repository),
+      ],
+    );
+    final subscription = container.listen(
+      settingsViewModelProvider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(() {
+      subscription.close();
+      container.dispose();
+    });
+    await container.read(settingsViewModelProvider.future);
+    final before = container.read(settingsViewModelProvider);
+
+    await container.read(settingsViewModelProvider.notifier).retry();
+
+    expect(
+      identical(container.read(settingsViewModelProvider), before),
+      isTrue,
+    );
+  });
+
   test('terminal network health failure rejects explicit retry', () async {
     const services = WalletServiceConfiguration(
       environment: BlockchainEnvironment.regtest,

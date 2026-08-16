@@ -22,11 +22,14 @@ class SettingsViewModel extends _$SettingsViewModel {
 
   /// Retries an initial catalog or preference failure.
   Future<void> retry() async {
-    if (state.isLoading || state.value?.isSaving == true) return;
-    if (state case AsyncError(:final error, :final stackTrace)
-        when !FailureMapper.from(error, stackTrace).retryable) {
-      return;
-    }
+    final failure = switch (state) {
+      AsyncError(:final error, :final stackTrace) => FailureMapper.from(
+        error,
+        stackTrace,
+      ),
+      _ => null,
+    };
+    if (failure == null || !failure.retryable) return;
     final generation = ++_stateGeneration;
     state = const AsyncLoading();
     final next = await AsyncValue.guard(() async {

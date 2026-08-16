@@ -2,6 +2,9 @@ import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:aster/core/core.dart';
+import 'package:aster/features/settings/domain/models/models.dart';
+import 'package:aster/features/settings/presentation/models/models.dart';
+import 'package:aster/features/settings/presentation/view_model/view_models.dart';
 import 'package:aster/features/transaction/presentation/screens/screens.dart';
 import 'package:aster/features/transaction/presentation/widgets/widgets.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
@@ -296,6 +299,63 @@ void main() {
     );
   });
 
+  testWidgets('Activity refresh retries a failed Settings dependency first', (
+    tester,
+  ) async {
+    const failure = AppFailure(
+      code: 'settings_temporarily_unavailable',
+      kind: AppFailureKind.unavailable,
+      userMessage: 'Settings are temporarily unavailable.',
+      retryable: true,
+    );
+    final harness = await _harness();
+    addTearDown(() => _disposeHarness(tester, harness));
+    final settingsViewModel = _InitiallyFailingSettingsViewModel(failure);
+    _configurePhone(tester);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: harness.container,
+        child: ProviderScope(
+          overrides: [
+            settingsViewModelProvider.overrideWith(() => settingsViewModel),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            home: const TransactionListScreen(
+              assetKind: WalletAssetKind.bitcoin,
+            ),
+          ),
+        ),
+      ),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.text(failure.userMessage).evaluate().isNotEmpty,
+    );
+    expect(
+      harness.engine.calls.where((call) => call == 'activity'),
+      hasLength(1),
+    );
+    expect(harness.engine.calls, isNot(contains('sync')));
+
+    final indicator = tester.widget<RefreshIndicator>(
+      find.byType(RefreshIndicator),
+    );
+    await indicator.onRefresh();
+    await tester.pump();
+    await _pumpUntil(
+      tester,
+      () => find.byType(TransactionItem).evaluate().length == 2,
+    );
+
+    expect(harness.engine.calls, isNot(contains('sync')));
+    expect(
+      harness.engine.calls.where((call) => call == 'activity'),
+      hasLength(1),
+    );
+    expect(settingsViewModel.retryAttempts, 1);
+  });
+
   testWidgets('Activity and details loading expose only truthful live nodes', (
     tester,
   ) async {
@@ -335,6 +395,42 @@ void main() {
 
     engine.activityGate!.complete();
   });
+}
+
+final class _InitiallyFailingSettingsViewModel extends SettingsViewModel {
+  _InitiallyFailingSettingsViewModel(this.failure);
+
+  final AppFailure failure;
+  var retryAttempts = 0;
+
+  @override
+  Future<SettingsState> build() {
+    return Future<SettingsState>.error(
+      AppFailureException(failure),
+      StackTrace.current,
+    );
+  }
+
+  @override
+  Future<void> retry() async {
+    retryAttempts += 1;
+    state = AsyncData(
+      SettingsState(
+        snapshot: SettingsSnapshot(
+          preferences: AppPreferences.defaults,
+          currencies: [
+            FiatCurrency(
+              name: 'United States Dollar',
+              symbol: r'$',
+              code: 'USD',
+              countryCode: 'US',
+            ),
+          ],
+          regions: [Region(name: 'United States', code: 'US')],
+        ),
+      ),
+    );
+  }
 }
 
 Future<PaymentFlowTestHarness> _harness({
