@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:aster/core/core.dart';
 import 'package:aster/features/wallet/data/runtime/runtime.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
+import 'package:aster/features/wallet/domain/validation/validation.dart';
 import 'package:dart_bech32/dart_bech32.dart' as bech32_codec;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -628,6 +629,7 @@ void main() {
     );
 
     expect(receive.encodedRequest, 'bitcoin:$address?amount=1.23456789');
+    expect(WalletProtocolText.isQrPayload(receive.encodedRequest), isTrue);
     expect(receive.displayValue, address);
     expect(sent.referenceId, 'bitcoin-txid');
     expect(sent.status, WalletPaymentStatus.pending);
@@ -794,6 +796,68 @@ void main() {
       ),
     );
     verifyNever(() => wallet.decodeLnInvoice(any()));
+  });
+
+  test('rejects oversized Lightning receive QR before native decode', () async {
+    final invoice = 'l' * (WalletProtocolText.maximumQrPayloadCharacters + 1);
+    final wallet = MockUtexoWallet();
+    when(
+      () =>
+          wallet.createLightningInvoice(amountSats: null, expirySeconds: 3600),
+    ).thenAnswer((_) async => LightningReceiveRequest(lnInvoice: invoice));
+    final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
+    const route = PaymentRoute(
+      asset: WalletAsset.bitcoin,
+      rail: PaymentRail.lightning,
+    );
+
+    await expectLater(
+      engine.createReceiveRequest(route),
+      throwsA(
+        isA<NativeProtocolException>().having(
+          (error) => error.field,
+          'field',
+          'LightningReceiveRequest.lnInvoice',
+        ),
+      ),
+    );
+    verifyNever(() => wallet.decodeLnInvoice(any()));
+  });
+
+  test('rejects oversized RGB receive QR before native decode', () async {
+    const assetId = 'rgb:configured-usdt';
+    const configuredServices = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.regtest,
+      sdkNetwork: 'regtest',
+      usdtAsset: RgbAssetConfiguration(contractId: assetId, precision: 6),
+    );
+    final invoice = 'r' * (WalletProtocolText.maximumQrPayloadCharacters + 1);
+    final wallet = MockUtexoWallet();
+    when(() => wallet.onchainReceive(any())).thenAnswer(
+      (_) async =>
+          OnchainReceiveResponse(invoice: invoice, batchTransferIdx: 0),
+    );
+    final engine = RgbWalletEngine(
+      wallet,
+      configuredServices,
+      UtexoUnlockConfig(),
+    );
+    final route = PaymentRoute(
+      asset: WalletAsset.rgbUsdt(assetId: assetId, precision: 6),
+      rail: PaymentRail.onchain,
+    );
+
+    await expectLater(
+      engine.createReceiveRequest(route),
+      throwsA(
+        isA<NativeProtocolException>().having(
+          (error) => error.field,
+          'field',
+          'OnchainReceiveResponse.invoice',
+        ),
+      ),
+    );
+    verifyNever(() => wallet.decodeRgbInvoice(any()));
   });
 
   test('creates, verifies, and pays Bitcoin Lightning invoices', () async {

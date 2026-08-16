@@ -6,9 +6,12 @@ import 'package:aster/features/home/presentation/screens/screens.dart';
 import 'package:aster/features/home/presentation/widgets/candle_chart.dart';
 import 'package:aster/features/home/presentation/widgets/widgets.dart';
 import 'package:aster/features/market/domain/models/models.dart';
+import 'package:aster/features/market/presentation/view_model/view_models.dart';
 import 'package:aster/features/settings/domain/models/models.dart';
 import 'package:aster/features/settings/presentation/view_model/view_models.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
+import 'package:aster/features/wallet/presentation/models/models.dart';
+import 'package:aster/features/wallet/presentation/view_model/view_models.dart';
 import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,6 +25,50 @@ import '../../support/wallet_fakes.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('Home loading surfaces announce one truthful status each', (
+    tester,
+  ) async {
+    final wallet = Completer<WalletState>();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          walletViewModelProvider.overrideWith(
+            () => _PendingWalletViewModel(wallet.future),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const Scaffold(body: HomeHeader()),
+        ),
+      ),
+    );
+
+    final walletLoading = find.bySemanticsLabel('Loading active wallet');
+    expect(walletLoading, findsOneWidget);
+    expect(
+      tester.getSemantics(walletLoading).flagsCollection.isLiveRegion,
+      isTrue,
+    );
+    expect(find.bySemanticsLabel('Wallet unavailable'), findsNothing);
+    wallet.complete(WalletState());
+    await tester.pump();
+
+    final harness = await PaymentFlowTestHarness.create();
+    addTearDown(() => _disposeHarness(tester, harness));
+    await _pump(
+      tester,
+      harness,
+      const Scaffold(body: AssetsSection(home: AsyncLoading())),
+    );
+    final balancesLoading = find.bySemanticsLabel('Loading asset balances');
+    expect(balancesLoading, findsOneWidget);
+    expect(
+      tester.getSemantics(balancesLoading).flagsCollection.isLiveRegion,
+      isTrue,
+    );
+    expect(find.bySemanticsLabel(RegExp('Bitcoin total')), findsNothing);
+  });
 
   testWidgets('Home renders totals, persists visibility, and hides semantics', (
     tester,
@@ -412,6 +459,17 @@ void main() {
           .evaluate()
           .isNotEmpty,
     );
+    final market = unavailableHarness.container.read(
+      bitcoinMarketViewModelProvider,
+    );
+    final failureMessage = switch (market) {
+      AsyncError(:final error) when error is AppFailureException =>
+        error.failure.userMessage,
+      _ => throw StateError('Expected a typed market failure.'),
+    };
+    final failure = find.bySemanticsLabel(failureMessage);
+    expect(failure, findsOneWidget);
+    expect(tester.getSemantics(failure).flagsCollection.isLiveRegion, isTrue);
   });
 
   testWidgets('home mesh blurs its own content without a backdrop capture', (
@@ -714,6 +772,15 @@ Future<void> _disposeHarness(
   final disposal = harness.dispose();
   await tester.pump();
   await disposal;
+}
+
+final class _PendingWalletViewModel extends WalletViewModel {
+  _PendingWalletViewModel(this._future);
+
+  final Future<WalletState> _future;
+
+  @override
+  Future<WalletState> build() => _future;
 }
 
 final class _BlockingVisibilityPreferencesService extends PreferencesService {

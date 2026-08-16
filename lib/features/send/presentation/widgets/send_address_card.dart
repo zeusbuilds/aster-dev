@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../shared/shared.dart';
 import '../../../wallet/domain/models/models.dart';
+import '../../../wallet/domain/validation/validation.dart';
 import '../../../wallet/presentation/models/models.dart';
 import '../../../wallet/presentation/widgets/widgets.dart';
 
@@ -73,8 +75,15 @@ class SendAddressCard extends StatelessWidget {
                 textInputAction: TextInputAction.done,
                 autocorrect: false,
                 enableSuggestions: false,
+                enableIMEPersonalizedLearning: false,
                 smartDashesType: SmartDashesType.disabled,
                 smartQuotesType: SmartQuotesType.disabled,
+                inputFormatters: <TextInputFormatter>[
+                  LengthLimitingTextInputFormatter(
+                    WalletProtocolText.maximumEncodedCharacters,
+                    maxLengthEnforcement: MaxLengthEnforcement.enforced,
+                  ),
+                ],
                 minLines: 2,
                 maxLines: 4,
                 decoration: InputDecoration(
@@ -146,6 +155,7 @@ class SendAddressCard extends StatelessWidget {
     );
     if (_behavior != null) return card;
     return Semantics(
+      liveRegion: true,
       label: 'Loading recipient form',
       excludeSemantics: true,
       child: AppSkeletonizer(enabled: true, child: card),

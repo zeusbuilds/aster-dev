@@ -168,6 +168,13 @@ void main() {
 
       expect(find.text(failure.userMessage), findsOneWidget);
       expect(
+        tester
+            .getSemantics(find.bySemanticsLabel(failure.userMessage))
+            .flagsCollection
+            .isLiveRegion,
+        isTrue,
+      );
+      expect(
         find.widgetWithText(CustomButton, 'Retry'),
         vector.showsRetry ? findsOneWidget : findsNothing,
       );

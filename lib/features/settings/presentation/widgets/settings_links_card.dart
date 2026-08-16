@@ -107,9 +107,15 @@ class SettingsLinksCard extends StatelessWidget {
           ),
           SizedBox(height: context.spacing.md),
         ],
-        Squircle(
-          padding: EdgeInsets.symmetric(vertical: context.spacing.xs),
-          child: Column(children: rows),
+        Semantics(
+          container: true,
+          liveRegion: loading,
+          label: loading ? 'Loading app information' : null,
+          excludeSemantics: loading,
+          child: Squircle(
+            padding: EdgeInsets.symmetric(vertical: context.spacing.xs),
+            child: Column(children: rows),
+          ),
         ),
       ],
     );

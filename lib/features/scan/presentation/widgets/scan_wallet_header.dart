@@ -32,6 +32,7 @@ class ScanWalletHeader extends StatelessWidget {
         : 'Active wallet, $name, ID $walletId';
     return Semantics(
       container: true,
+      liveRegion: loading,
       label: semanticLabel,
       excludeSemantics: true,
       child: AppSkeletonizer(

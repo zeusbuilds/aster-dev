@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
-import 'package:pretty_qr_code/pretty_qr_code.dart';
 
 import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
@@ -223,21 +222,9 @@ final class _RequestBody extends StatelessWidget {
           padding: EdgeInsets.all(context.spacing.xxl),
           child: Column(
             children: [
-              Semantics(
-                image: true,
-                label: '${state.route.target.requestLabel} QR code',
-                excludeSemantics: true,
-                child: Padding(
-                  padding: EdgeInsets.all(context.spacing.lg),
-                  child: PrettyQrView.data(
-                    data: state.request.encodedRequest,
-                    decoration: PrettyQrDecoration(
-                      shape: PrettyQrDotsSymbol(
-                        color: context.colorScheme.onSurface,
-                      ),
-                    ),
-                  ),
-                ),
+              ReceiveRequestQr(
+                encodedRequest: state.request.encodedRequest,
+                semanticLabel: '${state.route.target.requestLabel} QR code',
               ),
               SizedBox(height: context.spacing.lg),
               Text(
@@ -360,10 +347,13 @@ final class _RequestFailure extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            failure.userMessage,
-            style: context.type.statusMessage,
-            textAlign: TextAlign.center,
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              failure.userMessage,
+              style: context.type.statusMessage,
+              textAlign: TextAlign.center,
+            ),
           ),
           if (failure.retryable) ...[
             SizedBox(height: context.spacing.lg),

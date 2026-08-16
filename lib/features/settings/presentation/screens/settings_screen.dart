@@ -55,6 +55,7 @@ class SettingsScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Semantics(
+              liveRegion: walletLoading,
               label: walletLoading ? 'Loading wallet' : null,
               excludeSemantics: walletLoading,
               child: AppSkeletonizer(
@@ -132,6 +133,7 @@ class SettingsScreen extends ConsumerWidget {
             Text('App', style: type.sectionLabel),
             SizedBox(height: spacing.md),
             Semantics(
+              liveRegion: settings.isLoading,
               label: settings.isLoading ? 'Loading app settings' : null,
               excludeSemantics: settings.isLoading,
               child: AppSkeletonizer(

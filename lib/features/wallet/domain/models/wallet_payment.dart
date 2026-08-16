@@ -116,7 +116,7 @@ final class WalletReceiveRequest {
     this.referenceId,
     this.batchTransferIndex,
   }) {
-    _requireEncoded(encodedRequest, 'encodedRequest');
+    _requireQrPayload(encodedRequest, 'encodedRequest');
     _requireEncoded(displayValue, 'displayValue');
     final value = amount;
     if (value != null) _requireRouteAmount(route, value);
@@ -265,6 +265,12 @@ void _requireRouteAmount(PaymentRoute route, WalletAmount amount) {
 void _requireEncoded(String value, String field) {
   if (!WalletProtocolText.isEncodedValue(value)) {
     throw ArgumentError.value(value, field, 'Invalid encoded payment value.');
+  }
+}
+
+void _requireQrPayload(String value, String field) {
+  if (!WalletProtocolText.isQrPayload(value)) {
+    throw ArgumentError('Invalid QR payment value for $field.');
   }
 }
 

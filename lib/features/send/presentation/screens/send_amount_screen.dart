@@ -71,6 +71,10 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
 
   void _scheduleDeadline(SendFlowState? state, BitcoinMarketSnapshot? market) {
     _deadlineTimer?.cancel();
+    final now = ref.read(utcClockProvider)().toUtc();
+    // Provider state can arrive after one of its own deadlines. Keep the
+    // render clock synchronized even when there is no future timer to arm.
+    _now = now;
     if (state == null) return;
     final deadlines = <DateTime>[];
     final expiry = state.preview?.expiresAt;
@@ -88,7 +92,6 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
     if (marketPrice != null) deadlines.add(marketPrice.expiresAt);
     deadlines.sort();
     if (deadlines.isEmpty) return;
-    final now = ref.read(utcClockProvider)();
     DateTime? nextDeadline;
     for (final deadline in deadlines) {
       if (deadline.isAfter(now)) {
@@ -485,14 +488,20 @@ final class _AmountLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        SendCard.loading(target: target),
-        const Spacer(),
-        const AsterNumericKeypad.loading(),
-        SizedBox(height: context.spacing.md),
-        const CustomButton(text: 'Send'),
-      ],
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: 'Loading payment amount',
+      excludeSemantics: true,
+      child: Column(
+        children: [
+          SendCard.loading(target: target),
+          const Spacer(),
+          const AsterNumericKeypad.loading(),
+          SizedBox(height: context.spacing.md),
+          const CustomButton(text: 'Send'),
+        ],
+      ),
     );
   }
 }
@@ -509,10 +518,13 @@ final class _AmountFailure extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            failure.userMessage,
-            style: context.type.statusMessage,
-            textAlign: TextAlign.center,
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              failure.userMessage,
+              style: context.type.statusMessage,
+              textAlign: TextAlign.center,
+            ),
           ),
           if (failure.retryable) ...[
             SizedBox(height: context.spacing.lg),

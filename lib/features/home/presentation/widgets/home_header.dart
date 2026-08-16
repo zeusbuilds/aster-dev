@@ -49,7 +49,10 @@ class HomeHeader extends ConsumerWidget {
             child: Semantics(
               button: true,
               enabled: canSelectWallet,
-              label: walletName == null
+              liveRegion: walletState.isLoading,
+              label: walletState.isLoading
+                  ? 'Loading active wallet'
+                  : walletName == null
                   ? 'Wallet unavailable'
                   : 'Select wallet, $walletName',
               excludeSemantics: true,

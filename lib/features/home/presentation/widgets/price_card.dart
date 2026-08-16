@@ -330,7 +330,10 @@ class _MarketUnavailable extends StatelessWidget {
       padding: EdgeInsets.all(spacing.lg),
       child: Column(
         children: [
-          Text(message, style: context.type.brandMetric),
+          Semantics(
+            liveRegion: true,
+            child: Text(message, style: context.type.brandMetric),
+          ),
           if (onRetry case final retry?) ...[
             SizedBox(height: spacing.md),
             CustomButton.compact(text: 'Retry', onTap: retry),

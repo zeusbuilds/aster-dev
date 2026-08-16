@@ -268,12 +268,18 @@ class _AssetLoadingList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        AssetRow.loading(kind: WalletAssetKind.bitcoin, title: 'Bitcoin'),
-        SizedBox(height: context.spacing.lg),
-        AssetRow.loading(kind: WalletAssetKind.usdt, title: 'USDT'),
-      ],
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: 'Loading asset balances',
+      excludeSemantics: true,
+      child: Column(
+        children: [
+          AssetRow.loading(kind: WalletAssetKind.bitcoin, title: 'Bitcoin'),
+          SizedBox(height: context.spacing.lg),
+          AssetRow.loading(kind: WalletAssetKind.usdt, title: 'USDT'),
+        ],
+      ),
     );
   }
 }
@@ -313,10 +319,13 @@ class _AssetsFailure extends StatelessWidget {
       padding: EdgeInsets.symmetric(vertical: context.spacing.xl),
       child: Column(
         children: [
-          Text(
-            failure.userMessage,
-            style: context.type.statusMessage,
-            textAlign: TextAlign.center,
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              failure.userMessage,
+              style: context.type.statusMessage,
+              textAlign: TextAlign.center,
+            ),
           ),
           if (failure.retryable) ...[
             SizedBox(height: context.spacing.lg),

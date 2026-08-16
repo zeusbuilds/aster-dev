@@ -117,6 +117,43 @@ void main() {
     expect(find.bySemanticsLabel('Loading region'), findsNothing);
   });
 
+  testWidgets('app-information loading has one live semantic owner', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Scaffold(
+          body: SettingsLinksCard(state: null, loading: true, onOpen: (_) {}),
+        ),
+      ),
+    );
+
+    final loading = find.bySemanticsLabel('Loading app information');
+    expect(loading, findsOneWidget);
+    expect(tester.getSemantics(loading).flagsCollection.isLiveRegion, isTrue);
+    expect(find.bySemanticsLabel(RegExp('Contact Support')), findsNothing);
+    expect(find.bySemanticsLabel(RegExp('Privacy Policy')), findsNothing);
+  });
+
+  testWidgets('settings preference loading is a live non-fabricated status', (
+    tester,
+  ) async {
+    final pending = Completer<SettingsState>();
+    await _pumpSettingsScreen(
+      tester,
+      walletFuture: Future.value(WalletState(activeWallet: _walletProfile)),
+      appRepository: _appRepository(),
+      settingsViewModelFactory: () => _PendingSettingsViewModel(pending.future),
+    );
+    await tester.pump();
+
+    final loading = find.bySemanticsLabel('Loading app settings');
+    expect(loading, findsOneWidget);
+    expect(tester.getSemantics(loading).flagsCollection.isLiveRegion, isTrue);
+    expect(find.bySemanticsLabel(RegExp('Currency,')), findsNothing);
+  });
+
   for (final retryable in [true, false]) {
     for (final scenario in const [
       (name: 'currency', screen: CurrencySelectionScreen()),
@@ -514,6 +551,12 @@ void main() {
     );
 
     expect(find.text('Loading wallet'), findsWidgets);
+    final walletLoading = find.bySemanticsLabel('Loading wallet');
+    expect(walletLoading, findsOneWidget);
+    expect(
+      tester.getSemantics(walletLoading).flagsCollection.isLiveRegion,
+      isTrue,
+    );
     expect(find.text('Main'), findsNothing);
     wallet.completeError(
       const AppFailureException(
@@ -838,6 +881,15 @@ final class _FailingNetworkConfigurationViewModel
   Future<NetworkConfigurationState> build() {
     return Future.error(AppFailureException(failure), StackTrace.current);
   }
+}
+
+final class _PendingSettingsViewModel extends SettingsViewModel {
+  _PendingSettingsViewModel(this._future);
+
+  final Future<SettingsState> _future;
+
+  @override
+  Future<SettingsState> build() => _future;
 }
 
 final class _StaticSettingsViewModel extends SettingsViewModel {

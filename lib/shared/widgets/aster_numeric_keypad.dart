@@ -45,7 +45,7 @@ class AsterNumericKeypad extends StatelessWidget {
       const _KeypadValue.delete(),
     ];
 
-    return SizedBox(
+    final keypad = SizedBox(
       height: height,
       child: GridView.builder(
         physics: const NeverScrollableScrollPhysics(),
@@ -76,6 +76,8 @@ class AsterNumericKeypad extends StatelessWidget {
         },
       ),
     );
+    if (_behavior == null) return ExcludeSemantics(child: keypad);
+    return keypad;
   }
 
   bool _canActivate(_KeypadValue keyValue) {

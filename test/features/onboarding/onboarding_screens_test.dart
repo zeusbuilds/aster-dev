@@ -20,6 +20,44 @@ void main() {
   setUpAll(() => WidgetController.hitTestWarningShouldBeFatal = true);
   tearDownAll(() => WidgetController.hitTestWarningShouldBeFatal = false);
 
+  testWidgets('onboarding status is live without swallowing recovery actions', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: AsterFeedbackScope(
+          haptics: const NoopHapticFeedbackService(),
+          toasts: ToastController(),
+          child: Scaffold(
+            body: OnboardingStatusPanel.failure(
+              title: 'Wallet setup paused',
+              message: 'Wallet services are temporarily unavailable.',
+              primaryLabel: 'Retry',
+              onPrimary: () {},
+              onBack: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final status = find.bySemanticsLabel(
+      'Wallet setup paused. Wallet services are temporarily unavailable.',
+    );
+    expect(status, findsOneWidget);
+    expect(tester.getSemantics(status).flagsCollection.isLiveRegion, isTrue);
+    for (final action in const ['Retry', 'Back']) {
+      expect(
+        tester
+            .getSemantics(find.bySemanticsLabel(action))
+            .getSemanticsData()
+            .hasAction(ui.SemanticsAction.tap),
+        isTrue,
+      );
+    }
+  });
+
   testWidgets('import lowercases input and moves page from word four', (
     tester,
   ) async {

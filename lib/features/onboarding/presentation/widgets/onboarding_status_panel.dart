@@ -35,36 +35,47 @@ class OnboardingStatusPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final statusLabel = title == null ? message : '$title. $message';
     return Center(
       child: SingleChildScrollView(
         padding: EdgeInsets.all(context.spacing.xxl),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (_loading)
-              GridLoader(
-                colorStyle: GridLoaderColorStyle.custom,
-                color: context.appColors.onBrandArt,
-              )
-            else
-              Icon(
-                Icons.lock_outline,
-                color: context.appColors.onBrandArt,
-                size: context.icons.xl,
+            Semantics(
+              container: true,
+              liveRegion: true,
+              label: statusLabel,
+              excludeSemantics: true,
+              child: Column(
+                children: [
+                  if (_loading)
+                    GridLoader(
+                      colorStyle: GridLoaderColorStyle.custom,
+                      color: context.appColors.onBrandArt,
+                    )
+                  else
+                    Icon(
+                      Icons.lock_outline,
+                      color: context.appColors.onBrandArt,
+                      size: context.icons.xl,
+                    ),
+                  SizedBox(height: context.spacing.lg),
+                  if (title case final title?) ...[
+                    Text(
+                      title,
+                      style: context.type.brandTitle,
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: context.spacing.sm),
+                  ],
+                  Text(
+                    message,
+                    style: context.type.brandBody,
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
-            SizedBox(height: context.spacing.lg),
-            if (title case final title?) ...[
-              Text(
-                title,
-                style: context.type.brandTitle,
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: context.spacing.sm),
-            ],
-            Text(
-              message,
-              style: context.type.brandBody,
-              textAlign: TextAlign.center,
             ),
             if (primaryLabel case final label? when onPrimary != null) ...[
               SizedBox(height: context.spacing.xxl),

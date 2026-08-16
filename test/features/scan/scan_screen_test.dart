@@ -22,6 +22,22 @@ import '../../support/presentation_fakes.dart';
 import '../../support/scan_fakes.dart';
 
 void main() {
+  testWidgets('loading wallet header is one live non-fabricated status', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: const Scaffold(body: ScanWalletHeader(loading: true)),
+      ),
+    );
+
+    final loading = find.bySemanticsLabel('Loading active wallet');
+    expect(loading, findsOneWidget);
+    expect(tester.getSemantics(loading).flagsCollection.isLiveRegion, isTrue);
+    expect(find.bySemanticsLabel(RegExp('Wallet unavailable')), findsNothing);
+  });
+
   testWidgets('disabled Scan controls expose a visible disabled state', (
     tester,
   ) async {

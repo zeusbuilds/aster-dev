@@ -10,6 +10,13 @@ abstract final class WalletProtocolText {
   /// Maximum encoded payment-request length accepted at app boundaries.
   static const maximumEncodedCharacters = 8192;
 
+  /// Maximum visible-ASCII payload accepted by the Receive QR contract.
+  ///
+  /// The pinned QR encoder uses byte mode with error-correction level L. Its
+  /// Version 40 ceiling is 2,953 bytes; visible ASCII makes bytes and Dart
+  /// characters equivalent at this boundary.
+  static const maximumQrPayloadCharacters = 2953;
+
   /// Maximum opaque native-identifier length accepted at app boundaries.
   static const maximumIdentifierCharacters = 1024;
 
@@ -19,6 +26,11 @@ abstract final class WalletProtocolText {
     int maximumCharacters = maximumEncodedCharacters,
   }) {
     return _isVisibleAscii(value, maximumCharacters);
+  }
+
+  /// Whether [value] is safe and small enough for the Receive QR renderer.
+  static bool isQrPayload(String value) {
+    return _isVisibleAscii(value, maximumQrPayloadCharacters);
   }
 
   /// Whether [value] is a bounded nonempty visible ASCII identifier.

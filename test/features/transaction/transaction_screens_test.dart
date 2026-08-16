@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:aster/core/core.dart';
 import 'package:aster/features/transaction/presentation/screens/screens.dart';
@@ -227,6 +228,15 @@ void main() {
       find.text('This transaction is no longer available.'),
       findsOneWidget,
     );
+    expect(
+      tester
+          .getSemantics(
+            find.bySemanticsLabel('This transaction is no longer available.'),
+          )
+          .flagsCollection
+          .isLiveRegion,
+      isTrue,
+    );
     expect(find.widgetWithText(CustomButton, 'Retry'), findsOneWidget);
 
     harness.engine.syncGate = Completer<void>();
@@ -251,6 +261,41 @@ void main() {
     );
   });
 
+  testWidgets('Activity failure is live and preserves explicit retry', (
+    tester,
+  ) async {
+    const failure = AppFailure(
+      code: 'activity_temporarily_unavailable',
+      kind: AppFailureKind.unavailable,
+      userMessage: 'Activity is temporarily unavailable.',
+      retryable: true,
+    );
+    final engine = FakeWalletEngine()
+      ..activityError = const AppFailureException(failure);
+    final harness = await _harness(engine: engine);
+    addTearDown(() => _disposeHarness(tester, harness));
+
+    await _pump(
+      tester,
+      harness,
+      const TransactionListScreen(assetKind: WalletAssetKind.bitcoin),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.text(failure.userMessage).evaluate().isNotEmpty,
+    );
+
+    final message = find.bySemanticsLabel(failure.userMessage);
+    expect(tester.getSemantics(message).flagsCollection.isLiveRegion, isTrue);
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('Retry'))
+          .getSemanticsData()
+          .hasAction(ui.SemanticsAction.tap),
+      isTrue,
+    );
+  });
+
   testWidgets('Activity and details loading expose only truthful live nodes', (
     tester,
   ) async {
@@ -264,7 +309,12 @@ void main() {
       const TransactionListScreen(assetKind: WalletAssetKind.bitcoin),
     );
     await _pumpUntil(tester, () => engine.calls.contains('activity'));
-    expect(find.bySemanticsLabel('Loading activity'), findsOneWidget);
+    final activityLoading = find.bySemanticsLabel('Loading activity');
+    expect(activityLoading, findsOneWidget);
+    expect(
+      tester.getSemantics(activityLoading).flagsCollection.isLiveRegion,
+      isTrue,
+    );
     expect(find.bySemanticsLabel(RegExp(r'Sent|Received')), findsNothing);
 
     await _pump(
@@ -275,9 +325,11 @@ void main() {
         activityId: _onchainActivity().id,
       ),
     );
+    final detailsLoading = find.bySemanticsLabel('Loading transaction details');
+    expect(detailsLoading, findsOneWidget);
     expect(
-      find.bySemanticsLabel('Loading transaction details'),
-      findsOneWidget,
+      tester.getSemantics(detailsLoading).flagsCollection.isLiveRegion,
+      isTrue,
     );
     expect(find.text('Transaction ID'), findsNothing);
 

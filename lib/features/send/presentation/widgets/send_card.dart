@@ -167,6 +167,7 @@ class SendCard extends StatelessWidget {
     );
     if (content != null) return card;
     return Semantics(
+      liveRegion: true,
       label: 'Loading payment amount',
       excludeSemantics: true,
       child: AppSkeletonizer(enabled: true, child: card),

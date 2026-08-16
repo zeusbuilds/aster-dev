@@ -211,10 +211,13 @@ final class _SheetFailure extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            failure.userMessage,
-            style: context.type.statusMessage,
-            textAlign: TextAlign.center,
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              failure.userMessage,
+              style: context.type.statusMessage,
+              textAlign: TextAlign.center,
+            ),
           ),
           if (failure.retryable) ...[
             SizedBox(height: context.spacing.lg),

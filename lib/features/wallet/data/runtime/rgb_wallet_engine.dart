@@ -328,7 +328,10 @@ final class RgbWalletEngine implements WalletEngine {
           ).toString();
     return WalletReceiveRequest(
       route: route,
-      encodedRequest: encoded,
+      encodedRequest: _nativeQrPaymentValue(
+        encoded,
+        'BitcoinReceiveRequest.encodedRequest',
+      ),
       displayValue: address,
       amount: amount,
     );
@@ -362,7 +365,7 @@ final class RgbWalletEngine implements WalletEngine {
         expirySeconds: _receiveLifetime.inSeconds,
       );
     }
-    final invoice = _nativePaymentValue(
+    final invoice = _nativeQrPaymentValue(
       response.lnInvoice,
       'LightningReceiveRequest.lnInvoice',
     );
@@ -394,7 +397,7 @@ final class RgbWalletEngine implements WalletEngine {
         durationSeconds: _receiveLifetime.inSeconds,
       ),
     );
-    final invoice = _nativePaymentValue(
+    final invoice = _nativeQrPaymentValue(
       response.invoice,
       'OnchainReceiveResponse.invoice',
     );
@@ -705,10 +708,10 @@ final class RgbWalletEngine implements WalletEngine {
     }
   }
 
-  static String _nativePaymentValue(String value, String field) {
-    if (!_isValidPaymentValue(value)) {
+  static String _nativeQrPaymentValue(String value, String field) {
+    if (!WalletProtocolText.isQrPayload(value)) {
       throw NativeProtocolException(
-        'Native wallet returned a malformed payment request.',
+        'Native wallet returned a payment request that cannot be encoded as QR.',
         field: field,
       );
     }

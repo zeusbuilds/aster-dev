@@ -105,6 +105,55 @@ void main() {
     expect(find.bySemanticsLabel('Loading swap options'), findsOneWidget);
     expect(find.bySemanticsLabel('Bitcoin, On-chain'), findsNothing);
   });
+
+  testWidgets('Swap failure is live and preserves an eligible retry', (
+    tester,
+  ) async {
+    const failure = AppFailure(
+      code: 'swap_options_unavailable',
+      kind: AppFailureKind.unavailable,
+      userMessage: 'Swap options are temporarily unavailable.',
+      retryable: true,
+    );
+    final haptics = RecordingHapticFeedbackService();
+    final container = ProviderContainer(
+      retry: (retryCount, error) => null,
+      overrides: [
+        walletPaymentCapabilitiesProvider.overrideWith(
+          (ref) => Future.error(
+            const AppFailureException(failure),
+            StackTrace.empty,
+          ),
+        ),
+        hapticFeedbackServiceProvider.overrideWithValue(haptics),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: AsterFeedbackScope(
+          haptics: haptics,
+          toasts: RecordingToastPresentationService(),
+          child: MaterialApp(theme: AppTheme.light(), home: const SwapScreen()),
+        ),
+      ),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.text(failure.userMessage).evaluate().isNotEmpty,
+    );
+
+    final message = find.bySemanticsLabel(failure.userMessage);
+    expect(tester.getSemantics(message).flagsCollection.isLiveRegion, isTrue);
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('Retry'))
+          .getSemanticsData()
+          .hasAction(ui.SemanticsAction.tap),
+      isTrue,
+    );
+  });
 }
 
 Future<void> _pump(

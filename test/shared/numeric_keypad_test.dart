@@ -67,6 +67,22 @@ void main() {
     expect(value, '1');
   });
 
+  testWidgets('loading keypad reserves layout without inert key semantics', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: const Scaffold(body: AsterNumericKeypad.loading()),
+      ),
+    );
+
+    expect(find.text('1'), findsOneWidget);
+    expect(find.byIcon(MingCuteIcons.mgc_delete_back_line), findsOneWidget);
+    expect(find.bySemanticsLabel('1'), findsNothing);
+    expect(find.bySemanticsLabel('Delete digit'), findsNothing);
+  });
+
   testWidgets('keypad exposes actions only when they can edit the value', (
     tester,
   ) async {

@@ -210,6 +210,43 @@ void main() {
     },
   );
 
+  test('Receive QR payloads use a stricter exact protocol boundary', () {
+    const route = PaymentRoute(
+      asset: WalletAsset.bitcoin,
+      rail: PaymentRail.lightning,
+    );
+    final maximumQr = 'a' * WalletProtocolText.maximumQrPayloadCharacters;
+    final aboveQr = 'a' * (WalletProtocolText.maximumQrPayloadCharacters + 1);
+
+    expect(WalletProtocolText.isQrPayload(maximumQr), isTrue);
+    expect(WalletProtocolText.isQrPayload(aboveQr), isFalse);
+    expect(WalletProtocolText.isEncodedValue(aboveQr), isTrue);
+    expect(
+      WalletReceiveRequest(
+        route: route,
+        encodedRequest: maximumQr,
+        displayValue: 'lnbcrt1invoice',
+      ).encodedRequest,
+      maximumQr,
+    );
+    expect(
+      () => WalletReceiveRequest(
+        route: route,
+        encodedRequest: aboveQr,
+        displayValue: 'lnbcrt1invoice',
+      ),
+      throwsArgumentError,
+    );
+    expect(
+      WalletPaymentPreview(
+        route: route,
+        encodedDestination: aboveQr,
+        displayDestination: 'lnbcrt1invoice',
+      ).encodedDestination,
+      aboveQr,
+    );
+  });
+
   test('onchain commands require typed fees and Lightning forbids them', () {
     final observedAt = DateTime.utc(2026, 8, 11, 10);
     final fee = WalletFeeRateEstimate(
