@@ -8,6 +8,7 @@ import 'package:aster/features/home/presentation/widgets/widgets.dart';
 import 'package:aster/features/market/domain/models/models.dart';
 import 'package:aster/features/market/presentation/view_model/view_models.dart';
 import 'package:aster/features/settings/domain/models/models.dart';
+import 'package:aster/features/settings/presentation/models/models.dart';
 import 'package:aster/features/settings/presentation/view_model/view_models.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:aster/features/wallet/presentation/models/models.dart';
@@ -19,6 +20,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:remixicon/remixicon.dart';
 
 import '../../support/payment_flow_harness.dart';
 import '../../support/wallet_fakes.dart';
@@ -165,6 +167,60 @@ void main() {
 
       expect(harness.haptics.intents, isEmpty);
       expect(harness.toasts.messages, isEmpty);
+    },
+  );
+
+  testWidgets(
+    'Home refresh retries its rendered Settings failure without wallet sync',
+    (tester) async {
+      final now = DateTime.utc(2026, 8, 11, 12);
+      final engine = FakeWalletEngine()..balance = _bitcoinBalance();
+      final httpClient = _marketClient(now);
+      final harness = await PaymentFlowTestHarness.create(
+        engine: engine,
+        clock: () => now,
+        httpClient: httpClient,
+      );
+      final loadedSettings = await harness.container.read(
+        settingsViewModelProvider.future,
+      );
+      const failure = AppFailure(
+        code: 'settings_temporarily_unavailable',
+        kind: AppFailureKind.storage,
+        userMessage: 'Settings are temporarily unavailable.',
+        retryable: true,
+      );
+      final failingSettings = _InitiallyFailingSettingsViewModel(
+        failure: failure,
+        recovered: loadedSettings,
+      );
+      addTearDown(httpClient.close);
+      addTearDown(() => _disposeHarness(tester, harness));
+
+      await _pump(
+        tester,
+        harness,
+        ProviderScope(
+          overrides: [
+            settingsViewModelProvider.overrideWith(() => failingSettings),
+          ],
+          child: const HomeScreen(),
+        ),
+      );
+      await _pumpUntil(
+        tester,
+        () => find.text(failure.userMessage).evaluate().isNotEmpty,
+      );
+      engine.calls.clear();
+
+      await tester
+          .widget<RefreshIndicator>(find.byType(RefreshIndicator))
+          .onRefresh();
+      await tester.pump();
+
+      expect(failingSettings.retryAttempts, 1);
+      expect(engine.calls.where((call) => call == 'sync'), isEmpty);
+      await _pumpUntil(tester, () => find.text('Assets').evaluate().isNotEmpty);
     },
   );
 
@@ -415,6 +471,57 @@ void main() {
       find.bySemanticsLabel(RegExp(r'up 0\.19% over 24 hours')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('market header renders an exact zero change as neutral', (
+    tester,
+  ) async {
+    final now = DateTime.utc(2026, 8, 11, 12);
+    final httpClient = _marketClient(
+      now,
+      firstPrice: 100000,
+      bitcoinPrice: 100000,
+    );
+    final harness = await PaymentFlowTestHarness.create(
+      clock: () => now,
+      httpClient: httpClient,
+    );
+    addTearDown(httpClient.close);
+    addTearDown(() => _disposeHarness(tester, harness));
+    await _pump(tester, harness, const HomeScreen());
+
+    const unchangedLabel =
+        r'Bitcoin price $100,000.00 USD. unchanged at 0.0% over 24 hours. '
+        'Powered by CoinGecko.';
+    await _pumpUntil(
+      tester,
+      () => find.bySemanticsLabel(unchangedLabel).evaluate().isNotEmpty,
+    );
+    final priceCard = find.byType(PriceCard);
+    expect(
+      find.descendant(
+        of: priceCard,
+        matching: find.byIcon(RemixIcons.subtract_line),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: priceCard,
+        matching: find.byIcon(RemixIcons.arrow_up_line),
+      ),
+      findsNothing,
+    );
+    final percentage = find.byWidgetPredicate(
+      (widget) => widget is NumericText && widget.text == '0.0%',
+    );
+    final percentageWidget = tester.widget<NumericText>(percentage);
+    final percentageContext = tester.element(percentage);
+    expect(
+      percentageWidget.style?.color,
+      percentageContext.type.brandMetric.color,
+    );
+    expect(find.bySemanticsLabel(unchangedLabel), findsOneWidget);
   });
 
   testWidgets('market header announces falling and unavailable prices', (
@@ -781,6 +888,31 @@ final class _PendingWalletViewModel extends WalletViewModel {
 
   @override
   Future<WalletState> build() => _future;
+}
+
+final class _InitiallyFailingSettingsViewModel extends SettingsViewModel {
+  _InitiallyFailingSettingsViewModel({
+    required this.failure,
+    required this.recovered,
+  });
+
+  final AppFailure failure;
+  final SettingsState recovered;
+  var retryAttempts = 0;
+
+  @override
+  Future<SettingsState> build() {
+    return Future<SettingsState>.error(
+      AppFailureException(failure),
+      StackTrace.current,
+    );
+  }
+
+  @override
+  Future<void> retry() async {
+    retryAttempts += 1;
+    state = AsyncData(recovered);
+  }
 }
 
 final class _BlockingVisibilityPreferencesService extends PreferencesService {

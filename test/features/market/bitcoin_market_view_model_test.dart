@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:aster/core/core.dart';
 import 'package:aster/features/market/domain/models/models.dart';
 import 'package:aster/features/market/presentation/view_model/view_models.dart';
+import 'package:aster/features/settings/domain/models/models.dart';
+import 'package:aster/features/settings/presentation/models/models.dart';
+import 'package:aster/features/settings/presentation/view_model/view_models.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -239,6 +242,98 @@ void main() {
     },
   );
 
+  test(
+    'projects Settings updates onto selected currency identity only',
+    () async {
+      final now = DateTime.utc(2026, 8, 16, 12);
+      final initialSettings = _settingsState();
+      final settings = _MutableSettingsViewModel(initialSettings);
+      final requests = <String>[];
+      final transport = ResilientHttpClient(
+        client: MockClient((request) async {
+          final parameter = request.url.path.endsWith('/range')
+              ? 'vs_currency'
+              : 'vs_currencies';
+          final currency = request.url.queryParameters[parameter]!;
+          requests.add(currency);
+          if (request.url.path.endsWith('/range')) {
+            return http.Response(
+              '{"prices":[[${now.millisecondsSinceEpoch},64000]]}',
+              200,
+            );
+          }
+          return http.Response(
+            '{"bitcoin":{"$currency":65000,"last_updated_at":'
+            '${now.millisecondsSinceEpoch ~/ 1000}},'
+            '"tether":{"$currency":1,"last_updated_at":'
+            '${now.millisecondsSinceEpoch ~/ 1000}}}',
+            200,
+          );
+        }),
+        retryPolicy: RetryPolicy(maxAttempts: 1),
+      );
+      final container = ProviderContainer(
+        retry: (retryCount, error) => null,
+        overrides: [
+          utcClockProvider.overrideWithValue(() => now),
+          resilientHttpClientProvider.overrideWithValue(transport),
+          settingsViewModelProvider.overrideWith(() => settings),
+        ],
+      );
+      final selectedTransitions = <AsyncValue<MarketQuoteCurrency>>[];
+      final marketTransitions = <AsyncValue<BitcoinMarketSnapshot>>[];
+      final selectedSubscription = container.listen(
+        selectedMarketQuoteCurrencyProvider,
+        (_, next) => selectedTransitions.add(next),
+        fireImmediately: true,
+      );
+      final marketSubscription = container.listen(
+        bitcoinMarketViewModelProvider,
+        (_, next) => marketTransitions.add(next),
+        fireImmediately: true,
+      );
+      addTearDown(() {
+        selectedSubscription.close();
+        marketSubscription.close();
+        container.dispose();
+        transport.close();
+      });
+
+      expect(
+        (await container.read(bitcoinMarketViewModelProvider.future))
+            .quoteCurrency
+            .code,
+        'USD',
+      );
+      selectedTransitions.clear();
+      marketTransitions.clear();
+
+      settings.publish(
+        initialSettings.copyWith(operation: SettingsOperation.region),
+      );
+      await container.pump();
+
+      expect(selectedTransitions, isEmpty);
+      expect(marketTransitions, isEmpty);
+      expect(requests, ['usd', 'usd']);
+
+      settings.publish(
+        SettingsState(
+          snapshot: initialSettings.snapshot.copyWith(
+            preferences: initialSettings.snapshot.preferences.copyWith(
+              currencyCode: 'EUR',
+            ),
+          ),
+        ),
+      );
+      await container.pump();
+      final eur = await container.read(bitcoinMarketViewModelProvider.future);
+
+      expect(eur.quoteCurrency.code, 'EUR');
+      expect(requests, ['usd', 'usd', 'eur', 'eur']);
+    },
+  );
+
   test('a stale retry cannot overwrite a newer currency build', () async {
     var selected = _currency('USD', r'$');
     var usdRequests = 0;
@@ -324,3 +419,32 @@ void main() {
 
 MarketQuoteCurrency _currency(String code, String symbol) =>
     MarketQuoteCurrency(code: code, symbol: symbol, minorUnitDigits: 2);
+
+SettingsState _settingsState() {
+  return SettingsState(
+    snapshot: SettingsSnapshot(
+      preferences: AppPreferences.defaults,
+      currencies: [
+        FiatCurrency(
+          name: 'United States Dollar',
+          symbol: r'$',
+          code: 'USD',
+          countryCode: 'US',
+        ),
+        FiatCurrency(name: 'Euro', symbol: '€', code: 'EUR', countryCode: 'EU'),
+      ],
+      regions: [Region(name: 'United States', code: 'US')],
+    ),
+  );
+}
+
+final class _MutableSettingsViewModel extends SettingsViewModel {
+  _MutableSettingsViewModel(this.initial);
+
+  final SettingsState initial;
+
+  @override
+  Future<SettingsState> build() async => initial;
+
+  void publish(SettingsState next) => state = AsyncData(next);
+}

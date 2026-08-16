@@ -281,26 +281,30 @@ class _PriceChangeVisual extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final change = changeBasisPoints;
-    final positive = (change ?? 0) >= 0;
     final colors = context.appColors;
     final effects = context.effects;
+    final neutralColor = context.type.brandMetric.color ?? colors.onBrandArt;
+    final changeColor = change == null || change == 0
+        ? neutralColor
+        : change > 0
+        ? colors.success
+        : colors.danger;
+    final changeIcon = change == null || change == 0
+        ? RemixIcons.subtract_line
+        : change > 0
+        ? RemixIcons.arrow_up_line
+        : RemixIcons.arrow_down_line;
     final content = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (change != null || loading)
-          Icon(
-            positive ? RemixIcons.arrow_up_line : RemixIcons.arrow_down_line,
-            size: context.icons.xxs,
-            color: positive ? colors.success : colors.danger,
-          )
+          Icon(changeIcon, size: context.icons.xxs, color: changeColor)
         else
           SizedBox(height: context.spacing.md),
         SizedBox(width: context.spacing.xxs),
         NumericText(
           loading ? '0.0%' : _PriceCardState._formatBasisPoints(change),
-          style: context.type.brandMetric.copyWith(
-            color: positive ? colors.success : colors.danger,
-          ),
+          style: context.type.brandMetric.copyWith(color: changeColor),
         ),
       ],
     );

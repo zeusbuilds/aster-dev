@@ -1,7 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/core.dart';
-import '../../../settings/presentation/models/models.dart';
 import '../../../settings/presentation/view_model/view_models.dart';
 import '../../data/data.dart';
 import '../../domain/models/models.dart';
@@ -20,8 +19,16 @@ BitcoinMarketRepository bitcoinMarketRepository(Ref ref) {
 /// Maps the persisted settings selection to the market provider contract.
 @riverpod
 Future<MarketQuoteCurrency> selectedMarketQuoteCurrency(Ref ref) async {
-  final settings = await ref.watch(settingsViewModelProvider.future);
-  return _quoteCurrency(settings);
+  final selected = await ref.watch(
+    settingsViewModelProvider.selectAsync(
+      (state) => state.snapshot.selectedCurrency,
+    ),
+  );
+  return MarketQuoteCurrency(
+    code: selected.code,
+    symbol: selected.symbol,
+    minorUnitDigits: selected.minorUnitDigits,
+  );
 }
 
 /// Owns initial-load and retry state for the Bitcoin market card.
@@ -82,13 +89,4 @@ class BitcoinMarketViewModel extends _$BitcoinMarketViewModel {
       if (identical(_activeRequest, cancellation)) _activeRequest = null;
     }
   }
-}
-
-MarketQuoteCurrency _quoteCurrency(SettingsState state) {
-  final selected = state.snapshot.selectedCurrency;
-  return MarketQuoteCurrency(
-    code: selected.code,
-    symbol: selected.symbol,
-    minorUnitDigits: selected.minorUnitDigits,
-  );
 }

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../shared/shared.dart';
+import '../../../settings/presentation/view_model/view_models.dart';
 import '../view_model/view_models.dart';
 import '../widgets/widgets.dart';
 
@@ -13,6 +14,7 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final home = ref.watch(homeViewModelProvider);
+    ref.watch(settingsViewModelProvider);
     final heroMinimumHeight =
         MediaQuery.sizeOf(context).height *
         context.metrics.homeHeroHeightFactor;
@@ -23,9 +25,16 @@ class HomeScreen extends ConsumerWidget {
         context.spacing.xxl;
 
     Future<void> refresh() async {
-      final completed = await ref
-          .read(homeViewModelProvider.notifier)
-          .refresh();
+      final homeNotifier = ref.read(homeViewModelProvider.notifier);
+      if (ref.read(homeViewModelProvider).value == null) {
+        await homeNotifier.retry();
+        return;
+      }
+      if (ref.read(settingsViewModelProvider).value == null) {
+        await ref.read(settingsViewModelProvider.notifier).retry();
+        return;
+      }
+      final completed = await homeNotifier.refresh();
       if (!context.mounted || completed) return;
       final failure = ref.read(homeViewModelProvider).value?.refreshFailure;
       if (failure == null) return;
@@ -34,7 +43,7 @@ class HomeScreen extends ConsumerWidget {
         message: failure.userMessage,
         variant: ToastVariant.failure,
       );
-      ref.read(homeViewModelProvider.notifier).clearRefreshFailure();
+      homeNotifier.clearRefreshFailure();
     }
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
