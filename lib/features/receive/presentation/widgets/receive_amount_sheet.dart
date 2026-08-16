@@ -185,6 +185,11 @@ final class _AmountSheetBody extends StatelessWidget {
             ? 'Enter a whole-satoshi Lightning amount.'
             : null);
     final visibleMessage = amountMessage ?? state.failure?.userMessage;
+    final submitLabel = state.request == null
+        ? 'Create request'
+        : state.amountText.isEmpty && !state.amountRequired
+        ? 'Clear amount'
+        : 'Set amount';
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: context.spacing.screenPadding),
       child: Column(
@@ -232,7 +237,7 @@ final class _AmountSheetBody extends StatelessWidget {
           ),
           SizedBox(height: context.spacing.lg),
           CustomButton(
-            text: state.amountText.isEmpty ? 'Clear amount' : 'Set amount',
+            text: submitLabel,
             loading: state.isGenerating,
             enabled: state.canApplyAmount,
             hapticIntent: null,

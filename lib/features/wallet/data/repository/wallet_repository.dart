@@ -652,6 +652,11 @@ final class WalletRepository implements WalletLifecycleRepository {
       );
     }
     final route = (routeResult as AppSuccess<PaymentRoute>).value;
+    if (amountUnits == null && target.requiresReceiveAmount) {
+      return Future<AppResult<WalletReceiveRequest>>.value(
+        AppResult.failure(_receiveAmountRequiredFailure()),
+      );
+    }
     final amountResult = _amountForRoute(route, amountUnits);
     if (amountResult case AppFailureResult<WalletAmount?>(:final failure)) {
       return Future<AppResult<WalletReceiveRequest>>.value(
@@ -858,6 +863,13 @@ final class WalletRepository implements WalletLifecycleRepository {
     code: 'payment_amount_invalid',
     kind: AppFailureKind.validation,
     userMessage: 'Enter a valid amount greater than zero.',
+    retryable: false,
+  );
+
+  static AppFailure _receiveAmountRequiredFailure() => const AppFailure(
+    code: 'payment_receive_amount_required',
+    kind: AppFailureKind.validation,
+    userMessage: 'Enter an amount to create this payment request.',
     retryable: false,
   );
 

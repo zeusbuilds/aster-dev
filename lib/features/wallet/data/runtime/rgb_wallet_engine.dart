@@ -677,7 +677,7 @@ final class RgbWalletEngine implements WalletEngine {
 
   static void _requireOptionalAmount(PaymentRoute route, WalletAmount? amount) {
     if (amount == null) {
-      if (route.target == WalletPaymentTarget.usdtLightning) {
+      if (route.target.requiresReceiveAmount) {
         throw const WalletValidationException(
           'RGB Lightning invoices require an asset amount.',
           field: 'amount',

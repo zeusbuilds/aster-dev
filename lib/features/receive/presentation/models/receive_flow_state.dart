@@ -59,10 +59,18 @@ final class ReceiveFlowState {
         'Parsed text must match editable text.',
       );
     }
-    if (request.route != route) {
+    final currentRequest = request;
+    if (currentRequest == null && !route.target.requiresReceiveAmount) {
+      throw ArgumentError.value(
+        request,
+        'request',
+        'Only amount-required routes may start without a request.',
+      );
+    }
+    if (currentRequest != null && currentRequest.route != route) {
       throw ArgumentError.value(request, 'request', 'Route mismatch.');
     }
-    final appliedAmount = request.amount;
+    final appliedAmount = currentRequest?.amount;
     if (appliedAmount != null && appliedAmount.assetId != route.asset.id) {
       throw ArgumentError.value(request, 'request', 'Asset mismatch.');
     }
@@ -76,9 +84,12 @@ final class ReceiveFlowState {
 
   final PaymentRoute route;
   final BitcoinUnit bitcoinUnit;
-  final WalletReceiveRequest request;
 
-  /// Pending sheet input; [request] remains the currently encoded QR value.
+  /// The currently usable request, or `null` while an amount-required target
+  /// waits for its first exact amount.
+  final WalletReceiveRequest? request;
+
+  /// Pending sheet input; when present, [request] remains the encoded QR value.
   final String amountText;
   final WalletAmountInput amountInput;
   final ReceiveFlowOperation? operation;
@@ -89,18 +100,22 @@ final class ReceiveFlowState {
   bool get isBusy => operation != null;
   bool get isGenerating => operation == ReceiveFlowOperation.generatingRequest;
   bool get requiresReconciliation => failure?.requiresReconciliation ?? false;
-  bool get canReadRequest => !isBusy;
+  bool get amountRequired => route.target.requiresReceiveAmount;
+  bool get canReadRequest => request != null && !isBusy;
   bool get canEditAmount =>
       !isBusy && (retainedFailure == null || retainedFailure!.allowsAmountEdit);
 
-  /// Whether the same request-generation command may start again.
-  bool get canRegenerate {
+  /// Whether request generation may start with the current retained failure.
+  bool get canGenerateRequest {
     if (isBusy) return false;
     final retained = retainedFailure;
     return retained == null ||
         (retained.operation == ReceiveFlowOperation.generatingRequest &&
             retained.failure.retryable);
   }
+
+  /// Whether the currently rendered request may be regenerated unchanged.
+  bool get canRegenerate => request != null && canGenerateRequest;
 
   bool get amountUsesSupportedGranularity {
     if (amountText.isEmpty) return true;
@@ -111,15 +126,15 @@ final class ReceiveFlowState {
   }
 
   bool get hasPendingAmountChange {
-    final appliedUnits = request.amount?.units;
-    if (amountText.isEmpty) return appliedUnits != null;
+    final appliedUnits = request?.amount?.units;
+    if (amountText.isEmpty) return !amountRequired && appliedUnits != null;
     return amountInput.isValid &&
         amountUsesSupportedGranularity &&
         amountInput.units != appliedUnits;
   }
 
-  bool get canApplyAmount => canRegenerate && hasPendingAmountChange;
-  bool isExpiredAt(DateTime now) => request.isExpiredAt(now);
+  bool get canApplyAmount => canGenerateRequest && hasPendingAmountChange;
+  bool isExpiredAt(DateTime now) => request?.isExpiredAt(now) ?? false;
 
   ReceiveFlowState copyWith({
     WalletReceiveRequest? request,

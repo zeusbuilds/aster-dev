@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -31,14 +29,12 @@ class ReceiveScreen extends ConsumerWidget {
           child: PaymentTargetSelectionView(
             capabilities: ref.watch(walletPaymentCapabilitiesProvider),
             onRetry: () => ref.invalidate(walletPaymentCapabilitiesProvider),
-            onSelected: (target) {
-              unawaited(
-                context.pushNamed(
-                  RouteNames.receiveRequest,
-                  pathParameters: {
-                    RoutePaths.paymentTargetParameter: target.slug,
-                  },
-                ),
+            onSelected: (target) async {
+              await context.pushNamed(
+                RouteNames.receiveRequest,
+                pathParameters: {
+                  RoutePaths.paymentTargetParameter: target.slug,
+                },
               );
             },
           ),

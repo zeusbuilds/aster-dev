@@ -160,6 +160,13 @@ enum WalletPaymentTarget {
   final WalletAssetKind assetKind;
   final PaymentRail rail;
 
+  /// Whether creating a Receive request requires an explicit asset amount.
+  ///
+  /// RGB Lightning invoices carry both contract identity and asset amount.
+  /// The native API cannot create a truthful USDT Lightning request without
+  /// that amount, while the other supported targets allow amountless requests.
+  bool get requiresReceiveAmount => this == WalletPaymentTarget.usdtLightning;
+
   static WalletPaymentTarget? tryParse(String? value) {
     if (value == null) return null;
     for (final target in values) {

@@ -76,6 +76,15 @@ void main() {
     },
   );
 
+  test('only RGB Lightning requires an amount before Receive creation', () {
+    expect(
+      WalletPaymentTarget.values.where(
+        (target) => target.requiresReceiveAmount,
+      ),
+      [WalletPaymentTarget.usdtLightning],
+    );
+  });
+
   test('payment capabilities distinguish missing deployment metadata', () {
     final available = WalletPaymentCapability.available(
       PaymentRoute(asset: WalletAsset.bitcoin, rail: PaymentRail.onchain),

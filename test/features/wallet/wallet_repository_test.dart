@@ -299,6 +299,39 @@ void main() {
   });
 
   test(
+    'rejects amountless RGB Lightning receive before runtime work',
+    () async {
+      const configured = WalletServiceConfiguration(
+        environment: BlockchainEnvironment.regtest,
+        sdkNetwork: 'regtest',
+        usdtAsset: RgbAssetConfiguration(
+          contractId: 'rgb:configured-usdt',
+          precision: 6,
+        ),
+      );
+      final harness = await _createActiveRepository(services: configured);
+      addTearDown(harness.runtime.dispose);
+
+      final result = await harness.repository.createReceiveRequest(
+        WalletPaymentTarget.usdtLightning,
+      );
+
+      expect(
+        result,
+        isA<AppFailureResult<WalletReceiveRequest>>().having(
+          (failure) => failure.failure.code,
+          'code',
+          'payment_receive_amount_required',
+        ),
+      );
+      expect(
+        harness.engine.calls,
+        isNot(contains('createReceiveRequest:start')),
+      );
+    },
+  );
+
+  test(
     'rejects invalid receive amounts without invoking native code',
     () async {
       final harness = await _createActiveRepository();

@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
 
@@ -36,7 +34,6 @@ class PaymentTargetTile extends StatelessWidget {
     );
 
     void select() {
-      unawaited(context.haptics.trigger(HapticIntent.selection));
       onSelected?.call(target);
     }
 

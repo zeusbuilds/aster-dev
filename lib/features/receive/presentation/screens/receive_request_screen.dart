@@ -9,6 +9,7 @@ import '../../../../shared/shared.dart';
 import '../../../wallet/domain/models/models.dart';
 import '../../../wallet/presentation/formatting/formatting.dart';
 import '../../../wallet/presentation/models/models.dart';
+import '../../../wallet/presentation/widgets/widgets.dart';
 import '../models/models.dart';
 import '../view_model/view_models.dart';
 import '../widgets/widgets.dart';
@@ -51,21 +52,27 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) return;
-    setState(() => _now = ref.read(utcClockProvider)());
+    _scheduleExpiry(
+      ref.read(receiveFlowViewModelProvider(widget.target)).value,
+      notify: true,
+    );
   }
 
-  void _scheduleExpiry(ReceiveFlowState? state) {
+  void _scheduleExpiry(ReceiveFlowState? state, {bool notify = false}) {
     _expiryTimer?.cancel();
-    final expiry = state?.request.expiresAt;
-    if (expiry == null) return;
-    final delay = expiry.difference(ref.read(utcClockProvider)());
-    if (delay <= Duration.zero) {
-      _now = ref.read(utcClockProvider)();
-      return;
+    final now = ref.read(utcClockProvider)().toUtc();
+    if (notify) {
+      setState(() => _now = now);
+    } else {
+      _now = now;
     }
-    _expiryTimer = Timer(delay, () {
+    final expiry = state?.request?.expiresAt;
+    if (expiry == null) return;
+    final delay = expiry.difference(now);
+    if (delay <= Duration.zero) return;
+    _expiryTimer = Timer(delay + const Duration(milliseconds: 1), () {
       if (!mounted) return;
-      setState(() => _now = ref.read(utcClockProvider)());
+      _scheduleExpiry(state, notify: true);
     });
   }
 
@@ -211,8 +218,9 @@ final class _RequestBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final request = state.request;
     final expired = state.isExpiredAt(now);
-    final amount = state.request.amount;
+    final amount = request?.amount;
     final appliedAmount = amount == null
         ? null
         : _formatter.format(
@@ -222,53 +230,57 @@ final class _RequestBody extends StatelessWidget {
           );
     return ListView(
       children: [
-        Squircle(
-          borderRadius: context.radii.sheet,
-          padding: EdgeInsets.all(context.spacing.xxl),
-          child: Column(
-            children: [
-              ReceiveRequestQr(
-                encodedRequest: state.request.encodedRequest,
-                semanticLabel: '${state.route.target.requestLabel} QR code',
-              ),
-              SizedBox(height: context.spacing.lg),
-              Text(
-                state.request.displayValue,
-                style: context.type.addressSmall,
-                textAlign: TextAlign.center,
-                maxLines: 4,
-                overflow: TextOverflow.ellipsis,
-              ),
-              if (appliedAmount != null) ...[
-                SizedBox(height: context.spacing.sm),
-                AmountText(
-                  appliedAmount.text,
-                  style: context.type.rowValue,
-                  textAlign: TextAlign.center,
+        if (request == null)
+          _AmountRequiredCard(target: state.route.target)
+        else
+          Squircle(
+            borderRadius: context.radii.sheet,
+            padding: EdgeInsets.all(context.spacing.xxl),
+            child: Column(
+              children: [
+                ReceiveRequestQr(
+                  encodedRequest: request.encodedRequest,
+                  semanticLabel: '${state.route.target.requestLabel} QR code',
                 ),
-              ],
-              if (expired) ...[
-                SizedBox(height: context.spacing.sm),
+                SizedBox(height: context.spacing.lg),
                 Text(
-                  'This payment request has expired.',
-                  style: context.type.errorMessage.copyWith(
-                    color: context.appColors.warning,
-                  ),
+                  request.displayValue,
+                  style: context.type.addressSmall,
                   textAlign: TextAlign.center,
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (appliedAmount != null) ...[
+                  SizedBox(height: context.spacing.sm),
+                  AmountText(
+                    appliedAmount.text,
+                    style: context.type.rowValue,
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+                if (expired) ...[
+                  SizedBox(height: context.spacing.sm),
+                  Text(
+                    'This payment request has expired.',
+                    style: context.type.errorMessage.copyWith(
+                      color: context.appColors.warning,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+                SizedBox(height: context.spacing.md),
+                CustomButton.compact(
+                  text: 'Copy',
+                  prefixIcon: MingCuteIcons.mgc_copy_2_line,
+                  loading:
+                      state.operation == ReceiveFlowOperation.copyingRequest,
+                  enabled: state.canReadRequest && !expired,
+                  hapticIntent: null,
+                  onTap: onCopy,
                 ),
               ],
-              SizedBox(height: context.spacing.md),
-              CustomButton.compact(
-                text: 'Copy',
-                prefixIcon: MingCuteIcons.mgc_copy_2_line,
-                loading: state.operation == ReceiveFlowOperation.copyingRequest,
-                enabled: state.canReadRequest && !expired,
-                hapticIntent: null,
-                onTap: onCopy,
-              ),
-            ],
+            ),
           ),
-        ),
         SizedBox(height: context.spacing.xxl),
         Squircle(
           padding: EdgeInsets.symmetric(vertical: context.spacing.xs),
@@ -280,24 +292,27 @@ final class _RequestBody extends StatelessWidget {
                 prefixIcon: MingCuteIcons.mgc_edit_2_line,
                 onTap: state.canEditAmount ? onSetAmount : null,
               ),
-              const AsterDivider.inset(),
-              AsterOptionRow(
-                title: 'Generate new request',
-                details: state.isGenerating ? 'Generating' : null,
-                prefixIcon: MingCuteIcons.mgc_refresh_2_line,
-                hapticIntent: null,
-                onTap: state.canRegenerate ? onRegenerate : null,
-              ),
-              const AsterDivider.inset(),
-              AsterOptionRow(
-                title: 'Share',
-                details: state.operation == ReceiveFlowOperation.sharingRequest
-                    ? 'Opening'
-                    : null,
-                prefixIcon: MingCuteIcons.mgc_share_forward_line,
-                hapticIntent: null,
-                onTap: state.canReadRequest && !expired ? onShare : null,
-              ),
+              if (request != null) ...[
+                const AsterDivider.inset(),
+                AsterOptionRow(
+                  title: 'Generate new request',
+                  details: state.isGenerating ? 'Generating' : null,
+                  prefixIcon: MingCuteIcons.mgc_refresh_2_line,
+                  hapticIntent: null,
+                  onTap: state.canRegenerate ? onRegenerate : null,
+                ),
+                const AsterDivider.inset(),
+                AsterOptionRow(
+                  title: 'Share',
+                  details:
+                      state.operation == ReceiveFlowOperation.sharingRequest
+                      ? 'Opening'
+                      : null,
+                  prefixIcon: MingCuteIcons.mgc_share_forward_line,
+                  hapticIntent: null,
+                  onTap: state.canReadRequest && !expired ? onShare : null,
+                ),
+              ],
             ],
           ),
         ),
@@ -312,6 +327,43 @@ final class _RequestBody extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+final class _AmountRequiredCard extends StatelessWidget {
+  const _AmountRequiredCard({required this.target});
+
+  final WalletPaymentTarget target;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      label: 'Amount required before creating ${target.semanticLabel} request',
+      excludeSemantics: true,
+      child: Squircle(
+        borderRadius: context.radii.sheet,
+        padding: EdgeInsets.all(context.spacing.xxl),
+        child: Column(
+          children: [
+            WalletAssetIcon(kind: target.assetKind, size: context.icons.xl),
+            SizedBox(height: context.spacing.lg),
+            Text(
+              'Amount required',
+              style: context.type.title,
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: context.spacing.sm),
+            Text(
+              'Set a ${target.assetLabel} amount to create this '
+              '${target.railLabel} request.',
+              style: context.type.statusMessage,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

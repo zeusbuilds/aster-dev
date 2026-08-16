@@ -125,6 +125,49 @@ void main() {
     expect(tester, meetsGuideline(textContrastGuideline));
   });
 
+  testWidgets('payment target selection owns one route command at a time', (
+    tester,
+  ) async {
+    final harness = await PaymentFlowTestHarness.create();
+    addTearDown(() => _disposeHarness(tester, harness));
+    final navigationGate = Completer<void>();
+    var selectionCount = 0;
+    final capability = WalletPaymentCapability.available(
+      const PaymentRoute(asset: WalletAsset.bitcoin, rail: PaymentRail.onchain),
+    );
+    await _pumpWidget(
+      tester,
+      harness,
+      PaymentTargetSelectionView(
+        capabilities: AsyncData([capability]),
+        onSelected: (target) async {
+          selectionCount += 1;
+          await navigationGate.future;
+        },
+        onRetry: () {},
+      ),
+    );
+
+    final tile = find.byType(PaymentTargetTile);
+    await tester.tap(tile);
+    await tester.tap(tile);
+    await tester.pump();
+
+    expect(selectionCount, 1);
+    expect(harness.haptics.intents, [HapticIntent.selection]);
+    expect(
+      tester.getSemantics(tile).flagsCollection.isEnabled,
+      ui.Tristate.isFalse,
+    );
+
+    navigationGate.complete();
+    await tester.pump();
+    expect(
+      tester.getSemantics(tile).flagsCollection.isEnabled,
+      ui.Tristate.isTrue,
+    );
+  });
+
   testWidgets('payment target loading exposes one truthful live node', (
     tester,
   ) async {
@@ -135,7 +178,7 @@ void main() {
       harness,
       PaymentTargetSelectionView(
         capabilities: const AsyncLoading(),
-        onSelected: (_) {},
+        onSelected: (_) async {},
         onRetry: () {},
       ),
     );
@@ -164,7 +207,7 @@ void main() {
           AppFailureException(failure),
           StackTrace.empty,
         ),
-        onSelected: (_) {},
+        onSelected: (_) async {},
         onRetry: () {},
       ),
     );
@@ -646,6 +689,73 @@ void main() {
     expect(find.text('Retry fiat quote'), findsOneWidget);
   });
 
+  testWidgets('Send review explains expiry and preserves payment metadata', (
+    tester,
+  ) async {
+    var clockNow = DateTime.utc(2026, 8, 16, 12);
+    final expiresAt = clockNow.add(const Duration(minutes: 1));
+    const route = PaymentRoute(
+      asset: WalletAsset.bitcoin,
+      rail: PaymentRail.lightning,
+    );
+    final engine = FakeWalletEngine()
+      ..balance = _bitcoinBalance(1000)
+      ..decodedInvoice = WalletPaymentPreview(
+        route: route,
+        encodedDestination: 'lnbcrt1review',
+        displayDestination: 'lnbcrt1review',
+        amount: WalletAmount.lightning(
+          assetId: WalletAsset.bitcoin.id,
+          units: 2000,
+        ),
+        expiresAt: expiresAt,
+        recipientLabel: 'Merchant checkout',
+        message: 'Invoice 123',
+      );
+    final transport = ResilientHttpClient(
+      client: MockClient((request) async => http.Response('{}', 503)),
+      retryPolicy: RetryPolicy(maxAttempts: 1),
+      clock: () => clockNow,
+    );
+    addTearDown(transport.close);
+    final harness = await PaymentFlowTestHarness.create(
+      engine: engine,
+      httpClient: transport,
+      clock: () => clockNow,
+    );
+    addTearDown(() => _disposeHarness(tester, harness));
+    const target = WalletPaymentTarget.bitcoinLightning;
+    final provider = sendFlowViewModelProvider(target);
+    final subscription = harness.container.listen(provider, (_, _) {});
+    addTearDown(subscription.close);
+    await tester.runAsync(() => harness.container.read(provider.future));
+    final notifier = harness.container.read(provider.notifier);
+    notifier.updateDestination('lnbcrt1review');
+    expect(await tester.runAsync(notifier.validateDestination), isTrue);
+
+    clockNow = expiresAt;
+    await _pumpWidget(tester, harness, const SendAmountScreen(target: target));
+    await _pumpUntil(
+      tester,
+      () => find.byType(AsterNumericKeypad).evaluate().isNotEmpty,
+    );
+
+    expect(find.text('Payment label'), findsOneWidget);
+    expect(find.text('Merchant checkout'), findsOneWidget);
+    expect(find.text('Message'), findsOneWidget);
+    expect(find.text('Invoice 123'), findsOneWidget);
+    expect(find.text('This payment request has expired.'), findsOneWidget);
+    expect(
+      tester
+          .widget<CustomButton>(find.widgetWithText(CustomButton, 'Send'))
+          .enabled,
+      isFalse,
+    );
+    subscription.close();
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpFrames(tester);
+  });
+
   testWidgets('Receive renders real request, copies it, and applies amount', (
     tester,
   ) async {
@@ -724,6 +834,67 @@ void main() {
     expect(harness.engine.createdReceiveAmount?.units, 100000000);
   });
 
+  testWidgets('RGB Lightning Receive creates its first request from amount', (
+    tester,
+  ) async {
+    const services = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.regtest,
+      sdkNetwork: 'regtest',
+      usdtAsset: RgbAssetConfiguration(
+        contractId: 'rgb:configured-usdt',
+        precision: 6,
+      ),
+    );
+    final harness = await PaymentFlowTestHarness.create(services: services);
+    addTearDown(() => _disposeHarness(tester, harness));
+    await _pumpWidget(
+      tester,
+      harness,
+      const ReceiveRequestScreen(target: WalletPaymentTarget.usdtLightning),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.text('Amount required').evaluate().isNotEmpty,
+    );
+
+    expect(find.byType(PrettyQrView), findsNothing);
+    expect(find.widgetWithText(CustomButton, 'Copy'), findsNothing);
+    expect(find.text('Generate new request'), findsNothing);
+    expect(find.text('Share'), findsNothing);
+    expect(harness.engine.calls, isNot(contains('createReceiveRequest:start')));
+
+    await tester.tap(find.text('Set amount'));
+    await _pumpUntil(
+      tester,
+      () => find.byType(AsterNumericKeypad).evaluate().isNotEmpty,
+    );
+    await _pumpFrames(tester);
+    final createButton = find.widgetWithText(CustomButton, 'Create request');
+    expect(tester.widget<CustomButton>(createButton).enabled, isFalse);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AsterNumericKeypad),
+        matching: find.text('1'),
+      ),
+    );
+    await tester.pump();
+    expect(tester.widget<CustomButton>(createButton).enabled, isTrue);
+
+    await tester.tap(createButton);
+    await _pumpUntil(
+      tester,
+      () => find.byType(PrettyQrView).evaluate().isNotEmpty,
+    );
+
+    expect(harness.engine.createdReceiveAmount?.units, 1000000);
+    expect(
+      harness.engine.calls.where(
+        (call) => call == 'createReceiveRequest:start',
+      ),
+      hasLength(1),
+    );
+  });
+
   testWidgets('Receive QR encoder failure is bounded and announced', (
     tester,
   ) async {
@@ -772,6 +943,52 @@ void main() {
     await _pumpUntil(
       tester,
       () => find.byType(PrettyQrView).evaluate().isNotEmpty,
+    );
+  });
+
+  testWidgets('Receive expiry timer reschedules until the UTC boundary', (
+    tester,
+  ) async {
+    var clockNow = DateTime.utc(2026, 8, 16, 12);
+    final expiresAt = clockNow.add(const Duration(milliseconds: 10));
+    const route = PaymentRoute(
+      asset: WalletAsset.bitcoin,
+      rail: PaymentRail.lightning,
+    );
+    final engine = FakeWalletEngine()
+      ..createdReceiveRequest = WalletReceiveRequest(
+        route: route,
+        encodedRequest: 'lnbcrt1expiring',
+        displayValue: 'lnbcrt1expiring',
+        expiresAt: expiresAt,
+      );
+    final harness = await PaymentFlowTestHarness.create(
+      engine: engine,
+      clock: () => clockNow,
+    );
+    addTearDown(() => _disposeHarness(tester, harness));
+    await _pumpWidget(
+      tester,
+      harness,
+      const ReceiveRequestScreen(target: WalletPaymentTarget.bitcoinLightning),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byType(PrettyQrView).evaluate().isNotEmpty,
+    );
+
+    await tester.pump(const Duration(milliseconds: 20));
+    expect(find.text('This payment request has expired.'), findsNothing);
+
+    clockNow = expiresAt;
+    await tester.pump(const Duration(milliseconds: 12));
+
+    expect(find.text('This payment request has expired.'), findsOneWidget);
+    expect(
+      tester
+          .widget<CustomButton>(find.widgetWithText(CustomButton, 'Copy'))
+          .enabled,
+      isFalse,
     );
   });
 

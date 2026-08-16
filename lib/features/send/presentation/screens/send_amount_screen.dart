@@ -257,8 +257,9 @@ final class _AmountBody extends StatelessWidget {
       route: state.route,
       bitcoinUnit: state.bitcoinUnit,
     );
+    final preview = state.preview!;
     final fiatText = _fiatText(state, market, now);
-    final inputMessage = _amountMessage(state);
+    final inputMessage = _amountMessage(state, now);
     final fee = state.feeEstimate;
     final feeStale = fee?.isStaleAt(now) ?? false;
     final balanceFailure = state.failureFor(
@@ -364,11 +365,23 @@ final class _AmountBody extends StatelessWidget {
                       Text('Recipient', style: context.type.sectionLabel),
                       SizedBox(height: context.spacing.xs),
                       Text(
-                        state.preview!.displayDestination,
+                        preview.displayDestination,
                         style: context.type.addressSmall,
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis,
                       ),
+                      if (preview.recipientLabel case final label?) ...[
+                        SizedBox(height: context.spacing.md),
+                        Text('Payment label', style: context.type.sectionLabel),
+                        SizedBox(height: context.spacing.xs),
+                        Text(label, style: context.type.statusMessage),
+                      ],
+                      if (preview.message case final message?) ...[
+                        SizedBox(height: context.spacing.md),
+                        Text('Message', style: context.type.sectionLabel),
+                        SizedBox(height: context.spacing.xs),
+                        Text(message, style: context.type.statusMessage),
+                      ],
                     ],
                   ),
                 ),
@@ -441,9 +454,12 @@ final class _AmountBody extends StatelessWidget {
     return '≈ $value';
   }
 
-  static String? _amountMessage(SendFlowState state) {
+  static String? _amountMessage(SendFlowState state, DateTime now) {
     if (state.failureFor(SendFlowOperation.submitting) case final failure?) {
       return failure.userMessage;
+    }
+    if (state.isExpiredAt(now)) {
+      return 'This payment request has expired.';
     }
     if (!state.amountInput.isValid) {
       return switch (state.amountInput.issue) {

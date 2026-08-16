@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -51,14 +49,12 @@ class _SendScreenState extends ConsumerState<SendScreen> {
           child: PaymentTargetSelectionView(
             capabilities: ref.watch(walletPaymentCapabilitiesProvider),
             onRetry: () => ref.invalidate(walletPaymentCapabilitiesProvider),
-            onSelected: (target) {
-              unawaited(
-                context.pushNamed(
-                  RouteNames.sendAddress,
-                  pathParameters: {
-                    RoutePaths.paymentTargetParameter: target.slug,
-                  },
-                ),
+            onSelected: (target) async {
+              await context.pushNamed(
+                RouteNames.sendAddress,
+                pathParameters: {
+                  RoutePaths.paymentTargetParameter: target.slug,
+                },
               );
             },
           ),

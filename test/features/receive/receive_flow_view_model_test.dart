@@ -32,24 +32,109 @@ void main() {
       final initial = await harness.container.read(provider.future);
       final notifier = harness.container.read(provider.notifier);
 
-      expect(initial.request.amount, isNull);
+      expect(initial.request!.amount, isNull);
       notifier.updateAmount('0.00000100');
       expect(await notifier.applyAmount(), isTrue);
       final applied = harness.container.read(provider).requireValue;
-      expect(applied.request.amount?.units, 100);
+      expect(applied.request!.amount?.units, 100);
       expect(applied.amountText, '0.000001');
       expect(harness.engine.createdReceiveAmount?.units, 100);
 
       notifier.updateAmount('');
       expect(await notifier.applyAmount(), isTrue);
       final cleared = harness.container.read(provider).requireValue;
-      expect(cleared.request.amount, isNull);
+      expect(cleared.request!.amount, isNull);
       expect(cleared.amountText, isEmpty);
       await Future<void>.delayed(Duration.zero);
       expect(harness.haptics.intents, [
         HapticIntent.success,
         HapticIntent.success,
       ]);
+    },
+  );
+
+  test(
+    'configured RGB Lightning starts amount-first and forbids clearing',
+    () async {
+      const services = WalletServiceConfiguration(
+        environment: BlockchainEnvironment.regtest,
+        sdkNetwork: 'regtest',
+        usdtAsset: RgbAssetConfiguration(
+          contractId: 'rgb:configured-usdt',
+          precision: 6,
+        ),
+      );
+      final harness = await PaymentFlowTestHarness.create(services: services);
+      addTearDown(harness.dispose);
+      final provider = receiveFlowViewModelProvider(
+        WalletPaymentTarget.usdtLightning,
+      );
+      final subscription = harness.container.listen(
+        provider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      final initial = await harness.container.read(provider.future);
+      final notifier = harness.container.read(provider.notifier);
+
+      expect(initial.amountRequired, isTrue);
+      expect(initial.request, isNull);
+      expect(initial.canReadRequest, isFalse);
+      expect(initial.canRegenerate, isFalse);
+      expect(initial.canApplyAmount, isFalse);
+      expect(
+        harness.engine.calls,
+        isNot(contains('createReceiveRequest:start')),
+      );
+      final copy = await notifier.copyRequest();
+      final share = await notifier.shareRequest();
+      expect(
+        copy,
+        isA<AppFailureResult<void>>().having(
+          (result) => result.failure.code,
+          'code',
+          'payment_request_not_ready',
+        ),
+      );
+      expect(
+        share,
+        isA<AppFailureResult<ShareDisposition>>().having(
+          (result) => result.failure.code,
+          'code',
+          'payment_request_not_ready',
+        ),
+      );
+      expect(harness.clipboard.text, isNull);
+      expect(harness.share.sharedText, isNull);
+
+      notifier.updateAmount('1.25');
+      expect(
+        harness.container.read(provider).requireValue.canApplyAmount,
+        isTrue,
+      );
+      expect(await notifier.applyAmount(), isTrue);
+      final created = harness.container.read(provider).requireValue;
+      expect(created.request, isNotNull);
+      expect(created.request!.amount?.units, 1250000);
+      expect(harness.engine.createdReceiveAmount?.units, 1250000);
+      expect(
+        harness.engine.calls.where(
+          (call) => call == 'createReceiveRequest:start',
+        ),
+        hasLength(1),
+      );
+
+      notifier.updateAmount('');
+      final cleared = harness.container.read(provider).requireValue;
+      expect(cleared.canApplyAmount, isFalse);
+      expect(await notifier.applyAmount(), isFalse);
+      expect(
+        harness.engine.calls.where(
+          (call) => call == 'createReceiveRequest:start',
+        ),
+        hasLength(1),
+      );
     },
   );
 
@@ -510,13 +595,13 @@ void main() {
     final notifier = harness.container.read(provider.notifier);
 
     expect(await notifier.copyRequest(), isA<AppSuccess<void>>());
-    expect(harness.clipboard.text, state.request.encodedRequest);
+    expect(harness.clipboard.text, state.request!.encodedRequest);
     const origin = ShareOrigin(left: 1, top: 2, width: 3, height: 4);
     expect(
       await notifier.shareRequest(origin: origin),
       isA<AppSuccess<ShareDisposition>>(),
     );
-    expect(harness.share.sharedText, state.request.encodedRequest);
+    expect(harness.share.sharedText, state.request!.encodedRequest);
     expect(harness.share.sharedOrigin, same(origin));
     await Future<void>.delayed(Duration.zero);
     expect(harness.haptics.intents, [HapticIntent.lightImpact]);

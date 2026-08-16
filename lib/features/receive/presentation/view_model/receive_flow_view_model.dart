@@ -67,7 +67,7 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
     if (current == null || !current.canRegenerate) return false;
     return _generate(
       current,
-      amountUnits: current.request.amount?.units,
+      amountUnits: current.request!.amount?.units,
       emitSuccessHaptic: true,
     );
   }
@@ -84,9 +84,10 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
     state = AsyncData(
       current.copyWith(operation: ReceiveFlowOperation.copyingRequest),
     );
+    final request = current.request!;
     final result = await ref
         .read(clipboardServiceProvider)
-        .writeText(current.request.encodedRequest);
+        .writeText(request.encodedRequest);
     if (!ref.mounted) return result;
     state = AsyncData(current.copyWith(operation: null));
     unawaited(
@@ -115,10 +116,11 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
     state = AsyncData(
       current.copyWith(operation: ReceiveFlowOperation.sharingRequest),
     );
+    final request = current.request!;
     final result = await ref
         .read(shareServiceProvider)
         .shareText(
-          current.request.encodedRequest,
+          request.encodedRequest,
           subject: '${current.route.asset.displayName} payment request',
           origin: origin,
         );
@@ -157,13 +159,18 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
     final settingsSnapshot =
         (settingsResult as AppSuccess<SettingsSnapshot>).value;
     final bitcoinUnit = settingsSnapshot.preferences.bitcoinUnit;
-    final requestResult = await repository.createReceiveRequest(_target);
-    if (requestResult case AppFailureResult<WalletReceiveRequest>(
-      :final failure,
-    )) {
-      throw AppFailureException(failure);
+    final WalletReceiveRequest? request;
+    if (_target.requiresReceiveAmount) {
+      request = null;
+    } else {
+      final requestResult = await repository.createReceiveRequest(_target);
+      if (requestResult case AppFailureResult<WalletReceiveRequest>(
+        :final failure,
+      )) {
+        throw AppFailureException(failure);
+      }
+      request = (requestResult as AppSuccess<WalletReceiveRequest>).value;
     }
-    final request = (requestResult as AppSuccess<WalletReceiveRequest>).value;
     return ReceiveFlowState(
       route: route,
       bitcoinUnit: bitcoinUnit,
@@ -259,9 +266,10 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
   }
 
   AppFailure? _requestReadFailure(ReceiveFlowState current) {
-    if (!current.canReadRequest) {
+    if (current.isBusy) {
       return _operationUnavailableFailure();
     }
+    if (current.request == null) return _requestNotReadyFailure;
     if (current.isExpiredAt(ref.read(utcClockProvider)())) {
       return _requestExpiredFailure;
     }
@@ -279,6 +287,13 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
     code: 'payment_request_expired',
     kind: AppFailureKind.validation,
     userMessage: 'This payment request has expired. Generate a new request.',
+    retryable: false,
+  );
+
+  static const _requestNotReadyFailure = AppFailure(
+    code: 'payment_request_not_ready',
+    kind: AppFailureKind.conflict,
+    userMessage: 'Set an amount before using this payment request.',
     retryable: false,
   );
 }
