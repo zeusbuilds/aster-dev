@@ -556,6 +556,89 @@ void main() {
     expect(haptics.intents, isEmpty);
   });
 
+  testWidgets('Settings owns one navigation command across preference rows', (
+    tester,
+  ) async {
+    final haptics = _RecordingHaptics();
+    final router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) => const SettingsScreen(),
+          routes: [
+            GoRoute(
+              path: RoutePaths.currencySelection,
+              name: RouteNames.currencySelection,
+              builder: (context, state) => const Text('Currency destination'),
+            ),
+            GoRoute(
+              path: RoutePaths.bitcoinUnitSelection,
+              name: RouteNames.bitcoinUnitSelection,
+              builder: (context, state) => const Text('Unit destination'),
+            ),
+          ],
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await _pumpSettingsRouter(tester, router: router, haptics: haptics);
+    await tester.pumpAndSettle();
+
+    final currency = tester.widget<AsterOptionRow>(
+      find.widgetWithText(AsterOptionRow, 'Currency'),
+    );
+    final unit = tester.widget<AsterOptionRow>(
+      find.widgetWithText(AsterOptionRow, 'Bitcoin unit'),
+    );
+    currency.onTap!();
+    unit.onTap!();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Currency destination'), findsOneWidget);
+    expect(find.text('Unit destination'), findsNothing);
+    expect(haptics.intents, [HapticIntent.lightImpact]);
+  });
+
+  testWidgets('Advanced shares route ownership with its Back action', (
+    tester,
+  ) async {
+    final haptics = _RecordingHaptics();
+    final router = GoRouter(
+      initialLocation: '/advanced-test',
+      routes: [
+        GoRoute(
+          path: '/advanced-test',
+          builder: (context, state) => const AdvancedSettingsScreen(),
+          routes: [
+            GoRoute(
+              path: RoutePaths.networkConfiguration,
+              name: RouteNames.networkConfiguration,
+              builder: (context, state) => const Text('Network destination'),
+            ),
+          ],
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await _pumpSettingsRouter(tester, router: router, haptics: haptics);
+    await tester.pumpAndSettle();
+
+    final network = tester.widget<AsterOptionRow>(
+      find.widgetWithText(AsterOptionRow, 'Network configuration'),
+    );
+    final back = tester.widget<AsterIconButton>(
+      find.byWidgetPredicate(
+        (widget) => widget is AsterIconButton && widget.tooltip == 'Back',
+      ),
+    );
+    network.onTap!();
+    back.onPressed!();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Network destination'), findsOneWidget);
+    expect(haptics.intents, [HapticIntent.lightImpact]);
+  });
+
   testWidgets('settings renders real wallet and package metadata only', (
     tester,
   ) async {
@@ -876,6 +959,42 @@ Future<void> _pumpSettingsScreen(
           ),
         ),
         home: const SettingsScreen(),
+      ),
+    ),
+  );
+}
+
+Future<void> _pumpSettingsRouter(
+  WidgetTester tester, {
+  required GoRouter router,
+  required HapticFeedbackService haptics,
+}) async {
+  SharedPreferences.setMockInitialValues({});
+  final settingsRepository = SettingsRepository(
+    PreferencesService(await SharedPreferences.getInstance()),
+    _CatalogAssetBundle(),
+  );
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        walletViewModelProvider.overrideWith(
+          () => _TestWalletViewModel(
+            Future.value(WalletState(activeWallet: _walletProfile)),
+          ),
+        ),
+        settingsRepositoryProvider.overrideWith(
+          (ref) async => settingsRepository,
+        ),
+        settingsAppRepositoryProvider.overrideWithValue(_appRepository()),
+      ],
+      child: MaterialApp.router(
+        theme: AppTheme.light(),
+        routerConfig: router,
+        builder: (context, child) => AsterFeedbackScope(
+          haptics: haptics,
+          toasts: _RecordingToasts(),
+          child: child!,
+        ),
       ),
     ),
   );

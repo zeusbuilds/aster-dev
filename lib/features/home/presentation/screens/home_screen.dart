@@ -46,50 +46,54 @@ class HomeScreen extends ConsumerWidget {
       homeNotifier.clearRefreshFailure();
     }
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle(
-        statusBarColor: context.appColors.transparentSurface,
-        statusBarIconBrightness: Brightness.light,
-        statusBarBrightness: Brightness.dark,
-      ),
-      child: Scaffold(
-        backgroundColor: context.colorScheme.surface,
-        body: RefreshIndicator(
-          onRefresh: refresh,
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverToBoxAdapter(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: heroMinimumHeight),
-                  child: ClipRect(
-                    child: Stack(
-                      fit: StackFit.passthrough,
-                      children: [
-                        const Positioned.fill(child: MeshGradientBackground()),
-                        Padding(
-                          padding: EdgeInsets.only(
-                            top: context.windowInsets.topSystem,
-                            bottom: context.spacing.lg,
+    return AsterNavigationScope(
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle(
+          statusBarColor: context.appColors.transparentSurface,
+          statusBarIconBrightness: Brightness.light,
+          statusBarBrightness: Brightness.dark,
+        ),
+        child: Scaffold(
+          backgroundColor: context.colorScheme.surface,
+          body: RefreshIndicator(
+            onRefresh: refresh,
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                SliverToBoxAdapter(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: heroMinimumHeight),
+                    child: ClipRect(
+                      child: Stack(
+                        fit: StackFit.passthrough,
+                        children: [
+                          const Positioned.fill(
+                            child: MeshGradientBackground(),
                           ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const HomeHeader(),
-                              const PriceCard(),
-                              SizedBox(height: context.spacing.lg),
-                              const HomeActionButtons(),
-                            ],
+                          Padding(
+                            padding: EdgeInsets.only(
+                              top: context.windowInsets.topSystem,
+                              bottom: context.spacing.lg,
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const HomeHeader(),
+                                const PriceCard(),
+                                SizedBox(height: context.spacing.lg),
+                                const HomeActionButtons(),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-              SliverToBoxAdapter(child: AssetsSection(home: home)),
-              SliverToBoxAdapter(child: SizedBox(height: bottomContentInset)),
-            ],
+                SliverToBoxAdapter(child: AssetsSection(home: home)),
+                SliverToBoxAdapter(child: SizedBox(height: bottomContentInset)),
+              ],
+            ),
           ),
         ),
       ),

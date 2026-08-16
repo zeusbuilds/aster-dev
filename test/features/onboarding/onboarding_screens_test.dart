@@ -12,8 +12,10 @@ import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../support/onboarding_harness.dart';
+import '../../support/presentation_fakes.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -687,6 +689,58 @@ void main() {
       matching: find.byType(BackdropFilter),
     );
     expect(filters, findsNothing);
+  });
+
+  testWidgets('welcome owns one navigation command across both actions', (
+    tester,
+  ) async {
+    final haptics = RecordingHapticFeedbackService();
+    final router = GoRouter(
+      initialLocation: RoutePaths.onboardingWelcome,
+      routes: [
+        GoRoute(
+          path: RoutePaths.onboardingWelcome,
+          builder: (context, state) => const OnboardingWelcomeScreen(),
+        ),
+        GoRoute(
+          path: RoutePaths.onboardingCreateWallet,
+          builder: (context, state) => const Text('Create destination'),
+        ),
+        GoRoute(
+          path: RoutePaths.onboardingImportWallet,
+          builder: (context, state) => const Text('Import destination'),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      MaterialApp.router(
+        theme: AppTheme.light(),
+        routerConfig: router,
+        builder: (context, child) => AsterFeedbackScope(
+          haptics: haptics,
+          toasts: RecordingToastPresentationService(),
+          child: child!,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -2000));
+    await tester.pump();
+
+    final create = tester.widget<CustomButton>(
+      find.widgetWithText(CustomButton, 'Create Wallet'),
+    );
+    final import = tester.widget<OnboardingTextAction>(
+      find.widgetWithText(OnboardingTextAction, 'Import Wallet'),
+    );
+    create.onTap!();
+    import.onPressed();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Create destination'), findsOneWidget);
+    expect(find.text('Import destination'), findsNothing);
+    expect(haptics.intents, [HapticIntent.lightImpact]);
   });
 
   testWidgets('onboarding snapshot bounds retained texture density', (

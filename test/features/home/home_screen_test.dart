@@ -41,7 +41,7 @@ void main() {
         ],
         child: MaterialApp(
           theme: AppTheme.light(),
-          home: const Scaffold(body: HomeHeader()),
+          home: const AsterNavigationScope(child: Scaffold(body: HomeHeader())),
         ),
       ),
     );
@@ -344,7 +344,7 @@ void main() {
     expect(find.text('Market quote expired'), findsOneWidget);
   });
 
-  testWidgets('Home Send shortcut opens the target selector', (tester) async {
+  testWidgets('Home owns one cross-control navigation command', (tester) async {
     final now = DateTime.utc(2026, 8, 11, 12);
     final httpClient = _marketClient(now);
     final harness = await PaymentFlowTestHarness.create(
@@ -364,15 +364,47 @@ void main() {
           path: RoutePaths.send,
           builder: (context, state) => const Text('Send target selector'),
         ),
+        GoRoute(
+          path: RoutePaths.receive,
+          builder: (context, state) => const Text('Receive target selector'),
+        ),
       ],
     );
     addTearDown(router.dispose);
     await _pumpRouter(tester, harness, router);
 
-    await tester.tap(find.widgetWithText(CustomButton, 'Send'));
+    final send = tester.widget<CustomButton>(
+      find.widgetWithText(CustomButton, 'Send'),
+    );
+    final receive = tester.widget<CustomButton>(
+      find.widgetWithText(CustomButton, 'Receive'),
+    );
+    send.onTap!();
+    receive.onTap!();
     await tester.pumpAndSettle();
 
     expect(find.text('Send target selector'), findsOneWidget);
+    expect(find.text('Receive target selector'), findsNothing);
+    expect(harness.haptics.intents, [HapticIntent.lightImpact]);
+  });
+
+  testWidgets('price trends consume dedicated chart color roles', (
+    tester,
+  ) async {
+    await _expectPriceChangeColor(
+      tester,
+      firstPrice: 99000,
+      bitcoinPrice: 100000,
+      icon: RemixIcons.arrow_up_line,
+      expectedColor: const Color(0xFF123456),
+    );
+    await _expectPriceChangeColor(
+      tester,
+      firstPrice: 101000,
+      bitcoinPrice: 100000,
+      icon: RemixIcons.arrow_down_line,
+      expectedColor: const Color(0xFF654321),
+    );
   });
 
   testWidgets('market header preserves loading geometry and signed semantics', (
@@ -685,6 +717,47 @@ ResilientHttpClient _marketClient(
     }),
     retryPolicy: RetryPolicy(maxAttempts: 1),
   );
+}
+
+Future<void> _expectPriceChangeColor(
+  WidgetTester tester, {
+  required int firstPrice,
+  required int bitcoinPrice,
+  required IconData icon,
+  required Color expectedColor,
+}) async {
+  final now = DateTime.utc(2026, 8, 11, 12);
+  final httpClient = _marketClient(
+    now,
+    firstPrice: firstPrice,
+    bitcoinPrice: bitcoinPrice,
+  );
+  final harness = await PaymentFlowTestHarness.create(
+    clock: () => now,
+    httpClient: httpClient,
+  );
+  final baseTheme = AppTheme.light();
+  final customColors = baseTheme.extension<AsterColors>()!.copyWith(
+    chartPositive: const Color(0xFF123456),
+    chartNegative: const Color(0xFF654321),
+    success: const Color(0xFF00FF00),
+    danger: const Color(0xFFFF0000),
+  );
+  final theme = baseTheme.copyWith(
+    extensions: [
+      for (final extension in baseTheme.extensions.values)
+        if (extension is AsterColors) customColors else extension,
+    ],
+  );
+
+  try {
+    await _pump(tester, harness, Theme(data: theme, child: const PriceCard()));
+    await _pumpUntil(tester, () => find.byIcon(icon).evaluate().isNotEmpty);
+    expect(tester.widget<Icon>(find.byIcon(icon)).color, expectedColor);
+  } finally {
+    httpClient.close();
+    await _disposeHarness(tester, harness);
+  }
 }
 
 http.Response _historyResponse({

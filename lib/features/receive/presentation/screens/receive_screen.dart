@@ -12,31 +12,33 @@ class ReceiveScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Scaffold(
-      backgroundColor: context.colorScheme.surface,
-      appBar: CustomAppBar(
-        title: 'Receive',
-        leadingIcon: true,
-        centerTitle: false,
-      ),
-      body: SafeArea(
-        top: false,
-        minimum: EdgeInsets.only(bottom: context.spacing.lg),
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: context.spacing.screenPadding,
-          ),
-          child: PaymentTargetSelectionView(
-            capabilities: ref.watch(walletPaymentCapabilitiesProvider),
-            onRetry: () => ref.invalidate(walletPaymentCapabilitiesProvider),
-            onSelected: (target) async {
-              await context.pushNamed(
-                RouteNames.receiveRequest,
-                pathParameters: {
-                  RoutePaths.paymentTargetParameter: target.slug,
-                },
-              );
-            },
+    return AsterNavigationScope(
+      child: Scaffold(
+        backgroundColor: context.colorScheme.surface,
+        appBar: CustomAppBar(
+          title: 'Receive',
+          leadingIcon: true,
+          centerTitle: false,
+        ),
+        body: SafeArea(
+          top: false,
+          minimum: EdgeInsets.only(bottom: context.spacing.lg),
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: context.spacing.screenPadding,
+            ),
+            child: PaymentTargetSelectionView(
+              capabilities: ref.watch(walletPaymentCapabilitiesProvider),
+              onRetry: () => ref.invalidate(walletPaymentCapabilitiesProvider),
+              onSelected: (target) async {
+                await context.pushNamed(
+                  RouteNames.receiveRequest,
+                  pathParameters: {
+                    RoutePaths.paymentTargetParameter: target.slug,
+                  },
+                );
+              },
+            ),
           ),
         ),
       ),

@@ -9,7 +9,7 @@ import '../../domain/models/models.dart';
 import 'payment_target_tile.dart';
 
 /// Shared loading, failure, and four-target list for payment entry screens.
-class PaymentTargetSelectionView extends StatefulWidget {
+class PaymentTargetSelectionView extends StatelessWidget {
   const PaymentTargetSelectionView({
     super.key,
     required this.capabilities,
@@ -22,52 +22,35 @@ class PaymentTargetSelectionView extends StatefulWidget {
   final VoidCallback onRetry;
 
   @override
-  State<PaymentTargetSelectionView> createState() =>
-      _PaymentTargetSelectionViewState();
-}
-
-final class _PaymentTargetSelectionViewState
-    extends State<PaymentTargetSelectionView> {
-  var _selectionInFlight = false;
-
-  void _handleSelected(WalletPaymentTarget target) {
-    if (_selectionInFlight) return;
-    setState(() => _selectionInFlight = true);
-    unawaited(context.haptics.trigger(HapticIntent.selection));
-    unawaited(_completeSelection(target));
-  }
-
-  Future<void> _completeSelection(WalletPaymentTarget target) async {
-    try {
-      await widget.onSelected(target);
-    } catch (error, stackTrace) {
-      FlutterError.reportError(
-        FlutterErrorDetails(
-          exception: error,
-          stack: stackTrace,
-          library: 'UTEXO payment navigation',
-          context: ErrorDescription('while opening a payment target'),
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _selectionInFlight = false);
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return widget.capabilities.when(
+    if (AsterNavigationScope.maybeOf(context) != null) {
+      return _buildContent(context);
+    }
+    return AsterNavigationScope(child: Builder(builder: _buildContent));
+  }
+
+  Widget _buildContent(BuildContext context) {
+    final navigation = AsterNavigationScope.of(context);
+    return capabilities.when(
       skipLoadingOnRefresh: false,
       data: (items) => _PaymentTargetList(
         capabilities: items,
-        onSelected: _selectionInFlight ? null : _handleSelected,
+        onSelected: navigation.inFlight
+            ? null
+            : (target) => unawaited(
+                navigation.run(
+                  command: () => onSelected(target),
+                  failureTitle: 'Payment option could not be opened',
+                  hapticIntent: HapticIntent.selection,
+                ),
+              ),
       ),
       loading: () => const _PaymentTargetLoading(),
       error: (error, stackTrace) => _PaymentTargetFailure(
         failure: error is AppFailureException
             ? error.failure
             : FailureMapper.from(error, stackTrace),
-        onRetry: widget.onRetry,
+        onRetry: onRetry,
       ),
     );
   }

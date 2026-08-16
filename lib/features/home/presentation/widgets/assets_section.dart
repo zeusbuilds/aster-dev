@@ -176,6 +176,7 @@ class _AssetsBody extends ConsumerWidget {
     }
     final homeState = home.requireValue;
     final settingsState = settings.requireValue;
+    final navigation = AsterNavigationScope.of(context);
     final preferences = settingsState.snapshot.preferences;
     final marketSnapshot = market.value;
     final marketRetryable = _marketRetryable(
@@ -208,17 +209,22 @@ class _AssetsBody extends ConsumerWidget {
             display: displays[index],
             balancesVisible: preferences.balancesVisible,
             fiatLoading: market.isLoading,
-            onTap: () {
-              unawaited(context.haptics.trigger(HapticIntent.lightImpact));
-              unawaited(
-                context.pushNamed(
-                  RouteNames.transactionList,
-                  pathParameters: <String, String>{
-                    RoutePaths.assetKindParameter: displays[index].kind.slug,
+            onTap: navigation.inFlight
+                ? null
+                : () {
+                    unawaited(
+                      navigation.run(
+                        command: () => context.pushNamed(
+                          RouteNames.transactionList,
+                          pathParameters: <String, String>{
+                            RoutePaths.assetKindParameter:
+                                displays[index].kind.slug,
+                          },
+                        ),
+                        failureTitle: 'Activity could not open',
+                      ),
+                    );
                   },
-                ),
-              );
-            },
           ),
           if (index < displays.length - 1) SizedBox(height: context.spacing.lg),
         ],

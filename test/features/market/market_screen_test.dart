@@ -65,7 +65,7 @@ void main() {
     expect(find.text('Send target selection'), findsOneWidget);
     expect(haptics.intents, [HapticIntent.lightImpact]);
 
-    router.go('/');
+    router.pop();
     await tester.pumpAndSettle();
     final receive = find.widgetWithText(MarketTile, 'Receive');
     await tester.scrollUntilVisible(receive, 250);
@@ -76,6 +76,31 @@ void main() {
       HapticIntent.lightImpact,
       HapticIntent.lightImpact,
     ]);
+  });
+
+  testWidgets('Market suppresses same-frame sibling route commands', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(800, 1600);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    final haptics = _RecordingHaptics();
+    final router = _router();
+    addTearDown(router.dispose);
+    await tester.pumpWidget(_app(router, haptics));
+    await tester.pumpAndSettle();
+
+    final tiles = tester.widgetList<MarketTile>(find.byType(MarketTile));
+    final swap = tiles.singleWhere((tile) => tile.label == 'Swap');
+    final send = tiles.singleWhere((tile) => tile.label == 'Send');
+    swap.onTap!();
+    send.onTap!();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Swap preview'), findsOneWidget);
+    expect(find.text('Send target selection'), findsNothing);
+    expect(haptics.intents, [HapticIntent.lightImpact]);
   });
 
   testWidgets('Market remains usable on a compact phone at 2x text', (

@@ -23,6 +23,7 @@ class AsterTypography extends ThemeExtension<AsterTypography> {
 
   @override
   AsterTypography lerp(ThemeExtension<AsterTypography>? other, double t) {
-    return this;
+    if (other is! AsterTypography) return this;
+    return t < 0.5 ? this : other;
   }
 }

@@ -3,9 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/theme.dart';
 import 'amount_text.dart';
 
-/// Reusable row widget for displaying key-value pairs with optional icons
-///
-/// Displays a title and value with optional prefix/suffix icons.
+/// Semantic key-value row for short labels and numeric metadata.
 class DetailRow extends StatelessWidget {
   final IconData? prefixIcon;
   final IconData? suffixIcon;
@@ -69,7 +67,7 @@ class DetailRow extends StatelessWidget {
               ),
             ],
             SizedBox(width: spacing.sm),
-            AmountText(
+            NumericText(
               value,
               style: type.rowValue.copyWith(
                 color: valueColor ?? context.colorScheme.onSurface,

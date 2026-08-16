@@ -287,8 +287,8 @@ class _PriceChangeVisual extends StatelessWidget {
     final changeColor = change == null || change == 0
         ? neutralColor
         : change > 0
-        ? colors.success
-        : colors.danger;
+        ? colors.chartPositive
+        : colors.chartNegative;
     final changeIcon = change == null || change == 0
         ? RemixIcons.subtract_line
         : change > 0

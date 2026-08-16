@@ -61,12 +61,13 @@ Text('Recipient address', style: context.type.addressLabel);
 Text(versionLabel, style: context.type.versionLabel);
 ```
 
-Use `NumericText` for fully numeric strings and `AmountText` for mixed values
-where only the numeric chunks should use Public Sans:
+Use `NumericText` for numbers and ordinary numeric metadata. Use `AmountText`
+only for monetary values where surrounding currency symbols, asset labels, or
+units must remain DM Sans:
 
 ```dart
-NumericText(amount, style: context.type.amountLarge);
-AmountText('7 sats/vbyte', style: context.type.rowValue);
+NumericText('7 sats/vbyte', style: context.type.rowValue);
+AmountText('0.001 BTC', style: context.type.amountLarge);
 ```
 
 Avoid feature-level `fontSize`, `fontWeight`, `letterSpacing`, and raw

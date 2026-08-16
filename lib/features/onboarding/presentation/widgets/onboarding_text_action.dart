@@ -11,18 +11,22 @@ class OnboardingTextAction extends StatelessWidget {
     required this.label,
     required this.onPressed,
     this.enabled = true,
+    this.hapticIntent = HapticIntent.lightImpact,
   });
 
   final String label;
   final VoidCallback onPressed;
   final bool enabled;
+  final HapticIntent? hapticIntent;
 
   @override
   Widget build(BuildContext context) {
     return TextButton(
       onPressed: enabled
           ? () {
-              unawaited(context.haptics.trigger(HapticIntent.lightImpact));
+              if (hapticIntent case final intent?) {
+                unawaited(context.haptics.trigger(intent));
+              }
               onPressed();
             }
           : null,

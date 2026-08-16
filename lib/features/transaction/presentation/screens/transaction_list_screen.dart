@@ -34,7 +34,6 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
 
   Timer? _calendarTimer;
   late DateTime _now;
-  var _detailsNavigationInFlight = false;
 
   @override
   void initState() {
@@ -76,40 +75,6 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
     });
   }
 
-  Future<void> _openDetails(String activityId) async {
-    if (_detailsNavigationInFlight) return;
-    setState(() => _detailsNavigationInFlight = true);
-    unawaited(context.haptics.trigger(HapticIntent.lightImpact));
-    try {
-      await context.pushNamed<void>(
-        RouteNames.transactionDetails,
-        pathParameters: <String, String>{
-          RoutePaths.assetKindParameter: widget.assetKind.slug,
-          RoutePaths.activityIdParameter: activityId,
-        },
-      );
-    } catch (error, stackTrace) {
-      final failure = FailureMapper.from(error, stackTrace);
-      FlutterError.reportError(
-        FlutterErrorDetails(
-          exception: AppFailureException(failure),
-          stack: stackTrace,
-          library: 'UTEXO activity navigation',
-          context: ErrorDescription('while opening transaction details'),
-        ),
-      );
-      if (mounted) {
-        context.toasts.show(
-          title: 'Transaction details could not be opened',
-          message: failure.userMessage,
-          variant: ToastVariant.failure,
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _detailsNavigationInFlight = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final assetKind = widget.assetKind;
@@ -143,27 +108,50 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
       notifier.clearRefreshFailure();
     }
 
-    return Scaffold(
-      backgroundColor: context.colorScheme.surface,
-      appBar: CustomAppBar(
-        title:
-            '${TransactionListScreen._formatter.assetTitle(assetKind)} Activity',
-        leadingIcon: true,
-        centerTitle: false,
-      ),
-      body: SafeArea(
-        top: false,
-        child: RefreshIndicator(
-          onRefresh: refresh,
-          child: _ActivityBody(
-            activity: activity,
-            settings: settings,
-            assetKind: assetKind,
-            now: _now,
-            formatter: TransactionListScreen._formatter,
-            onOpenDetails: _detailsNavigationInFlight ? null : _openDetails,
-          ),
-        ),
+    return AsterNavigationScope(
+      child: Builder(
+        builder: (context) {
+          final navigation = AsterNavigationScope.of(context);
+
+          void openDetails(String activityId) {
+            unawaited(
+              navigation.run(
+                command: () => context.pushNamed<void>(
+                  RouteNames.transactionDetails,
+                  pathParameters: <String, String>{
+                    RoutePaths.assetKindParameter: widget.assetKind.slug,
+                    RoutePaths.activityIdParameter: activityId,
+                  },
+                ),
+                failureTitle: 'Transaction details could not be opened',
+              ),
+            );
+          }
+
+          return Scaffold(
+            backgroundColor: context.colorScheme.surface,
+            appBar: CustomAppBar(
+              title:
+                  '${TransactionListScreen._formatter.assetTitle(assetKind)} Activity',
+              leadingIcon: true,
+              centerTitle: false,
+            ),
+            body: SafeArea(
+              top: false,
+              child: RefreshIndicator(
+                onRefresh: refresh,
+                child: _ActivityBody(
+                  activity: activity,
+                  settings: settings,
+                  assetKind: assetKind,
+                  now: _now,
+                  formatter: TransactionListScreen._formatter,
+                  onOpenDetails: navigation.inFlight ? null : openDetails,
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

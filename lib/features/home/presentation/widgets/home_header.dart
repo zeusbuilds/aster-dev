@@ -19,6 +19,7 @@ class HomeHeader extends ConsumerWidget {
     final spacing = context.spacing;
     final colors = context.appColors;
     final icons = context.icons;
+    final navigation = AsterNavigationScope.of(context);
     final walletState = ref.watch(walletViewModelProvider);
     final activeWallet = switch (walletState) {
       AsyncData(:final value) => value.activeWallet,
@@ -48,7 +49,7 @@ class HomeHeader extends ConsumerWidget {
           Expanded(
             child: Semantics(
               button: true,
-              enabled: canSelectWallet,
+              enabled: canSelectWallet && !navigation.inFlight,
               liveRegion: walletState.isLoading,
               label: walletState.isLoading
                   ? 'Loading active wallet'
@@ -59,14 +60,16 @@ class HomeHeader extends ConsumerWidget {
               child: Material(
                 color: colors.transparentSurface,
                 child: InkWell(
-                  onTap: !canSelectWallet
+                  onTap: !canSelectWallet || navigation.inFlight
                       ? null
                       : () {
                           unawaited(
-                            context.haptics.trigger(HapticIntent.lightImpact),
-                          );
-                          unawaited(
-                            context.pushNamed<void>(RouteNames.walletSelection),
+                            navigation.run(
+                              command: () => context.pushNamed<void>(
+                                RouteNames.walletSelection,
+                              ),
+                              failureTitle: 'Wallet selector could not open',
+                            ),
                           );
                         },
                   child: ConstrainedBox(

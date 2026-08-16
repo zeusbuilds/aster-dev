@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:aster/features/shell/presentation/providers/providers.dart';
@@ -143,6 +144,35 @@ void main() {
     expect(roles.statusMessage.fontSize, theme.textTheme.bodyMedium!.fontSize);
     expect(roles.statusMessage.fontWeight, FontWeight.w400);
     expect(roles.statusMessage.color, theme.colorScheme.onSurface);
+  });
+
+  test(
+    'typography families switch discretely at the interpolation midpoint',
+    () {
+      const source = AsterTypography(
+        fontFamilyPrimary: 'Primary A',
+        fontFamilyNumeric: 'Numeric A',
+      );
+      const destination = AsterTypography(
+        fontFamilyPrimary: 'Primary B',
+        fontFamilyNumeric: 'Numeric B',
+      );
+
+      expect(source.lerp(destination, 0.49), same(source));
+      expect(source.lerp(destination, 0.5), same(destination));
+      expect(source.lerp(null, 1), same(source));
+    },
+  );
+
+  testWidgets('detail rows classify fee rates as numeric metadata', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _themedHarness(const DetailRow(title: 'Fee rate', value: '7 sats/vbyte')),
+    );
+
+    expect(find.byType(NumericText), findsOneWidget);
+    expect(find.byType(AmountText), findsNothing);
   });
 
   testWidgets('squircle resolves its default border from the active theme', (
@@ -397,6 +427,64 @@ void main() {
     expect(haptics.intents, [HapticIntent.lightImpact]);
   });
 
+  testWidgets(
+    'screen navigation owner suppresses same-frame sibling commands',
+    (tester) async {
+      final gate = Completer<void>();
+      final haptics = _RecordingHaptics();
+      final accepted = <String>[];
+      await tester.pumpWidget(
+        _themedHarness(
+          _NavigationHarness(
+            first: () async {
+              accepted.add('first');
+              await gate.future;
+            },
+            second: () async => accepted.add('second'),
+          ),
+          haptics: haptics,
+        ),
+      );
+
+      final first = tester.widget<CustomButton>(
+        find.widgetWithText(CustomButton, 'First'),
+      );
+      final second = tester.widget<CustomButton>(
+        find.widgetWithText(CustomButton, 'Second'),
+      );
+      first.onTap!();
+      second.onTap!();
+      await tester.pump();
+
+      expect(accepted, ['first']);
+      expect(haptics.intents, [HapticIntent.lightImpact]);
+      expect(
+        tester
+            .getSemantics(find.bySemanticsLabel('First'))
+            .flagsCollection
+            .isEnabled,
+        ui.Tristate.isFalse,
+      );
+      expect(
+        tester
+            .getSemantics(find.bySemanticsLabel('Second'))
+            .flagsCollection
+            .isEnabled,
+        ui.Tristate.isFalse,
+      );
+
+      gate.complete();
+      await tester.pump();
+      expect(
+        tester
+            .getSemantics(find.bySemanticsLabel('Second'))
+            .flagsCollection
+            .isEnabled,
+        ui.Tristate.isTrue,
+      );
+    },
+  );
+
   testWidgets('reduced motion leaves loaders settled', (tester) async {
     await tester.pumpWidget(
       _themedHarness(const GridLoader(), disableAnimations: true),
@@ -627,6 +715,55 @@ final class _NoopToasts implements ToastPresentationService {
     Duration? duration,
   }) {
     return true;
+  }
+}
+
+final class _NavigationHarness extends StatelessWidget {
+  const _NavigationHarness({required this.first, required this.second});
+
+  final Future<void> Function() first;
+  final Future<void> Function() second;
+
+  @override
+  Widget build(BuildContext context) {
+    return AsterNavigationScope(
+      child: Builder(
+        builder: (context) {
+          final navigation = AsterNavigationScope.of(context);
+
+          void run(Future<void> Function() command) {
+            unawaited(
+              navigation.run(
+                command: command,
+                failureTitle: 'Page could not open',
+              ),
+            );
+          }
+
+          return Row(
+            children: [
+              Expanded(
+                child: CustomButton(
+                  text: 'First',
+                  enabled: !navigation.inFlight,
+                  hapticIntent: null,
+                  onTap: () => run(first),
+                ),
+              ),
+              SizedBox(width: context.spacing.sm),
+              Expanded(
+                child: CustomButton(
+                  text: 'Second',
+                  enabled: !navigation.inFlight,
+                  hapticIntent: null,
+                  onTap: () => run(second),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 }
 

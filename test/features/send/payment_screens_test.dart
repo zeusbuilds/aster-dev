@@ -168,6 +168,51 @@ void main() {
     );
   });
 
+  testWidgets('payment navigation faults are redacted and release ownership', (
+    tester,
+  ) async {
+    final harness = await PaymentFlowTestHarness.create();
+    addTearDown(() => _disposeHarness(tester, harness));
+    final capability = WalletPaymentCapability.available(
+      const PaymentRoute(asset: WalletAsset.bitcoin, rail: PaymentRail.onchain),
+    );
+    await _pumpWidget(
+      tester,
+      harness,
+      PaymentTargetSelectionView(
+        capabilities: AsyncData([capability]),
+        onSelected: (_) => throw const _SecretNavigationError(),
+        onRetry: () {},
+      ),
+    );
+    final reported = <FlutterErrorDetails>[];
+    final previousHandler = FlutterError.onError;
+    FlutterError.onError = reported.add;
+    addTearDown(() => FlutterError.onError = previousHandler);
+
+    final tile = find.byType(PaymentTargetTile);
+    await tester.tap(tile);
+    await tester.pump();
+
+    expect(reported, hasLength(1));
+    expect(reported.single.exception, isA<AppFailureException>());
+    expect(reported.single.exception.toString(), isNot(contains('secret')));
+    expect(harness.toasts.messages, hasLength(1));
+    expect(
+      harness.toasts.messages.single.title,
+      'Payment option could not be opened',
+    );
+    expect(harness.toasts.messages.single.message, isNot(contains('secret')));
+    expect(harness.haptics.intents, [
+      HapticIntent.selection,
+      HapticIntent.error,
+    ]);
+    expect(
+      tester.getSemantics(tile).flagsCollection.isEnabled,
+      ui.Tristate.isTrue,
+    );
+  });
+
   testWidgets('payment target loading exposes one truthful live node', (
     tester,
   ) async {
@@ -293,6 +338,82 @@ void main() {
     );
 
     expect(find.text('Amount step'), findsOneWidget);
+  });
+
+  testWidgets('Send destination serializes validation, Scan, and navigation', (
+    tester,
+  ) async {
+    final decodeGate = Completer<void>();
+    const route = PaymentRoute(
+      asset: WalletAsset.bitcoin,
+      rail: PaymentRail.lightning,
+    );
+    final engine = FakeWalletEngine()
+      ..decodeInvoiceGate = decodeGate
+      ..decodedInvoice = WalletPaymentPreview(
+        route: route,
+        encodedDestination: 'lnbcrt1navigation',
+        displayDestination: 'lnbcrt1navigation',
+      );
+    final harness = await PaymentFlowTestHarness.create(engine: engine);
+    addTearDown(() => _disposeHarness(tester, harness));
+    final router = GoRouter(
+      initialLocation: '/send/bitcoin-lightning/address',
+      routes: [
+        GoRoute(
+          path: RoutePaths.sendAddress,
+          name: RouteNames.sendAddress,
+          builder: (context, state) => const SendAddressScreen(
+            target: WalletPaymentTarget.bitcoinLightning,
+          ),
+        ),
+        GoRoute(
+          path: RoutePaths.sendAmount,
+          name: RouteNames.sendAmount,
+          builder: (context, state) => const Text('Amount step'),
+        ),
+        GoRoute(
+          path: RoutePaths.scan,
+          name: RouteNames.scan,
+          builder: (context, state) => const Text('Scanner route'),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await _pumpRouter(tester, harness, router);
+    final destinationField = find.byWidgetPredicate(
+      (widget) => widget is TextField && widget.enabled == true,
+    );
+    await _pumpUntil(tester, () => destinationField.evaluate().isNotEmpty);
+    await tester.enterText(destinationField, 'lnbcrt1navigation');
+    await tester.pump();
+
+    final continueButton = tester.widget<CustomButton>(
+      find.widgetWithText(CustomButton, 'Continue'),
+    );
+    final scanButton = tester.widget<AsterIconButton>(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is AsterIconButton && widget.tooltip.startsWith('Scan '),
+      ),
+    );
+    continueButton.onTap!();
+    scanButton.onPressed!();
+    await tester.pump();
+
+    expect(engine.calls.where((call) => call == 'decodeInvoice:start'), [
+      'decodeInvoice:start',
+    ]);
+    expect(find.text('Scanner route'), findsNothing);
+    expect(harness.haptics.intents, isEmpty);
+
+    decodeGate.complete();
+    await _pumpUntil(
+      tester,
+      () => find.text('Amount step').evaluate().isNotEmpty,
+    );
+    expect(find.text('Amount step'), findsOneWidget);
+    expect(find.text('Scanner route'), findsNothing);
   });
 
   testWidgets('Send destination is private and bounded before state updates', (
@@ -1493,6 +1614,13 @@ void main() {
     );
     expect(tester.widget<CustomButton>(refreshBalance).enabled, isTrue);
   });
+}
+
+final class _SecretNavigationError implements Exception {
+  const _SecretNavigationError();
+
+  @override
+  String toString() => 'secret-payment-destination';
 }
 
 Future<void> _pumpRouter(

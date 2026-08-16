@@ -23,6 +23,9 @@ class MarketTile extends StatelessWidget {
   /// Accepted action, or `null` when the capability is unavailable.
   final VoidCallback? onTap;
 
+  /// Tactile feedback emitted only after an enabled activation.
+  final HapticIntent? hapticIntent;
+
   /// Authored Market background recipe.
   final AsterGradientSpec gradient;
 
@@ -36,6 +39,7 @@ class MarketTile extends StatelessWidget {
     this.tipText,
     required this.icon,
     this.onTap,
+    this.hapticIntent = HapticIntent.lightImpact,
     required this.gradient,
     this.shadowColor,
   });
@@ -55,7 +59,9 @@ class MarketTile extends StatelessWidget {
             .clamp(1, _marketTextureSourceDimension);
 
     void activate() {
-      unawaited(context.haptics.trigger(HapticIntent.lightImpact));
+      if (hapticIntent case final intent?) {
+        unawaited(context.haptics.trigger(intent));
+      }
       onTap?.call();
     }
 

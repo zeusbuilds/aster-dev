@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:go_router/go_router.dart';
 import 'package:remixicon/remixicon.dart';
 
+import '../routing/navigation_command_scope.dart';
 import '../routing/route_paths.dart';
 import '../theme/theme.dart';
 import 'aster_icon_button.dart';
@@ -44,13 +47,33 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final icons = context.icons;
     final metrics = context.metrics;
+    final hasScreenOwner = AsterNavigationScope.maybeOf(context) != null;
 
-    void goBack() {
-      if (context.canPop()) {
-        context.pop();
-      } else {
-        context.go(fallbackLocation);
+    Widget buildLeading(BuildContext context) {
+      final navigation = AsterNavigationScope.of(context);
+
+      void goBack() {
+        unawaited(
+          navigation.run(
+            command: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go(fallbackLocation);
+              }
+            },
+            failureTitle: 'Previous page could not open',
+          ),
+        );
       }
+
+      return AsterIconButton(
+        icon: leadingIconData ?? RemixIcons.arrow_left_s_line,
+        tooltip: 'Back',
+        onPressed: leadingEnabled && !navigation.inFlight ? goBack : null,
+        hapticIntent: null,
+        iconSize: icons.sm,
+      );
     }
 
     return AppBar(
@@ -59,12 +82,9 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
       centerTitle: centerTitle,
       title: Text(title, style: context.type.appBarTitle),
       leading: leadingIcon
-          ? AsterIconButton(
-              icon: leadingIconData ?? RemixIcons.arrow_left_s_line,
-              tooltip: 'Back',
-              onPressed: leadingEnabled ? goBack : null,
-              iconSize: icons.sm,
-            )
+          ? hasScreenOwner
+                ? Builder(builder: buildLeading)
+                : AsterNavigationScope(child: Builder(builder: buildLeading))
           : null,
       leadingWidth: metrics.appBarLeadingWidth,
       actions: action != null ? [action!] : null,

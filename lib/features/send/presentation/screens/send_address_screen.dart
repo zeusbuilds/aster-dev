@@ -33,15 +33,25 @@ class _SendAddressScreenState extends ConsumerState<SendAddressScreen> {
     super.dispose();
   }
 
-  Future<void> _openScan() async {
-    final result = await context.push<String?>(
-      RoutePaths.scan,
-      extra: ScanPurpose.destinationPicker,
+  void _openScan(
+    BuildContext routeContext,
+    AsterNavigationCommandOwner navigation,
+  ) {
+    unawaited(
+      navigation.run(
+        command: () async {
+          final result = await routeContext.push<String?>(
+            RoutePaths.scan,
+            extra: ScanPurpose.destinationPicker,
+          );
+          if (!mounted || result == null) return;
+          ref
+              .read(sendFlowViewModelProvider(widget.target).notifier)
+              .updateDestination(result.trim());
+        },
+        failureTitle: 'Scanner could not open',
+      ),
     );
-    if (!mounted || result == null) return;
-    ref
-        .read(sendFlowViewModelProvider(widget.target).notifier)
-        .updateDestination(result.trim());
   }
 
   Future<void> _paste() async {
@@ -67,14 +77,27 @@ class _SendAddressScreenState extends ConsumerState<SendAddressScreen> {
     }
   }
 
-  Future<void> _continue() async {
-    final valid = await ref
-        .read(sendFlowViewModelProvider(widget.target).notifier)
-        .validateDestination();
-    if (!mounted || !valid) return;
-    await context.pushNamed(
-      RouteNames.sendAmount,
-      pathParameters: {RoutePaths.paymentTargetParameter: widget.target.slug},
+  void _continue(
+    BuildContext routeContext,
+    AsterNavigationCommandOwner navigation,
+  ) {
+    unawaited(
+      navigation.run(
+        command: () async {
+          final valid = await ref
+              .read(sendFlowViewModelProvider(widget.target).notifier)
+              .validateDestination();
+          if (!mounted || !routeContext.mounted || !valid) return;
+          await routeContext.pushNamed(
+            RouteNames.sendAmount,
+            pathParameters: {
+              RoutePaths.paymentTargetParameter: widget.target.slug,
+            },
+          );
+        },
+        failureTitle: 'Amount entry could not open',
+        hapticIntent: null,
+      ),
     );
   }
 
@@ -95,52 +118,64 @@ class _SendAddressScreenState extends ConsumerState<SendAddressScreen> {
     final current = flow.value;
     final controlsEnabled = current?.canChangeDestination ?? false;
 
-    return GestureDetector(
-      onTap: () => FocusScope.of(context).unfocus(),
-      child: Scaffold(
-        backgroundColor: context.colorScheme.surface,
-        appBar: CustomAppBar(
-          title: 'Send ${widget.target.assetLabel}',
-          leadingIcon: true,
-          centerTitle: false,
-          fallbackLocation: RoutePaths.send,
-          action: AsterIconButton(
-            onPressed: controlsEnabled ? () => unawaited(_openScan()) : null,
-            icon: MingCuteIcons.mgc_scan_line,
-            tooltip: 'Scan ${widget.target.destinationLabel.toLowerCase()}',
-          ),
-        ),
-        body: SafeArea(
-          top: false,
-          minimum: EdgeInsets.only(bottom: context.spacing.lg),
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: context.spacing.screenPadding,
-            ),
-            child: flow.when(
-              skipLoadingOnRefresh: false,
-              data: (state) => _DestinationBody(
-                state: state,
-                controller: _destinationController,
-                onChanged: ref.read(provider.notifier).updateDestination,
-                onClear: () {
-                  _destinationController.clear();
-                  ref.read(provider.notifier).updateDestination('');
-                },
-                onPaste: () => unawaited(_paste()),
-                onSubmitted: () => unawaited(_continue()),
-                onContinue: () => unawaited(_continue()),
+    return AsterNavigationScope(
+      child: Builder(
+        builder: (context) {
+          final navigation = AsterNavigationScope.of(context);
+          return GestureDetector(
+            onTap: () => FocusScope.of(context).unfocus(),
+            child: Scaffold(
+              backgroundColor: context.colorScheme.surface,
+              appBar: CustomAppBar(
+                title: 'Send ${widget.target.assetLabel}',
+                leadingIcon: true,
+                centerTitle: false,
+                fallbackLocation: RoutePaths.send,
+                action: AsterIconButton(
+                  onPressed: controlsEnabled && !navigation.inFlight
+                      ? () => _openScan(context, navigation)
+                      : null,
+                  hapticIntent: null,
+                  icon: MingCuteIcons.mgc_scan_line,
+                  tooltip:
+                      'Scan ${widget.target.destinationLabel.toLowerCase()}',
+                ),
               ),
-              loading: () => _DestinationLoading(target: widget.target),
-              error: (error, stackTrace) => _DestinationFailure(
-                failure: error is AppFailureException
-                    ? error.failure
-                    : FailureMapper.from(error, stackTrace),
-                onRetry: ref.read(provider.notifier).retry,
+              body: SafeArea(
+                top: false,
+                minimum: EdgeInsets.only(bottom: context.spacing.lg),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: context.spacing.screenPadding,
+                  ),
+                  child: flow.when(
+                    skipLoadingOnRefresh: false,
+                    data: (state) => _DestinationBody(
+                      state: state,
+                      commandsEnabled: !navigation.inFlight,
+                      controller: _destinationController,
+                      onChanged: ref.read(provider.notifier).updateDestination,
+                      onClear: () {
+                        _destinationController.clear();
+                        ref.read(provider.notifier).updateDestination('');
+                      },
+                      onPaste: () => unawaited(_paste()),
+                      onSubmitted: () => _continue(context, navigation),
+                      onContinue: () => _continue(context, navigation),
+                    ),
+                    loading: () => _DestinationLoading(target: widget.target),
+                    error: (error, stackTrace) => _DestinationFailure(
+                      failure: error is AppFailureException
+                          ? error.failure
+                          : FailureMapper.from(error, stackTrace),
+                      onRetry: ref.read(provider.notifier).retry,
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -149,6 +184,7 @@ class _SendAddressScreenState extends ConsumerState<SendAddressScreen> {
 final class _DestinationBody extends StatelessWidget {
   const _DestinationBody({
     required this.state,
+    required this.commandsEnabled,
     required this.controller,
     required this.onChanged,
     required this.onClear,
@@ -158,6 +194,7 @@ final class _DestinationBody extends StatelessWidget {
   });
 
   final SendFlowState state;
+  final bool commandsEnabled;
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
   final VoidCallback onClear;
@@ -175,7 +212,7 @@ final class _DestinationBody extends StatelessWidget {
         SendAddressCard(
           target: state.route.target,
           controller: controller,
-          enabled: state.canChangeDestination,
+          enabled: commandsEnabled && state.canChangeDestination,
           pasting: pasting,
           failureMessage: state
               .failureFor(SendFlowOperation.validatingDestination)
@@ -190,6 +227,7 @@ final class _DestinationBody extends StatelessWidget {
           text: 'Continue',
           loading: validating,
           enabled:
+              commandsEnabled &&
               state.canStart(SendFlowOperation.validatingDestination) &&
               state.destination.trim().isNotEmpty,
           hapticIntent: null,

@@ -46,218 +46,264 @@ class SettingsScreen extends ConsumerWidget {
         : null;
     final settingsEnabled = settingsState != null && !settingsState.isSaving;
 
-    return Scaffold(
-      backgroundColor: context.colorScheme.surface,
-      appBar: CustomAppBar(title: 'Settings'),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(horizontal: spacing.screenPadding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Semantics(
-              liveRegion: walletLoading,
-              label: walletLoading ? 'Loading wallet' : null,
-              excludeSemantics: walletLoading,
-              child: AppSkeletonizer(
-                enabled: walletLoading,
-                child: Squircle(
-                  padding: EdgeInsets.symmetric(vertical: spacing.xs),
-                  child: AsterOptionRow(
-                    key: const ValueKey('settings-wallet-summary'),
-                    title: walletLoading
-                        ? 'Loading wallet'
-                        : walletFailure != null
-                        ? 'Wallet unavailable'
-                        : activeWallet?.name ?? 'No active wallet',
-                    details: walletLoading || walletFailure != null
-                        ? null
-                        : activeWallet?.displayId ?? 'Choose wallet',
-                    prefixIcon: MingCuteIcons.mgc_wallet_3_line,
-                    onTap: walletLoading || walletFailure != null
-                        ? null
-                        : () => context.pushNamed(RouteNames.walletSelection),
-                  ),
-                ),
-              ),
-            ),
-            if (walletFailure != null) ...[
-              SizedBox(height: spacing.md),
-              Semantics(
-                liveRegion: true,
-                child: Text(
-                  walletFailure.userMessage,
-                  style: type.errorMessage,
-                ),
-              ),
-              if (walletFailure.retryable) ...[
-                SizedBox(height: spacing.sm),
-                CustomButton.compact(
-                  text: 'Retry wallet',
-                  variant: ButtonVariant.secondary,
-                  onTap: () => unawaited(
-                    ref.read(walletViewModelProvider.notifier).reload(),
-                  ),
-                ),
-              ],
-            ],
-            SizedBox(height: spacing.xxl),
+    return AsterNavigationScope(
+      child: Builder(
+        builder: (context) {
+          final navigation = AsterNavigationScope.of(context);
 
-            Text('Wallet', style: type.sectionLabel),
-            SizedBox(height: spacing.md),
-            Squircle(
-              padding: EdgeInsets.symmetric(vertical: spacing.xs),
+          VoidCallback? openNamed(String routeName, String failureTitle) {
+            if (navigation.inFlight) return null;
+            return () => unawaited(
+              navigation.run(
+                command: () => context.pushNamed<void>(routeName),
+                failureTitle: failureTitle,
+              ),
+            );
+          }
+
+          return Scaffold(
+            backgroundColor: context.colorScheme.surface,
+            appBar: CustomAppBar(title: 'Settings'),
+            body: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(horizontal: spacing.screenPadding),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AsterOptionRow(
-                    title: 'Wallet details',
-                    details: walletLoading ? 'Loading' : 'Unavailable',
-                    prefixIcon: MingCuteIcons.mgc_information_line,
+                  Semantics(
+                    liveRegion: walletLoading,
+                    label: walletLoading ? 'Loading wallet' : null,
+                    excludeSemantics: walletLoading,
+                    child: AppSkeletonizer(
+                      enabled: walletLoading,
+                      child: Squircle(
+                        padding: EdgeInsets.symmetric(vertical: spacing.xs),
+                        child: AsterOptionRow(
+                          key: const ValueKey('settings-wallet-summary'),
+                          title: walletLoading
+                              ? 'Loading wallet'
+                              : walletFailure != null
+                              ? 'Wallet unavailable'
+                              : activeWallet?.name ?? 'No active wallet',
+                          details: walletLoading || walletFailure != null
+                              ? null
+                              : activeWallet?.displayId ?? 'Choose wallet',
+                          prefixIcon: MingCuteIcons.mgc_wallet_3_line,
+                          hapticIntent: null,
+                          onTap:
+                              walletLoading ||
+                                  walletFailure != null ||
+                                  navigation.inFlight
+                              ? null
+                              : openNamed(
+                                  RouteNames.walletSelection,
+                                  'Wallet selector could not open',
+                                ),
+                        ),
+                      ),
+                    ),
                   ),
-                  const AsterDivider.inset(),
-                  const AsterOptionRow(
-                    title: 'Manage assets',
-                    details: 'Unavailable',
-                    prefixIcon: MingCuteIcons.mgc_coin_2_line,
+                  if (walletFailure != null) ...[
+                    SizedBox(height: spacing.md),
+                    Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        walletFailure.userMessage,
+                        style: type.errorMessage,
+                      ),
+                    ),
+                    if (walletFailure.retryable) ...[
+                      SizedBox(height: spacing.sm),
+                      CustomButton.compact(
+                        text: 'Retry wallet',
+                        variant: ButtonVariant.secondary,
+                        onTap: () => unawaited(
+                          ref.read(walletViewModelProvider.notifier).reload(),
+                        ),
+                      ),
+                    ],
+                  ],
+                  SizedBox(height: spacing.xxl),
+
+                  Text('Wallet', style: type.sectionLabel),
+                  SizedBox(height: spacing.md),
+                  Squircle(
+                    padding: EdgeInsets.symmetric(vertical: spacing.xs),
+                    child: Column(
+                      children: [
+                        AsterOptionRow(
+                          title: 'Wallet details',
+                          details: walletLoading ? 'Loading' : 'Unavailable',
+                          prefixIcon: MingCuteIcons.mgc_information_line,
+                        ),
+                        const AsterDivider.inset(),
+                        const AsterOptionRow(
+                          title: 'Manage assets',
+                          details: 'Unavailable',
+                          prefixIcon: MingCuteIcons.mgc_coin_2_line,
+                        ),
+                        const AsterDivider.inset(),
+                        AsterOptionRow(
+                          title: 'Advanced',
+                          prefixIcon: MingCuteIcons.mgc_tool_line,
+                          hapticIntent: null,
+                          onTap: openNamed(
+                            RouteNames.advancedSettings,
+                            'Advanced settings could not open',
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const AsterDivider.inset(),
-                  AsterOptionRow(
-                    title: 'Advanced',
-                    prefixIcon: MingCuteIcons.mgc_tool_line,
-                    onTap: () => context.pushNamed(RouteNames.advancedSettings),
+                  SizedBox(height: spacing.xxl),
+
+                  Text('App', style: type.sectionLabel),
+                  SizedBox(height: spacing.md),
+                  Semantics(
+                    liveRegion: settings.isLoading,
+                    label: settings.isLoading ? 'Loading app settings' : null,
+                    excludeSemantics: settings.isLoading,
+                    child: AppSkeletonizer(
+                      enabled: settings.isLoading,
+                      child: Squircle(
+                        padding: EdgeInsets.symmetric(vertical: spacing.xs),
+                        child: Column(
+                          children: [
+                            AsterOptionRow(
+                              title: 'Currency',
+                              details:
+                                  settingsSnapshot?.selectedCurrency.code ??
+                                  (settings.hasError
+                                      ? 'Unavailable'
+                                      : 'Loading'),
+                              prefixIcon: MingCuteIcons.mgc_cash_line,
+                              hapticIntent: null,
+                              onTap: settingsEnabled && !navigation.inFlight
+                                  ? openNamed(
+                                      RouteNames.currencySelection,
+                                      'Currency selector could not open',
+                                    )
+                                  : null,
+                            ),
+                            const AsterDivider.inset(),
+                            AsterOptionRow(
+                              title: 'Bitcoin unit',
+                              details:
+                                  settingsSnapshot
+                                      ?.preferences
+                                      .bitcoinUnit
+                                      .label ??
+                                  (settings.hasError
+                                      ? 'Unavailable'
+                                      : 'Loading'),
+                              prefixIcon: MingCuteIcons.mgc_coin_2_line,
+                              hapticIntent: null,
+                              onTap: settingsEnabled && !navigation.inFlight
+                                  ? openNamed(
+                                      RouteNames.bitcoinUnitSelection,
+                                      'Bitcoin unit selector could not open',
+                                    )
+                                  : null,
+                            ),
+                            const AsterDivider.inset(),
+                            const AsterOptionRow(
+                              title: 'Language',
+                              details: 'English',
+                              prefixIcon: MingCuteIcons.mgc_translate_2_line,
+                            ),
+                            const AsterDivider.inset(),
+                            AsterOptionRow(
+                              title: 'Region',
+                              details:
+                                  settingsSnapshot?.selectedRegion.name ??
+                                  (settings.hasError
+                                      ? 'Unavailable'
+                                      : 'Loading'),
+                              prefixIcon: MingCuteIcons.mgc_world_2_line,
+                              hapticIntent: null,
+                              onTap: settingsEnabled && !navigation.inFlight
+                                  ? openNamed(
+                                      RouteNames.countrySelection,
+                                      'Region selector could not open',
+                                    )
+                                  : null,
+                            ),
+                            const AsterDivider.inset(),
+                            const AsterOptionRow(
+                              title: 'Notifications',
+                              details: 'Unavailable',
+                              prefixIcon: MingCuteIcons.mgc_bell_ringing_line,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (settingsFailure != null) ...[
+                    SizedBox(height: spacing.md),
+                    Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        settingsFailure.userMessage,
+                        style: type.errorMessage,
+                      ),
+                    ),
+                    if (settingsFailure.retryable) ...[
+                      SizedBox(height: spacing.sm),
+                      CustomButton(
+                        text: 'Retry settings',
+                        variant: ButtonVariant.secondary,
+                        onTap: () => ref
+                            .read(settingsViewModelProvider.notifier)
+                            .retry(),
+                      ),
+                    ],
+                  ],
+                  SizedBox(height: spacing.xxl),
+
+                  SettingsLinksCard(
+                    state: appInfo.value,
+                    loading: appInfo.isLoading,
+                    onOpen: (link) => unawaited(_openLink(context, ref, link)),
+                  ),
+                  SizedBox(height: spacing.xxxl),
+
+                  Center(
+                    child: SvgPicture.asset(
+                      'assets/brand/utexo-mark.svg',
+                      width: metrics.brandMarkSize,
+                      colorFilter: ColorFilter.mode(
+                        context.colorScheme.onSurface,
+                        BlendMode.srcIn,
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: spacing.xs),
+                  SettingsVersionFooter(
+                    appInfo: appInfo,
+                    onRetry: () {
+                      if (appInfo.value case final state?) {
+                        if (state.metadataLoading) return;
+                        unawaited(
+                          ref
+                              .read(settingsAppViewModelProvider.notifier)
+                              .retryMetadata(),
+                        );
+                        return;
+                      }
+                      ref.invalidate(settingsAppViewModelProvider);
+                    },
+                  ),
+                  SizedBox(
+                    height:
+                        context.windowInsets.bottomSystem +
+                        spacing.lg +
+                        metrics.floatingNavClearance,
                   ),
                 ],
               ),
             ),
-            SizedBox(height: spacing.xxl),
-
-            Text('App', style: type.sectionLabel),
-            SizedBox(height: spacing.md),
-            Semantics(
-              liveRegion: settings.isLoading,
-              label: settings.isLoading ? 'Loading app settings' : null,
-              excludeSemantics: settings.isLoading,
-              child: AppSkeletonizer(
-                enabled: settings.isLoading,
-                child: Squircle(
-                  padding: EdgeInsets.symmetric(vertical: spacing.xs),
-                  child: Column(
-                    children: [
-                      AsterOptionRow(
-                        title: 'Currency',
-                        details:
-                            settingsSnapshot?.selectedCurrency.code ??
-                            (settings.hasError ? 'Unavailable' : 'Loading'),
-                        prefixIcon: MingCuteIcons.mgc_cash_line,
-                        onTap: settingsEnabled
-                            ? () => context.pushNamed(
-                                RouteNames.currencySelection,
-                              )
-                            : null,
-                      ),
-                      const AsterDivider.inset(),
-                      AsterOptionRow(
-                        title: 'Bitcoin unit',
-                        details:
-                            settingsSnapshot?.preferences.bitcoinUnit.label ??
-                            (settings.hasError ? 'Unavailable' : 'Loading'),
-                        prefixIcon: MingCuteIcons.mgc_coin_2_line,
-                        onTap: settingsEnabled
-                            ? () => context.pushNamed(
-                                RouteNames.bitcoinUnitSelection,
-                              )
-                            : null,
-                      ),
-                      const AsterDivider.inset(),
-                      const AsterOptionRow(
-                        title: 'Language',
-                        details: 'English',
-                        prefixIcon: MingCuteIcons.mgc_translate_2_line,
-                      ),
-                      const AsterDivider.inset(),
-                      AsterOptionRow(
-                        title: 'Region',
-                        details:
-                            settingsSnapshot?.selectedRegion.name ??
-                            (settings.hasError ? 'Unavailable' : 'Loading'),
-                        prefixIcon: MingCuteIcons.mgc_world_2_line,
-                        onTap: settingsEnabled
-                            ? () =>
-                                  context.pushNamed(RouteNames.countrySelection)
-                            : null,
-                      ),
-                      const AsterDivider.inset(),
-                      const AsterOptionRow(
-                        title: 'Notifications',
-                        details: 'Unavailable',
-                        prefixIcon: MingCuteIcons.mgc_bell_ringing_line,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            if (settingsFailure != null) ...[
-              SizedBox(height: spacing.md),
-              Semantics(
-                liveRegion: true,
-                child: Text(
-                  settingsFailure.userMessage,
-                  style: type.errorMessage,
-                ),
-              ),
-              if (settingsFailure.retryable) ...[
-                SizedBox(height: spacing.sm),
-                CustomButton(
-                  text: 'Retry settings',
-                  variant: ButtonVariant.secondary,
-                  onTap: () =>
-                      ref.read(settingsViewModelProvider.notifier).retry(),
-                ),
-              ],
-            ],
-            SizedBox(height: spacing.xxl),
-
-            SettingsLinksCard(
-              state: appInfo.value,
-              loading: appInfo.isLoading,
-              onOpen: (link) => unawaited(_openLink(context, ref, link)),
-            ),
-            SizedBox(height: spacing.xxxl),
-
-            Center(
-              child: SvgPicture.asset(
-                'assets/brand/utexo-mark.svg',
-                width: metrics.brandMarkSize,
-                colorFilter: ColorFilter.mode(
-                  context.colorScheme.onSurface,
-                  BlendMode.srcIn,
-                ),
-              ),
-            ),
-            SizedBox(height: spacing.xs),
-            SettingsVersionFooter(
-              appInfo: appInfo,
-              onRetry: () {
-                if (appInfo.value case final state?) {
-                  if (state.metadataLoading) return;
-                  unawaited(
-                    ref
-                        .read(settingsAppViewModelProvider.notifier)
-                        .retryMetadata(),
-                  );
-                  return;
-                }
-                ref.invalidate(settingsAppViewModelProvider);
-              },
-            ),
-            SizedBox(
-              height:
-                  context.windowInsets.bottomSystem +
-                  spacing.lg +
-                  metrics.floatingNavClearance,
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

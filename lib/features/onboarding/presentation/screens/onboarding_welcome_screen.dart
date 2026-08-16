@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -10,9 +12,11 @@ class OnboardingWelcomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: context.appColors.transparentSurface,
-      body: const SafeArea(child: _OnboardingContent()),
+    return AsterNavigationScope(
+      child: Scaffold(
+        backgroundColor: context.appColors.transparentSurface,
+        body: const SafeArea(child: _OnboardingContent()),
+      ),
     );
   }
 }
@@ -24,6 +28,16 @@ class _OnboardingContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final spacing = context.spacing;
     final type = context.type;
+    final navigation = AsterNavigationScope.of(context);
+
+    void open(String location, String failureTitle) {
+      unawaited(
+        navigation.run(
+          command: () => context.push(location),
+          failureTitle: failureTitle,
+        ),
+      );
+    }
 
     return CustomScrollView(
       slivers: [
@@ -69,13 +83,22 @@ class _OnboardingContent extends StatelessWidget {
                 CustomButton(
                   text: 'Create Wallet',
                   variant: ButtonVariant.translucent,
-                  onTap: () => context.push(RoutePaths.onboardingCreateWallet),
+                  enabled: !navigation.inFlight,
+                  hapticIntent: null,
+                  onTap: () => open(
+                    RoutePaths.onboardingCreateWallet,
+                    'Wallet creation could not open',
+                  ),
                 ),
                 SizedBox(height: spacing.md),
                 OnboardingTextAction(
                   label: 'Import Wallet',
-                  onPressed: () =>
-                      context.push(RoutePaths.onboardingImportWallet),
+                  enabled: !navigation.inFlight,
+                  hapticIntent: null,
+                  onPressed: () => open(
+                    RoutePaths.onboardingImportWallet,
+                    'Wallet import could not open',
+                  ),
                 ),
               ],
             ),
