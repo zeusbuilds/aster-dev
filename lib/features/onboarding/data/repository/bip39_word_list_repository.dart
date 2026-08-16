@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
@@ -34,23 +33,12 @@ final class Bip39WordListRepository {
   final AssetBundle _assets;
   Future<AppResult<Bip39WordList>>? _loadRequest;
 
-  /// Returns one shared validated load. A failed load is not cached so an
-  /// explicit retry can recover from a transient asset read failure.
-  Future<AppResult<Bip39WordList>> load() {
-    final current = _loadRequest;
-    if (current != null) return current;
-    final request = _load();
-    _loadRequest = request;
-    unawaited(
-      request.then((result) {
-        if (result is AppFailureResult<Bip39WordList> &&
-            identical(_loadRequest, request)) {
-          _loadRequest = null;
-        }
-      }),
-    );
-    return request;
-  }
+  /// Returns one shared validated load for the immutable bundled vocabulary.
+  ///
+  /// A failure is retained for this repository lifetime because retrying cannot
+  /// repair bytes installed with the application. A new app process or build
+  /// creates a new repository and performs the integrity check again.
+  Future<AppResult<Bip39WordList>> load() => _loadRequest ??= _load();
 
   Future<AppResult<Bip39WordList>> _load() async {
     try {
@@ -69,10 +57,11 @@ final class Bip39WordListRepository {
     } catch (error, stackTrace) {
       return AppResult.failure(
         AppFailure(
-          code: 'bip39_word_list_unavailable',
+          code: 'bip39_word_list_invalid',
           kind: AppFailureKind.configuration,
-          userMessage: 'Recovery phrase validation is unavailable.',
-          retryable: true,
+          userMessage:
+              'Recovery phrase validation is unavailable in this build.',
+          retryable: false,
           cause: FailureMapper.diagnosticCause(error),
           stackTrace: stackTrace,
         ),

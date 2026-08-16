@@ -406,6 +406,57 @@ void main() {
     expect(find.text('https://explorer.example.com/regtest'), findsOneWidget);
   });
 
+  testWidgets('network health reports node response without inferring peers', (
+    tester,
+  ) async {
+    const configuration = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.regtest,
+      sdkNetwork: 'regtest',
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          networkConfigurationViewModelProvider.overrideWith(
+            () => _StaticNetworkConfigurationViewModel(
+              NetworkConfigurationState(
+                configuration: configuration,
+                status: WalletNetworkStatus(
+                  environment: BlockchainEnvironment.regtest,
+                  blockHeight: 42,
+                  nodePublicKey: _nodePublicKey,
+                  channelCount: 0,
+                  usableChannelCount: 0,
+                  peerCount: 0,
+                ),
+              ),
+            ),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const NetworkConfigurationScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(find.text('Responding'), 300);
+    await tester.pump();
+    final status = find.byWidgetPredicate(
+      (widget) =>
+          widget is Semantics &&
+          widget.properties.label == 'Status, Responding',
+    );
+    expect(status, findsOneWidget);
+    expect(tester.getSemantics(status).label, 'Status, Responding');
+    final peers = find.byWidgetPredicate(
+      (widget) => widget is Semantics && widget.properties.label == 'Peers, 0',
+    );
+    expect(peers, findsOneWidget);
+    expect(tester.getSemantics(peers).label, 'Peers, 0');
+    expect(find.text('Connected'), findsNothing);
+  });
+
   for (final retryable in [true, false]) {
     testWidgets('network load ${retryable ? 'shows' : 'hides'} retry', (
       tester,
@@ -780,6 +831,9 @@ final _walletProfile = WalletProfile(
   state: WalletProfileState.ready,
   storageToken: 'fedcba9876543210fedcba9876543210',
 );
+
+const _nodePublicKey =
+    '020000000000000000000000000000000000000000000000000000000000000000';
 
 Future<void> _pumpSettingsScreen(
   WidgetTester tester, {

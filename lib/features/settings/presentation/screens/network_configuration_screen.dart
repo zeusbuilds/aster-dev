@@ -90,7 +90,7 @@ class _NetworkConfigurationContent extends ConsumerWidget {
             children: [
               _ConfigurationRow(
                 label: 'Status',
-                value: status == null ? 'Unavailable' : 'Connected',
+                value: status == null ? 'Unavailable' : 'Responding',
                 valueColor: status == null
                     ? context.appColors.warning
                     : context.appColors.success,
@@ -184,6 +184,7 @@ class _ConfigurationRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
+      container: true,
       label: '$label, $value',
       excludeSemantics: true,
       child: Padding(

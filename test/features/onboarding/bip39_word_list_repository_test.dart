@@ -28,12 +28,17 @@ void main() {
       utf8.encode(source.replaceFirst('zoo', 'zap')),
     );
 
-    final result = await Bip39WordListRepository(bundle).load();
+    final repository = Bip39WordListRepository(bundle);
+    final result = await repository.load();
 
     expect(result, isA<AppFailureResult<Bip39WordList>>());
     final failure = (result as AppFailureResult<Bip39WordList>).failure;
-    expect(failure.code, 'bip39_word_list_unavailable');
+    expect(failure.code, 'bip39_word_list_invalid');
+    expect(failure.kind, AppFailureKind.configuration);
+    expect(failure.retryable, isFalse);
     expect(failure.userMessage, isNot(contains('zap')));
+    expect(await repository.load(), same(result));
+    expect(bundle.loadCount, 1);
   });
 
   test('shares a successful load across concurrent consumers', () async {

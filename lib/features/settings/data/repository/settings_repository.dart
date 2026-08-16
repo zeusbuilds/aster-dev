@@ -184,15 +184,23 @@ final class SettingsRepository {
   }
 
   Future<_SettingsCatalog> _loadCatalog() {
-    return _catalogFuture ??= _readCatalogWithFailureReset();
+    return _catalogFuture ??= _readCatalogSafely();
   }
 
-  Future<_SettingsCatalog> _readCatalogWithFailureReset() async {
+  Future<_SettingsCatalog> _readCatalogSafely() async {
     try {
       return await _readCatalog();
-    } catch (_) {
-      _catalogFuture = null;
-      rethrow;
+    } catch (error, stackTrace) {
+      throw AppFailureException(
+        AppFailure(
+          code: 'settings_catalog_invalid',
+          kind: AppFailureKind.configuration,
+          userMessage: 'App settings are unavailable in this build.',
+          retryable: false,
+          cause: FailureMapper.diagnosticCause(error),
+          stackTrace: stackTrace,
+        ),
+      );
     }
   }
 

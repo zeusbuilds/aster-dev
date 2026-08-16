@@ -92,7 +92,7 @@ void main() {
     expect(failure.cause.toString(), isNot(contains('mnemonic material')));
   });
 
-  test('preserves catalog failure origin and retries after failure', () async {
+  test('caches a terminal catalog failure with its original origin', () async {
     final preferences = PreferencesService(
       await SharedPreferences.getInstance(),
     );
@@ -106,16 +106,23 @@ void main() {
 
     expect(failed, isA<AppFailureResult<SettingsSnapshot>>());
     final failure = (failed as AppFailureResult<SettingsSnapshot>).failure;
+    expect(failure.code, 'settings_catalog_invalid');
+    expect(failure.kind, AppFailureKind.configuration);
+    expect(failure.retryable, isFalse);
     expect(
       failure.stackTrace.toString(),
       contains('_FailOnceCatalogAssetBundle.loadString'),
     );
     expect(assets.currencyLoadCount, 1);
 
-    final recovered = await repository.load();
+    final repeated = await repository.load();
 
-    expect(recovered, isA<AppSuccess<SettingsSnapshot>>());
-    expect(assets.currencyLoadCount, 2);
+    expect(repeated, isA<AppFailureResult<SettingsSnapshot>>());
+    expect(
+      (repeated as AppFailureResult<SettingsSnapshot>).failure,
+      same(failure),
+    );
+    expect(assets.currencyLoadCount, 1);
   });
 
   test('production catalogs satisfy repository invariants', () async {
