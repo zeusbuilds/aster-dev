@@ -25,6 +25,8 @@
           includeEmulator = false;
           includeSystemImages = false;
           includeSources = false;
+          includeNDK = true;
+          ndkVersions = [ "28.2.13676358" ];
         };
         androidSdk = androidComposition.androidsdk;
 

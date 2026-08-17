@@ -173,6 +173,7 @@ This project uses [Nix Flakes](https://nixos.wiki/wiki/Flakes) to pin the native
 development prerequisites. The environment includes:
 
 - Android SDK platform/build/platform tools 36
+- Android NDK 28.2.13676358, matching Flutter 3.47.0
 - Java JDK 21
 - CocoaPods (macOS only)
 

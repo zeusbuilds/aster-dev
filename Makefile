@@ -1,4 +1,4 @@
-.PHONY: shell bootstrap clean build watch run test ios-storage-test android-storage-test format format-check analyze docs verify verify-architecture verify-design-system verify-barrels verify-generated lint android-release-bundle android-release-apks verify-android-release-bundle verify-android-release-apks verify-android-apk-signature-policy fvm-setup help
+.PHONY: shell bootstrap clean build watch run test ios-storage-test android-storage-test format format-check analyze docs verify verify-toolchain verify-architecture verify-design-system verify-barrels verify-generated lint android-release-bundle android-release-apks verify-android-release-bundle verify-android-release-apks verify-android-apk-signature-policy fvm-setup help
 
 # Default target
 help:
@@ -18,6 +18,7 @@ help:
 	@echo "  make analyze   - Run static analysis"
 	@echo "  make docs      - Generate and validate Dart API documentation"
 	@echo "  make verify    - Verify repository policy and tracker inventory"
+	@echo "  make verify-toolchain - Verify Flutter, Android, Nix, and docs alignment"
 	@echo "  make verify-architecture - Verify dependency and adapter boundaries"
 	@echo "  make verify-design-system - Verify semantic UI design-system boundaries"
 	@echo "  make verify-barrels - Verify barrel-export boundaries"
@@ -97,6 +98,8 @@ docs:
 
 # Verify repository invariants that are not covered by the analyzer.
 verify:
+	@echo "Verifying toolchain alignment..."
+	fvm dart run tool/verify_toolchain.dart
 	@echo "Verifying architecture boundaries..."
 	fvm dart run tool/verify_architecture.dart
 	@echo "Verifying design-system boundaries..."
@@ -109,6 +112,10 @@ verify:
 verify-architecture:
 	@echo "Verifying architecture boundaries..."
 	fvm dart run tool/verify_architecture.dart
+
+verify-toolchain:
+	@echo "Verifying toolchain alignment..."
+	fvm dart run tool/verify_toolchain.dart
 
 verify-design-system:
 	@echo "Verifying design-system boundaries..."
