@@ -39,8 +39,9 @@ package_path() {
 
 readonly release_path_before="$(package_path "${release_package}")"
 
+fvm flutter pub get --enforce-lockfile
 set +e
-fvm flutter drive \
+fvm flutter drive --no-pub \
   --driver=test_driver/integration_test.dart \
   --target="${target}" \
   --keep-app-running \

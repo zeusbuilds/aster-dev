@@ -65,6 +65,7 @@ void main() {
       'flake.nix',
       'includeNDK = true;\n'
           'ndkVersions = [ "28.2.13676358" ];\n'
+          'platformToolsVersion = "36.0.0";\n'
           'buildToolsVersions = [ "36.0.0" ];\n'
           'platformVersions = [ "36" ];\n'
           'PATH="build-tools/36.0.0";',
@@ -78,7 +79,15 @@ void main() {
     _write(
       repository,
       '.github/workflows/dart.yml',
-      'flutter-version: "3.47.0"',
+      'flutter-version: "3.47.0"\n'
+          'run: flutter pub get --enforce-lockfile\n'
+          'run: flutter analyze --no-pub --fatal-warnings --fatal-infos\n'
+          'run: flutter test --no-pub',
+    );
+    _write(
+      repository,
+      'Makefile',
+      'dependencies:\n\tfvm flutter pub get --enforce-lockfile',
     );
     _write(
       repository,
@@ -90,7 +99,7 @@ void main() {
     _write(
       repository,
       'docs/DEVELOPMENT.md',
-      '- Android SDK platform 36, build tools 36.0.0, and platform tools\n'
+      '- Android SDK platform 36, build tools 36.0.0, and platform tools 36.0.0\n'
           '- Android NDK 28.2.13676358, matching Flutter\n'
           '- Gradle 9.3.1, Android Gradle Plugin 9.1.0, and Kotlin 2.4.0\n'
           '- Flutter 3.47.0 and Dart 3.13.0',
@@ -120,6 +129,7 @@ void main() {
     expect(result.flutterTargetSdk, 36);
     expect(result.flutterNdkVersion, '28.2.13676358');
     expect(result.androidBuildToolsVersion, '36.0.0');
+    expect(result.androidPlatformToolsVersion, '36.0.0');
   });
 
   test('rejects omitted NDK and divergent Nix revisions', () {
@@ -143,6 +153,7 @@ void main() {
         contains('exactly Flutter NDK 28.2.13676358'),
         contains('exactly Android build tools 36.0.0'),
         contains('exactly Android SDK platform 36'),
+        contains('Nix Android platform-tools version'),
       ]),
     );
   });
@@ -220,7 +231,10 @@ void main() {
     _write(
       repository,
       '.github/workflows/dart.yml',
-      'flutter-version: "3.46.0"',
+      'flutter-version: "3.46.0"\n'
+          'run: flutter pub get\n'
+          'run: flutter analyze --fatal-warnings --fatal-infos\n'
+          'run: flutter test',
     );
     _write(
       repository,
@@ -243,6 +257,9 @@ void main() {
         contains('.fvmrc Flutter version must be exactly 3.47.0'),
         contains('VS Code Flutter SDK path must be exactly'),
         contains('GitHub Actions Flutter version must be exactly 3.47.0'),
+        contains('must resolve the committed Pub lockfile'),
+        contains('analysis must not re-resolve dependencies'),
+        contains('tests must not re-resolve dependencies'),
         contains('must require Dart >=3.13.0 <4.0.0'),
         contains('must require Flutter >=3.47.0'),
       ]),
@@ -282,6 +299,24 @@ void main() {
     expect(
       result.failures,
       contains('Android build tools 35.0.0 must match compile SDK 36.'),
+    );
+  });
+
+  test('rejects unpinned Make dependency resolution', () {
+    _write(repository, 'Makefile', 'dependencies:\n\tfvm flutter pub get');
+
+    final result = _verify(
+      repository,
+      flutterVersionMetadata,
+      flutterExtension,
+      flutterGradleUtils,
+    );
+
+    expect(
+      result.failures,
+      contains(
+        'Makefile dependency setup must enforce the committed Pub lockfile.',
+      ),
     );
   });
 

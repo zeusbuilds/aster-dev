@@ -52,7 +52,6 @@ void main() {
       'build-tools/36.0.0/apksigner',
       'build-tools/36.0.0/aapt2',
       'build-tools/36.0.0/zipalign',
-      'platform-tools/adb',
     ]) {
       _executable(androidSdk, path);
     }

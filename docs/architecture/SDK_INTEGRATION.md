@@ -33,10 +33,12 @@ dependency_overrides:
     path: ../rgb-sdk-flutter
 ```
 
-Run `fvm flutter pub get` after adding or removing the file. Before release
-evidence, remove it, resolve dependencies again, and confirm that
-`pubspec.lock` contains the immutable Git `resolved-ref` above. The override is
-ignored by Git and is never supported for candidate evidence.
+Run `fvm flutter pub get` after adding or removing the file. Normal Make
+commands consume that resolved development graph without invoking Pub again.
+Before lint, integration, or release evidence, remove the override, run
+`make dependencies`, and confirm that `pubspec.lock` contains the immutable Git
+`resolved-ref` above. The override is ignored by Git and is never supported for
+candidate evidence.
 
 ## Ownership Boundary
 

@@ -1,9 +1,10 @@
-.PHONY: shell bootstrap clean build watch run test ios-storage-test android-storage-test format format-check analyze docs verify verify-toolchain verify-architecture verify-design-system verify-barrels verify-generated lint android-release-bundle android-release-apks verify-android-release-bundle verify-android-release-apks verify-android-apk-signature-policy fvm-setup help
+.PHONY: shell dependencies bootstrap clean build watch run test ios-storage-test android-storage-test format format-check analyze docs verify verify-toolchain verify-architecture verify-design-system verify-barrels verify-generated lint android-release-bundle android-release-apks verify-android-release-bundle verify-android-release-apks verify-android-apk-signature-policy fvm-setup help
 
 # Default target
 help:
 	@echo "Available commands:"
 	@echo "  make shell     - Enter Nix development environment"
+	@echo "  make dependencies - Resolve the exact committed Pub lockfile"
 	@echo "  make fvm-setup - Install/use Flutter via FVM for this project"
 	@echo "  make bootstrap - Initial project setup (clean, pub get, build_runner)"
 	@echo "  make clean     - Clean Flutter build artifacts"
@@ -35,10 +36,14 @@ shell:
 	@echo "Entering Nix development environment..."
 	nix develop --experimental-features 'nix-command flakes'
 
+# Resolve only the dependency graph committed by the repository.
+dependencies:
+	fvm flutter pub get --enforce-lockfile
+
 # Initial project setup
 bootstrap: clean
 	@echo "Setting up project..."
-	fvm flutter pub get
+	@$(MAKE) --no-print-directory dependencies
 	@echo "Running build_runner..."
 	fvm dart run build_runner build
 	@echo "Setup complete!"
@@ -61,12 +66,12 @@ watch:
 # Run Flutter app
 run:
 	@echo "Running Flutter app..."
-	fvm flutter run
+	fvm flutter run --no-pub
 
 # Run Flutter tests
 test:
 	@echo "Running Flutter tests..."
-	fvm flutter test
+	fvm flutter test --no-pub
 
 # Flutter integration tests temporarily rewrite ignored iOS build settings to a
 # disposable listener target. The wrapper restores lib/main.dart on every exit.
@@ -89,7 +94,7 @@ format-check:
 # Run static analysis with all diagnostics fatal.
 analyze:
 	@echo "Running static analysis..."
-	fvm flutter analyze --fatal-warnings --fatal-infos
+	fvm flutter analyze --no-pub --fatal-warnings --fatal-infos
 
 # Generate docs into a disposable directory and fail on warnings or bad links.
 docs:
@@ -131,28 +136,28 @@ verify-generated:
 	fvm dart run build_runner build
 
 # Quality checks suitable for pre-commit and CI.
-lint: format-check verify-generated analyze docs verify
+lint: dependencies format-check verify-generated analyze docs verify
 
 # Google Play performs device-specific delivery from this bundle. Signing and
 # application identity still have to be supplied by the release owner.
-android-release-bundle:
-	fvm flutter build appbundle --release
+android-release-bundle: dependencies
+	fvm flutter build appbundle --release --no-pub
 	./scripts/verify-android-release-bundle.sh
 
 # The pinned wallet SDK AAR contains multiple native ABIs. Direct APK delivery
 # must therefore use Flutter's ABI splits; --target-platform alone does not
 # remove foreign JNI libraries from transitive Android archives.
-android-release-apks:
-	fvm flutter build apk --release --split-per-abi
+android-release-apks: dependencies
+	fvm flutter build apk --release --split-per-abi --no-pub
 	./scripts/verify-android-release-apks.sh
 
-verify-android-release-bundle:
+verify-android-release-bundle: dependencies
 	./scripts/verify-android-release-bundle.sh
 
-verify-android-release-apks:
+verify-android-release-apks: dependencies
 	./scripts/verify-android-release-apks.sh
 
-verify-android-apk-signature-policy:
+verify-android-apk-signature-policy: dependencies
 	./scripts/test-android-apk-signature-policy.sh
 
 # One-time FVM setup for this project

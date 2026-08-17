@@ -15,7 +15,6 @@ final class AndroidArtifactToolchain {
     required this.aapt2,
     required this.zipalign,
     required this.llvmReadelf,
-    required this.adb,
   });
 
   final String agpVersion;
@@ -29,7 +28,6 @@ final class AndroidArtifactToolchain {
   final File aapt2;
   final File zipalign;
   final File llvmReadelf;
-  final File adb;
 }
 
 /// Result of resolving one release-verification toolchain.
@@ -174,12 +172,6 @@ AndroidArtifactToolchainResolution resolveAndroidArtifactToolchain({
       failures,
     );
   }
-  final adb = _requiredExecutable(
-    File('${androidSdkRoot.absolute.path}/platform-tools/adb'),
-    'Android adb',
-    failures,
-  );
-
   failures.sort();
   if (failures.isNotEmpty ||
       agpVersion == null ||
@@ -192,8 +184,7 @@ AndroidArtifactToolchainResolution resolveAndroidArtifactToolchain({
       apksigner == null ||
       aapt2 == null ||
       zipalign == null ||
-      llvmReadelf == null ||
-      adb == null) {
+      llvmReadelf == null) {
     return AndroidArtifactToolchainResolution(
       toolchain: null,
       failures: List.unmodifiable(failures),
@@ -213,7 +204,6 @@ AndroidArtifactToolchainResolution resolveAndroidArtifactToolchain({
       aapt2: aapt2,
       zipalign: zipalign,
       llvmReadelf: llvmReadelf,
-      adb: adb,
     ),
     failures: const [],
   );
@@ -261,7 +251,6 @@ void main() {
   _emit('UTEXO_AAPT2', toolchain.aapt2.path);
   _emit('UTEXO_ZIPALIGN', toolchain.zipalign.path);
   _emit('UTEXO_LLVM_READELF', toolchain.llvmReadelf.path);
-  _emit('UTEXO_ADB', toolchain.adb.path);
 }
 
 Map<String, Object?>? _agpModuleMetadata(

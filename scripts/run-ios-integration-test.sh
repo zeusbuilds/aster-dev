@@ -30,12 +30,14 @@ bundle_path() {
 
 readonly release_path_before="$(bundle_path "${release_bundle}")"
 
+fvm flutter pub get --enforce-lockfile
+
 restore_flutter_target() {
   local test_status=$?
   local restore_status
   trap - EXIT
   set +e
-  fvm flutter build ios --simulator --debug --config-only
+  fvm flutter build ios --simulator --debug --config-only --no-pub
   restore_status=$?
   set -e
 
@@ -50,7 +52,7 @@ restore_flutter_target() {
 }
 
 trap restore_flutter_target EXIT
-fvm flutter test "${target}" -d "${simulator_id}"
+fvm flutter test --no-pub "${target}" -d "${simulator_id}"
 
 readonly release_path_after="$(bundle_path "${release_bundle}")"
 [[ "${release_path_after}" == "${release_path_before}" ]] ||

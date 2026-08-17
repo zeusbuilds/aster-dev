@@ -7,8 +7,7 @@ utexo_resolve_android_artifact_toolchain() {
     -n "${UTEXO_APKSIGNER:-}" &&
     -n "${UTEXO_AAPT2:-}" &&
     -n "${UTEXO_ZIPALIGN:-}" &&
-    -n "${UTEXO_LLVM_READELF:-}" &&
-    -n "${UTEXO_ADB:-}" ]]; then
+    -n "${UTEXO_LLVM_READELF:-}" ]]; then
     return 0
   fi
 
@@ -31,8 +30,7 @@ utexo_resolve_android_artifact_toolchain() {
     UTEXO_APKSIGNER \
     UTEXO_AAPT2 \
     UTEXO_ZIPALIGN \
-    UTEXO_LLVM_READELF \
-    UTEXO_ADB; do
+    UTEXO_LLVM_READELF; do
     line="$(printf '%s\n' "${output}" | grep -E "^${key}=" || true)"
     if [[ -z "${line}" || "${line}" == *$'\n'* ]]; then
       printf 'Android artifact toolchain resolution failed for %s.\n' \

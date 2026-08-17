@@ -14,6 +14,7 @@ final class ToolchainVerification {
     required this.flutterTargetSdk,
     required this.flutterNdkVersion,
     required this.androidBuildToolsVersion,
+    required this.androidPlatformToolsVersion,
     required this.failures,
   });
 
@@ -46,6 +47,9 @@ final class ToolchainVerification {
 
   /// Android build-tools revision pinned by the application and Nix shell.
   final String? androidBuildToolsVersion;
+
+  /// Android platform-tools revision pinned by the reproducible Nix shell.
+  final String? androidPlatformToolsVersion;
 
   /// Deterministically ordered missing or divergent toolchain declarations.
   final List<String> failures;
@@ -83,7 +87,8 @@ void main() {
     'Dart ${result.dartVersion}, Gradle ${result.flutterGradleVersion}, '
     'AGP ${result.flutterAgpVersion}, Kotlin ${result.flutterKotlinVersion}, '
     'Android SDK ${result.flutterCompileSdk}, build tools '
-    '${result.androidBuildToolsVersion}, and NDK '
+    '${result.androidBuildToolsVersion}, platform tools '
+    '${result.androidPlatformToolsVersion}, and NDK '
     '${result.flutterNdkVersion}.',
   );
 }
@@ -262,6 +267,7 @@ ToolchainVerification verifyToolchain({
   }
 
   final flake = _readRequired(File('$root/flake.nix'), 'flake.nix', failures);
+  String? platformToolsVersion;
   if (flake != null) {
     if (!RegExp(r'\bincludeNDK\s*=\s*true\s*;').hasMatch(flake)) {
       failures.add('flake.nix must include the Android NDK.');
@@ -287,6 +293,12 @@ ToolchainVerification verifyToolchain({
       expected: compileSdk?.toString(),
       label: 'Android SDK platform',
       failures: failures,
+    );
+    platformToolsVersion = _readSingleCapture(
+      flake,
+      RegExp(r'\bplatformToolsVersion\s*=\s*"([0-9]+\.[0-9]+\.[0-9]+)"'),
+      'Nix Android platform-tools version',
+      failures,
     );
     if (buildToolsVersion != null &&
         !flake.contains('build-tools/$buildToolsVersion')) {
@@ -329,6 +341,42 @@ ToolchainVerification verifyToolchain({
       RegExp(r'\bflutter-version:\s*"([^"]+)"'),
       flutterVersion,
       'GitHub Actions Flutter version',
+      failures,
+    );
+  }
+  if (workflow != null) {
+    _requireSinglePattern(
+      workflow,
+      RegExp(
+        r'^\s*run:\s*flutter pub get --enforce-lockfile\s*$',
+        multiLine: true,
+      ),
+      'GitHub Actions must resolve the committed Pub lockfile exactly once.',
+      failures,
+    );
+    _requireSinglePattern(
+      workflow,
+      RegExp(r'^\s*run:\s*flutter analyze --no-pub\b', multiLine: true),
+      'GitHub Actions analysis must not re-resolve dependencies.',
+      failures,
+    );
+    _requireSinglePattern(
+      workflow,
+      RegExp(r'^\s*run:\s*flutter test --no-pub\s*$', multiLine: true),
+      'GitHub Actions tests must not re-resolve dependencies.',
+      failures,
+    );
+  }
+
+  final makefile = _readRequired(File('$root/Makefile'), 'Makefile', failures);
+  if (makefile != null) {
+    _requireSinglePattern(
+      makefile,
+      RegExp(
+        r'^\s*fvm flutter pub get --enforce-lockfile\s*$',
+        multiLine: true,
+      ),
+      'Makefile dependency setup must enforce the committed Pub lockfile.',
       failures,
     );
   }
@@ -386,9 +434,10 @@ ToolchainVerification verifyToolchain({
   if (development != null &&
       compileSdk != null &&
       buildToolsVersion != null &&
+      platformToolsVersion != null &&
       !development.contains(
         'Android SDK platform $compileSdk, build tools $buildToolsVersion, '
-        'and platform tools',
+        'and platform tools $platformToolsVersion',
       )) {
     failures.add(
       'docs/DEVELOPMENT.md must document the Android SDK/build-tools chain.',
@@ -415,6 +464,7 @@ ToolchainVerification verifyToolchain({
     flutterTargetSdk: targetSdk,
     flutterNdkVersion: ndkVersion,
     androidBuildToolsVersion: buildToolsVersion,
+    androidPlatformToolsVersion: platformToolsVersion,
     failures: List.unmodifiable(failures),
   );
 }
