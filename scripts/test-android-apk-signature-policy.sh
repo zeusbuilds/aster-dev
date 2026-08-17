@@ -2,6 +2,10 @@
 
 set -euo pipefail
 
+readonly root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${root}/scripts/android-artifact-toolchain.sh"
+utexo_resolve_android_artifact_toolchain
+
 readonly source_apk="${1:-build/app/outputs/flutter-apk/app-debug.apk}"
 readonly debug_keystore="${ANDROID_TEST_KEYSTORE:-${HOME}/.android/debug.keystore}"
 
@@ -13,18 +17,7 @@ fail() {
 [[ -f "${source_apk}" ]] || fail "missing source APK: ${source_apk}"
 [[ -f "${debug_keystore}" ]] || fail "missing disposable test keystore"
 command -v keytool >/dev/null 2>&1 || fail "keytool is required"
-
-sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
-if [[ -z "${sdk_root}" && -f android/local.properties ]]; then
-  sdk_root="$(sed -n 's/^sdk\.dir=//p' android/local.properties | tail -n 1)"
-fi
-readonly sdk_root
-readonly apksigner="$({
-  find "${sdk_root}/build-tools" -type f -name apksigner -print 2>/dev/null |
-    LC_ALL=C sort |
-    tail -n 1
-})"
-[[ -x "${apksigner}" ]] || fail "apksigner is required"
+readonly apksigner="${UTEXO_APKSIGNER}"
 
 readonly fixtures="$(mktemp -d "${TMPDIR:-/tmp}/utexo-apk-signatures.XXXXXX")"
 trap 'rm -rf "${fixtures}"' EXIT

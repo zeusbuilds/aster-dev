@@ -172,7 +172,7 @@ make bootstrap
 This project uses [Nix Flakes](https://nixos.wiki/wiki/Flakes) to pin the native
 development prerequisites. The environment includes:
 
-- Android SDK platform/build/platform tools 36
+- Android SDK platform 36, build tools 36.0.0, and platform tools
 - Android NDK 28.2.13676358, matching Flutter 3.47.0
 - Gradle 9.3.1, Android Gradle Plugin 9.1.0, and Kotlin 2.4.0
 - Java JDK 21

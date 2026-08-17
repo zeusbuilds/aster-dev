@@ -62,13 +62,10 @@ readonly release_path_after="$(package_path "${release_package}")"
 
 readonly apk="build/app/outputs/flutter-apk/app-debug.apk"
 [[ -f "${apk}" ]] || fail "Flutter did not produce ${apk}"
-readonly aapt2="$({
-  find "${sdk_root}/build-tools" -type f -name aapt2 -print 2>/dev/null |
-    LC_ALL=C sort |
-    tail -n 1
-})"
-[[ -x "${aapt2}" ]] || fail "Android aapt2 is unavailable"
-readonly built_package="$(${aapt2} dump packagename "${apk}")"
+source "${root}/scripts/android-artifact-toolchain.sh"
+utexo_resolve_android_artifact_toolchain ||
+  fail "the exact Android artifact toolchain is unavailable"
+readonly built_package="$("${UTEXO_AAPT2}" dump packagename "${apk}")"
 [[ "${built_package}" == "${test_package}" ]] ||
   fail "debug APK uses ${built_package}, expected ${test_package}"
 

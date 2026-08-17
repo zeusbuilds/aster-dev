@@ -2,6 +2,10 @@
 
 set -euo pipefail
 
+readonly root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${root}/scripts/android-artifact-toolchain.sh"
+utexo_resolve_android_artifact_toolchain
+
 readonly bundle_path="${1:-build/app/outputs/bundle/release/app-release.aab}"
 readonly expected_certificate_sha256="${UTEXO_RELEASE_CERT_SHA256:-}"
 
@@ -35,24 +39,7 @@ for abi in arm64-v8a armeabi-v7a x86_64; do
   done
 done
 
-readonly gradle_cache="${GRADLE_USER_HOME:-${HOME}/.gradle}/caches/modules-2/files-2.1"
-readonly bundletool_jar="$({
-  find "${gradle_cache}/com.android.tools.build/bundletool/1.18.3" \
-    -name 'bundletool-1.18.3.jar' -print 2>/dev/null |
-    LC_ALL=C sort |
-    tail -n 1
-})"
-readonly protobuf_jar="$({
-  find "${gradle_cache}/com.google.protobuf/protobuf-java/3.22.3" \
-    -name 'protobuf-java-3.22.3.jar' -print 2>/dev/null |
-    LC_ALL=C sort |
-    tail -n 1
-})"
-[[ -f "${bundletool_jar}" ]] ||
-  fail "AGP-resolved bundletool 1.18.3 is required"
-[[ -f "${protobuf_jar}" ]] ||
-  fail "bundletool's protobuf-java 3.22.3 runtime is required"
-java --class-path "${bundletool_jar}:${protobuf_jar}" \
+java --class-path "${UTEXO_BUNDLETOOL_JAR}:${UTEXO_PROTOBUF_JAR}" \
   scripts/BundleConfigInspector.java "${bundle_path}" ||
   fail "${bundle_path} does not request 16 KiB native-library page alignment"
 

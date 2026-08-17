@@ -2,6 +2,10 @@
 
 set -euo pipefail
 
+readonly root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${root}/scripts/android-artifact-toolchain.sh"
+utexo_resolve_android_artifact_toolchain
+
 readonly archive_path="${1:-}"
 readonly native_root="${2:-}"
 readonly archive_kind="${3:-}"
@@ -17,51 +21,10 @@ fail() {
   fail "archive kind must be apk or aab"
 [[ -f "${archive_path}" ]] || fail "missing ${archive_path}"
 command -v unzip >/dev/null 2>&1 || fail "unzip is required"
-
-find_android_sdk_root() {
-  local sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
-  if [[ -z "${sdk_root}" && -f android/local.properties ]]; then
-    sdk_root="$(sed -n 's/^sdk\.dir=//p' android/local.properties | tail -n 1)"
-  fi
-  printf '%s' "${sdk_root}"
-}
-
-find_sdk_tool() {
-  local root_path="$1"
-  local tool_name="$2"
-  local tool_path
-
-  tool_path="$({
-    find "${root_path}/build-tools" -name "${tool_name}" -print 2>/dev/null |
-      LC_ALL=C sort |
-      tail -n 1
-  })"
-  [[ -n "${tool_path}" && -x "${tool_path}" ]] ||
-    fail "Android SDK ${tool_name} is required"
-  printf '%s' "${tool_path}"
-}
-
-find_readelf() {
-  local root_path="$1"
-  local readelf_path
-
-  readelf_path="$({
-    find "${root_path}/ndk" -name llvm-readelf -print 2>/dev/null |
-      LC_ALL=C sort |
-      tail -n 1
-  })"
-  [[ -n "${readelf_path}" && -x "${readelf_path}" ]] ||
-    fail "Android NDK llvm-readelf is required"
-  printf '%s' "${readelf_path}"
-}
-
-readonly sdk_root="$(find_android_sdk_root)"
-[[ -n "${sdk_root}" && -d "${sdk_root}" ]] ||
-  fail "ANDROID_SDK_ROOT, ANDROID_HOME, or android/local.properties is required"
-readonly readelf_bin="$(find_readelf "${sdk_root}")"
+readonly readelf_bin="${UTEXO_LLVM_READELF}"
 
 if [[ "${archive_kind}" == "apk" ]]; then
-  readonly zipalign_bin="$(find_sdk_tool "${sdk_root}" zipalign)"
+  readonly zipalign_bin="${UTEXO_ZIPALIGN}"
   "${zipalign_bin}" -c -P 16 4 "${archive_path}" >/dev/null ||
     fail "${archive_path} does not use 16 KiB APK alignment"
   printf 'Verified %s uses 16 KiB APK alignment\n' "${archive_path}"

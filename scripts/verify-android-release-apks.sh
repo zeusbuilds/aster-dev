@@ -2,6 +2,10 @@
 
 set -euo pipefail
 
+readonly root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${root}/scripts/android-artifact-toolchain.sh"
+utexo_resolve_android_artifact_toolchain
+
 readonly output_dir="${1:-build/app/outputs/flutter-apk}"
 
 fail() {

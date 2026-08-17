@@ -2,6 +2,10 @@
 
 set -euo pipefail
 
+readonly root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${root}/scripts/android-artifact-toolchain.sh"
+utexo_resolve_android_artifact_toolchain
+
 readonly apk_path="${1:-}"
 readonly expected_certificate_sha256="${UTEXO_RELEASE_CERT_SHA256:-}"
 
@@ -14,29 +18,11 @@ fail() {
   fail "pass an existing APK path"
 command -v unzip >/dev/null 2>&1 || fail "unzip is required"
 
-find_apksigner() {
-  if command -v apksigner >/dev/null 2>&1; then
-    command -v apksigner
-    return
-  fi
-
-  local sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
-  if [[ -z "${sdk_root}" && -f android/local.properties ]]; then
-    sdk_root="$(sed -n 's/^sdk\.dir=//p' android/local.properties | tail -n 1)"
-  fi
-  if [[ -n "${sdk_root}" ]]; then
-    find "${sdk_root}/build-tools" -type f -name apksigner -print 2>/dev/null |
-      LC_ALL=C sort |
-      tail -n 1
-  fi
-}
-
 normalize_digest() {
   printf '%s' "$1" | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]'
 }
 
-readonly apksigner="$(find_apksigner)"
-[[ -n "${apksigner}" && -x "${apksigner}" ]] || fail "apksigner is required"
+readonly apksigner="${UTEXO_APKSIGNER}"
 
 archive_entries="$(unzip -Z1 "${apk_path}")" ||
   fail "could not inspect ${apk_path}"
@@ -65,7 +51,7 @@ fi
 actual_digest="$({
   printf '%s\n' "${signature_output}" |
     sed -nE \
-      's/^(Signer #[0-9]+|V[0-9.]+ Signer): certificate SHA-256 digest: (.*)$/\2/p'
+      's/^(Signer #[0-9]+|V[0-9.]+ Signer):?[[:space:]]+certificate SHA-256 digest: (.*)$/\2/p'
 })"
 [[ -n "${actual_digest}" && "${actual_digest}" != *$'\n'* ]] ||
   fail "${apk_path} must have exactly one inspectable signing certificate"

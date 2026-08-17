@@ -1,14 +1,27 @@
+import 'dart:convert';
 import 'dart:io';
 
 /// Result of checking the repository's cross-toolchain version contract.
 final class ToolchainVerification {
   const ToolchainVerification({
+    required this.flutterVersion,
+    required this.dartVersion,
     required this.flutterGradleVersion,
     required this.flutterAgpVersion,
     required this.flutterKotlinVersion,
+    required this.flutterCompileSdk,
+    required this.flutterMinSdk,
+    required this.flutterTargetSdk,
     required this.flutterNdkVersion,
+    required this.androidBuildToolsVersion,
     required this.failures,
   });
+
+  /// Flutter framework revision represented by the executing SDK.
+  final String? flutterVersion;
+
+  /// Dart SDK revision bundled with the executing Flutter SDK.
+  final String? dartVersion;
 
   /// Gradle wrapper revision declared by the Flutter project template.
   final String? flutterGradleVersion;
@@ -19,8 +32,20 @@ final class ToolchainVerification {
   /// Kotlin Gradle Plugin revision declared by the Flutter project template.
   final String? flutterKotlinVersion;
 
+  /// Android compile SDK declared by the Flutter Gradle extension.
+  final int? flutterCompileSdk;
+
+  /// Android minimum SDK declared by the Flutter Gradle extension.
+  final int? flutterMinSdk;
+
+  /// Android target SDK declared by the Flutter Gradle extension.
+  final int? flutterTargetSdk;
+
   /// NDK revision declared by the Flutter SDK, when it could be resolved.
   final String? flutterNdkVersion;
+
+  /// Android build-tools revision pinned by the application and Nix shell.
+  final String? androidBuildToolsVersion;
 
   /// Deterministically ordered missing or divergent toolchain declarations.
   final List<String> failures;
@@ -31,12 +56,16 @@ final class ToolchainVerification {
 
 /// Verifies the checked-out repository against the Dart executable's Flutter SDK.
 void main() {
+  final flutterVersionMetadata = _locateFlutterVersionMetadata(
+    Platform.resolvedExecutable,
+  );
   final flutterExtension = _locateFlutterExtension(Platform.resolvedExecutable);
   final flutterGradleUtils = _locateFlutterGradleUtils(
     Platform.resolvedExecutable,
   );
   final result = verifyToolchain(
     repositoryRoot: Directory.current,
+    flutterVersionMetadata: flutterVersionMetadata,
     flutterExtension: flutterExtension,
     flutterGradleUtils: flutterGradleUtils,
   );
@@ -50,23 +79,44 @@ void main() {
   }
 
   stdout.writeln(
-    'Toolchain policy verified for Gradle ${result.flutterGradleVersion}, '
+    'Toolchain policy verified for Flutter ${result.flutterVersion}, '
+    'Dart ${result.dartVersion}, Gradle ${result.flutterGradleVersion}, '
     'AGP ${result.flutterAgpVersion}, Kotlin ${result.flutterKotlinVersion}, '
-    'and NDK ${result.flutterNdkVersion}.',
+    'Android SDK ${result.flutterCompileSdk}, build tools '
+    '${result.androidBuildToolsVersion}, and NDK '
+    '${result.flutterNdkVersion}.',
   );
 }
 
-/// Checks Android, Nix, and documentation against Flutter's NDK declaration.
+/// Checks every owned toolchain surface against the executing Flutter SDK.
 ///
-/// [flutterExtension] is injectable so the fail-closed policy can be tested
-/// without depending on a globally installed Flutter checkout. The same is
-/// true of [flutterGradleUtils], which owns Flutter's Android template pins.
+/// Flutter-owned files are injectable so the fail-closed policy can be tested
+/// without depending on a globally installed Flutter checkout.
 ToolchainVerification verifyToolchain({
   required Directory repositoryRoot,
+  required File? flutterVersionMetadata,
   required File? flutterExtension,
   required File? flutterGradleUtils,
 }) {
   final failures = <String>[];
+  final versionMetadata = _readJsonObject(
+    flutterVersionMetadata,
+    'Flutter version metadata',
+    failures,
+  );
+  final flutterVersion = _readJsonString(
+    versionMetadata,
+    'flutterVersion',
+    'Flutter framework version',
+    failures,
+  );
+  final dartVersion = _readJsonString(
+    versionMetadata,
+    'dartSdkVersion',
+    'Flutter-bundled Dart version',
+    failures,
+  );
+
   final extensionContents = _readRequired(
     flutterExtension,
     'Flutter Gradle extension',
@@ -82,6 +132,24 @@ ToolchainVerification verifyToolchain({
       'Flutter Gradle extension does not expose an inspectable ndkVersion.',
     );
   }
+  final compileSdk = _readKotlinIntProperty(
+    extensionContents,
+    'compileSdkVersion',
+    'Flutter compile SDK',
+    failures,
+  );
+  final minSdk = _readKotlinIntProperty(
+    extensionContents,
+    'minSdkVersion',
+    'Flutter minimum SDK',
+    failures,
+  );
+  final targetSdk = _readKotlinIntProperty(
+    extensionContents,
+    'targetSdkVersion',
+    'Flutter target SDK',
+    failures,
+  );
 
   final gradleUtilsContents = _readRequired(
     flutterGradleUtils,
@@ -113,11 +181,46 @@ ToolchainVerification verifyToolchain({
     'android/app/build.gradle.kts',
     failures,
   );
-  if (android != null &&
-      !RegExp(r'\bndkVersion\s*=\s*flutter\.ndkVersion\b').hasMatch(android)) {
-    failures.add(
-      'android/app/build.gradle.kts must delegate ndkVersion to Flutter.',
+  String? buildToolsVersion;
+  if (android != null) {
+    _requireSinglePattern(
+      android,
+      RegExp(r'\bcompileSdk\s*=\s*flutter\.compileSdkVersion\b'),
+      'android/app/build.gradle.kts must delegate compileSdk to Flutter.',
+      failures,
     );
+    _requireSinglePattern(
+      android,
+      RegExp(r'\bminSdk\s*=\s*flutter\.minSdkVersion\b'),
+      'android/app/build.gradle.kts must delegate minSdk to Flutter.',
+      failures,
+    );
+    _requireSinglePattern(
+      android,
+      RegExp(r'\btargetSdk\s*=\s*flutter\.targetSdkVersion\b'),
+      'android/app/build.gradle.kts must delegate targetSdk to Flutter.',
+      failures,
+    );
+    _requireSinglePattern(
+      android,
+      RegExp(r'\bndkVersion\s*=\s*flutter\.ndkVersion\b'),
+      'android/app/build.gradle.kts must delegate ndkVersion to Flutter.',
+      failures,
+    );
+    buildToolsVersion = _readSingleCapture(
+      android,
+      RegExp(r'\bbuildToolsVersion\s*=\s*"([0-9]+\.[0-9]+\.[0-9]+)"'),
+      'Android build-tools version',
+      failures,
+    );
+    if (compileSdk != null &&
+        buildToolsVersion != null &&
+        buildToolsVersion.split('.').first != compileSdk.toString()) {
+      failures.add(
+        'Android build tools $buildToolsVersion must match compile SDK '
+        '$compileSdk.',
+      );
+    }
   }
 
   final settings = _readRequired(
@@ -171,6 +274,91 @@ ToolchainVerification verifyToolchain({
             declaredVersions.single != ndkVersion)) {
       failures.add('flake.nix must declare exactly Flutter NDK $ndkVersion.');
     }
+    _requireNixVersionList(
+      flake,
+      property: 'buildToolsVersions',
+      expected: buildToolsVersion,
+      label: 'Android build tools',
+      failures: failures,
+    );
+    _requireNixVersionList(
+      flake,
+      property: 'platformVersions',
+      expected: compileSdk?.toString(),
+      label: 'Android SDK platform',
+      failures: failures,
+    );
+    if (buildToolsVersion != null &&
+        !flake.contains('build-tools/$buildToolsVersion')) {
+      failures.add(
+        'flake.nix PATH must expose Android build tools $buildToolsVersion.',
+      );
+    }
+  }
+
+  final fvm = _readJsonObject(File('$root/.fvmrc'), '.fvmrc', failures);
+  _requireJsonValue(
+    fvm,
+    key: 'flutter',
+    expected: flutterVersion,
+    label: '.fvmrc Flutter version',
+    failures: failures,
+  );
+
+  final vscode = _readJsonObject(
+    File('$root/.vscode/settings.json'),
+    '.vscode/settings.json',
+    failures,
+  );
+  _requireJsonValue(
+    vscode,
+    key: 'dart.flutterSdkPath',
+    expected: flutterVersion == null ? null : '.fvm/versions/$flutterVersion',
+    label: 'VS Code Flutter SDK path',
+    failures: failures,
+  );
+
+  final workflow = _readRequired(
+    File('$root/.github/workflows/dart.yml'),
+    '.github/workflows/dart.yml',
+    failures,
+  );
+  if (workflow != null && flutterVersion != null) {
+    _requireSingleCapturedValue(
+      workflow,
+      RegExp(r'\bflutter-version:\s*"([^"]+)"'),
+      flutterVersion,
+      'GitHub Actions Flutter version',
+      failures,
+    );
+  }
+
+  final pubspec = _readRequired(
+    File('$root/pubspec.yaml'),
+    'pubspec.yaml',
+    failures,
+  );
+  if (pubspec != null && dartVersion != null) {
+    _requireSinglePattern(
+      pubspec,
+      RegExp(
+        '^  sdk: ">=${RegExp.escape(dartVersion)} <4\\.0\\.0"\\s*\$',
+        multiLine: true,
+      ),
+      'pubspec.yaml must require Dart >=$dartVersion <4.0.0.',
+      failures,
+    );
+  }
+  if (pubspec != null && flutterVersion != null) {
+    _requireSinglePattern(
+      pubspec,
+      RegExp(
+        '^  flutter: ">=${RegExp.escape(flutterVersion)}"\\s*\$',
+        multiLine: true,
+      ),
+      'pubspec.yaml must require Flutter >=$flutterVersion.',
+      failures,
+    );
   }
 
   final development = _readRequired(
@@ -195,15 +383,154 @@ ToolchainVerification verifyToolchain({
       'docs/DEVELOPMENT.md must document Flutter\'s Android build chain.',
     );
   }
+  if (development != null &&
+      compileSdk != null &&
+      buildToolsVersion != null &&
+      !development.contains(
+        'Android SDK platform $compileSdk, build tools $buildToolsVersion, '
+        'and platform tools',
+      )) {
+    failures.add(
+      'docs/DEVELOPMENT.md must document the Android SDK/build-tools chain.',
+    );
+  }
+  if (development != null &&
+      flutterVersion != null &&
+      dartVersion != null &&
+      !development.contains('Flutter $flutterVersion and Dart $dartVersion')) {
+    failures.add(
+      'docs/DEVELOPMENT.md must document the Flutter/Dart versions.',
+    );
+  }
 
   failures.sort();
   return ToolchainVerification(
+    flutterVersion: flutterVersion,
+    dartVersion: dartVersion,
     flutterGradleVersion: gradleVersion,
     flutterAgpVersion: agpVersion,
     flutterKotlinVersion: kotlinVersion,
+    flutterCompileSdk: compileSdk,
+    flutterMinSdk: minSdk,
+    flutterTargetSdk: targetSdk,
     flutterNdkVersion: ndkVersion,
+    androidBuildToolsVersion: buildToolsVersion,
     failures: List.unmodifiable(failures),
   );
+}
+
+Map<String, Object?>? _readJsonObject(
+  File? file,
+  String label,
+  List<String> failures,
+) {
+  final contents = _readRequired(file, label, failures);
+  if (contents == null) return null;
+  try {
+    final decoded = jsonDecode(contents);
+    if (decoded is Map<String, Object?>) return decoded;
+  } on FormatException {
+    // The deterministic failure below owns malformed metadata.
+  }
+  failures.add('$label must contain one JSON object.');
+  return null;
+}
+
+String? _readJsonString(
+  Map<String, Object?>? object,
+  String key,
+  String label,
+  List<String> failures,
+) {
+  if (object == null) return null;
+  final value = object[key];
+  if (value is String && value.isNotEmpty) return value;
+  failures.add('$label is not inspectable.');
+  return null;
+}
+
+int? _readKotlinIntProperty(
+  String? contents,
+  String name,
+  String label,
+  List<String> failures,
+) {
+  if (contents == null) return null;
+  final value = _readSingleCapture(
+    contents,
+    RegExp('val\\s+$name\\s*:\\s*Int\\s*=\\s*(\\d+)'),
+    label,
+    failures,
+  );
+  return value == null ? null : int.parse(value);
+}
+
+String? _readSingleCapture(
+  String contents,
+  RegExp pattern,
+  String label,
+  List<String> failures,
+) {
+  final matches = pattern.allMatches(contents).toList();
+  final value = matches.length == 1 ? matches.single.group(1) : null;
+  if (value == null) {
+    failures.add('Expected one inspectable $label, found ${matches.length}.');
+  }
+  return value;
+}
+
+void _requireSinglePattern(
+  String contents,
+  RegExp pattern,
+  String message,
+  List<String> failures,
+) {
+  if (pattern.allMatches(contents).length != 1) failures.add(message);
+}
+
+void _requireSingleCapturedValue(
+  String contents,
+  RegExp pattern,
+  String expected,
+  String label,
+  List<String> failures,
+) {
+  final values = pattern
+      .allMatches(contents)
+      .map((match) => match.group(1))
+      .toList();
+  if (values.length != 1 || values.single != expected) {
+    failures.add('$label must be exactly $expected.');
+  }
+}
+
+void _requireNixVersionList(
+  String flake, {
+  required String property,
+  required String? expected,
+  required String label,
+  required List<String> failures,
+}) {
+  if (expected == null) return;
+  final versions = RegExp(
+    '\\b${RegExp.escape(property)}\\s*=\\s*\\[\\s*"([^"]+)"\\s*\\]\\s*;',
+  ).allMatches(flake).map((match) => match.group(1)).toList();
+  if (versions.length != 1 || versions.single != expected) {
+    failures.add('flake.nix must declare exactly $label $expected.');
+  }
+}
+
+void _requireJsonValue(
+  Map<String, Object?>? object, {
+  required String key,
+  required String? expected,
+  required String label,
+  required List<String> failures,
+}) {
+  if (object == null || expected == null) return;
+  if (object[key] != expected) {
+    failures.add('$label must be exactly $expected.');
+  }
 }
 
 String? _readDartStringConstant(
@@ -243,6 +570,10 @@ File? _locateFlutterExtension(String dartExecutable) {
     dartExecutable,
     'packages/flutter_tools/gradle/src/main/kotlin/FlutterExtension.kt',
   );
+}
+
+File? _locateFlutterVersionMetadata(String dartExecutable) {
+  return _locateFlutterFile(dartExecutable, 'bin/cache/flutter.version.json');
 }
 
 File? _locateFlutterGradleUtils(String dartExecutable) {

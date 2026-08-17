@@ -8,7 +8,8 @@ plugins {
 android {
     // Final package identity is release-owned and remains blocked by DEC-006.
     namespace = "com.example.asterdev"
-    compileSdk = 36
+    compileSdk = flutter.compileSdkVersion
+    buildToolsVersion = "36.0.0"
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -18,8 +19,8 @@ android {
 
     defaultConfig {
         applicationId = "com.example.asterdev"
-        minSdk = 24
-        targetSdk = 36
+        minSdk = flutter.minSdkVersion
+        targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
