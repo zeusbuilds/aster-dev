@@ -13,8 +13,6 @@ fail() {
   exit 1
 }
 
-command -v unzip >/dev/null 2>&1 || fail "unzip is required"
-
 verify_signature() {
   local apk_path="$1"
 
@@ -24,9 +22,6 @@ verify_signature() {
 verify_apk() {
   local apk_path="$1"
   local expected_abi="$2"
-  local archive_entries
-  local packaged_abis
-
   [[ -f "${apk_path}" ]] || fail "missing ${apk_path}"
 
   fvm dart run tool/verify_android_release_identity.dart \
@@ -34,26 +29,12 @@ verify_apk() {
     --aapt2 "${UTEXO_AAPT2}" ||
     fail "${apk_path} does not match committed release identity"
 
-  archive_entries="$(unzip -Z1 "${apk_path}")" ||
-    fail "could not inspect ${apk_path}"
-  packaged_abis="$(
-    printf '%s\n' "${archive_entries}" |
-      sed -nE 's#^lib/([^/]+)/.*#\1#p' |
-      LC_ALL=C sort -u
-  )"
-
-  [[ "${packaged_abis}" == "${expected_abi}" ]] ||
-    fail "${apk_path} contains ABIs [${packaged_abis//$'\n'/, }] instead of only ${expected_abi}"
-
-  local required_library
-  for required_library in libapp.so libflutter.so librgb_lightning_node.so; do
-    printf '%s\n' "${archive_entries}" |
-      grep -Fxq "lib/${expected_abi}/${required_library}" ||
-      fail "${apk_path} is missing lib/${expected_abi}/${required_library}"
-  done
-
   verify_signature "${apk_path}"
-  ./scripts/verify-android-native-libraries.sh "${apk_path}" lib apk
+  ./scripts/verify-android-native-libraries.sh \
+    "${apk_path}" \
+    lib \
+    apk \
+    "${expected_abi}"
   printf 'Verified %s (%s only)\n' "${apk_path}" "${expected_abi}"
 }
 

@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:xml/xml.dart';
+import 'gradle_verification_metadata.dart';
 
 const _reviewedGradleDistributionSha256 = <String, String>{
   '9.3.1': '17f277867f6914d61b1aa02efab1ba7bb439ad652ca485cd8ca6842fccec6e43',
@@ -594,6 +594,56 @@ ToolchainVerification verifyToolchain({
       failures: failures,
     );
   }
+  if (androidIntegration != null) {
+    _requireSinglePattern(
+      androidIntegration,
+      RegExp(r'^trap cleanup EXIT\s*$', multiLine: true),
+      'Android integration must install fail-safe EXIT cleanup.',
+      failures,
+    );
+    _requireSinglePattern(
+      androidIntegration,
+      RegExp(
+        r'"\$\{adb\}" -s "\$\{device_id\}" shell am force-stop \\\s*\n'
+        r'\s*"\$\{test_package\}"',
+        multiLine: true,
+      ),
+      'Android integration cleanup must stop only its debug package.',
+      failures,
+    );
+    _requireSinglePattern(
+      androidIntegration,
+      RegExp(
+        r'^\(\(test_status == 0\)\) \|\| exit "\$\{test_status\}"\s*$',
+        multiLine: true,
+      ),
+      'Android integration must preserve the drive failure before artifact '
+      'verification.',
+      failures,
+    );
+    _requireSinglePattern(
+      androidIntegration,
+      RegExp(
+        r'^release_path_before="\$\(package_path "\$\{release_package\}"\)" '
+        r'\|\|\s*$',
+        multiLine: true,
+      ),
+      'Android integration must fail when its pre-launch release identity '
+      'query fails.',
+      failures,
+    );
+    _requireSinglePattern(
+      androidIntegration,
+      RegExp(
+        r'^\s*if ! release_path_after="\$\(package_path '
+        r'"\$\{release_package\}"\)"; then\s*$',
+        multiLine: true,
+      ),
+      'Android integration cleanup must distinguish a failed release query '
+      'from an absent package.',
+      failures,
+    );
+  }
   if (iosIntegration != null) {
     _requireSinglePattern(
       iosIntegration,
@@ -854,6 +904,21 @@ ToolchainVerification verifyToolchain({
     'scripts/verify-android-release-apks.sh',
     failures,
   );
+  final apkSignatureVerifier = _readRequired(
+    File('$root/scripts/verify-android-apk-signature.sh'),
+    'scripts/verify-android-apk-signature.sh',
+    failures,
+  );
+  final nativeLibraryVerifier = _readRequired(
+    File('$root/scripts/verify-android-native-libraries.sh'),
+    'scripts/verify-android-native-libraries.sh',
+    failures,
+  );
+  final nativeLibraryExtractor = _readRequired(
+    File('$root/scripts/AndroidNativeLibraryExtractor.java'),
+    'scripts/AndroidNativeLibraryExtractor.java',
+    failures,
+  );
   if (apkVerifier != null) {
     _requireSinglePattern(
       apkVerifier,
@@ -867,10 +932,32 @@ ToolchainVerification verifyToolchain({
       'APK identity verification must use the resolved aapt2 binary.',
       failures,
     );
+    _requireSinglePattern(
+      apkVerifier,
+      RegExp(
+        r'\./scripts/verify-android-native-libraries\.sh\s*\\\s*\n'
+        r'\s*"\$\{apk_path\}"\s*\\\s*\n'
+        r'\s*lib\s*\\\s*\n'
+        r'\s*apk\s*\\\s*\n'
+        r'\s*"\$\{expected_abi\}"',
+        multiLine: true,
+      ),
+      'APK verification must delegate exact ABI ownership to the native '
+      'archive boundary.',
+      failures,
+    );
+    if (apkVerifier.contains('unzip -Z1')) {
+      failures.add('APK verification must not parse line-oriented ZIP names.');
+    }
   }
   final bundleVerifier = _readRequired(
     File('$root/scripts/verify-android-release-bundle.sh'),
     'scripts/verify-android-release-bundle.sh',
+    failures,
+  );
+  final jarSignatureInspector = _readRequired(
+    File('$root/scripts/AndroidJarSignatureInspector.java'),
+    'scripts/AndroidJarSignatureInspector.java',
     failures,
   );
   if (bundleVerifier != null) {
@@ -892,6 +979,154 @@ ToolchainVerification verifyToolchain({
       'Bundle identity verification must use the resolved protobuf runtime.',
       failures,
     );
+    _requireSinglePattern(
+      bundleVerifier,
+      RegExp(
+        r'java scripts/AndroidJarSignatureInspector\.java '
+        r'"\$\{bundle_path\}"',
+      ),
+      'Bundle verification must inspect signing coverage for every entry.',
+      failures,
+    );
+    if (bundleVerifier.contains('jarsigner -verify')) {
+      failures.add(
+        'Bundle verification must not rely on permissive jarsigner status.',
+      );
+    }
+    _requireSinglePattern(
+      bundleVerifier,
+      RegExp(
+        r'\./scripts/verify-android-native-libraries\.sh\s*\\\s*\n'
+        r'\s*"\$\{bundle_path\}"\s*\\\s*\n'
+        r'\s*base/lib\s*\\\s*\n'
+        r'\s*aab\s*\\\s*\n'
+        r'\s*arm64-v8a,armeabi-v7a,x86_64',
+        multiLine: true,
+      ),
+      'Bundle verification must delegate its exact ABI matrix to the native '
+      'archive boundary.',
+      failures,
+    );
+    if (bundleVerifier.contains('unzip -Z1')) {
+      failures.add(
+        'Bundle verification must not parse line-oriented ZIP names.',
+      );
+    }
+  }
+  if (apkSignatureVerifier != null) {
+    _requireSinglePattern(
+      apkSignatureVerifier,
+      RegExp(
+        r'java scripts/AndroidJarSignatureInspector\.java\s*\\\s*\n'
+        r'\s*--signature-evidence\s*\\\s*\n'
+        r'\s*"\$\{apk_path\}"',
+        multiLine: true,
+      ),
+      'APK signature verification must inspect v1 evidence through the '
+      'structured archive boundary.',
+      failures,
+    );
+    if (apkSignatureVerifier.contains('unzip -Z1')) {
+      failures.add(
+        'APK signature verification must not parse line-oriented ZIP names.',
+      );
+    }
+  }
+  if (nativeLibraryVerifier != null) {
+    _requireSinglePattern(
+      nativeLibraryVerifier,
+      RegExp(
+        r'java scripts/AndroidNativeLibraryExtractor\.java\s*\\\s*\n'
+        r'\s*"\$\{archive_path\}"\s*\\\s*\n'
+        r'\s*"\$\{native_root\}"\s*\\\s*\n'
+        r'\s*"\$\{temporary_directory\}"\s*\\\s*\n'
+        r'\s*"\$\{expected_abis\}"',
+        multiLine: true,
+      ),
+      'Native-library verification must use the path-safe bounded extractor.',
+      failures,
+    );
+    if (nativeLibraryVerifier.contains('unzip ')) {
+      failures.add(
+        'Native-library verification must not delegate extraction to unzip.',
+      );
+    }
+  }
+  if (nativeLibraryExtractor != null) {
+    for (final contract in <({RegExp pattern, String failure})>[
+      (
+        pattern: RegExp(r'new ZipFile\(archive\.toFile\(\)\)'),
+        failure: 'Native archive extraction must use structured ZIP entries.',
+      ),
+      (
+        pattern: RegExp(r'validateEntryName\(name\)'),
+        failure: 'Native archive extraction must validate every entry path.',
+      ),
+      (
+        pattern: RegExp(r'private static final int MAX_ENTRY_COUNT ='),
+        failure: 'Native archive extraction must bound archive entry count.',
+      ),
+      (
+        pattern: RegExp(r'private static final long MAX_NATIVE_BYTES ='),
+        failure: 'Native archive extraction must bound extracted bytes.',
+      ),
+      (
+        pattern: RegExp(r'librariesByAbi\.keySet\(\)\.equals\(expectedAbis\)'),
+        failure: 'Native archive extraction must prove the exact ABI set.',
+      ),
+      (
+        pattern: RegExp(
+          r'private static final Set<String> REQUIRED_LIBRARIES =',
+        ),
+        failure: 'Native archive extraction must prove required libraries.',
+      ),
+      (
+        pattern: RegExp(r'StandardOpenOption\.CREATE_NEW'),
+        failure: 'Native archive extraction must not overwrite output paths.',
+      ),
+    ]) {
+      _requireSinglePattern(
+        nativeLibraryExtractor,
+        contract.pattern,
+        contract.failure,
+        failures,
+      );
+    }
+  }
+  if (jarSignatureInspector != null) {
+    for (final contract in <({RegExp pattern, String failure})>[
+      (
+        pattern: RegExp(r'new JarFile\([^;]+, true\)'),
+        failure: 'JAR signature inspection must enable entry verification.',
+      ),
+      (
+        pattern: RegExp(r'entry\.getCodeSigners\(\)'),
+        failure: 'JAR signature inspection must read every entry signer.',
+      ),
+      (
+        pattern: RegExp(r'hasSignedContent && firstUnsignedEntry != null'),
+        failure: 'JAR signature inspection must reject partial signatures.',
+      ),
+      (
+        pattern: RegExp(r'arguments\[0\]\.equals\("--signature-evidence"\)'),
+        failure: 'JAR inspection must expose structured signature evidence.',
+      ),
+      (
+        pattern: RegExp(r'private static final int MAX_ENTRY_COUNT ='),
+        failure: 'JAR inspection must bound archive entry count.',
+      ),
+      (
+        pattern: RegExp(r'private static final long MAX_EXPANDED_BYTES ='),
+        failure: 'JAR inspection must bound expanded archive bytes.',
+      ),
+    ]) {
+      _requireSinglePattern(
+        jarSignatureInspector,
+        contract.pattern,
+        contract.failure,
+        failures,
+      );
+    }
   }
 
   final pubspec = _readRequired(
@@ -1034,136 +1269,9 @@ int _verifyGradleDependencyMetadata(File file, List<String> failures) {
     failures,
   );
   if (contents == null) return 0;
-
-  try {
-    final document = XmlDocument.parse(contents);
-    final root = document.rootElement;
-    const namespace = 'https://schema.gradle.org/dependency-verification';
-    if (root.name.local != 'verification-metadata' ||
-        root.name.namespaceUri != namespace) {
-      failures.add('Gradle verification metadata has an invalid root.');
-      return 0;
-    }
-
-    final rootChildren = root.childElements.toList();
-    final configurations = rootChildren
-        .where(
-          (element) =>
-              element.name.local == 'configuration' &&
-              element.name.namespaceUri == namespace,
-        )
-        .toList();
-    final componentContainers = rootChildren
-        .where(
-          (element) =>
-              element.name.local == 'components' &&
-              element.name.namespaceUri == namespace,
-        )
-        .toList();
-    if (rootChildren.length != 2 ||
-        configurations.length != 1 ||
-        componentContainers.length != 1) {
-      failures.add(
-        'Gradle verification metadata must contain one configuration and '
-        'one components container.',
-      );
-      return 0;
-    }
-
-    final configuration = configurations.single;
-    final options = <String, String>{};
-    for (final option in configuration.childElements) {
-      if (option.name.namespaceUri != namespace) {
-        failures.add('Gradle verification contains a foreign option.');
-        continue;
-      }
-      final name = option.name.local;
-      if (options.containsKey(name)) {
-        failures.add('Gradle verification option $name is duplicated.');
-        continue;
-      }
-      options[name] = option.innerText.trim();
-    }
-    if (options.length != 2 ||
-        options['verify-metadata'] != 'true' ||
-        options['verify-signatures'] != 'false') {
-      failures.add(
-        'Gradle dependency verification must use strict metadata SHA-256 '
-        'checks without broad trust exceptions.',
-      );
-    }
-
-    final componentKeys = <String>{};
-    var artifactCount = 0;
-    for (final component in componentContainers.single.childElements) {
-      if (component.name.local != 'component' ||
-          component.name.namespaceUri != namespace) {
-        failures.add('Gradle components contain an unexpected element.');
-        continue;
-      }
-      final group = component.getAttribute('group');
-      final name = component.getAttribute('name');
-      final version = component.getAttribute('version');
-      if ([
-        group,
-        name,
-        version,
-      ].any((value) => value == null || value.isEmpty)) {
-        failures.add(
-          'Gradle verification contains an unidentifiable component.',
-        );
-        continue;
-      }
-      final componentKey = '$group:$name:$version';
-      if (!componentKeys.add(componentKey)) {
-        failures.add('Gradle verification duplicates $componentKey.');
-      }
-
-      final artifactNames = <String>{};
-      final artifacts = component.childElements.toList();
-      if (artifacts.isEmpty) {
-        failures.add('Gradle verification component $componentKey is empty.');
-      }
-      for (final artifact in artifacts) {
-        if (artifact.name.local != 'artifact' ||
-            artifact.name.namespaceUri != namespace) {
-          failures.add('$componentKey contains an unexpected element.');
-          continue;
-        }
-        final artifactName = artifact.getAttribute('name');
-        if (artifactName == null || artifactName.isEmpty) {
-          failures.add('$componentKey contains an unnamed artifact.');
-          continue;
-        }
-        if (!artifactNames.add(artifactName)) {
-          failures.add('$componentKey duplicates artifact $artifactName.');
-        }
-        final checksums = artifact.childElements.toList();
-        if (checksums.length != 1 ||
-            checksums.single.name.local != 'sha256' ||
-            checksums.single.name.namespaceUri != namespace) {
-          failures.add(
-            '$componentKey:$artifactName must use exactly one SHA-256 checksum.',
-          );
-          continue;
-        }
-        final value = checksums.single.getAttribute('value');
-        if (value == null || !RegExp(r'^[0-9a-f]{64}$').hasMatch(value)) {
-          failures.add(
-            '$componentKey:$artifactName has an invalid SHA-256 checksum.',
-          );
-        }
-        artifactCount += 1;
-      }
-    }
-    if (artifactCount == 0) {
-      failures.add('Gradle verification metadata contains no artifacts.');
-    }
-    return artifactCount;
-  } on XmlParserException {
-    failures.add('Gradle verification metadata is malformed XML.');
-    return 0;
-  }
+  final result = parseGradleVerificationMetadata(contents);
+  failures.addAll(result.failures);
+  return result.metadata?.artifactCount ?? 0;
 }
 
 void _verifyGemfile(

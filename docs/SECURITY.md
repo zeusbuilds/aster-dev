@@ -72,7 +72,14 @@ distribution digest, Gradle rejects unreviewed external artifact checksums, and
 iOS tooling is resolved from the checksummed Bundler lock rather than an
 arbitrary host CocoaPods executable. Verification metadata is reviewed source;
 regenerating it is a dependency change, not a routine way to make a failed
-build pass.
+build pass. Android release inspection re-hashes directly executed Gradle-cache
+JARs at point of use through bounded streaming reads. Signed AAB evidence
+requires complete one-certificate coverage for every payload entry; a matching
+certificate on only part of an archive is rejected. APK/AAB archive inspection
+rejects duplicate and unsafe entry names, bounds archive and expansion
+resources, proves the exact native ABI/runtime-library matrix, and writes only
+validated native basenames beneath an owned temporary directory. Line-oriented
+ZIP output and wildcard extraction are not trusted security boundaries.
 
 ## Open Security Decisions
 

@@ -241,7 +241,19 @@ upstream SHA-256 digest. Gradle also enforces the committed
 Debug, Profile, Release, bundle, and native-test dependency graph. A new or
 changed Maven artifact must fail first; update verification metadata only in a
 dedicated dependency-review change and inspect every added component and
-checksum before committing it.
+checksum before committing it. Release artifact inspection also re-hashes the
+exact cached AGP module metadata, AAPT schema, Bundletool, and protobuf JARs
+against that catalog through bounded streaming reads immediately before parsing
+or executing them. Exact names and versions alone are not accepted as
+release-verifier provenance, and an oversized cache entry fails before hashing.
+
+Android archive policy is owned by Java `ZipFile` boundaries, not shell parsing
+of line-oriented ZIP listings or wildcard extraction. Native verification
+rejects duplicate, absolute, control-character, backslash, dot-segment, nested,
+or otherwise malformed native paths; proves the exact expected ABI set and
+required runtime libraries; bounds compressed, expanded, per-entry, and native
+payload sizes; and extracts only validated basenames into an empty owned
+temporary directory before ELF inspection.
 
 ## Local SDK Development
 

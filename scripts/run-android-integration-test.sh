@@ -32,14 +32,58 @@ readonly adb="${sdk_root}/platform-tools/adb"
   fail "device is not attached: ${device_id}"
 
 package_path() {
-  "${adb}" -s "${device_id}" shell pm path "$1" 2>/dev/null |
+  local raw_path
+  raw_path="$(
+    "${adb}" -s "${device_id}" shell pm path "$1" 2>/dev/null
+  )" || return
+  printf '%s\n' "${raw_path}" |
     tr -d '\r' |
     LC_ALL=C sort
 }
 
-readonly release_path_before="$(package_path "${release_package}")"
+release_path_before="$(package_path "${release_package}")" ||
+  fail "could not inspect the release package before the integration run"
+readonly release_path_before
 
 fvm flutter pub get --enforce-lockfile
+
+cleanup() {
+  local command_status=$?
+  local cleanup_status=0
+  local release_path_after
+  local test_path_after
+  trap - EXIT
+  set +e
+
+  if ! "${adb}" -s "${device_id}" get-state >/dev/null 2>&1; then
+    printf 'Android device detached before integration cleanup.\n' >&2
+    cleanup_status=1
+  else
+    if ! test_path_after="$(package_path "${test_package}")"; then
+      printf 'Could not inspect the debug package during cleanup.\n' >&2
+      cleanup_status=1
+    elif [[ -n "${test_path_after}" ]]; then
+      "${adb}" -s "${device_id}" shell am force-stop \
+        "${test_package}" >/dev/null || cleanup_status=1
+    fi
+    if ! release_path_after="$(package_path "${release_package}")"; then
+      printf 'Could not inspect the release package during cleanup.\n' >&2
+      cleanup_status=1
+    elif [[ "${release_path_after}" != "${release_path_before}" ]]; then
+      printf 'The release package changed during the integration run.\n' >&2
+      cleanup_status=1
+    fi
+  fi
+
+  if ((command_status != 0)); then
+    exit "${command_status}"
+  fi
+  exit "${cleanup_status}"
+}
+
+trap cleanup EXIT
+# Flutter does not account for the build-type suffix when stopping this run.
+# Keep it alive so the EXIT owner can stop only the isolated debug identity.
 set +e
 fvm flutter drive --no-pub \
   --driver=test_driver/integration_test.dart \
@@ -48,17 +92,17 @@ fvm flutter drive --no-pub \
   -d "${device_id}"
 test_status=$?
 set -e
+((test_status == 0)) || exit "${test_status}"
 
-# Flutter's Android project parser does not account for a build-type
-# applicationIdSuffix when stopping a drive run. Keep the app running above,
-# then stop only the known isolated test package ourselves. Never uninstall a
-# package here: both release-candidate and developer debug state are durable.
-"${adb}" -s "${device_id}" shell am force-stop "${test_package}" >/dev/null
-
-readonly release_path_after="$(package_path "${release_package}")"
+release_path_after="$(package_path "${release_package}")" ||
+  fail "could not inspect the release package after the integration run"
+readonly release_path_after
 [[ "${release_path_after}" == "${release_path_before}" ]] ||
   fail "the release package changed during the integration run"
-[[ -n "$(package_path "${test_package}")" ]] ||
+test_path_after="$(package_path "${test_package}")" ||
+  fail "could not inspect the debug package after the integration run"
+readonly test_path_after
+[[ -n "${test_path_after}" ]] ||
   fail "the isolated debug package was not installed"
 
 readonly apk="build/app/outputs/flutter-apk/app-debug.apk"
@@ -70,6 +114,5 @@ readonly built_package="$("${UTEXO_AAPT2}" dump packagename "${apk}")"
 [[ "${built_package}" == "${test_package}" ]] ||
   fail "debug APK uses ${built_package}, expected ${test_package}"
 
-((test_status == 0)) || exit "${test_status}"
 printf 'Android integration test preserved release identity and used %s.\n' \
   "${test_package}"

@@ -141,8 +141,8 @@ final class PaymentFlowTestHarness {
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
-    await repository.dispose();
     container.dispose();
+    await repository.dispose();
   }
 }
 

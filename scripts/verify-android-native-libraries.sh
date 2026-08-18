@@ -9,18 +9,25 @@ utexo_resolve_android_artifact_toolchain
 readonly archive_path="${1:-}"
 readonly native_root="${2:-}"
 readonly archive_kind="${3:-}"
+readonly expected_abis="${4:-}"
 
 fail() {
   printf 'Android native-library check failed: %s\n' "$1" >&2
   exit 1
 }
 
-[[ -n "${archive_path}" && -n "${native_root}" && -n "${archive_kind}" ]] ||
-  fail "usage: $0 <archive> <native-root> <apk|aab>"
+[[ -n "${archive_path}" && -n "${native_root}" && -n "${archive_kind}" &&
+  -n "${expected_abis}" ]] ||
+  fail "usage: $0 <archive> <native-root> <apk|aab> <expected-abis-csv>"
 [[ "${archive_kind}" == "apk" || "${archive_kind}" == "aab" ]] ||
   fail "archive kind must be apk or aab"
+if [[ "${archive_kind}" == "apk" ]]; then
+  [[ "${native_root}" == "lib" ]] || fail "APK native root must be lib"
+else
+  [[ "${native_root}" == "base/lib" ]] || fail "AAB native root must be base/lib"
+fi
 [[ -f "${archive_path}" ]] || fail "missing ${archive_path}"
-command -v unzip >/dev/null 2>&1 || fail "unzip is required"
+command -v java >/dev/null 2>&1 || fail "java is required"
 readonly readelf_bin="${UTEXO_LLVM_READELF}"
 
 if [[ "${archive_kind}" == "apk" ]]; then
@@ -36,9 +43,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
-unzip -qq "${archive_path}" "${native_root}/*/*.so" \
-  -d "${temporary_directory}" ||
-  fail "could not extract native libraries from ${archive_path}"
+java scripts/AndroidNativeLibraryExtractor.java \
+  "${archive_path}" \
+  "${native_root}" \
+  "${temporary_directory}" \
+  "${expected_abis}" ||
+  fail "could not validate and extract native libraries from ${archive_path}"
 
 library_count=0
 while IFS= read -r library_path; do
@@ -52,20 +62,28 @@ while IFS= read -r library_path; do
 
   program_headers="$("${readelf_bin}" -lW "${library_path}")" ||
     fail "could not inspect ELF headers for ${abi}/${library_name}"
-  load_alignments="$({
+  load_segments="$({
     printf '%s\n' "${program_headers}" |
-      awk '$1 == "LOAD" {print $NF}'
+      awk '$1 == "LOAD" {print $2, $3, $NF}'
   })"
-  [[ -n "${load_alignments}" ]] ||
+  [[ -n "${load_segments}" ]] ||
     fail "${abi}/${library_name} has no inspectable ELF LOAD segments"
 
-  while IFS= read -r alignment; do
-    [[ "${alignment}" =~ ^0x[0-9a-fA-F]+$ ]] ||
-      fail "${abi}/${library_name} has malformed LOAD alignment ${alignment}"
+  while read -r offset virtual_address alignment; do
+    for value in "${offset}" "${virtual_address}" "${alignment}"; do
+      [[ "${value}" =~ ^0x[0-9a-fA-F]+$ ]] ||
+        fail "${abi}/${library_name} has malformed LOAD metadata ${value}"
+    done
+    if ((alignment == 0 || (alignment & (alignment - 1)) != 0)); then
+      fail "${abi}/${library_name} has non-power-of-two LOAD alignment ${alignment}"
+    fi
     if (( alignment < minimum_alignment )); then
       fail "${abi}/${library_name} has ${alignment} LOAD alignment; ${minimum_alignment} bytes is required"
     fi
-  done <<<"${load_alignments}"
+    if ((offset % alignment != virtual_address % alignment)); then
+      fail "${abi}/${library_name} has incongruent LOAD offset/address for ${alignment} alignment"
+    fi
+  done <<<"${load_segments}"
 
   if ! grep -q 'GNU_RELRO' <<<"${program_headers}"; then
     dynamic_headers="$("${readelf_bin}" -dW "${library_path}")" ||
@@ -75,7 +93,8 @@ while IFS= read -r library_path; do
     fi
   fi
 done < <(
-  find "${temporary_directory}/${native_root}" -type f -name '*.so' -print |
+  find "${temporary_directory}" -mindepth 2 -maxdepth 2 \
+    -type f -name '*.so' -print |
     LC_ALL=C sort
 )
 

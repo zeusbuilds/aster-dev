@@ -31,6 +31,7 @@ void main() {
     expect(result.repositoryFileCount, 2);
     expect(result.inventoryRowCount, 2);
     expect(result.findingCount, 1);
+    expect(result.phaseCount, 2);
   });
 
   test('reports duplicate malformed unknown and mismatched inventory rows', () {
@@ -137,6 +138,92 @@ void main() {
     );
   });
 
+  test('release mode rejects a transient execution phase', () {
+    final transient = _validTracker().replaceFirst(
+      '| 1 | Closeout | verified | Complete. |',
+      '| 1 | Closeout | unreviewed | Pending. |',
+    );
+    _writeTracker(repository, transient);
+
+    final normal = verifyProductionTracker(
+      repository,
+      repositoryFiles: const {
+        'docs/PRODUCTION_REFACTOR_TRACKER.md',
+        'lib/a.dart',
+      },
+    );
+    final release = verifyProductionTracker(
+      repository,
+      releaseMode: true,
+      repositoryFiles: const {
+        'docs/PRODUCTION_REFACTOR_TRACKER.md',
+        'lib/a.dart',
+      },
+    );
+
+    expect(normal.passed, isTrue, reason: normal.failures.join('\n'));
+    expect(
+      release.failures,
+      contains('Phase 1 remains unreviewed in release mode.'),
+    );
+  });
+
+  test('rejects malformed duplicate and non-contiguous phase rows', () {
+    final invalid = _validTracker()
+        .replaceFirst('| 0 | Foundation | verified | Complete. |\n', '')
+        .replaceFirst(
+          '| 1 | Closeout | verified | Complete. |',
+          '| 1 | Closeout | invented | Complete. |\n'
+              '| 1 | Duplicate | verified | Complete. |',
+        );
+    _writeTracker(repository, invalid);
+
+    final result = verifyProductionTracker(
+      repository,
+      repositoryFiles: const {
+        'docs/PRODUCTION_REFACTOR_TRACKER.md',
+        'lib/a.dart',
+      },
+    );
+
+    expect(
+      result.failures,
+      containsAll(<Matcher>[
+        contains('Phase 1 has invalid status invented'),
+        contains('Duplicate phase row: 1'),
+        contains('Phase Plan is missing phase 0'),
+      ]),
+    );
+  });
+
+  test('deduplicates repeated validation failures deterministically', () {
+    _writeTracker(
+      repository,
+      _validTracker().replaceFirst(
+        '| TEST-001 | evidence',
+        '| TEST-999 | evidence',
+      ),
+    );
+
+    final result = verifyProductionTracker(
+      repository,
+      repositoryFiles: const {
+        'docs/PRODUCTION_REFACTOR_TRACKER.md',
+        'lib/a.dart',
+      },
+    );
+
+    expect(
+      result.failures.where(
+        (failure) =>
+            failure ==
+            'Inventory row lib/a.dart references unknown ID TEST-999.',
+      ),
+      hasLength(1),
+    );
+    expect(result.failures, orderedEquals(result.failures.toList()..sort()));
+  });
+
   test('fails closed for missing or duplicated inventory markers', () {
     _writeTracker(
       repository,
@@ -157,6 +244,13 @@ String _validTracker() => '''
 # Tracker
 
 Statuses are documented.
+
+## Phase Plan
+
+| Phase | Scope | Status | Exit evidence |
+| --- | --- | --- | --- |
+| 0 | Foundation | verified | Complete. |
+| 1 | Closeout | verified | Complete. |
 
 ## Findings
 

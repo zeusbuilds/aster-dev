@@ -173,7 +173,21 @@ void main() {
       repository,
       'scripts/run-android-integration-test.sh',
       'readonly release_package="com.example.utexo"\n'
-          'readonly test_package="\${release_package}.debug"',
+          'readonly test_package="\${release_package}.debug"\n'
+          'cleanup() {\n'
+          '  "\${adb}" -s "\${device_id}" shell am force-stop \\\n'
+          '    "\${test_package}" >/dev/null\n'
+          '  if ! release_path_after="\$(package_path '
+          '"\${release_package}")"; then\n'
+          '    cleanup_status=1\n'
+          '  fi\n'
+          '}\n'
+          'trap cleanup EXIT\n'
+          'release_path_before="\$(package_path '
+          '"\${release_package}")" ||\n'
+          '  fail "query failed"\n'
+          'test_status=0\n'
+          '((test_status == 0)) || exit "\${test_status}"',
     );
     _write(
       repository,
@@ -281,7 +295,12 @@ esac''');
       'scripts/verify-android-release-apks.sh',
       'fvm dart run tool/verify_android_release_identity.dart \\\n'
           '  --apk "\${apk_path}" \\\n'
-          '  --aapt2 "\${UTEXO_AAPT2}"',
+          '  --aapt2 "\${UTEXO_AAPT2}"\n'
+          './scripts/verify-android-native-libraries.sh \\\n'
+          '  "\${apk_path}" \\\n'
+          '  lib \\\n'
+          '  apk \\\n'
+          '  "\${expected_abi}"',
     );
     _write(
       repository,
@@ -289,7 +308,51 @@ esac''');
       'fvm dart run tool/verify_android_release_identity.dart \\\n'
           '  --bundle "\${bundle_path}" \\\n'
           '  --aapt2-proto "\${UTEXO_AAPT2_PROTO_JAR}" \\\n'
-          '  --protobuf "\${UTEXO_PROTOBUF_JAR}"',
+          '  --protobuf "\${UTEXO_PROTOBUF_JAR}"\n'
+          'java scripts/AndroidJarSignatureInspector.java '
+          '"\${bundle_path}"\n'
+          './scripts/verify-android-native-libraries.sh \\\n'
+          '  "\${bundle_path}" \\\n'
+          '  base/lib \\\n'
+          '  aab \\\n'
+          '  arm64-v8a,armeabi-v7a,x86_64',
+    );
+    _write(
+      repository,
+      'scripts/verify-android-apk-signature.sh',
+      'java scripts/AndroidJarSignatureInspector.java \\\n'
+          '  --signature-evidence \\\n'
+          '  "\${apk_path}"',
+    );
+    _write(
+      repository,
+      'scripts/verify-android-native-libraries.sh',
+      'java scripts/AndroidNativeLibraryExtractor.java \\\n'
+          '  "\${archive_path}" \\\n'
+          '  "\${native_root}" \\\n'
+          '  "\${temporary_directory}" \\\n'
+          '  "\${expected_abis}"',
+    );
+    _write(
+      repository,
+      'scripts/AndroidNativeLibraryExtractor.java',
+      'new ZipFile(archive.toFile());\n'
+          'validateEntryName(name);\n'
+          'private static final int MAX_ENTRY_COUNT = 1;\n'
+          'private static final long MAX_NATIVE_BYTES = 1;\n'
+          'librariesByAbi.keySet().equals(expectedAbis);\n'
+          'private static final Set<String> REQUIRED_LIBRARIES = Set.of();\n'
+          'StandardOpenOption.CREATE_NEW;',
+    );
+    _write(
+      repository,
+      'scripts/AndroidJarSignatureInspector.java',
+      'new JarFile(archive.toFile(), true);\n'
+          'entry.getCodeSigners();\n'
+          'if (hasSignedContent && firstUnsignedEntry != null) {}\n'
+          'arguments[0].equals("--signature-evidence");\n'
+          'private static final int MAX_ENTRY_COUNT = 1;\n'
+          'private static final long MAX_EXPANDED_BYTES = 1;',
     );
     _write(
       repository,
@@ -908,6 +971,121 @@ esac''');
     expect(
       result.failures,
       contains('Bundle verification must enforce committed release identity.'),
+    );
+  });
+
+  test('rejects incomplete AAB signature ownership', () {
+    _write(
+      repository,
+      'scripts/verify-android-release-bundle.sh',
+      'fvm dart run tool/verify_android_release_identity.dart \\\n'
+          '  --bundle "\${bundle_path}" \\\n'
+          '  --aapt2-proto "\${UTEXO_AAPT2_PROTO_JAR}" \\\n'
+          '  --protobuf "\${UTEXO_PROTOBUF_JAR}"\n'
+          'jarsigner -verify "\${bundle_path}"',
+    );
+
+    final result = _verify(
+      repository,
+      flutterVersionMetadata,
+      flutterExtension,
+      flutterGradleUtils,
+    );
+
+    expect(
+      result.failures,
+      containsAll(<Matcher>[
+        contains('inspect signing coverage for every entry'),
+        contains('must not rely on permissive jarsigner status'),
+      ]),
+    );
+  });
+
+  test('rejects line-oriented Android archive security decisions', () {
+    for (final path in <String>[
+      'scripts/verify-android-release-apks.sh',
+      'scripts/verify-android-release-bundle.sh',
+      'scripts/verify-android-apk-signature.sh',
+    ]) {
+      final file = File('${repository.path}/$path');
+      file.writeAsStringSync('${file.readAsStringSync()}\nunzip -Z1 archive');
+    }
+
+    final result = _verify(
+      repository,
+      flutterVersionMetadata,
+      flutterExtension,
+      flutterGradleUtils,
+    );
+
+    expect(
+      result.failures,
+      containsAll(<Matcher>[
+        contains('APK verification must not parse line-oriented ZIP names'),
+        contains('Bundle verification must not parse line-oriented ZIP names'),
+        contains(
+          'APK signature verification must not parse line-oriented ZIP names',
+        ),
+      ]),
+    );
+  });
+
+  test('rejects an unbounded native archive extraction bypass', () {
+    _write(
+      repository,
+      'scripts/verify-android-native-libraries.sh',
+      'unzip archive.zip',
+    );
+    _write(
+      repository,
+      'scripts/AndroidNativeLibraryExtractor.java',
+      'new ZipFile(archive.toFile());',
+    );
+
+    final result = _verify(
+      repository,
+      flutterVersionMetadata,
+      flutterExtension,
+      flutterGradleUtils,
+    );
+
+    expect(
+      result.failures,
+      containsAll(<Matcher>[
+        contains('must use the path-safe bounded extractor'),
+        contains('must not delegate extraction to unzip'),
+        contains('must validate every entry path'),
+        contains('must bound archive entry count'),
+        contains('must bound extracted bytes'),
+        contains('must prove the exact ABI set'),
+        contains('must prove required libraries'),
+        contains('must not overwrite output paths'),
+      ]),
+    );
+  });
+
+  test('rejects Android integration without fail-safe cleanup', () {
+    _write(
+      repository,
+      'scripts/run-android-integration-test.sh',
+      'readonly release_package="com.example.utexo"\n'
+          'readonly test_package="\${release_package}.debug"',
+    );
+
+    final result = _verify(
+      repository,
+      flutterVersionMetadata,
+      flutterExtension,
+      flutterGradleUtils,
+    );
+
+    expect(
+      result.failures,
+      containsAll(<Matcher>[
+        contains('install fail-safe EXIT cleanup'),
+        contains('stop only its debug package'),
+        contains('preserve the drive failure'),
+      ]),
     );
   });
 

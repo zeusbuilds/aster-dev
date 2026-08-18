@@ -16,7 +16,7 @@ fail() {
 
 [[ -n "${apk_path}" && -f "${apk_path}" ]] ||
   fail "pass an existing APK path"
-command -v unzip >/dev/null 2>&1 || fail "unzip is required"
+command -v java >/dev/null 2>&1 || fail "java is required"
 
 normalize_digest() {
   printf '%s' "$1" | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]'
@@ -24,14 +24,21 @@ normalize_digest() {
 
 readonly apksigner="${UTEXO_APKSIGNER}"
 
-archive_entries="$(unzip -Z1 "${apk_path}")" ||
-  fail "could not inspect ${apk_path}"
+signature_evidence="$(
+  java scripts/AndroidJarSignatureInspector.java \
+    --signature-evidence \
+    "${apk_path}"
+)" || fail "could not inspect ${apk_path} archive metadata"
+[[ "${signature_evidence}" == "SIGNATURE_EVIDENCE" ||
+  "${signature_evidence}" == "NO_SIGNATURE_EVIDENCE" ]] ||
+  fail "${apk_path} emitted an unknown archive-signature result"
+
 signature_output=''
 if ! signature_output="$(
   "${apksigner}" verify --verbose --print-certs "${apk_path}" 2>&1
 )"; then
   if grep -aFq 'APK Sig Block 42' "${apk_path}" ||
-    grep -Eq '^META-INF/[^/]+\.(RSA|DSA|EC|SF)$' <<<"${archive_entries}"; then
+    [[ "${signature_evidence}" == "SIGNATURE_EVIDENCE" ]]; then
     fail "${apk_path} contains an invalid APK signature"
   fi
   [[ -z "${expected_certificate_sha256}" ]] ||

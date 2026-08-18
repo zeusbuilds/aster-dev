@@ -67,7 +67,13 @@ construction failure fails the test.
 Android release APK and AAB verification rejects every signed candidate unless
 `UTEXO_RELEASE_CERT_SHA256` identifies the one approved certificate. With no
 approved fingerprint configured, only unsigned candidate artifacts pass; they
-are build evidence and cannot be distributed.
+are build evidence and cannot be distributed. An AAB is signed only when every
+non-signature payload entry verifies against exactly one common certificate.
+Partially signed, modified, duplicate-entry, or multi-signer bundles fail even
+when an inspectable certificate matches the configured fingerprint.
+Both JAR-signature and native-library inspection use structured ZIP APIs with
+entry-name, duplicate, entry-count, compressed-size, per-entry, and aggregate
+expansion limits. They do not make security decisions from `unzip -Z1` output.
 
 Build Android Release artifacts only through `make android-release-bundle` or
 `make android-release-apks`. Their guarded preparation step works around
@@ -95,13 +101,22 @@ make verify-android-apk-signature-policy
 
 The same release verifiers inspect every packaged ELF LOAD segment and the APK
 ZIP alignment. The AAB gate also parses `BundleConfig.pb` with the exact
-Bundletool/protobuf versions resolved by AGP and requires
-`PAGE_ALIGNMENT_16K`. A passing package gate therefore requires 16 KiB
-alignment in both packaging and every 64-bit native dependency, plus GNU RELRO
-where dynamic relocations exist. The current pinned wallet SDK fails this gate
-at `librgb_lightning_node.so`; see `SDK-004`. After an immutable compatible SDK
-revision is approved, rerun both artifact gates and a real 16 KiB emulator or
-device smoke before qualification.
+Bundletool/protobuf versions resolved by AGP, re-hashes those JARs against the
+committed Gradle catalog with bounded streaming reads at point of use, and
+requires `PAGE_ALIGNMENT_16K`.
+A passing package gate therefore requires a power-of-two ELF alignment,
+congruent LOAD file/virtual addresses, 16 KiB alignment in both packaging and
+every 64-bit native dependency, plus GNU RELRO where dynamic relocations exist.
+Before ELF inspection, the native archive boundary proves the exact expected
+ABI set, requires `libapp.so`, `libflutter.so`, and
+`librgb_lightning_node.so` in every ABI, rejects unsafe or nested paths, and
+transactionally extracts only validated `.so` basenames beneath an owned empty
+directory. Additional plugin libraries are allowed only in that same exact
+`<native-root>/<abi>/<basename>.so` shape.
+The current pinned wallet SDK fails this gate at `librgb_lightning_node.so`;
+see `SDK-004`. After an immutable compatible SDK revision is approved, rerun
+both artifact gates and a real 16 KiB emulator or device smoke before
+qualification.
 
 Run the app-owned iOS storage/file-policy integration contract with:
 
@@ -120,7 +135,10 @@ not account for the build-type application-ID suffix when stopping the app and
 can target the unsuffixed release package. The wrapper keeps Flutter from
 stopping the app, force-stops only `com.example.asterdev.debug`, verifies the
 actual APK identity, and proves any pre-existing release package is unchanged.
-It never uninstalls either package or erases developer state.
+On every post-launch exit it force-stops only that debug identity, rechecks the
+release path, and preserves the original drive failure ahead of cleanup or
+artifact diagnostics. It never uninstalls either package or erases developer
+state.
 
 Use this target instead of invoking the iOS integration test directly. Flutter
 temporarily points ignored iOS build settings at a disposable test listener;

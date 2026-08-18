@@ -1,6 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
+
+import 'gradle_verification_metadata.dart';
+
+const _maxVerifiedArtifactBytes = 512 * 1024 * 1024;
+const _hashBufferBytes = 64 * 1024;
+
 /// Exact Android tools and AGP libraries used to inspect release artifacts.
 final class AndroidArtifactToolchain {
   const AndroidArtifactToolchain({
@@ -75,6 +82,10 @@ AndroidArtifactToolchainResolution resolveAndroidArtifactToolchain({
     'Flutter Gradle extension',
     failures,
   );
+  final verificationMetadata = _readGradleVerificationMetadata(
+    File('$root/android/gradle/verification-metadata.xml'),
+    failures,
+  );
 
   final agpVersion = _singleMatch(
     settings,
@@ -103,7 +114,12 @@ AndroidArtifactToolchainResolution resolveAndroidArtifactToolchain({
   String? aapt2ProtoVersion;
   String? protobufVersion;
   if (agpVersion != null) {
-    final metadata = _agpModuleMetadata(gradleUserHome, agpVersion, failures);
+    final metadata = _agpModuleMetadata(
+      gradleUserHome,
+      agpVersion,
+      verificationMetadata,
+      failures,
+    );
     if (metadata != null) {
       aapt2ProtoVersion = _dependencyVersion(
         metadata,
@@ -133,6 +149,7 @@ AndroidArtifactToolchainResolution resolveAndroidArtifactToolchain({
       group: 'com.android.tools.build',
       module: 'aapt2-proto',
       version: aapt2ProtoVersion,
+      verificationMetadata: verificationMetadata,
       failures: failures,
     );
   }
@@ -143,6 +160,7 @@ AndroidArtifactToolchainResolution resolveAndroidArtifactToolchain({
       group: 'com.android.tools.build',
       module: 'bundletool',
       version: bundletoolVersion,
+      verificationMetadata: verificationMetadata,
       failures: failures,
     );
   }
@@ -153,6 +171,7 @@ AndroidArtifactToolchainResolution resolveAndroidArtifactToolchain({
       group: 'com.google.protobuf',
       module: 'protobuf-java',
       version: protobufVersion,
+      verificationMetadata: verificationMetadata,
       failures: failures,
     );
   }
@@ -283,6 +302,7 @@ void main() {
 Map<String, Object?>? _agpModuleMetadata(
   Directory gradleHome,
   String agpVersion,
+  GradleVerificationMetadata? verificationMetadata,
   List<String> failures,
 ) {
   final directory = Directory(
@@ -304,8 +324,19 @@ Map<String, Object?>? _agpModuleMetadata(
     );
     return null;
   }
+  final metadataFile = files.single;
+  if (!_matchesVerifiedChecksum(
+    metadataFile,
+    group: 'com.android.tools.build',
+    module: 'gradle',
+    version: agpVersion,
+    verificationMetadata: verificationMetadata,
+    failures: failures,
+  )) {
+    return null;
+  }
   try {
-    final decoded = jsonDecode(files.single.readAsStringSync());
+    final decoded = jsonDecode(metadataFile.readAsStringSync());
     if (decoded is Map<String, Object?>) return decoded;
   } on FormatException {
     // The deterministic failure below owns malformed cache metadata.
@@ -354,6 +385,7 @@ File? _singleCachedJar(
   required String group,
   required String module,
   required String version,
+  required GradleVerificationMetadata? verificationMetadata,
   required List<String> failures,
 }) {
   final directory = Directory(
@@ -374,7 +406,116 @@ File? _singleCachedJar(
     );
     return null;
   }
-  return files.single.absolute;
+  final jar = files.single.absolute;
+  if (!_matchesVerifiedChecksum(
+    jar,
+    group: group,
+    module: module,
+    version: version,
+    verificationMetadata: verificationMetadata,
+    failures: failures,
+  )) {
+    return null;
+  }
+  return jar;
+}
+
+GradleVerificationMetadata? _readGradleVerificationMetadata(
+  File file,
+  List<String> failures,
+) {
+  final contents = _readRequired(
+    file,
+    'android/gradle/verification-metadata.xml',
+    failures,
+  );
+  if (contents == null) return null;
+  final result = parseGradleVerificationMetadata(contents);
+  failures.addAll(result.failures);
+  return result.passed ? result.metadata : null;
+}
+
+bool _matchesVerifiedChecksum(
+  File file, {
+  required String group,
+  required String module,
+  required String version,
+  required GradleVerificationMetadata? verificationMetadata,
+  required List<String> failures,
+}) {
+  if (verificationMetadata == null) return false;
+  final artifactName = _basename(file.path);
+  final key = '$group:$module:$version:$artifactName';
+  final expected = verificationMetadata.checksumFor(
+    group: group,
+    module: module,
+    version: version,
+    artifactName: artifactName,
+  );
+  if (expected == null) {
+    failures.add('Missing committed SHA-256 for $key.');
+    return false;
+  }
+  try {
+    final actual = _sha256File(file);
+    if (actual == expected) return true;
+  } on _ArtifactSizeException {
+    failures.add('Cached artifact $key exceeds the verification size limit.');
+    return false;
+  } on FileSystemException {
+    failures.add('Could not hash $key.');
+    return false;
+  }
+  failures.add('Cached artifact $key does not match its committed SHA-256.');
+  return false;
+}
+
+String _sha256File(File file) {
+  final input = file.openSync();
+  try {
+    if (input.lengthSync() > _maxVerifiedArtifactBytes) {
+      throw const _ArtifactSizeException();
+    }
+
+    final output = _SingleDigestSink();
+    final digestInput = sha256.startChunkedConversion(output);
+    var totalBytes = 0;
+    while (true) {
+      final chunk = input.readSync(_hashBufferBytes);
+      if (chunk.isEmpty) break;
+      totalBytes += chunk.length;
+      if (totalBytes > _maxVerifiedArtifactBytes) {
+        throw const _ArtifactSizeException();
+      }
+      digestInput.add(chunk);
+    }
+    digestInput.close();
+    return output.digest.toString();
+  } finally {
+    input.closeSync();
+  }
+}
+
+final class _SingleDigestSink implements Sink<Digest> {
+  Digest? _digest;
+
+  Digest get digest =>
+      _digest ?? (throw StateError('SHA-256 conversion produced no digest.'));
+
+  @override
+  void add(Digest data) {
+    if (_digest != null) {
+      throw StateError('SHA-256 conversion produced multiple digests.');
+    }
+    _digest = data;
+  }
+
+  @override
+  void close() {}
+}
+
+final class _ArtifactSizeException implements Exception {
+  const _ArtifactSizeException();
 }
 
 File? _singleExecutableNamed(

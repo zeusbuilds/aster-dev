@@ -20,6 +20,7 @@ final class ProductionTrackerVerification {
     required this.repositoryFileCount,
     required this.inventoryRowCount,
     required this.findingCount,
+    required this.phaseCount,
     required this.failures,
   });
 
@@ -31,6 +32,9 @@ final class ProductionTrackerVerification {
 
   /// Number of structurally valid finding rows found in the tracker.
   final int findingCount;
+
+  /// Number of structurally valid execution-phase rows found in the tracker.
+  final int phaseCount;
 
   /// Deterministically sorted schema, inventory, or readiness failures.
   final List<String> failures;
@@ -96,6 +100,7 @@ ProductionTrackerVerification verifyProductionTracker(
       repositoryFileCount: files.length,
       inventoryRowCount: 0,
       findingCount: 0,
+      phaseCount: 0,
       failures: List<String>.unmodifiable(failures..sort()),
     );
   }
@@ -126,6 +131,13 @@ ProductionTrackerVerification verifyProductionTracker(
     }
   }
   if (releaseMode) {
+    for (final phase in document.phases) {
+      if (_transientStatuses.contains(phase.status)) {
+        failures.add(
+          'Phase ${phase.id} remains ${phase.status} in release mode.',
+        );
+      }
+    }
     for (final finding in document.findings) {
       if (_transientStatuses.contains(finding.status)) {
         failures.add(
@@ -135,15 +147,13 @@ ProductionTrackerVerification verifyProductionTracker(
     }
   }
 
+  final uniqueFailures = failures.toSet().toList()..sort();
   return ProductionTrackerVerification(
     repositoryFileCount: files.length,
     inventoryRowCount: document.inventory.length,
     findingCount: document.findings.length,
-    failures: List<String>.unmodifiable(
-      failures
-        ..toSet().toList()
-        ..sort(),
-    ),
+    phaseCount: document.phases.length,
+    failures: List<String>.unmodifiable(uniqueFailures),
   );
 }
 
@@ -216,7 +226,12 @@ _TrackerDocument _parseTracker(String contents, List<String> failures) {
     failures.add(
       'Tracker inventory markers are missing, duplicated, or invalid.',
     );
-    return const _TrackerDocument(inventory: {}, findings: [], declaredIds: {});
+    return const _TrackerDocument(
+      inventory: {},
+      phases: [],
+      findings: [],
+      declaredIds: {},
+    );
   }
 
   final declaredIds = <String>{};
@@ -230,8 +245,65 @@ _TrackerDocument _parseTracker(String contents, List<String> failures) {
     }
   }
 
-  final findings = <_FindingRow>[];
+  final phases = <_PhaseRow>[];
+  final phaseNumbers = <int>{};
+  final phaseStart = contents.indexOf('## Phase Plan');
   final findingsStart = contents.indexOf('## Findings');
+  if (phaseStart < 0 || findingsStart <= phaseStart) {
+    failures.add('Phase Plan section is missing or invalid.');
+  } else {
+    final region = contents.substring(phaseStart, findingsStart);
+    for (final entry in const LineSplitter().convert(region).indexed) {
+      final lineNumber =
+          const LineSplitter()
+              .convert(contents.substring(0, phaseStart))
+              .length +
+          entry.$1 +
+          1;
+      final cells = _markdownCells(entry.$2);
+      if (cells == null || cells.isEmpty) continue;
+      if (cells.first == 'Phase' || cells.first == '---') continue;
+      final phaseNumber = int.tryParse(cells.first);
+      if (phaseNumber == null) continue;
+      if (cells.length != 4) {
+        failures.add(
+          'Phase row ${cells.first} on line $lineNumber must have 4 '
+          'columns, found ${cells.length}.',
+        );
+        continue;
+      }
+      final status = cells[2];
+      if (!_validStatuses.contains(status)) {
+        failures.add('Phase ${cells.first} has invalid status $status.');
+      }
+      if (!phaseNumbers.add(phaseNumber)) {
+        failures.add('Duplicate phase row: $phaseNumber.');
+        continue;
+      }
+      for (var index = 1; index < cells.length; index++) {
+        if (cells[index].isEmpty) {
+          failures.add(
+            'Phase ${cells.first} has an empty column ${index + 1}.',
+          );
+        }
+      }
+      phases.add(_PhaseRow(id: phaseNumber, status: status));
+    }
+    if (phases.isEmpty) {
+      failures.add('Phase Plan contains no phase rows.');
+    } else {
+      final highestPhase = phaseNumbers.reduce(
+        (left, right) => left > right ? left : right,
+      );
+      for (var phase = 0; phase <= highestPhase; phase += 1) {
+        if (!phaseNumbers.contains(phase)) {
+          failures.add('Phase Plan is missing phase $phase.');
+        }
+      }
+    }
+  }
+
+  final findings = <_FindingRow>[];
   final findingsEnd = contents.indexOf('## Generated Artifact Validation');
   if (findingsStart < 0 || findingsEnd <= findingsStart) {
     failures.add('Findings section is missing or invalid.');
@@ -333,6 +405,7 @@ _TrackerDocument _parseTracker(String contents, List<String> failures) {
 
   return _TrackerDocument(
     inventory: Map<String, _InventoryRow>.unmodifiable(inventory),
+    phases: List<_PhaseRow>.unmodifiable(phases),
     findings: List<_FindingRow>.unmodifiable(findings),
     declaredIds: Set<String>.unmodifiable(declaredIds),
   );
@@ -388,11 +461,13 @@ String _escape(String path) => path.replaceAll('|', r'\|');
 final class _TrackerDocument {
   const _TrackerDocument({
     required this.inventory,
+    required this.phases,
     required this.findings,
     required this.declaredIds,
   });
 
   final Map<String, _InventoryRow> inventory;
+  final List<_PhaseRow> phases;
   final List<_FindingRow> findings;
   final Set<String> declaredIds;
 }
@@ -409,6 +484,13 @@ final class _InventoryRow {
   final String status;
   final List<String> findingIds;
   final String source;
+}
+
+final class _PhaseRow {
+  const _PhaseRow({required this.id, required this.status});
+
+  final int id;
+  final String status;
 }
 
 final class _FindingRow {

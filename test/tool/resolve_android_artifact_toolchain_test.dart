@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../tool/resolve_android_artifact_toolchain.dart';
@@ -71,6 +72,7 @@ void main() {
       'ndk/28.2.13676358/toolchains/llvm/prebuilt/test/bin/llvm-readelf',
       'llvm-readobj',
     );
+    _writeVerificationMetadata(repository, _verifiedArtifacts(gradleHome));
   });
 
   tearDown(() {
@@ -150,6 +152,7 @@ void main() {
           'gradle/9.1.0/hash/gradle-9.1.0.module',
       '{malformed',
     );
+    _writeVerificationMetadata(repository, _verifiedArtifacts(gradleHome));
 
     final malformed = resolve();
 
@@ -208,10 +211,102 @@ void main() {
       ),
     );
   });
+
+  test('rejects cache bytes that differ from committed checksums', () {
+    File(
+      '${gradleHome.path}/caches/modules-2/files-2.1/'
+      'com.android.tools.build/bundletool/1.18.3/hash/'
+      'bundletool-1.18.3.jar',
+    ).writeAsStringSync('changed after Gradle verification');
+
+    final result = resolve();
+
+    expect(
+      result.failures,
+      contains(
+        contains(
+          'Cached artifact com.android.tools.build:bundletool:1.18.3:'
+          'bundletool-1.18.3.jar does not match its committed SHA-256',
+        ),
+      ),
+    );
+  });
+
+  test('rejects an oversized cache artifact before hashing its contents', () {
+    final artifact = File(
+      '${gradleHome.path}/caches/modules-2/files-2.1/'
+      'com.android.tools.build/bundletool/1.18.3/hash/'
+      'bundletool-1.18.3.jar',
+    );
+    final handle = artifact.openSync(mode: FileMode.write);
+    handle.truncateSync(512 * 1024 * 1024 + 1);
+    handle.closeSync();
+
+    final result = resolve();
+
+    expect(
+      result.failures,
+      contains(
+        contains(
+          'Cached artifact com.android.tools.build:bundletool:1.18.3:'
+          'bundletool-1.18.3.jar exceeds the verification size limit',
+        ),
+      ),
+    );
+  });
+
+  test('rejects unverified AGP module metadata before parsing it', () {
+    final metadata = File(
+      '${gradleHome.path}/caches/modules-2/files-2.1/'
+      'com.android.tools.build/gradle/9.1.0/hash/gradle-9.1.0.module',
+    );
+    metadata.writeAsStringSync('${metadata.readAsStringSync()}\n');
+
+    final result = resolve();
+
+    expect(
+      result.failures,
+      contains(
+        contains(
+          'Cached artifact com.android.tools.build:gradle:9.1.0:'
+          'gradle-9.1.0.module does not match its committed SHA-256',
+        ),
+      ),
+    );
+  });
+
+  test('rejects missing and duplicate committed checksums', () {
+    final artifacts = _verifiedArtifacts(gradleHome);
+    _writeVerificationMetadata(
+      repository,
+      artifacts.where((artifact) => artifact.module != 'protobuf-java'),
+    );
+
+    final missing = resolve();
+
+    expect(
+      missing.failures,
+      contains(
+        contains(
+          'Missing committed SHA-256 for com.google.protobuf:'
+          'protobuf-java:3.25.5:protobuf-java-3.25.5.jar',
+        ),
+      ),
+    );
+
+    _writeVerificationMetadata(repository, artifacts, duplicateFirst: true);
+
+    final duplicate = resolve();
+
+    expect(
+      duplicate.failures,
+      contains(contains('Gradle verification duplicates')),
+    );
+  });
 }
 
-void _writeAgpMetadata(Directory gradleHome, {String suffix = 'hash'}) {
-  _write(
+File _writeAgpMetadata(Directory gradleHome, {String suffix = 'hash'}) {
+  return _write(
     gradleHome,
     'caches/modules-2/files-2.1/com.android.tools.build/'
     'gradle/9.1.0/$suffix/gradle-9.1.0.module',
@@ -240,6 +335,99 @@ void _writeAgpMetadata(Directory gradleHome, {String suffix = 'hash'}) {
       ],
     }),
   );
+}
+
+List<_VerifiedArtifact> _verifiedArtifacts(Directory gradleHome) => [
+  _VerifiedArtifact(
+    group: 'com.android.tools.build',
+    module: 'gradle',
+    version: '9.1.0',
+    file: File(
+      '${gradleHome.path}/caches/modules-2/files-2.1/'
+      'com.android.tools.build/gradle/9.1.0/hash/gradle-9.1.0.module',
+    ),
+  ),
+  _VerifiedArtifact(
+    group: 'com.android.tools.build',
+    module: 'aapt2-proto',
+    version: '9.1.0-14792394',
+    file: File(
+      '${gradleHome.path}/caches/modules-2/files-2.1/'
+      'com.android.tools.build/aapt2-proto/9.1.0-14792394/hash/'
+      'aapt2-proto-9.1.0-14792394.jar',
+    ),
+  ),
+  _VerifiedArtifact(
+    group: 'com.android.tools.build',
+    module: 'bundletool',
+    version: '1.18.3',
+    file: File(
+      '${gradleHome.path}/caches/modules-2/files-2.1/'
+      'com.android.tools.build/bundletool/1.18.3/hash/'
+      'bundletool-1.18.3.jar',
+    ),
+  ),
+  _VerifiedArtifact(
+    group: 'com.google.protobuf',
+    module: 'protobuf-java',
+    version: '3.25.5',
+    file: File(
+      '${gradleHome.path}/caches/modules-2/files-2.1/'
+      'com.google.protobuf/protobuf-java/3.25.5/hash/'
+      'protobuf-java-3.25.5.jar',
+    ),
+  ),
+];
+
+void _writeVerificationMetadata(
+  Directory repository,
+  Iterable<_VerifiedArtifact> artifacts, {
+  bool duplicateFirst = false,
+}) {
+  final entries = artifacts.toList();
+  final components = entries.map((artifact) {
+    final checksum = sha256.convert(artifact.file.readAsBytesSync());
+    return '      <component group="${artifact.group}" '
+        'name="${artifact.module}" version="${artifact.version}">\n'
+        '        <artifact name="${_basename(artifact.file.path)}">\n'
+        '          <sha256 value="$checksum"/>\n'
+        '        </artifact>\n'
+        '      </component>';
+  }).toList();
+  if (duplicateFirst && components.isNotEmpty) {
+    components.add(components.first);
+  }
+  _write(
+    repository,
+    'android/gradle/verification-metadata.xml',
+    '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<verification-metadata '
+        'xmlns="https://schema.gradle.org/dependency-verification">\n'
+        '  <configuration>\n'
+        '    <verify-metadata>true</verify-metadata>\n'
+        '    <verify-signatures>false</verify-signatures>\n'
+        '  </configuration>\n'
+        '  <components>\n'
+        '${components.join('\n')}\n'
+        '  </components>\n'
+        '</verification-metadata>\n',
+  );
+}
+
+String _basename(String path) => path.split(Platform.pathSeparator).last;
+
+final class _VerifiedArtifact {
+  const _VerifiedArtifact({
+    required this.group,
+    required this.module,
+    required this.version,
+    required this.file,
+  });
+
+  final String group;
+  final String module;
+  final String version;
+  final File file;
 }
 
 File _write(Directory root, String relativePath, String contents) {
