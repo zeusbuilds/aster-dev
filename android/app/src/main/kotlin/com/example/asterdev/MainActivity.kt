@@ -13,14 +13,21 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : FlutterActivity() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var walletStorageChannel: MethodChannel? = null
     private var walletStorageExecutor: ExecutorService? = null
+    private var walletStorageSession: StorageChannelSession? = null
+    private var walletStorageGeneration = 0L
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        detachWalletStorageChannel()
+        val generation = walletStorageGeneration
+        val session = StorageChannelSession()
         val policy = WalletStoragePolicy(filesDir)
         val executor = Executors.newSingleThreadExecutor { operation ->
             Thread(operation, "utexo-wallet-storage").apply { isDaemon = true }
@@ -31,37 +38,95 @@ class MainActivity : FlutterActivity() {
             WalletStoragePolicy.channelName,
         )
         channel.setMethodCallHandler { call, result ->
-            executor.execute {
-                val response = try {
-                    policy.handle(call)
-                    StoragePolicyResponse.success
-                } catch (error: WalletStoragePolicyException) {
-                    StoragePolicyResponse.failure(error.reason.wireName)
-                } catch (_: Exception) {
-                    StoragePolicyResponse.failure("native")
-                }
-                mainHandler.post {
-                    if (response.reason == null) {
-                        result.success(null)
-                    } else {
-                        result.error(
-                            "wallet_storage_${response.reason}",
-                            "Wallet storage policy failed.",
-                            null,
-                        )
+            if (!session.tryBegin()) {
+                deliverStorageResponse(
+                    result,
+                    StoragePolicyResponse.failure("unavailable"),
+                )
+                return@setMethodCallHandler
+            }
+            try {
+                executor.execute {
+                    val response = try {
+                        policy.handle(call)
+                        StoragePolicyResponse.success
+                    } catch (error: WalletStoragePolicyException) {
+                        StoragePolicyResponse.failure(error.reason.wireName)
+                    } catch (_: Exception) {
+                        StoragePolicyResponse.failure("native")
                     }
+                    mainHandler.post {
+                        if (session.complete() &&
+                            generation == walletStorageGeneration &&
+                            channel === walletStorageChannel
+                        ) {
+                            deliverStorageResponse(result, response)
+                        }
+                    }
+                }
+            } catch (_: RejectedExecutionException) {
+                if (session.complete() &&
+                    generation == walletStorageGeneration &&
+                    channel === walletStorageChannel
+                ) {
+                    deliverStorageResponse(
+                        result,
+                        StoragePolicyResponse.failure("unavailable"),
+                    )
                 }
             }
         }
         walletStorageChannel = channel
+        walletStorageSession = session
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        detachWalletStorageChannel()
+        super.cleanUpFlutterEngine(flutterEngine)
+    }
+
+    private fun detachWalletStorageChannel() {
+        walletStorageGeneration += 1
+        walletStorageSession?.invalidate()
+        walletStorageSession = null
         walletStorageChannel?.setMethodCallHandler(null)
         walletStorageChannel = null
         walletStorageExecutor?.shutdown()
         walletStorageExecutor = null
-        super.cleanUpFlutterEngine(flutterEngine)
+    }
+
+    private fun deliverStorageResponse(
+        result: MethodChannel.Result,
+        response: StoragePolicyResponse,
+    ) {
+        if (response.reason == null) {
+            result.success(null)
+        } else {
+            result.error(
+                "wallet_storage_${response.reason}",
+                "Wallet storage policy failed.",
+                null,
+            )
+        }
+    }
+}
+
+internal class StorageChannelSession {
+    private val active = AtomicBoolean(true)
+    private val pending = AtomicBoolean(false)
+
+    fun tryBegin(): Boolean {
+        if (!active.get() || !pending.compareAndSet(false, true)) return false
+        if (active.get()) return true
+        pending.set(false)
+        return false
+    }
+
+    fun complete(): Boolean = pending.getAndSet(false) && active.get()
+
+    fun invalidate() {
+        active.set(false)
+        pending.set(false)
     }
 }
 
@@ -90,9 +155,9 @@ private class WalletStoragePolicy(private val filesRoot: File) {
     }
 
     private fun prepareRoot(directory: File) {
+        requireSecureParent(directory)
         val metadata = metadataOrNull(directory)
         if (metadata == null) {
-            requireSecureParent(directory)
             Os.mkdir(directory.path, ownerOnlyPermissions)
         } else {
             requireOwnedDirectoryIdentity(metadata)
@@ -115,10 +180,12 @@ private class WalletStoragePolicy(private val filesRoot: File) {
     }
 
     private fun verifyDirectory(directory: File) {
+        requireSecureParent(directory)
         requireOwnedDirectory(metadataOrNull(directory) ?: fail(PolicyError.missing))
     }
 
     private fun verifyFile(file: File) {
+        requireSecureParent(file)
         requireOwnedFile(metadataOrNull(file) ?: fail(PolicyError.missing))
     }
 
@@ -168,17 +235,22 @@ private class WalletStoragePolicy(private val filesRoot: File) {
         ) {
             fail(PolicyError.parent)
         }
-        val metadata = metadataOrNull(canonicalParent) ?: fail(PolicyError.parent)
-        try {
-            if (canonicalParent == root) {
-                requireOwnedDirectoryIdentity(metadata)
-            } else {
-                requireOwnedDirectory(metadata)
+        var current = canonicalParent
+        while (true) {
+            val metadata = metadataOrNull(current) ?: fail(PolicyError.parent)
+            try {
+                if (current == root) {
+                    requireOwnedDirectoryIdentity(metadata)
+                } else {
+                    requireOwnedDirectory(metadata)
+                }
+            } catch (_: WalletStoragePolicyException) {
+                fail(PolicyError.parent)
             }
-        } catch (_: WalletStoragePolicyException) {
-            fail(PolicyError.parent)
+            if (current == root) break
+            current = current.parentFile ?: fail(PolicyError.parent)
         }
-        return parent
+        return canonicalParent
     }
 
     private fun validatePath(path: String): File {
@@ -209,19 +281,19 @@ private class WalletStoragePolicy(private val filesRoot: File) {
         return normalized
     }
 
-    private fun requireOwnedDirectoryIdentity(metadata: DirectoryMetadata) {
+    private fun requireOwnedDirectoryIdentity(metadata: StorageMetadata) {
         if (!metadata.isDirectory || metadata.ownerId != Os.geteuid()) {
             fail(PolicyError.identity)
         }
     }
 
-    private fun requireOwnedDirectory(metadata: DirectoryMetadata) {
+    private fun requireOwnedDirectory(metadata: StorageMetadata) {
         requireOwnedDirectoryIdentity(metadata)
         if (metadata.permissions != ownerOnlyPermissions) fail(PolicyError.permissions)
     }
 
-    private fun requireOwnedFile(metadata: DirectoryMetadata) {
-        if (!metadata.isRegularFile || metadata.ownerId != Os.geteuid()) {
+    private fun requireOwnedFile(metadata: StorageMetadata) {
+        if (!metadata.hasOwnedRegularFileIdentity(Os.geteuid())) {
             fail(PolicyError.identity)
         }
         if (metadata.permissions != ownerOnlyFilePermissions) {
@@ -229,29 +301,23 @@ private class WalletStoragePolicy(private val filesRoot: File) {
         }
     }
 
-    private fun metadataOrNull(file: File): DirectoryMetadata? {
+    private fun metadataOrNull(file: File): StorageMetadata? {
         val status = try {
             Os.lstat(file.path)
         } catch (error: ErrnoException) {
             if (error.errno == OsConstants.ENOENT) return null
             throw error
         }
-        return DirectoryMetadata(
+        return StorageMetadata(
             isDirectory = status.st_mode and OsConstants.S_IFMT == OsConstants.S_IFDIR,
             isRegularFile = status.st_mode and OsConstants.S_IFMT == OsConstants.S_IFREG,
             ownerId = status.st_uid,
             permissions = status.st_mode and permissionMask,
+            linkCount = status.st_nlink,
         )
     }
 
     private fun fail(reason: PolicyError): Nothing = throw WalletStoragePolicyException(reason)
-
-    private data class DirectoryMetadata(
-        val isDirectory: Boolean,
-        val isRegularFile: Boolean,
-        val ownerId: Int,
-        val permissions: Int,
-    )
 
     companion object {
         const val channelName = "com.utexo.wallet/storage_security"
@@ -261,6 +327,18 @@ private class WalletStoragePolicy(private val filesRoot: File) {
         private const val maximumTextFileBytes = 1024 * 1024
     }
 }
+
+internal data class StorageMetadata(
+    val isDirectory: Boolean,
+    val isRegularFile: Boolean,
+    val ownerId: Int,
+    val permissions: Int,
+    val linkCount: Long,
+)
+
+internal fun StorageMetadata.hasOwnedRegularFileIdentity(
+    expectedOwnerId: Int,
+): Boolean = isRegularFile && ownerId == expectedOwnerId && linkCount == 1L
 
 private class WalletStoragePolicyException(
     val reason: PolicyError,

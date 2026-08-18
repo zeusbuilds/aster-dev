@@ -81,6 +81,44 @@ void main() {
     await security.replaceTextFile(metadata.path, 'second');
     expect(await metadata.readAsString(), 'second');
 
+    await expectLater(
+      security.replaceTextFile(metadata.path, ''),
+      throwsA(isA<FileSystemException>()),
+    );
+    await expectLater(
+      security.replaceTextFile(
+        metadata.path,
+        String.fromCharCodes(
+          List<int>.filled(1024 * 1024 + 1, 0x78, growable: false),
+        ),
+      ),
+      throwsA(isA<FileSystemException>()),
+    );
+    await expectLater(
+      security.createDirectory(metadata.path),
+      throwsA(isA<FileSystemException>()),
+    );
+    await expectLater(
+      security.replaceTextFile(child.path, 'replacement'),
+      throwsA(isA<FileSystemException>()),
+    );
+    expect(await metadata.readAsString(), 'second');
+    expect(await child.exists(), isTrue);
+
+    final fileLink = Link(
+      '${root.path}${Platform.pathSeparator}wallet_registry.link.json',
+    );
+    await fileLink.create(metadata.path);
+    await expectLater(
+      security.verifyFile(fileLink.path),
+      throwsA(isA<FileSystemException>()),
+    );
+    await expectLater(
+      security.replaceTextFile(fileLink.path, 'replacement'),
+      throwsA(isA<FileSystemException>()),
+    );
+    expect(await metadata.readAsString(), 'second');
+
     final link = Link('${root.path}${Platform.pathSeparator}wallet_link');
     await link.create(child.path);
     await expectLater(
@@ -114,5 +152,75 @@ void main() {
       ),
       throwsA(isA<FileSystemException>()),
     );
+    await expectLater(
+      security.verifyDirectory('relative_wallet'),
+      throwsA(isA<FileSystemException>()),
+    );
+    await expectLater(
+      security.verifyDirectory(' ${root.path}'),
+      throwsA(isA<FileSystemException>()),
+    );
+    await expectLater(
+      security.verifyDirectory(
+        '${support.parent.path}${Platform.pathSeparator}outside_wallet',
+      ),
+      throwsA(isA<FileSystemException>()),
+    );
+
+    if (Platform.isAndroid) {
+      final looseAncestor = Directory(
+        '${root.path}${Platform.pathSeparator}loose_ancestor',
+      );
+      final secureParent = Directory(
+        '${looseAncestor.path}${Platform.pathSeparator}secure_parent',
+      );
+      await looseAncestor.create();
+      await secureParent.create();
+      final chmodLoose = await Process.run('/system/bin/chmod', [
+        '0777',
+        looseAncestor.path,
+      ]);
+      final chmodSecure = await Process.run('/system/bin/chmod', [
+        '0700',
+        secureParent.path,
+      ]);
+      expect(chmodLoose.exitCode, 0, reason: '${chmodLoose.stderr}');
+      expect(chmodSecure.exitCode, 0, reason: '${chmodSecure.stderr}');
+      await expectLater(
+        security.createDirectory(
+          '${secureParent.path}${Platform.pathSeparator}wallet',
+        ),
+        throwsA(isA<FileSystemException>()),
+      );
+
+      final hardLink = File(
+        '${root.path}${Platform.pathSeparator}wallet_registry.hard.json',
+      );
+      final linkResult = await Process.run('/system/bin/ln', [
+        metadata.path,
+        hardLink.path,
+      ]);
+      if (linkResult.exitCode == 0) {
+        await expectLater(
+          security.verifyFile(metadata.path),
+          throwsA(isA<FileSystemException>()),
+        );
+        await expectLater(
+          security.verifyFile(hardLink.path),
+          throwsA(isA<FileSystemException>()),
+        );
+        await hardLink.delete();
+      } else {
+        expect(
+          linkResult.stderr.toString(),
+          anyOf(
+            contains('Permission denied'),
+            contains('Operation not permitted'),
+          ),
+        );
+        expect(await hardLink.exists(), isFalse);
+      }
+      await security.verifyFile(metadata.path);
+    }
   });
 }

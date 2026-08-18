@@ -38,6 +38,24 @@ An exact release candidate additionally requires:
 Simulator and host tests cannot qualify physical haptics, camera hardware,
 screen readers, signing, or a funds-bearing native supply chain.
 
+Run the app-host native suites before their Flutter integration contracts:
+
+```sh
+make ios-native-test IOS_SIMULATOR_ID=<simulator-udid>
+make android-native-test
+```
+
+The iOS target performs an Xcode clean before XCTest so a prior Flutter
+integration listener cannot leave stale products in candidate evidence.
+The iOS suite executes the filesystem policy directly, including insecure
+ancestors, hard-link aliases, bounds, collisions, byte preservation, and
+channel-session invalidation. Android unit tests stress concurrent admission,
+exactly-once session state, invalidation, and the same `st_nlink == 1` identity
+predicate used by production. The Android integration contract additionally
+accepts only an explicit platform `Permission denied`/`Operation not permitted`
+when API-level sandbox policy prevents constructing a hard link; any other
+construction failure fails the test.
+
 Android release APK and AAB verification rejects every signed candidate unless
 `UTEXO_RELEASE_CERT_SHA256` identifies the one approved certificate. With no
 approved fingerprint configured, only unsigned candidate artifacts pass; they

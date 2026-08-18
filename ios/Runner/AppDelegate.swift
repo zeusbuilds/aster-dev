@@ -5,6 +5,7 @@ import UIKit
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private var walletStorageChannel: FlutterMethodChannel?
+  private var walletStorageSession: StorageChannelSession?
   private let walletStorageQueue = DispatchQueue(
     label: "com.utexo.wallet.storage-security",
     qos: .utility
@@ -19,13 +20,26 @@ import UIKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    walletStorageSession?.invalidate()
+    walletStorageChannel?.setMethodCallHandler(nil)
     let channel = FlutterMethodChannel(
       name: WalletStoragePolicy.channelName,
       binaryMessenger: engineBridge.applicationRegistrar.messenger()
     )
-    channel.setMethodCallHandler { [weak self] call, result in
-      guard let self else { return }
-      walletStorageQueue.async {
+    let queue = walletStorageQueue
+    let session = StorageChannelSession()
+    channel.setMethodCallHandler { call, result in
+      guard session.tryBegin() else {
+        result(
+          FlutterError(
+            code: "wallet_storage_unavailable",
+            message: "Wallet storage policy failed.",
+            details: nil
+          )
+        )
+        return
+      }
+      queue.async {
         let response: FlutterError?
         do {
           try WalletStoragePolicy.handle(call)
@@ -38,11 +52,43 @@ import UIKit
           )
         }
         DispatchQueue.main.async {
-          result(response)
+          if session.complete() {
+            result(response)
+          }
         }
       }
     }
     walletStorageChannel = channel
+    walletStorageSession = session
+  }
+}
+
+final class StorageChannelSession {
+  private let lock = NSLock()
+  private var active = true
+  private var pending = false
+
+  func tryBegin() -> Bool {
+    lock.lock()
+    defer { lock.unlock() }
+    guard active, !pending else { return false }
+    pending = true
+    return true
+  }
+
+  func complete() -> Bool {
+    lock.lock()
+    defer { lock.unlock() }
+    guard active, pending else { return false }
+    pending = false
+    return true
+  }
+
+  func invalidate() {
+    lock.lock()
+    defer { lock.unlock() }
+    active = false
+    pending = false
   }
 }
 
@@ -55,7 +101,7 @@ enum WalletStoragePolicy {
       let arguments = call.arguments as? [String: Any],
       let path = arguments["path"] as? String
     else {
-      throw PolicyError.path
+      throw PolicyError.argument
     }
     let url = try validatedURL(path)
     switch call.method {
@@ -69,11 +115,11 @@ enum WalletStoragePolicy {
       try verifyFile(url)
     case "replaceTextFile":
       guard let contents = arguments["contents"] as? String else {
-        throw PolicyError.path
+        throw PolicyError.argument
       }
       try replaceTextFile(url, contents: contents)
     default:
-      throw PolicyError.path
+      throw PolicyError.argument
     }
   }
 
@@ -82,6 +128,8 @@ enum WalletStoragePolicy {
   }
 
   private static func prepareRoot(_ url: URL) throws {
+    try ensureApplicationSupportRoot()
+    try requireSecureParent(url)
     var metadata = stat()
     if lstat(url.path, &metadata) == 0 {
       try requireOwnedDirectoryIdentity(metadata)
@@ -90,7 +138,6 @@ enum WalletStoragePolicy {
       }
     } else {
       guard errno == ENOENT else { throw PolicyError.native }
-      try requireSecureParent(url)
       try FileManager.default.createDirectory(
         at: url,
         withIntermediateDirectories: false,
@@ -103,9 +150,8 @@ enum WalletStoragePolicy {
 
   private static func createDirectory(_ url: URL) throws {
     var metadata = stat()
-    guard lstat(url.path, &metadata) != 0, errno == ENOENT else {
-      throw PolicyError.collision
-    }
+    if lstat(url.path, &metadata) == 0 { throw PolicyError.collision }
+    guard errno == ENOENT else { throw PolicyError.native }
     try requireSecureParent(url)
     try FileManager.default.createDirectory(
       at: url,
@@ -123,6 +169,7 @@ enum WalletStoragePolicy {
   }
 
   private static func verifyDirectory(_ url: URL) throws {
+    try requireSecureParent(url)
     var metadata = stat()
     guard lstat(url.path, &metadata) == 0 else { throw PolicyError.missing }
     try requireOwnedDirectory(metadata)
@@ -140,6 +187,7 @@ enum WalletStoragePolicy {
   }
 
   private static func verifyFile(_ url: URL) throws {
+    try requireSecureParent(url)
     var metadata = stat()
     guard lstat(url.path, &metadata) == 0 else { throw PolicyError.missing }
     try requireOwnedFile(metadata)
@@ -162,7 +210,7 @@ enum WalletStoragePolicy {
       !data.isEmpty,
       data.count <= 1_048_576
     else {
-      throw PolicyError.path
+      throw PolicyError.argument
     }
     try requireSecureParent(url)
     var existing = stat()
@@ -221,8 +269,11 @@ enum WalletStoragePolicy {
   private static func syncDirectory(_ url: URL) throws {
     let descriptor = open(url.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
     guard descriptor >= 0 else { throw PolicyError.native }
-    defer { _ = close(descriptor) }
-    guard fsync(descriptor) == 0 else { throw PolicyError.native }
+    guard fsync(descriptor) == 0 else {
+      _ = close(descriptor)
+      throw PolicyError.native
+    }
+    guard close(descriptor) == 0 else { throw PolicyError.native }
   }
 
   private static func applyProtection(_ url: URL) throws {
@@ -237,30 +288,27 @@ enum WalletStoragePolicy {
   }
 
   private static func requireSecureParent(_ url: URL) throws {
-    let parent = url.deletingLastPathComponent()
-    var metadata = stat()
-    guard lstat(parent.path, &metadata) == 0 else { throw PolicyError.parent }
-    do {
-      if try isApplicationSupportRoot(parent) {
-        try requireOwnedDirectoryIdentity(metadata)
-      } else {
-        try requireOwnedDirectory(metadata)
+    let root = try applicationSupportRoot()
+    var current = url.deletingLastPathComponent().standardizedFileURL
+    while true {
+      var metadata = stat()
+      guard lstat(current.path, &metadata) == 0 else {
+        throw PolicyError.parent
       }
-    } catch {
-      throw PolicyError.parent
+      do {
+        if current.path == root.path {
+          try requireOwnedDirectoryIdentity(metadata)
+        } else {
+          try requireOwnedDirectory(metadata)
+        }
+      } catch {
+        throw PolicyError.parent
+      }
+      if current.path == root.path { break }
+      let ancestor = current.deletingLastPathComponent().standardizedFileURL
+      guard ancestor.path != current.path else { throw PolicyError.parent }
+      current = ancestor
     }
-  }
-
-  private static func isApplicationSupportRoot(_ url: URL) throws -> Bool {
-    guard
-      let support = FileManager.default.urls(
-        for: .applicationSupportDirectory,
-        in: .userDomainMask
-      ).first
-    else {
-      throw PolicyError.parent
-    }
-    return url.standardizedFileURL.path == support.standardizedFileURL.path
   }
 
   private static func requireOwnedDirectory(_ metadata: stat) throws {
@@ -280,7 +328,8 @@ enum WalletStoragePolicy {
 
   private static func requireOwnedFile(_ metadata: stat) throws {
     guard (metadata.st_mode & mode_t(S_IFMT)) == mode_t(S_IFREG),
-      metadata.st_uid == geteuid()
+      metadata.st_uid == geteuid(),
+      metadata.st_nlink == 1
     else {
       throw PolicyError.identity
     }
@@ -294,14 +343,11 @@ enum WalletStoragePolicy {
       !path.isEmpty,
       (path as NSString).isAbsolutePath,
       !(path as NSString).pathComponents.contains(where: { $0 == "." || $0 == ".." }),
-      let support = FileManager.default.urls(
-        for: .applicationSupportDirectory,
-        in: .userDomainMask
-      ).first
+      let support = try? applicationSupportRoot()
     else {
       throw PolicyError.path
     }
-    let standardizedSupport = support.standardizedFileURL
+    let standardizedSupport = support
     let root = standardizedSupport.path + "/"
     let url = URL(fileURLWithPath: path).standardizedFileURL
     guard url.path.hasPrefix(root) else { throw PolicyError.path }
@@ -316,7 +362,43 @@ enum WalletStoragePolicy {
     return url
   }
 
+  private static func applicationSupportRoot() throws -> URL {
+    guard
+      let support = FileManager.default.urls(
+        for: .applicationSupportDirectory,
+        in: .userDomainMask
+      ).first
+    else {
+      throw PolicyError.parent
+    }
+    return support.standardizedFileURL
+  }
+
+  private static func ensureApplicationSupportRoot() throws {
+    let root = try applicationSupportRoot()
+    var metadata = stat()
+    if lstat(root.path, &metadata) == 0 {
+      try requireOwnedDirectoryIdentity(metadata)
+      return
+    }
+    guard errno == ENOENT else { throw PolicyError.native }
+
+    let parent = root.deletingLastPathComponent().standardizedFileURL
+    guard lstat(parent.path, &metadata) == 0 else { throw PolicyError.parent }
+    do {
+      try requireOwnedDirectoryIdentity(metadata)
+    } catch {
+      throw PolicyError.parent
+    }
+    try FileManager.default.createDirectory(
+      at: root,
+      withIntermediateDirectories: false,
+      attributes: [.posixPermissions: NSNumber(value: ownerOnlyPermissions)]
+    )
+  }
+
   private enum PolicyError: String, Error {
+    case argument
     case backup
     case collision
     case identity

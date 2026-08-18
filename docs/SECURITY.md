@@ -22,6 +22,12 @@ or transient toasts. Tests use synthetic values that cannot spend funds.
   backup-excluded wallet files.
 - Android uses namespaced AES-GCM secure storage with destructive reset
   disabled; cloud backup and device transfer are disabled.
+- Native wallet-file policy validates every app-owned ancestor back to the
+  trusted platform storage root, rejects symbolic and multi-hard-link aliases,
+  requires owner-only modes below that root, and bounds metadata replacement.
+- Each Flutter engine owns one native storage-channel session. Work is
+  serialized off the platform thread, obsolete-engine completions are
+  suppressed, and concurrent calls fail closed without mutating storage.
 - Metadata uses a checksummed two-slot journal and ownership-bound recovery.
 - Corrupt, unknown, or legacy records are preserved and fail closed.
 

@@ -15,7 +15,8 @@ from a clean worktree and record commands/results in the production tracker.
 
 ## Platforms
 
-- [ ] clean iOS build and XCTest
+- [ ] `make ios-native-test IOS_SIMULATOR_ID=<id>` and
+      `make ios-storage-test IOS_SIMULATOR_ID=<id>`
 - [ ] root iOS privacy manifest is present in the built app and its approved
       required-reason entries match the exact executable/API scan
 - [ ] iOS install/launch smoke on the recorded simulator/device
@@ -25,6 +26,8 @@ from a clean worktree and record commands/results in the production tracker.
       the base build number and each split APK uses Flutter's verified ABI code
 - [ ] direct APK artifacts contain exactly one ABI; never distribute the
       universal `app-release.apk`
+- [ ] `make android-native-test` and
+      `make android-storage-test ANDROID_DEVICE_ID=<id>`
 - [ ] Android install/launch smoke on the recorded ABI/API
 - [ ] package IDs, entitlements, backup policy, signing, and release metadata
 - [ ] every Release wallet service endpoint is TLS-protected; no HTTP, `tcp`,

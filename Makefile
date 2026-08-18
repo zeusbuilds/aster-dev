@@ -1,4 +1,4 @@
-.PHONY: shell dependencies bootstrap clean build watch run test ios-storage-test android-storage-test format format-check analyze docs verify verify-toolchain verify-architecture verify-design-system verify-barrels verify-generated lint prepare-android-release android-release-bundle android-release-apks verify-android-release-bundle verify-android-release-apks verify-android-apk-signature-policy fvm-setup help
+.PHONY: shell dependencies bootstrap clean build watch run test ios-native-test android-native-test ios-storage-test android-storage-test format format-check analyze docs verify verify-toolchain verify-architecture verify-design-system verify-barrels verify-generated lint prepare-android-release android-release-bundle android-release-apks verify-android-release-bundle verify-android-release-apks verify-android-apk-signature-policy fvm-setup help
 
 # Default target
 help:
@@ -12,6 +12,8 @@ help:
 	@echo "  make watch     - Run build_runner in watch mode"
 	@echo "  make run       - Run Flutter app"
 	@echo "  make test      - Run Flutter tests"
+	@echo "  make ios-native-test IOS_SIMULATOR_ID=<id> - Run iOS Runner XCTest"
+	@echo "  make android-native-test - Run Android app-host unit tests"
 	@echo "  make ios-storage-test IOS_SIMULATOR_ID=<id> - Run iOS storage integration tests safely"
 	@echo "  make android-storage-test ANDROID_DEVICE_ID=<id> - Run Android storage integration tests safely"
 	@echo "  make format    - Format Dart code"
@@ -73,6 +75,13 @@ run:
 test:
 	@echo "Running Flutter tests..."
 	fvm flutter test --no-pub
+
+ios-native-test:
+	@test -n "$(IOS_SIMULATOR_ID)" || (echo "IOS_SIMULATOR_ID is required" >&2; exit 64)
+	xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner -configuration Debug -destination "platform=iOS Simulator,id=$(IOS_SIMULATOR_ID)" -quiet clean test
+
+android-native-test:
+	cd android && ./gradlew :app:testDebugUnitTest
 
 # Flutter integration tests temporarily rewrite ignored iOS build settings to a
 # disposable listener target. The wrapper restores lib/main.dart on every exit.
