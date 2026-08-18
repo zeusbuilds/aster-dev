@@ -5,9 +5,11 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val utexoApplicationId = providers.gradleProperty("utexo.applicationId").get()
+
 android {
     // Final package identity is release-owned and remains blocked by DEC-006.
-    namespace = "com.example.asterdev"
+    namespace = utexoApplicationId
     compileSdk = flutter.compileSdkVersion
     buildToolsVersion = "36.0.0"
     ndkVersion = flutter.ndkVersion
@@ -18,7 +20,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.asterdev"
+        applicationId = utexoApplicationId
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

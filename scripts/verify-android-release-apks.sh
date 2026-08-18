@@ -29,6 +29,11 @@ verify_apk() {
 
   [[ -f "${apk_path}" ]] || fail "missing ${apk_path}"
 
+  fvm dart run tool/verify_android_release_identity.dart \
+    --apk "${apk_path}" \
+    --aapt2 "${UTEXO_AAPT2}" ||
+    fail "${apk_path} does not match committed release identity"
+
   archive_entries="$(unzip -Z1 "${apk_path}")" ||
     fail "could not inspect ${apk_path}"
   packaged_abis="$(

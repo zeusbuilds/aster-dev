@@ -26,6 +26,19 @@ void main() {
           'val targetSdkVersion: Int = 36\n'
           'val ndkVersion: String = "28.2.13676358"',
     );
+    _write(
+      repository,
+      'flutter/packages/flutter_tools/gradle/src/main/kotlin/'
+          'FlutterPluginConstants.kt',
+      'ARCH_ARM32 to 1\n'
+          'ARCH_ARM64 to 2\n'
+          'ARCH_X86_64 to 4',
+    );
+    _write(
+      repository,
+      'flutter/packages/flutter_tools/gradle/src/main/kotlin/FlutterPlugin.kt',
+      'output.versionCodeOverride = abiVersionCode * 1000 + baseVersionCode',
+    );
     flutterGradleUtils = _write(
       repository,
       'flutter/packages/flutter_tools/lib/src/android/gradle_utils.dart',
@@ -36,15 +49,25 @@ void main() {
     _write(
       repository,
       'android/app/build.gradle.kts',
-      'android {\n'
+      'val utexoApplicationId = '
+          'providers.gradleProperty("utexo.applicationId").get()\n'
+          'android {\n'
+          '  namespace = utexoApplicationId\n'
           '  compileSdk = flutter.compileSdkVersion\n'
           '  buildToolsVersion = "36.0.0"\n'
           '  ndkVersion = flutter.ndkVersion\n'
           '  defaultConfig {\n'
+          '    applicationId = utexoApplicationId\n'
           '    minSdk = flutter.minSdkVersion\n'
           '    targetSdk = flutter.targetSdkVersion\n'
           '  }\n'
           '}',
+    );
+    _write(
+      repository,
+      'android/gradle.properties',
+      'android.useAndroidX=true\n'
+          'utexo.applicationId=com.example.utexo\n',
     );
     _write(
       repository,
@@ -87,7 +110,31 @@ void main() {
     _write(
       repository,
       'Makefile',
-      'dependencies:\n\tfvm flutter pub get --enforce-lockfile',
+      'dependencies:\n'
+          '\tfvm flutter pub get --enforce-lockfile\n'
+          'prepare-android-release:\n'
+          '\tfvm flutter clean\n'
+          '\t@\$(MAKE) --no-print-directory dependencies\n'
+          '\tfvm dart run tool/prepare_android_release.dart\n'
+          'android-release-bundle: prepare-android-release\n'
+          '\tfvm flutter build appbundle --release --no-pub\n'
+          'android-release-apks: prepare-android-release\n'
+          '\tfvm flutter build apk --release --split-per-abi --no-pub',
+    );
+    _write(
+      repository,
+      'scripts/verify-android-release-apks.sh',
+      'fvm dart run tool/verify_android_release_identity.dart \\\n'
+          '  --apk "\${apk_path}" \\\n'
+          '  --aapt2 "\${UTEXO_AAPT2}"',
+    );
+    _write(
+      repository,
+      'scripts/verify-android-release-bundle.sh',
+      'fvm dart run tool/verify_android_release_identity.dart \\\n'
+          '  --bundle "\${bundle_path}" \\\n'
+          '  --aapt2-proto "\${UTEXO_AAPT2_PROTO_JAR}" \\\n'
+          '  --protobuf "\${UTEXO_PROTOBUF_JAR}"',
     );
     _write(
       repository,
@@ -197,6 +244,29 @@ void main() {
         contains('exactly Kotlin Gradle Plugin 2.4.0'),
         contains('wrapper must use Flutter Gradle 9.3.1'),
       ]),
+    );
+  });
+
+  test('rejects Flutter split-ABI versioning drift', () {
+    _write(
+      repository,
+      'flutter/packages/flutter_tools/gradle/src/main/kotlin/'
+          'FlutterPluginConstants.kt',
+      'ARCH_ARM32 to 1\nARCH_ARM64 to 3\nARCH_X86_64 to 4',
+    );
+
+    final result = _verify(
+      repository,
+      flutterVersionMetadata,
+      flutterExtension,
+      flutterGradleUtils,
+    );
+
+    expect(
+      result.failures,
+      contains(
+        'Flutter split-ABI version map differs from the artifact verifier.',
+      ),
     );
   });
 
@@ -320,6 +390,77 @@ void main() {
     );
   });
 
+  test('rejects Android Release targets that bypass guarded preparation', () {
+    final makefile = File('${repository.path}/Makefile');
+    makefile.writeAsStringSync(
+      makefile.readAsStringSync().replaceFirst(
+        'android-release-bundle: prepare-android-release',
+        'android-release-bundle: dependencies',
+      ),
+    );
+
+    final result = _verify(
+      repository,
+      flutterVersionMetadata,
+      flutterExtension,
+      flutterGradleUtils,
+    );
+
+    expect(
+      result.failures,
+      contains(
+        'android-release-bundle must depend on guarded Release plugin preparation.',
+      ),
+    );
+  });
+
+  test('rejects reordered Android Release preparation', () {
+    final makefile = File('${repository.path}/Makefile');
+    makefile.writeAsStringSync(
+      makefile.readAsStringSync().replaceFirst(
+        '\tfvm flutter clean\n'
+            '\t@\$(MAKE) --no-print-directory dependencies\n',
+        '\t@\$(MAKE) --no-print-directory dependencies\n'
+            '\tfvm flutter clean\n',
+      ),
+    );
+
+    final result = _verify(
+      repository,
+      flutterVersionMetadata,
+      flutterExtension,
+      flutterGradleUtils,
+    );
+
+    expect(
+      result.failures,
+      contains(
+        'Android Release preparation must clean, resolve the exact lock, and '
+        'then run the guarded plugin tool in order.',
+      ),
+    );
+  });
+
+  test('rejects Android artifact identity bypasses', () {
+    _write(
+      repository,
+      'scripts/verify-android-release-bundle.sh',
+      './scripts/verify-android-native-libraries.sh',
+    );
+
+    final result = _verify(
+      repository,
+      flutterVersionMetadata,
+      flutterExtension,
+      flutterGradleUtils,
+    );
+
+    expect(
+      result.failures,
+      contains('Bundle verification must enforce committed release identity.'),
+    );
+  });
+
   test('rejects malformed Flutter version metadata', () {
     flutterVersionMetadata.writeAsStringSync('{malformed');
 
@@ -351,6 +492,8 @@ void main() {
       result.failures,
       containsAll([
         'Missing Flutter Gradle extension.',
+        'Missing Flutter Gradle plugin.',
+        'Missing Flutter Gradle plugin constants.',
         'Missing Flutter Gradle utilities.',
         'Missing Flutter version metadata.',
       ]),

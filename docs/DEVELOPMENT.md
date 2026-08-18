@@ -113,6 +113,32 @@ verifies the production tracker inventory.
 - `make verify-barrels` - Verify barrel boundaries directly
 - `make lint` - Run all pre-commit gates; ignored generated sources may refresh
 
+### Android Release Builds
+
+Use only the owned targets:
+
+```bash
+make android-release-bundle
+make android-release-apks
+```
+
+Flutter issue [169336](https://github.com/flutter/flutter/issues/169336)
+causes a no-Pub Release build to reuse the development plugin registrant. The
+owned `prepare-android-release` prerequisite removes inherited Flutter/Gradle
+output, resolves only the committed lock, runs Flutter's config-only
+workaround, then rejects any `pubspec.lock` or normalized package-graph drift,
+any development plugin in the Release registrant, and any missing production
+registration. Artifact compilation resumes with `--no-pub`.
+
+The package verifiers compare the APK/AAB application ID, version name, and
+version code with `android/gradle.properties` and `pubspec.yaml`. Flutter
+intentionally encodes the ABI in split APK version codes (`1000 + base` for
+armeabi-v7a, `2000 + base` for arm64-v8a, and `4000 + base` for x86_64); the
+AAB retains the base code. The toolchain gate verifies this mapping against the
+executing pinned Flutter source. Do not replace this sequence with a direct
+`flutter build` command or interpret a valid split code as the source build
+number.
+
 ### CI (GitHub Actions)
 
 On push to `main` and on pull requests, the **Dart** workflow runs:
@@ -219,6 +245,14 @@ non-secret endpoint overrides are documented in
 `docs/architecture/SDK_INTEGRATION.md`. Never pass LSP, VSS, Bitcoin RPC, or
 other credentials with `--dart-define`, because compile-time values are part of
 the application binary.
+
+The immutable SDK's default regtest indexer uses local plain HTTP. That default
+is accepted only by Debug and Profile builds. Release builds reject HTTP,
+unencrypted Electrum (`tcp`), and unencrypted RGB transport (`rpc`) before
+native wallet creation, including on loopback and `10.0.2.2`. A Release build
+for regtest therefore requires explicit TLS-protected service endpoints; an
+unconfigured Release build fails closed instead of silently relying on a
+transport Android packaging already forbids.
 
 RGB USDT requires both `UTEXO_USDT_ASSET_ID` and
 `UTEXO_USDT_PRECISION` for the selected environment. These are non-secret

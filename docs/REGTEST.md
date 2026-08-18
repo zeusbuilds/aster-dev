@@ -23,3 +23,6 @@ protected ports for loopback, expanded or IPv4-mapped IPv6 loopback, and the
 Android emulator host alias. Legacy numeric aliases such as `127.1` are
 rejected before resolver or native-SDK use. Regtest evidence must record the
 exact configuration without recording RPC, LSP, VSS, or proxy credentials.
+Local insecure transports are available only in Debug/Profile. Release
+regtest candidates require explicit TLS-protected endpoints and fail closed on
+the SDK's local HTTP default.

@@ -2,7 +2,8 @@
 
 # Resolves release-verification tools from exact repository/AGP declarations.
 utexo_resolve_android_artifact_toolchain() {
-  if [[ -n "${UTEXO_BUNDLETOOL_JAR:-}" &&
+  if [[ -n "${UTEXO_AAPT2_PROTO_JAR:-}" &&
+    -n "${UTEXO_BUNDLETOOL_JAR:-}" &&
     -n "${UTEXO_PROTOBUF_JAR:-}" &&
     -n "${UTEXO_APKSIGNER:-}" &&
     -n "${UTEXO_AAPT2:-}" &&
@@ -23,8 +24,10 @@ utexo_resolve_android_artifact_toolchain() {
     UTEXO_AGP_VERSION \
     UTEXO_BUILD_TOOLS_VERSION \
     UTEXO_NDK_VERSION \
+    UTEXO_AAPT2_PROTO_VERSION \
     UTEXO_BUNDLETOOL_VERSION \
     UTEXO_PROTOBUF_VERSION \
+    UTEXO_AAPT2_PROTO_JAR \
     UTEXO_BUNDLETOOL_JAR \
     UTEXO_PROTOBUF_JAR \
     UTEXO_APKSIGNER \

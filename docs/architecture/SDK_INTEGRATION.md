@@ -91,10 +91,14 @@ Each resolved endpoint is bounded to 2,048 visible-ASCII characters and must
 use a canonical DNS, IPv4, or IPv6 host. Malformed DNS labels, encoded control
 text, and resolver-dependent numeric aliases such as `127.1` fail before any
 native wallet is created. Plain HTTP is accepted only for canonical loopback
-development endpoints. Regtest validation recognizes expanded and
-IPv4-mapped IPv6 loopback and rejects host ports `18443`, `50001`, and `3000`,
-which belong to the protected external performance-lab stack documented in
-`docs/DEVELOPMENT.md`.
+development endpoints in Debug and Profile builds. Release validation rejects
+HTTP, unencrypted Electrum (`tcp`), and unencrypted RGB transport (`rpc`) even
+on loopback, so the SDK's local HTTP regtest indexer default deliberately makes
+an unconfigured Release build fail closed. A Release regtest deployment must
+supply explicit TLS-protected endpoints. Regtest validation recognizes
+expanded and IPv4-mapped IPv6 loopback and rejects host ports `18443`, `50001`,
+and `3000`, which belong to the protected external performance-lab stack
+documented in `docs/DEVELOPMENT.md`.
 
 The product-facing network is `mainnet`, `signet`, or `regtest`. The SDK's
 `utexo` service profile is an implementation detail used for UTEXO-hosted

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:rgb_sdk_flutter/rgb_sdk_flutter.dart';
 
 import '../../../../core/config/app_environment.dart';
@@ -20,9 +21,12 @@ abstract final class RgbWalletServiceConfigurationResolver {
   static const _utexoSignetLspBaseUrl = 'https://lsp-signet.utexo.com';
 
   static WalletServiceConfiguration resolve(
-    WalletServiceConfiguration configured,
-  ) {
-    configured.validate();
+    WalletServiceConfiguration configured, {
+    bool allowInsecureDevelopmentEndpoints = !kReleaseMode,
+  }) {
+    configured.validate(
+      allowInsecureDevelopmentEndpoints: allowInsecureDevelopmentEndpoints,
+    );
     final defaults = getNetworkDefaults(configured.sdkNetwork);
     final indexerUrl = configured.indexerUrl ?? defaults?.indexerUrl;
     final rgbTransportProxy =
@@ -42,7 +46,9 @@ abstract final class RgbWalletServiceConfigurationResolver {
       explorerBaseUrl: configured.explorerBaseUrl,
       usdtAsset: configured.usdtAsset,
     );
-    resolved.validate();
+    resolved.validate(
+      allowInsecureDevelopmentEndpoints: allowInsecureDevelopmentEndpoints,
+    );
     return resolved;
   }
 }

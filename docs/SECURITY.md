@@ -37,6 +37,11 @@ values are bounded visible ASCII, use canonical DNS/IP syntax, and reject
 resolver-dependent numeric aliases before crossing the native bridge. Mutation
 requests are not retried without a real idempotency contract.
 
+Insecure loopback service transports are a Debug/Profile-only regtest
+capability. Release composition rejects HTTP, unencrypted Electrum, and
+unencrypted RGB transport before native creation on both platforms. Release
+regtest deployments must provide explicit TLS-protected service endpoints.
+
 A wallet failure that retains or cannot prove consistency of a native handle,
 directory, credential, or registry record is marked `requiresReconciliation`.
 The runtime preserves the first exact failure and rejects subsequent wallet

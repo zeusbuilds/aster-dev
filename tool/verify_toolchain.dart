@@ -127,6 +127,26 @@ ToolchainVerification verifyToolchain({
     'Flutter Gradle extension',
     failures,
   );
+  final flutterGradleDirectory = flutterExtension?.parent;
+  final flutterPluginConstants = _readRequired(
+    flutterGradleDirectory == null
+        ? null
+        : File('${flutterGradleDirectory.path}/FlutterPluginConstants.kt'),
+    'Flutter Gradle plugin constants',
+    failures,
+  );
+  final flutterPlugin = _readRequired(
+    flutterGradleDirectory == null
+        ? null
+        : File('${flutterGradleDirectory.path}/FlutterPlugin.kt'),
+    'Flutter Gradle plugin',
+    failures,
+  );
+  _verifyFlutterSplitVersioning(
+    constants: flutterPluginConstants,
+    plugin: flutterPlugin,
+    failures: failures,
+  );
   final ndkVersion = extensionContents == null
       ? null
       : RegExp(r'val\s+ndkVersion\s*:\s*String\s*=\s*"([^"]+)"')
@@ -186,8 +206,34 @@ ToolchainVerification verifyToolchain({
     'android/app/build.gradle.kts',
     failures,
   );
+  final androidProperties = _readRequired(
+    File('$root/android/gradle.properties'),
+    'android/gradle.properties',
+    failures,
+  );
   String? buildToolsVersion;
   if (android != null) {
+    _requireSinglePattern(
+      android,
+      RegExp(
+        r'val\s+utexoApplicationId\s*=\s*providers\.gradleProperty\('
+        r'"utexo\.applicationId"\)\.get\(\)',
+      ),
+      'Android application ID must come from the owned Gradle property.',
+      failures,
+    );
+    _requireSinglePattern(
+      android,
+      RegExp(r'\bnamespace\s*=\s*utexoApplicationId\b'),
+      'Android namespace must use the owned application ID.',
+      failures,
+    );
+    _requireSinglePattern(
+      android,
+      RegExp(r'\bapplicationId\s*=\s*utexoApplicationId\b'),
+      'Android release application ID must use the owned property.',
+      failures,
+    );
     _requireSinglePattern(
       android,
       RegExp(r'\bcompileSdk\s*=\s*flutter\.compileSdkVersion\b'),
@@ -344,6 +390,18 @@ ToolchainVerification verifyToolchain({
       failures,
     );
   }
+  if (androidProperties != null) {
+    _readSingleCapture(
+      androidProperties,
+      RegExp(
+        r'^utexo\.applicationId='
+        r'([A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+)\s*$',
+        multiLine: true,
+      ),
+      'Android application ID property',
+      failures,
+    );
+  }
   if (workflow != null) {
     _requireSinglePattern(
       workflow,
@@ -377,6 +435,72 @@ ToolchainVerification verifyToolchain({
         multiLine: true,
       ),
       'Makefile dependency setup must enforce the committed Pub lockfile.',
+      failures,
+    );
+    _requireSinglePattern(
+      makefile,
+      RegExp(
+        r'^prepare-android-release:\s*$\n'
+        r'\tfvm flutter clean\s*$\n'
+        r'\t@\$\(MAKE\) --no-print-directory dependencies\s*$\n'
+        r'\tfvm dart run tool/prepare_android_release\.dart\s*$',
+        multiLine: true,
+      ),
+      'Android Release preparation must clean, resolve the exact lock, and '
+      'then run the guarded plugin tool in order.',
+      failures,
+    );
+    for (final target in ['android-release-bundle', 'android-release-apks']) {
+      _requireSinglePattern(
+        makefile,
+        RegExp('^$target:\\s+prepare-android-release\\s*\$', multiLine: true),
+        '$target must depend on guarded Release plugin preparation.',
+        failures,
+      );
+    }
+  }
+
+  final apkVerifier = _readRequired(
+    File('$root/scripts/verify-android-release-apks.sh'),
+    'scripts/verify-android-release-apks.sh',
+    failures,
+  );
+  if (apkVerifier != null) {
+    _requireSinglePattern(
+      apkVerifier,
+      RegExp(r'fvm dart run tool/verify_android_release_identity\.dart'),
+      'APK verification must enforce committed release identity.',
+      failures,
+    );
+    _requireSinglePattern(
+      apkVerifier,
+      RegExp(r'--aapt2 "\$\{UTEXO_AAPT2\}"'),
+      'APK identity verification must use the resolved aapt2 binary.',
+      failures,
+    );
+  }
+  final bundleVerifier = _readRequired(
+    File('$root/scripts/verify-android-release-bundle.sh'),
+    'scripts/verify-android-release-bundle.sh',
+    failures,
+  );
+  if (bundleVerifier != null) {
+    _requireSinglePattern(
+      bundleVerifier,
+      RegExp(r'fvm dart run tool/verify_android_release_identity\.dart'),
+      'Bundle verification must enforce committed release identity.',
+      failures,
+    );
+    _requireSinglePattern(
+      bundleVerifier,
+      RegExp(r'--aapt2-proto "\$\{UTEXO_AAPT2_PROTO_JAR\}"'),
+      'Bundle identity verification must use the resolved aapt2 schema.',
+      failures,
+    );
+    _requireSinglePattern(
+      bundleVerifier,
+      RegExp(r'--protobuf "\$\{UTEXO_PROTOBUF_JAR\}"'),
+      'Bundle identity verification must use the resolved protobuf runtime.',
       failures,
     );
   }
@@ -611,6 +735,41 @@ void _requirePluginVersion(
   if (matches.length != 1 || matches.single != expected) {
     failures.add(
       'android/settings.gradle.kts must declare exactly $label $expected.',
+    );
+  }
+}
+
+void _verifyFlutterSplitVersioning({
+  required String? constants,
+  required String? plugin,
+  required List<String> failures,
+}) {
+  if (constants != null) {
+    final actual = <String, int>{};
+    for (final match in RegExp(
+      r'ARCH_(ARM32|ARM64|X86_64)\s+to\s+([0-9]+)',
+    ).allMatches(constants)) {
+      final abi = match.group(1)!;
+      if (actual.containsKey(abi)) {
+        failures.add('Flutter split-ABI version map contains duplicate $abi.');
+        continue;
+      }
+      actual[abi] = int.parse(match.group(2)!);
+    }
+    const expected = {'ARM32': 1, 'ARM64': 2, 'X86_64': 4};
+    if (actual.length != expected.length ||
+        expected.entries.any((entry) => actual[entry.key] != entry.value)) {
+      failures.add(
+        'Flutter split-ABI version map differs from the artifact verifier.',
+      );
+    }
+  }
+  if (plugin != null &&
+      !RegExp(r'versionCodeOverride\s*=\s*abiVersionCode\s*\*\s*1000\s*\+')
+          .hasMatch(plugin)) {
+    failures.add(
+      'Flutter split-ABI version-code multiplier differs from the artifact '
+      'verifier.',
     );
   }
 }

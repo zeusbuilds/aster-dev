@@ -7,8 +7,10 @@ final class AndroidArtifactToolchain {
     required this.agpVersion,
     required this.buildToolsVersion,
     required this.ndkVersion,
+    required this.aapt2ProtoVersion,
     required this.bundletoolVersion,
     required this.protobufVersion,
+    required this.aapt2ProtoJar,
     required this.bundletoolJar,
     required this.protobufJar,
     required this.apksigner,
@@ -20,8 +22,10 @@ final class AndroidArtifactToolchain {
   final String agpVersion;
   final String buildToolsVersion;
   final String ndkVersion;
+  final String aapt2ProtoVersion;
   final String bundletoolVersion;
   final String protobufVersion;
+  final File aapt2ProtoJar;
   final File bundletoolJar;
   final File protobufJar;
   final File apksigner;
@@ -96,10 +100,17 @@ AndroidArtifactToolchainResolution resolveAndroidArtifactToolchain({
   }
 
   String? bundletoolVersion;
+  String? aapt2ProtoVersion;
   String? protobufVersion;
   if (agpVersion != null) {
     final metadata = _agpModuleMetadata(gradleUserHome, agpVersion, failures);
     if (metadata != null) {
+      aapt2ProtoVersion = _dependencyVersion(
+        metadata,
+        group: 'com.android.tools.build',
+        module: 'aapt2-proto',
+        failures: failures,
+      );
       bundletoolVersion = _dependencyVersion(
         metadata,
         group: 'com.android.tools.build',
@@ -115,6 +126,16 @@ AndroidArtifactToolchainResolution resolveAndroidArtifactToolchain({
     }
   }
 
+  File? aapt2ProtoJar;
+  if (aapt2ProtoVersion != null) {
+    aapt2ProtoJar = _singleCachedJar(
+      gradleUserHome,
+      group: 'com.android.tools.build',
+      module: 'aapt2-proto',
+      version: aapt2ProtoVersion,
+      failures: failures,
+    );
+  }
   File? bundletoolJar;
   if (bundletoolVersion != null) {
     bundletoolJar = _singleCachedJar(
@@ -177,8 +198,10 @@ AndroidArtifactToolchainResolution resolveAndroidArtifactToolchain({
       agpVersion == null ||
       buildToolsVersion == null ||
       ndkVersion == null ||
+      aapt2ProtoVersion == null ||
       bundletoolVersion == null ||
       protobufVersion == null ||
+      aapt2ProtoJar == null ||
       bundletoolJar == null ||
       protobufJar == null ||
       apksigner == null ||
@@ -196,8 +219,10 @@ AndroidArtifactToolchainResolution resolveAndroidArtifactToolchain({
       agpVersion: agpVersion,
       buildToolsVersion: buildToolsVersion,
       ndkVersion: ndkVersion,
+      aapt2ProtoVersion: aapt2ProtoVersion,
       bundletoolVersion: bundletoolVersion,
       protobufVersion: protobufVersion,
+      aapt2ProtoJar: aapt2ProtoJar,
       bundletoolJar: bundletoolJar,
       protobufJar: protobufJar,
       apksigner: apksigner,
@@ -243,8 +268,10 @@ void main() {
   _emit('UTEXO_AGP_VERSION', toolchain.agpVersion);
   _emit('UTEXO_BUILD_TOOLS_VERSION', toolchain.buildToolsVersion);
   _emit('UTEXO_NDK_VERSION', toolchain.ndkVersion);
+  _emit('UTEXO_AAPT2_PROTO_VERSION', toolchain.aapt2ProtoVersion);
   _emit('UTEXO_BUNDLETOOL_VERSION', toolchain.bundletoolVersion);
   _emit('UTEXO_PROTOBUF_VERSION', toolchain.protobufVersion);
+  _emit('UTEXO_AAPT2_PROTO_JAR', toolchain.aapt2ProtoJar.path);
   _emit('UTEXO_BUNDLETOOL_JAR', toolchain.bundletoolJar.path);
   _emit('UTEXO_PROTOBUF_JAR', toolchain.protobufJar.path);
   _emit('UTEXO_APKSIGNER', toolchain.apksigner.path);

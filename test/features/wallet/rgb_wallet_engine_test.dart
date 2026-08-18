@@ -86,6 +86,34 @@ void main() {
     expect(resolved.sdkNetwork, configured.sdkNetwork);
   });
 
+  test('release resolution rejects the SDK insecure regtest default', () {
+    const unconfigured = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.regtest,
+      sdkNetwork: 'regtest',
+    );
+    const secure = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.regtest,
+      sdkNetwork: 'regtest',
+      indexerUrl: 'ssl://127.0.0.1:50002',
+      rgbTransportProxy: 'rpcs://127.0.0.1:3001/json-rpc',
+    );
+
+    expect(
+      () => RgbWalletServiceConfigurationResolver.resolve(
+        unconfigured,
+        allowInsecureDevelopmentEndpoints: false,
+      ),
+      throwsA(isA<AppConfigurationException>()),
+    );
+    expect(
+      RgbWalletServiceConfigurationResolver.resolve(
+        secure,
+        allowInsecureDevelopmentEndpoints: false,
+      ),
+      secure,
+    );
+  });
+
   test('effective endpoint resolution preserves every explicit override', () {
     const configured = WalletServiceConfiguration(
       environment: BlockchainEnvironment.regtest,

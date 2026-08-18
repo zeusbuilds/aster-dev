@@ -39,6 +39,13 @@ void main() {
     _write(
       gradleHome,
       'caches/modules-2/files-2.1/com.android.tools.build/'
+          'aapt2-proto/9.1.0-14792394/hash/'
+          'aapt2-proto-9.1.0-14792394.jar',
+      '',
+    );
+    _write(
+      gradleHome,
+      'caches/modules-2/files-2.1/com.android.tools.build/'
           'bundletool/1.18.3/hash/bundletool-1.18.3.jar',
       '',
     );
@@ -97,6 +104,7 @@ void main() {
     expect(result.passed, isTrue, reason: result.failures.join('\n'));
     final toolchain = result.toolchain!;
     expect(toolchain.agpVersion, '9.1.0');
+    expect(toolchain.aapt2ProtoVersion, '9.1.0-14792394');
     expect(toolchain.bundletoolVersion, '1.18.3');
     expect(toolchain.protobufVersion, '3.25.5');
     expect(toolchain.apksigner.path, contains('/build-tools/36.0.0/'));
@@ -158,6 +166,11 @@ void main() {
       'com.google.protobuf/protobuf-java/3.25.5/hash/'
       'protobuf-java-3.25.5.jar',
     ).deleteSync();
+    File(
+      '${gradleHome.path}/caches/modules-2/files-2.1/'
+      'com.android.tools.build/aapt2-proto/9.1.0-14792394/hash/'
+      'aapt2-proto-9.1.0-14792394.jar',
+    ).deleteSync();
 
     final result = resolve();
 
@@ -165,6 +178,10 @@ void main() {
       result.failures,
       containsAll(<Matcher>[
         contains('Missing executable Android zipalign 36.0.0'),
+        contains(
+          'cached com.android.tools.build:aapt2-proto:'
+          '9.1.0-14792394 jar',
+        ),
         contains('cached com.google.protobuf:protobuf-java:3.25.5 jar'),
       ]),
     );
@@ -203,6 +220,11 @@ void _writeAgpMetadata(Directory gradleHome, {String suffix = 'hash'}) {
         {
           'name': 'runtimeElements',
           'dependencies': [
+            {
+              'group': 'com.android.tools.build',
+              'module': 'aapt2-proto',
+              'version': {'requires': '9.1.0-14792394'},
+            },
             {
               'group': 'com.android.tools.build',
               'module': 'bundletool',

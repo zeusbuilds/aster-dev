@@ -43,6 +43,21 @@ Android release APK and AAB verification rejects every signed candidate unless
 approved fingerprint configured, only unsigned candidate artifacts pass; they
 are build evidence and cannot be distributed.
 
+Build Android Release artifacts only through `make android-release-bundle` or
+`make android-release-apks`. Their guarded preparation step works around
+Flutter issue 169336 while proving the committed lockfile and normalized
+package graph remain unchanged and that the generated registrant contains
+exactly production method-channel plugins. A direct no-Pub Release build after
+development tooling can fail or compile the wrong plugin surface and is not
+release evidence. Preparation begins with `flutter clean`, then exact locked
+resolution, so prior build-mode output cannot become candidate evidence.
+
+Every release package verifier also compares packaged application ID, version
+name, and version code with committed source. Split APK codes include Flutter's
+ABI prefix (`1xxx` armeabi-v7a, `2xxx` arm64-v8a, `4xxx` x86_64); the AAB uses
+the base code from `pubspec.yaml`. The executable toolchain policy verifies
+that mapping against the pinned Flutter Gradle plugin before accepting it.
+
 Directly distributed signed APKs must also use APK Signature Scheme v2 or v3.
 JAR/v1-only signing is rejected even when its certificate fingerprint matches.
 The local fault matrix uses only the disposable Android debug key and never

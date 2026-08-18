@@ -158,10 +158,13 @@ final class WalletServiceConfiguration {
   /// Whether the validated VSS endpoint is an HTTP development endpoint.
   ///
   /// The SDK defaults to rejecting HTTP VSS. This opt-in is derived only after
-  /// the app's regtest/loopback policy has accepted the endpoint.
+  /// the app's Debug/Profile regtest policy has accepted the endpoint. Release
+  /// builds never opt the native SDK into insecure VSS transport.
   bool get allowsInsecureLocalVss {
     final value = vssUrl;
-    if (value == null || environment != BlockchainEnvironment.regtest) {
+    if (kReleaseMode ||
+        value == null ||
+        environment != BlockchainEnvironment.regtest) {
       return false;
     }
     final uri = Uri.parse(value);
@@ -170,22 +173,49 @@ final class WalletServiceConfiguration {
   }
 
   /// Validates URL policy before any native wallet is created.
-  void validate() {
+  ///
+  /// Insecure loopback transport is a local Debug/Profile capability, not a
+  /// property of regtest itself. The explicit parameter is a deterministic
+  /// test seam; it cannot weaken the Release-mode policy.
+  void validate({bool allowInsecureDevelopmentEndpoints = !kReleaseMode}) {
+    final permitsInsecureDevelopmentEndpoints =
+        !kReleaseMode && allowInsecureDevelopmentEndpoints;
     final expectedSdkNetwork = environment == BlockchainEnvironment.signet
         ? 'utexo'
         : environment.name;
     if (sdkNetwork != expectedSdkNetwork) {
       throw const AppConfigurationException();
     }
-    _validateEndpoint(indexerUrl, _EndpointKind.indexer, environment);
+    _validateEndpoint(
+      indexerUrl,
+      _EndpointKind.indexer,
+      environment,
+      permitsInsecureDevelopmentEndpoints,
+    );
     _validateEndpoint(
       rgbTransportProxy,
       _EndpointKind.rgbTransport,
       environment,
+      permitsInsecureDevelopmentEndpoints,
     );
-    _validateEndpoint(lspBaseUrl, _EndpointKind.webService, environment);
-    _validateEndpoint(vssUrl, _EndpointKind.webService, environment);
-    _validateEndpoint(explorerBaseUrl, _EndpointKind.explorer, environment);
+    _validateEndpoint(
+      lspBaseUrl,
+      _EndpointKind.webService,
+      environment,
+      permitsInsecureDevelopmentEndpoints,
+    );
+    _validateEndpoint(
+      vssUrl,
+      _EndpointKind.webService,
+      environment,
+      permitsInsecureDevelopmentEndpoints,
+    );
+    _validateEndpoint(
+      explorerBaseUrl,
+      _EndpointKind.explorer,
+      environment,
+      permitsInsecureDevelopmentEndpoints,
+    );
     usdtAsset?.validate();
   }
 
@@ -208,6 +238,7 @@ final class WalletServiceConfiguration {
     String? raw,
     _EndpointKind kind,
     BlockchainEnvironment environment,
+    bool allowInsecureDevelopmentEndpoints,
   ) {
     if (raw == null) return;
     if (!_isSafeEndpointWireValue(raw)) {
@@ -234,17 +265,19 @@ final class WalletServiceConfiguration {
         _protectedDevelopmentPorts.contains(uri.port)) {
       throw const AppConfigurationException();
     }
+    final permitsInsecureTransport =
+        developmentHost && allowInsecureDevelopmentEndpoints;
     final allowed = switch (kind) {
       _EndpointKind.indexer =>
-        developmentHost
+        permitsInsecureTransport
             ? const {'http', 'https', 'tcp', 'ssl'}
             : const {'https', 'ssl'},
       _EndpointKind.rgbTransport =>
-        developmentHost
+        permitsInsecureTransport
             ? const {'http', 'https', 'rpc', 'rpcs'}
             : const {'https', 'rpcs'},
       _EndpointKind.webService =>
-        developmentHost ? const {'http', 'https'} : const {'https'},
+        permitsInsecureTransport ? const {'http', 'https'} : const {'https'},
       _EndpointKind.explorer => const {'https'},
     };
     if (!allowed.contains(uri.scheme.toLowerCase())) {

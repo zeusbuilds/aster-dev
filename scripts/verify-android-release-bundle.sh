@@ -20,6 +20,12 @@ command -v keytool >/dev/null 2>&1 || fail "keytool is required"
 command -v java >/dev/null 2>&1 || fail "java is required"
 [[ -f "${bundle_path}" ]] || fail "missing ${bundle_path}"
 
+fvm dart run tool/verify_android_release_identity.dart \
+  --bundle "${bundle_path}" \
+  --aapt2-proto "${UTEXO_AAPT2_PROTO_JAR}" \
+  --protobuf "${UTEXO_PROTOBUF_JAR}" ||
+  fail "${bundle_path} does not match committed release identity"
+
 readonly archive_entries="$(unzip -Z1 "${bundle_path}")" ||
   fail "could not inspect ${bundle_path}"
 readonly packaged_abis="$({

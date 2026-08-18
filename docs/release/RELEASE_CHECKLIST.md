@@ -19,11 +19,16 @@ from a clean worktree and record commands/results in the production tracker.
 - [ ] root iOS privacy manifest is present in the built app and its approved
       required-reason entries match the exact executable/API scan
 - [ ] iOS install/launch smoke on the recorded simulator/device
-- [ ] clean Android release AAB or `make android-release-apks` build and native tests
+- [ ] clean `make android-release-bundle` or `make android-release-apks` run;
+      guarded preparation reports unchanged lock/graph and no dev plugins
+- [ ] APK/AAB application ID and version name match committed source; AAB uses
+      the base build number and each split APK uses Flutter's verified ABI code
 - [ ] direct APK artifacts contain exactly one ABI; never distribute the
       universal `app-release.apk`
 - [ ] Android install/launch smoke on the recorded ABI/API
 - [ ] package IDs, entitlements, backup policy, signing, and release metadata
+- [ ] every Release wallet service endpoint is TLS-protected; no HTTP, `tcp`,
+      or `rpc` loopback development transport survives composition
 - [ ] public app version/build number and upgrade policy are approved
 - [ ] Android APK/AAB artifacts are unsigned candidates or match the approved
       `UTEXO_RELEASE_CERT_SHA256`; debug-signed artifacts are rejected

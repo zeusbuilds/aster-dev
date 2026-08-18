@@ -1,4 +1,4 @@
-.PHONY: shell dependencies bootstrap clean build watch run test ios-storage-test android-storage-test format format-check analyze docs verify verify-toolchain verify-architecture verify-design-system verify-barrels verify-generated lint android-release-bundle android-release-apks verify-android-release-bundle verify-android-release-apks verify-android-apk-signature-policy fvm-setup help
+.PHONY: shell dependencies bootstrap clean build watch run test ios-storage-test android-storage-test format format-check analyze docs verify verify-toolchain verify-architecture verify-design-system verify-barrels verify-generated lint prepare-android-release android-release-bundle android-release-apks verify-android-release-bundle verify-android-release-apks verify-android-apk-signature-policy fvm-setup help
 
 # Default target
 help:
@@ -25,6 +25,7 @@ help:
 	@echo "  make verify-barrels - Verify barrel-export boundaries"
 	@echo "  make verify-generated - Regenerate ignored generated sources"
 	@echo "  make lint      - Run all repository quality checks"
+	@echo "  make prepare-android-release - Clean and verify Release plugin wiring"
 	@echo "  make android-release-bundle - Build the Play Store release bundle"
 	@echo "  make android-release-apks - Build and verify ABI-split release APKs"
 	@echo "  make verify-android-release-bundle - Verify the existing Play Store bundle"
@@ -138,16 +139,24 @@ verify-generated:
 # Quality checks suitable for pre-commit and CI.
 lint: dependencies format-check verify-generated analyze docs verify
 
+# Flutter issue 169336 skips release-specific plugin regeneration with
+# --no-pub. Clean first so the candidate cannot inherit an earlier variant,
+# then prove Pub and plugin wiring did not drift before no-Pub compilation.
+prepare-android-release:
+	fvm flutter clean
+	@$(MAKE) --no-print-directory dependencies
+	fvm dart run tool/prepare_android_release.dart
+
 # Google Play performs device-specific delivery from this bundle. Signing and
 # application identity still have to be supplied by the release owner.
-android-release-bundle: dependencies
+android-release-bundle: prepare-android-release
 	fvm flutter build appbundle --release --no-pub
 	./scripts/verify-android-release-bundle.sh
 
 # The pinned wallet SDK AAR contains multiple native ABIs. Direct APK delivery
 # must therefore use Flutter's ABI splits; --target-platform alone does not
 # remove foreign JNI libraries from transitive Android archives.
-android-release-apks: dependencies
+android-release-apks: prepare-android-release
 	fvm flutter build apk --release --split-per-abi --no-pub
 	./scripts/verify-android-release-apks.sh
 

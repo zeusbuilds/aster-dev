@@ -102,6 +102,63 @@ void main() {
     );
 
     expect(configuration.validate, returnsNormally);
+    expect(
+      () => configuration.validate(allowInsecureDevelopmentEndpoints: false),
+      throwsA(isA<AppConfigurationException>()),
+    );
+  });
+
+  test('release policy rejects every insecure regtest transport', () {
+    for (final configuration in [
+      const WalletServiceConfiguration(
+        environment: BlockchainEnvironment.regtest,
+        sdkNetwork: 'regtest',
+        indexerUrl: '127.0.0.1:50002',
+      ),
+      const WalletServiceConfiguration(
+        environment: BlockchainEnvironment.regtest,
+        sdkNetwork: 'regtest',
+        indexerUrl: 'tcp://127.0.0.1:50002',
+      ),
+      const WalletServiceConfiguration(
+        environment: BlockchainEnvironment.regtest,
+        sdkNetwork: 'regtest',
+        rgbTransportProxy: 'rpc://127.0.0.1:3001/json-rpc',
+      ),
+      const WalletServiceConfiguration(
+        environment: BlockchainEnvironment.regtest,
+        sdkNetwork: 'regtest',
+        lspBaseUrl: 'http://10.0.2.2:3100',
+      ),
+      const WalletServiceConfiguration(
+        environment: BlockchainEnvironment.regtest,
+        sdkNetwork: 'regtest',
+        vssUrl: 'http://localhost:3200',
+      ),
+    ]) {
+      expect(
+        () => configuration.validate(allowInsecureDevelopmentEndpoints: false),
+        throwsA(isA<AppConfigurationException>()),
+        reason:
+            configuration.indexerUrl ??
+            configuration.rgbTransportProxy ??
+            configuration.lspBaseUrl ??
+            configuration.vssUrl,
+      );
+    }
+
+    const secure = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.regtest,
+      sdkNetwork: 'regtest',
+      indexerUrl: 'ssl://127.0.0.1:50002',
+      rgbTransportProxy: 'rpcs://127.0.0.1:3001/json-rpc',
+      lspBaseUrl: 'https://127.0.0.1:3100',
+      vssUrl: 'https://127.0.0.1:3200',
+    );
+    expect(
+      () => secure.validate(allowInsecureDevelopmentEndpoints: false),
+      returnsNormally,
+    );
   });
 
   test('rejects insecure loopback endpoints outside regtest', () {
