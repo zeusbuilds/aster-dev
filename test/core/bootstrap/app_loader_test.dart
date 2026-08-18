@@ -12,7 +12,6 @@ void main() {
   testWidgets('startup splash owns semantics until the app is revealed', (
     tester,
   ) async {
-    final semantics = tester.ensureSemantics();
     final initialization = Completer<ProviderContainer>();
     await tester.pumpWidget(
       AppLoader(
@@ -38,7 +37,6 @@ void main() {
     await tester.pumpAndSettle(motion.splashRevealDuration);
     expect(find.bySemanticsLabel('Opening UTEXO'), findsNothing);
     expect(find.bySemanticsLabel('Ready'), findsOneWidget);
-    semantics.dispose();
   });
 
   testWidgets('shows redacted bootstrap failure and can recover on retry', (

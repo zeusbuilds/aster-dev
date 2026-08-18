@@ -23,8 +23,6 @@ void main() {
     (tester) async {
       final viewModel = _ControlledWalletViewModel(_walletState);
       final harness = await _pumpWalletSelection(tester, viewModel);
-      final semantics = tester.ensureSemantics();
-
       final selected = tester.getSemantics(
         find.bySemanticsLabel(_primaryLabel),
       );
@@ -104,7 +102,6 @@ void main() {
           .getSemanticsData();
       expect(idleBack.flagsCollection.isEnabled, ui.Tristate.isTrue);
       expect(idleBack.hasAction(ui.SemanticsAction.tap), isTrue);
-      semantics.dispose();
     },
   );
 
@@ -184,8 +181,6 @@ void main() {
         _FutureWalletViewModel(pending.future),
         textScaler: const TextScaler.linear(2),
       );
-      final semantics = tester.ensureSemantics();
-
       expect(find.bySemanticsLabel('Loading wallets'), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsNothing);
 
@@ -198,7 +193,6 @@ void main() {
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
       await expectLater(tester, meetsGuideline(textContrastGuideline));
-      semantics.dispose();
     },
   );
 

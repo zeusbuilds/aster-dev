@@ -138,7 +138,6 @@ void main() {
   testWidgets('gate excludes content until resume and retains retry surface', (
     tester,
   ) async {
-    final semantics = tester.ensureSemantics();
     var retries = 0;
     const failure = AppFailure(
       code: 'resume_failed',
@@ -203,7 +202,6 @@ void main() {
       find.bySemanticsLabel(RegExp('Sensitive wallet balance')),
       findsOneWidget,
     );
-    semantics.dispose();
   });
 }
 
