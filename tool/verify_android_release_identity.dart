@@ -244,18 +244,39 @@ Future<AndroidReleaseIdentity> _inspectArtifact(
     _requireFile(artifact, 'Android App Bundle');
     _requireFile(aapt2Proto, 'aapt2-proto jar');
     _requireFile(protobuf, 'protobuf jar');
-    final result = await Process.run('java', [
-      '--class-path',
-      '$aapt2Proto${Platform.isWindows ? ';' : ':'}$protobuf',
-      'scripts/AndroidManifestInspector.java',
-      artifact,
-    ], workingDirectory: repository.path);
-    if (result.exitCode != 0) {
-      throw StateError(
-        'bundle manifest inspector exited with code ${result.exitCode}.',
-      );
+    final temporaryDirectory = await Directory.systemTemp.createTemp(
+      'utexo_android_manifest_',
+    );
+    try {
+      final manifest = File('${temporaryDirectory.path}/AndroidManifest.pb');
+      final extraction = await Process.run('java', [
+        'scripts/AndroidArchiveEntryExtractor.java',
+        artifact,
+        'base/manifest/AndroidManifest.xml',
+        manifest.path,
+        '16777216',
+      ], workingDirectory: repository.path);
+      if (extraction.exitCode != 0) {
+        throw StateError(
+          'bundle manifest extraction exited with code '
+          '${extraction.exitCode}.',
+        );
+      }
+      final result = await Process.run('java', [
+        '--class-path',
+        '$aapt2Proto${Platform.isWindows ? ';' : ':'}$protobuf',
+        'scripts/AndroidManifestInspector.java',
+        manifest.path,
+      ], workingDirectory: repository.path);
+      if (result.exitCode != 0) {
+        throw StateError(
+          'bundle manifest inspector exited with code ${result.exitCode}.',
+        );
+      }
+      return parseBundleManifestIdentity(result.stdout as String);
+    } finally {
+      await temporaryDirectory.delete(recursive: true);
     }
-    return parseBundleManifestIdentity(result.stdout as String);
   }
   throw const FormatException('Unsupported Android artifact arguments.');
 }
@@ -313,8 +334,12 @@ AndroidReleaseIdentity _identityFromValues({
 }
 
 void _requireFile(String path, String description) {
-  if (!File(path).existsSync()) {
-    throw FileSystemException('$description is missing.', path);
+  if (FileSystemEntity.typeSync(path, followLinks: false) !=
+      FileSystemEntityType.file) {
+    throw FileSystemException(
+      '$description is missing or is not a regular file.',
+      path,
+    );
   }
 }
 

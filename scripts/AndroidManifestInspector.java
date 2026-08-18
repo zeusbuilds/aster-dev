@@ -1,12 +1,17 @@
 import com.android.aapt.Resources.XmlAttribute;
 import com.android.aapt.Resources.XmlElement;
 import com.android.aapt.Resources.XmlNode;
+import com.google.protobuf.CodedInputStream;
 import java.io.InputStream;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
 
-/** Reads release identity from an Android App Bundle's protobuf manifest. */
+/** Reads release identity from an already-extracted protobuf manifest. */
 public final class AndroidManifestInspector {
+  private static final int MAX_PROTOBUF_BYTES = 16 * 1024 * 1024;
+  private static final int MAX_MANIFEST_ATTRIBUTES = 1024;
+  private static final int MAX_ATTRIBUTE_VALUE_LENGTH = 4096;
   private static final String ANDROID_NAMESPACE =
       "http://schemas.android.com/apk/res/android";
 
@@ -14,35 +19,44 @@ public final class AndroidManifestInspector {
 
   public static void main(String[] arguments) throws Exception {
     if (arguments.length != 1) {
-      throw new IllegalArgumentException("Expected exactly one Android App Bundle path");
+      throw new IllegalArgumentException("Expected exactly one extracted manifest path");
     }
 
-    try (ZipFile bundle = new ZipFile(arguments[0])) {
-      ZipEntry entry = bundle.getEntry("base/manifest/AndroidManifest.xml");
-      if (entry == null) {
-        throw new IllegalStateException("Base AndroidManifest.xml is missing");
+    Path manifestPath = requireBoundedProtobuf(Path.of(arguments[0]));
+    try (InputStream input = Files.newInputStream(manifestPath)) {
+      CodedInputStream codedInput = CodedInputStream.newInstance(input);
+      codedInput.setSizeLimit(MAX_PROTOBUF_BYTES);
+      XmlNode root = XmlNode.parseFrom(codedInput);
+      if (!root.hasElement() || !"manifest".equals(root.getElement().getName())) {
+        throw new IllegalStateException("Bundle manifest root is not <manifest>");
       }
-      try (InputStream input = bundle.getInputStream(entry)) {
-        XmlNode root = XmlNode.parseFrom(input);
-        if (!root.hasElement() || !"manifest".equals(root.getElement().getName())) {
-          throw new IllegalStateException("Bundle manifest root is not <manifest>");
-        }
-        XmlElement manifest = root.getElement();
-        emit(
-            "UTEXO_APPLICATION_ID",
-            requireAttribute(manifest, "", "package"));
-        emit(
-            "UTEXO_VERSION_CODE",
-            requireAttribute(manifest, ANDROID_NAMESPACE, "versionCode"));
-        emit(
-            "UTEXO_VERSION_NAME",
-            requireAttribute(manifest, ANDROID_NAMESPACE, "versionName"));
-      }
+      XmlElement manifest = root.getElement();
+      emit("UTEXO_APPLICATION_ID", requireAttribute(manifest, "", "package"));
+      emit(
+          "UTEXO_VERSION_CODE",
+          requireAttribute(manifest, ANDROID_NAMESPACE, "versionCode"));
+      emit(
+          "UTEXO_VERSION_NAME",
+          requireAttribute(manifest, ANDROID_NAMESPACE, "versionName"));
     }
+  }
+
+  private static Path requireBoundedProtobuf(Path input) throws Exception {
+    if (!Files.isRegularFile(input, LinkOption.NOFOLLOW_LINKS)) {
+      throw new IllegalArgumentException("Manifest input is not a regular file");
+    }
+    long size = Files.size(input);
+    if (size <= 0 || size > MAX_PROTOBUF_BYTES) {
+      throw new IllegalArgumentException("Manifest protobuf size is outside the permitted range");
+    }
+    return input;
   }
 
   private static String requireAttribute(
       XmlElement element, String namespaceUri, String name) {
+    if (element.getAttributeCount() > MAX_MANIFEST_ATTRIBUTES) {
+      throw new IllegalStateException("Bundle manifest has too many attributes");
+    }
     String value = null;
     for (XmlAttribute attribute : element.getAttributeList()) {
       if (namespaceUri.equals(attribute.getNamespaceUri()) && name.equals(attribute.getName())) {
@@ -55,8 +69,13 @@ public final class AndroidManifestInspector {
     if (value == null || value.isEmpty()) {
       throw new IllegalStateException("Missing manifest attribute " + name);
     }
-    if (value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0) {
-      throw new IllegalStateException("Invalid manifest attribute " + name);
+    if (value.length() > MAX_ATTRIBUTE_VALUE_LENGTH) {
+      throw new IllegalStateException("Manifest attribute is too long: " + name);
+    }
+    for (int index = 0; index < value.length(); index++) {
+      if (Character.isISOControl(value.charAt(index))) {
+        throw new IllegalStateException("Invalid manifest attribute " + name);
+      }
     }
     return value;
   }

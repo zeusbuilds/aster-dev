@@ -919,6 +919,26 @@ ToolchainVerification verifyToolchain({
     'scripts/AndroidNativeLibraryExtractor.java',
     failures,
   );
+  final archiveEntryExtractor = _readRequired(
+    File('$root/scripts/AndroidArchiveEntryExtractor.java'),
+    'scripts/AndroidArchiveEntryExtractor.java',
+    failures,
+  );
+  final manifestInspector = _readRequired(
+    File('$root/scripts/AndroidManifestInspector.java'),
+    'scripts/AndroidManifestInspector.java',
+    failures,
+  );
+  final bundleConfigInspector = _readRequired(
+    File('$root/scripts/BundleConfigInspector.java'),
+    'scripts/BundleConfigInspector.java',
+    failures,
+  );
+  final androidReleaseIdentityVerifier = _readRequired(
+    File('$root/tool/verify_android_release_identity.dart'),
+    'tool/verify_android_release_identity.dart',
+    failures,
+  );
   if (apkVerifier != null) {
     _requireSinglePattern(
       apkVerifier,
@@ -977,6 +997,40 @@ ToolchainVerification verifyToolchain({
       bundleVerifier,
       RegExp(r'--protobuf "\$\{UTEXO_PROTOBUF_JAR\}"'),
       'Bundle identity verification must use the resolved protobuf runtime.',
+      failures,
+    );
+    _requireSinglePattern(
+      bundleVerifier,
+      RegExp(
+        r'java scripts/AndroidArchiveEntryExtractor\.java\s*\\\s*\n'
+        r'\s*"\$\{bundle_path\}"\s*\\\s*\n'
+        r'\s*BundleConfig\.pb\s*\\\s*\n'
+        r'\s*"\$\{bundle_config_path\}"\s*\\\s*\n'
+        r'\s*16777216',
+        multiLine: true,
+      ),
+      'Bundle verification must safely extract one bounded BundleConfig.pb.',
+      failures,
+    );
+    _requireSinglePattern(
+      bundleVerifier,
+      RegExp(
+        r'scripts/BundleConfigInspector\.java '
+        r'"\$\{bundle_config_path\}"',
+      ),
+      'Bundle configuration inspection must consume only the extracted file.',
+      failures,
+    );
+    _requireSinglePattern(
+      bundleVerifier,
+      RegExp(r'^trap cleanup EXIT\s*$', multiLine: true),
+      'Bundle verification must install fail-safe temporary-file cleanup.',
+      failures,
+    );
+    _requireSinglePattern(
+      bundleVerifier,
+      RegExp(r'mktemp -d "\$\{TMPDIR:-/tmp\}/utexo-aab-config\.XXXXXX"'),
+      'Bundle verification must use an isolated owned inspection directory.',
       failures,
     );
     _requireSinglePattern(
@@ -1090,6 +1144,124 @@ ToolchainVerification verifyToolchain({
         contract.pattern,
         contract.failure,
         failures,
+      );
+    }
+  }
+  if (archiveEntryExtractor != null) {
+    for (final contract in <({RegExp pattern, String failure})>[
+      (
+        pattern: RegExp(r'new ZipFile\(archive\.toFile\(\)\)'),
+        failure: 'Exact archive extraction must use structured ZIP entries.',
+      ),
+      (
+        pattern: RegExp(
+          r'Files\.isRegularFile\(archive, LinkOption\.NOFOLLOW_LINKS\)',
+        ),
+        failure: 'Exact archive extraction must reject non-regular inputs.',
+      ),
+      (
+        pattern: RegExp(r'validateEntryName\(name\)'),
+        failure: 'Exact archive extraction must validate every entry path.',
+      ),
+      (
+        pattern: RegExp(r'if \(!entryNames\.add\(name\)\)'),
+        failure: 'Exact archive extraction must reject duplicate entries.',
+      ),
+      (
+        pattern: RegExp(r'private static final int MAX_ENTRY_COUNT ='),
+        failure: 'Exact archive extraction must bound archive entry count.',
+      ),
+      (
+        pattern: RegExp(r'private static final long MAX_EXPANDED_BYTES ='),
+        failure: 'Exact archive extraction must bound declared expanded bytes.',
+      ),
+      (
+        pattern: RegExp(r'size > maximumEntryBytes'),
+        failure: 'Exact archive extraction must bound the requested entry.',
+      ),
+      (
+        pattern: RegExp(r'StandardOpenOption\.CREATE_NEW'),
+        failure: 'Exact archive extraction must not overwrite output paths.',
+      ),
+      (
+        pattern: RegExp(r'Files\.deleteIfExists\(target\)'),
+        failure: 'Exact archive extraction must delete partial output.',
+      ),
+    ]) {
+      _requireSinglePattern(
+        archiveEntryExtractor,
+        contract.pattern,
+        contract.failure,
+        failures,
+      );
+    }
+  }
+  if (androidReleaseIdentityVerifier != null) {
+    _requireSinglePattern(
+      androidReleaseIdentityVerifier,
+      RegExp(
+        r"'scripts/AndroidArchiveEntryExtractor\.java',\s*"
+        r"artifact,\s*"
+        r"'base/manifest/AndroidManifest\.xml',\s*"
+        r'manifest\.path,\s*'
+        r"'16777216',",
+        multiLine: true,
+      ),
+      'AAB identity verification must safely extract one bounded manifest.',
+      failures,
+    );
+    _requireSinglePattern(
+      androidReleaseIdentityVerifier,
+      RegExp(
+        r"'scripts/AndroidManifestInspector\.java',\s*manifest\.path,",
+        multiLine: true,
+      ),
+      'AAB identity inspection must consume only the extracted manifest.',
+      failures,
+    );
+    _requireSinglePattern(
+      androidReleaseIdentityVerifier,
+      RegExp(r'await temporaryDirectory\.delete\(recursive: true\);'),
+      'AAB identity verification must clean its owned temporary directory.',
+      failures,
+    );
+  }
+  for (final inspector in <({String? source, String name})>[
+    (source: manifestInspector, name: 'Manifest'),
+    (source: bundleConfigInspector, name: 'BundleConfig'),
+  ]) {
+    final source = inspector.source;
+    if (source == null) continue;
+    for (final contract in <({RegExp pattern, String failure})>[
+      (
+        pattern: RegExp(r'private static final int MAX_PROTOBUF_BYTES ='),
+        failure: '${inspector.name} parsing must bound protobuf input bytes.',
+      ),
+      (
+        pattern: RegExp(
+          r'Files\.isRegularFile\(input, LinkOption\.NOFOLLOW_LINKS\)',
+        ),
+        failure: '${inspector.name} parsing must reject non-regular inputs.',
+      ),
+      (
+        pattern: RegExp(r'CodedInputStream\.newInstance\(input\)'),
+        failure: '${inspector.name} parsing must use a bounded coded stream.',
+      ),
+      (
+        pattern: RegExp(r'codedInput\.setSizeLimit\(MAX_PROTOBUF_BYTES\)'),
+        failure: '${inspector.name} parsing must enforce its protobuf limit.',
+      ),
+    ]) {
+      _requireSinglePattern(
+        source,
+        contract.pattern,
+        contract.failure,
+        failures,
+      );
+    }
+    if (source.contains('ZipFile') || source.contains('ZipEntry')) {
+      failures.add(
+        '${inspector.name} parsing must not open Android archives directly.',
       );
     }
   }

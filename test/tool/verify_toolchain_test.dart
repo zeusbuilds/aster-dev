@@ -309,6 +309,14 @@ esac''');
           '  --bundle "\${bundle_path}" \\\n'
           '  --aapt2-proto "\${UTEXO_AAPT2_PROTO_JAR}" \\\n'
           '  --protobuf "\${UTEXO_PROTOBUF_JAR}"\n'
+          'trap cleanup EXIT\n'
+          'mktemp -d "\${TMPDIR:-/tmp}/utexo-aab-config.XXXXXX"\n'
+          'java scripts/AndroidArchiveEntryExtractor.java \\\n'
+          '  "\${bundle_path}" \\\n'
+          '  BundleConfig.pb \\\n'
+          '  "\${bundle_config_path}" \\\n'
+          '  16777216\n'
+          'scripts/BundleConfigInspector.java "\${bundle_config_path}"\n'
           'java scripts/AndroidJarSignatureInspector.java '
           '"\${bundle_path}"\n'
           './scripts/verify-android-native-libraries.sh \\\n'
@@ -335,6 +343,35 @@ esac''');
     );
     _write(
       repository,
+      'scripts/AndroidArchiveEntryExtractor.java',
+      'new ZipFile(archive.toFile());\n'
+          'Files.isRegularFile(archive, LinkOption.NOFOLLOW_LINKS);\n'
+          'validateEntryName(name);\n'
+          'if (!entryNames.add(name)) {}\n'
+          'private static final int MAX_ENTRY_COUNT = 1;\n'
+          'private static final long MAX_EXPANDED_BYTES = 1;\n'
+          'if (size > maximumEntryBytes) {}\n'
+          'StandardOpenOption.CREATE_NEW;\n'
+          'Files.deleteIfExists(target);',
+    );
+    _write(
+      repository,
+      'scripts/AndroidManifestInspector.java',
+      'private static final int MAX_PROTOBUF_BYTES = 1;\n'
+          'Files.isRegularFile(input, LinkOption.NOFOLLOW_LINKS);\n'
+          'CodedInputStream.newInstance(input);\n'
+          'codedInput.setSizeLimit(MAX_PROTOBUF_BYTES);',
+    );
+    _write(
+      repository,
+      'scripts/BundleConfigInspector.java',
+      'private static final int MAX_PROTOBUF_BYTES = 1;\n'
+          'Files.isRegularFile(input, LinkOption.NOFOLLOW_LINKS);\n'
+          'CodedInputStream.newInstance(input);\n'
+          'codedInput.setSizeLimit(MAX_PROTOBUF_BYTES);',
+    );
+    _write(
+      repository,
       'scripts/AndroidNativeLibraryExtractor.java',
       'new ZipFile(archive.toFile());\n'
           'validateEntryName(name);\n'
@@ -353,6 +390,18 @@ esac''');
           'arguments[0].equals("--signature-evidence");\n'
           'private static final int MAX_ENTRY_COUNT = 1;\n'
           'private static final long MAX_EXPANDED_BYTES = 1;',
+    );
+    _write(
+      repository,
+      'tool/verify_android_release_identity.dart',
+      "'scripts/AndroidArchiveEntryExtractor.java',\n"
+          'artifact,\n'
+          "'base/manifest/AndroidManifest.xml',\n"
+          'manifest.path,\n'
+          "'16777216',\n"
+          "'scripts/AndroidManifestInspector.java',\n"
+          'manifest.path,\n'
+          'await temporaryDirectory.delete(recursive: true);',
     );
     _write(
       repository,
@@ -1060,6 +1109,69 @@ esac''');
         contains('must prove the exact ABI set'),
         contains('must prove required libraries'),
         contains('must not overwrite output paths'),
+      ]),
+    );
+  });
+
+  test('rejects unbounded Android bundle protobuf inspection', () {
+    _write(
+      repository,
+      'scripts/verify-android-release-bundle.sh',
+      'fvm dart run tool/verify_android_release_identity.dart\n'
+          'scripts/BundleConfigInspector.java "\${bundle_path}"\n'
+          'java scripts/AndroidJarSignatureInspector.java '
+          '"\${bundle_path}"\n'
+          './scripts/verify-android-native-libraries.sh \\\n'
+          '  "\${bundle_path}" \\\n'
+          '  base/lib \\\n'
+          '  aab \\\n'
+          '  arm64-v8a,armeabi-v7a,x86_64',
+    );
+    _write(
+      repository,
+      'tool/verify_android_release_identity.dart',
+      "'scripts/AndroidManifestInspector.java', artifact,",
+    );
+    _write(
+      repository,
+      'scripts/AndroidArchiveEntryExtractor.java',
+      'new ZipFile(archive.toFile());',
+    );
+    _write(
+      repository,
+      'scripts/AndroidManifestInspector.java',
+      'new ZipFile(bundle);',
+    );
+    _write(
+      repository,
+      'scripts/BundleConfigInspector.java',
+      'new ZipFile(bundle);',
+    );
+
+    final result = _verify(
+      repository,
+      flutterVersionMetadata,
+      flutterExtension,
+      flutterGradleUtils,
+    );
+
+    expect(
+      result.failures,
+      containsAll(<Matcher>[
+        contains('safely extract one bounded BundleConfig.pb'),
+        contains('consume only the extracted file'),
+        contains('fail-safe temporary-file cleanup'),
+        contains('safely extract one bounded manifest'),
+        contains('consume only the extracted manifest'),
+        contains('clean its owned temporary directory'),
+        contains('Exact archive extraction must reject non-regular inputs'),
+        contains('Exact archive extraction must validate every entry path'),
+        contains('Manifest parsing must bound protobuf input bytes'),
+        contains('Manifest parsing must not open Android archives directly'),
+        contains('BundleConfig parsing must bound protobuf input bytes'),
+        contains(
+          'BundleConfig parsing must not open Android archives directly',
+        ),
       ]),
     );
   });
