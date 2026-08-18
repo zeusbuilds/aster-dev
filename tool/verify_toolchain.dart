@@ -1173,6 +1173,11 @@ ToolchainVerification verifyToolchain({
     'tool/verify_android_release_identity.dart',
     failures,
   );
+  final boundedProcess = _readRequired(
+    File('$root/tool/bounded_process.dart'),
+    'tool/bounded_process.dart',
+    failures,
+  );
   if (apkVerifier != null) {
     _requireSinglePattern(
       apkVerifier,
@@ -1483,6 +1488,41 @@ ToolchainVerification verifyToolchain({
   if (androidReleaseIdentityVerifier != null) {
     _requireSinglePattern(
       androidReleaseIdentityVerifier,
+      RegExp(r"import 'bounded_process\.dart';"),
+      'Android identity verification must import the bounded process owner.',
+      failures,
+    );
+    _requirePatternCount(
+      androidReleaseIdentityVerifier,
+      RegExp(r'await runBoundedProcess\('),
+      3,
+      'Android identity verification must execute exactly three bounded '
+      'inspector processes.',
+      failures,
+    );
+    for (final contract in <({RegExp pattern, String label})>[
+      (pattern: RegExp(r'workingDirectory:'), label: 'working-directory'),
+      (pattern: RegExp(r'maxStdoutBytes:'), label: 'stdout-limit'),
+      (pattern: RegExp(r'maxStderrBytes:'), label: 'stderr-limit'),
+      (pattern: RegExp(r'timeout:'), label: 'deadline'),
+    ]) {
+      _requirePatternCount(
+        androidReleaseIdentityVerifier,
+        contract.pattern,
+        3,
+        'Every Android identity inspector must own one ${contract.label} '
+        'policy.',
+        failures,
+      );
+    }
+    if (androidReleaseIdentityVerifier.contains('Process.run(')) {
+      failures.add(
+        'Android identity verification must not buffer subprocess output with '
+        'Process.run.',
+      );
+    }
+    _requireSinglePattern(
+      androidReleaseIdentityVerifier,
       RegExp(
         r"'scripts/AndroidArchiveEntryExtractor\.java',\s*"
         r"artifact,\s*"
@@ -1509,6 +1549,70 @@ ToolchainVerification verifyToolchain({
       'AAB identity verification must clean its owned temporary directory.',
       failures,
     );
+  }
+  if (boundedProcess != null) {
+    for (final contract in <({RegExp pattern, String failure})>[
+      (
+        pattern: RegExp(r'Process\.start\('),
+        failure: 'Bounded subprocess execution must stream with Process.start.',
+      ),
+      (
+        pattern: RegExp(
+          r'_readBoundedUtf8\(\s*process\.stdout,\s*'
+          r"streamName: 'stdout',\s*"
+          r'maximumBytes: maxStdoutBytes,\s*onLimit: terminate,\s*\)',
+        ),
+        failure: 'Bounded subprocess execution must enforce its stdout limit.',
+      ),
+      (
+        pattern: RegExp(
+          r'_readBoundedUtf8\(\s*process\.stderr,\s*'
+          r"streamName: 'stderr',\s*"
+          r'maximumBytes: maxStderrBytes,\s*onLimit: terminate,\s*\)',
+        ),
+        failure: 'Bounded subprocess execution must enforce its stderr limit.',
+      ),
+      (
+        pattern: RegExp(r'totalBytes > maximumBytes'),
+        failure:
+            'Bounded subprocess execution must count bytes before capture.',
+      ),
+      (
+        pattern: RegExp(r'utf8\.decode\(output\.takeBytes\(\)\)'),
+        failure: 'Bounded subprocess output must use strict UTF-8 decoding.',
+      ),
+      (
+        pattern: RegExp(
+          r'Future\.wait<Object>\(\[\s*process\.exitCode,\s*'
+          r'stdoutFuture,\s*stderrFuture,\s*\],\s*eagerError: true,?\s*'
+          r'\)\.timeout\(\s*timeout,',
+        ),
+        failure: 'Bounded subprocess execution must enforce one deadline.',
+      ),
+      (
+        pattern: RegExp(r'ProcessSignal\.sigkill'),
+        failure: 'Bounded subprocess failures must force child termination.',
+      ),
+      (
+        pattern: RegExp(r'on ProcessException[\s\S]*ProcessLaunchException'),
+        failure: 'Bounded subprocess launch failures must redact arguments.',
+      ),
+    ]) {
+      _requireSinglePattern(
+        boundedProcess,
+        contract.pattern,
+        contract.failure,
+        failures,
+      );
+    }
+    if (boundedProcess.contains('Process.run(')) {
+      failures.add(
+        'Bounded subprocess execution must not use buffered Process.run.',
+      );
+    }
+    if (boundedProcess.contains('allowMalformed: true')) {
+      failures.add('Bounded subprocess output must reject malformed UTF-8.');
+    }
   }
   for (final inspector in <({String? source, String name})>[
     (source: manifestInspector, name: 'Manifest'),
@@ -2271,6 +2375,16 @@ void _requireSinglePattern(
   List<String> failures,
 ) {
   if (pattern.allMatches(contents).length != 1) failures.add(message);
+}
+
+void _requirePatternCount(
+  String contents,
+  RegExp pattern,
+  int expected,
+  String message,
+  List<String> failures,
+) {
+  if (pattern.allMatches(contents).length != expected) failures.add(message);
 }
 
 void _requireSingleCapturedValue(

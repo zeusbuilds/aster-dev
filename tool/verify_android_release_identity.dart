@@ -2,6 +2,13 @@ import 'dart:io';
 
 import 'package:yaml/yaml.dart';
 
+import 'bounded_process.dart';
+
+const _artifactToolTimeout = Duration(minutes: 2);
+const _maximumAapt2OutputBytes = 1024 * 1024;
+const _maximumInspectorOutputBytes = 64 * 1024;
+const _maximumInspectorDiagnosticBytes = 256 * 1024;
+
 /// Application and version metadata that must match a release artifact.
 final class AndroidReleaseIdentity {
   const AndroidReleaseIdentity({
@@ -230,11 +237,18 @@ Future<AndroidReleaseIdentity> _inspectArtifact(
   if (options case {'apk': final artifact, 'aapt2': final aapt2}) {
     _requireFile(artifact, 'APK');
     _requireFile(aapt2, 'aapt2');
-    final result = await Process.run(aapt2, ['dump', 'badging', artifact]);
+    final result = await runBoundedProcess(
+      aapt2,
+      ['dump', 'badging', artifact],
+      workingDirectory: repository.path,
+      maxStdoutBytes: _maximumAapt2OutputBytes,
+      maxStderrBytes: _maximumInspectorDiagnosticBytes,
+      timeout: _artifactToolTimeout,
+    );
     if (result.exitCode != 0) {
       throw StateError('aapt2 exited with code ${result.exitCode}.');
     }
-    return parseAapt2Badging(result.stdout as String);
+    return parseAapt2Badging(result.stdout);
   }
   if (options case {
     'bundle': final artifact,
@@ -249,31 +263,45 @@ Future<AndroidReleaseIdentity> _inspectArtifact(
     );
     try {
       final manifest = File('${temporaryDirectory.path}/AndroidManifest.pb');
-      final extraction = await Process.run('java', [
-        'scripts/AndroidArchiveEntryExtractor.java',
-        artifact,
-        'base/manifest/AndroidManifest.xml',
-        manifest.path,
-        '16777216',
-      ], workingDirectory: repository.path);
+      final extraction = await runBoundedProcess(
+        'java',
+        [
+          'scripts/AndroidArchiveEntryExtractor.java',
+          artifact,
+          'base/manifest/AndroidManifest.xml',
+          manifest.path,
+          '16777216',
+        ],
+        workingDirectory: repository.path,
+        maxStdoutBytes: _maximumInspectorOutputBytes,
+        maxStderrBytes: _maximumInspectorDiagnosticBytes,
+        timeout: _artifactToolTimeout,
+      );
       if (extraction.exitCode != 0) {
         throw StateError(
           'bundle manifest extraction exited with code '
           '${extraction.exitCode}.',
         );
       }
-      final result = await Process.run('java', [
-        '--class-path',
-        '$aapt2Proto${Platform.isWindows ? ';' : ':'}$protobuf',
-        'scripts/AndroidManifestInspector.java',
-        manifest.path,
-      ], workingDirectory: repository.path);
+      final result = await runBoundedProcess(
+        'java',
+        [
+          '--class-path',
+          '$aapt2Proto${Platform.isWindows ? ';' : ':'}$protobuf',
+          'scripts/AndroidManifestInspector.java',
+          manifest.path,
+        ],
+        workingDirectory: repository.path,
+        maxStdoutBytes: _maximumInspectorOutputBytes,
+        maxStderrBytes: _maximumInspectorDiagnosticBytes,
+        timeout: _artifactToolTimeout,
+      );
       if (result.exitCode != 0) {
         throw StateError(
           'bundle manifest inspector exited with code ${result.exitCode}.',
         );
       }
-      return parseBundleManifestIdentity(result.stdout as String);
+      return parseBundleManifestIdentity(result.stdout);
     } finally {
       await temporaryDirectory.delete(recursive: true);
     }

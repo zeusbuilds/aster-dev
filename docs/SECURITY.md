@@ -80,6 +80,10 @@ rejects duplicate and unsafe entry names, bounds archive and expansion
 resources, proves the exact native ABI/runtime-library matrix, and writes only
 validated native basenames beneath an owned temporary directory. Line-oriented
 ZIP output and wildcard extraction are not trusted security boundaries.
+Direct Android identity inspectors run through one streamed subprocess boundary
+with independent stdout/stderr byte ceilings, strict UTF-8 decoding, a fixed
+deadline, and forced child termination. Inspector output is never accumulated
+without a bound, and launch failures do not echo artifact arguments.
 
 ## Open Security Decisions
 

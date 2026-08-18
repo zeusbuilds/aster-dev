@@ -498,7 +498,20 @@ library_count=1
     _write(
       repository,
       'tool/verify_android_release_identity.dart',
-      "'scripts/AndroidArchiveEntryExtractor.java',\n"
+      "import 'bounded_process.dart';\n"
+          'await runBoundedProcess(\n'
+          "  'aapt2', const [],\n"
+          '  workingDirectory: root, maxStdoutBytes: 1,\n'
+          '  maxStderrBytes: 1, timeout: deadline);\n'
+          'await runBoundedProcess(\n'
+          "  'java', const [],\n"
+          '  workingDirectory: root, maxStdoutBytes: 1,\n'
+          '  maxStderrBytes: 1, timeout: deadline);\n'
+          'await runBoundedProcess(\n'
+          "  'java', const [],\n"
+          '  workingDirectory: root, maxStdoutBytes: 1,\n'
+          '  maxStderrBytes: 1, timeout: deadline);\n'
+          "'scripts/AndroidArchiveEntryExtractor.java',\n"
           'artifact,\n'
           "'base/manifest/AndroidManifest.xml',\n"
           'manifest.path,\n'
@@ -506,6 +519,32 @@ library_count=1
           "'scripts/AndroidManifestInspector.java',\n"
           'manifest.path,\n'
           'await temporaryDirectory.delete(recursive: true);',
+    );
+    _write(
+      repository,
+      'tool/bounded_process.dart',
+      'Process.start(\n'
+          '_readBoundedUtf8(\n'
+          '  process.stdout,\n'
+          "  streamName: 'stdout',\n"
+          '  maximumBytes: maxStdoutBytes,\n'
+          '  onLimit: terminate,\n'
+          ');\n'
+          '_readBoundedUtf8(\n'
+          '  process.stderr,\n'
+          "  streamName: 'stderr',\n"
+          '  maximumBytes: maxStderrBytes,\n'
+          '  onLimit: terminate,\n'
+          ');\n'
+          'totalBytes > maximumBytes;\n'
+          'utf8.decode(output.takeBytes());\n'
+          'Future.wait<Object>([\n'
+          '  process.exitCode,\n'
+          '  stdoutFuture,\n'
+          '  stderrFuture,\n'
+          '], eagerError: true).timeout(timeout, onTimeout: fail);\n'
+          'ProcessSignal.sigkill;\n'
+          'on ProcessException { throw const ProcessLaunchException(); }',
     );
     _write(
       repository,
@@ -1417,6 +1456,55 @@ esac''');
         contains(
           'BundleConfig parsing must not open Android archives directly',
         ),
+      ]),
+    );
+  });
+
+  test('rejects buffered or incompletely bounded identity subprocesses', () {
+    _write(
+      repository,
+      'tool/verify_android_release_identity.dart',
+      "import 'bounded_process.dart';\n"
+          'await Process.run(aapt2, const []);\n'
+          'await Process.run(java, const []);\n'
+          'await Process.run(java, const []);\n'
+          "'scripts/AndroidArchiveEntryExtractor.java',\n"
+          'artifact,\n'
+          "'base/manifest/AndroidManifest.xml',\n"
+          'manifest.path,\n'
+          "'16777216',\n"
+          "'scripts/AndroidManifestInspector.java',\n"
+          'manifest.path,\n'
+          'await temporaryDirectory.delete(recursive: true);',
+    );
+    _write(
+      repository,
+      'tool/bounded_process.dart',
+      'Process.run(executable, arguments);\n'
+          'utf8.decode(output.takeBytes(), allowMalformed: true);',
+    );
+
+    final result = _verify(
+      repository,
+      flutterVersionMetadata,
+      flutterExtension,
+      flutterGradleUtils,
+    );
+
+    expect(
+      result.failures,
+      containsAll(<Matcher>[
+        contains('execute exactly three bounded inspector processes'),
+        contains('must not buffer subprocess output with Process.run'),
+        contains('must stream with Process.start'),
+        contains('must enforce its stdout limit'),
+        contains('must enforce its stderr limit'),
+        contains('must count bytes before capture'),
+        contains('must enforce one deadline'),
+        contains('must force child termination'),
+        contains('launch failures must redact arguments'),
+        contains('must not use buffered Process.run'),
+        contains('must reject malformed UTF-8'),
       ]),
     );
   });
