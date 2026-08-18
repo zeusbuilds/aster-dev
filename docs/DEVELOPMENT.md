@@ -78,9 +78,8 @@ make bootstrap
 
 3. **Run the app:**
    ```bash
-   make run
-   # or
-   flutter run   # after FVM is set up, inside `make shell`
+   make run-ios IOS_SIMULATOR_ID=<simulator-udid>
+   # Or: make run-android ANDROID_DEVICE_ID=<emulator-or-device-id>
    ```
 
 ## Linting and Code Style
@@ -165,7 +164,8 @@ commit and push again.
 - `make dependencies` - Resolve exactly the committed Pub dependency graph
 - `make build`      - Run build_runner to generate code
 - `make watch`      - Run build_runner in watch mode
-- `make run`        - Run Flutter app
+- `make run-ios IOS_SIMULATOR_ID=<id>` - Run iOS through locked CocoaPods
+- `make run-android ANDROID_DEVICE_ID=<id>` - Run Android on an explicit device
 - `make test`       - Run Flutter tests
 - `make format`     - Format Dart code
 - `make format-check` - Verify formatting without changing files
@@ -203,7 +203,7 @@ development prerequisites. The environment includes:
 - Android NDK 28.2.13676358, matching Flutter 3.47.0
 - Gradle 9.3.1, Android Gradle Plugin 9.1.0, and Kotlin 2.4.0
 - Java JDK 21
-- CocoaPods (macOS only)
+- CocoaPods 1.16.2 through Bundler 4.0.10 (macOS only)
 
 The flake deliberately does not install Flutter or Dart. It places the
 project-local `.fvm/flutter_sdk/bin` on `PATH`; FVM remains the sole source of
@@ -214,6 +214,34 @@ analysis, tests, or documentation.
 Flutter itself is managed via [FVM](https://fvm.app/) and pinned per project
 using `.fvmrc` (`flutter: 3.47.0`). This keeps the Flutter version
 consistent across developers without relying on the Nix store.
+
+### Locked iOS toolchain
+
+Do not run a host-global `pod install` for repository evidence. `Gemfile.lock`
+pins CocoaPods and its complete Ruby dependency graph, including gem checksums.
+Install it into the ignored checkout-local `.bundle/` directory before iOS
+work:
+
+```sh
+make ios-dependencies
+```
+
+The target requires Bundler 4.0.10, enables frozen lockfile mode, and fails
+instead of changing the committed resolution. Repository-owned iOS build and
+integration commands execute Flutter through `bundle exec`, so Flutter's
+implicit CocoaPods invocation uses CocoaPods 1.16.2 from this lock. Use the
+owned Make targets for release evidence rather than invoking `pod`, `flutter
+build ios`, or iOS integration tests directly.
+
+### Verified Android dependencies
+
+The Gradle wrapper validates the Gradle 9.3.1 distribution against its reviewed
+upstream SHA-256 digest. Gradle also enforces the committed
+`android/gradle/verification-metadata.xml` checksums for the complete owned
+Debug, Profile, Release, bundle, and native-test dependency graph. A new or
+changed Maven artifact must fail first; update verification metadata only in a
+dedicated dependency-review change and inspect every added component and
+checksum before committing it.
 
 ## Local SDK Development
 

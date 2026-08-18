@@ -1,16 +1,21 @@
-.PHONY: shell dependencies bootstrap clean build watch run test ios-native-test android-native-test ios-storage-test android-storage-test format format-check analyze docs verify verify-toolchain verify-architecture verify-design-system verify-barrels verify-generated lint prepare-android-release android-release-bundle android-release-apks verify-android-release-bundle verify-android-release-apks verify-android-apk-signature-policy fvm-setup help
+.PHONY: shell dependencies ios-dependencies bootstrap clean build watch run-ios run-android test ios-native-test android-native-test ios-storage-test android-storage-test format format-check analyze docs verify verify-toolchain verify-architecture verify-design-system verify-barrels verify-generated lint prepare-android-release android-release-bundle android-release-apks verify-android-release-bundle verify-android-release-apks verify-android-apk-signature-policy fvm-setup help
+
+BUNDLE_PATH ?= $(CURDIR)/.bundle
+BUNDLER_VERSION := 4.0.10
 
 # Default target
 help:
 	@echo "Available commands:"
 	@echo "  make shell     - Enter Nix development environment"
 	@echo "  make dependencies - Resolve the exact committed Pub lockfile"
+	@echo "  make ios-dependencies - Install the exact committed CocoaPods bundle"
 	@echo "  make fvm-setup - Install/use Flutter via FVM for this project"
 	@echo "  make bootstrap - Initial project setup (clean, pub get, build_runner)"
 	@echo "  make clean     - Clean Flutter build artifacts"
 	@echo "  make build     - Run build_runner to generate code"
 	@echo "  make watch     - Run build_runner in watch mode"
-	@echo "  make run       - Run Flutter app"
+	@echo "  make run-ios IOS_SIMULATOR_ID=<id> - Run the iOS Debug app with locked CocoaPods"
+	@echo "  make run-android ANDROID_DEVICE_ID=<id> - Run the Android Debug app"
 	@echo "  make test      - Run Flutter tests"
 	@echo "  make ios-native-test IOS_SIMULATOR_ID=<id> - Run iOS Runner XCTest"
 	@echo "  make android-native-test - Run Android app-host unit tests"
@@ -43,6 +48,12 @@ shell:
 dependencies:
 	fvm flutter pub get --enforce-lockfile
 
+# Keep CocoaPods and its Ruby graph local to this checkout and Gemfile.lock.
+ios-dependencies:
+	@command -v bundle >/dev/null 2>&1 || (echo "Bundler is required for iOS work" >&2; exit 64)
+	@test "$$(bundle --version)" = "$(BUNDLER_VERSION)" || (echo "Bundler $(BUNDLER_VERSION) is required" >&2; exit 64)
+	@BUNDLE_FROZEN=true BUNDLE_PATH="$(BUNDLE_PATH)" bundle check >/dev/null 2>&1 || BUNDLE_FROZEN=true BUNDLE_PATH="$(BUNDLE_PATH)" bundle install --jobs 4 --retry 3
+
 # Initial project setup
 bootstrap: clean
 	@echo "Setting up project..."
@@ -66,20 +77,24 @@ watch:
 	@echo "Running build_runner in watch mode..."
 	fvm dart run build_runner watch
 
-# Run Flutter app
-run:
-	@echo "Running Flutter app..."
-	fvm flutter run --no-pub
+# Interactive builds require an explicit platform and device identity.
+run-ios: dependencies ios-dependencies
+	@test -n "$(IOS_SIMULATOR_ID)" || (echo "IOS_SIMULATOR_ID is required" >&2; exit 64)
+	BUNDLE_FROZEN=true BUNDLE_PATH="$(BUNDLE_PATH)" bundle exec fvm flutter run --no-pub -d "$(IOS_SIMULATOR_ID)"
+
+run-android: dependencies
+	@test -n "$(ANDROID_DEVICE_ID)" || (echo "ANDROID_DEVICE_ID is required" >&2; exit 64)
+	fvm flutter run --no-pub -d "$(ANDROID_DEVICE_ID)"
 
 # Run Flutter tests
 test:
 	@echo "Running Flutter tests..."
 	fvm flutter test --no-pub
 
-ios-native-test: dependencies
+ios-native-test: dependencies ios-dependencies
 	@test -n "$(IOS_SIMULATOR_ID)" || (echo "IOS_SIMULATOR_ID is required" >&2; exit 64)
 	fvm dart run build_runner build
-	fvm flutter build ios --simulator --debug --config-only --no-pub
+	BUNDLE_FROZEN=true BUNDLE_PATH="$(BUNDLE_PATH)" bundle exec fvm flutter build ios --simulator --debug --config-only --no-pub
 	xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner -configuration Debug -destination "platform=iOS Simulator,id=$(IOS_SIMULATOR_ID)" -quiet clean test
 
 android-native-test: dependencies
@@ -89,7 +104,7 @@ android-native-test: dependencies
 
 # Flutter integration tests temporarily rewrite ignored iOS build settings to a
 # disposable listener target. The wrapper restores lib/main.dart on every exit.
-ios-storage-test:
+ios-storage-test: ios-dependencies
 	./scripts/run-ios-integration-test.sh integration_test/wallet_storage_security_test.dart "$(IOS_SIMULATOR_ID)"
 
 android-storage-test:
@@ -188,4 +203,4 @@ fvm-setup:
 	@echo "Using the exact Flutter version pinned in .fvmrc."
 	fvm install
 	fvm use
-	@echo "FVM setup complete. You can now run 'make bootstrap' and 'make run'."
+	@echo "FVM setup complete. Run 'make bootstrap', then an explicit run-ios or run-android target."

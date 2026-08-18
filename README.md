@@ -65,14 +65,16 @@ See `docs/architecture/ARCHITECTURE.md` and
 Prerequisites:
 
 - FVM
-- Xcode and CocoaPods for iOS
+- Xcode plus Bundler 4.0.10 for the locked CocoaPods 1.16.2 toolchain
 - Android SDK and Java 21 for Android
 - Nix and direnv are optional development-shell helpers
 
 ```sh
 make fvm-setup
 make bootstrap
-make run
+make ios-dependencies # macOS only; installs the locked bundle under .bundle/
+make run-ios IOS_SIMULATOR_ID=<simulator-udid>
+# Or: make run-android ANDROID_DEVICE_ID=<emulator-or-device-id>
 ```
 
 Flutter `3.47.0` and Dart `3.13.0` are pinned. Flutter 3.47.0 was the latest

@@ -51,6 +51,10 @@ native targets first run Flutter's `--config-only` platform bootstrap, so they
 also work from a source-only checkout where Riverpod outputs, the Gradle
 wrapper, CocoaPods, and Flutter host files are correctly ignored. Locked Pub
 resolution and deterministic code generation happen before native compilation.
+The iOS targets also require Bundler 4.0.10 and execute every Flutter/CocoaPods
+path through the checksummed CocoaPods 1.16.2 graph in `Gemfile.lock`. Android
+builds verify both the Gradle distribution digest and every resolved external
+artifact against committed dependency-verification metadata.
 The iOS suite executes the filesystem policy directly, including insecure
 ancestors, hard-link aliases, bounds, collisions, byte preservation, and
 channel-session invalidation. Android unit tests stress concurrent admission,
@@ -121,10 +125,12 @@ It never uninstalls either package or erases developer state.
 Use this target instead of invoking the iOS integration test directly. Flutter
 temporarily points ignored iOS build settings at a disposable test listener;
 the owned wrapper preserves the test result, proves the unsuffixed candidate
-bundle path is unchanged, and restores the ordinary `lib/main.dart` simulator
-target on every exit so later Xcode builds remain reproducible. The in-process
-integration assertion proves the transient test bundle uses `.debug`; Flutter
-may remove that test bundle after execution.
+bundle path is unchanged, requires the expected `.debug` application container
+after a successful run, and restores the ordinary `lib/main.dart` simulator
+target and installed Debug app on every exit so later development builds remain
+reproducible. The in-process integration assertion, built-plist inspection, and
+simulator-container check jointly prove the transient test used the isolated
+debug identity without leaving the test-listener binary installed.
 
 ## Profile Performance Gate
 

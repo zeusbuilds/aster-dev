@@ -57,3 +57,6 @@ app.*.map.json
 
 # direnv environment
 .direnv/
+
+# Repository-local Ruby gems installed from Gemfile.lock.
+/.bundle/

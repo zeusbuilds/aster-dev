@@ -9,6 +9,11 @@ from a clean worktree and record commands/results in the production tracker.
 - [ ] `git status --short` is clean
 - [ ] immutable SDK `resolved-ref` matches the approved commit
 - [ ] `fvm flutter --version` matches `.fvmrc`
+- [ ] Gradle wrapper distribution checksum matches the reviewed official digest
+- [ ] Gradle dependency verification passes without trust exceptions and covers
+      Debug, Profile, Release, bundle, and native-test graphs
+- [ ] Bundler 4.0.10 resolves the checksummed `Gemfile.lock`, and every owned
+      iOS Flutter/CocoaPods command uses CocoaPods 1.16.2 through `bundle exec`
 - [ ] `make lint`
 - [ ] `fvm flutter test --coverage`
 - [ ] dependency, license, discontinued-package, and advisory review
@@ -30,6 +35,9 @@ from a clean worktree and record commands/results in the production tracker.
       `make android-storage-test ANDROID_DEVICE_ID=<id>`
 - [ ] Android install/launch smoke on the recorded ABI/API
 - [ ] package IDs, entitlements, backup policy, signing, and release metadata
+- [ ] Apple export-compliance classification is approved by the release owner;
+      submission metadata and `ITSAppUsesNonExemptEncryption`, if applicable,
+      match that documented legal classification
 - [ ] every Release wallet service endpoint is TLS-protected; no HTTP, `tcp`,
       or `rpc` loopback development transport survives composition
 - [ ] public app version/build number and upgrade policy are approved

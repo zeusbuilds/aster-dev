@@ -67,8 +67,18 @@ profile builds retain native diagnostics for local investigation. A future
 production telemetry system must use an app-owned redaction boundary instead
 of re-enabling arbitrary dependency logs.
 
+Build inputs are part of the security boundary. The Gradle wrapper checks its
+distribution digest, Gradle rejects unreviewed external artifact checksums, and
+iOS tooling is resolved from the checksummed Bundler lock rather than an
+arbitrary host CocoaPods executable. Verification metadata is reviewed source;
+regenerating it is a dependency change, not a routine way to make a failed
+build pass.
+
 ## Open Security Decisions
 
+- Apple's export-compliance classification for the app and native wallet
+  cryptography requires release-owner/legal approval. The repository must not
+  infer or publish `ITSAppUsesNonExemptEncryption` before that decision.
 - Authentication for seed viewing and xpub export is not selected.
 - Recovery-screen screenshot/screen-recording policy is not selected and has
   platform asymmetry.

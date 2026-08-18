@@ -31,7 +31,8 @@
         androidSdk = androidComposition.androidsdk;
 
         jdk = pkgs.jdk21;
-        cocoapods = pkgs.cocoapods;
+        ruby = pkgs.ruby;
+        bundler = pkgs.bundler;
 
         commonBuildInputs = with pkgs; [
           jdk
@@ -43,7 +44,8 @@
         ];
 
         macosBuildInputs = with pkgs; lib.optionals (system == "aarch64-darwin" || system == "x86_64-darwin") [
-          cocoapods
+          ruby
+          bundler
         ];
 
         buildInputs = commonBuildInputs ++ macosBuildInputs;
@@ -58,7 +60,7 @@
           export PATH="$(pwd)/.fvm/flutter_sdk/bin:$PATH"
           
           ${pkgs.lib.optionalString (system == "aarch64-darwin" || system == "x86_64-darwin") ''
-            export PATH="${cocoapods}/bin:$PATH"
+            export PATH="${ruby}/bin:${bundler}/bin:$PATH"
           ''}
           
           if [ -x "$(pwd)/.fvm/flutter_sdk/bin/flutter" ]; then

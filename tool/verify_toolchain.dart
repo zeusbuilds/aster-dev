@@ -1,6 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:xml/xml.dart';
+
+const _reviewedGradleDistributionSha256 = <String, String>{
+  '9.3.1': '17f277867f6914d61b1aa02efab1ba7bb439ad652ca485cd8ca6842fccec6e43',
+};
+
 /// Result of checking the repository's cross-toolchain version contract.
 final class ToolchainVerification {
   const ToolchainVerification({
@@ -13,8 +19,13 @@ final class ToolchainVerification {
     required this.flutterMinSdk,
     required this.flutterTargetSdk,
     required this.flutterNdkVersion,
+    required this.gradleDistributionSha256,
+    required this.androidVerifiedArtifacts,
     required this.androidBuildToolsVersion,
     required this.androidPlatformToolsVersion,
+    required this.androidApplicationId,
+    required this.cocoaPodsVersion,
+    required this.bundlerVersion,
     required this.failures,
   });
 
@@ -45,11 +56,26 @@ final class ToolchainVerification {
   /// NDK revision declared by the Flutter SDK, when it could be resolved.
   final String? flutterNdkVersion;
 
+  /// Reviewed digest for the exact Gradle wrapper distribution.
+  final String? gradleDistributionSha256;
+
+  /// Number of Maven artifacts covered by strict SHA-256 verification.
+  final int androidVerifiedArtifacts;
+
   /// Android build-tools revision pinned by the application and Nix shell.
   final String? androidBuildToolsVersion;
 
   /// Android platform-tools revision pinned by the reproducible Nix shell.
   final String? androidPlatformToolsVersion;
+
+  /// Provisional application identity shared by both mobile hosts.
+  final String? androidApplicationId;
+
+  /// CocoaPods version locked for every owned iOS build path.
+  final String? cocoaPodsVersion;
+
+  /// Bundler version that generated the committed Ruby dependency lock.
+  final String? bundlerVersion;
 
   /// Deterministically ordered missing or divergent toolchain declarations.
   final List<String> failures;
@@ -85,11 +111,13 @@ void main() {
   stdout.writeln(
     'Toolchain policy verified for Flutter ${result.flutterVersion}, '
     'Dart ${result.dartVersion}, Gradle ${result.flutterGradleVersion}, '
+    '${result.androidVerifiedArtifacts} verified Android artifacts, '
     'AGP ${result.flutterAgpVersion}, Kotlin ${result.flutterKotlinVersion}, '
     'Android SDK ${result.flutterCompileSdk}, build tools '
     '${result.androidBuildToolsVersion}, platform tools '
-    '${result.androidPlatformToolsVersion}, and NDK '
-    '${result.flutterNdkVersion}.',
+    '${result.androidPlatformToolsVersion}, NDK '
+    '${result.flutterNdkVersion}, CocoaPods ${result.cocoaPodsVersion}, and '
+    'Bundler ${result.bundlerVersion}.',
   );
 }
 
@@ -211,6 +239,18 @@ ToolchainVerification verifyToolchain({
     'android/gradle.properties',
     failures,
   );
+  final androidApplicationId = androidProperties == null
+      ? null
+      : _readSingleCapture(
+          androidProperties,
+          RegExp(
+            r'^utexo\.applicationId='
+            r'([A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+)\s*$',
+            multiLine: true,
+          ),
+          'Android application ID property',
+          failures,
+        );
   String? buildToolsVersion;
   if (android != null) {
     _requireSinglePattern(
@@ -301,20 +341,63 @@ ToolchainVerification verifyToolchain({
     'android/gradle/wrapper/gradle-wrapper.properties',
     failures,
   );
-  if (wrapper != null &&
-      gradleVersion != null &&
-      !wrapper.contains(
-        'distributionUrl=https\\://services.gradle.org/distributions/'
-        'gradle-$gradleVersion-all.zip',
-      )) {
-    failures.add(
+  String? gradleDistributionSha256;
+  if (wrapper != null && gradleVersion != null) {
+    _requireSinglePattern(
+      wrapper,
+      RegExp(
+        '^distributionUrl=https\\\\://services\\.gradle\\.org/'
+        'distributions/gradle-${RegExp.escape(gradleVersion)}-all\\.zip\\s*\$',
+        multiLine: true,
+      ),
       'Android Gradle wrapper must use Flutter Gradle $gradleVersion.',
+      failures,
     );
+    gradleDistributionSha256 = _readSingleCapture(
+      wrapper,
+      RegExp(r'^distributionSha256Sum=([0-9a-f]{64})\s*$', multiLine: true),
+      'Gradle distribution SHA-256',
+      failures,
+    );
+    final reviewedSha256 = _reviewedGradleDistributionSha256[gradleVersion];
+    if (reviewedSha256 == null) {
+      failures.add(
+        'Flutter Gradle $gradleVersion has no reviewed distribution digest.',
+      );
+    } else if (gradleDistributionSha256 != null &&
+        gradleDistributionSha256 != reviewedSha256) {
+      failures.add(
+        'Gradle $gradleVersion distribution SHA-256 does not match the '
+        'reviewed official digest.',
+      );
+    }
   }
+
+  final androidVerifiedArtifacts = _verifyGradleDependencyMetadata(
+    File('$root/android/gradle/verification-metadata.xml'),
+    failures,
+  );
 
   final flake = _readRequired(File('$root/flake.nix'), 'flake.nix', failures);
   String? platformToolsVersion;
   if (flake != null) {
+    _requireSinglePattern(
+      flake,
+      RegExp(r'\bruby\s*=\s*pkgs\.ruby\s*;'),
+      'flake.nix must provide the pinned Ruby package on macOS.',
+      failures,
+    );
+    _requireSinglePattern(
+      flake,
+      RegExp(r'\bbundler\s*=\s*pkgs\.bundler\s*;'),
+      'flake.nix must provide Bundler on macOS.',
+      failures,
+    );
+    if (RegExp(r'\bcocoapods\s*=\s*pkgs\.cocoapods\s*;').hasMatch(flake)) {
+      failures.add(
+        'flake.nix must obtain CocoaPods through the committed Bundler lock.',
+      );
+    }
     if (!RegExp(r'\bincludeNDK\s*=\s*true\s*;').hasMatch(flake)) {
       failures.add('flake.nix must include the Android NDK.');
     }
@@ -390,18 +473,6 @@ ToolchainVerification verifyToolchain({
       failures,
     );
   }
-  if (androidProperties != null) {
-    _readSingleCapture(
-      androidProperties,
-      RegExp(
-        r'^utexo\.applicationId='
-        r'([A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+)\s*$',
-        multiLine: true,
-      ),
-      'Android application ID property',
-      failures,
-    );
-  }
   if (workflow != null) {
     _requireSinglePattern(
       workflow,
@@ -426,8 +497,177 @@ ToolchainVerification verifyToolchain({
     );
   }
 
+  final iosProject = _readRequired(
+    File('$root/ios/Runner.xcodeproj/project.pbxproj'),
+    'ios/Runner.xcodeproj/project.pbxproj',
+    failures,
+  );
+  final androidIntegration = _readRequired(
+    File('$root/scripts/run-android-integration-test.sh'),
+    'scripts/run-android-integration-test.sh',
+    failures,
+  );
+  final iosIntegration = _readRequired(
+    File('$root/scripts/run-ios-integration-test.sh'),
+    'scripts/run-ios-integration-test.sh',
+    failures,
+  );
+  if (androidApplicationId != null) {
+    if (iosProject != null) {
+      for (final bundleId in <String>[
+        androidApplicationId,
+        '$androidApplicationId.debug',
+        '$androidApplicationId.profile',
+        '$androidApplicationId.tests',
+        '$androidApplicationId.debug.tests',
+        '$androidApplicationId.profile.tests',
+      ]) {
+        _requireSinglePattern(
+          iosProject,
+          RegExp(
+            '\\bPRODUCT_BUNDLE_IDENTIFIER\\s*=\\s*'
+            '${RegExp.escape(bundleId)}\\s*;',
+          ),
+          'iOS build settings must declare exactly one $bundleId identity.',
+          failures,
+        );
+      }
+    }
+    _requireIntegrationIdentity(
+      androidIntegration,
+      label: 'Android integration wrapper',
+      variable: 'release_package',
+      expected: androidApplicationId,
+      failures: failures,
+    );
+    _requireIntegrationIdentity(
+      iosIntegration,
+      label: 'iOS integration wrapper',
+      variable: 'release_bundle',
+      expected: androidApplicationId,
+      failures: failures,
+    );
+    _requireDerivedDebugIdentity(
+      androidIntegration,
+      label: 'Android integration wrapper',
+      variable: 'test_package',
+      releaseVariable: 'release_package',
+      failures: failures,
+    );
+    _requireDerivedDebugIdentity(
+      iosIntegration,
+      label: 'iOS integration wrapper',
+      variable: 'test_bundle',
+      releaseVariable: 'release_bundle',
+      failures: failures,
+    );
+  }
+  if (iosIntegration != null) {
+    _requireSinglePattern(
+      iosIntegration,
+      RegExp(
+        r'^readonly built_test_app="\$\{root\}/build/ios/'
+        r'iphonesimulator/Runner\.app"\s*$',
+        multiLine: true,
+      ),
+      'iOS integration must inspect the exact built test application.',
+      failures,
+    );
+    _requireSinglePattern(
+      iosIntegration,
+      RegExp(r'plutil -extract CFBundleIdentifier raw'),
+      'iOS integration must inspect the built test bundle identifier.',
+      failures,
+    );
+    _requireSinglePattern(
+      iosIntegration,
+      RegExp(
+        r'xcrun simctl install "\$\{simulator_id\}" "\$\{built_test_app\}"',
+      ),
+      'iOS integration must install the exact built debug artifact.',
+      failures,
+    );
+    _requireSinglePattern(
+      iosIntegration,
+      RegExp(
+        r'^\s*local restored_app="\$\{root\}/build/ios/'
+        r'iphonesimulator/Runner\.app"\s*$',
+        multiLine: true,
+      ),
+      'iOS integration must own the ordinary app restoration artifact.',
+      failures,
+    );
+    _requireSinglePattern(
+      iosIntegration,
+      RegExp(r'xcrun simctl install "\$\{simulator_id\}" "\$\{restored_app\}"'),
+      'iOS integration must restore the ordinary installed debug app.',
+      failures,
+    );
+    _requireSinglePattern(
+      iosIntegration,
+      RegExp(
+        r'^readonly test_path_after="\$\(bundle_path "\$\{test_bundle\}"\)"\s*$',
+        multiLine: true,
+      ),
+      'iOS integration must inspect the installed debug bundle.',
+      failures,
+    );
+    _requireSinglePattern(
+      iosIntegration,
+      RegExp(r'fail "the isolated debug bundle was not installed"'),
+      'iOS integration must fail when its debug bundle is absent.',
+      failures,
+    );
+  }
+
+  final podLock = _readRequired(
+    File('$root/ios/Podfile.lock'),
+    'ios/Podfile.lock',
+    failures,
+  );
+  final cocoaPodsVersion = podLock == null
+      ? null
+      : _readSingleCapture(
+          podLock,
+          RegExp(r'^COCOAPODS: ([0-9]+\.[0-9]+\.[0-9]+)\s*$', multiLine: true),
+          'CocoaPods lock version',
+          failures,
+        );
+  final gemfile = _readRequired(File('$root/Gemfile'), 'Gemfile', failures);
+  final gemfileLock = _readRequired(
+    File('$root/Gemfile.lock'),
+    'Gemfile.lock',
+    failures,
+  );
+  String? bundlerVersion;
+  if (cocoaPodsVersion != null && gemfile != null) {
+    _verifyGemfile(
+      gemfile,
+      cocoaPodsVersion: cocoaPodsVersion,
+      failures: failures,
+    );
+  }
+  if (gemfileLock != null) {
+    bundlerVersion = _verifyBundlerLock(
+      gemfileLock,
+      cocoaPodsVersion: cocoaPodsVersion,
+      failures: failures,
+    );
+  }
+
   final makefile = _readRequired(File('$root/Makefile'), 'Makefile', failures);
   if (makefile != null) {
+    if (bundlerVersion != null) {
+      _requireSinglePattern(
+        makefile,
+        RegExp(
+          '^BUNDLER_VERSION := ${RegExp.escape(bundlerVersion)}\\s*\$',
+          multiLine: true,
+        ),
+        'Makefile must require Bundler $bundlerVersion.',
+        failures,
+      );
+    }
     _requireSinglePattern(
       makefile,
       RegExp(
@@ -435,6 +675,77 @@ ToolchainVerification verifyToolchain({
         multiLine: true,
       ),
       'Makefile dependency setup must enforce the committed Pub lockfile.',
+      failures,
+    );
+    _requireSinglePattern(
+      makefile,
+      RegExp(r'^ios-dependencies:\s*$', multiLine: true),
+      'Makefile must own one locked iOS dependency bootstrap target.',
+      failures,
+    );
+    _requireSinglePattern(
+      makefile,
+      RegExp(r'\bbundle check\b[^\n]*\|\|[^\n]*\bbundle install\b'),
+      'iOS dependency bootstrap must check before installing Gemfile.lock.',
+      failures,
+    );
+    _requireSinglePattern(
+      makefile,
+      RegExp(
+        r'^ios-native-test:\s+dependencies ios-dependencies\s*$',
+        multiLine: true,
+      ),
+      'iOS native tests must bootstrap Pub and locked Ruby dependencies.',
+      failures,
+    );
+    _requireSinglePattern(
+      makefile,
+      RegExp(r'^ios-storage-test:\s+ios-dependencies\s*$', multiLine: true),
+      'iOS integration tests must bootstrap locked Ruby dependencies.',
+      failures,
+    );
+    _requireSinglePattern(
+      makefile,
+      RegExp(r'^run-ios:\s+dependencies ios-dependencies\s*$', multiLine: true),
+      'Interactive iOS builds must bootstrap locked Pub and Ruby dependencies.',
+      failures,
+    );
+    _requireSinglePattern(
+      makefile,
+      RegExp(
+        r'^\s*BUNDLE_FROZEN=true BUNDLE_PATH="\$\(BUNDLE_PATH\)" '
+        r'bundle exec fvm flutter run --no-pub -d '
+        r'"\$\(IOS_SIMULATOR_ID\)"\s*$',
+        multiLine: true,
+      ),
+      'Interactive iOS builds must execute Flutter inside the Ruby bundle.',
+      failures,
+    );
+    _requireSinglePattern(
+      makefile,
+      RegExp(r'^run-android:\s+dependencies\s*$', multiLine: true),
+      'Interactive Android builds must enforce the committed Pub lock.',
+      failures,
+    );
+    _requireSinglePattern(
+      makefile,
+      RegExp(
+        r'^\s*fvm flutter run --no-pub -d '
+        r'"\$\(ANDROID_DEVICE_ID\)"\s*$',
+        multiLine: true,
+      ),
+      'Interactive Android builds must require an explicit device.',
+      failures,
+    );
+    _requireSinglePattern(
+      makefile,
+      RegExp(
+        r'^\s*BUNDLE_FROZEN=true BUNDLE_PATH="\$\(BUNDLE_PATH\)" '
+        r'bundle exec fvm flutter '
+        r'build ios --simulator --debug --config-only --no-pub\s*$',
+        multiLine: true,
+      ),
+      'iOS native bootstrap must execute Flutter inside the Ruby bundle.',
       failures,
     );
     _requireSinglePattern(
@@ -455,6 +766,43 @@ ToolchainVerification verifyToolchain({
         makefile,
         RegExp('^$target:\\s+prepare-android-release\\s*\$', multiLine: true),
         '$target must depend on guarded Release plugin preparation.',
+        failures,
+      );
+    }
+  }
+  if (iosIntegration != null) {
+    if (bundlerVersion != null) {
+      _requireSinglePattern(
+        iosIntegration,
+        RegExp(
+          '^readonly bundler_version="${RegExp.escape(bundlerVersion)}"\\s*\$',
+          multiLine: true,
+        ),
+        'iOS integration must require Bundler $bundlerVersion.',
+        failures,
+      );
+    }
+    _requireSinglePattern(
+      iosIntegration,
+      RegExp(r'^export BUNDLE_FROZEN=true\s*$', multiLine: true),
+      'iOS integration must prevent Gemfile.lock mutation.',
+      failures,
+    );
+    _requireSinglePattern(
+      iosIntegration,
+      RegExp(r'^bundle check >/dev/null 2>&1 \|\|\s*$', multiLine: true),
+      'iOS integration must fail closed when locked gems are unavailable.',
+      failures,
+    );
+    for (final command in <String>[
+      'pub get --enforce-lockfile',
+      'build ios --simulator --debug --no-pub',
+      'test --no-pub',
+    ]) {
+      _requireSinglePattern(
+        iosIntegration,
+        RegExp('bundle exec fvm flutter ${RegExp.escape(command)}'),
+        'iOS integration must run `$command` inside the Ruby bundle.',
         failures,
       );
     }
@@ -575,6 +923,29 @@ ToolchainVerification verifyToolchain({
       'docs/DEVELOPMENT.md must document the Flutter/Dart versions.',
     );
   }
+  if (development != null &&
+      cocoaPodsVersion != null &&
+      bundlerVersion != null &&
+      !development.contains(
+        'CocoaPods $cocoaPodsVersion through Bundler $bundlerVersion',
+      )) {
+    failures.add(
+      'docs/DEVELOPMENT.md must document the CocoaPods/Bundler versions.',
+    );
+  }
+  if (development != null && androidApplicationId != null) {
+    for (final identity in <String>[
+      '$androidApplicationId.debug',
+      '$androidApplicationId.profile',
+      androidApplicationId,
+    ]) {
+      if (!development.contains('`$identity`')) {
+        failures.add(
+          'docs/DEVELOPMENT.md must document platform identity $identity.',
+        );
+      }
+    }
+  }
 
   failures.sort();
   return ToolchainVerification(
@@ -587,8 +958,13 @@ ToolchainVerification verifyToolchain({
     flutterMinSdk: minSdk,
     flutterTargetSdk: targetSdk,
     flutterNdkVersion: ndkVersion,
+    gradleDistributionSha256: gradleDistributionSha256,
+    androidVerifiedArtifacts: androidVerifiedArtifacts,
     androidBuildToolsVersion: buildToolsVersion,
     androidPlatformToolsVersion: platformToolsVersion,
+    androidApplicationId: androidApplicationId,
+    cocoaPodsVersion: cocoaPodsVersion,
+    bundlerVersion: bundlerVersion,
     failures: List.unmodifiable(failures),
   );
 }
@@ -608,6 +984,378 @@ Map<String, Object?>? _readJsonObject(
   }
   failures.add('$label must contain one JSON object.');
   return null;
+}
+
+int _verifyGradleDependencyMetadata(File file, List<String> failures) {
+  final contents = _readRequired(
+    file,
+    'android/gradle/verification-metadata.xml',
+    failures,
+  );
+  if (contents == null) return 0;
+
+  try {
+    final document = XmlDocument.parse(contents);
+    final root = document.rootElement;
+    const namespace = 'https://schema.gradle.org/dependency-verification';
+    if (root.name.local != 'verification-metadata' ||
+        root.name.namespaceUri != namespace) {
+      failures.add('Gradle verification metadata has an invalid root.');
+      return 0;
+    }
+
+    final rootChildren = root.childElements.toList();
+    final configurations = rootChildren
+        .where(
+          (element) =>
+              element.name.local == 'configuration' &&
+              element.name.namespaceUri == namespace,
+        )
+        .toList();
+    final componentContainers = rootChildren
+        .where(
+          (element) =>
+              element.name.local == 'components' &&
+              element.name.namespaceUri == namespace,
+        )
+        .toList();
+    if (rootChildren.length != 2 ||
+        configurations.length != 1 ||
+        componentContainers.length != 1) {
+      failures.add(
+        'Gradle verification metadata must contain one configuration and '
+        'one components container.',
+      );
+      return 0;
+    }
+
+    final configuration = configurations.single;
+    final options = <String, String>{};
+    for (final option in configuration.childElements) {
+      if (option.name.namespaceUri != namespace) {
+        failures.add('Gradle verification contains a foreign option.');
+        continue;
+      }
+      final name = option.name.local;
+      if (options.containsKey(name)) {
+        failures.add('Gradle verification option $name is duplicated.');
+        continue;
+      }
+      options[name] = option.innerText.trim();
+    }
+    if (options.length != 2 ||
+        options['verify-metadata'] != 'true' ||
+        options['verify-signatures'] != 'false') {
+      failures.add(
+        'Gradle dependency verification must use strict metadata SHA-256 '
+        'checks without broad trust exceptions.',
+      );
+    }
+
+    final componentKeys = <String>{};
+    var artifactCount = 0;
+    for (final component in componentContainers.single.childElements) {
+      if (component.name.local != 'component' ||
+          component.name.namespaceUri != namespace) {
+        failures.add('Gradle components contain an unexpected element.');
+        continue;
+      }
+      final group = component.getAttribute('group');
+      final name = component.getAttribute('name');
+      final version = component.getAttribute('version');
+      if ([
+        group,
+        name,
+        version,
+      ].any((value) => value == null || value.isEmpty)) {
+        failures.add(
+          'Gradle verification contains an unidentifiable component.',
+        );
+        continue;
+      }
+      final componentKey = '$group:$name:$version';
+      if (!componentKeys.add(componentKey)) {
+        failures.add('Gradle verification duplicates $componentKey.');
+      }
+
+      final artifactNames = <String>{};
+      final artifacts = component.childElements.toList();
+      if (artifacts.isEmpty) {
+        failures.add('Gradle verification component $componentKey is empty.');
+      }
+      for (final artifact in artifacts) {
+        if (artifact.name.local != 'artifact' ||
+            artifact.name.namespaceUri != namespace) {
+          failures.add('$componentKey contains an unexpected element.');
+          continue;
+        }
+        final artifactName = artifact.getAttribute('name');
+        if (artifactName == null || artifactName.isEmpty) {
+          failures.add('$componentKey contains an unnamed artifact.');
+          continue;
+        }
+        if (!artifactNames.add(artifactName)) {
+          failures.add('$componentKey duplicates artifact $artifactName.');
+        }
+        final checksums = artifact.childElements.toList();
+        if (checksums.length != 1 ||
+            checksums.single.name.local != 'sha256' ||
+            checksums.single.name.namespaceUri != namespace) {
+          failures.add(
+            '$componentKey:$artifactName must use exactly one SHA-256 checksum.',
+          );
+          continue;
+        }
+        final value = checksums.single.getAttribute('value');
+        if (value == null || !RegExp(r'^[0-9a-f]{64}$').hasMatch(value)) {
+          failures.add(
+            '$componentKey:$artifactName has an invalid SHA-256 checksum.',
+          );
+        }
+        artifactCount += 1;
+      }
+    }
+    if (artifactCount == 0) {
+      failures.add('Gradle verification metadata contains no artifacts.');
+    }
+    return artifactCount;
+  } on XmlParserException {
+    failures.add('Gradle verification metadata is malformed XML.');
+    return 0;
+  }
+}
+
+void _verifyGemfile(
+  String gemfile, {
+  required String cocoaPodsVersion,
+  required List<String> failures,
+}) {
+  _requireSinglePattern(
+    gemfile,
+    RegExp(r'^source "https://rubygems\.org"\s*$', multiLine: true),
+    'Gemfile HTTPS RubyGems source',
+    failures,
+  );
+  _requireSinglePattern(
+    gemfile,
+    RegExp(
+      '^gem "cocoapods", "${RegExp.escape(cocoaPodsVersion)}"\\s*\$',
+      multiLine: true,
+    ),
+    'Gemfile must pin CocoaPods $cocoaPodsVersion exactly',
+    failures,
+  );
+  final activeLines = gemfile
+      .split('\n')
+      .map((line) => line.trim())
+      .where((line) => line.isNotEmpty && !line.startsWith('#'))
+      .toList();
+  final expectedLines = <String>[
+    'source "https://rubygems.org"',
+    'gem "cocoapods", "$cocoaPodsVersion"',
+  ];
+  if (activeLines.length != expectedLines.length ||
+      activeLines.indexed.any((entry) => entry.$2 != expectedLines[entry.$1])) {
+    failures.add(
+      'Gemfile must contain only the reviewed RubyGems source and exact '
+      'CocoaPods dependency.',
+    );
+  }
+}
+
+String? _verifyBundlerLock(
+  String lock, {
+  required String? cocoaPodsVersion,
+  required List<String> failures,
+}) {
+  final sectionHeaders = RegExp(
+    r'^[A-Z][A-Z ]*$',
+    multiLine: true,
+  ).allMatches(lock).map((match) => match.group(0)!).toList();
+  const expectedSections = <String>[
+    'GEM',
+    'PLATFORMS',
+    'DEPENDENCIES',
+    'CHECKSUMS',
+    'BUNDLED WITH',
+  ];
+  if (sectionHeaders.length != expectedSections.length ||
+      sectionHeaders.indexed.any(
+        (entry) => entry.$2 != expectedSections[entry.$1],
+      )) {
+    failures.add('Gemfile.lock contains an unexpected dependency source.');
+  }
+
+  _requireSinglePattern(
+    lock,
+    RegExp(r'^  remote: https://rubygems\.org/\s*$', multiLine: true),
+    'Gemfile.lock must use only the HTTPS RubyGems source.',
+    failures,
+  );
+  if (RegExp(r'^  remote: .+$', multiLine: true).allMatches(lock).length != 1) {
+    failures.add('Gemfile.lock must declare exactly one gem source.');
+  }
+  if (cocoaPodsVersion != null) {
+    _requireSinglePattern(
+      lock,
+      RegExp(
+        '^    cocoapods \\(${RegExp.escape(cocoaPodsVersion)}\\)\\s*\$',
+        multiLine: true,
+      ),
+      'Gemfile.lock must resolve CocoaPods $cocoaPodsVersion exactly.',
+      failures,
+    );
+    _requireSinglePattern(
+      lock,
+      RegExp(
+        '^  cocoapods \\(= ${RegExp.escape(cocoaPodsVersion)}\\)\\s*\$',
+        multiLine: true,
+      ),
+      'Gemfile.lock must retain the exact CocoaPods dependency constraint.',
+      failures,
+    );
+    _requireSinglePattern(
+      lock,
+      RegExp(
+        '^  cocoapods \\(${RegExp.escape(cocoaPodsVersion)}\\) '
+        r'sha256=[0-9a-f]{64}\s*$',
+        multiLine: true,
+      ),
+      'Gemfile.lock must checksum CocoaPods $cocoaPodsVersion.',
+      failures,
+    );
+  }
+
+  final platformSection = RegExp(
+    r'^PLATFORMS\s*$([\s\S]*?)^DEPENDENCIES\s*$',
+    multiLine: true,
+  ).firstMatch(lock)?.group(1);
+  final platforms = platformSection
+      ?.split('\n')
+      .map((line) => line.trim())
+      .where((line) => line.isNotEmpty)
+      .toList();
+  const expectedPlatforms = <String>['arm64-darwin', 'ruby', 'x86_64-darwin'];
+  if (platforms == null ||
+      platforms.length != expectedPlatforms.length ||
+      platforms.indexed.any(
+        (entry) => entry.$2 != expectedPlatforms[entry.$1],
+      )) {
+    failures.add(
+      'Gemfile.lock must support exactly arm64, x86_64, and generic Ruby.',
+    );
+  }
+
+  final gemSection = RegExp(
+    r'^GEM\s*$([\s\S]*?)^PLATFORMS\s*$',
+    multiLine: true,
+  ).firstMatch(lock)?.group(1);
+  final checksumSection = RegExp(
+    r'^CHECKSUMS\s*$([\s\S]*?)^BUNDLED WITH\s*$',
+    multiLine: true,
+  ).firstMatch(lock)?.group(1);
+  final gemKeys = <String>{};
+  var invalidGemEntry = false;
+  if (gemSection != null) {
+    for (final line in gemSection.split('\n')) {
+      if (!line.startsWith('    ') || line.startsWith('      ')) continue;
+      final match = RegExp(r'^    ([A-Za-z0-9_.-]+ \([^)]+\))$')
+          .firstMatch(line);
+      if (match == null || !gemKeys.add(match.group(1)!)) {
+        invalidGemEntry = true;
+      }
+    }
+  }
+
+  final checksumKeys = <String>{};
+  var invalidChecksumEntry = false;
+  if (checksumSection != null) {
+    for (final line in checksumSection.split('\n')) {
+      if (line.trim().isEmpty) continue;
+      final match = RegExp(
+        r'^  ([A-Za-z0-9_.-]+ \([^)]+\)) sha256=[0-9a-f]{64}$',
+      ).firstMatch(line);
+      if (match == null || !checksumKeys.add(match.group(1)!)) {
+        invalidChecksumEntry = true;
+      }
+    }
+  }
+  if (gemKeys.isEmpty ||
+      invalidGemEntry ||
+      invalidChecksumEntry ||
+      gemKeys.length != checksumKeys.length ||
+      !gemKeys.containsAll(checksumKeys) ||
+      !checksumKeys.containsAll(gemKeys)) {
+    failures.add('Every locked Ruby gem must carry one SHA-256 checksum.');
+  }
+
+  final dependencySection = RegExp(
+    r'^DEPENDENCIES\s*$([\s\S]*?)^CHECKSUMS\s*$',
+    multiLine: true,
+  ).firstMatch(lock)?.group(1);
+  final dependencies = dependencySection
+      ?.split('\n')
+      .map((line) => line.trim())
+      .where((line) => line.isNotEmpty)
+      .toList();
+  final expectedDependency = cocoaPodsVersion == null
+      ? null
+      : 'cocoapods (= $cocoaPodsVersion)';
+  if (expectedDependency != null &&
+      (dependencies == null ||
+          dependencies.length != 1 ||
+          dependencies.single != expectedDependency)) {
+    failures.add('Gemfile.lock must contain only the CocoaPods dependency.');
+  }
+
+  return _readSingleCapture(
+    lock,
+    RegExp(
+      r'^BUNDLED WITH\s*\n  ([0-9]+\.[0-9]+\.[0-9]+)\s*$',
+      multiLine: true,
+    ),
+    'Bundler lock version',
+    failures,
+  );
+}
+
+void _requireIntegrationIdentity(
+  String? contents, {
+  required String label,
+  required String variable,
+  required String expected,
+  required List<String> failures,
+}) {
+  if (contents == null) return;
+  _requireSinglePattern(
+    contents,
+    RegExp(
+      '^readonly ${RegExp.escape(variable)}="${RegExp.escape(expected)}"\\s*\$',
+      multiLine: true,
+    ),
+    '$label must use release identity $expected.',
+    failures,
+  );
+}
+
+void _requireDerivedDebugIdentity(
+  String? contents, {
+  required String label,
+  required String variable,
+  required String releaseVariable,
+  required List<String> failures,
+}) {
+  if (contents == null) return;
+  _requireSinglePattern(
+    contents,
+    RegExp(
+      '^readonly ${RegExp.escape(variable)}="\\\$\\{'
+      '${RegExp.escape(releaseVariable)}\\}\\.debug"\\s*\$',
+      multiLine: true,
+    ),
+    '$label must derive its debug identity from $releaseVariable.',
+    failures,
+  );
 }
 
 String? _readJsonString(
