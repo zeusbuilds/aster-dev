@@ -507,6 +507,21 @@ ToolchainVerification verifyToolchain({
     'scripts/run-android-integration-test.sh',
     failures,
   );
+  final androidPerformance = _readRequired(
+    File('$root/scripts/run-android-presentation-performance-test.sh'),
+    'scripts/run-android-presentation-performance-test.sh',
+    failures,
+  );
+  final androidPerformanceRenderer = _readRequired(
+    File('$root/scripts/verify-android-performance-renderer.sh'),
+    'scripts/verify-android-performance-renderer.sh',
+    failures,
+  );
+  final presentationPerformanceTest = _readRequired(
+    File('$root/integration_test/presentation_performance_test.dart'),
+    'integration_test/presentation_performance_test.dart',
+    failures,
+  );
   final iosIntegration = _readRequired(
     File('$root/scripts/run-ios-integration-test.sh'),
     'scripts/run-ios-integration-test.sh',
@@ -541,24 +556,41 @@ ToolchainVerification verifyToolchain({
       failures: failures,
     );
     _requireIntegrationIdentity(
+      androidPerformance,
+      label: 'Android performance wrapper',
+      variable: 'release_package',
+      expected: androidApplicationId,
+      failures: failures,
+    );
+    _requireIntegrationIdentity(
       iosIntegration,
       label: 'iOS integration wrapper',
       variable: 'release_bundle',
       expected: androidApplicationId,
       failures: failures,
     );
-    _requireDerivedDebugIdentity(
+    _requireDerivedIdentity(
       androidIntegration,
       label: 'Android integration wrapper',
       variable: 'test_package',
       releaseVariable: 'release_package',
+      suffix: 'debug',
       failures: failures,
     );
-    _requireDerivedDebugIdentity(
+    _requireDerivedIdentity(
       iosIntegration,
       label: 'iOS integration wrapper',
       variable: 'test_bundle',
       releaseVariable: 'release_bundle',
+      suffix: 'debug',
+      failures: failures,
+    );
+    _requireDerivedIdentity(
+      androidPerformance,
+      label: 'Android performance wrapper',
+      variable: 'profile_package',
+      releaseVariable: 'release_package',
+      suffix: 'profile',
       failures: failures,
     );
   }
@@ -656,6 +688,15 @@ ToolchainVerification verifyToolchain({
   }
 
   final makefile = _readRequired(File('$root/Makefile'), 'Makefile', failures);
+  if (androidPerformance != null) {
+    _verifyAndroidPerformanceWrapper(
+      androidPerformance,
+      benchmark: presentationPerformanceTest,
+      makefile: makefile,
+      rendererVerifier: androidPerformanceRenderer,
+      failures: failures,
+    );
+  }
   if (makefile != null) {
     if (bundlerVersion != null) {
       _requireSinglePattern(
@@ -1338,11 +1379,12 @@ void _requireIntegrationIdentity(
   );
 }
 
-void _requireDerivedDebugIdentity(
+void _requireDerivedIdentity(
   String? contents, {
   required String label,
   required String variable,
   required String releaseVariable,
+  required String suffix,
   required List<String> failures,
 }) {
   if (contents == null) return;
@@ -1350,12 +1392,167 @@ void _requireDerivedDebugIdentity(
     contents,
     RegExp(
       '^readonly ${RegExp.escape(variable)}="\\\$\\{'
-      '${RegExp.escape(releaseVariable)}\\}\\.debug"\\s*\$',
+      '${RegExp.escape(releaseVariable)}\\}\\.${RegExp.escape(suffix)}"\\s*\$',
       multiLine: true,
     ),
-    '$label must derive its debug identity from $releaseVariable.',
+    '$label must derive its $suffix identity from $releaseVariable.',
     failures,
   );
+}
+
+void _verifyAndroidPerformanceWrapper(
+  String contents, {
+  required String? benchmark,
+  required String? makefile,
+  required String? rendererVerifier,
+  required List<String> failures,
+}) {
+  _requireSinglePattern(
+    contents,
+    RegExp(
+      r'^readonly target="integration_test/'
+      r'presentation_performance_test\.dart"\s*$',
+      multiLine: true,
+    ),
+    'Android performance wrapper must own the presentation target.',
+    failures,
+  );
+  if (benchmark != null) {
+    _requireSinglePattern(
+      benchmark,
+      RegExp(
+        r'bool\.fromEnvironment\(\s*'
+        r"'UTEXO_ISOLATED_PROFILE_BENCHMARK'\s*,\s*\)",
+      ),
+      'Presentation benchmark must require the wrapper isolation marker.',
+      failures,
+    );
+    _requireSinglePattern(
+      benchmark,
+      RegExp(r'expect\(\s*_isIsolatedProfileBenchmark,\s*isTrue,'),
+      'Presentation benchmark must fail closed outside the owned wrapper.',
+      failures,
+    );
+  }
+  for (final option in <String>[
+    r'^fvm flutter drive --no-pub \\$',
+    r'^  --no-dds \\$',
+    r'^  --driver=test_driver/integration_test\.dart \\$',
+    r'^  --target="\$\{target\}" \\$',
+    r'^  --keep-app-running \\$',
+    r'^  --dart-define=UTEXO_ISOLATED_PROFILE_BENCHMARK=true \\$',
+    r'^  -d "\$\{device_id\}" \\$',
+    r'^  --profile$',
+  ]) {
+    _requireSinglePattern(
+      contents,
+      RegExp(option, multiLine: true),
+      'Android performance wrapper must use the exact isolated Profile drive '
+      'command.',
+      failures,
+    );
+  }
+  _requireSinglePattern(
+    contents,
+    RegExp(
+      r'^clear_profile_state \|\| fail '
+      r'"could not reset the isolated profile package"$',
+      multiLine: true,
+    ),
+    'Android performance wrapper must clear Profile state before measurement.',
+    failures,
+  );
+  _requireSinglePattern(
+    contents,
+    RegExp(
+      r'^"\$\{root\}/scripts/verify-android-performance-renderer\.sh" \\$'
+      r'\n  "\$\{adb\}" "\$\{device_id\}"$',
+      multiLine: true,
+    ),
+    'Android performance wrapper must reject software renderers before '
+    'measurement.',
+    failures,
+  );
+  if (rendererVerifier != null) {
+    _requireSinglePattern(
+      rendererVerifier,
+      RegExp(r'shell dumpsys SurfaceFlinger'),
+      'Android performance renderer verification must inspect SurfaceFlinger.',
+      failures,
+    );
+    _requireSinglePattern(
+      rendererVerifier,
+      RegExp(r"grep -m 1 '\^GLES:'"),
+      'Android performance renderer verification must identify the active '
+      'GLES backend.',
+      failures,
+    );
+    for (final softwareRenderer in <String>[
+      'swiftshader',
+      'llvmpipe',
+      'lavapipe',
+      'softpipe',
+      'software\\ rasterizer',
+    ]) {
+      _requireSinglePattern(
+        rendererVerifier,
+        RegExp('\\*${RegExp.escape(softwareRenderer)}\\*'),
+        'Android performance renderer verification must reject known software '
+        'backend $softwareRenderer.',
+        failures,
+      );
+    }
+  }
+  _requireSinglePattern(
+    contents,
+    RegExp(r'^  clear_profile_state$', multiLine: true),
+    'Android performance wrapper must clear Profile state during cleanup.',
+    failures,
+  );
+  _requireSinglePattern(
+    contents,
+    RegExp(r'^trap cleanup EXIT$', multiLine: true),
+    'Android performance wrapper must install deterministic cleanup.',
+    failures,
+  );
+  for (final identity in <String>['release', 'debug']) {
+    final assignment =
+        '${identity}_path_after="\$(package_path "\${${identity}_package}")"';
+    _requireSinglePattern(
+      contents,
+      RegExp(RegExp.escape(assignment)),
+      'Android performance wrapper must preserve the $identity package.',
+      failures,
+    );
+  }
+  _requireSinglePattern(
+    contents,
+    RegExp(r'^fvm flutter pub get --enforce-lockfile$', multiLine: true),
+    'Android performance wrapper must enforce the committed Pub lock.',
+    failures,
+  );
+  _requireSinglePattern(
+    contents,
+    RegExp(
+      '^${RegExp.escape(r'''readonly built_package="$("${UTEXO_AAPT2}" dump packagename "${apk}")"''')}\\s*\$',
+      multiLine: true,
+    ),
+    'Android performance wrapper must inspect the exact built APK identity.',
+    failures,
+  );
+  if (makefile != null) {
+    _requireSinglePattern(
+      makefile,
+      RegExp(
+        r'^android-presentation-performance-test:\s*$\n'
+        r'\t\./scripts/run-android-presentation-performance-test\.sh '
+        r'"\$\(ANDROID_DEVICE_ID\)"\s*$',
+        multiLine: true,
+      ),
+      'Makefile must expose the owned Android performance wrapper.',
+      failures,
+    );
+  }
 }
 
 String? _readJsonString(

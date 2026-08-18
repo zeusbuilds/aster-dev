@@ -15,6 +15,9 @@ const _frameBudgetMicroseconds = 16000;
 const _setupTimeout = Duration(seconds: 45);
 const _routeCycles = 6;
 const _pageCycles = 5;
+const _isIsolatedProfileBenchmark = bool.fromEnvironment(
+  'UTEXO_ISOLATED_PROFILE_BENCHMARK',
+);
 
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -24,6 +27,14 @@ void main() {
   testWidgets('onboarding choreography stays within frame and memory budgets', (
     tester,
   ) async {
+    expect(
+      _isIsolatedProfileBenchmark,
+      isTrue,
+      reason:
+          'Run this benchmark through '
+          '`make android-presentation-performance-test` so Profile state is '
+          'isolated and reset.',
+    );
     app.main();
     await _pumpUntilGone(tester, find.byType(AnimatedSplashScreen));
     await _pumpUntilFound(tester, find.bySemanticsLabel('Import Wallet'));
@@ -45,9 +56,11 @@ void main() {
     }, reportKey: 'onboarding_route_choreography');
 
     await _openImportRoute(tester);
+    _expectMountedBackgroundSnapshot(tester, backgroundPainter);
     await binding.watchPerformance(() async {
       await _exercisePageChoreography(tester);
     }, reportKey: 'onboarding_page_choreography');
+    _expectMountedBackgroundSnapshot(tester, backgroundPainter);
     for (var iteration = 1; iteration < _pageCycles; iteration += 1) {
       await _exercisePageChoreography(tester);
     }
@@ -110,6 +123,19 @@ Future<SnapshotWidget> _waitForBackgroundSnapshot(
     reason: 'The onboarding background never produced a retained snapshot.',
   );
   return snapshot;
+}
+
+void _expectMountedBackgroundSnapshot(
+  WidgetTester tester,
+  OnboardingBackgroundSnapshotPainter expectedPainter,
+) {
+  final snapshots = tester
+      .widgetList<SnapshotWidget>(find.byType(SnapshotWidget))
+      .where((candidate) => candidate.child is OnboardingWelcomeMeshBackground)
+      .toList(growable: false);
+  expect(snapshots, hasLength(1));
+  expect(snapshots.single.painter, same(expectedPainter));
+  expect(expectedPainter.hasPaintedSnapshot, isTrue);
 }
 
 Future<void> _exerciseImportRoute(WidgetTester tester) async {
@@ -182,14 +208,29 @@ String _budgetFailure(
   required int missedFrames,
 }) {
   final rawTimes = metrics['frame_${phase}_times'];
+  final frameTimes = <int>[];
   final slowFrames = <String>[];
   if (rawTimes is List<dynamic>) {
     for (final (index, value) in rawTimes.indexed) {
-      if (value is! int || value <= _frameBudgetMicroseconds) continue;
-      slowFrames.add('$index:${(value / 1000).toStringAsFixed(3)}ms');
+      if (value is! int) continue;
+      frameTimes.add(value);
+      if (value > _frameBudgetMicroseconds) {
+        slowFrames.add('$index:${(value / 1000).toStringAsFixed(3)}ms');
+      }
     }
   }
+  frameTimes.sort();
+  final average = frameTimes.isEmpty
+      ? 0
+      : frameTimes.reduce((left, right) => left + right) / frameTimes.length;
+  final p90 = frameTimes.isEmpty
+      ? 0
+      : frameTimes[((frameTimes.length - 1) * 0.9).round()];
+  final worst = frameTimes.isEmpty ? 0 : frameTimes.last;
   return '$workload missed $missedFrames/$frameCount $phase budgets; '
+      'average ${(average / 1000).toStringAsFixed(3)}ms, '
+      'p90 ${(p90 / 1000).toStringAsFixed(3)}ms, '
+      'worst ${(worst / 1000).toStringAsFixed(3)}ms; '
       'slow frames: ${slowFrames.join(', ')}.';
 }
 

@@ -1,4 +1,4 @@
-.PHONY: shell dependencies ios-dependencies bootstrap clean build watch run-ios run-android test ios-native-test android-native-test ios-storage-test android-storage-test format format-check analyze docs verify verify-toolchain verify-architecture verify-design-system verify-barrels verify-generated lint prepare-android-release android-release-bundle android-release-apks verify-android-release-bundle verify-android-release-apks verify-android-apk-signature-policy fvm-setup help
+.PHONY: shell dependencies ios-dependencies bootstrap clean build watch run-ios run-android test ios-native-test android-native-test ios-storage-test android-storage-test android-presentation-performance-test format format-check analyze docs verify verify-toolchain verify-architecture verify-design-system verify-barrels verify-generated lint prepare-android-release android-release-bundle android-release-apks verify-android-release-bundle verify-android-release-apks verify-android-apk-signature-policy fvm-setup help
 
 BUNDLE_PATH ?= $(CURDIR)/.bundle
 BUNDLER_VERSION := 4.0.10
@@ -21,6 +21,7 @@ help:
 	@echo "  make android-native-test - Run Android app-host unit tests"
 	@echo "  make ios-storage-test IOS_SIMULATOR_ID=<id> - Run iOS storage integration tests safely"
 	@echo "  make android-storage-test ANDROID_DEVICE_ID=<id> - Run Android storage integration tests safely"
+	@echo "  make android-presentation-performance-test ANDROID_DEVICE_ID=<id> - Run the isolated Android Profile performance gate"
 	@echo "  make format    - Format Dart code"
 	@echo "  make format-check - Verify Dart formatting without changing files"
 	@echo "  make analyze   - Run static analysis"
@@ -109,6 +110,9 @@ ios-storage-test: ios-dependencies
 
 android-storage-test:
 	./scripts/run-android-integration-test.sh integration_test/wallet_storage_security_test.dart "$(ANDROID_DEVICE_ID)"
+
+android-presentation-performance-test:
+	./scripts/run-android-presentation-performance-test.sh "$(ANDROID_DEVICE_ID)"
 
 # Format Dart code
 format:

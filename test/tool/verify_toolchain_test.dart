@@ -147,6 +147,9 @@ void main() {
           '\tBUNDLE_FROZEN=true BUNDLE_PATH="\$(BUNDLE_PATH)" bundle exec fvm flutter run --no-pub -d "\$(IOS_SIMULATOR_ID)"\n'
           'run-android: dependencies\n'
           '\tfvm flutter run --no-pub -d "\$(ANDROID_DEVICE_ID)"\n'
+          'android-presentation-performance-test:\n'
+          '\t./scripts/run-android-presentation-performance-test.sh '
+          '"\$(ANDROID_DEVICE_ID)"\n'
           'prepare-android-release:\n'
           '\tfvm flutter clean\n'
           '\t@\$(MAKE) --no-print-directory dependencies\n'
@@ -171,6 +174,62 @@ void main() {
       'scripts/run-android-integration-test.sh',
       'readonly release_package="com.example.utexo"\n'
           'readonly test_package="\${release_package}.debug"',
+    );
+    _write(
+      repository,
+      'scripts/run-android-presentation-performance-test.sh',
+      'readonly target="integration_test/'
+          'presentation_performance_test.dart"\n'
+          'readonly release_package="com.example.utexo"\n'
+          'readonly debug_package="\${release_package}.debug"\n'
+          'readonly profile_package="\${release_package}.profile"\n'
+          '"\${root}/scripts/verify-android-performance-renderer.sh" \\\n'
+          '  "\${adb}" "\${device_id}"\n'
+          'readonly release_path_before="\$(package_path '
+          '"\${release_package}")"\n'
+          'readonly debug_path_before="\$(package_path '
+          '"\${debug_package}")"\n'
+          'cleanup() {\n'
+          '  clear_profile_state\n'
+          '  release_path_after="\$(package_path '
+          '"\${release_package}")"\n'
+          '  debug_path_after="\$(package_path "\${debug_package}")"\n'
+          '}\n'
+          'trap cleanup EXIT\n'
+          'clear_profile_state || fail '
+          '"could not reset the isolated profile package"\n'
+          'fvm flutter pub get --enforce-lockfile\n'
+          'fvm flutter drive --no-pub \\\n'
+          '  --no-dds \\\n'
+          '  --driver=test_driver/integration_test.dart \\\n'
+          '  --target="\${target}" \\\n'
+          '  --keep-app-running \\\n'
+          '  --dart-define=UTEXO_ISOLATED_PROFILE_BENCHMARK=true \\\n'
+          '  -d "\${device_id}" \\\n'
+          '  --profile\n'
+          'readonly built_package="\$("\${UTEXO_AAPT2}" '
+          'dump packagename "\${apk}")"',
+    );
+    _write(repository, 'scripts/verify-android-performance-renderer.sh', r'''surface_dump="$("${adb}" -s "${device_id}" shell dumpsys SurfaceFlinger)"
+renderer_line="$(printf "%s\n" "${surface_dump}" | grep -m 1 '^GLES:')"
+case "${renderer_normalized}" in
+  *swiftshader* | *llvmpipe* | *lavapipe* | *softpipe* | *software\ rasterizer*)
+    exit 64
+    ;;
+esac''');
+    _write(
+      repository,
+      'integration_test/presentation_performance_test.dart',
+      "const _isIsolatedProfileBenchmark = bool.fromEnvironment(\n"
+          "  'UTEXO_ISOLATED_PROFILE_BENCHMARK',\n"
+          ');\n'
+          'void main() {\n'
+          '  expect(\n'
+          '    _isIsolatedProfileBenchmark,\n'
+          '    isTrue,\n'
+          "    reason: 'Use the wrapper.',\n"
+          '  );\n'
+          '}',
     );
     _write(
       repository,
@@ -462,7 +521,6 @@ void main() {
         '',
       ),
     );
-
     final result = _verify(
       repository,
       flutterVersionMetadata,
@@ -573,6 +631,68 @@ void main() {
         contains('iOS integration wrapper must derive its debug identity'),
         contains('iOS integration must install the exact built debug artifact'),
         contains('must document platform identity com.example.utexo.debug'),
+      ]),
+    );
+  });
+
+  test('rejects a non-isolated Android performance command', () {
+    final script = File(
+      '${repository.path}/scripts/'
+      'run-android-presentation-performance-test.sh',
+    );
+    script.writeAsStringSync(
+      script
+          .readAsStringSync()
+          .replaceFirst(
+            'readonly profile_package="\${release_package}.profile"',
+            'readonly profile_package="\${release_package}.debug"',
+          )
+          .replaceFirst('  --no-dds \\\n', '')
+          .replaceFirst(
+            'clear_profile_state || fail '
+                '"could not reset the isolated profile package"\n',
+            '',
+          )
+          .replaceFirst(
+            '"\${root}/scripts/verify-android-performance-renderer.sh" \\\n'
+                '  "\${adb}" "\${device_id}"\n',
+            '',
+          )
+          .replaceFirst('trap cleanup EXIT\n', ''),
+    );
+    final makefile = File('${repository.path}/Makefile');
+    makefile.writeAsStringSync(
+      makefile.readAsStringSync().replaceFirst(
+        'android-presentation-performance-test:\n'
+            '\t./scripts/run-android-presentation-performance-test.sh '
+            '"\$(ANDROID_DEVICE_ID)"\n',
+        '',
+      ),
+    );
+    _write(
+      repository,
+      'integration_test/presentation_performance_test.dart',
+      'void main() {}',
+    );
+
+    final result = _verify(
+      repository,
+      flutterVersionMetadata,
+      flutterExtension,
+      flutterGradleUtils,
+    );
+
+    expect(
+      result.failures,
+      containsAll(<Matcher>[
+        contains('must derive its profile identity'),
+        contains('must use the exact isolated Profile drive command'),
+        contains('must clear Profile state before measurement'),
+        contains('must reject software renderers before measurement'),
+        contains('must install deterministic cleanup'),
+        contains('must require the wrapper isolation marker'),
+        contains('must fail closed outside the owned wrapper'),
+        contains('Makefile must expose the owned Android performance wrapper'),
       ]),
     );
   });

@@ -138,12 +138,19 @@ Run the repeatable presentation workload on an otherwise idle app-owned
 Android emulator:
 
 ```sh
-fvm flutter drive --no-dds \
-  --driver=test_driver/integration_test.dart \
-  --target=integration_test/presentation_performance_test.dart \
-  -d <device-id> \
-  --profile
+make android-presentation-performance-test ANDROID_DEVICE_ID=<device-id>
 ```
+
+This command treats `com.example.asterdev.profile` as disposable test state:
+it clears that profile-only application before and after the run so an existing
+wallet cannot redirect the benchmark away from onboarding. It never clears or
+reinstalls the release or debug identities, verifies both remain installed at
+the same package paths, verifies the built APK has the profile identity, and
+rejects SwiftShader and other known software renderers. Start an app-owned
+emulator with host graphics or use a hardware device; software-rendered frame
+timings are not release evidence.
+Do not replace the wrapper with a direct `flutter drive` command when recording
+release evidence.
 
 `--no-dds` is required by Flutter's `watchPerformance` VM-service contract.
 The test warms image, shader, route, and BIP39 caches before measuring. It then
