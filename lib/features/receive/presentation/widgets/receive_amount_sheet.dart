@@ -251,11 +251,10 @@ final class _AmountSheetBody extends StatelessWidget {
           ),
           if (visibleMessage case final message?) ...[
             SizedBox(height: context.spacing.sm),
-            Text(
+            AsterStatusMessage(
               message,
-              style: context.type.errorMessage.copyWith(
-                color: context.appColors.danger,
-              ),
+              tone: AsterStatusTone.danger,
+              announce: amountMessage == null && state.failure != null,
             ),
           ],
           SizedBox(height: context.spacing.lg),

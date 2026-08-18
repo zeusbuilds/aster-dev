@@ -8,6 +8,7 @@ import 'package:ming_cute_icons/ming_cute_icons.dart';
 import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
 import '../../../market/domain/models/models.dart';
+import '../../../market/presentation/models/models.dart';
 import '../../../market/presentation/view_model/view_models.dart';
 import '../../../settings/presentation/models/models.dart';
 import '../../../settings/presentation/view_model/view_models.dart';
@@ -35,7 +36,7 @@ class _AssetsSectionState extends ConsumerState<AssetsSection> {
     super.initState();
     ref.listenManual(
       bitcoinMarketViewModelProvider,
-      (previous, next) => _scheduleMarketExpiry(next.value),
+      (previous, next) => _scheduleMarketExpiry(next.value?.snapshot),
       fireImmediately: true,
     );
   }
@@ -152,7 +153,7 @@ class _AssetsBody extends ConsumerWidget {
 
   final AsyncValue<HomeState> home;
   final AsyncValue<SettingsState> settings;
-  final AsyncValue<BitcoinMarketSnapshot> market;
+  final AsyncValue<BitcoinMarketState> market;
   final DateTime now;
 
   static final _formatter = HomeAssetDisplayFormatter();
@@ -178,7 +179,10 @@ class _AssetsBody extends ConsumerWidget {
     final settingsState = settings.requireValue;
     final navigation = AsterNavigationScope.of(context);
     final preferences = settingsState.snapshot.preferences;
-    final marketSnapshot = market.value;
+    final marketState = market.value;
+    final marketSnapshot = marketState?.snapshot;
+    final marketMatchesCurrency =
+        marketSnapshot?.quoteCurrency.code == preferences.currencyCode;
     final marketRetryable = _marketRetryable(
       market: market,
       currencyCode: preferences.currencyCode,
@@ -208,7 +212,7 @@ class _AssetsBody extends ConsumerWidget {
           AssetRow.loaded(
             display: displays[index],
             balancesVisible: preferences.balancesVisible,
-            fiatLoading: market.isLoading,
+            fiatLoading: market.isLoading && !marketMatchesCurrency,
             onTap: navigation.inFlight
                 ? null
                 : () {
@@ -246,16 +250,21 @@ class _AssetsBody extends ConsumerWidget {
   }
 
   static bool _marketRetryable({
-    required AsyncValue<BitcoinMarketSnapshot> market,
+    required AsyncValue<BitcoinMarketState> market,
     required String currencyCode,
     required bool hasUsdt,
     required DateTime now,
   }) {
+    final presentation = market.value;
+    if (presentation?.refreshing ?? false) return false;
+    if (presentation?.refreshFailure case final failure?) {
+      return failure.retryable;
+    }
     if (market.isLoading) return false;
     if (market case AsyncError(:final error, :final stackTrace)) {
       return _failure(error, stackTrace).retryable;
     }
-    final snapshot = market.value;
+    final snapshot = presentation?.snapshot;
     if (snapshot == null || snapshot.quoteCurrency.code != currencyCode) {
       return true;
     }

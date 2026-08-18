@@ -497,6 +497,15 @@ void main() {
     );
     expect(retry.value, 'Loading');
     expect(retry.flagsCollection.isEnabled, ui.Tristate.isFalse);
+    expect(
+      tester
+          .getSemantics(
+            find.bySemanticsLabel('Node health is temporarily unavailable.'),
+          )
+          .flagsCollection
+          .isLiveRegion,
+      isTrue,
+    );
     expect(find.text('Status'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.text('https://explorer.example.com/regtest'),
@@ -555,6 +564,7 @@ void main() {
     expect(peers, findsOneWidget);
     expect(tester.getSemantics(peers).label, 'Peers, 0');
     expect(find.text('Connected'), findsNothing);
+    expect(find.text('Refresh health'), findsOneWidget);
   });
 
   for (final retryable in [true, false]) {

@@ -4,6 +4,7 @@ import '../../../../core/core.dart';
 import '../../../settings/presentation/view_model/view_models.dart';
 import '../../data/data.dart';
 import '../../domain/models/models.dart';
+import '../models/models.dart';
 
 part 'bitcoin_market_view_model.g.dart';
 
@@ -31,26 +32,53 @@ Future<MarketQuoteCurrency> selectedMarketQuoteCurrency(Ref ref) async {
   );
 }
 
-/// Owns initial-load and retry state for the Bitcoin market card.
+/// Owns initial load and retained-content refresh for market presentation.
 @riverpod
 class BitcoinMarketViewModel extends _$BitcoinMarketViewModel {
   NetworkCancellationToken? _activeRequest;
   var _stateGeneration = 0;
 
   @override
-  Future<BitcoinMarketSnapshot> build() async {
+  Future<BitcoinMarketState> build() async {
     _stateGeneration += 1;
     _activeRequest?.cancel();
     ref.onDispose(() => _activeRequest?.cancel());
     final currency = await ref.watch(
       selectedMarketQuoteCurrencyProvider.future,
     );
-    return _fetch(currency);
+    return BitcoinMarketState(snapshot: await _fetch(currency));
   }
 
-  /// Force-refreshes loaded data or retries a retryable initial failure.
+  /// Force-refreshes retained data or retries a retryable initial failure.
   Future<void> retry() async {
     if (state.isLoading) return;
+    final current = state.value;
+    if (current != null) {
+      if (current.refreshing || current.refreshFailure?.retryable == false) {
+        return;
+      }
+      final generation = ++_stateGeneration;
+      state = AsyncData(
+        current.copyWith(refreshing: true, refreshFailure: null),
+      );
+      try {
+        final currency = await ref.read(
+          selectedMarketQuoteCurrencyProvider.future,
+        );
+        final snapshot = await _fetch(currency, forceRefresh: true);
+        if (!ref.mounted || generation != _stateGeneration) return;
+        state = AsyncData(BitcoinMarketState(snapshot: snapshot));
+      } catch (error, stackTrace) {
+        if (!ref.mounted || generation != _stateGeneration) return;
+        state = AsyncData(
+          current.copyWith(
+            refreshing: false,
+            refreshFailure: FailureMapper.from(error, stackTrace),
+          ),
+        );
+      }
+      return;
+    }
     if (state case AsyncError(:final error, :final stackTrace)
         when !FailureMapper.from(error, stackTrace).retryable) {
       return;
@@ -61,7 +89,9 @@ class BitcoinMarketViewModel extends _$BitcoinMarketViewModel {
       final currency = await ref.read(
         selectedMarketQuoteCurrencyProvider.future,
       );
-      return _fetch(currency, forceRefresh: true);
+      return BitcoinMarketState(
+        snapshot: await _fetch(currency, forceRefresh: true),
+      );
     });
     if (ref.mounted && generation == _stateGeneration) state = next;
   }

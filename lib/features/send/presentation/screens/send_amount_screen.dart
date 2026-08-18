@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
 import '../../../market/domain/models/models.dart';
+import '../../../market/presentation/models/models.dart';
 import '../../../market/presentation/view_model/view_models.dart';
 import '../../../wallet/domain/models/models.dart';
 import '../../../wallet/presentation/formatting/formatting.dart';
@@ -40,14 +41,14 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
       flowProvider,
       (previous, next) => _scheduleDeadline(
         next.value,
-        ref.read(bitcoinMarketViewModelProvider).value,
+        ref.read(bitcoinMarketViewModelProvider).value?.snapshot,
       ),
       fireImmediately: true,
     );
     ref.listenManual(
       bitcoinMarketViewModelProvider,
       (previous, next) =>
-          _scheduleDeadline(ref.read(flowProvider).value, next.value),
+          _scheduleDeadline(ref.read(flowProvider).value, next.value?.snapshot),
       fireImmediately: true,
     );
   }
@@ -65,7 +66,7 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
     setState(() => _now = ref.read(utcClockProvider)());
     _scheduleDeadline(
       ref.read(sendFlowViewModelProvider(widget.target)).value,
-      ref.read(bitcoinMarketViewModelProvider).value,
+      ref.read(bitcoinMarketViewModelProvider).value?.snapshot,
     );
   }
 
@@ -231,9 +232,14 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
 
   static bool _marketRetryable(
     SendFlowState state,
-    AsyncValue<BitcoinMarketSnapshot> market,
+    AsyncValue<BitcoinMarketState> market,
     DateTime now,
   ) {
+    final presentation = market.value;
+    if (presentation?.refreshing ?? false) return false;
+    if (presentation?.refreshFailure case final failure?) {
+      return failure.retryable;
+    }
     if (market.isLoading) return false;
     if (market case AsyncError(:final error, :final stackTrace)) {
       final failure = error is AppFailureException
@@ -241,7 +247,7 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
           : FailureMapper.from(error, stackTrace);
       return failure.retryable;
     }
-    final snapshot = market.value;
+    final snapshot = presentation?.snapshot;
     if (snapshot == null || snapshot.quoteCurrency.code != state.currencyCode) {
       return true;
     }
@@ -267,7 +273,7 @@ final class _AmountBody extends StatelessWidget {
 
   final SendFlowState state;
   final DateTime now;
-  final AsyncValue<BitcoinMarketSnapshot> market;
+  final AsyncValue<BitcoinMarketState> market;
   final ValueChanged<String> onAmountChanged;
   final VoidCallback onRefreshBalance;
   final VoidCallback onRefreshFee;
@@ -292,6 +298,7 @@ final class _AmountBody extends StatelessWidget {
     final balanceFailure = state.failureFor(
       SendFlowOperation.refreshingBalance,
     );
+    final submissionFailure = state.failureFor(SendFlowOperation.submitting);
     final submitting = state.operation == SendFlowOperation.submitting;
     final canSubmit = state.canSubmitAt(now);
 
@@ -308,6 +315,8 @@ final class _AmountBody extends StatelessWidget {
                   fiatText: fiatText,
                   amountLocked: state.amountIsLocked,
                   validationMessage: inputMessage,
+                  announceValidation:
+                      submissionFailure != null || state.isExpiredAt(now),
                 ),
                 SizedBox(height: context.spacing.md),
                 Squircle(
@@ -327,13 +336,11 @@ final class _AmountBody extends StatelessWidget {
                       ),
                       if (feeStale || state.feeFailure != null) ...[
                         SizedBox(height: context.spacing.sm),
-                        Text(
+                        AsterStatusMessage(
                           state.feeFailure?.userMessage ??
                               'Refresh the network fee before sending.',
-                          style: context.type.errorMessage.copyWith(
-                            color: context.appColors.warning,
-                          ),
-                          textAlign: TextAlign.center,
+                          tone: AsterStatusTone.warning,
+                          announce: true,
                         ),
                         if (state.feeFailure?.retryable != false) ...[
                           SizedBox(height: context.spacing.sm),
@@ -359,12 +366,10 @@ final class _AmountBody extends StatelessWidget {
                       ],
                       SizedBox(height: context.spacing.sm),
                       if (balanceFailure case final failure?) ...[
-                        Text(
+                        AsterStatusMessage(
                           failure.userMessage,
-                          style: context.type.errorMessage.copyWith(
-                            color: context.appColors.danger,
-                          ),
-                          textAlign: TextAlign.center,
+                          tone: AsterStatusTone.danger,
+                          announce: true,
                         ),
                         SizedBox(height: context.spacing.sm),
                       ],
@@ -438,14 +443,14 @@ final class _AmountBody extends StatelessWidget {
 
   String _fiatText(
     SendFlowState state,
-    AsyncValue<BitcoinMarketSnapshot> market,
+    AsyncValue<BitcoinMarketState> market,
     DateTime now,
   ) {
     final units = state.amountInput.units;
     if (market.isLoading) {
       return '${state.currencyCode} quote loading';
     }
-    final snapshot = market.value;
+    final snapshot = market.value?.snapshot;
     if (snapshot == null || snapshot.quoteCurrency.code != state.currencyCode) {
       return '${state.currencyCode} quote unavailable';
     }

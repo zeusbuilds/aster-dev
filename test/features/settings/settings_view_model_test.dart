@@ -6,6 +6,9 @@ import 'package:aster/core/core.dart';
 import 'package:aster/features/settings/data/repository/repository.dart';
 import 'package:aster/features/settings/presentation/view_model/view_models.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
+import 'package:aster/features/wallet/presentation/models/models.dart';
+import 'package:aster/features/wallet/presentation/view_model/view_models.dart';
+import 'package:aster/shared/feedback/feedback.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -143,6 +146,9 @@ void main() {
     final container = ProviderContainer(
       retry: applicationProviderRetryPolicy,
       overrides: [
+        hapticFeedbackServiceProvider.overrideWithValue(
+          const NoopHapticFeedbackService(),
+        ),
         walletRepositoryProvider.overrideWith((ref) async => repository),
         walletServiceConfigurationProvider.overrideWithValue(services),
       ],
@@ -170,7 +176,7 @@ void main() {
     firstHarness.engine.networkStatusGate = gate;
     final staleRetry = container
         .read(networkConfigurationViewModelProvider.notifier)
-        .retryHealth();
+        .refreshHealth();
     await _waitFor(
       () =>
           firstHarness.engine.calls
@@ -288,6 +294,9 @@ void main() {
     final container = ProviderContainer(
       retry: applicationProviderRetryPolicy,
       overrides: [
+        hapticFeedbackServiceProvider.overrideWithValue(
+          const NoopHapticFeedbackService(),
+        ),
         walletRepositoryProvider.overrideWith(
           (ref) async => harness.repository,
         ),
@@ -310,11 +319,75 @@ void main() {
 
     await container
         .read(networkConfigurationViewModelProvider.notifier)
-        .retryHealth();
+        .refreshHealth();
 
     expect(
       harness.engine.calls.where((call) => call == 'networkStatus'),
       hasLength(1),
+    );
+  });
+
+  test('confirmed foreground resume reloads healthy network status', () async {
+    const services = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.regtest,
+      sdkNetwork: 'regtest',
+    );
+    final harness = await PaymentFlowTestHarness.create(services: services);
+    addTearDown(harness.dispose);
+    final lifecycle = _MutableWalletLifecycleViewModel();
+    harness.engine.networkStatus = WalletNetworkStatus(
+      environment: BlockchainEnvironment.regtest,
+      blockHeight: 100,
+      nodePublicKey:
+          '020000000000000000000000000000000000000000000000000000000000000000',
+      channelCount: 1,
+      usableChannelCount: 1,
+      peerCount: 1,
+    );
+    final container = ProviderContainer(
+      retry: applicationProviderRetryPolicy,
+      overrides: [
+        walletLifecycleViewModelProvider.overrideWith(() => lifecycle),
+        walletRepositoryProvider.overrideWith(
+          (ref) async => harness.repository,
+        ),
+        walletServiceConfigurationProvider.overrideWithValue(services),
+      ],
+    );
+    final subscription = container.listen(
+      networkConfigurationViewModelProvider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(() {
+      subscription.close();
+      container.dispose();
+    });
+
+    final initial = await container.read(
+      networkConfigurationViewModelProvider.future,
+    );
+    expect(initial.status?.blockHeight, 100);
+
+    harness.engine.networkStatus = WalletNetworkStatus(
+      environment: BlockchainEnvironment.regtest,
+      blockHeight: 101,
+      nodePublicKey:
+          '020000000000000000000000000000000000000000000000000000000000000000',
+      channelCount: 2,
+      usableChannelCount: 1,
+      peerCount: 2,
+    );
+    lifecycle.publishForeground(1);
+    await container.pump();
+    final resumed = await container.read(
+      networkConfigurationViewModelProvider.future,
+    );
+
+    expect(resumed.status?.blockHeight, 101);
+    expect(
+      harness.engine.calls.where((call) => call == 'networkStatus'),
+      hasLength(2),
     );
   });
 }
@@ -325,6 +398,15 @@ Future<void> _waitFor(bool Function() predicate) async {
     await Future<void>.delayed(Duration.zero);
   }
   fail('Timed out waiting for asynchronous state.');
+}
+
+final class _MutableWalletLifecycleViewModel extends WalletLifecycleViewModel {
+  @override
+  WalletLifecycleState build() => const WalletLifecycleState();
+
+  void publishForeground(int generation) {
+    state = WalletLifecycleState(foregroundGeneration: generation);
+  }
 }
 
 final class _DelayedPreferencesService extends PreferencesService {

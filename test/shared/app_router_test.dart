@@ -77,6 +77,30 @@ void main() {
     expect(find.byType(BottomNav), findsOneWidget);
   });
 
+  testWidgets('the orphan Market location cannot bypass the app shell', (
+    tester,
+  ) async {
+    tester.binding.platformDispatcher.defaultRouteNameTestValue = '/market';
+    addTearDown(
+      tester.binding.platformDispatcher.clearDefaultRouteNameTestValue,
+    );
+    final (harness, transport) = await _createActiveHarness();
+    addTearDown(transport.close);
+    addTearDown(() => _disposeHarness(tester, harness));
+
+    final router = await _pumpRouter(tester, harness);
+
+    expect(_location(router), '/market');
+    expect(find.text('Route Error'), findsOneWidget);
+    expect(find.byType(BottomNav), findsNothing);
+
+    await tester.tap(find.text('Go to Home'));
+    await _pumpFrames(tester);
+
+    expect(_location(router), RoutePaths.home);
+    expect(find.byType(BottomNav), findsOneWidget);
+  });
+
   testWidgets('an invalid payment target slug returns to target selection', (
     tester,
   ) async {

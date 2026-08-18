@@ -16,6 +16,7 @@ class SendCard extends StatelessWidget {
     required String fiatText,
     required this.amountLocked,
     this.validationMessage,
+    this.announceValidation = false,
   }) : _content = _SendCardContent(
          route: route,
          amountText: amountText,
@@ -28,11 +29,13 @@ class SendCard extends StatelessWidget {
   const SendCard.loading({super.key, required WalletPaymentTarget target})
     : amountLocked = false,
       validationMessage = null,
+      announceValidation = false,
       _content = null,
       _loadingTarget = target;
 
   final bool amountLocked;
   final String? validationMessage;
+  final bool announceValidation;
   final _SendCardContent? _content;
   final WalletPaymentTarget? _loadingTarget;
 
@@ -114,11 +117,11 @@ class SendCard extends StatelessWidget {
               ),
               if (validationMessage case final message?) ...[
                 SizedBox(height: context.spacing.sm),
-                Text(
+                AsterStatusMessage(
                   message,
-                  style: context.type.errorMessage.copyWith(
-                    color: context.appColors.danger,
-                  ),
+                  tone: AsterStatusTone.danger,
+                  announce: announceValidation,
+                  textAlign: TextAlign.start,
                 ),
               ],
             ],

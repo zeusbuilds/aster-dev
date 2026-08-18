@@ -71,6 +71,11 @@ void main() {
       find.text('Wallet data could not be opened safely.'),
       findsOneWidget,
     );
+    final failure = find.bySemanticsLabel(
+      'Wallet data could not be opened safely.',
+    );
+    expect(failure, findsOneWidget);
+    expect(tester.getSemantics(failure).flagsCollection.isLiveRegion, isTrue);
     final failureContext = tester.element(
       find.text('Wallet could not be opened'),
     );

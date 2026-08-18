@@ -51,6 +51,8 @@ void main() {
     await tester.tap(find.text('Bitcoin · On-chain'));
     await tester.pumpAndSettle();
     expect(find.byType(AssetSelectorSheet), findsOneWidget);
+    expect(find.text('Select payment option'), findsOneWidget);
+    expect(find.text('Select Network'), findsNothing);
     final selected = tester.getSemantics(
       find.bySemanticsLabel('Bitcoin, On-chain'),
     );

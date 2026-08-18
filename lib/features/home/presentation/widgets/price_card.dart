@@ -9,6 +9,7 @@ import 'package:unicons/unicons.dart';
 import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
 import '../../../market/domain/models/models.dart';
+import '../../../market/presentation/models/models.dart';
 import '../../../market/presentation/view_model/view_models.dart';
 import '../../../settings/presentation/view_model/view_models.dart';
 import 'candle_chart.dart';
@@ -30,7 +31,7 @@ class _PriceCardState extends ConsumerState<PriceCard> {
     super.initState();
     ref.listenManual(
       bitcoinMarketViewModelProvider,
-      (previous, next) => _scheduleExpiry(next.value),
+      (previous, next) => _scheduleExpiry(next.value?.snapshot),
       fireImmediately: true,
     );
   }
@@ -61,7 +62,8 @@ class _PriceCardState extends ConsumerState<PriceCard> {
     final selectedQuote = ref.watch(selectedMarketQuoteCurrencyProvider);
     final selectedCurrency = selectedQuote.value;
     final now = ref.watch(utcClockProvider)().toUtc();
-    final rawSnapshot = market.value;
+    final marketState = market.value;
+    final rawSnapshot = marketState?.snapshot;
     final snapshot =
         rawSnapshot?.quoteCurrency == selectedCurrency &&
             rawSnapshot?.isCurrentAt(now) == true
@@ -69,7 +71,13 @@ class _PriceCardState extends ConsumerState<PriceCard> {
         : null;
     final chartData = snapshot?.history;
     final change = snapshot?.changeBasisPoints;
-    final headerLoading = selectedQuote.isLoading || market.isLoading;
+    final headerLoading =
+        selectedQuote.isLoading || (market.isLoading && rawSnapshot == null);
+    final ownsCurrentCurrency =
+        rawSnapshot != null && rawSnapshot.quoteCurrency == selectedCurrency;
+    final refreshFailure = ownsCurrentCurrency
+        ? marketState?.refreshFailure
+        : null;
     final colors = context.appColors;
     final effects = context.effects;
     final spacing = context.spacing;
@@ -165,6 +173,16 @@ class _PriceCardState extends ConsumerState<PriceCard> {
             ),
           ),
         ),
+        if (ownsCurrentCurrency && marketState!.refreshing)
+          const _MarketRefreshStatus.refreshing()
+        else if (refreshFailure case final failure?)
+          _MarketRefreshStatus.failure(
+            message: failure.userMessage,
+            onRetry: failure.retryable
+                ? () =>
+                      ref.read(bitcoinMarketViewModelProvider.notifier).retry()
+                : null,
+          ),
         switch ((selectedQuote, market)) {
           (AsyncLoading<MarketQuoteCurrency>(), _) => const CandleChart(
             data: null,
@@ -180,13 +198,13 @@ class _PriceCardState extends ConsumerState<PriceCard> {
                   ? () => ref.read(settingsViewModelProvider.notifier).retry()
                   : null,
             ),
-          (_, AsyncLoading<BitcoinMarketSnapshot>()) => const CandleChart(
+          (_, AsyncLoading<BitcoinMarketState>()) => const CandleChart(
             data: null,
             isSkeleton: true,
           ),
           (
             _,
-            AsyncError<BitcoinMarketSnapshot>(:final error, :final stackTrace),
+            AsyncError<BitcoinMarketState>(:final error, :final stackTrace),
           ) =>
             _MarketUnavailable(
               message: _failure(error, stackTrace).userMessage,
@@ -196,22 +214,27 @@ class _PriceCardState extends ConsumerState<PriceCard> {
                         .retry()
                   : null,
             ),
-          (_, AsyncData<BitcoinMarketSnapshot>()) when snapshot == null =>
+          (_, AsyncData<BitcoinMarketState>()) when snapshot == null =>
             _MarketUnavailable(
-              message: rawSnapshot?.quoteCurrency == selectedCurrency
-                  ? 'Market quote expired'
-                  : 'Market quote unavailable',
-              onRetry: () =>
-                  ref.read(bitcoinMarketViewModelProvider.notifier).retry(),
+              message:
+                  marketState?.refreshFailure?.userMessage ??
+                  (rawSnapshot?.quoteCurrency == selectedCurrency
+                      ? 'Market quote expired'
+                      : 'Market quote unavailable'),
+              onRetry: marketState?.refreshFailure?.retryable == false
+                  ? null
+                  : () => ref
+                        .read(bitcoinMarketViewModelProvider.notifier)
+                        .retry(),
             ),
-          (_, AsyncData<BitcoinMarketSnapshot>())
+          (_, AsyncData<BitcoinMarketState>())
               when chartData?.isEmpty ?? true =>
             _MarketUnavailable(
               message: '24-hour chart unavailable',
               onRetry: () =>
                   ref.read(bitcoinMarketViewModelProvider.notifier).retry(),
             ),
-          (_, AsyncData<BitcoinMarketSnapshot>()) => CandleChart(
+          (_, AsyncData<BitcoinMarketState>()) => CandleChart(
             data: chartData,
             isSkeleton: false,
           ),
@@ -267,6 +290,68 @@ class _PriceCardState extends ConsumerState<PriceCard> {
       error is AppFailureException
       ? error.failure
       : FailureMapper.from(error, stackTrace);
+}
+
+final class _MarketRefreshStatus extends StatelessWidget {
+  const _MarketRefreshStatus.refreshing()
+    : message = 'Refreshing market data',
+      refreshing = true,
+      onRetry = null;
+
+  const _MarketRefreshStatus.failure({
+    required this.message,
+    required this.onRetry,
+  }) : refreshing = false;
+
+  final String message;
+  final bool refreshing;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        context.spacing.lg,
+        context.spacing.xs,
+        context.spacing.lg,
+        context.spacing.sm,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Semantics(
+              container: true,
+              liveRegion: true,
+              label: message,
+              excludeSemantics: true,
+              child: Text(
+                message,
+                style: context.type.brandMetric,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+          if (refreshing) ...[
+            SizedBox(width: context.spacing.sm),
+            const GridLoader(
+              colorStyle: GridLoaderColorStyle.white,
+              style: GridLoaderStyle.plusLoop,
+            ),
+          ] else if (onRetry case final retry?) ...[
+            SizedBox(width: context.spacing.sm),
+            AsterIconButton(
+              icon: RemixIcons.refresh_line,
+              tooltip: 'Retry market refresh',
+              color: context.appColors.onBrandArt,
+              hapticIntent: null,
+              onPressed: retry,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 class _PriceChangeVisual extends StatelessWidget {

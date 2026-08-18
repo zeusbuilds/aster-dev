@@ -289,12 +289,10 @@ final class _RequestBody extends StatelessWidget {
                 ],
                 if (expired) ...[
                   SizedBox(height: context.spacing.sm),
-                  Text(
+                  const AsterStatusMessage(
                     'This payment request has expired.',
-                    style: context.type.errorMessage.copyWith(
-                      color: context.appColors.warning,
-                    ),
-                    textAlign: TextAlign.center,
+                    tone: AsterStatusTone.warning,
+                    announce: true,
                   ),
                 ],
                 SizedBox(height: context.spacing.md),
@@ -353,13 +351,7 @@ final class _RequestBody extends StatelessWidget {
         ),
         if (state.failure case final failure?) ...[
           SizedBox(height: context.spacing.md),
-          Text(
-            failure.userMessage,
-            style: context.type.errorMessage.copyWith(
-              color: context.appColors.danger,
-            ),
-            textAlign: TextAlign.center,
-          ),
+          AsterStatusMessage(failure.userMessage, tone: AsterStatusTone.danger),
         ],
       ],
     );

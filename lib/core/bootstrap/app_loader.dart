@@ -224,11 +224,7 @@ class _BootstrapFailureView extends StatelessWidget {
                     textAlign: TextAlign.center,
                   ),
                   SizedBox(height: themedSpacing.sm),
-                  Text(
-                    failure.userMessage,
-                    style: context.type.statusMessage,
-                    textAlign: TextAlign.center,
-                  ),
+                  AsterStatusMessage(failure.userMessage, announce: true),
                   if (failure.retryable) ...[
                     SizedBox(height: themedSpacing.xxl),
                     ValueListenableBuilder<bool>(

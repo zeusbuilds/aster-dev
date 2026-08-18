@@ -113,26 +113,28 @@ class _NetworkConfigurationContent extends ConsumerWidget {
           ),
           if (state.healthFailure != null) ...[
             SizedBox(height: spacing.lg),
-            Semantics(
-              liveRegion: true,
-              child: Text(
-                state.healthFailure!.userMessage,
-                style: context.type.errorMessage,
-              ),
+            AsterStatusMessage(
+              state.healthFailure!.userMessage,
+              tone: AsterStatusTone.danger,
+              announce: true,
+              textAlign: TextAlign.start,
             ),
-            if (state.healthFailure!.retryable) ...[
-              SizedBox(height: spacing.md),
-              CustomButton(
-                text: 'Retry health check',
-                variant: ButtonVariant.secondary,
-                loading: state.refreshing,
-                onTap: state.refreshing
-                    ? null
-                    : () => ref
-                          .read(networkConfigurationViewModelProvider.notifier)
-                          .retryHealth(),
-              ),
-            ],
+          ],
+          if (status != null || state.healthFailure?.retryable == true) ...[
+            SizedBox(height: spacing.md),
+            CustomButton(
+              text: state.healthFailure == null
+                  ? 'Refresh health'
+                  : 'Retry health check',
+              variant: ButtonVariant.secondary,
+              loading: state.refreshing,
+              hapticIntent: null,
+              onTap: state.refreshing
+                  ? null
+                  : () => ref
+                        .read(networkConfigurationViewModelProvider.notifier)
+                        .refreshHealth(),
+            ),
           ],
         ],
       ),

@@ -1,6 +1,5 @@
 import 'package:go_router/go_router.dart';
 
-import '../../features/market/presentation/screens/screens.dart';
 import '../../features/onboarding/presentation/screens/screens.dart';
 import '../../features/receive/presentation/screens/screens.dart';
 import '../../features/scan/domain/models/models.dart';
@@ -90,11 +89,6 @@ abstract final class RouteConfig {
         path: RoutePaths.swap,
         name: RouteNames.swap,
         builder: (context, state) => const SwapScreen(),
-      ),
-      GoRoute(
-        path: RoutePaths.market,
-        name: RouteNames.market,
-        builder: (context, state) => const MarketScreen(),
       ),
       GoRoute(
         path: RoutePaths.transactionList,

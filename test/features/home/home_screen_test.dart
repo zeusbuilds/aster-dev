@@ -481,6 +481,92 @@ void main() {
     ]);
   });
 
+  testWidgets('market refresh retains confirmed content through failure', (
+    tester,
+  ) async {
+    final now = DateTime.utc(2026, 8, 18, 12);
+    final releaseRefresh = Completer<void>();
+    var requestCount = 0;
+    final httpClient = ResilientHttpClient(
+      client: MockClient((request) async {
+        requestCount += 1;
+        if (requestCount > 2) {
+          await releaseRefresh.future;
+          return http.Response('temporarily unavailable', 503);
+        }
+        if (request.url.path.endsWith('/range')) {
+          return _historyResponse(
+            now: now,
+            firstPrice: 99000,
+            lastPrice: 100000,
+          );
+        }
+        return _currentResponse(
+          observedAt: now.subtract(const Duration(minutes: 1)),
+          bitcoinPrice: 100000,
+        );
+      }),
+      retryPolicy: RetryPolicy(maxAttempts: 1),
+      clock: () => now,
+    );
+    final harness = await PaymentFlowTestHarness.create(
+      clock: () => now,
+      httpClient: httpClient,
+    );
+    addTearDown(() {
+      if (!releaseRefresh.isCompleted) releaseRefresh.complete();
+      httpClient.close();
+    });
+    addTearDown(() => _disposeHarness(tester, harness));
+    await _pump(tester, harness, const PriceCard());
+    const loadedLabel =
+        r'Bitcoin price $100,000.00 USD. up 1.01% over 24 hours. '
+        'Powered by CoinGecko.';
+    await _pumpUntil(
+      tester,
+      () => find.bySemanticsLabel(loadedLabel).evaluate().isNotEmpty,
+    );
+
+    final refresh = harness.container
+        .read(bitcoinMarketViewModelProvider.notifier)
+        .retry();
+    await _pumpUntil(
+      tester,
+      () =>
+          find.bySemanticsLabel('Refreshing market data').evaluate().isNotEmpty,
+    );
+
+    expect(find.bySemanticsLabel(loadedLabel), findsOneWidget);
+    expect(
+      tester
+          .widgetList<AppSkeletonizer>(
+            find.descendant(
+              of: find.byType(PriceCard),
+              matching: find.byType(AppSkeletonizer),
+            ),
+          )
+          .any((widget) => widget.enabled),
+      isFalse,
+    );
+
+    releaseRefresh.complete();
+    await tester.runAsync(() => refresh);
+    await tester.pump();
+    final failure = harness.container
+        .read(bitcoinMarketViewModelProvider)
+        .requireValue
+        .refreshFailure!;
+    final failureStatus = find.bySemanticsLabel(failure.userMessage);
+
+    expect(find.bySemanticsLabel(loadedLabel), findsOneWidget);
+    expect(failureStatus, findsOneWidget);
+    expect(
+      tester.getSemantics(failureStatus).flagsCollection.isLiveRegion,
+      isTrue,
+    );
+    expect(find.byTooltip('Retry market refresh'), findsOneWidget);
+  });
+
   testWidgets('market header preserves exact basis-point precision', (
     tester,
   ) async {

@@ -16,7 +16,6 @@ class RouteNames {
   static const String receive = 'receive';
   static const String receiveRequest = 'receiveRequest';
   static const String swap = 'swap';
-  static const String market = 'market';
   static const String transactionList = 'transactionList';
   static const String transactionDetails = 'transactionDetails';
   static const String settings = 'settings';

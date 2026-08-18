@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:aster/core/core.dart';
 import 'package:aster/features/market/domain/models/models.dart';
+import 'package:aster/features/market/presentation/models/models.dart';
 import 'package:aster/features/market/presentation/view_model/view_models.dart';
 import 'package:aster/features/settings/domain/models/models.dart';
 import 'package:aster/features/settings/presentation/models/models.dart';
@@ -131,9 +132,86 @@ void main() {
 
     expect(
       container.read(bitcoinMarketViewModelProvider),
-      isA<AsyncData<BitcoinMarketSnapshot>>(),
+      isA<AsyncData<BitcoinMarketState>>(),
     );
     expect(requestCount, 4);
+  });
+
+  test('loaded refresh retains confirmed content and typed failure', () async {
+    final now = DateTime.utc(2026, 8, 18, 12);
+    final refreshStarted = Completer<void>();
+    final releaseRefresh = Completer<void>();
+    var requestCount = 0;
+    final transport = ResilientHttpClient(
+      client: MockClient((request) async {
+        requestCount += 1;
+        if (requestCount > 2) {
+          if (requestCount == 4 && !refreshStarted.isCompleted) {
+            refreshStarted.complete();
+          }
+          await releaseRefresh.future;
+          return http.Response('temporarily unavailable', 503);
+        }
+        if (request.url.path.endsWith('/range')) {
+          return http.Response(
+            '{"prices":[[${now.subtract(const Duration(hours: 24)).millisecondsSinceEpoch},64000],'
+            '[${now.subtract(const Duration(minutes: 1)).millisecondsSinceEpoch},65000]]}',
+            200,
+          );
+        }
+        return http.Response(
+          '{"bitcoin":{"usd":65000,"last_updated_at":'
+          '${now.millisecondsSinceEpoch ~/ 1000}},'
+          '"tether":{"usd":1,"last_updated_at":'
+          '${now.millisecondsSinceEpoch ~/ 1000}}}',
+          200,
+        );
+      }),
+      retryPolicy: RetryPolicy(maxAttempts: 1),
+      clock: () => now,
+    );
+    final container = ProviderContainer(
+      retry: (retryCount, error) => null,
+      overrides: [
+        utcClockProvider.overrideWithValue(() => now),
+        resilientHttpClientProvider.overrideWithValue(transport),
+        selectedMarketQuoteCurrencyProvider.overrideWith(
+          (ref) async => _currency('USD', r'$'),
+        ),
+      ],
+    );
+    final subscription = container.listen(
+      bitcoinMarketViewModelProvider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(() {
+      if (!releaseRefresh.isCompleted) releaseRefresh.complete();
+      subscription.close();
+      container.dispose();
+      transport.close();
+    });
+
+    final initial = await container.read(bitcoinMarketViewModelProvider.future);
+    final refresh = container
+        .read(bitcoinMarketViewModelProvider.notifier)
+        .retry();
+    await refreshStarted.future;
+
+    final refreshing = container
+        .read(bitcoinMarketViewModelProvider)
+        .requireValue;
+    expect(refreshing.snapshot, initial.snapshot);
+    expect(refreshing.refreshing, isTrue);
+    expect(refreshing.refreshFailure, isNull);
+
+    releaseRefresh.complete();
+    await refresh;
+
+    final failed = container.read(bitcoinMarketViewModelProvider).requireValue;
+    expect(failed.snapshot, initial.snapshot);
+    expect(failed.refreshing, isFalse);
+    expect(failed.refreshFailure?.retryable, isTrue);
   });
 
   test('terminal market failure cannot be retried', () async {
@@ -160,7 +238,7 @@ void main() {
         ),
       ],
     );
-    final transitions = <AsyncValue<BitcoinMarketSnapshot>>[];
+    final transitions = <AsyncValue<BitcoinMarketState>>[];
     final subscription = container.listen(
       bitcoinMarketViewModelProvider,
       (_, next) => transitions.add(next),
@@ -183,7 +261,7 @@ void main() {
     expect(transitions, isEmpty);
     expect(
       container.read(bitcoinMarketViewModelProvider),
-      isA<AsyncError<BitcoinMarketSnapshot>>(),
+      isA<AsyncError<BitcoinMarketState>>(),
     );
     expect(requestCount, 0);
   });
@@ -231,13 +309,13 @@ void main() {
       });
 
       final usd = await container.read(bitcoinMarketViewModelProvider.future);
-      expect(usd.quoteCurrency.code, 'USD');
+      expect(usd.snapshot.quoteCurrency.code, 'USD');
 
       selected = _currency('EUR', '€');
       container.invalidate(selectedMarketQuoteCurrencyProvider);
       final eur = await container.read(bitcoinMarketViewModelProvider.future);
 
-      expect(eur.quoteCurrency.code, 'EUR');
+      expect(eur.snapshot.quoteCurrency.code, 'EUR');
       expect(requests, ['usd', 'usd', 'eur', 'eur']);
     },
   );
@@ -281,7 +359,7 @@ void main() {
         ],
       );
       final selectedTransitions = <AsyncValue<MarketQuoteCurrency>>[];
-      final marketTransitions = <AsyncValue<BitcoinMarketSnapshot>>[];
+      final marketTransitions = <AsyncValue<BitcoinMarketState>>[];
       final selectedSubscription = container.listen(
         selectedMarketQuoteCurrencyProvider,
         (_, next) => selectedTransitions.add(next),
@@ -301,6 +379,7 @@ void main() {
 
       expect(
         (await container.read(bitcoinMarketViewModelProvider.future))
+            .snapshot
             .quoteCurrency
             .code,
         'USD',
@@ -329,7 +408,7 @@ void main() {
       await container.pump();
       final eur = await container.read(bitcoinMarketViewModelProvider.future);
 
-      expect(eur.quoteCurrency.code, 'EUR');
+      expect(eur.snapshot.quoteCurrency.code, 'EUR');
       expect(requests, ['usd', 'usd', 'eur', 'eur']);
     },
   );
@@ -393,6 +472,7 @@ void main() {
 
     expect(
       (await container.read(bitcoinMarketViewModelProvider.future))
+          .snapshot
           .quoteCurrency
           .code,
       'USD',
@@ -409,9 +489,13 @@ void main() {
     releaseStaleRetry.complete();
     await retry;
 
-    expect(eur.quoteCurrency.code, 'EUR');
+    expect(eur.snapshot.quoteCurrency.code, 'EUR');
     expect(
-      container.read(bitcoinMarketViewModelProvider).requireValue.quoteCurrency,
+      container
+          .read(bitcoinMarketViewModelProvider)
+          .requireValue
+          .snapshot
+          .quoteCurrency,
       selected,
     );
   });

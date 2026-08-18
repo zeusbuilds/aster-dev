@@ -1,7 +1,12 @@
+import 'dart:async';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/core.dart';
+import '../../../../shared/feedback/feedback.dart';
 import '../../../wallet/domain/models/models.dart';
+import '../../../wallet/presentation/view_model/view_models.dart';
 import '../models/models.dart';
 
 part 'network_configuration_view_model.g.dart';
@@ -14,21 +19,26 @@ class NetworkConfigurationViewModel extends _$NetworkConfigurationViewModel {
   @override
   Future<NetworkConfigurationState> build() {
     _stateGeneration += 1;
+    ref.watch(
+      walletLifecycleViewModelProvider.select(
+        (state) => state.foregroundGeneration,
+      ),
+    );
     return _load();
   }
 
   /// Refreshes health while preserving the last confirmed status.
-  Future<void> retryHealth() async {
+  Future<bool> refreshHealth() async {
     final current = state.value;
     if (current == null ||
         current.refreshing ||
-        current.healthFailure?.retryable != true) {
-      return;
+        current.healthFailure?.retryable == false) {
+      return false;
     }
     final generation = _stateGeneration;
     state = AsyncData(current.copyWith(refreshing: true));
     final result = await _readNetworkStatus();
-    if (!ref.mounted || generation != _stateGeneration) return;
+    if (!ref.mounted || generation != _stateGeneration) return false;
     state = AsyncData(switch (result) {
       AppSuccess(:final value) => current.copyWith(
         status: value,
@@ -40,6 +50,13 @@ class NetworkConfigurationViewModel extends _$NetworkConfigurationViewModel {
         refreshing: false,
       ),
     });
+    final succeeded = result is AppSuccess<WalletNetworkStatus>;
+    unawaited(
+      ref
+          .read(hapticFeedbackServiceProvider)
+          .trigger(succeeded ? HapticIntent.success : HapticIntent.error),
+    );
+    return succeeded;
   }
 
   Future<NetworkConfigurationState> _load() async {

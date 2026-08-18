@@ -79,7 +79,7 @@ class AssetSelectorSheet extends StatelessWidget {
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Select asset and network',
+                    'Select payment option',
                     style: context.type.title,
                   ),
                 ),

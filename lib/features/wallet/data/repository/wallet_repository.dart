@@ -108,7 +108,7 @@ final class WalletRepository implements WalletLifecycleRepository {
       const AppFailure(
         code: 'payment_target_unknown',
         kind: AppFailureKind.validation,
-        userMessage: 'Choose a supported asset and network.',
+        userMessage: 'Choose a supported asset and payment rail.',
         retryable: false,
       ),
     );

@@ -723,6 +723,15 @@ void main() {
       find.text('Refresh the network fee before sending.'),
       findsOneWidget,
     );
+    expect(
+      tester
+          .getSemantics(
+            find.bySemanticsLabel('Refresh the network fee before sending.'),
+          )
+          .flagsCollection
+          .isLiveRegion,
+      isTrue,
+    );
     final sendButton = find.byWidgetPredicate(
       (widget) => widget is CustomButton && widget.text == 'Send',
     );
@@ -866,6 +875,15 @@ void main() {
     expect(find.text('Message'), findsOneWidget);
     expect(find.text('Invoice 123'), findsOneWidget);
     expect(find.text('This payment request has expired.'), findsOneWidget);
+    expect(
+      tester
+          .getSemantics(
+            find.bySemanticsLabel('This payment request has expired.'),
+          )
+          .flagsCollection
+          .isLiveRegion,
+      isTrue,
+    );
     expect(
       tester
           .widget<CustomButton>(find.widgetWithText(CustomButton, 'Send'))
@@ -1203,6 +1221,15 @@ void main() {
     await tester.pump(const Duration(milliseconds: 12));
 
     expect(find.text('This payment request has expired.'), findsOneWidget);
+    expect(
+      tester
+          .getSemantics(
+            find.bySemanticsLabel('This payment request has expired.'),
+          )
+          .flagsCollection
+          .isLiveRegion,
+      isTrue,
+    );
     expect(
       tester
           .widget<CustomButton>(find.widgetWithText(CustomButton, 'Copy'))
@@ -1604,6 +1631,18 @@ void main() {
       ),
       findsOneWidget,
     );
+    expect(
+      tester
+          .getSemantics(
+            find.bySemanticsLabel(
+              'The wallet did not confirm the operation in time. Check its '
+              'status before trying again.',
+            ),
+          )
+          .flagsCollection
+          .isLiveRegion,
+      isTrue,
+    );
 
     await _pumpWidget(
       tester,
@@ -1665,6 +1704,13 @@ void main() {
     await _pumpFrames(tester);
 
     expect(find.text(failureMessage), findsOneWidget);
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel(failureMessage))
+          .flagsCollection
+          .isLiveRegion,
+      isTrue,
+    );
     expect(find.text('Refresh fee'), findsNothing);
     final sendButton = find.byWidgetPredicate(
       (widget) => widget is CustomButton && widget.text == 'Send',
@@ -1718,6 +1764,13 @@ void main() {
       isNull,
     );
     expect(find.text(failureMessage), findsOneWidget);
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel(failureMessage))
+          .flagsCollection
+          .isLiveRegion,
+      isTrue,
+    );
     final refreshBalance = find.byWidgetPredicate(
       (widget) => widget is CustomButton && widget.text == 'Refresh balance',
     );

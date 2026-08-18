@@ -110,11 +110,11 @@ class SendAddressCard extends StatelessWidget {
               ),
               if (failureMessage case final message?) ...[
                 SizedBox(height: context.spacing.sm),
-                Text(
+                AsterStatusMessage(
                   message,
-                  style: context.type.errorMessage.copyWith(
-                    color: context.appColors.danger,
-                  ),
+                  tone: AsterStatusTone.danger,
+                  announce: true,
+                  textAlign: TextAlign.start,
                 ),
               ],
             ],
