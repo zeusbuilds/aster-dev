@@ -2,16 +2,6 @@
 
 # Resolves release-verification tools from exact repository/AGP declarations.
 utexo_resolve_android_artifact_toolchain() {
-  if [[ -n "${UTEXO_AAPT2_PROTO_JAR:-}" &&
-    -n "${UTEXO_BUNDLETOOL_JAR:-}" &&
-    -n "${UTEXO_PROTOBUF_JAR:-}" &&
-    -n "${UTEXO_APKSIGNER:-}" &&
-    -n "${UTEXO_AAPT2:-}" &&
-    -n "${UTEXO_ZIPALIGN:-}" &&
-    -n "${UTEXO_LLVM_READELF:-}" ]]; then
-    return 0
-  fi
-
   local script_root repository output key line value
   script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   repository="$(cd "${script_root}/.." && pwd)"
