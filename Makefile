@@ -76,11 +76,15 @@ test:
 	@echo "Running Flutter tests..."
 	fvm flutter test --no-pub
 
-ios-native-test:
+ios-native-test: dependencies
 	@test -n "$(IOS_SIMULATOR_ID)" || (echo "IOS_SIMULATOR_ID is required" >&2; exit 64)
+	fvm dart run build_runner build
+	fvm flutter build ios --simulator --debug --config-only --no-pub
 	xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner -configuration Debug -destination "platform=iOS Simulator,id=$(IOS_SIMULATOR_ID)" -quiet clean test
 
-android-native-test:
+android-native-test: dependencies
+	fvm dart run build_runner build
+	fvm flutter build apk --debug --config-only --no-pub
 	cd android && ./gradlew :app:testDebugUnitTest
 
 # Flutter integration tests temporarily rewrite ignored iOS build settings to a

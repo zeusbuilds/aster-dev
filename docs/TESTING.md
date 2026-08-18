@@ -46,7 +46,11 @@ make android-native-test
 ```
 
 The iOS target performs an Xcode clean before XCTest so a prior Flutter
-integration listener cannot leave stale products in candidate evidence.
+integration listener cannot leave stale products in candidate evidence. Both
+native targets first run Flutter's `--config-only` platform bootstrap, so they
+also work from a source-only checkout where Riverpod outputs, the Gradle
+wrapper, CocoaPods, and Flutter host files are correctly ignored. Locked Pub
+resolution and deterministic code generation happen before native compilation.
 The iOS suite executes the filesystem policy directly, including insecure
 ancestors, hard-link aliases, bounds, collisions, byte preservation, and
 channel-session invalidation. Android unit tests stress concurrent admission,
