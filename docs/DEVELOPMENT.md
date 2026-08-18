@@ -97,7 +97,12 @@ From the project root:
 After this, each `git commit` verifies formatting, regenerates ignored
 generated sources, runs analysis with every diagnostic fatal, validates fresh
 Dart API documentation, architecture, design-system and barrel boundaries, and
-verifies the production tracker inventory.
+verifies the production tracker inventory. The hook rejects unstaged tracked
+changes and untracked non-ignored files before lint, then proves neither the
+staged tree nor those inputs changed during the gate. This prevents a passing
+working tree from masking different bytes in the commit. Commit or otherwise
+separate unrelated work before invoking `git commit`; ignored local overrides
+and generated/build outputs do not violate this check.
 
 ### Manual commands
 

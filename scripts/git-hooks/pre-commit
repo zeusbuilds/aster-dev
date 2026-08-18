@@ -1,12 +1,33 @@
 #!/bin/sh
-# Pre-commit: regenerate ignored outputs, then run repository quality gates.
-# Run from repo root. Install with: ./scripts/install-git-hooks.sh
+# Pre-commit: validate exactly the staged repository inputs.
+# Install with: ./scripts/install-git-hooks.sh
 
-set -e
+set -eu
 cd "$(git rev-parse --show-toplevel)"
+
+fail() {
+  echo "[pre-commit] $1" >&2
+  exit 1
+}
+
+require_index_worktree_parity() {
+  git diff --quiet -- ||
+    fail "Unstaged tracked changes would make lint differ from the commit."
+  if [ -n "$(git ls-files --others --exclude-standard)" ]; then
+    fail "Untracked non-ignored files would make lint differ from the commit."
+  fi
+}
+
+require_index_worktree_parity
+STAGED_TREE="$(git write-tree)" || fail "Could not snapshot the staged tree."
 
 echo "[pre-commit] Running format, generation, analysis, docs, and policy gates..."
 make lint
+
+CURRENT_TREE="$(git write-tree)" || fail "Could not re-read the staged tree."
+[ "$CURRENT_TREE" = "$STAGED_TREE" ] ||
+  fail "The staged tree changed while lint was running."
+require_index_worktree_parity
 
 echo "[pre-commit] Quality gates passed."
 exit 0
