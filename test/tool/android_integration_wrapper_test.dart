@@ -35,6 +35,10 @@ case "\$*" in
     if [ "\${UTEXO_TEST_FAIL_RELEASE_QUERY:-}" = "1" ]; then
       exit 42
     fi
+    if [ "\${UTEXO_TEST_MALFORMED_RELEASE_QUERY:-}" = "1" ]; then
+      printf 'Error: package manager unavailable\n'
+      exit 0
+    fi
     printf 'package:/release/base.apk\n'
     ;;
   "-s test-device shell pm path com.example.asterdev.debug")
@@ -105,6 +109,33 @@ esac
         'UTEXO_TEST_ADB_LOG': adbLog.path,
         'UTEXO_TEST_FVM_LOG': fvmLog.path,
         'UTEXO_TEST_FAIL_RELEASE_QUERY': '1',
+        'PATH': '${bin.path}:${Platform.environment['PATH']}',
+      },
+    );
+
+    expect(result.exitCode, 64);
+    expect(
+      '${result.stderr}',
+      contains('could not inspect the release package before'),
+    );
+    expect(fvmLog.existsSync(), isFalse);
+  });
+
+  test('fails before launch when release identity output is malformed', () {
+    final result = Process.runSync(
+      'bash',
+      [
+        'scripts/run-android-integration-test.sh',
+        'integration_test/wallet_storage_security_test.dart',
+        'test-device',
+      ],
+      workingDirectory: Directory.current.path,
+      environment: {
+        ...Platform.environment,
+        'ANDROID_SDK_ROOT': sdk.path,
+        'UTEXO_TEST_ADB_LOG': adbLog.path,
+        'UTEXO_TEST_FVM_LOG': fvmLog.path,
+        'UTEXO_TEST_MALFORMED_RELEASE_QUERY': '1',
         'PATH': '${bin.path}:${Platform.environment['PATH']}',
       },
     );

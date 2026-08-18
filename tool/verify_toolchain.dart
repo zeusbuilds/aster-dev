@@ -507,6 +507,11 @@ ToolchainVerification verifyToolchain({
     'scripts/run-android-integration-test.sh',
     failures,
   );
+  final androidPackageState = _readRequired(
+    File('$root/scripts/android-package-state.sh'),
+    'scripts/android-package-state.sh',
+    failures,
+  );
   final androidPerformance = _readRequired(
     File('$root/scripts/run-android-presentation-performance-test.sh'),
     'scripts/run-android-presentation-performance-test.sh',
@@ -644,7 +649,185 @@ ToolchainVerification verifyToolchain({
       failures,
     );
   }
+  for (final wrapper in <({String label, String? contents})>[
+    (label: 'Android integration wrapper', contents: androidIntegration),
+    (label: 'Android performance wrapper', contents: androidPerformance),
+  ]) {
+    if (wrapper.contents == null) continue;
+    _requireSinglePattern(
+      wrapper.contents!,
+      RegExp(
+        RegExp.escape(r'source "${root}/scripts/android-package-state.sh"'),
+      ),
+      '${wrapper.label} must source the shared package-state boundary.',
+      failures,
+    );
+    _requireSinglePattern(
+      wrapper.contents!,
+      RegExp(
+        RegExp.escape(
+          r'utexo_android_package_paths "${adb}" "${device_id}" "$1"',
+        ),
+      ),
+      '${wrapper.label} must delegate package discovery to the shared '
+      'boundary.',
+      failures,
+    );
+  }
+  if (androidPackageState != null) {
+    for (final contract in <({RegExp pattern, String failure})>[
+      (
+        pattern: RegExp(
+          r'^utexo_android_package_paths\(\) \{$',
+          multiLine: true,
+        ),
+        failure: 'Android package-state inspection must expose one owned API.',
+      ),
+      (
+        pattern: RegExp(r'^\s*set -o pipefail\s*$', multiLine: true),
+        failure:
+            'Android package-state inspection must preserve every '
+            'pipeline failure.',
+      ),
+      (
+        pattern: RegExp(r'^\s*\[\[ "\$\{package_name\}" =~ ', multiLine: true),
+        failure:
+            'Android package-state inspection must validate package identity.',
+      ),
+      (
+        pattern: RegExp(
+          r'shell pm path \\\s*\n\s*"\$\{package_name\}" 2>/dev/null',
+          multiLine: true,
+        ),
+        failure:
+            'Android package-state inspection must query the exact '
+            'package through adb.',
+      ),
+      (
+        pattern: RegExp(r'consumed \+= length\(\$0\) \+ 1'),
+        failure: 'Android package-state inspection must account for every input byte.',
+      ),
+      (
+        pattern: RegExp(r'if \(consumed > 65536\) exit 65'),
+        failure:
+            'Android package-state inspection must bound successful '
+            'package-manager output.',
+      ),
+      (
+        pattern: RegExp(RegExp.escape(r'sub(/\r$/, "")')),
+        failure:
+            'Android package-state inspection must normalize only CRLF line '
+            'terminators.',
+      ),
+      (
+        pattern: RegExp(
+          RegExp.escape(r'if ($0 !~ /^package:\/[^[:cntrl:]]+$/) exit 66'),
+        ),
+        failure:
+            'Android package-state inspection must reject malformed '
+            'package-manager output.',
+      ),
+      (
+        pattern: RegExp(r'LC_ALL=C sort -u'),
+        failure:
+            'Android package-state inspection must canonicalize one exact '
+            'path set.',
+      ),
+    ]) {
+      _requireSinglePattern(
+        androidPackageState,
+        contract.pattern,
+        contract.failure,
+        failures,
+      );
+    }
+    if (androidPackageState.contains('|| true')) {
+      failures.add(
+        'Android package-state inspection must not mask adb or parser failures.',
+      );
+    }
+  }
   if (iosIntegration != null) {
+    _requireSinglePattern(
+      iosIntegration,
+      RegExp(
+        r'^\s*installed_apps="\$\(xcrun simctl listapps '
+        r'"\$\{simulator_id\}" 2>/dev/null\)" \|\|\s*$',
+        multiLine: true,
+      ),
+      'iOS integration must query installed applications through a '
+      'status-bearing machine-readable simctl boundary.',
+      failures,
+    );
+    _requireSinglePattern(
+      iosIntegration,
+      RegExp(r'plutil -lint - >/dev/null 2>&1 \|\|'),
+      'iOS integration must validate the complete simctl application plist.',
+      failures,
+    );
+    _requireSinglePattern(
+      iosIntegration,
+      RegExp(
+        RegExp.escape(r'escaped_identifier="${bundle_identifier//./\\.}"'),
+      ),
+      'iOS integration must escape bundle identifiers before plist key-path '
+      'lookup.',
+      failures,
+    );
+    _requireSinglePattern(
+      iosIntegration,
+      RegExp(
+        RegExp.escape(r'plutil -extract "${escaped_identifier}.Path" raw -'),
+      ),
+      'iOS integration must read the installed bundle path from validated '
+      'plist data.',
+      failures,
+    );
+    for (final query in <({String variable, String bundle, String label})>[
+      (
+        variable: 'release_path_before',
+        bundle: 'release_bundle',
+        label: 'pre-run release bundle',
+      ),
+      (
+        variable: 'release_path_after',
+        bundle: 'release_bundle',
+        label: 'post-run release bundle',
+      ),
+      (
+        variable: 'test_path_after',
+        bundle: 'test_bundle',
+        label: 'installed debug bundle',
+      ),
+      (
+        variable: 'release_path_after_install',
+        bundle: 'release_bundle',
+        label: 'post-install release bundle',
+      ),
+    ]) {
+      _requireSinglePattern(
+        iosIntegration,
+        RegExp(
+          '^${RegExp.escape(query.variable)}="\\\$\\(bundle_path '
+          '"\\\$\\{${RegExp.escape(query.bundle)}\\}"\\)" \\|\\|\\s*\$',
+          multiLine: true,
+        ),
+        'iOS integration must fail explicitly when its ${query.label} query '
+        'fails.',
+        failures,
+      );
+    }
+    if (iosIntegration.contains('get_app_container')) {
+      failures.add(
+        'iOS integration must not infer installation state from '
+        'get_app_container diagnostics.',
+      );
+    }
+    if (iosIntegration.contains('|| true')) {
+      failures.add(
+        'iOS integration must not mask simulator or bundle-inspection failures.',
+      );
+    }
     _requireSinglePattern(
       iosIntegration,
       RegExp(
@@ -687,11 +870,8 @@ ToolchainVerification verifyToolchain({
     );
     _requireSinglePattern(
       iosIntegration,
-      RegExp(
-        r'^readonly test_path_after="\$\(bundle_path "\$\{test_bundle\}"\)"\s*$',
-        multiLine: true,
-      ),
-      'iOS integration must inspect the installed debug bundle.',
+      RegExp(r'^readonly test_path_after\s*$', multiLine: true),
+      'iOS integration must make the inspected debug path immutable.',
       failures,
     );
     _requireSinglePattern(
@@ -1103,6 +1283,56 @@ ToolchainVerification verifyToolchain({
     if (nativeLibraryVerifier.contains('unzip ')) {
       failures.add(
         'Native-library verification must not delegate extraction to unzip.',
+      );
+    }
+    _requireSinglePattern(
+      nativeLibraryVerifier,
+      RegExp(r'^extraction_output="\$\(\{\s*$', multiLine: true),
+      'Native-library verification must capture the extractor result.',
+      failures,
+    );
+    _requireSinglePattern(
+      nativeLibraryVerifier,
+      RegExp(
+        RegExp.escape(
+          r'[[ "${extraction_output}" =~ ^EXTRACTED_NATIVE_LIBRARIES=([1-9][0-9]*)$ ]]',
+        ),
+      ),
+      'Native-library verification must validate the extractor count exactly.',
+      failures,
+    );
+    _requireSinglePattern(
+      nativeLibraryVerifier,
+      RegExp(
+        RegExp.escape(r'readonly extracted_library_count="${BASH_REMATCH[1]}"'),
+      ),
+      'Native-library verification must retain the authoritative extractor '
+      'count.',
+      failures,
+    );
+    _requireSinglePattern(
+      nativeLibraryVerifier,
+      RegExp(
+        r'^if ! find "\$\{temporary_directory\}" -mindepth 2 -maxdepth 2 '
+        r'\\\s*$\n'
+        r"\s*-type f -name '\*\.so' -print \| LC_ALL=C sort "
+        r'>"\$\{library_inventory\}"; then\s*$',
+        multiLine: true,
+      ),
+      'Native-library verification must materialize one status-bearing exact '
+      'inventory.',
+      failures,
+    );
+    _requireSinglePattern(
+      nativeLibraryVerifier,
+      RegExp(RegExp.escape(r'((library_count == extracted_library_count)) ||')),
+      'Native-library verification must inspect every extracted library.',
+      failures,
+    );
+    if (nativeLibraryVerifier.contains('done < <(')) {
+      failures.add(
+        'Native-library verification must not hide enumeration failure in '
+        'process substitution.',
       );
     }
   }
@@ -1697,6 +1927,64 @@ void _verifyAndroidPerformanceWrapper(
     'Android performance wrapper must own the presentation target.',
     failures,
   );
+  _requireSinglePattern(
+    contents,
+    RegExp(
+      r'^\s*installed_path="\$\(package_path '
+      r'"\$\{profile_package\}"\)" \|\| return 1\s*$',
+      multiLine: true,
+    ),
+    'Android performance wrapper must fail when Profile state inspection '
+    'fails.',
+    failures,
+  );
+  for (final query in <({String variable, String package, String label})>[
+    (
+      variable: 'release_path_before',
+      package: 'release_package',
+      label: 'pre-run release package',
+    ),
+    (
+      variable: 'debug_path_before',
+      package: 'debug_package',
+      label: 'pre-run debug package',
+    ),
+    (
+      variable: 'profile_path_after',
+      package: 'profile_package',
+      label: 'post-run Profile package',
+    ),
+  ]) {
+    _requireSinglePattern(
+      contents,
+      RegExp(
+        '^${RegExp.escape(query.variable)}="\\\$\\(package_path '
+        '"\\\$\\{${RegExp.escape(query.package)}\\}"\\)" \\|\\|\\s*\$',
+        multiLine: true,
+      ),
+      'Android performance wrapper must fail explicitly when its ${query.label} '
+      'query fails.',
+      failures,
+    );
+  }
+  for (final identity in <String>['release', 'debug']) {
+    _requireSinglePattern(
+      contents,
+      RegExp(
+        '^\\s*if ! ${identity}_path_after="\\\$\\(package_path '
+        '"\\\$\\{${identity}_package\\}"\\)"; then\\s*\$',
+        multiLine: true,
+      ),
+      'Android performance cleanup must distinguish a failed $identity query '
+      'from an absent package.',
+      failures,
+    );
+  }
+  if (contents.contains('|| true')) {
+    failures.add(
+      'Android performance wrapper must not mask package-inspection failures.',
+    );
+  }
   if (benchmark != null) {
     _requireSinglePattern(
       benchmark,
@@ -1762,11 +2050,40 @@ void _verifyAndroidPerformanceWrapper(
     );
     _requireSinglePattern(
       rendererVerifier,
-      RegExp(r"grep -m 1 '\^GLES:'"),
-      'Android performance renderer verification must identify the active '
-      'GLES backend.',
+      RegExp(r'^readonly maximum_diagnostic_bytes=', multiLine: true),
+      'Android performance renderer verification must bound diagnostics.',
       failures,
     );
+    _requireSinglePattern(
+      rendererVerifier,
+      RegExp(r'if \(consumed > maximum\) exit 65'),
+      'Android performance renderer verification must enforce its byte limit '
+      'while streaming.',
+      failures,
+    );
+    _requireSinglePattern(
+      rendererVerifier,
+      RegExp(r'if \(!found && \$0 ~ /\^GLES:/\)'),
+      'Android performance renderer verification must retain only the first '
+      'GLES backend line.',
+      failures,
+    );
+    _requireSinglePattern(
+      rendererVerifier,
+      RegExp(
+        r'^\)" \|\| fail "could not inspect bounded SurfaceFlinger diagnostics',
+        multiLine: true,
+      ),
+      'Android performance renderer verification must preserve pipeline '
+      'failure status.',
+      failures,
+    );
+    if (rendererVerifier.contains('surface_dump=')) {
+      failures.add(
+        'Android performance renderer verification must not buffer the full '
+        'SurfaceFlinger dump.',
+      );
+    }
     for (final softwareRenderer in <String>[
       'swiftshader',
       'llvmpipe',
@@ -1785,8 +2102,8 @@ void _verifyAndroidPerformanceWrapper(
   }
   _requireSinglePattern(
     contents,
-    RegExp(r'^  clear_profile_state$', multiLine: true),
-    'Android performance wrapper must clear Profile state during cleanup.',
+    RegExp(r'^\s*if ! clear_profile_state; then\s*$', multiLine: true),
+    'Android performance wrapper must verify Profile cleanup.',
     failures,
   );
   _requireSinglePattern(
@@ -1795,16 +2112,6 @@ void _verifyAndroidPerformanceWrapper(
     'Android performance wrapper must install deterministic cleanup.',
     failures,
   );
-  for (final identity in <String>['release', 'debug']) {
-    final assignment =
-        '${identity}_path_after="\$(package_path "\${${identity}_package}")"';
-    _requireSinglePattern(
-      contents,
-      RegExp(RegExp.escape(assignment)),
-      'Android performance wrapper must preserve the $identity package.',
-      failures,
-    );
-  }
   _requireSinglePattern(
     contents,
     RegExp(r'^fvm flutter pub get --enforce-lockfile$', multiLine: true),

@@ -171,9 +171,35 @@ void main() {
     );
     _write(
       repository,
+      'scripts/android-package-state.sh',
+      r'''utexo_android_package_paths() {
+  set -o pipefail
+  [[ "${package_name}" =~ ^[A-Za-z] ]]
+  normalized_paths="$({
+    "${package_adb}" -s "${package_device_id}" shell pm path \
+      "${package_name}" 2>/dev/null |
+      awk '
+        {
+          consumed += length($0) + 1
+          if (consumed > 65536) exit 65
+          sub(/\r$/, "")
+          if ($0 !~ /^package:\/[^[:cntrl:]]+$/) exit 66
+        }
+      ' |
+      LC_ALL=C sort -u
+  })"
+}''',
+    );
+    _write(
+      repository,
       'scripts/run-android-integration-test.sh',
       'readonly release_package="com.example.utexo"\n'
           'readonly test_package="\${release_package}.debug"\n'
+          'source "\${root}/scripts/android-package-state.sh"\n'
+          'package_path() {\n'
+          '  utexo_android_package_paths "\${adb}" '
+          '"\${device_id}" "\$1"\n'
+          '}\n'
           'cleanup() {\n'
           '  "\${adb}" -s "\${device_id}" shell am force-stop \\\n'
           '    "\${test_package}" >/dev/null\n'
@@ -192,45 +218,71 @@ void main() {
     _write(
       repository,
       'scripts/run-android-presentation-performance-test.sh',
-      'readonly target="integration_test/'
-          'presentation_performance_test.dart"\n'
-          'readonly release_package="com.example.utexo"\n'
-          'readonly debug_package="\${release_package}.debug"\n'
-          'readonly profile_package="\${release_package}.profile"\n'
-          '"\${root}/scripts/verify-android-performance-renderer.sh" \\\n'
-          '  "\${adb}" "\${device_id}"\n'
-          'readonly release_path_before="\$(package_path '
-          '"\${release_package}")"\n'
-          'readonly debug_path_before="\$(package_path '
-          '"\${debug_package}")"\n'
-          'cleanup() {\n'
-          '  clear_profile_state\n'
-          '  release_path_after="\$(package_path '
-          '"\${release_package}")"\n'
-          '  debug_path_after="\$(package_path "\${debug_package}")"\n'
-          '}\n'
-          'trap cleanup EXIT\n'
-          'clear_profile_state || fail '
-          '"could not reset the isolated profile package"\n'
-          'fvm flutter pub get --enforce-lockfile\n'
-          'fvm flutter drive --no-pub \\\n'
-          '  --no-dds \\\n'
-          '  --driver=test_driver/integration_test.dart \\\n'
-          '  --target="\${target}" \\\n'
-          '  --keep-app-running \\\n'
-          '  --dart-define=UTEXO_ISOLATED_PROFILE_BENCHMARK=true \\\n'
-          '  -d "\${device_id}" \\\n'
-          '  --profile\n'
-          'readonly built_package="\$("\${UTEXO_AAPT2}" '
-          'dump packagename "\${apk}")"',
+      r'''readonly target="integration_test/presentation_performance_test.dart"
+readonly release_package="com.example.utexo"
+readonly debug_package="${release_package}.debug"
+readonly profile_package="${release_package}.profile"
+"${root}/scripts/verify-android-performance-renderer.sh" \
+  "${adb}" "${device_id}"
+source "${root}/scripts/android-package-state.sh"
+package_path() {
+  utexo_android_package_paths "${adb}" "${device_id}" "$1"
+}
+clear_profile_state() {
+  local installed_path
+  installed_path="$(package_path "${profile_package}")" || return 1
+}
+release_path_before="$(package_path "${release_package}")" ||
+  fail "release query failed"
+readonly release_path_before
+debug_path_before="$(package_path "${debug_package}")" ||
+  fail "debug query failed"
+readonly debug_path_before
+cleanup() {
+  if ! clear_profile_state; then
+    cleanup_status=1
+  fi
+  if ! release_path_after="$(package_path "${release_package}")"; then
+    cleanup_status=1
+  fi
+  if ! debug_path_after="$(package_path "${debug_package}")"; then
+    cleanup_status=1
+  fi
+}
+trap cleanup EXIT
+clear_profile_state || fail "could not reset the isolated profile package"
+fvm flutter pub get --enforce-lockfile
+fvm flutter drive --no-pub \
+  --no-dds \
+  --driver=test_driver/integration_test.dart \
+  --target="${target}" \
+  --keep-app-running \
+  --dart-define=UTEXO_ISOLATED_PROFILE_BENCHMARK=true \
+  -d "${device_id}" \
+  --profile
+profile_path_after="$(package_path "${profile_package}")" ||
+  fail "profile query failed"
+readonly profile_path_after
+readonly built_package="$("${UTEXO_AAPT2}" dump packagename "${apk}")"''',
     );
-    _write(repository, 'scripts/verify-android-performance-renderer.sh', r'''surface_dump="$("${adb}" -s "${device_id}" shell dumpsys SurfaceFlinger)"
-renderer_line="$(printf "%s\n" "${surface_dump}" | grep -m 1 '^GLES:')"
+    _write(
+      repository,
+      'scripts/verify-android-performance-renderer.sh',
+      r'''readonly maximum_diagnostic_bytes=$((4 * 1024 * 1024))
+renderer_line="$(
+  "${adb}" -s "${device_id}" shell dumpsys SurfaceFlinger |
+    awk -v maximum="${maximum_diagnostic_bytes}" '
+      { consumed += length($0) + 1 }
+      { if (consumed > maximum) exit 65 }
+      { if (!found && $0 ~ /^GLES:/) { print; found = 1 } }
+    '
+)" || fail "could not inspect bounded SurfaceFlinger diagnostics"
 case "${renderer_normalized}" in
   *swiftshader* | *llvmpipe* | *lavapipe* | *softpipe* | *software\ rasterizer*)
     exit 64
     ;;
-esac''');
+esac''',
+    );
     _write(
       repository,
       'integration_test/presentation_performance_test.dart',
@@ -248,21 +300,44 @@ esac''');
     _write(
       repository,
       'scripts/run-ios-integration-test.sh',
-      'readonly release_bundle="com.example.utexo"\n'
-          'readonly test_bundle="\${release_bundle}.debug"\n'
-          'readonly bundler_version="4.0.10"\n'
-          'export BUNDLE_FROZEN=true\n'
-          'bundle check >/dev/null 2>&1 ||\n'
-          'bundle exec fvm flutter pub get --enforce-lockfile\n'
-          'bundle exec fvm flutter build ios --simulator --debug --no-pub\n'
-          'bundle exec fvm flutter test --no-pub target\n'
-          'readonly built_test_app="\${root}/build/ios/iphonesimulator/Runner.app"\n'
-          'plutil -extract CFBundleIdentifier raw -- "\${built_test_app}/Info.plist"\n'
-          'xcrun simctl install "\${simulator_id}" "\${built_test_app}"\n'
-          'local restored_app="\${root}/build/ios/iphonesimulator/Runner.app"\n'
-          'xcrun simctl install "\${simulator_id}" "\${restored_app}"\n'
-          'readonly test_path_after="\$(bundle_path "\${test_bundle}")"\n'
-          'fail "the isolated debug bundle was not installed"',
+      r'''readonly release_bundle="com.example.utexo"
+readonly test_bundle="${release_bundle}.debug"
+readonly bundler_version="4.0.10"
+export BUNDLE_FROZEN=true
+bundle_path() {
+  local bundle_identifier="$1"
+  local escaped_identifier installed_apps path
+  installed_apps="$(xcrun simctl listapps "${simulator_id}" 2>/dev/null)" ||
+    return 1
+  printf '%s\n' "${installed_apps}" | plutil -lint - >/dev/null 2>&1 ||
+    return 1
+  escaped_identifier="${bundle_identifier//./\\.}"
+  path="$(printf '%s\n' "${installed_apps}" |
+    plutil -extract "${escaped_identifier}.Path" raw -)"
+}
+release_path_before="$(bundle_path "${release_bundle}")" ||
+  fail "release query failed"
+readonly release_path_before
+bundle check >/dev/null 2>&1 ||
+  fail "gems unavailable"
+bundle exec fvm flutter pub get --enforce-lockfile
+bundle exec fvm flutter build ios --simulator --debug --no-pub
+bundle exec fvm flutter test --no-pub target
+release_path_after="$(bundle_path "${release_bundle}")" ||
+  fail "post-run release query failed"
+readonly release_path_after
+readonly built_test_app="${root}/build/ios/iphonesimulator/Runner.app"
+plutil -extract CFBundleIdentifier raw -- "${built_test_app}/Info.plist"
+xcrun simctl install "${simulator_id}" "${built_test_app}"
+local restored_app="${root}/build/ios/iphonesimulator/Runner.app"
+xcrun simctl install "${simulator_id}" "${restored_app}"
+test_path_after="$(bundle_path "${test_bundle}")" ||
+  fail "debug query failed"
+readonly test_path_after
+release_path_after_install="$(bundle_path "${release_bundle}")" ||
+  fail "post-install release query failed"
+readonly release_path_after_install
+fail "the isolated debug bundle was not installed"''',
     );
     _write(repository, 'ios/Podfile.lock', 'COCOAPODS: 1.16.2');
     _write(
@@ -335,11 +410,23 @@ esac''');
     _write(
       repository,
       'scripts/verify-android-native-libraries.sh',
-      'java scripts/AndroidNativeLibraryExtractor.java \\\n'
-          '  "\${archive_path}" \\\n'
-          '  "\${native_root}" \\\n'
-          '  "\${temporary_directory}" \\\n'
-          '  "\${expected_abis}"',
+      r'''extraction_output="$({
+  java scripts/AndroidNativeLibraryExtractor.java \
+    "${archive_path}" \
+    "${native_root}" \
+    "${temporary_directory}" \
+    "${expected_abis}"
+})"
+[[ "${extraction_output}" =~ ^EXTRACTED_NATIVE_LIBRARIES=([1-9][0-9]*)$ ]]
+readonly extracted_library_count="${BASH_REMATCH[1]}"
+readonly library_inventory="${temporary_directory}/.native-library-inventory"
+if ! find "${temporary_directory}" -mindepth 2 -maxdepth 2 \
+  -type f -name '*.so' -print | LC_ALL=C sort >"${library_inventory}"; then
+  exit 1
+fi
+library_count=1
+((library_count == extracted_library_count)) ||
+  exit 1''',
     );
     _write(
       repository,
@@ -805,6 +892,87 @@ esac''');
         contains('must require the wrapper isolation marker'),
         contains('must fail closed outside the owned wrapper'),
         contains('Makefile must expose the owned Android performance wrapper'),
+      ]),
+    );
+  });
+
+  test('rejects masked platform discovery and partial native evidence', () {
+    final androidPerformance = File(
+      '${repository.path}/scripts/'
+      'run-android-presentation-performance-test.sh',
+    );
+    androidPerformance.writeAsStringSync(
+      androidPerformance.readAsStringSync().replaceFirst(
+        r'''utexo_android_package_paths "${adb}" "${device_id}" "$1"''',
+        r'''printf 'package:/unvalidated.apk\n' || true''',
+      ),
+    );
+    final androidPackageState = File(
+      '${repository.path}/scripts/android-package-state.sh',
+    );
+    final weakenedPackageState = androidPackageState
+        .readAsStringSync()
+        .replaceFirst('  set -o pipefail\n', '')
+        .replaceFirst('          consumed += length(\$0) + 1\n', '')
+        .replaceFirst(
+          r'''if ($0 !~ /^package:\/[^[:cntrl:]]+$/) exit 66''',
+          'if (false) exit 66',
+        );
+    androidPackageState.writeAsStringSync(weakenedPackageState);
+    _write(repository, 'scripts/verify-android-performance-renderer.sh', r'''surface_dump="$("${adb}" -s "${device_id}" shell dumpsys SurfaceFlinger)"
+renderer_line="$(printf '%s\n' "${surface_dump}" | grep -m 1 '^GLES:')"
+case "${renderer_normalized}" in
+  *swiftshader* | *llvmpipe* | *lavapipe* | *softpipe* | *software\ rasterizer*)
+    exit 64
+    ;;
+esac''');
+    final iosIntegration = File(
+      '${repository.path}/scripts/run-ios-integration-test.sh',
+    );
+    iosIntegration.writeAsStringSync(
+      iosIntegration.readAsStringSync().replaceFirst(
+        r'''installed_apps="$(xcrun simctl listapps "${simulator_id}" 2>/dev/null)" ||
+    return 1''',
+        r'''installed_apps="$(xcrun simctl get_app_container "${simulator_id}" "${bundle_identifier}")" || true''',
+      ),
+    );
+    final nativeVerifier = File(
+      '${repository.path}/scripts/verify-android-native-libraries.sh',
+    );
+    final incompleteNativeVerifier = nativeVerifier
+        .readAsStringSync()
+        .replaceFirst(
+          '((library_count == extracted_library_count)) ||',
+          '((library_count > 0)) ||',
+        );
+    nativeVerifier.writeAsStringSync(
+      '$incompleteNativeVerifier\n'
+      r'''done < <(find "${temporary_directory}" -name '*.so')''',
+    );
+
+    final result = _verify(
+      repository,
+      flutterVersionMetadata,
+      flutterExtension,
+      flutterGradleUtils,
+    );
+
+    expect(
+      result.failures,
+      containsAll(<Matcher>[
+        contains('must delegate package discovery'),
+        contains('must not mask package-inspection failures'),
+        contains('must preserve every pipeline failure'),
+        contains('must account for every input byte'),
+        contains('must reject malformed package-manager output'),
+        contains('must bound diagnostics'),
+        contains('must enforce its byte limit while streaming'),
+        contains('must not buffer the full SurfaceFlinger dump'),
+        contains('status-bearing machine-readable simctl boundary'),
+        contains('must not infer installation state from get_app_container'),
+        contains('must not mask simulator or bundle-inspection failures'),
+        contains('must inspect every extracted library'),
+        contains('must not hide enumeration failure in process substitution'),
       ]),
     );
   });

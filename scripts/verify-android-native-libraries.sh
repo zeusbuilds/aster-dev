@@ -43,12 +43,23 @@ cleanup() {
 }
 trap cleanup EXIT
 
-java scripts/AndroidNativeLibraryExtractor.java \
-  "${archive_path}" \
-  "${native_root}" \
-  "${temporary_directory}" \
-  "${expected_abis}" ||
+extraction_output="$({
+  java scripts/AndroidNativeLibraryExtractor.java \
+    "${archive_path}" \
+    "${native_root}" \
+    "${temporary_directory}" \
+    "${expected_abis}"
+})" ||
   fail "could not validate and extract native libraries from ${archive_path}"
+readonly extraction_output
+[[ "${extraction_output}" =~ ^EXTRACTED_NATIVE_LIBRARIES=([1-9][0-9]*)$ ]] ||
+  fail "native-library extractor emitted an invalid result"
+readonly extracted_library_count="${BASH_REMATCH[1]}"
+readonly library_inventory="${temporary_directory}/.native-library-inventory"
+if ! find "${temporary_directory}" -mindepth 2 -maxdepth 2 \
+  -type f -name '*.so' -print | LC_ALL=C sort >"${library_inventory}"; then
+  fail "could not enumerate every extracted native library"
+fi
 
 library_count=0
 while IFS= read -r library_path; do
@@ -92,12 +103,9 @@ while IFS= read -r library_path; do
       fail "${abi}/${library_name} has dynamic relocations without GNU_RELRO"
     fi
   fi
-done < <(
-  find "${temporary_directory}" -mindepth 2 -maxdepth 2 \
-    -type f -name '*.so' -print |
-    LC_ALL=C sort
-)
+done <"${library_inventory}"
 
-((library_count > 0)) || fail "${archive_path} contains no native libraries"
+((library_count == extracted_library_count)) ||
+  fail "inspected ${library_count} of ${extracted_library_count} extracted native libraries"
 printf 'Verified %s has compatible ELF alignment and RELRO policy for %d libraries\n' \
   "${archive_path}" "${library_count}"

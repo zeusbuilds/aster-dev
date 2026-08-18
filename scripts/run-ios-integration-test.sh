@@ -36,10 +36,33 @@ xcrun simctl getenv "${simulator_id}" SIMULATOR_UDID >/dev/null 2>&1 ||
   fail "simulator is not booted: ${simulator_id}"
 
 bundle_path() {
-  xcrun simctl get_app_container "${simulator_id}" "$1" app 2>/dev/null || true
+  local bundle_identifier="$1"
+  local escaped_identifier installed_apps path
+  [[ "${bundle_identifier}" =~ ^[A-Za-z][A-Za-z0-9-]*(\.[A-Za-z0-9-]+)+$ ]] ||
+    return 1
+  installed_apps="$(xcrun simctl listapps "${simulator_id}" 2>/dev/null)" ||
+    return 1
+  printf '%s\n' "${installed_apps}" | plutil -lint - >/dev/null 2>&1 ||
+    return 1
+  escaped_identifier="${bundle_identifier//./\\.}"
+  if path="$({
+    printf '%s\n' "${installed_apps}" |
+      plutil -extract "${escaped_identifier}.Path" raw - 2>/dev/null
+  })"; then
+    [[ -n "${path}" && "${path}" != *$'\n'* ]] || return 1
+    printf '%s\n' "${path}"
+    return 0
+  fi
+  if printf '%s\n' "${installed_apps}" |
+    plutil -type "${escaped_identifier}" - >/dev/null 2>&1; then
+    return 1
+  fi
+  return 0
 }
 
-readonly release_path_before="$(bundle_path "${release_bundle}")"
+release_path_before="$(bundle_path "${release_bundle}")" ||
+  fail "could not inspect the release bundle before the integration run"
+readonly release_path_before
 
 bundle exec fvm flutter pub get --enforce-lockfile
 
@@ -70,7 +93,9 @@ restore_flutter_target() {
 trap restore_flutter_target EXIT
 bundle exec fvm flutter test --no-pub "${target}" -d "${simulator_id}"
 
-readonly release_path_after="$(bundle_path "${release_bundle}")"
+release_path_after="$(bundle_path "${release_bundle}")" ||
+  fail "could not inspect the release bundle after the integration run"
+readonly release_path_after
 [[ "${release_path_after}" == "${release_path_before}" ]] ||
   fail "the release bundle changed during the integration run"
 
@@ -83,10 +108,15 @@ readonly built_test_bundle="$(
   fail "the built integration app has the wrong bundle identity"
 xcrun simctl install "${simulator_id}" "${built_test_app}"
 
-readonly test_path_after="$(bundle_path "${test_bundle}")"
+test_path_after="$(bundle_path "${test_bundle}")" ||
+  fail "could not inspect the installed debug bundle"
+readonly test_path_after
 [[ -n "${test_path_after}" ]] ||
   fail "the isolated debug bundle was not installed"
-[[ "$(bundle_path "${release_bundle}")" == "${release_path_before}" ]] ||
+release_path_after_install="$(bundle_path "${release_bundle}")" ||
+  fail "could not inspect the release bundle after debug installation"
+readonly release_path_after_install
+[[ "${release_path_after_install}" == "${release_path_before}" ]] ||
   fail "installing the debug proof artifact changed the release bundle"
 printf 'iOS integration test preserved release identity and used %s.\n' \
   "${test_bundle}"

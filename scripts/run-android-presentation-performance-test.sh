@@ -30,15 +30,16 @@ readonly adb="${sdk_root}/platform-tools/adb"
   fail "device is not attached: ${device_id}"
 "${root}/scripts/verify-android-performance-renderer.sh" \
   "${adb}" "${device_id}"
+source "${root}/scripts/android-package-state.sh"
 
 package_path() {
-  "${adb}" -s "${device_id}" shell pm path "$1" 2>/dev/null |
-    tr -d '\r' |
-    LC_ALL=C sort
+  utexo_android_package_paths "${adb}" "${device_id}" "$1"
 }
 
 clear_profile_state() {
-  [[ -n "$(package_path "${profile_package}")" ]] || return 0
+  local installed_path
+  installed_path="$(package_path "${profile_package}")" || return 1
+  [[ -n "${installed_path}" ]] || return 0
   "${adb}" -s "${device_id}" shell am force-stop \
     "${profile_package}" >/dev/null
   local output
@@ -49,8 +50,12 @@ clear_profile_state() {
   [[ "${output}" == "Success" ]]
 }
 
-readonly release_path_before="$(package_path "${release_package}")"
-readonly debug_path_before="$(package_path "${debug_package}")"
+release_path_before="$(package_path "${release_package}")" ||
+  fail "could not inspect the release package before measurement"
+readonly release_path_before
+debug_path_before="$(package_path "${debug_package}")" ||
+  fail "could not inspect the debug package before measurement"
+readonly debug_path_before
 
 cleanup() {
   local command_status=$?
@@ -59,15 +64,21 @@ cleanup() {
   trap - EXIT
   set +e
 
-  clear_profile_state
-  cleanup_status=$?
-  release_path_after="$(package_path "${release_package}")"
-  debug_path_after="$(package_path "${debug_package}")"
-  if [[ "${release_path_after}" != "${release_path_before}" ]]; then
+  if ! clear_profile_state; then
+    printf 'Could not reset the Profile package during cleanup.\n' >&2
+    cleanup_status=1
+  fi
+  if ! release_path_after="$(package_path "${release_package}")"; then
+    printf 'Could not inspect the release package during cleanup.\n' >&2
+    cleanup_status=1
+  elif [[ "${release_path_after}" != "${release_path_before}" ]]; then
     printf 'The release package changed during the performance run.\n' >&2
     cleanup_status=1
   fi
-  if [[ "${debug_path_after}" != "${debug_path_before}" ]]; then
+  if ! debug_path_after="$(package_path "${debug_package}")"; then
+    printf 'Could not inspect the debug package during cleanup.\n' >&2
+    cleanup_status=1
+  elif [[ "${debug_path_after}" != "${debug_path_before}" ]]; then
     printf 'The debug package changed during the performance run.\n' >&2
     cleanup_status=1
   fi
@@ -91,7 +102,9 @@ fvm flutter drive --no-pub \
   -d "${device_id}" \
   --profile
 
-readonly profile_path_after="$(package_path "${profile_package}")"
+profile_path_after="$(package_path "${profile_package}")" ||
+  fail "could not inspect the Profile package after measurement"
+readonly profile_path_after
 [[ -n "${profile_path_after}" ]] ||
   fail "the isolated profile package was not installed"
 

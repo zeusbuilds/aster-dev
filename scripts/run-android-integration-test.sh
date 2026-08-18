@@ -30,15 +30,10 @@ readonly adb="${sdk_root}/platform-tools/adb"
 [[ -x "${adb}" ]] || fail "Android adb is unavailable"
 "${adb}" -s "${device_id}" get-state >/dev/null 2>&1 ||
   fail "device is not attached: ${device_id}"
+source "${root}/scripts/android-package-state.sh"
 
 package_path() {
-  local raw_path
-  raw_path="$(
-    "${adb}" -s "${device_id}" shell pm path "$1" 2>/dev/null
-  )" || return
-  printf '%s\n' "${raw_path}" |
-    tr -d '\r' |
-    LC_ALL=C sort
+  utexo_android_package_paths "${adb}" "${device_id}" "$1"
 }
 
 release_path_before="$(package_path "${release_package}")" ||

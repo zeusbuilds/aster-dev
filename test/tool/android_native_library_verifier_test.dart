@@ -35,6 +35,17 @@ printf 'UTEXO_AAPT2=/dev/null\n'
 printf 'UTEXO_ZIPALIGN=/dev/null\n'
 printf 'UTEXO_LLVM_READELF=${readelf.path}\n'
 ''');
+    _writeExecutable(File('${bin.path}/find'), r'''#!/bin/sh
+if [ "${FAKE_FIND_PARTIAL:-}" = "1" ]; then
+  case " $* " in
+    *" -mindepth "*)
+      /usr/bin/find "$@" | /usr/bin/head -n 1
+      exit 42
+      ;;
+  esac
+fi
+exec /usr/bin/find "$@"
+''');
     for (final library in <String>[
       'libapp.so',
       'libflutter.so',
@@ -62,6 +73,7 @@ printf 'UTEXO_LLVM_READELF=${readelf.path}\n'
   ProcessResult verify({
     required String alignment,
     required String virtualAddress,
+    bool failEnumeration = false,
   }) {
     return Process.runSync(
       'bash',
@@ -77,6 +89,7 @@ printf 'UTEXO_LLVM_READELF=${readelf.path}\n'
         ...Platform.environment,
         'FAKE_ALIGNMENT': alignment,
         'FAKE_VIRTUAL_ADDRESS': virtualAddress,
+        if (failEnumeration) 'FAKE_FIND_PARTIAL': '1',
         'PATH': '${bin.path}:${Platform.environment['PATH']}',
       },
     );
@@ -101,6 +114,17 @@ printf 'UTEXO_LLVM_READELF=${readelf.path}\n'
 
     expect(result.exitCode, isNot(0));
     expect('${result.stderr}', contains('incongruent LOAD offset/address'));
+  });
+
+  test('rejects a partial native-library enumeration', () {
+    final result = verify(
+      alignment: '0x4000',
+      virtualAddress: '0x000000',
+      failEnumeration: true,
+    );
+
+    expect(result.exitCode, isNot(0));
+    expect('${result.stderr}', contains('could not enumerate every extracted'));
   });
 }
 

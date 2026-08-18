@@ -20,6 +20,15 @@ void main() {
 #!/usr/bin/env bash
 set -euo pipefail
 [[ "\$*" == "-s emulator-5554 shell dumpsys SurfaceFlinger" ]]
+if [[ -n "\${UTEXO_TEST_DIAGNOSTIC_LINES:-}" ]]; then
+  awk -v count="\${UTEXO_TEST_DIAGNOSTIC_LINES}" 'BEGIN {
+    print "GLES: hardware renderer"
+    for (line = 0; line < count; line++) {
+      print "SurfaceFlinger bounded diagnostic fixture line"
+    }
+  }'
+  exit 0
+fi
 printf '%s\n' "\${UTEXO_TEST_SURFACE_FLINGER_OUTPUT:-}"
 ''');
     final chmod = await Process.run('chmod', ['755', fakeAdb.path]);
@@ -70,19 +79,34 @@ printf '%s\n' "\${UTEXO_TEST_SURFACE_FLINGER_OUTPUT:-}"
     expect(result.exitCode, 64);
     expect(result.stderr, contains('did not report a GLES renderer'));
   });
+
+  test('rejects oversized SurfaceFlinger diagnostics', () async {
+    final result = await _verify(
+      verifier,
+      fakeAdb,
+      '',
+      diagnosticLines: 100000,
+    );
+
+    expect(result.exitCode, 64);
+    expect(result.stderr, contains('bounded SurfaceFlinger diagnostics'));
+  });
 }
 
 Future<ProcessResult> _verify(
   File verifier,
   File adb,
-  String surfaceFlingerOutput,
-) {
+  String surfaceFlingerOutput, {
+  int? diagnosticLines,
+}) {
   return Process.run(
     'bash',
     [verifier.path, adb.path, 'emulator-5554'],
     environment: <String, String>{
       ...Platform.environment,
       'UTEXO_TEST_SURFACE_FLINGER_OUTPUT': surfaceFlingerOutput,
+      if (diagnosticLines != null)
+        'UTEXO_TEST_DIAGNOSTIC_LINES': '$diagnosticLines',
     },
   );
 }
