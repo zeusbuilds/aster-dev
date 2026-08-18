@@ -140,19 +140,36 @@ void main() {
           '\tfvm flutter pub get --enforce-lockfile\n'
           'ios-dependencies:\n'
           '\t@BUNDLE_FROZEN=true BUNDLE_PATH="\$(BUNDLE_PATH)" bundle check || BUNDLE_FROZEN=true BUNDLE_PATH="\$(BUNDLE_PATH)" bundle install\n'
-          'ios-native-test: dependencies ios-dependencies\n'
-          '\tBUNDLE_FROZEN=true BUNDLE_PATH="\$(BUNDLE_PATH)" bundle exec fvm flutter build ios --simulator --debug --config-only --no-pub\n'
-          'ios-storage-test: ios-dependencies\n'
-          'run-ios: dependencies ios-dependencies\n'
+          'bootstrap: clean\n'
+          '\t@\$(MAKE) --no-print-directory verify-generated\n'
+          'build: verify-generated\n'
+          'watch: dependencies\n'
+          'run-ios: verify-generated ios-dependencies\n'
           '\tBUNDLE_FROZEN=true BUNDLE_PATH="\$(BUNDLE_PATH)" bundle exec fvm flutter run --no-pub -d "\$(IOS_SIMULATOR_ID)"\n'
-          'run-android: dependencies\n'
+          'run-android: verify-generated\n'
           '\tfvm flutter run --no-pub -d "\$(ANDROID_DEVICE_ID)"\n'
-          'android-presentation-performance-test:\n'
+          'test: verify-generated\n'
+          'ios-native-test: verify-generated ios-dependencies\n'
+          '\tBUNDLE_FROZEN=true BUNDLE_PATH="\$(BUNDLE_PATH)" bundle exec fvm flutter build ios --simulator --debug --config-only --no-pub\n'
+          'android-native-test: verify-generated\n'
+          'ios-storage-test: verify-generated ios-dependencies\n'
+          'android-storage-test: verify-generated\n'
+          'android-presentation-performance-test: verify-generated\n'
           '\t./scripts/run-android-presentation-performance-test.sh '
           '"\$(ANDROID_DEVICE_ID)"\n'
+          'analyze: verify-generated\n'
+          'docs: verify-generated\n'
+          'verify: verify-generated\n'
+          'verify-toolchain: verify-generated\n'
+          'verify-architecture: verify-generated\n'
+          'verify-design-system: verify-generated\n'
+          'verify-barrels: verify-generated\n'
+          'verify-generated: dependencies\n'
+          '\tfvm dart run build_runner build\n'
+          'lint: dependencies verify-generated analyze docs verify\n'
           'prepare-android-release:\n'
           '\tfvm flutter clean\n'
-          '\t@\$(MAKE) --no-print-directory dependencies\n'
+          '\t@\$(MAKE) --no-print-directory verify-generated\n'
           '\tfvm dart run tool/prepare_android_release.dart\n'
           'android-release-bundle: prepare-android-release\n'
           '\tfvm flutter build appbundle --release --no-pub\n'
@@ -862,7 +879,7 @@ library_count=1
     final makefile = File('${repository.path}/Makefile');
     makefile.writeAsStringSync(
       makefile.readAsStringSync().replaceFirst(
-        'android-presentation-performance-test:\n'
+        'android-presentation-performance-test: verify-generated\n'
             '\t./scripts/run-android-presentation-performance-test.sh '
             '"\$(ANDROID_DEVICE_ID)"\n',
         '',
@@ -1120,6 +1137,66 @@ esac''');
     );
   });
 
+  test('rejects every standalone Make preparation bypass', () {
+    final makefile = File('${repository.path}/Makefile');
+    var contents = makefile.readAsStringSync();
+    const contracts = <String, String>{
+      'verify-generated': 'dependencies',
+      'watch': 'dependencies',
+      'build': 'verify-generated',
+      'run-ios': 'verify-generated',
+      'run-android': 'verify-generated',
+      'test': 'verify-generated',
+      'ios-native-test': 'verify-generated',
+      'android-native-test': 'verify-generated',
+      'ios-storage-test': 'verify-generated',
+      'android-storage-test': 'verify-generated',
+      'android-presentation-performance-test': 'verify-generated',
+      'analyze': 'verify-generated',
+      'docs': 'verify-generated',
+      'verify': 'verify-generated',
+      'verify-toolchain': 'verify-generated',
+      'verify-architecture': 'verify-generated',
+      'verify-design-system': 'verify-generated',
+      'verify-barrels': 'verify-generated',
+      'lint': 'verify-generated',
+    };
+    for (final contract in contracts.entries) {
+      contents = _withoutMakePrerequisite(
+        contents,
+        target: contract.key,
+        prerequisite: contract.value,
+      );
+    }
+    contents = contents
+        .replaceFirst('\tfvm dart run build_runner build\n', '')
+        .replaceFirst(
+          '\t@\$(MAKE) --no-print-directory verify-generated\n',
+          '\t@\$(MAKE) --no-print-directory dependencies\n',
+        );
+    makefile.writeAsStringSync(contents);
+
+    final result = _verify(
+      repository,
+      flutterVersionMetadata,
+      flutterExtension,
+      flutterGradleUtils,
+    );
+
+    expect(
+      result.failures,
+      containsAll(<Matcher>[
+        for (final contract in contracts.entries)
+          contains(
+            'Make target ${contract.key} must depend directly on '
+            '${contract.value}.',
+          ),
+        contains('exactly one canonical generated-source build command'),
+        contains('must clean before invoking canonical generated-source'),
+      ]),
+    );
+  });
+
   test('rejects Android Release targets that bypass guarded preparation', () {
     final makefile = File('${repository.path}/Makefile');
     makefile.writeAsStringSync(
@@ -1149,8 +1226,8 @@ esac''');
     makefile.writeAsStringSync(
       makefile.readAsStringSync().replaceFirst(
         '\tfvm flutter clean\n'
-            '\t@\$(MAKE) --no-print-directory dependencies\n',
-        '\t@\$(MAKE) --no-print-directory dependencies\n'
+            '\t@\$(MAKE) --no-print-directory verify-generated\n',
+        '\t@\$(MAKE) --no-print-directory verify-generated\n'
             '\tfvm flutter clean\n',
       ),
     );
@@ -1165,8 +1242,8 @@ esac''');
     expect(
       result.failures,
       contains(
-        'Android Release preparation must clean, resolve the exact lock, and '
-        'then run the guarded plugin tool in order.',
+        'Android Release preparation must clean, regenerate from the exact '
+        'lock, and then run the guarded plugin tool in order.',
       ),
     );
   });
@@ -1420,6 +1497,32 @@ ToolchainVerification _verify(
     flutterVersionMetadata: flutterVersionMetadata,
     flutterExtension: flutterExtension,
     flutterGradleUtils: flutterGradleUtils,
+  );
+}
+
+String _withoutMakePrerequisite(
+  String contents, {
+  required String target,
+  required String prerequisite,
+}) {
+  final declaration = RegExp(
+    '^${RegExp.escape(target)}\\s*:\\s*([^\\n]*)\$',
+    multiLine: true,
+  );
+  final matches = declaration.allMatches(contents).toList(growable: false);
+  if (matches.length != 1) {
+    throw StateError('Expected one Make target declaration for $target.');
+  }
+  final prerequisites = matches.single
+      .group(1)!
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((value) => value.isNotEmpty && value != prerequisite)
+      .join(' ');
+  return contents.replaceRange(
+    matches.single.start,
+    matches.single.end,
+    '$target:${prerequisites.isEmpty ? '' : ' $prerequisites'}',
   );
 }
 

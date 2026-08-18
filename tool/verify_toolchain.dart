@@ -950,6 +950,54 @@ ToolchainVerification verifyToolchain({
     );
     _requireSinglePattern(
       makefile,
+      RegExp(r'^\s*fvm dart run build_runner build\s*$', multiLine: true),
+      'Makefile must own exactly one canonical generated-source build command.',
+      failures,
+    );
+    for (final contract in <({String target, String prerequisite})>[
+      (target: 'verify-generated', prerequisite: 'dependencies'),
+      (target: 'watch', prerequisite: 'dependencies'),
+      (target: 'build', prerequisite: 'verify-generated'),
+      (target: 'run-ios', prerequisite: 'verify-generated'),
+      (target: 'run-android', prerequisite: 'verify-generated'),
+      (target: 'test', prerequisite: 'verify-generated'),
+      (target: 'ios-native-test', prerequisite: 'verify-generated'),
+      (target: 'android-native-test', prerequisite: 'verify-generated'),
+      (target: 'ios-storage-test', prerequisite: 'verify-generated'),
+      (target: 'android-storage-test', prerequisite: 'verify-generated'),
+      (
+        target: 'android-presentation-performance-test',
+        prerequisite: 'verify-generated',
+      ),
+      (target: 'analyze', prerequisite: 'verify-generated'),
+      (target: 'docs', prerequisite: 'verify-generated'),
+      (target: 'verify', prerequisite: 'verify-generated'),
+      (target: 'verify-toolchain', prerequisite: 'verify-generated'),
+      (target: 'verify-architecture', prerequisite: 'verify-generated'),
+      (target: 'verify-design-system', prerequisite: 'verify-generated'),
+      (target: 'verify-barrels', prerequisite: 'verify-generated'),
+      (target: 'lint', prerequisite: 'verify-generated'),
+    ]) {
+      _requireMakeTargetPrerequisite(
+        makefile,
+        target: contract.target,
+        prerequisite: contract.prerequisite,
+        failures: failures,
+      );
+    }
+    _requireSinglePattern(
+      makefile,
+      RegExp(
+        r'^bootstrap:\s+clean\s*$\n'
+        r'(?:\t[^\n]*\n)*?'
+        r'\t@\$\(MAKE\) --no-print-directory verify-generated\s*$',
+        multiLine: true,
+      ),
+      'Make bootstrap must clean before invoking canonical generated-source preparation.',
+      failures,
+    );
+    _requireSinglePattern(
+      makefile,
       RegExp(r'^ios-dependencies:\s*$', multiLine: true),
       'Makefile must own one locked iOS dependency bootstrap target.',
       failures,
@@ -963,22 +1011,28 @@ ToolchainVerification verifyToolchain({
     _requireSinglePattern(
       makefile,
       RegExp(
-        r'^ios-native-test:\s+dependencies ios-dependencies\s*$',
+        r'^ios-native-test:\s+verify-generated ios-dependencies\s*$',
         multiLine: true,
       ),
-      'iOS native tests must bootstrap Pub and locked Ruby dependencies.',
+      'iOS native tests must bootstrap generated Dart and locked Ruby dependencies.',
       failures,
     );
     _requireSinglePattern(
       makefile,
-      RegExp(r'^ios-storage-test:\s+ios-dependencies\s*$', multiLine: true),
-      'iOS integration tests must bootstrap locked Ruby dependencies.',
+      RegExp(
+        r'^ios-storage-test:\s+verify-generated ios-dependencies\s*$',
+        multiLine: true,
+      ),
+      'iOS integration tests must bootstrap generated Dart and locked Ruby dependencies.',
       failures,
     );
     _requireSinglePattern(
       makefile,
-      RegExp(r'^run-ios:\s+dependencies ios-dependencies\s*$', multiLine: true),
-      'Interactive iOS builds must bootstrap locked Pub and Ruby dependencies.',
+      RegExp(
+        r'^run-ios:\s+verify-generated ios-dependencies\s*$',
+        multiLine: true,
+      ),
+      'Interactive iOS builds must bootstrap generated Dart and locked Ruby dependencies.',
       failures,
     );
     _requireSinglePattern(
@@ -994,8 +1048,8 @@ ToolchainVerification verifyToolchain({
     );
     _requireSinglePattern(
       makefile,
-      RegExp(r'^run-android:\s+dependencies\s*$', multiLine: true),
-      'Interactive Android builds must enforce the committed Pub lock.',
+      RegExp(r'^run-android:\s+verify-generated\s*$', multiLine: true),
+      'Interactive Android builds must bootstrap generated Dart sources.',
       failures,
     );
     _requireSinglePattern(
@@ -1024,12 +1078,12 @@ ToolchainVerification verifyToolchain({
       RegExp(
         r'^prepare-android-release:\s*$\n'
         r'\tfvm flutter clean\s*$\n'
-        r'\t@\$\(MAKE\) --no-print-directory dependencies\s*$\n'
+        r'\t@\$\(MAKE\) --no-print-directory verify-generated\s*$\n'
         r'\tfvm dart run tool/prepare_android_release\.dart\s*$',
         multiLine: true,
       ),
-      'Android Release preparation must clean, resolve the exact lock, and '
-      'then run the guarded plugin tool in order.',
+      'Android Release preparation must clean, regenerate from the exact lock, '
+      'and then run the guarded plugin tool in order.',
       failures,
     );
     for (final target in ['android-release-bundle', 'android-release-apks']) {
@@ -2131,7 +2185,7 @@ void _verifyAndroidPerformanceWrapper(
     _requireSinglePattern(
       makefile,
       RegExp(
-        r'^android-presentation-performance-test:\s*$\n'
+        r'^android-presentation-performance-test:\s+verify-generated\s*$\n'
         r'\t\./scripts/run-android-presentation-performance-test\.sh '
         r'"\$\(ANDROID_DEVICE_ID\)"\s*$',
         multiLine: true,
@@ -2139,6 +2193,31 @@ void _verifyAndroidPerformanceWrapper(
       'Makefile must expose the owned Android performance wrapper.',
       failures,
     );
+  }
+}
+
+void _requireMakeTargetPrerequisite(
+  String contents, {
+  required String target,
+  required String prerequisite,
+  required List<String> failures,
+}) {
+  final declarations = RegExp(
+    '^${RegExp.escape(target)}[ \\t]*:[ \\t]*([^#\\n]*)(?:#.*)?\$',
+    multiLine: true,
+  ).allMatches(contents).toList(growable: false);
+  if (declarations.length != 1) {
+    failures.add('Make target $target must have one unambiguous declaration.');
+    return;
+  }
+  final prerequisites = declarations.single
+      .group(1)!
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((value) => value.isNotEmpty)
+      .toSet();
+  if (!prerequisites.contains(prerequisite)) {
+    failures.add('Make target $target must depend directly on $prerequisite.');
   }
 }
 

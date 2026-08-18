@@ -58,9 +58,7 @@ ios-dependencies:
 # Initial project setup
 bootstrap: clean
 	@echo "Setting up project..."
-	@$(MAKE) --no-print-directory dependencies
-	@echo "Running build_runner..."
-	fvm dart run build_runner build
+	@$(MAKE) --no-print-directory verify-generated
 	@echo "Setup complete!"
 
 # Clean Flutter build artifacts
@@ -68,50 +66,46 @@ clean:
 	@echo "Cleaning Flutter build..."
 	fvm flutter clean
 
-# Run build_runner to generate code
-build:
-	@echo "Running build_runner..."
-	fvm dart run build_runner build
+# Regenerate code through the same dependency-locked path used by quality gates.
+build: verify-generated
 
 # Run build_runner in watch mode
-watch:
+watch: dependencies
 	@echo "Running build_runner in watch mode..."
 	fvm dart run build_runner watch
 
 # Interactive builds require an explicit platform and device identity.
-run-ios: dependencies ios-dependencies
+run-ios: verify-generated ios-dependencies
 	@test -n "$(IOS_SIMULATOR_ID)" || (echo "IOS_SIMULATOR_ID is required" >&2; exit 64)
 	BUNDLE_FROZEN=true BUNDLE_PATH="$(BUNDLE_PATH)" bundle exec fvm flutter run --no-pub -d "$(IOS_SIMULATOR_ID)"
 
-run-android: dependencies
+run-android: verify-generated
 	@test -n "$(ANDROID_DEVICE_ID)" || (echo "ANDROID_DEVICE_ID is required" >&2; exit 64)
 	fvm flutter run --no-pub -d "$(ANDROID_DEVICE_ID)"
 
 # Run Flutter tests
-test:
+test: verify-generated
 	@echo "Running Flutter tests..."
 	fvm flutter test --no-pub
 
-ios-native-test: dependencies ios-dependencies
+ios-native-test: verify-generated ios-dependencies
 	@test -n "$(IOS_SIMULATOR_ID)" || (echo "IOS_SIMULATOR_ID is required" >&2; exit 64)
-	fvm dart run build_runner build
 	BUNDLE_FROZEN=true BUNDLE_PATH="$(BUNDLE_PATH)" bundle exec fvm flutter build ios --simulator --debug --config-only --no-pub
 	xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner -configuration Debug -destination "platform=iOS Simulator,id=$(IOS_SIMULATOR_ID)" -quiet clean test
 
-android-native-test: dependencies
-	fvm dart run build_runner build
+android-native-test: verify-generated
 	fvm flutter build apk --debug --config-only --no-pub
 	cd android && ./gradlew :app:testDebugUnitTest
 
 # Flutter integration tests temporarily rewrite ignored iOS build settings to a
 # disposable listener target. The wrapper restores lib/main.dart on every exit.
-ios-storage-test: ios-dependencies
+ios-storage-test: verify-generated ios-dependencies
 	./scripts/run-ios-integration-test.sh integration_test/wallet_storage_security_test.dart "$(IOS_SIMULATOR_ID)"
 
-android-storage-test:
+android-storage-test: verify-generated
 	./scripts/run-android-integration-test.sh integration_test/wallet_storage_security_test.dart "$(ANDROID_DEVICE_ID)"
 
-android-presentation-performance-test:
+android-presentation-performance-test: verify-generated
 	./scripts/run-android-presentation-performance-test.sh "$(ANDROID_DEVICE_ID)"
 
 # Format Dart code
@@ -125,17 +119,17 @@ format-check:
 	fvm dart format --output=none --set-exit-if-changed .
 
 # Run static analysis with all diagnostics fatal.
-analyze:
+analyze: verify-generated
 	@echo "Running static analysis..."
 	fvm flutter analyze --no-pub --fatal-warnings --fatal-infos
 
 # Generate docs into a disposable directory and fail on warnings or bad links.
-docs:
+docs: verify-generated
 	@echo "Validating Dart API documentation..."
 	fvm dart run tool/verify_dartdoc.dart
 
 # Verify repository invariants that are not covered by the analyzer.
-verify:
+verify: verify-generated
 	@echo "Verifying toolchain alignment..."
 	fvm dart run tool/verify_toolchain.dart
 	@echo "Verifying architecture boundaries..."
@@ -147,24 +141,24 @@ verify:
 	@echo "Verifying production tracker inventory..."
 	fvm dart run tool/verify_production_tracker.dart
 
-verify-architecture:
+verify-architecture: verify-generated
 	@echo "Verifying architecture boundaries..."
 	fvm dart run tool/verify_architecture.dart
 
-verify-toolchain:
+verify-toolchain: verify-generated
 	@echo "Verifying toolchain alignment..."
 	fvm dart run tool/verify_toolchain.dart
 
-verify-design-system:
+verify-design-system: verify-generated
 	@echo "Verifying design-system boundaries..."
 	fvm dart run tool/verify_design_system.dart
 
-verify-barrels:
+verify-barrels: verify-generated
 	@echo "Verifying barrel-export boundaries..."
 	fvm dart run tool/verify_barrel_exports.dart
 
 # Generated Dart sources are intentionally ignored and recreated from source.
-verify-generated:
+verify-generated: dependencies
 	@echo "Verifying generated Dart sources..."
 	fvm dart run build_runner build
 
@@ -176,7 +170,7 @@ lint: dependencies format-check verify-generated analyze docs verify
 # then prove Pub and plugin wiring did not drift before no-Pub compilation.
 prepare-android-release:
 	fvm flutter clean
-	@$(MAKE) --no-print-directory dependencies
+	@$(MAKE) --no-print-directory verify-generated
 	fvm dart run tool/prepare_android_release.dart
 
 # Google Play performs device-specific delivery from this bundle. Signing and

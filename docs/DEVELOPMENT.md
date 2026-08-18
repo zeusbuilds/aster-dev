@@ -157,6 +157,12 @@ commit and push again.
 
 ## Available Commands
 
+Targets that compile, analyze, document, test, or inspect application Dart code
+depend on `verify-generated`. From a clean checkout they first resolve the exact
+committed Pub lockfile and regenerate ignored Riverpod/build-runner sources.
+Within one aggregate Make invocation, dependency resolution and generation each
+run once. Do not bypass this graph with raw `--no-pub` Flutter commands.
+
 - `make shell`      - Enter Nix development environment
 - `make fvm-setup`  - Install/use Flutter via FVM for this project (uses version from `.fvmrc`)
 - `make bootstrap`  - Initial project setup (clean, pub get, build_runner)
