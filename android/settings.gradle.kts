@@ -20,7 +20,7 @@ pluginManagement {
 plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
     id("com.android.application") version "9.1.0" apply false
-    id("com.android.built-in-kotlin") version "9.1.0" apply false
+    id("com.android.built-in-kotlin") version "9.3.1" apply false
     // Flutter validates this floor even though AGP supplies Kotlin compilation
     // to Aster's app module through built-in Kotlin. Plugins still using the
     // legacy integration resolve this version while they migrate upstream.
