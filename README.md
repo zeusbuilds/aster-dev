@@ -80,8 +80,9 @@ make run-ios IOS_SIMULATOR_ID=<simulator-udid>
 Flutter `3.47.0` and Dart `3.13.0` are pinned. Flutter 3.47.0 was the latest
 stable release in Flutter's official archive when verified on 2026-08-13.
 
-For complete setup, build defines, the optional uncommitted local SDK override,
-and protected-regtest isolation, read `docs/DEVELOPMENT.md`.
+For complete setup, the reviewed release-manifest workflow, the optional
+uncommitted local SDK override, and protected-regtest isolation, read
+`docs/DEVELOPMENT.md`.
 
 ## Quality Gates
 
@@ -91,11 +92,12 @@ make test
 ```
 
 `make lint` checks formatting, regenerates generated sources, runs analysis with
-all diagnostics fatal, creates clean isolated Dart API docs, validates barrel
-boundaries, and checks tracker inventory. iOS/Android builds, native tests,
-runtime smokes, Android package/signature/16 KiB native-library checks, and
-profile measurements remain exact-candidate release gates; a host-only green CI
-job is not platform qualification.
+all diagnostics fatal, creates clean isolated Dart API docs, and validates
+architecture, design, barrel, release-configuration, governance, and tracker
+policy. GitHub also compiles unsigned Debug Android and iOS host integrations.
+Native runtime, signing, configured services, physical devices, Android package
+and 16 KiB checks, and profile measurements remain exact-candidate release
+gates; green compile CI is not platform qualification.
 
 See `docs/TESTING.md` and `docs/release/RELEASE_CHECKLIST.md`.
 
@@ -117,4 +119,5 @@ onboarding, disclosure, or logging behavior.
 - Typography and tokens: `docs/design/TYPOGRAPHY_USAGE.md`
 - Security: `docs/SECURITY.md`
 - Testing: `docs/TESTING.md`
+- Release configuration: `config/README.md`
 - Regtest isolation: `docs/REGTEST.md`

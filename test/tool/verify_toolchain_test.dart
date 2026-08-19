@@ -49,7 +49,11 @@ void main() {
     _write(
       repository,
       'android/app/build.gradle.kts',
-      'val asterApplicationId = '
+      'plugins {\n'
+          '  id("com.android.application")\n'
+          '  id("com.android.built-in-kotlin")\n'
+          '}\n'
+          'val asterApplicationId = '
           'providers.gradleProperty("aster.applicationId").get()\n'
           'android {\n'
           '  namespace = asterApplicationId\n'
@@ -67,6 +71,8 @@ void main() {
       repository,
       'android/gradle.properties',
       'android.useAndroidX=true\n'
+          'android.builtInKotlin=false\n'
+          'android.newDsl=false\n'
           'aster.applicationId=com.example.asterdev\n',
     );
     _write(
@@ -74,6 +80,7 @@ void main() {
       'android/settings.gradle.kts',
       'plugins {\n'
           '  id("com.android.application") version "9.1.0" apply false\n'
+          '  id("com.android.built-in-kotlin") version "9.1.0" apply false\n'
           '  id("org.jetbrains.kotlin.android") version "2.4.0" apply false\n'
           '}',
     );
@@ -901,6 +908,7 @@ library_count=1
       'android/settings.gradle.kts',
       'plugins {\n'
           '  id("com.android.application") version "9.0.1" apply false\n'
+          '  id("com.android.built-in-kotlin") version "9.0.1" apply false\n'
           '  id("org.jetbrains.kotlin.android") version "2.3.20" apply false\n'
           '}',
     );
@@ -925,9 +933,36 @@ library_count=1
         contains('must delegate minSdk to Flutter'),
         contains('must delegate targetSdk to Flutter'),
         contains('must delegate ndkVersion to Flutter'),
+        contains('must apply AGP built-in Kotlin'),
         contains('exactly Android Gradle Plugin 9.1.0'),
+        contains('exactly Android built-in Kotlin plugin 9.1.0'),
         contains('exactly Kotlin Gradle Plugin 2.4.0'),
         contains('wrapper must use Flutter Gradle 9.3.1'),
+      ]),
+    );
+  });
+
+  test('rejects legacy Kotlin ownership in the Aster app module', () {
+    final appBuild = File('${repository.path}/android/app/build.gradle.kts');
+    appBuild.writeAsStringSync(
+      appBuild.readAsStringSync().replaceFirst(
+        'id("com.android.built-in-kotlin")',
+        'id("kotlin-android")',
+      ),
+    );
+
+    final result = _verify(
+      repository,
+      flutterVersionMetadata,
+      flutterExtension,
+      flutterGradleUtils,
+    );
+
+    expect(
+      result.failures,
+      containsAll(<Matcher>[
+        contains('must apply AGP built-in Kotlin'),
+        contains('must not apply the legacy Kotlin Gradle plugin'),
       ]),
     );
   });

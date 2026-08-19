@@ -27,7 +27,33 @@ const _infrastructureOwners = <String, Set<String>>{
 
 const _sdkOwners = {
   'lib/core/errors/failure_mapper.dart',
+  'lib/features/wallet/data/runtime/rgb_wallet_activity_mapper.dart',
+  'lib/features/wallet/data/runtime/rgb_wallet_balance_mapper.dart',
   'lib/features/wallet/data/runtime/rgb_wallet_engine.dart',
+  'lib/features/wallet/data/runtime/rgb_wallet_native_value_parser.dart',
+};
+
+const _implementationConsumers = <String, Set<String>>{
+  'lib/features/scan/data/services/scan_lifecycle_surface.dart': {
+    'lib/features/scan/data/services/scan_session.dart',
+  },
+  'lib/features/scan/data/services/scan_session.dart': {
+    'lib/features/scan/data/services/mobile_scan_adapters.dart',
+  },
+  'lib/features/wallet/data/runtime/rgb_wallet_activity_mapper.dart': {
+    'lib/features/wallet/data/runtime/rgb_wallet_engine.dart',
+  },
+  'lib/features/wallet/data/runtime/rgb_wallet_balance_mapper.dart': {
+    'lib/features/wallet/data/runtime/rgb_wallet_engine.dart',
+  },
+  'lib/features/wallet/data/runtime/rgb_wallet_native_value_parser.dart': {
+    'lib/features/wallet/data/runtime/rgb_wallet_activity_mapper.dart',
+    'lib/features/wallet/data/runtime/rgb_wallet_balance_mapper.dart',
+    'lib/features/wallet/data/runtime/rgb_wallet_engine.dart',
+  },
+  'lib/features/wallet/data/repository/wallet_payment_operations.dart': {
+    'lib/features/wallet/data/repository/wallet_repository.dart',
+  },
 };
 
 const _presentationInfrastructureProviders = <String>{
@@ -155,6 +181,14 @@ ArchitectureVerification verifyArchitecture(Directory repositoryRoot) {
 
       final targetPath = _repositoryTarget(root, source, uri);
       if (targetPath == null) continue;
+      final implementationConsumers = _implementationConsumers[targetPath];
+      if (implementationConsumers != null &&
+          !implementationConsumers.contains(sourcePath)) {
+        failures.add(
+          '$sourcePath:$line: implementation-only $targetPath may be '
+          'imported only by its owning adapter.',
+        );
+      }
       if (_isFeatureDomain(sourcePath) &&
           (_isFeatureData(targetPath) || _isFeaturePresentation(targetPath))) {
         failures.add(

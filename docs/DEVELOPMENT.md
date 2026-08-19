@@ -135,11 +135,17 @@ limit is a reviewed tool-policy change with fault tests, not an inline escape.
 
 ### Android Release Builds
 
-Use only the owned targets:
+Release artifacts require one ignored, reviewed, non-secret JSON manifest. See
+`config/README.md`, copy `config/release.example.json`, replace every
+placeholder, and use only the owned targets:
 
 ```bash
-make android-release-bundle
-make android-release-apks
+make android-release-bundle \
+  RELEASE_CONFIG=config/release.internal.local.json \
+  RELEASE_AUDIENCE=internal-beta
+make android-release-apks \
+  RELEASE_CONFIG=config/release.internal.local.json \
+  RELEASE_AUDIENCE=internal-beta
 ```
 
 Flutter issue [169336](https://github.com/flutter/flutter/issues/169336)
@@ -159,9 +165,48 @@ executing pinned Flutter source. Do not replace this sequence with a direct
 `flutter build` command or interpret a valid split code as the source build
 number.
 
+Each AAB and split APK must also remain below its reviewed regression budget.
+Verification prints the exact artifact byte count and streamed SHA-256 digest.
+The current wallet SDK still fails the separate 16 KiB ELF gate under SDK-004;
+a size/digest pass does not override that blocker.
+
+### iOS Release Archives
+
+Build unsigned archive evidence through the same manifest contract:
+
+```bash
+make ios-release-archive \
+  RELEASE_CONFIG=config/release.internal.local.json \
+  RELEASE_AUDIENCE=internal-beta
+```
+
+For a release-owned signed export, keep ExportOptions outside Git and run:
+
+```bash
+make ios-release-ipa \
+  RELEASE_CONFIG=config/release.public.local.json \
+  RELEASE_AUDIENCE=public-distribution \
+  IOS_EXPORT_OPTIONS_PLIST=ios/ExportOptions.public.local.plist
+```
+
+Before Xcode runs, the signed target rejects symlinked or unreviewed export
+options and requires an explicit team, bundle identity, distribution method,
+and source-owned version/build policy. The archive gate compares bundle/version
+identity with committed source, requires the iPhone-only Aster metadata, the
+exact approved privacy declarations, and the exact local-network-only App
+Transport Security policy, measures installed size, and hashes the app
+executable. The signed path preflights the actual IPA
+for traversal, links, special nodes, path collisions, ambiguous Payloads, and
+expansion limits before extraction. It then re-verifies identity, privacy,
+installed size, executable digest, embedded provisioning, and the code
+signature from the exported package itself. It cannot approve final
+identifiers, certificate ownership, provisioning ownership, or export
+classification; those remain release-owner inputs.
+
 ### CI (GitHub Actions)
 
-On push to `main` and on pull requests, the **Dart** workflow runs:
+On push to `main` and on pull requests, the **Quality** workflow runs on the
+pinned Ubuntu 24.04 runner image:
 
 - `dart format --output=none --set-exit-if-changed .`
 - `dart run build_runner build`
@@ -171,7 +216,16 @@ On push to `main` and on pull requests, the **Dart** workflow runs:
 - `dart run tool/verify_barrel_exports.dart`
 - `dart run tool/verify_architecture.dart`
 - `dart run tool/verify_design_system.dart`
+- `dart run tool/verify_repository_governance.dart`
+- `dart run tool/verify_release_configuration_contract.dart`
 - `dart run tool/verify_production_tracker.dart`
+
+The separate **Platform compile** workflow uses immutable action commits,
+Java 21, Flutter 3.47.0, Ruby 3.4.10, Bundler 4.0.10, and the locked dependency
+graphs to compile Android Debug plus iOS Simulator Debug and run Android host
+tests. It consumes no release configuration, signing secret, or network stack,
+so it proves host integration only. Physical/runtime and signed-candidate gates
+remain local release evidence.
 
 Fix failures locally with `make format`, `make lint`, and `make test`, then
 commit and push again.
@@ -231,6 +285,13 @@ development prerequisites. The environment includes:
 - Gradle 9.3.1, Android Gradle Plugin 9.1.0, and Kotlin 2.4.0
 - Java JDK 21
 - CocoaPods 1.16.2 through Bundler 4.0.10 (macOS only)
+
+The Aster app module applies AGP 9.1's built-in Kotlin plugin directly. The
+global `android.builtInKotlin=false` and `android.newDsl=false` flags remain a
+temporary dependency compatibility boundary: hosted Flutter plugins and the
+immutable UTEXO SDK still apply legacy KGP. Do not restore `kotlin-android` in
+`android/app`; remove the global opt-outs only after every dependency module
+has migrated and the native and platform matrices pass.
 
 The flake deliberately does not install Flutter or Dart. It places the
 project-local `.fvm/flutter_sdk/bin` on `PATH`; FVM remains the sole source of
@@ -307,11 +368,13 @@ use the isolated Debug or Profile package instead.
 
 ## Wallet Service Configuration
 
-The default build is regtest and cannot become mainnet accidentally. Optional
-non-secret endpoint overrides are documented in
-`docs/architecture/SDK_INTEGRATION.md`. Never pass LSP, VSS, Bitcoin RPC, or
-other credentials with `--dart-define`, because compile-time values are part of
-the application binary.
+The default development build is regtest and cannot become mainnet
+accidentally. Release builds consume exactly one validated file through
+`--dart-define-from-file`; see `config/README.md`. The validator requires every
+technical service and RGB identity key, sorted keys, visible ASCII, and
+TLS-protected public DNS endpoints. Unknown keys and placeholders fail closed.
+Never place LSP, VSS, Bitcoin RPC, provider, or other credentials in that file:
+compile-time values are recoverable from the application binary.
 
 The immutable SDK's default regtest indexer uses local plain HTTP. That default
 is accepted only by Debug and Profile builds. Release builds reject HTTP,
@@ -345,15 +408,10 @@ private hosts, credentials, query strings, and fragments are rejected. Never
 place a CoinGecko or proxy API key in `--dart-define`; mobile binaries cannot
 protect it.
 
-Example non-secret release identity:
-
-```sh
---dart-define=ASTER_MARKET_API_BASE_URL=https://market.aster.example/api/v3
-```
-
-The `.example` hostname above is documentation only and is deliberately
-rejected at runtime. A release owner must substitute the real approved public
-host.
+Public-distribution manifest validation requires the approved market proxy in
+addition to technical wallet services. Reserved example/invalid hosts and
+direct CoinGecko API hosts are deliberately rejected; a release owner must
+supply the real approved public host.
 
 Settings support, legal, and social destinations are optional deployment
 configuration. Omitted values render as disabled actions; the app never ships

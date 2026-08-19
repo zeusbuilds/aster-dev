@@ -11,10 +11,11 @@ make test
 ```
 
 The lint gate checks formatting, regenerates ignored generated sources, runs
-fatal analysis, generates fresh API docs with link validation, validates barrel
-boundaries, and verifies the file tracker. The test suite covers domain math,
-repository failures, runtime ordering, retry policy, ViewModels, widgets,
-routing, accessibility semantics, layout bounds, reduced motion, and goldens.
+fatal analysis, generates fresh API docs with link validation, and validates
+architecture, design, barrel, release-configuration, repository-governance, and
+file-tracker policy. The test suite covers domain math, repository failures,
+runtime ordering, retry policy, ViewModels, widgets, routing, accessibility
+semantics, layout bounds, reduced motion, release tooling, and goldens.
 
 Coverage is a diagnostic. New assertions must target behavior and failure
 boundaries; assertion-free tests or tests added only to raise a percentage are
@@ -103,7 +104,9 @@ entry-name, duplicate, entry-count, compressed-size, per-entry, and aggregate
 expansion limits. They do not make security decisions from `unzip -Z1` output.
 
 Build Android Release artifacts only through `make android-release-bundle` or
-`make android-release-apks`. Their guarded preparation step works around
+`make android-release-apks`, supplying `RELEASE_CONFIG` and
+`RELEASE_AUDIENCE`. The manifest must pass the strict non-secret contract in
+`config/README.md`. Their guarded preparation step works around
 Flutter issue 169336 while proving the committed lockfile and normalized
 package graph remain unchanged and that the generated registrant contains
 exactly production method-channel plugins. A direct no-Pub Release build after
@@ -144,6 +147,27 @@ The current pinned wallet SDK fails this gate at `librgb_lightning_node.so`;
 see `SDK-004`. After an immutable compatible SDK revision is approved, rerun
 both artifact gates and a real 16 KiB emulator or device smoke before
 qualification.
+
+Build unsigned iOS archive evidence only through `make ios-release-archive`
+with the same manifest. Build a signed export only through
+`make ios-release-ipa` with an ignored release-owned ExportOptions plist. The
+export-policy gate requires explicit signing ownership and prevents Xcode from
+changing source version metadata. The archive verifier converts plists through
+bounded `plutil`, compares source and
+packaged identity, checks phone-only metadata, the exact approved privacy and
+local-network-only transport policies, installed size, and executable digest.
+The signed path also
+requires exactly one IPA, preflights its complete ZIP namespace before
+extraction, and re-verifies the exported app's source identity, privacy
+contract, installed size, executable digest, embedded provisioning profile,
+and deep code signature. It does not infer certificate ownership or Apple
+export classification.
+
+Android App Bundles are capped at 170 MiB, ABI-split APKs at 140 MiB each,
+exported IPAs at 250 MiB, and archived installed iOS app content at 500 MiB.
+These are regression ceilings based on the current native-heavy candidate, not
+store limits or targets. Every verifier reports exact bytes and SHA-256; any
+budget change requires a reviewed finding and new candidate measurement.
 
 Run the app-owned iOS storage/file-policy integration contract with:
 

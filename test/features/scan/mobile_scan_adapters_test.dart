@@ -1,5 +1,5 @@
 import 'package:aster/features/scan/data/services/mobile_scan_adapters.dart';
-import 'package:aster/features/scan/data/services/scan_session.dart';
+import 'package:aster/features/scan/data/services/scan_session_contract.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';

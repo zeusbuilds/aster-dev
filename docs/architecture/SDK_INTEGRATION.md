@@ -66,7 +66,11 @@ not the only reason reconciliation can be required.
 
 ## Runtime Configuration
 
-The app reads non-secret service settings from compile-time defines:
+The app reads non-secret service settings from compile-time defines. Debug and
+Profile developers may pass individual values while investigating one local
+environment. Every Release artifact instead requires the single reviewed JSON
+manifest documented in `config/README.md` and consumes it through
+`--dart-define-from-file`:
 
 | Define | Purpose |
 | --- | --- |
@@ -77,8 +81,10 @@ The app reads non-secret service settings from compile-time defines:
 | `ASTER_VSS_URL` | Optional VSS base URL |
 | `ASTER_EXPLORER_URL` | Optional public transaction explorer base |
 
-Credentials and bearer tokens must never be supplied with `--dart-define`;
-those values are recoverable from the application binary. At composition,
+Credentials and bearer tokens must never be supplied through either individual
+defines or the manifest; those values are recoverable from the application
+binary. Release validation rejects unknown keys, placeholders, and non-TLS
+service endpoints before packaging. At composition,
 `RgbWalletServiceConfigurationResolver` fills missing indexer and RGB transport
 values from the immutable SDK's public network-default contract and fills the
 same UTEXO protocol signet LSP default used by that pinned SDK. The resolved

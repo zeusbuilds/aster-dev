@@ -7,6 +7,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../../core/errors/errors.dart';
 import 'scan_session.dart';
+import 'scan_session_contract.dart';
 
 /// Production factory for isolated `mobile_scanner` / `image_picker` sessions.
 final class MobileScanSessionFactory implements ScanSessionFactory {

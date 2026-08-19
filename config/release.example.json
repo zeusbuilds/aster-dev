@@ -1,0 +1,14 @@
+{
+  "ASTER_EXPLORER_URL": "https://REPLACE_ME",
+  "ASTER_INDEXER_URL": "ssl://REPLACE_ME:50002",
+  "ASTER_LSP_URL": "https://REPLACE_ME",
+  "ASTER_MARKET_API_BASE_URL": "https://REPLACE_ME/api/v3/",
+  "ASTER_NETWORK": "signet",
+  "ASTER_PRIVACY_URL": "https://REPLACE_ME/privacy",
+  "ASTER_RGB_PROXY_URL": "rpcs://REPLACE_ME:443",
+  "ASTER_SUPPORT_URL": "https://REPLACE_ME/support",
+  "ASTER_TERMS_URL": "https://REPLACE_ME/terms",
+  "ASTER_USDT_ASSET_ID": "REPLACE_ME",
+  "ASTER_USDT_PRECISION": "8",
+  "ASTER_VSS_URL": "https://REPLACE_ME"
+}

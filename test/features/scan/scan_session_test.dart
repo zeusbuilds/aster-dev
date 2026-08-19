@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:aster/core/core.dart';
 import 'package:aster/features/scan/data/services/scan_session.dart';
+import 'package:aster/features/scan/data/services/scan_session_contract.dart';
 import 'package:aster/features/scan/domain/models/models.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';

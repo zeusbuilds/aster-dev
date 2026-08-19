@@ -1,0 +1,11 @@
+# Repository ownership is intentionally explicit until feature teams exist.
+* @zeusbuilds
+
+# Security and release surfaces always require the repository owner.
+/.github/ @zeusbuilds
+/android/ @zeusbuilds
+/ios/ @zeusbuilds
+/lib/core/ @zeusbuilds
+/lib/features/wallet/ @zeusbuilds
+/scripts/ @zeusbuilds
+/tool/ @zeusbuilds

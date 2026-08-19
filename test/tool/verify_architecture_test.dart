@@ -221,6 +221,41 @@ void main() {
     );
   });
 
+  test('keeps extracted native and lifecycle collaborators private', () {
+    _write(
+      repository,
+      'lib/features/pay/data/repository.dart',
+      "import '../../wallet/data/runtime/rgb_wallet_activity_mapper.dart';\n"
+          "import '../../scan/data/services/scan_lifecycle_surface.dart';\n"
+          "import '../../wallet/data/repository/wallet_payment_operations.dart';",
+    );
+    _write(
+      repository,
+      'lib/features/wallet/data/runtime/rgb_wallet_activity_mapper.dart',
+      'class Mapper {}',
+    );
+    _write(
+      repository,
+      'lib/features/scan/data/services/scan_lifecycle_surface.dart',
+      'class Surface {}',
+    );
+    _write(
+      repository,
+      'lib/features/wallet/data/repository/wallet_payment_operations.dart',
+      'class Operations {}',
+    );
+
+    final result = verifyArchitecture(repository);
+
+    expect(result.passed, isFalse);
+    expect(
+      result.failures.where(
+        (failure) => failure.contains('implementation-only'),
+      ),
+      hasLength(3),
+    );
+  });
+
   test('fails closed when the repository has no lib directory', () {
     final result = verifyArchitecture(repository);
 

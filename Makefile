@@ -1,7 +1,8 @@
-.PHONY: shell dependencies ios-dependencies bootstrap clean build watch run-ios run-android test ios-native-test android-native-test ios-storage-test android-storage-test android-presentation-performance-test format format-check analyze docs verify verify-toolchain verify-architecture verify-design-system verify-barrels verify-generated lint prepare-android-release android-release-bundle android-release-apks verify-android-release-bundle verify-android-release-apks verify-android-apk-signature-policy fvm-setup help
+.PHONY: shell dependencies ios-dependencies bootstrap clean build watch run-ios run-android test ios-native-test android-native-test ios-storage-test android-storage-test android-presentation-performance-test format format-check analyze docs verify verify-toolchain verify-architecture verify-design-system verify-barrels verify-generated verify-release-configuration lint prepare-android-release android-release-bundle android-release-apks verify-android-release-bundle verify-android-release-apks verify-android-apk-signature-policy prepare-ios-release ios-release-archive ios-release-ipa verify-ios-export-options verify-ios-release-archive verify-ios-signed-release-archive verify-ios-release-ipa fvm-setup help
 
 BUNDLE_PATH ?= $(CURDIR)/.bundle
 BUNDLER_VERSION := 4.0.10
+RELEASE_AUDIENCE ?= internal-beta
 
 # Default target
 help:
@@ -32,10 +33,13 @@ help:
 	@echo "  make verify-design-system - Verify semantic UI design-system boundaries"
 	@echo "  make verify-barrels - Verify barrel-export boundaries"
 	@echo "  make verify-generated - Regenerate ignored generated sources"
+	@echo "  make verify-release-configuration RELEASE_CONFIG=<file> - Validate release defines"
 	@echo "  make lint      - Run all repository quality checks"
 	@echo "  make prepare-android-release - Clean and verify Release plugin wiring"
 	@echo "  make android-release-bundle - Build the Play Store release bundle"
 	@echo "  make android-release-apks - Build and verify ABI-split release APKs"
+	@echo "  make ios-release-archive - Build and verify an unsigned iOS archive"
+	@echo "  make ios-release-ipa IOS_EXPORT_OPTIONS_PLIST=<file> - Export and verify a signed IPA"
 	@echo "  make verify-android-release-bundle - Verify the existing Play Store bundle"
 	@echo "  make verify-android-release-apks - Verify existing ABI-split APKs"
 	@echo "  make verify-android-apk-signature-policy - Fault-test APK signature policy"
@@ -138,6 +142,10 @@ verify: verify-generated
 	fvm dart run tool/verify_design_system.dart
 	@echo "Verifying barrel-export boundaries..."
 	fvm dart run tool/verify_barrel_exports.dart
+	@echo "Verifying repository governance and CI policy..."
+	fvm dart run tool/verify_repository_governance.dart
+	@echo "Verifying release configuration contract..."
+	fvm dart run tool/verify_release_configuration_contract.dart
 	@echo "Verifying production tracker inventory..."
 	fvm dart run tool/verify_production_tracker.dart
 
@@ -165,10 +173,16 @@ verify-generated: dependencies
 # Quality checks suitable for pre-commit and CI.
 lint: dependencies format-check verify-generated analyze docs verify
 
+# Release artifacts accept one reviewed non-secret manifest. App/service
+# credentials never belong in dart-defines because mobile binaries expose them.
+verify-release-configuration:
+	@test -n "$(RELEASE_CONFIG)" || (echo "RELEASE_CONFIG is required" >&2; exit 64)
+	fvm dart run tool/verify_release_configuration.dart --file "$(RELEASE_CONFIG)" --audience "$(RELEASE_AUDIENCE)"
+
 # Flutter issue 169336 skips release-specific plugin regeneration with
 # --no-pub. Clean first so the candidate cannot inherit an earlier variant,
 # then prove Pub and plugin wiring did not drift before no-Pub compilation.
-prepare-android-release:
+prepare-android-release: verify-release-configuration
 	fvm flutter clean
 	@$(MAKE) --no-print-directory verify-generated
 	fvm dart run tool/prepare_android_release.dart
@@ -176,14 +190,14 @@ prepare-android-release:
 # Google Play performs device-specific delivery from this bundle. Signing and
 # application identity still have to be supplied by the release owner.
 android-release-bundle: prepare-android-release
-	fvm flutter build appbundle --release --no-pub
+	fvm flutter build appbundle --release --no-pub --dart-define-from-file="$(RELEASE_CONFIG)"
 	./scripts/verify-android-release-bundle.sh
 
 # The pinned wallet SDK AAR contains multiple native ABIs. Direct APK delivery
 # must therefore use Flutter's ABI splits; --target-platform alone does not
 # remove foreign JNI libraries from transitive Android archives.
 android-release-apks: prepare-android-release
-	fvm flutter build apk --release --split-per-abi --no-pub
+	fvm flutter build apk --release --split-per-abi --no-pub --dart-define-from-file="$(RELEASE_CONFIG)"
 	./scripts/verify-android-release-apks.sh
 
 verify-android-release-bundle: dependencies
@@ -194,6 +208,36 @@ verify-android-release-apks: dependencies
 
 verify-android-apk-signature-policy: dependencies
 	./scripts/test-android-apk-signature-policy.sh
+
+# iOS uses the same reviewed release manifest as Android. An unsigned archive
+# is build evidence only; public distribution requires the separate signed IPA
+# target plus release-owned identifiers, provisioning, and export policy.
+prepare-ios-release: verify-release-configuration
+	fvm flutter clean
+	@$(MAKE) --no-print-directory verify-generated ios-dependencies
+
+ios-release-archive: prepare-ios-release
+	BUNDLE_FROZEN=true BUNDLE_PATH="$(BUNDLE_PATH)" bundle exec fvm flutter build ipa --release --no-pub --no-codesign --dart-define-from-file="$(RELEASE_CONFIG)"
+	@$(MAKE) --no-print-directory verify-ios-release-archive
+
+ios-release-ipa: prepare-ios-release
+	@test -n "$(IOS_EXPORT_OPTIONS_PLIST)" || (echo "IOS_EXPORT_OPTIONS_PLIST is required" >&2; exit 64)
+	@$(MAKE) --no-print-directory verify-ios-export-options
+	BUNDLE_FROZEN=true BUNDLE_PATH="$(BUNDLE_PATH)" bundle exec fvm flutter build ipa --release --no-pub --export-options-plist="$(IOS_EXPORT_OPTIONS_PLIST)" --dart-define-from-file="$(RELEASE_CONFIG)"
+	@$(MAKE) --no-print-directory verify-ios-signed-release-archive verify-ios-release-ipa
+
+verify-ios-export-options: dependencies
+	@test -n "$(IOS_EXPORT_OPTIONS_PLIST)" || (echo "IOS_EXPORT_OPTIONS_PLIST is required" >&2; exit 64)
+	fvm dart run tool/verify_ios_export_options.dart --file "$(IOS_EXPORT_OPTIONS_PLIST)" --audience "$(RELEASE_AUDIENCE)"
+
+verify-ios-release-archive: dependencies
+	fvm dart run tool/verify_ios_release_archive.dart --archive "$(or $(IOS_ARCHIVE_PATH),build/ios/archive/Runner.xcarchive)"
+
+verify-ios-signed-release-archive: dependencies
+	fvm dart run tool/verify_ios_release_archive.dart --archive "$(or $(IOS_ARCHIVE_PATH),build/ios/archive/Runner.xcarchive)" --require-signed
+
+verify-ios-release-ipa: dependencies
+	fvm dart run tool/verify_ios_release_export.dart --directory "$(or $(IOS_IPA_DIRECTORY),build/ios/ipa)"
 
 # One-time FVM setup for this project
 fvm-setup:

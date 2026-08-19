@@ -60,3 +60,8 @@ app.*.map.json
 
 # Repository-local Ruby gems installed from Gemfile.lock.
 /.bundle/
+
+# Release-owned non-secret manifests and signing/export inputs. The reviewed
+# schema and deliberately invalid example remain versioned under config/.
+/config/*.local.json
+/ios/ExportOptions*.local.plist

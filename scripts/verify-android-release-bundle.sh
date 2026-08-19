@@ -43,6 +43,12 @@ mktemp_bin="$(command -v mktemp)" || fail "mktemp is required"
 rm_bin="$(command -v rm)" || fail "rm is required"
 readonly java_bin mktemp_bin rm_bin
 [[ -f "${bundle_path}" ]] || fail "missing ${bundle_path}"
+aster_run_inspector \
+  "${ASTER_BOUNDED_DART}" --disable-dart-dev \
+  tool/verify_release_artifact.dart \
+  --kind android-bundle \
+  --file "${bundle_path}" ||
+  fail "${bundle_path} exceeds the release artifact budget or is unsafe"
 temporary_directory="$(
   aster_capture_quick \
     "${mktemp_bin}" -d "${TMPDIR:-/tmp}/aster-aab-config.XXXXXX"

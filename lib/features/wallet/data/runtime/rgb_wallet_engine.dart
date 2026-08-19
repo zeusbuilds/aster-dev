@@ -1,6 +1,3 @@
-import 'dart:convert';
-
-import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:rgb_sdk_flutter/rgb_sdk_flutter.dart';
 
@@ -10,6 +7,9 @@ import '../../../../core/errors/failure_mapper.dart';
 import '../../domain/models/models.dart';
 import '../../domain/validation/validation.dart';
 import '../validation/validation.dart';
+import 'rgb_wallet_activity_mapper.dart';
+import 'rgb_wallet_balance_mapper.dart';
+import 'rgb_wallet_native_value_parser.dart';
 import 'wallet_engine.dart';
 
 /// Resolves explicit deployment overrides and immutable-SDK endpoint defaults.
@@ -138,7 +138,9 @@ final class RgbWalletEngine implements WalletEngine {
   }) : _clock = clock ?? _utcNow;
 
   static const _receiveLifetime = Duration(hours: 1);
-  static const _maximumUnixSeconds = 253402300799;
+  static const _activities = RgbWalletActivityMapper();
+  static const _balances = RgbWalletBalanceMapper();
+  static const _nativeValues = RgbWalletNativeValueParser();
 
   final UtexoWallet _wallet;
   final WalletServiceConfiguration _services;
@@ -180,10 +182,10 @@ final class RgbWalletEngine implements WalletEngine {
         _wallet.getBtcBalance(),
         _wallet.getNodeInfo(),
       ).wait;
-      return _bitcoinBalance(asset, balance, node, channels);
+      return _balances.bitcoin(asset, balance, node, channels);
     }
     final rgb = await _wallet.getAssetBalance(asset.id.value);
-    return _rgbBalance(asset, rgb, channels);
+    return _balances.rgb(asset, rgb, channels);
   }
 
   @override
@@ -193,19 +195,21 @@ final class RgbWalletEngine implements WalletEngine {
       if (asset.kind == WalletAssetKind.bitcoin) {
         final transactions = await _wallet.listTransactions();
         activities.addAll(
-          transactions.map((item) => _bitcoinActivity(asset, item)),
+          transactions.map((item) => _activities.bitcoin(asset, item)),
         );
       } else {
         final transfers = await _wallet.listTransfers(assetId: asset.id.value);
-        activities.addAll(transfers.map((item) => _rgbActivity(asset, item)));
+        activities.addAll(
+          transfers.map((item) => _activities.rgb(asset, item)),
+        );
       }
       final payments = await _wallet.listPayments();
       activities.addAll(
         payments
-            .where((item) => _paymentBelongsToAsset(item, asset))
-            .map((item) => _lightningActivity(asset, item)),
+            .where((item) => _activities.paymentBelongsToAsset(item, asset))
+            .map((item) => _activities.lightning(asset, item)),
       );
-      return _normalizeActivities(activities);
+      return _activities.normalize(activities);
     } on ArgumentError {
       throw const NativeProtocolException(
         'Native wallet returned malformed activity data.',
@@ -407,11 +411,11 @@ final class RgbWalletEngine implements WalletEngine {
       response.invoice,
       'OnchainReceiveResponse.invoice',
     );
-    final nativeRecipient = _optionalNativeIdentifier(
+    final nativeRecipient = _nativeValues.optionalIdentifier(
       response.recipientId,
       'OnchainReceiveResponse.recipientId',
     );
-    final batchTransferIndex = _optionalNativeIndex(
+    final batchTransferIndex = _nativeValues.optionalIndex(
       response.batchTransferIdx,
       'OnchainReceiveResponse.batchTransferIdx',
     );
@@ -423,7 +427,7 @@ final class RgbWalletEngine implements WalletEngine {
         field: 'CoreInvoiceData',
       );
     }
-    final responseExpiry = _optionalUnixSeconds(
+    final responseExpiry = _nativeValues.optionalUnixSeconds(
       response.expirationTimestamp,
       'OnchainReceiveResponse.expirationTimestamp',
     );
@@ -458,7 +462,7 @@ final class RgbWalletEngine implements WalletEngine {
     }
     final amount = decoded.assignment.amount == null
         ? null
-        : _nativeAmount(
+        : _nativeValues.amount(
             route,
             decoded.assignment.amount!,
             'CoreInvoiceData.assignment.amount',
@@ -468,11 +472,11 @@ final class RgbWalletEngine implements WalletEngine {
       encodedDestination: invoice,
       displayDestination: invoice,
       amount: amount,
-      expiresAt: _optionalUnixSeconds(
+      expiresAt: _nativeValues.optionalUnixSeconds(
         decoded.expirationTimestamp,
         'CoreInvoiceData.expirationTimestamp',
       ),
-      referenceId: _optionalNativeIdentifier(
+      referenceId: _nativeValues.optionalIdentifier(
         decoded.recipientId,
         'CoreInvoiceData.recipientId',
       ),
@@ -498,7 +502,7 @@ final class RgbWalletEngine implements WalletEngine {
       }
       amount = decoded.amtMsat == null
           ? null
-          : _nativeAmount(
+          : _nativeValues.amount(
               route,
               decoded.amtMsat!,
               'DecodedLightningInvoice.amtMsat',
@@ -511,35 +515,20 @@ final class RgbWalletEngine implements WalletEngine {
           field: 'DecodedLightningInvoice.assetId',
         );
       }
-      amount = _nativeAmount(
+      amount = _nativeValues.amount(
         route,
         decoded.assetAmount!,
         'DecodedLightningInvoice.assetAmount',
       );
     }
-    final createdAt = _unixSeconds(
+    final createdAt = _nativeValues.unixSeconds(
       decoded.timestamp,
       'DecodedLightningInvoice.timestamp',
     );
-    if (decoded.expirySec < 0) {
-      throw const NativeProtocolException(
-        'Lightning invoice expiry must not be negative.',
-        field: 'DecodedLightningInvoice.expirySec',
-      );
-    }
-    final expiryMicros =
-        BigInt.from(createdAt.microsecondsSinceEpoch) +
-        BigInt.from(decoded.expirySec) * BigInt.from(1000000);
-    if (expiryMicros >
-        BigInt.from(_maximumUnixSeconds) * BigInt.from(1000000)) {
-      throw const NativeProtocolException(
-        'Lightning invoice expiry is outside supported bounds.',
-        field: 'DecodedLightningInvoice.expirySec',
-      );
-    }
-    final expiresAt = DateTime.fromMicrosecondsSinceEpoch(
-      expiryMicros.toInt(),
-      isUtc: true,
+    final expiresAt = _nativeValues.addSeconds(
+      createdAt,
+      decoded.expirySec,
+      'DecodedLightningInvoice.expirySec',
     );
     return WalletPaymentPreview(
       route: route,
@@ -547,7 +536,7 @@ final class RgbWalletEngine implements WalletEngine {
       displayDestination: invoice,
       amount: amount,
       expiresAt: expiresAt,
-      referenceId: _nativeIdentifier(
+      referenceId: _nativeValues.identifier(
         decoded.paymentHash,
         'DecodedLightningInvoice.paymentHash',
       ),
@@ -574,7 +563,7 @@ final class RgbWalletEngine implements WalletEngine {
       return WalletSendResult(
         route: command.route,
         amount: command.amount,
-        referenceId: _nativeIdentifier(txid, 'sendBtc.txid'),
+        referenceId: _nativeValues.identifier(txid, 'sendBtc.txid'),
         status: WalletPaymentStatus.pending,
       );
     });
@@ -616,12 +605,12 @@ final class RgbWalletEngine implements WalletEngine {
       return WalletSendResult(
         route: command.route,
         amount: command.amount,
-        referenceId: _nativeIdentifier(
+        referenceId: _nativeValues.identifier(
           response.txid,
           'OnchainSendResponse.txid',
         ),
         status: WalletPaymentStatus.pending,
-        batchTransferIndex: _optionalNativeIndex(
+        batchTransferIndex: _nativeValues.optionalIndex(
           response.batchTransferIdx,
           'OnchainSendResponse.batchTransferIdx',
         ),
@@ -657,11 +646,11 @@ final class RgbWalletEngine implements WalletEngine {
       return WalletSendResult(
         route: command.route,
         amount: command.amount,
-        referenceId: _nativeIdentifier(
+        referenceId: _nativeValues.identifier(
           response.txid,
           'LightningSendRequest.txid',
         ),
-        status: _paymentStatus(response.status),
+        status: _nativeValues.paymentStatus(response.status),
       );
     });
   }
@@ -727,29 +716,6 @@ final class RgbWalletEngine implements WalletEngine {
   static bool _isValidPaymentValue(String value) =>
       WalletProtocolText.isEncodedValue(value);
 
-  static String _nativeIdentifier(String value, String field) {
-    if (!WalletProtocolText.isIdentifier(value)) {
-      throw NativeProtocolException(
-        'Native wallet returned a malformed payment identifier.',
-        field: field,
-      );
-    }
-    return value;
-  }
-
-  static String? _optionalNativeIdentifier(String? value, String field) =>
-      value == null ? null : _nativeIdentifier(value, field);
-
-  static int? _optionalNativeIndex(int? value, String field) {
-    if (value != null && value < 0) {
-      throw NativeProtocolException(
-        'Native wallet returned an invalid transfer index.',
-        field: field,
-      );
-    }
-    return value;
-  }
-
   static void _requireMatchingAmount(
     WalletPaymentPreview preview,
     WalletAmount amount,
@@ -781,7 +747,7 @@ final class RgbWalletEngine implements WalletEngine {
     }
     final BlockchainEnvironment environment;
     try {
-      environment = _sdkBlockchainEnvironment(raw);
+      environment = _nativeValues.environment(raw);
     } on AppConfigurationException {
       throw NativeProtocolException(
         'Native payment request has an unknown network.',
@@ -794,393 +760,6 @@ final class RgbWalletEngine implements WalletEngine {
         field: field,
       );
     }
-  }
-
-  static WalletAmount _nativeAmount(
-    PaymentRoute route,
-    int units,
-    String field,
-  ) {
-    try {
-      return route.rail == PaymentRail.onchain
-          ? WalletAmount.onchain(assetId: route.asset.id, units: units)
-          : WalletAmount.lightning(assetId: route.asset.id, units: units);
-    } on ArgumentError {
-      throw NativeProtocolException(
-        'Native payment amount is outside supported bounds.',
-        field: field,
-      );
-    }
-  }
-
-  static DateTime? _optionalUnixSeconds(int? value, String field) =>
-      value == null ? null : _unixSeconds(value, field);
-
-  static DateTime _unixSeconds(int value, String field) {
-    if (value < 0 || value > _maximumUnixSeconds) {
-      throw NativeProtocolException(
-        'Native timestamp is outside supported bounds.',
-        field: field,
-      );
-    }
-    return DateTime.fromMillisecondsSinceEpoch(value * 1000, isUtc: true);
-  }
-
-  static WalletPaymentStatus _paymentStatus(String? value) => switch (value) {
-    null ||
-    RlnPaymentStatuses.pending ||
-    RlnPaymentStatuses.claimable ||
-    RlnPaymentStatuses.claiming => WalletPaymentStatus.pending,
-    RlnPaymentStatuses.succeeded => WalletPaymentStatus.succeeded,
-    RlnPaymentStatuses.cancelled => WalletPaymentStatus.cancelled,
-    RlnPaymentStatuses.failed => WalletPaymentStatus.failed,
-    _ => throw const NativeProtocolException(
-      'Native payment returned an unknown status.',
-      field: 'LightningSendRequest.status',
-    ),
-  };
-
-  static WalletActivity _bitcoinActivity(
-    WalletAsset asset,
-    CoreTransaction transaction,
-  ) {
-    final txid = _nativeIdentifier(transaction.txid, 'CoreTransaction.txid');
-    _requireNonNegative(transaction.received, 'CoreTransaction.received');
-    _requireNonNegative(transaction.sent, 'CoreTransaction.sent');
-    _requireNonNegative(transaction.fee, 'CoreTransaction.fee');
-    final confirmation = transaction.confirmationTime;
-    final confirmedAt = confirmation == null
-        ? null
-        : _unixSeconds(
-            confirmation.timestamp,
-            'CoreTransaction.confirmationTime.timestamp',
-          );
-    if (confirmation != null && confirmation.height < 0) {
-      throw const NativeProtocolException(
-        'Native transaction confirmation height must not be negative.',
-        field: 'CoreTransaction.confirmationTime.height',
-      );
-    }
-    final (
-      operation,
-      direction,
-      amountUnits,
-    ) = switch (transaction.transactionType) {
-      'Incoming' => (
-        WalletActivityOperation.bitcoinReceive,
-        WalletActivityDirection.received,
-        transaction.received,
-      ),
-      'SendBtc' => (
-        WalletActivityOperation.bitcoinSend,
-        WalletActivityDirection.sent,
-        _externalBitcoinAmount(transaction),
-      ),
-      'Drain' => (
-        WalletActivityOperation.bitcoinDrain,
-        WalletActivityDirection.sent,
-        _externalBitcoinAmount(transaction),
-      ),
-      'CreateUtxos' => (
-        WalletActivityOperation.bitcoinUtxoCreation,
-        WalletActivityDirection.internal,
-        0,
-      ),
-      'RgbSend' => (
-        WalletActivityOperation.rgbAnchor,
-        WalletActivityDirection.internal,
-        0,
-      ),
-      _ => throw const NativeProtocolException(
-        'Native wallet returned an unknown transaction type.',
-        field: 'CoreTransaction.transactionType',
-      ),
-    };
-    return WalletActivity(
-      id: _activityId('bitcoin-transaction', asset, txid),
-      source: WalletActivitySource.bitcoinTransaction,
-      operation: operation,
-      asset: asset,
-      rail: PaymentRail.onchain,
-      direction: direction,
-      status: confirmation == null
-          ? WalletActivityStatus.pending
-          : WalletActivityStatus.succeeded,
-      amount: amountUnits == 0
-          ? null
-          : WalletAmount.onchain(assetId: asset.id, units: amountUnits),
-      fee: transaction.fee == 0
-          ? null
-          : WalletAmount.onchain(
-              assetId: WalletAsset.bitcoin.id,
-              units: transaction.fee,
-            ),
-      occurredAt: confirmedAt,
-      confirmedAt: confirmedAt,
-      confirmationHeight: confirmation?.height,
-      txid: txid,
-    );
-  }
-
-  static WalletActivity _rgbActivity(WalletAsset asset, CoreTransfer transfer) {
-    if (transfer.idx < 0) {
-      throw const NativeProtocolException(
-        'Native RGB transfer index must not be negative.',
-        field: 'CoreTransfer.idx',
-      );
-    }
-    final (operation, direction) = switch (transfer.kind) {
-      'Send' => (WalletActivityOperation.rgbSend, WalletActivityDirection.sent),
-      'ReceiveBlind' || 'ReceiveWitness' => (
-        WalletActivityOperation.rgbReceive,
-        WalletActivityDirection.received,
-      ),
-      'Issuance' => (
-        WalletActivityOperation.rgbIssuance,
-        WalletActivityDirection.received,
-      ),
-      'Inflation' => (
-        WalletActivityOperation.rgbInflation,
-        WalletActivityDirection.received,
-      ),
-      'Burn' => (WalletActivityOperation.rgbBurn, WalletActivityDirection.sent),
-      _ => throw const NativeProtocolException(
-        'Native wallet returned an unknown RGB transfer kind.',
-        field: 'CoreTransfer.kind',
-      ),
-    };
-    final createdAt = _optionalUnixSeconds(
-      transfer.createdAt,
-      'CoreTransfer.createdAt',
-    );
-    final updatedAt = _optionalUnixSeconds(
-      transfer.updatedAt,
-      'CoreTransfer.updatedAt',
-    );
-    final endpoints = transfer.transportEndpoints;
-    final transportTypes =
-        endpoints
-            .map((endpoint) => endpoint.transportType)
-            .toSet()
-            .toList(growable: false)
-          ..sort();
-    return WalletActivity(
-      id: _activityId('rgb-transfer', asset, transfer.idx.toString()),
-      source: WalletActivitySource.rgbTransfer,
-      operation: operation,
-      asset: asset,
-      rail: PaymentRail.onchain,
-      direction: direction,
-      status: _transferStatus(transfer.status),
-      amount: WalletAmount.onchain(
-        assetId: asset.id,
-        units: _transferAmount(transfer.assignments),
-      ),
-      occurredAt: createdAt ?? updatedAt,
-      updatedAt: updatedAt,
-      expiresAt: _optionalUnixSeconds(
-        transfer.expiration,
-        'CoreTransfer.expiration',
-      ),
-      txid: _optionalNativeIdentifier(transfer.txid, 'CoreTransfer.txid'),
-      recipientId: _optionalNativeIdentifier(
-        transfer.recipientId,
-        'CoreTransfer.recipientId',
-      ),
-      transferIndex: transfer.idx,
-      batchTransferIndex: _optionalNativeIndex(
-        transfer.batchTransferIdx,
-        'CoreTransfer.batchTransferIdx',
-      ),
-      receiveOutpoint: _outpoint(
-        transfer.receiveUtxo,
-        'CoreTransfer.receiveUtxo',
-      ),
-      changeOutpoint: _outpoint(transfer.changeUtxo, 'CoreTransfer.changeUtxo'),
-      transportEndpointCount: endpoints.length,
-      usedTransportEndpointCount: endpoints
-          .where((endpoint) => endpoint.used)
-          .length,
-      transportTypes: transportTypes,
-    );
-  }
-
-  static WalletActivity _lightningActivity(
-    WalletAsset asset,
-    LightningPayment payment,
-  ) {
-    final paymentHash = _nativeIdentifier(
-      payment.paymentHash,
-      'LightningPayment.paymentHash',
-    );
-    final amountUnits = asset.kind == WalletAssetKind.bitcoin
-        ? payment.amtMsat
-        : payment.assetAmount;
-    if (asset.kind == WalletAssetKind.bitcoin && payment.assetAmount != null) {
-      throw const NativeProtocolException(
-        'Bitcoin Lightning payment unexpectedly contains an RGB amount.',
-        field: 'LightningPayment.assetAmount',
-      );
-    }
-    if (amountUnits != null && amountUnits <= 0) {
-      throw const NativeProtocolException(
-        'Native Lightning payment amount must be positive.',
-        field: 'LightningPayment.amount',
-      );
-    }
-    final createdAt = _optionalUnixSeconds(
-      payment.createdAt,
-      'LightningPayment.createdAt',
-    );
-    final updatedAt = _optionalUnixSeconds(
-      payment.updatedAt,
-      'LightningPayment.updatedAt',
-    );
-    return WalletActivity(
-      id: _activityId('lightning-payment', asset, paymentHash),
-      source: WalletActivitySource.lightningPayment,
-      operation: WalletActivityOperation.lightningPayment,
-      asset: asset,
-      rail: PaymentRail.lightning,
-      direction: switch (payment.inbound) {
-        true => WalletActivityDirection.received,
-        false => WalletActivityDirection.sent,
-        null => WalletActivityDirection.unknown,
-      },
-      status: _lightningStatus(payment.status),
-      amount: amountUnits == null
-          ? null
-          : WalletAmount.lightning(assetId: asset.id, units: amountUnits),
-      occurredAt: createdAt ?? updatedAt,
-      updatedAt: updatedAt,
-      paymentHash: paymentHash,
-      invoice: payment.invoice,
-      payeePublicKey: _optionalNativeIdentifier(
-        payment.payeePubkey,
-        'LightningPayment.payeePubkey',
-      ),
-    );
-  }
-
-  static bool _paymentBelongsToAsset(
-    LightningPayment payment,
-    WalletAsset asset,
-  ) {
-    final nativeAssetId = payment.assetId;
-    if (asset.kind == WalletAssetKind.bitcoin) return nativeAssetId == null;
-    return nativeAssetId == asset.id.value;
-  }
-
-  static List<WalletActivity> _normalizeActivities(
-    Iterable<WalletActivity> activities,
-  ) {
-    final byId = <String, WalletActivity>{};
-    for (final activity in activities) {
-      final existing = byId[activity.id];
-      if (existing == null) {
-        byId[activity.id] = activity;
-      } else if (existing != activity) {
-        throw const NativeProtocolException(
-          'Native wallet returned conflicting duplicate activity.',
-          field: 'WalletActivity.id',
-        );
-      }
-    }
-    final normalized = byId.values.toList(growable: false)
-      ..sort(WalletActivityFeed.compareByRecency);
-    return List<WalletActivity>.unmodifiable(normalized);
-  }
-
-  static int _externalBitcoinAmount(CoreTransaction transaction) {
-    final value =
-        BigInt.from(transaction.sent) -
-        BigInt.from(transaction.received) -
-        BigInt.from(transaction.fee);
-    if (value.isNegative || value > BigInt.from(WalletAmount.maxNativeUnits)) {
-      throw const NativeProtocolException(
-        'Native Bitcoin transaction amounts are inconsistent.',
-        field: 'CoreTransaction.sent',
-      );
-    }
-    return value.toInt();
-  }
-
-  static int _transferAmount(List<Assignment> assignments) {
-    var total = BigInt.zero;
-    var foundAmount = false;
-    for (final assignment in assignments) {
-      final amount = assignment.amount;
-      if (amount == null) continue;
-      foundAmount = true;
-      if (amount < 0) {
-        throw const NativeProtocolException(
-          'Native RGB assignment amount must not be negative.',
-          field: 'CoreTransfer.assignments.amount',
-        );
-      }
-      total += BigInt.from(amount);
-      if (total > BigInt.from(WalletAmount.maxNativeUnits)) {
-        throw const NativeProtocolException(
-          'Native RGB transfer amount exceeds supported bounds.',
-          field: 'CoreTransfer.assignments.amount',
-        );
-      }
-    }
-    if (!foundAmount || total == BigInt.zero) {
-      throw const NativeProtocolException(
-        'Native fungible RGB transfer has no positive amount.',
-        field: 'CoreTransfer.assignments.amount',
-      );
-    }
-    return total.toInt();
-  }
-
-  static WalletActivityStatus _transferStatus(String status) =>
-      switch (status) {
-        'Initiated' => WalletActivityStatus.pending,
-        'WaitingCounterparty' => WalletActivityStatus.waitingCounterparty,
-        'WaitingSafeHeight' => WalletActivityStatus.waitingSafeHeight,
-        'WaitingConfirmations' => WalletActivityStatus.waitingConfirmations,
-        'Settled' => WalletActivityStatus.succeeded,
-        'Failed' => WalletActivityStatus.failed,
-        _ => throw const NativeProtocolException(
-          'Native wallet returned an unknown RGB transfer status.',
-          field: 'CoreTransfer.status',
-        ),
-      };
-
-  static WalletActivityStatus _lightningStatus(String status) =>
-      switch (status) {
-        RlnPaymentStatuses.pending => WalletActivityStatus.pending,
-        RlnPaymentStatuses.claimable => WalletActivityStatus.claimable,
-        RlnPaymentStatuses.claiming => WalletActivityStatus.claiming,
-        RlnPaymentStatuses.succeeded => WalletActivityStatus.succeeded,
-        RlnPaymentStatuses.cancelled => WalletActivityStatus.cancelled,
-        RlnPaymentStatuses.failed => WalletActivityStatus.failed,
-        RlnInvoiceStatuses.expired => WalletActivityStatus.expired,
-        _ => throw const NativeProtocolException(
-          'Native wallet returned an unknown Lightning payment status.',
-          field: 'LightningPayment.status',
-        ),
-      };
-
-  static String? _outpoint(Outpoint? outpoint, String field) {
-    if (outpoint == null) return null;
-    final txid = _nativeIdentifier(outpoint.txid, '$field.txid');
-    if (outpoint.vout < 0) {
-      throw NativeProtocolException(
-        'Native RGB outpoint index must not be negative.',
-        field: '$field.vout',
-      );
-    }
-    return '$txid:${outpoint.vout}';
-  }
-
-  static String _activityId(String source, WalletAsset asset, String nativeId) {
-    final digest = sha256.convert(
-      utf8.encode('v1|$source|${asset.id.value}|$nativeId'),
-    );
-    return 'activity-$digest';
   }
 
   static String _formatBitcoinUriAmount(int satoshis) {
@@ -1208,7 +787,7 @@ final class RgbWalletEngine implements WalletEngine {
     }
     final BlockchainEnvironment nativeEnvironment;
     try {
-      nativeEnvironment = _sdkBlockchainEnvironment(network.network);
+      nativeEnvironment = _nativeValues.environment(network.network);
     } on AppConfigurationException {
       throw NativeProtocolException(
         'Native wallet returned an unknown network.',
@@ -1259,223 +838,4 @@ final class RgbWalletEngine implements WalletEngine {
       );
     }
   }
-
-  static WalletBalance _bitcoinBalance(
-    WalletAsset asset,
-    CoreBtcBalance balance,
-    WalletNodeInfo node,
-    List<LightningChannel> channels,
-  ) {
-    _validateCoreBalance(balance.vanilla, 'bitcoin.vanilla');
-    _validateCoreBalance(balance.colored, 'bitcoin.colored');
-    _requireNonNegative(node.localBalanceSat, 'node.localBalanceSat');
-    final outboundMsat = _sum(
-      channels
-          .where((channel) => channel.ready && channel.isUsable == true)
-          .map(
-            (channel) => _requirePresent(
-              channel.outboundBalanceMsat,
-              'channel.outboundBalanceMsat',
-            ),
-          ),
-      'channel.outboundBalanceMsat',
-    );
-    final inboundMsat = _sum(
-      channels
-          .where((channel) => channel.ready && channel.isUsable == true)
-          .map(
-            (channel) => _requirePresent(
-              channel.inboundBalanceMsat,
-              'channel.inboundBalanceMsat',
-            ),
-          ),
-      'channel.inboundBalanceMsat',
-    );
-    return WalletBalance(
-      asset: asset,
-      onchainSettled: WalletAmount.onchain(
-        assetId: asset.id,
-        units: _checkedAdd(
-          balance.vanilla.settled,
-          balance.colored.settled,
-          'bitcoin.settled',
-        ),
-      ),
-      onchainFuture: WalletAmount.onchain(
-        assetId: asset.id,
-        units: _checkedAdd(
-          balance.vanilla.future,
-          balance.colored.future,
-          'bitcoin.future',
-        ),
-      ),
-      onchainSpendable: WalletAmount.onchain(
-        assetId: asset.id,
-        units: balance.vanilla.spendable,
-      ),
-      onchainLocked: WalletAmount.onchain(
-        assetId: asset.id,
-        units: _checkedSubtract(
-          _checkedAdd(
-            balance.vanilla.settled,
-            balance.colored.settled,
-            'bitcoin.settled',
-          ),
-          balance.vanilla.spendable,
-          'bitcoin.locked',
-        ),
-      ),
-      lightningOwned: WalletAmount.lightning(
-        assetId: asset.id,
-        units: _checkedMultiply(
-          node.localBalanceSat,
-          1000,
-          'node.localBalanceSat',
-        ),
-      ),
-      lightningSpendable: WalletAmount.lightning(
-        assetId: asset.id,
-        units: outboundMsat,
-      ),
-      lightningReceivable: WalletAmount.lightning(
-        assetId: asset.id,
-        units: inboundMsat,
-      ),
-    );
-  }
-
-  static WalletBalance _rgbBalance(
-    WalletAsset asset,
-    CoreAssetBalance balance,
-    List<LightningChannel> channels,
-  ) {
-    _validateCoreBalance(balance, 'rgb');
-    _requireNonNegative(balance.offchainOutbound, 'rgb.offchainOutbound');
-    _requireNonNegative(balance.offchainInbound, 'rgb.offchainInbound');
-    final assetChannels = channels.where(
-      (channel) => channel.assetId == asset.id.value,
-    );
-    final local = _sum(
-      assetChannels.map(
-        (channel) => _requirePresent(
-          channel.assetLocalAmount,
-          'channel.assetLocalAmount',
-        ),
-      ),
-      'channel.assetLocalAmount',
-    );
-    return WalletBalance(
-      asset: asset,
-      onchainSettled: WalletAmount.onchain(
-        assetId: asset.id,
-        units: balance.settled,
-      ),
-      onchainFuture: WalletAmount.onchain(
-        assetId: asset.id,
-        units: balance.future,
-      ),
-      onchainSpendable: WalletAmount.onchain(
-        assetId: asset.id,
-        units: balance.spendable,
-      ),
-      onchainLocked: WalletAmount.onchain(
-        assetId: asset.id,
-        units: _checkedSubtract(
-          balance.settled,
-          balance.spendable,
-          'rgb.locked',
-        ),
-      ),
-      lightningOwned: WalletAmount.lightning(assetId: asset.id, units: local),
-      lightningSpendable: WalletAmount.lightning(
-        assetId: asset.id,
-        units: balance.offchainOutbound,
-      ),
-      lightningReceivable: WalletAmount.lightning(
-        assetId: asset.id,
-        units: balance.offchainInbound,
-      ),
-    );
-  }
-
-  static void _validateCoreBalance(CoreBalance balance, String field) {
-    _requireNonNegative(balance.settled, '$field.settled');
-    _requireNonNegative(balance.future, '$field.future');
-    _requireNonNegative(balance.spendable, '$field.spendable');
-    if (balance.spendable > balance.settled) {
-      throw NativeProtocolException(
-        'Spendable balance exceeds settled balance.',
-        field: '$field.spendable',
-      );
-    }
-  }
-
-  static int _sum(Iterable<int> values, String field) {
-    var total = BigInt.zero;
-    for (final value in values) {
-      _requireNonNegative(value, field);
-      total += BigInt.from(value);
-      if (total > BigInt.from(WalletAmount.maxNativeUnits)) {
-        throw NativeProtocolException(
-          'Native monetary aggregate exceeds supported bounds.',
-          field: field,
-        );
-      }
-    }
-    return total.toInt();
-  }
-
-  static int _checkedAdd(int left, int right, String field) {
-    final value = BigInt.from(left) + BigInt.from(right);
-    return _checkedNativeValue(value, field);
-  }
-
-  static int _checkedSubtract(int left, int right, String field) {
-    final value = BigInt.from(left) - BigInt.from(right);
-    return _checkedNativeValue(value, field);
-  }
-
-  static int _checkedMultiply(int left, int right, String field) {
-    final value = BigInt.from(left) * BigInt.from(right);
-    return _checkedNativeValue(value, field);
-  }
-
-  static int _checkedNativeValue(BigInt value, String field) {
-    if (value.isNegative || value > BigInt.from(WalletAmount.maxNativeUnits)) {
-      throw NativeProtocolException(
-        'Native monetary value exceeds supported bounds.',
-        field: field,
-      );
-    }
-    return value.toInt();
-  }
-
-  static int _requirePresent(int? value, String field) {
-    if (value == null) {
-      throw NativeProtocolException(
-        'Native monetary value is missing.',
-        field: field,
-      );
-    }
-    return value;
-  }
-
-  static void _requireNonNegative(int value, String field) {
-    if (value < 0) {
-      throw NativeProtocolException(
-        'Native monetary value must not be negative.',
-        field: field,
-      );
-    }
-  }
-}
-
-BlockchainEnvironment _sdkBlockchainEnvironment(String value) {
-  return switch (value) {
-    // These values belong to the pinned SDK wire contract. They must not leak
-    // into Aster's app-owned chain-environment representation.
-    'bitcoin' => BlockchainEnvironment.mainnet,
-    'utexo' => BlockchainEnvironment.signet,
-    _ => BlockchainEnvironment.parse(value),
-  };
 }

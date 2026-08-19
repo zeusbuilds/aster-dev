@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   format-and-analyze:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -67,6 +67,12 @@ jobs:
 
       - name: Verify design-system boundaries
         run: dart run tool/verify_design_system.dart
+
+      - name: Verify repository governance
+        run: dart run tool/verify_repository_governance.dart
+
+      - name: Verify release configuration contract
+        run: dart run tool/verify_release_configuration_contract.dart
 
       - name: Verify tracker inventory
         run: dart run tool/verify_production_tracker.dart

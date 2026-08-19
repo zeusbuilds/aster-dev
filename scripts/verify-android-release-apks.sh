@@ -30,6 +30,13 @@ verify_apk() {
 
   aster_run_inspector \
     "${ASTER_BOUNDED_DART}" --disable-dart-dev \
+    tool/verify_release_artifact.dart \
+    --kind android-split-apk \
+    --file "${apk_path}" ||
+    fail "${apk_path} exceeds the release artifact budget or is unsafe"
+
+  aster_run_inspector \
+    "${ASTER_BOUNDED_DART}" --disable-dart-dev \
     tool/verify_android_release_identity.dart \
     --apk "${apk_path}" \
     --aapt2 "${ASTER_AAPT2}" ||

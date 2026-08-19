@@ -1,0 +1,88 @@
+# Compile-only platform integration gates. Signing, devices, configured network
+# runtime, and funds-bearing behavior remain exact-candidate local gates.
+name: Platform compile
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: platform-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android-debug:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Java
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: "3.47.0"
+          cache: true
+
+      - name: Resolve locked dependencies
+        run: flutter pub get --enforce-lockfile
+
+      - name: Generate sources
+        run: dart run build_runner build
+
+      - name: Compile Android host integration
+        run: flutter build apk --debug --no-pub
+
+      - name: Run Android host tests
+        working-directory: android
+        run: ./gradlew :app:testDebugUnitTest --no-daemon
+
+  ios-simulator:
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1 reviewed 2026-08-19
+        with:
+          ruby-version: "3.4.10"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: "3.47.0"
+          cache: true
+
+      - name: Install exact Bundler
+        run: gem install bundler --version 4.0.10 --no-document
+
+      - name: Resolve locked dependencies
+        run: flutter pub get --enforce-lockfile
+
+      - name: Generate sources
+        run: dart run build_runner build
+
+      - name: Resolve locked CocoaPods dependencies
+        env:
+          BUNDLE_FROZEN: "true"
+          BUNDLE_PATH: ${{ github.workspace }}/.bundle
+        run: bundle install --jobs 4 --retry 3
+
+      - name: Compile iOS host integration
+        env:
+          BUNDLE_FROZEN: "true"
+          BUNDLE_PATH: ${{ github.workspace }}/.bundle
+        run: bundle exec flutter build ios --simulator --debug --no-pub

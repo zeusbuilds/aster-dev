@@ -74,7 +74,12 @@ distribution digest, Gradle rejects unreviewed external artifact checksums, and
 iOS tooling is resolved from the checksummed Bundler lock rather than an
 arbitrary host CocoaPods executable. Verification metadata is reviewed source;
 regenerating it is a dependency change, not a routine way to make a failed
-build pass. Android release inspection re-hashes directly executed Gradle-cache
+build pass. Every release package consumes one sorted, bounded, non-secret JSON
+manifest. Unknown keys, placeholders, insecure/private endpoints, direct market
+provider hosts, credentials, and malformed RGB identity fail closed before
+packaging. Local manifests and iOS export policies are ignored; their digests,
+not their deployment values, belong in release evidence. Android release
+inspection re-hashes directly executed Gradle-cache
 JARs at point of use through bounded streaming reads. Signed AAB evidence
 requires complete one-certificate coverage for every payload entry; a matching
 certificate on only part of an archive is rejected. APK/AAB archive inspection
@@ -93,6 +98,16 @@ retain only the bounded result needed for the decision. Android identity,
 signature, archive, ELF, package-state, renderer, Git-hook, and iOS simulator
 paths all use this contract. A watchdog failure invalidates evidence; it does
 not justify an automatic mutation retry.
+
+iOS archive verification compares packaged identity with committed source,
+validates the exact approved privacy declarations and local-network-only
+transport policy, bounds installed size, and hashes the executable. Signed
+exports additionally preflight the
+actual IPA against archive-path and expansion attacks, then require matching
+identity/privacy metadata, platform signature verification, embedded
+provisioning, installed-size bounds, and package/executable digests from its
+extracted app. These mechanical checks do not establish certificate ownership,
+legal export classification, or App Store approval.
 
 ## Open Security Decisions
 

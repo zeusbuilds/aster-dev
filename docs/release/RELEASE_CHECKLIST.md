@@ -17,6 +17,11 @@ from a clean worktree and record commands/results in the production tracker.
 - [ ] `make lint`
 - [ ] `fvm flutter test --coverage`
 - [ ] dependency, license, discontinued-package, and advisory review
+- [ ] one sorted non-secret release manifest passes
+      `make verify-release-configuration` for the intended audience; its
+      SHA-256 is recorded and the file remains uncommitted
+- [ ] GitHub Quality and Platform compile workflows pass on this exact commit;
+      compile CI is not recorded as runtime or signing evidence
 
 ## Platforms
 
@@ -25,6 +30,11 @@ from a clean worktree and record commands/results in the production tracker.
 - [ ] root iOS privacy manifest is present in the built app and its approved
       required-reason entries match the exact executable/API scan
 - [ ] iOS install/launch smoke on the recorded simulator/device
+- [ ] unsigned iOS archive built through `make ios-release-archive`, or signed
+      IPA built through `make ios-release-ipa` with an ignored approved export
+      policy; the distributed IPA passes archive preflight plus extracted
+      identity/privacy/signature/provisioning/size checks and exact digests are
+      recorded
 - [ ] clean `make android-release-bundle` or `make android-release-apks` run;
       guarded preparation reports unchanged lock/graph and no dev plugins
 - [ ] APK/AAB application ID and version name match committed source; AAB uses
@@ -61,6 +71,8 @@ from a clean worktree and record commands/results in the production tracker.
 - [ ] approved `ASTER_MARKET_API_BASE_URL`, provider license/attribution, proxy
       availability, and server-side credential ownership
 - [ ] artifact sizes and SHA-256 digests recorded
+- [ ] AAB, split APK, archived iOS app, and IPA remain within reviewed
+      regression budgets; no budget was raised merely to pass the candidate
 
 ## Product And Security
 
@@ -80,6 +92,8 @@ from a clean worktree and record commands/results in the production tracker.
 - [ ] every repository-owned non-generated file independently reviewed
 - [ ] zero unreviewed tracker rows
 - [ ] zero untracked findings
+- [ ] CODEOWNERS, dependency-update policy, and required branch protections are
+      confirmed; source policy does not substitute for remote administrator state
 - [ ] blockers and accepted constraints listed in release notes
 - [ ] exact commit pushed to the authorized remote
 - [ ] eligibility stated separately for internal beta, signet, and mainnet

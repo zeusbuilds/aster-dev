@@ -260,6 +260,19 @@ ToolchainVerification verifyToolchain({
   if (android != null) {
     _requireSinglePattern(
       android,
+      RegExp(r'id\("com\.android\.built-in-kotlin"\)'),
+      'Aster Android app module must apply AGP built-in Kotlin.',
+      failures,
+    );
+    if (RegExp(r'id\("(?:kotlin-android|org\.jetbrains\.kotlin\.android)"\)')
+        .hasMatch(android)) {
+      failures.add(
+        'Aster Android app module must not apply the legacy Kotlin Gradle '
+        'plugin.',
+      );
+    }
+    _requireSinglePattern(
+      android,
       RegExp(
         r'val\s+asterApplicationId\s*=\s*providers\.gradleProperty\('
         r'"aster\.applicationId"\)\.get\(\)',
@@ -319,6 +332,23 @@ ToolchainVerification verifyToolchain({
     }
   }
 
+  if (androidProperties != null) {
+    _requireSinglePattern(
+      androidProperties,
+      RegExp(r'^android\.builtInKotlin=false\s*$', multiLine: true),
+      'Android must keep global built-in Kotlin disabled only for unmigrated '
+      'dependency modules.',
+      failures,
+    );
+    _requireSinglePattern(
+      androidProperties,
+      RegExp(r'^android\.newDsl=false\s*$', multiLine: true),
+      'Android must keep the legacy DSL compatibility flag explicit while '
+      'dependency modules require it.',
+      failures,
+    );
+  }
+
   final settings = _readRequired(
     File('$root/android/settings.gradle.kts'),
     'android/settings.gradle.kts',
@@ -330,6 +360,13 @@ ToolchainVerification verifyToolchain({
       plugin: 'com.android.application',
       expected: agpVersion,
       label: 'Android Gradle Plugin',
+      failures: failures,
+    );
+    _requirePluginVersion(
+      settings,
+      plugin: 'com.android.built-in-kotlin',
+      expected: agpVersion,
+      label: 'Android built-in Kotlin plugin',
       failures: failures,
     );
     _requirePluginVersion(
@@ -1079,7 +1116,8 @@ ToolchainVerification verifyToolchain({
     _requireSinglePattern(
       makefile,
       RegExp(
-        r'^prepare-android-release:\s*$\n'
+        r'^prepare-android-release:'
+        r'(?:\s+verify-release-configuration)?\s*$\n'
         r'\tfvm flutter clean\s*$\n'
         r'\t@\$\(MAKE\) --no-print-directory verify-generated\s*$\n'
         r'\tfvm dart run tool/prepare_android_release\.dart\s*$',
