@@ -1178,6 +1178,11 @@ ToolchainVerification verifyToolchain({
     'tool/bounded_process.dart',
     failures,
   );
+  final androidArtifactToolchainResolver = _readRequired(
+    File('$root/tool/resolve_android_artifact_toolchain.dart'),
+    'tool/resolve_android_artifact_toolchain.dart',
+    failures,
+  );
   final boundedDartTools =
       <({String label, bool ownsDescendants, String? source})>[
         (
@@ -1703,6 +1708,55 @@ ToolchainVerification verifyToolchain({
     }
     if (boundedProcess.contains('allowMalformed: true')) {
       failures.add('Bounded subprocess output must reject malformed UTF-8.');
+    }
+  }
+  if (androidArtifactToolchainResolver != null) {
+    for (final contract in <({RegExp pattern, String failure})>[
+      (
+        pattern: RegExp(r'const _maxAgpModuleMetadataBytes = 1024 \* 1024;'),
+        failure: 'AGP module metadata must have an exact 1 MiB byte ceiling.',
+      ),
+      (
+        pattern: RegExp(
+          r'final verifiedBytes = _readVerifiedArtifactBytes\(\s*'
+          r'metadataFile,[\s\S]*?'
+          r'maximumBytes: _maxAgpModuleMetadataBytes,',
+        ),
+        failure: 'AGP module metadata must be captured under its format-specific ceiling.',
+      ),
+      (
+        pattern: RegExp(r'input\.lengthSync\(\) > maximumBytes'),
+        failure: 'Verified metadata capture must reject oversized files before reading.',
+      ),
+      (
+        pattern: RegExp(r'totalBytes > maximumBytes'),
+        failure:
+            'Verified metadata capture must reject growth while streaming.',
+      ),
+      (
+        pattern: RegExp(
+          r'if \(captured\.digest == expected\) return captured\.bytes;',
+        ),
+        failure: 'AGP metadata parsing must consume only the checksum-verified byte snapshot.',
+      ),
+      (
+        pattern: RegExp(r'jsonDecode\(utf8\.decode\(verifiedBytes\)\)'),
+        failure: 'AGP metadata must use strict UTF-8 decoding after checksum verification.',
+      ),
+    ]) {
+      _requireSinglePattern(
+        androidArtifactToolchainResolver,
+        contract.pattern,
+        contract.failure,
+        failures,
+      );
+    }
+    if (androidArtifactToolchainResolver.contains(
+      'metadataFile.readAsStringSync()',
+    )) {
+      failures.add(
+        'AGP metadata must not bypass bounded verified-byte capture.',
+      );
     }
   }
   for (final tool in boundedDartTools) {

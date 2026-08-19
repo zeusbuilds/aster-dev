@@ -1,11 +1,14 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 
 import 'gradle_verification_metadata.dart';
 
 const _maxVerifiedArtifactBytes = 512 * 1024 * 1024;
+const _maxAgpModuleMetadataBytes = 1024 * 1024;
 const _hashBufferBytes = 64 * 1024;
 
 /// Exact Android tools and AGP libraries used to inspect release artifacts.
@@ -325,18 +328,19 @@ Map<String, Object?>? _agpModuleMetadata(
     return null;
   }
   final metadataFile = files.single;
-  if (!_matchesVerifiedChecksum(
+  final verifiedBytes = _readVerifiedArtifactBytes(
     metadataFile,
     group: 'com.android.tools.build',
     module: 'gradle',
     version: agpVersion,
     verificationMetadata: verificationMetadata,
+    maximumBytes: _maxAgpModuleMetadataBytes,
+    sizeLimitLabel: 'AGP module metadata size limit',
     failures: failures,
-  )) {
-    return null;
-  }
+  );
+  if (verifiedBytes == null) return null;
   try {
-    final decoded = jsonDecode(metadataFile.readAsStringSync());
+    final decoded = jsonDecode(utf8.decode(verifiedBytes));
     if (decoded is Map<String, Object?>) return decoded;
   } on FormatException {
     // The deterministic failure below owns malformed cache metadata.
@@ -345,6 +349,77 @@ Map<String, Object?>? _agpModuleMetadata(
   }
   failures.add('AGP $agpVersion module metadata is malformed or unreadable.');
   return null;
+}
+
+Uint8List? _readVerifiedArtifactBytes(
+  File file, {
+  required String group,
+  required String module,
+  required String version,
+  required GradleVerificationMetadata? verificationMetadata,
+  required int maximumBytes,
+  required String sizeLimitLabel,
+  required List<String> failures,
+}) {
+  if (verificationMetadata == null) return null;
+  final artifactName = _basename(file.path);
+  final key = '$group:$module:$version:$artifactName';
+  final expected = verificationMetadata.checksumFor(
+    group: group,
+    module: module,
+    version: version,
+    artifactName: artifactName,
+  );
+  if (expected == null) {
+    failures.add('Missing committed SHA-256 for $key.');
+    return null;
+  }
+  try {
+    final captured = _captureArtifact(file, maximumBytes: maximumBytes);
+    if (captured.digest == expected) return captured.bytes;
+  } on _ArtifactSizeException {
+    failures.add('Cached artifact $key exceeds the $sizeLimitLabel.');
+    return null;
+  } on FileSystemException {
+    failures.add('Could not read or hash $key.');
+    return null;
+  }
+  failures.add('Cached artifact $key does not match its committed SHA-256.');
+  return null;
+}
+
+({Uint8List bytes, String digest}) _captureArtifact(
+  File file, {
+  required int maximumBytes,
+}) {
+  final input = file.openSync();
+  try {
+    if (input.lengthSync() > maximumBytes) {
+      throw const _ArtifactSizeException();
+    }
+
+    final bytes = BytesBuilder(copy: false);
+    final digestOutput = _SingleDigestSink();
+    final digestInput = sha256.startChunkedConversion(digestOutput);
+    var totalBytes = 0;
+    while (true) {
+      final remainingBytes = maximumBytes - totalBytes;
+      final chunk = input.readSync(
+        remainingBytes == 0 ? 1 : min(_hashBufferBytes, remainingBytes),
+      );
+      if (chunk.isEmpty) break;
+      totalBytes += chunk.length;
+      if (totalBytes > maximumBytes) {
+        throw const _ArtifactSizeException();
+      }
+      bytes.add(chunk);
+      digestInput.add(chunk);
+    }
+    digestInput.close();
+    return (bytes: bytes.takeBytes(), digest: digestOutput.digest.toString());
+  } finally {
+    input.closeSync();
+  }
 }
 
 String? _dependencyVersion(

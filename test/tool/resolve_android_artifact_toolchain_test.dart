@@ -6,6 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../tool/resolve_android_artifact_toolchain.dart';
 
+const _agpMetadataLimitBytes = 1024 * 1024;
+
 void main() {
   late Directory root;
   late Directory repository;
@@ -162,6 +164,54 @@ void main() {
     );
   });
 
+  test('accepts checksum-verified AGP metadata at the exact byte limit', () {
+    final metadata = _writeAgpMetadata(
+      gradleHome,
+      byteLength: _agpMetadataLimitBytes,
+    );
+    _writeVerificationMetadata(repository, _verifiedArtifacts(gradleHome));
+
+    final result = resolve();
+
+    expect(metadata.lengthSync(), _agpMetadataLimitBytes);
+    expect(result.passed, isTrue, reason: result.failures.join('\n'));
+  });
+
+  test('rejects checksum-verified AGP metadata above its format limit', () {
+    final metadata = _writeAgpMetadata(
+      gradleHome,
+      byteLength: _agpMetadataLimitBytes + 1,
+    );
+    _writeVerificationMetadata(repository, _verifiedArtifacts(gradleHome));
+
+    final result = resolve();
+
+    expect(metadata.lengthSync(), _agpMetadataLimitBytes + 1);
+    expect(
+      result.failures,
+      contains(
+        contains(
+          'Cached artifact com.android.tools.build:gradle:9.1.0:'
+          'gradle-9.1.0.module exceeds the AGP module metadata size limit',
+        ),
+      ),
+    );
+  });
+
+  test('rejects checksum-verified malformed UTF-8 metadata', () {
+    final metadata = _writeAgpMetadata(gradleHome)
+      ..writeAsBytesSync(const <int>[0xff]);
+    _writeVerificationMetadata(repository, _verifiedArtifacts(gradleHome));
+
+    final result = resolve();
+
+    expect(metadata.lengthSync(), 1);
+    expect(
+      result.failures,
+      contains(contains('metadata is malformed or unreadable')),
+    );
+  });
+
   test('rejects missing exact tools and cached libraries', () {
     File('${androidSdk.path}/build-tools/36.0.0/zipalign').deleteSync();
     File(
@@ -305,35 +355,59 @@ void main() {
   });
 }
 
-File _writeAgpMetadata(Directory gradleHome, {String suffix = 'hash'}) {
+File _writeAgpMetadata(
+  Directory gradleHome, {
+  String suffix = 'hash',
+  int? byteLength,
+}) {
+  final metadata = <String, Object?>{
+    'variants': [
+      {
+        'name': 'runtimeElements',
+        'dependencies': [
+          {
+            'group': 'com.android.tools.build',
+            'module': 'aapt2-proto',
+            'version': {'requires': '9.1.0-14792394'},
+          },
+          {
+            'group': 'com.android.tools.build',
+            'module': 'bundletool',
+            'version': {'requires': '1.18.3'},
+          },
+          {
+            'group': 'com.google.protobuf',
+            'module': 'protobuf-java',
+            'version': {'requires': '3.25.5'},
+          },
+        ],
+      },
+    ],
+  };
+  if (byteLength != null) {
+    metadata['padding'] = '';
+  }
+  var contents = jsonEncode(metadata);
+  if (byteLength != null) {
+    final paddingLength = byteLength - utf8.encode(contents).length;
+    if (paddingLength < 0) {
+      throw ArgumentError.value(
+        byteLength,
+        'byteLength',
+        'is smaller than the required AGP fixture',
+      );
+    }
+    metadata['padding'] = ''.padRight(paddingLength, 'x');
+    contents = jsonEncode(metadata);
+    if (utf8.encode(contents).length != byteLength) {
+      throw StateError('AGP fixture did not reach its exact byte length.');
+    }
+  }
   return _write(
     gradleHome,
     'caches/modules-2/files-2.1/com.android.tools.build/'
     'gradle/9.1.0/$suffix/gradle-9.1.0.module',
-    jsonEncode({
-      'variants': [
-        {
-          'name': 'runtimeElements',
-          'dependencies': [
-            {
-              'group': 'com.android.tools.build',
-              'module': 'aapt2-proto',
-              'version': {'requires': '9.1.0-14792394'},
-            },
-            {
-              'group': 'com.android.tools.build',
-              'module': 'bundletool',
-              'version': {'requires': '1.18.3'},
-            },
-            {
-              'group': 'com.google.protobuf',
-              'module': 'protobuf-java',
-              'version': {'requires': '3.25.5'},
-            },
-          ],
-        },
-      ],
-    }),
+    contents,
   );
 }
 

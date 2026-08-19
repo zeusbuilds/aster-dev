@@ -565,6 +565,19 @@ library_count=1
           'await ensureTerminated();\n'
           'on ProcessException { throw const ProcessLaunchException(); }',
     );
+    _write(
+      repository,
+      'tool/resolve_android_artifact_toolchain.dart',
+      'const _maxAgpModuleMetadataBytes = 1024 * 1024;\n'
+          'final verifiedBytes = _readVerifiedArtifactBytes(\n'
+          '  metadataFile,\n'
+          '  maximumBytes: _maxAgpModuleMetadataBytes,\n'
+          ');\n'
+          'if (input.lengthSync() > maximumBytes) {}\n'
+          'if (totalBytes > maximumBytes) {}\n'
+          'if (captured.digest == expected) return captured.bytes;\n'
+          'jsonDecode(utf8.decode(verifiedBytes));',
+    );
     for (final path in <String>[
       'tool/verify_dartdoc.dart',
       'tool/prepare_android_release.dart',
@@ -1623,6 +1636,34 @@ esac''');
         contains(
           'Android Release preparation must own its complete subprocess tree',
         ),
+      ]),
+    );
+  });
+
+  test('rejects unbounded or checksum-detached AGP metadata parsing', () {
+    _write(
+      repository,
+      'tool/resolve_android_artifact_toolchain.dart',
+      'final decoded = jsonDecode(metadataFile.readAsStringSync());',
+    );
+
+    final result = _verify(
+      repository,
+      flutterVersionMetadata,
+      flutterExtension,
+      flutterGradleUtils,
+    );
+
+    expect(
+      result.failures,
+      containsAll(<Matcher>[
+        contains('must have an exact 1 MiB byte ceiling'),
+        contains('must be captured under its format-specific ceiling'),
+        contains('must reject oversized files before reading'),
+        contains('must reject growth while streaming'),
+        contains('consume only the checksum-verified byte snapshot'),
+        contains('strict UTF-8 decoding after checksum verification'),
+        contains('must not bypass bounded verified-byte capture'),
       ]),
     );
   });
