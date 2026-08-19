@@ -523,18 +523,35 @@ library_count=1
     _write(
       repository,
       'tool/bounded_process.dart',
-      'Process.start(\n'
+      "const supervisor = r'''\n"
+          'set -m\n'
+          'set +m\n'
+          '"\$@" >&3 2>&4\n'
+          'owned_status=\$?\n'
+          'while :; do /bin/sleep 3600; done &\n'
+          'kill -TERM -- "-\$owned_pid"\n'
+          'kill -KILL -- "-\$owned_pid"\n'
+          'trap - HUP INT TERM\n'
+          'stop_owned_groups\n'
+          'exit "\$status"\n'
+          "''';\n"
+          'killProcessTree && (!Platform.isMacOS && !Platform.isLinux);\n'
+          "killProcessTree ? '/bin/bash' : executable;\n"
+          "'--noprofile', '--norc', '-p', '-c',\n"
+          "_posixProcessTreeSupervisor, 'utexo-bounded-process',\n"
+          'executable, ...arguments,\n'
+          'Process.start(\n'
           '_readBoundedUtf8(\n'
           '  process.stdout,\n'
           "  streamName: 'stdout',\n"
           '  maximumBytes: maxStdoutBytes,\n'
-          '  onLimit: terminate,\n'
+          '  onLimit: requestTermination,\n'
           ');\n'
           '_readBoundedUtf8(\n'
           '  process.stderr,\n'
           "  streamName: 'stderr',\n"
           '  maximumBytes: maxStderrBytes,\n'
-          '  onLimit: terminate,\n'
+          '  onLimit: requestTermination,\n'
           ');\n'
           'totalBytes > maximumBytes;\n'
           'utf8.decode(output.takeBytes());\n'
@@ -543,8 +560,35 @@ library_count=1
           '  stdoutFuture,\n'
           '  stderrFuture,\n'
           '], eagerError: true).timeout(timeout, onTimeout: fail);\n'
+          'ProcessSignal.sigterm;\n'
           'ProcessSignal.sigkill;\n'
+          'await ensureTerminated();\n'
           'on ProcessException { throw const ProcessLaunchException(); }',
+    );
+    for (final path in <String>[
+      'tool/verify_dartdoc.dart',
+      'tool/prepare_android_release.dart',
+    ]) {
+      _write(
+        repository,
+        path,
+        "import 'bounded_process.dart';\n"
+        'await runBoundedProcess(command, const [],\n'
+        '  killProcessTree: true,\n'
+        '  maxStdoutBytes: 1, maxStderrBytes: 1, timeout: deadline);',
+      );
+    }
+    _write(
+      repository,
+      'tool/verify_production_tracker.dart',
+      "import 'bounded_process.dart';\n"
+          'await runBoundedProcess(command, const [],\n'
+          '  maxStdoutBytes: 1, maxStderrBytes: 1, timeout: deadline);\n'
+          "const ['ls-files', '-z', '--cached'];\n"
+          "output.endsWith('\\u0000');\n"
+          "output.split('\\u0000');\n"
+          '!files.add(path);\n'
+          'value < 0x20 || value == 0x7f;',
     );
     _write(
       repository,
@@ -1502,9 +1546,83 @@ esac''');
         contains('must count bytes before capture'),
         contains('must enforce one deadline'),
         contains('must force child termination'),
+        contains('must request graceful termination'),
+        contains('must ignore shell startup code'),
+        contains('must reserve the owned group until status capture'),
+        contains('must clean descendants after normal completion'),
         contains('launch failures must redact arguments'),
         contains('must not use buffered Process.run'),
         contains('must reject malformed UTF-8'),
+      ]),
+    );
+  });
+
+  test('rejects unbounded Dart tools and line-framed Git inventory', () {
+    for (final path in <String>[
+      'tool/verify_dartdoc.dart',
+      'tool/prepare_android_release.dart',
+      'tool/verify_production_tracker.dart',
+    ]) {
+      _write(repository, path, 'await Process.run(command, const []);');
+    }
+
+    final result = _verify(
+      repository,
+      flutterVersionMetadata,
+      flutterExtension,
+      flutterGradleUtils,
+    );
+
+    expect(
+      result.failures,
+      containsAll(<Matcher>[
+        contains('Dartdoc verification must import the bounded process owner'),
+        contains('Dartdoc verification must invoke exactly one bounded'),
+        contains('Dartdoc verification must not invoke Process APIs'),
+        contains('Android Release preparation must import the bounded'),
+        contains('Android Release preparation must invoke exactly one bounded'),
+        contains('Android Release preparation must not invoke Process APIs'),
+        contains('Dartdoc verification must own its complete subprocess tree'),
+        contains(
+          'Android Release preparation must own its complete subprocess tree',
+        ),
+        contains('Production tracker verification must import the bounded'),
+        contains('Production tracker verification must invoke exactly one'),
+        contains('Production tracker verification must not invoke Process'),
+        contains('Git inventory must use NUL framing'),
+        contains('must reject truncated Git inventory'),
+        contains('must parse NUL-framed Git records'),
+        contains('must reject duplicate Git paths'),
+        contains('must reject control-bearing Git paths'),
+      ]),
+    );
+  });
+
+  test('rejects missing descendant ownership on process-tree tools', () {
+    for (final path in <String>[
+      'tool/verify_dartdoc.dart',
+      'tool/prepare_android_release.dart',
+    ]) {
+      final file = File('${repository.path}/$path');
+      file.writeAsStringSync(
+        file.readAsStringSync().replaceFirst('  killProcessTree: true,\n', ''),
+      );
+    }
+
+    final result = _verify(
+      repository,
+      flutterVersionMetadata,
+      flutterExtension,
+      flutterGradleUtils,
+    );
+
+    expect(
+      result.failures,
+      containsAll(<Matcher>[
+        contains('Dartdoc verification must own its complete subprocess tree'),
+        contains(
+          'Android Release preparation must own its complete subprocess tree',
+        ),
       ]),
     );
   });

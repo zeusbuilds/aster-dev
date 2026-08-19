@@ -238,6 +238,38 @@ void main() {
     expect(result.passed, isFalse);
     expect(result.failures.single, contains('markers are missing, duplicated'));
   });
+
+  test('parses exact NUL-framed Git inventory without line ambiguity', () {
+    _writeFile(repository, 'lib/a.dart');
+    _writeFile(repository, 'lib/generated.g.dart');
+    _writeFile(repository, 'docs/read me.md');
+
+    final files = parseRepositoryFileInventory(
+      repository,
+      'lib/a.dart\u0000lib/generated.g.dart\u0000'
+      'docs/read me.md\u0000missing.dart\u0000',
+    );
+
+    expect(files, {'lib/a.dart', 'docs/read me.md'});
+  });
+
+  test('rejects truncated, duplicate, empty, or unsafe Git records', () {
+    for (final output in <String>[
+      'lib/a.dart',
+      'lib/a.dart\u0000lib/a.dart\u0000',
+      'lib/a.dart\u0000\u0000',
+      'lib/a\n.dart\u0000',
+      '../outside.dart\u0000',
+      'lib/a\\b.dart\u0000',
+      'lib/`a`.dart\u0000',
+    ]) {
+      expect(
+        () => parseRepositoryFileInventory(repository, output),
+        throwsFormatException,
+        reason: output.codeUnits.toString(),
+      );
+    }
+  });
 }
 
 String _validTracker() => '''
@@ -274,4 +306,10 @@ void _writeTracker(Directory root, String contents) {
   final file = File('${root.path}/docs/PRODUCTION_REFACTOR_TRACKER.md');
   file.parent.createSync(recursive: true);
   file.writeAsStringSync(contents);
+}
+
+void _writeFile(Directory root, String path) {
+  final file = File('${root.path}/$path');
+  file.parent.createSync(recursive: true);
+  file.writeAsStringSync('fixture');
 }

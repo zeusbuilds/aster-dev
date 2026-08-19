@@ -15,6 +15,17 @@ void main() {
     expect(result.stderr, 'err');
   });
 
+  test('process-tree supervision preserves normal output and status', () async {
+    final result = await _runDart(
+      "stdout.write('out'); stderr.write('err'); exitCode = 9;",
+      killProcessTree: true,
+    );
+
+    expect(result.exitCode, 9);
+    expect(result.stdout, 'out');
+    expect(result.stderr, 'err');
+  });
+
   test('rejects stdout beyond its independent byte ceiling', () async {
     await expectLater(
       _runDart("stdout.write('123456789');", maxStdoutBytes: 8),
@@ -50,6 +61,100 @@ void main() {
 
     expect(stopwatch.elapsed, lessThan(const Duration(seconds: 3)));
   });
+
+  test(
+    'process-tree success terminates a surviving grandchild',
+    () async {
+      final directory = Directory.systemTemp.createTempSync(
+        'utexo_process_tree_success_',
+      );
+      try {
+        final fixture = _writeProcessTreeFixture(
+          directory,
+          grandchildDelay: const Duration(seconds: 2),
+          parentDelay: Duration.zero,
+        );
+
+        final result = await runBoundedProcess(
+          '/bin/sh',
+          <String>[
+            '-c',
+            r'''"$1" "$2" "$3" "$4" &
+while [ ! -e "$3" ]; do sleep 0.01; done
+exit 0''',
+            'utexo-process-tree-fixture',
+            _dartExecutable(),
+            fixture.grandchild.path,
+            fixture.readyMarker.path,
+            fixture.survivalMarker.path,
+          ],
+          killProcessTree: true,
+          maxStdoutBytes: 4096,
+          maxStderrBytes: 4096,
+          timeout: const Duration(seconds: 5),
+        );
+
+        expect(result.exitCode, 0);
+        expect(fixture.readyMarker.existsSync(), isTrue);
+        await Future<void>.delayed(const Duration(seconds: 3));
+        expect(
+          fixture.survivalMarker.existsSync(),
+          isFalse,
+          reason: 'A successful parent must not leave an owned descendant.',
+        );
+      } finally {
+        directory.deleteSync(recursive: true);
+      }
+    },
+    skip: Platform.isWindows
+        ? 'POSIX process-group supervision is unavailable on Windows.'
+        : false,
+  );
+
+  test(
+    'process-tree deadline terminates the parent and grandchild',
+    () async {
+      final directory = Directory.systemTemp.createTempSync(
+        'utexo_process_tree_',
+      );
+      try {
+        final fixture = _writeProcessTreeFixture(
+          directory,
+          grandchildDelay: const Duration(seconds: 4),
+          parentDelay: const Duration(seconds: 30),
+        );
+
+        await expectLater(
+          runBoundedProcess(
+            _dartExecutable(),
+            fixture.arguments,
+            killProcessTree: true,
+            maxStdoutBytes: 4096,
+            maxStderrBytes: 4096,
+            timeout: const Duration(seconds: 2),
+          ),
+          throwsA(isA<ProcessDeadlineException>()),
+        );
+
+        expect(
+          fixture.readyMarker.existsSync(),
+          isTrue,
+          reason: 'The grandchild must start before the deadline is tested.',
+        );
+        await Future<void>.delayed(const Duration(seconds: 3));
+        expect(
+          fixture.survivalMarker.existsSync(),
+          isFalse,
+          reason: 'No owned descendant may outlive a bounded failure.',
+        );
+      } finally {
+        directory.deleteSync(recursive: true);
+      }
+    },
+    skip: Platform.isWindows
+        ? 'POSIX process-group supervision is unavailable on Windows.'
+        : false,
+  );
 
   test(
     'rejects malformed UTF-8 instead of repairing inspector output',
@@ -105,11 +210,63 @@ void main() {
   });
 }
 
+({
+  List<String> arguments,
+  File grandchild,
+  File readyMarker,
+  File survivalMarker,
+})
+_writeProcessTreeFixture(
+  Directory directory, {
+  required Duration grandchildDelay,
+  required Duration parentDelay,
+}) {
+  final readyMarker = File('${directory.path}/grandchild-ready');
+  final survivalMarker = File('${directory.path}/grandchild-survived');
+  final grandchild = File('${directory.path}/grandchild.dart')
+    ..writeAsStringSync(
+      "import 'dart:async';\n"
+      "import 'dart:io';\n"
+      'Future<void> main(List<String> arguments) async {\n'
+      "  File(arguments[0]).writeAsStringSync('ready');\n"
+      '  await Future<void>.delayed('
+      'const Duration(milliseconds: ${grandchildDelay.inMilliseconds}));\n'
+      "  File(arguments[1]).writeAsStringSync('survived');\n"
+      '}\n',
+    );
+  final parent = File('${directory.path}/parent.dart')
+    ..writeAsStringSync(
+      "import 'dart:async';\n"
+      "import 'dart:io';\n"
+      'Future<void> main(List<String> arguments) async {\n'
+      '  await Process.start(arguments[0], arguments.sublist(1));\n'
+      '  while (!File(arguments[2]).existsSync()) {\n'
+      '    await Future<void>.delayed(const Duration(milliseconds: 10));\n'
+      '  }\n'
+      '  await Future<void>.delayed('
+      'const Duration(milliseconds: ${parentDelay.inMilliseconds}));\n'
+      '}\n',
+    );
+  return (
+    arguments: <String>[
+      parent.path,
+      _dartExecutable(),
+      grandchild.path,
+      readyMarker.path,
+      survivalMarker.path,
+    ],
+    grandchild: grandchild,
+    readyMarker: readyMarker,
+    survivalMarker: survivalMarker,
+  );
+}
+
 Future<BoundedProcessResult> _runDart(
   String body, {
   int maxStdoutBytes = 4096,
   int maxStderrBytes = 4096,
   Duration timeout = const Duration(seconds: 2),
+  bool killProcessTree = false,
 }) async {
   final directory = Directory.systemTemp.createTempSync('utexo_process_');
   try {
@@ -123,6 +280,7 @@ Future<BoundedProcessResult> _runDart(
     return await runBoundedProcess(
       _dartExecutable(),
       [script.path],
+      killProcessTree: killProcessTree,
       maxStdoutBytes: maxStdoutBytes,
       maxStderrBytes: maxStderrBytes,
       timeout: timeout,

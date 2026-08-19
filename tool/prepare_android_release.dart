@@ -3,6 +3,11 @@ import 'dart:io';
 
 import 'package:yaml/yaml.dart';
 
+import 'bounded_process.dart';
+
+const _releaseConfigurationTimeout = Duration(minutes: 20);
+const _maximumReleaseConfigurationOutputBytes = 32 * 1024 * 1024;
+
 /// Immutable dependency inputs captured around Flutter's Release preparation.
 final class AndroidReleaseDependencySnapshot {
   const AndroidReleaseDependencySnapshot({
@@ -139,23 +144,29 @@ Future<void> main() async {
   // Flutter issue 169336 requires a Pub-enabled config-only pass to filter
   // development plugins from the Android Release registrant. The snapshots
   // make that upstream workaround fail closed on any dependency drift.
-  Process process;
+  BoundedProcessResult process;
   try {
-    process = await Process.start(
+    process = await runBoundedProcess(
       'fvm',
       const ['flutter', 'build', 'apk', '--release', '--config-only'],
       workingDirectory: repository.path,
-      mode: ProcessStartMode.inheritStdio,
+      killProcessTree: true,
+      maxStdoutBytes: _maximumReleaseConfigurationOutputBytes,
+      maxStderrBytes: _maximumReleaseConfigurationOutputBytes,
+      timeout: _releaseConfigurationTimeout,
     );
-  } on ProcessException {
-    stderr.writeln('Flutter Android Release configuration could not start.');
+  } on Object catch (error) {
+    stderr.writeln(
+      'Flutter Android Release configuration did not complete: $error',
+    );
     exitCode = 1;
     return;
   }
-  final processExitCode = await process.exitCode;
-  if (processExitCode != 0) {
+  stdout.write(process.stdout);
+  stderr.write(process.stderr);
+  if (process.exitCode != 0) {
     stderr.writeln('Flutter Android Release configuration failed.');
-    exitCode = processExitCode;
+    exitCode = process.exitCode;
     return;
   }
 

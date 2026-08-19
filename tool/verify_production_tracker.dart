@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'bounded_process.dart';
+
 const _trackerPath = 'docs/PRODUCTION_REFACTOR_TRACKER.md';
 const _startMarker = '<!-- FILE_INVENTORY_START -->';
 const _endMarker = '<!-- FILE_INVENTORY_END -->';
@@ -13,6 +15,9 @@ const _validStatuses = <String>{
   'accepted-constraint',
 };
 const _transientStatuses = <String>{'unreviewed', 'fixing'};
+const _gitInventoryTimeout = Duration(seconds: 30);
+const _maximumGitInventoryBytes = 16 * 1024 * 1024;
+const _maximumGitDiagnosticBytes = 1024 * 1024;
 
 /// Result of validating the production tracker against one repository tree.
 final class ProductionTrackerVerification {
@@ -43,7 +48,7 @@ final class ProductionTrackerVerification {
   bool get passed => failures.isEmpty;
 }
 
-void main(List<String> arguments) {
+Future<void> main(List<String> arguments) async {
   final unknownArguments = arguments
       .where((argument) => argument != '--sync' && argument != '--release')
       .toList();
@@ -54,8 +59,16 @@ void main(List<String> arguments) {
   }
 
   final root = Directory.current;
+  final Set<String> repositoryFiles;
+  try {
+    repositoryFiles = await _repositoryFiles(root);
+  } on Object catch (error) {
+    stderr.writeln('Could not enumerate repository files: $error');
+    exitCode = 1;
+    return;
+  }
   if (arguments.contains('--sync')) {
-    final failure = _synchronizeTracker(root);
+    final failure = _synchronizeTracker(root, repositoryFiles);
     if (failure != null) {
       stderr.writeln(failure);
       exitCode = 1;
@@ -64,7 +77,11 @@ void main(List<String> arguments) {
   }
 
   final releaseMode = arguments.contains('--release');
-  final result = verifyProductionTracker(root, releaseMode: releaseMode);
+  final result = verifyProductionTracker(
+    root,
+    releaseMode: releaseMode,
+    repositoryFiles: repositoryFiles,
+  );
   if (!result.passed) {
     for (final failure in result.failures) {
       stderr.writeln(failure);
@@ -83,16 +100,16 @@ void main(List<String> arguments) {
 /// Validates tracker schema, references, inventory coverage, and optional
 /// release-closeout state beneath [repositoryRoot].
 ///
-/// [repositoryFiles] exists for deterministic fault fixtures. Production
-/// callers should omit it so Git remains the source of owned-file truth.
+/// [repositoryFiles] must come from the bounded, NUL-framed Git inventory in
+/// production. It is explicit so structural fault fixtures stay pure.
 ProductionTrackerVerification verifyProductionTracker(
   Directory repositoryRoot, {
   bool releaseMode = false,
-  Set<String>? repositoryFiles,
+  required Set<String> repositoryFiles,
 }) {
   final root = repositoryRoot.absolute;
   final failures = <String>[];
-  final files = repositoryFiles ?? _repositoryFiles(root, failures: failures);
+  final files = repositoryFiles;
   final tracker = File('${root.path}/$_trackerPath');
   if (!tracker.existsSync()) {
     failures.add('Missing $_trackerPath.');
@@ -157,12 +174,11 @@ ProductionTrackerVerification verifyProductionTracker(
   );
 }
 
-String? _synchronizeTracker(Directory root) {
+String? _synchronizeTracker(Directory root, Set<String> repositoryFiles) {
   final tracker = File('${root.absolute.path}/$_trackerPath');
   if (!tracker.existsSync()) return 'Missing $_trackerPath.';
 
   final failures = <String>[];
-  final repositoryFiles = _repositoryFiles(root, failures: failures);
   final contents = tracker.readAsStringSync();
   final document = _parseTracker(contents, failures);
   if (failures.isNotEmpty) {
@@ -193,20 +209,46 @@ String? _synchronizeTracker(Directory root) {
   return null;
 }
 
-Set<String> _repositoryFiles(Directory root, {required List<String> failures}) {
-  final result = Process.runSync('git', const [
-    'ls-files',
-    '--cached',
-    '--others',
-    '--exclude-standard',
-  ], workingDirectory: root.path);
+Future<Set<String>> _repositoryFiles(Directory root) async {
+  final result = await runBoundedProcess(
+    'git',
+    const ['ls-files', '-z', '--cached', '--others', '--exclude-standard'],
+    workingDirectory: root.path,
+    maxStdoutBytes: _maximumGitInventoryBytes,
+    maxStderrBytes: _maximumGitDiagnosticBytes,
+    timeout: _gitInventoryTimeout,
+  );
   if (result.exitCode != 0) {
-    failures.add('Could not enumerate repository files: ${result.stderr}');
-    return const <String>{};
+    throw StateError('Git inventory exited with code ${result.exitCode}.');
   }
+  return parseRepositoryFileInventory(root, result.stdout);
+}
 
-  return LineSplitter.split(result.stdout as String).where((path) {
-    if (path.isEmpty || _isGenerated(path)) return false;
+/// Parses exact NUL-framed Git inventory and retains owned existing files.
+Set<String> parseRepositoryFileInventory(Directory root, String output) {
+  if (output.isEmpty) return const <String>{};
+  if (!output.endsWith('\u0000')) {
+    throw const FormatException('Git inventory output is truncated.');
+  }
+  final records = output.substring(0, output.length - 1).split('\u0000');
+  if (records.any((path) => path.isEmpty)) {
+    throw const FormatException('Git inventory contains an empty path.');
+  }
+  final files = <String>{};
+  for (final path in records) {
+    if (path.startsWith('/') ||
+        path.split('/').contains('..') ||
+        path.contains(r'\') ||
+        path.contains('`') ||
+        path.runes.any((value) => value < 0x20 || value == 0x7f)) {
+      throw const FormatException('Git inventory contains an unsafe path.');
+    }
+    if (!files.add(path)) {
+      throw const FormatException('Git inventory contains a duplicate path.');
+    }
+  }
+  return files.where((path) {
+    if (_isGenerated(path)) return false;
     return FileSystemEntity.typeSync(
           '${root.path}/$path',
           followLinks: false,

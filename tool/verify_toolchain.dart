@@ -1178,6 +1178,36 @@ ToolchainVerification verifyToolchain({
     'tool/bounded_process.dart',
     failures,
   );
+  final boundedDartTools =
+      <({String label, bool ownsDescendants, String? source})>[
+        (
+          label: 'Dartdoc verification',
+          ownsDescendants: true,
+          source: _readRequired(
+            File('$root/tool/verify_dartdoc.dart'),
+            'tool/verify_dartdoc.dart',
+            failures,
+          ),
+        ),
+        (
+          label: 'Android Release preparation',
+          ownsDescendants: true,
+          source: _readRequired(
+            File('$root/tool/prepare_android_release.dart'),
+            'tool/prepare_android_release.dart',
+            failures,
+          ),
+        ),
+        (
+          label: 'Production tracker verification',
+          ownsDescendants: false,
+          source: _readRequired(
+            File('$root/tool/verify_production_tracker.dart'),
+            'tool/verify_production_tracker.dart',
+            failures,
+          ),
+        ),
+      ];
   if (apkVerifier != null) {
     _requireSinglePattern(
       apkVerifier,
@@ -1560,7 +1590,8 @@ ToolchainVerification verifyToolchain({
         pattern: RegExp(
           r'_readBoundedUtf8\(\s*process\.stdout,\s*'
           r"streamName: 'stdout',\s*"
-          r'maximumBytes: maxStdoutBytes,\s*onLimit: terminate,\s*\)',
+          r'maximumBytes: maxStdoutBytes,\s*'
+          r'onLimit: requestTermination,\s*\)',
         ),
         failure: 'Bounded subprocess execution must enforce its stdout limit.',
       ),
@@ -1568,7 +1599,8 @@ ToolchainVerification verifyToolchain({
         pattern: RegExp(
           r'_readBoundedUtf8\(\s*process\.stderr,\s*'
           r"streamName: 'stderr',\s*"
-          r'maximumBytes: maxStderrBytes,\s*onLimit: terminate,\s*\)',
+          r'maximumBytes: maxStderrBytes,\s*'
+          r'onLimit: requestTermination,\s*\)',
         ),
         failure: 'Bounded subprocess execution must enforce its stderr limit.',
       ),
@@ -1594,6 +1626,65 @@ ToolchainVerification verifyToolchain({
         failure: 'Bounded subprocess failures must force child termination.',
       ),
       (
+        pattern: RegExp(r'ProcessSignal\.sigterm'),
+        failure:
+            'Bounded subprocess failures must request graceful termination.',
+      ),
+      (
+        pattern: RegExp(
+          r'killProcessTree && \(!Platform\.isMacOS && !Platform\.isLinux\)',
+        ),
+        failure:
+            'Process-tree supervision must fail closed on unsupported hosts.',
+      ),
+      (
+        pattern: RegExp(r"killProcessTree \? '/bin/bash' : executable"),
+        failure:
+            'Descendant-owning commands must use the fixed POSIX supervisor.',
+      ),
+      (
+        pattern: RegExp(
+          r"'--noprofile',\s*'--norc',\s*'-p',\s*'-c',\s*"
+          r'_posixProcessTreeSupervisor,\s*'
+          r"'utexo-bounded-process',\s*executable,\s*\.\.\.arguments,",
+        ),
+        failure: 'The POSIX subprocess supervisor must ignore shell startup code and forward positional arguments.',
+      ),
+      (
+        pattern: RegExp(r'set -m'),
+        failure: 'The POSIX subprocess supervisor must create an owned process group.',
+      ),
+      (
+        pattern: RegExp(r'"\$@" >&3 2>&4'),
+        failure: 'The POSIX subprocess supervisor must forward arguments without interpolation.',
+      ),
+      (
+        pattern: RegExp(
+          r'set \+m\s*"\$@" >&3 2>&4\s*owned_status=\$\?\s*'
+          r'while :; do /bin/sleep 3600; done &',
+        ),
+        failure: 'The POSIX subprocess supervisor must reserve the owned group until status capture.',
+      ),
+      (
+        pattern: RegExp(r'kill -TERM -- "-\$owned_pid"'),
+        failure: 'The POSIX subprocess supervisor must terminate the complete group.',
+      ),
+      (
+        pattern: RegExp(r'kill -KILL -- "-\$owned_pid"'),
+        failure: 'The POSIX subprocess supervisor must force-stop the complete group.',
+      ),
+      (
+        pattern: RegExp(
+          r'trap - HUP INT TERM\s*stop_owned_groups\s*exit "\$status"',
+        ),
+        failure: 'The POSIX subprocess supervisor must clean descendants after normal completion.',
+      ),
+      (
+        pattern: RegExp(r'await ensureTerminated\(\);'),
+        failure:
+            'Bounded subprocess failures must await deterministic cleanup.',
+      ),
+      (
         pattern: RegExp(r'on ProcessException[\s\S]*ProcessLaunchException'),
         failure: 'Bounded subprocess launch failures must redact arguments.',
       ),
@@ -1612,6 +1703,83 @@ ToolchainVerification verifyToolchain({
     }
     if (boundedProcess.contains('allowMalformed: true')) {
       failures.add('Bounded subprocess output must reject malformed UTF-8.');
+    }
+  }
+  for (final tool in boundedDartTools) {
+    final source = tool.source;
+    if (source == null) continue;
+    _requireSinglePattern(
+      source,
+      RegExp(r"import 'bounded_process\.dart';"),
+      '${tool.label} must import the bounded process owner.',
+      failures,
+    );
+    _requirePatternCount(
+      source,
+      RegExp(r'await runBoundedProcess\('),
+      1,
+      '${tool.label} must invoke exactly one bounded subprocess.',
+      failures,
+    );
+    for (final contract in <({RegExp pattern, String label})>[
+      (pattern: RegExp(r'maxStdoutBytes:'), label: 'stdout-limit'),
+      (pattern: RegExp(r'maxStderrBytes:'), label: 'stderr-limit'),
+      (pattern: RegExp(r'timeout:'), label: 'deadline'),
+    ]) {
+      _requirePatternCount(
+        source,
+        contract.pattern,
+        1,
+        '${tool.label} must own exactly one ${contract.label} policy.',
+        failures,
+      );
+    }
+    _requirePatternCount(
+      source,
+      RegExp(r'killProcessTree:\s*true'),
+      tool.ownsDescendants ? 1 : 0,
+      tool.ownsDescendants
+          ? '${tool.label} must own its complete subprocess tree.'
+          : '${tool.label} must not pay for unnecessary process-tree supervision.',
+      failures,
+    );
+    if (RegExp(r'Process\.(?:run|runSync|start|startSync)\(')
+        .hasMatch(source)) {
+      failures.add(
+        '${tool.label} must not invoke Process APIs outside the bounded owner.',
+      );
+    }
+  }
+  final trackerTool = boundedDartTools.last.source;
+  if (trackerTool != null) {
+    for (final contract in <({RegExp pattern, String failure})>[
+      (
+        pattern: RegExp(r"'ls-files',\s*'-z',"),
+        failure: 'Production tracker Git inventory must use NUL framing.',
+      ),
+      (
+        pattern: RegExp(r"output\.endsWith\('\\u0000'\)"),
+        failure: 'Production tracker must reject truncated Git inventory.',
+      ),
+      (
+        pattern: RegExp(r"split\('\\u0000'\)"),
+        failure: 'Production tracker must parse NUL-framed Git records.',
+      ),
+      (
+        pattern: RegExp(r'!files\.add\(path\)'),
+        failure: 'Production tracker must reject duplicate Git paths.',
+      ),
+      (
+        pattern: RegExp(r'value < 0x20 \|\| value == 0x7f'),
+        failure: 'Production tracker must reject control-bearing Git paths.',
+      ),
+    ]) {
+      _requireSinglePattern(
+        trackerTool,
+        contract.pattern,
+        contract.failure,
+        failures,
+      );
     }
   }
   for (final inspector in <({String? source, String name})>[
