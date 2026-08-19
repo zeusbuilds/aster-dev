@@ -1627,11 +1627,15 @@ esac''');
             r'-n "${_utexo_bounded_flutter_root}" &&',
           )
           .replaceFirst(
-            r'_utexo_bounded_flutter_version="$(<"${_utexo_bounded_flutter_version_file}")"',
-            '_utexo_bounded_flutter_version=3.47.0',
+            r'${_utexo_bounded_flutter_root}/bin/cache/flutter.version.json',
+            r'${_utexo_bounded_flutter_root}/version',
           )
           .replaceFirst(
-            r'"${_utexo_bounded_flutter_version}" ==',
+            r'_utexo_bounded_flutter_version_count=$((_utexo_bounded_flutter_version_count + 1))',
+            '_utexo_bounded_flutter_version_count=1',
+          )
+          .replaceFirst(
+            r'"${_utexo_bounded_flutter_version_count}" == 1 &&',
             r'-n "${_utexo_bounded_flutter_version}" &&',
           )
           .replaceFirst(
@@ -1699,8 +1703,9 @@ esac''');
         contains('must support the pinned CI Flutter root'),
         contains('must prefer the repository Flutter VM'),
         contains('must reject relative CI Flutter roots'),
-        contains('must read the CI Flutter version file'),
-        contains('must reject mismatched CI Flutter roots'),
+        contains('must read canonical CI Flutter metadata'),
+        contains('must reject duplicate CI version fields'),
+        contains('must reject malformed or mismatched CI Flutter roots'),
         contains('must pin Flutter 3.47.0'),
         contains('must not discover Dart from ambient PATH'),
         contains('must reject direct helper execution'),

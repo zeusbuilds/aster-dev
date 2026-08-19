@@ -107,10 +107,11 @@ and generated/build outputs do not violate this check.
 Repository-owned shell entrypoints execute external commands through
 `scripts/bounded-command.sh`. The helper prefers the checkout's
 `.fvm/flutter_sdk` Dart VM. On a source-only CI checkout, it accepts only an
-absolute `FLUTTER_ROOT` whose `version` file exactly matches `.fvmrc`; a missing,
-relative, malformed, or differently versioned root fails closed. Ambient
-`PATH` discovery is deliberately unsupported. The selected trusted VM delegates
-to the sole process-tree owner in `tool/bounded_process.dart`; do not invoke the
+absolute `FLUTTER_ROOT` whose canonical `bin/cache/flutter.version.json`
+contains exactly one `frameworkVersion` matching `.fvmrc`; missing, duplicate,
+malformed, or differently versioned metadata fails closed. Ambient `PATH`
+discovery is deliberately unsupported. The selected trusted VM delegates to
+the sole process-tree owner in `tool/bounded_process.dart`; do not invoke the
 helper directly or add raw `git`, `fvm`, Android, Java, Bundler, or simulator
 subprocesses to a script. Quick operations use a 120-second/8 MiB-per-stream
 profile, artifact inspection uses 10 minutes/16 MiB, and builds or platform

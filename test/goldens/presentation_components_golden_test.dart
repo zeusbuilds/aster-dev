@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -25,7 +27,7 @@ void main() {
 
     await expectLater(
       find.byKey(const ValueKey('presentation-golden')),
-      matchesGoldenFile('presentation_components.png'),
+      matchesGoldenFile(_presentationGoldenForHost()),
     );
   });
 
@@ -41,6 +43,16 @@ void main() {
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     await expectLater(tester, meetsGuideline(textContrastGuideline));
   });
+}
+
+String _presentationGoldenForHost() {
+  return switch (Platform.operatingSystem) {
+    'macos' => 'presentation_components.png',
+    'linux' => 'presentation_components_linux.png',
+    final host => throw UnsupportedError(
+      'Presentation goldens have no reviewed baseline for $host.',
+    ),
+  };
 }
 
 Future<void> _loadFont(String family, String asset) async {

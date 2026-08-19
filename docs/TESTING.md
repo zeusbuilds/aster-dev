@@ -32,9 +32,12 @@ reported as successful merely because the test harness reclaimed its process.
 
 Repository shell wrappers prefer the checkout's `.fvm/flutter_sdk` runtime.
 Source-only CI accepts the absolute `FLUTTER_ROOT` exported by the pinned
-Flutter setup action only when its `version` file exactly matches `.fvmrc`.
-Tests cover local-runtime precedence plus missing, relative, malformed, and
-mismatched CI roots; ambient `PATH` lookup is never a fallback.
+Flutter setup action only when canonical Flutter metadata contains exactly one
+`frameworkVersion` matching `.fvmrc`. Tests cover local-runtime precedence plus
+missing, duplicate, relative, malformed, and mismatched CI roots; ambient
+`PATH` lookup is never a fallback. Platform-wrapper tests supply every
+host-specific command they exercise, including a fixture-owned plist parser,
+so Linux does not accidentally depend on macOS tools and vice versa.
 
 Pixel goldens use an explicitly reviewed exact baseline for each supported
 raster host because Flutter text and icon rasterization can differ between

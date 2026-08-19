@@ -29,13 +29,25 @@ readonly UTEXO_BOUNDED_LOCAL_DART="${UTEXO_BOUNDED_ROOT}/.fvm/flutter_sdk/bin/ca
 _utexo_bounded_dart="${UTEXO_BOUNDED_LOCAL_DART}"
 if [[ ! -x "${_utexo_bounded_dart}" ]]; then
   _utexo_bounded_flutter_root="${FLUTTER_ROOT:-}"
-  _utexo_bounded_flutter_version_file="${_utexo_bounded_flutter_root}/version"
+  _utexo_bounded_flutter_metadata_file="${_utexo_bounded_flutter_root}/bin/cache/flutter.version.json"
   _utexo_bounded_flutter_version=''
+  _utexo_bounded_flutter_version_count=0
+  _utexo_bounded_flutter_version_pattern='^[[:space:]]*"frameworkVersion"[[:space:]]*:[[:space:]]*"([^"]+)"[[:space:]]*,[[:space:]]*$'
   if [[ "${_utexo_bounded_flutter_root}" == /* &&
-    -f "${_utexo_bounded_flutter_version_file}" ]]; then
-    _utexo_bounded_flutter_version="$(<"${_utexo_bounded_flutter_version_file}")"
+    -f "${_utexo_bounded_flutter_metadata_file}" ]]; then
+    while IFS= read -r _utexo_bounded_flutter_metadata_line ||
+      [[ -n "${_utexo_bounded_flutter_metadata_line}" ]]; do
+      if [[ "${_utexo_bounded_flutter_metadata_line}" == *'"frameworkVersion"'* ]]; then
+        _utexo_bounded_flutter_version_count=$((_utexo_bounded_flutter_version_count + 1))
+        if [[ "${_utexo_bounded_flutter_metadata_line}" =~ ${_utexo_bounded_flutter_version_pattern} ]]; then
+          _utexo_bounded_flutter_version="${BASH_REMATCH[1]}"
+        else
+          _utexo_bounded_flutter_version=''
+        fi
+      fi
+    done <"${_utexo_bounded_flutter_metadata_file}"
   fi
-  if [[ "${_utexo_bounded_flutter_version}" == "${UTEXO_BOUNDED_FLUTTER_VERSION}" ]]; then
+  if [[ "${_utexo_bounded_flutter_version_count}" == 1 && "${_utexo_bounded_flutter_version}" == "${UTEXO_BOUNDED_FLUTTER_VERSION}" ]]; then
     _utexo_bounded_dart="${_utexo_bounded_flutter_root}/bin/cache/dart-sdk/bin/dart"
   else
     _utexo_bounded_dart=''
@@ -45,8 +57,11 @@ readonly UTEXO_BOUNDED_DART="${_utexo_bounded_dart}"
 readonly UTEXO_BOUNDED_RUNNER="${UTEXO_BOUNDED_ROOT}/tool/run_bounded_command.dart"
 unset _utexo_bounded_dart
 unset _utexo_bounded_flutter_root
+unset _utexo_bounded_flutter_metadata_file
+unset _utexo_bounded_flutter_metadata_line
 unset _utexo_bounded_flutter_version
-unset _utexo_bounded_flutter_version_file
+unset _utexo_bounded_flutter_version_count
+unset _utexo_bounded_flutter_version_pattern
 
 readonly UTEXO_QUICK_TIMEOUT_SECONDS=120
 readonly UTEXO_INSPECT_TIMEOUT_SECONDS=600

@@ -98,6 +98,55 @@ case "$*" in
     ;;
 esac
 ''');
+    await _writeExecutable(File('${bin.path}/plutil'), r'''#!/usr/bin/env bash
+set -euo pipefail
+
+case "${1:-}" in
+  -lint)
+    readonly contents="$(<"$2")"
+    [[ "${contents}" == \{* && "${contents}" == *\} ]] || exit 1
+    ;;
+  -extract)
+    readonly key="$2"
+    [[ "$3" == raw ]] || exit 64
+    if [[ "${4:-}" == -- ]]; then
+      readonly plist="$5"
+    else
+      readonly plist="$4"
+    fi
+    readonly contents="$(<"${plist}")"
+    case "${key}" in
+      'com\.example\.asterdev.Path')
+        [[ "${contents}" == *'"com.example.asterdev" = { Path = "/Applications/Release.app"; };'* ]] || exit 1
+        printf '/Applications/Release.app\n'
+        ;;
+      'com\.example\.asterdev\.debug.Path')
+        [[ "${contents}" == *'"com.example.asterdev.debug" = { Path = "/Applications/Debug.app"; };'* ]] || exit 1
+        printf '/Applications/Debug.app\n'
+        ;;
+      CFBundleIdentifier)
+        [[ "${contents}" == *'CFBundleIdentifier = "com.example.asterdev.debug";'* ]] || exit 1
+        printf 'com.example.asterdev.debug\n'
+        ;;
+      *) exit 1 ;;
+    esac
+    ;;
+  -type)
+    readonly key="$2"
+    readonly contents="$(<"$3")"
+    case "${key}" in
+      'com\.example\.asterdev' | 'com.example.asterdev')
+        [[ "${contents}" == *'"com.example.asterdev" = {'* ]] || exit 1
+        ;;
+      'com\.example\.asterdev\.debug' | 'com.example.asterdev.debug')
+        [[ "${contents}" == *'"com.example.asterdev.debug" = {'* ]] || exit 1
+        ;;
+      *) exit 1 ;;
+    esac
+    ;;
+  *) exit 64 ;;
+esac
+''');
   });
 
   tearDown(() {

@@ -2742,26 +2742,35 @@ void _verifyBoundedShellExecution(
       (
         pattern: RegExp(
           r'"\$\{_utexo_bounded_flutter_root\}" == /\* &&\s*'
-          r'-f "\$\{_utexo_bounded_flutter_version_file\}"',
+          r'-f "\$\{_utexo_bounded_flutter_metadata_file\}"',
         ),
         failure:
             'Bounded shell execution must reject relative CI Flutter roots.',
       ),
       (
         pattern: RegExp(
-          r'_utexo_bounded_flutter_version="\$\(<"\$\{'
-          r'_utexo_bounded_flutter_version_file\}"\)"',
+          RegExp.escape(
+            r'${_utexo_bounded_flutter_root}/bin/cache/flutter.version.json',
+          ),
         ),
         failure:
-            'Bounded shell execution must read the CI Flutter version file.',
+            'Bounded shell execution must read canonical CI Flutter metadata.',
       ),
       (
         pattern: RegExp(
+          r'_utexo_bounded_flutter_version_count='
+          r'\$\(\(_utexo_bounded_flutter_version_count \+ 1\)\)',
+        ),
+        failure:
+            'Bounded shell execution must reject duplicate CI version fields.',
+      ),
+      (
+        pattern: RegExp(
+          r'"\$\{_utexo_bounded_flutter_version_count\}" == 1 &&\s*'
           r'"\$\{_utexo_bounded_flutter_version\}" ==\s*'
           r'"\$\{UTEXO_BOUNDED_FLUTTER_VERSION\}"',
         ),
-        failure:
-            'Bounded shell execution must reject mismatched CI Flutter roots.',
+        failure: 'Bounded shell execution must reject malformed or mismatched CI Flutter roots.',
       ),
       (
         pattern: RegExp(
