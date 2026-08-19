@@ -82,6 +82,11 @@ graph compiled by the remote platform gate. Both targets work from a
 source-only checkout where Riverpod outputs, the Gradle wrapper, CocoaPods, and
 Flutter host files are correctly ignored. Locked Pub resolution and
 deterministic code generation happen before native compilation.
+The remote Android job then runs root `flutter clean` under `if: always()` only
+after those tests, freeing transient build products before action post-steps
+save dependency caches. This is CI workspace hygiene, not test cleanup or a
+substitute for a successful compile; executable governance policy enforces the
+command, scope, condition, and order.
 The iOS targets also require Bundler 4.0.10 and execute every Flutter/CocoaPods
 path through the checksummed CocoaPods 1.16.2 graph in `Gemfile.lock`. Android
 builds verify both the Gradle distribution digest and every resolved external

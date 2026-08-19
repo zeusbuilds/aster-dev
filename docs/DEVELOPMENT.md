@@ -225,7 +225,10 @@ Java 21, Flutter 3.47.0, Ruby 3.4.10, Bundler 4.0.10, and the locked dependency
 graphs to compile Android Debug plus iOS Simulator Debug and run Android host
 tests. It consumes no release configuration, signing secret, or network stack,
 so it proves host integration only. Physical/runtime and signed-candidate gates
-remain local release evidence.
+remain local release evidence. After the Android compile and host tests, an
+always-run root `flutter clean` releases transient build outputs before action
+post-steps archive the reviewed Flutter and Gradle caches. Governance policy
+enforces that ordering so cache maintenance cannot replace or precede the test.
 
 Fix failures locally with `make format`, `make lint`, and `make test`, then
 commit and push again.

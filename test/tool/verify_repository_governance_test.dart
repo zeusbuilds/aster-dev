@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -168,6 +169,72 @@ void main() {
     expect(failures, contains(contains('gradle ownership')));
     expect(failures, contains(contains('must not consume repository secrets')));
   });
+
+  group('Android post-test cleanup', () {
+    const hostTests = '''
+      - name: Run Android host tests
+        working-directory: android
+        run: ./gradlew :app:testDebugUnitTest --no-daemon
+''';
+    const cleanup = '''
+      - name: Release transient Android build outputs
+        if: always()
+        run: flutter clean
+''';
+
+    test('rejects a missing cleanup', () {
+      _expectInvalidAndroidCleanup(
+        addTearDown,
+        (source) => source.replaceFirst(cleanup, ''),
+      );
+    });
+
+    test('rejects cleanup that is conditional on success', () {
+      _expectInvalidAndroidCleanup(
+        addTearDown,
+        (source) => source.replaceFirst(
+          '        if: always()\n',
+          '        if: success()\n',
+        ),
+      );
+    });
+
+    test('rejects cleanup scoped to the Android directory', () {
+      _expectInvalidAndroidCleanup(
+        addTearDown,
+        (source) => source.replaceFirst(
+          '        if: always()\n        run: flutter clean\n',
+          '        if: always()\n'
+              '        working-directory: android\n'
+              '        run: flutter clean\n',
+        ),
+      );
+    });
+
+    test('rejects cleanup before host tests', () {
+      _expectInvalidAndroidCleanup(
+        addTearDown,
+        (source) =>
+            source.replaceFirst('$hostTests\n$cleanup', '$cleanup\n$hostTests'),
+      );
+    });
+  });
+}
+
+void _expectInvalidAndroidCleanup(
+  void Function(FutureOr<void> Function()) registerTearDown,
+  String Function(String) mutate,
+) {
+  final repository = Directory.systemTemp.createTempSync('aster-governance-');
+  registerTearDown(() => repository.deleteSync(recursive: true));
+  _copyGovernanceFiles(repository);
+  final platform = File('${repository.path}/.github/workflows/platform.yml');
+  platform.writeAsStringSync(mutate(platform.readAsStringSync()));
+
+  expect(
+    verifyRepositoryGovernance(repository),
+    contains(contains('always clean transient build outputs after host tests')),
+  );
 }
 
 void _copyGovernanceFiles(Directory target) {

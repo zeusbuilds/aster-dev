@@ -241,6 +241,12 @@ void _verifyWorkflow(File file, List<String> failures) {
     if (!_jobUsesJava21(android)) {
       failures.add('Android platform CI must configure Java 21.');
     }
+    if (!_jobHasPostTestAndroidCleanup(android)) {
+      failures.add(
+        'Android platform CI must always clean transient build outputs after '
+        'host tests.',
+      );
+    }
     if (commands.any(
       (command) =>
           command.contains('--release') ||
@@ -337,6 +343,28 @@ bool _jobUsesJava21(Object? job) {
     }
   }
   return false;
+}
+
+bool _jobHasPostTestAndroidCleanup(Object? job) {
+  if (job is! YamlMap) return false;
+  final steps = job['steps'];
+  if (steps is! YamlList) return false;
+
+  var hostTestIndex = -1;
+  var cleanupIndex = -1;
+  for (var index = 0; index < steps.length; index += 1) {
+    final step = steps[index];
+    if (step is! YamlMap) continue;
+    if (step['run'] == './gradlew :app:testDebugUnitTest --no-daemon') {
+      hostTestIndex = index;
+    }
+    if (step['run'] == 'flutter clean' &&
+        step['if'] == 'always()' &&
+        !step.containsKey('working-directory')) {
+      cleanupIndex = index;
+    }
+  }
+  return hostTestIndex >= 0 && cleanupIndex > hostTestIndex;
 }
 
 bool _orderedEquals<T>(List<T> left, List<T> right) {

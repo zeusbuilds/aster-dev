@@ -49,6 +49,10 @@ jobs:
         working-directory: android
         run: ./gradlew :app:testDebugUnitTest --no-daemon
 
+      - name: Release transient Android build outputs
+        if: always()
+        run: flutter clean
+
   ios-simulator:
     runs-on: macos-26
     timeout-minutes: 60
