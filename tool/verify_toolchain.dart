@@ -1095,6 +1095,17 @@ ToolchainVerification verifyToolchain({
     _requireSinglePattern(
       makefile,
       RegExp(
+        r'^android-native-test:\s+verify-generated\s*$\n'
+        r'\tfvm flutter build apk --debug --no-pub\s*$\n'
+        r'\tcd android && ./gradlew :app:testDebugUnitTest --no-daemon\s*$',
+        multiLine: true,
+      ),
+      'Android native tests must compile the complete Debug APK before one no-daemon host-test run.',
+      failures,
+    );
+    _requireSinglePattern(
+      makefile,
+      RegExp(
         r'^\s*fvm flutter run --no-pub -d '
         r'"\$\(ANDROID_DEVICE_ID\)"\s*$',
         multiLine: true,

@@ -74,11 +74,14 @@ make android-native-test
 ```
 
 The iOS target performs an Xcode clean before XCTest so a prior Flutter
-integration listener cannot leave stale products in candidate evidence. Both
-native targets first run Flutter's `--config-only` platform bootstrap, so they
-also work from a source-only checkout where Riverpod outputs, the Gradle
-wrapper, CocoaPods, and Flutter host files are correctly ignored. Locked Pub
-resolution and deterministic code generation happen before native compilation.
+integration listener cannot leave stale products in candidate evidence. Its
+Flutter `--config-only` bootstrap prepares the Xcode host before the clean
+XCTest build. The Android target builds the complete Debug APK before its JVM
+host tests, proving the same Flutter, plugin-loader, Gradle, Kotlin, and package
+graph compiled by the remote platform gate. Both targets work from a
+source-only checkout where Riverpod outputs, the Gradle wrapper, CocoaPods, and
+Flutter host files are correctly ignored. Locked Pub resolution and
+deterministic code generation happen before native compilation.
 The iOS targets also require Bundler 4.0.10 and execute every Flutter/CocoaPods
 path through the checksummed CocoaPods 1.16.2 graph in `Gemfile.lock`. Android
 builds verify both the Gradle distribution digest and every resolved external

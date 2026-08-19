@@ -335,6 +335,12 @@ against that catalog through bounded streaming reads immediately before parsing
 or executing them. Exact names and versions alone are not accepted as
 release-verifier provenance, and an oversized cache entry fails before hashing.
 
+Because Gradle plugin graphs can differ by host, `make android-native-test`
+builds the complete Debug APK before JVM tests and the Ubuntu platform workflow
+repeats that build. A checksum discovered only on another host must be verified
+against independent canonical repositories before it is added; no trust
+exception or generated bulk acceptance is permitted.
+
 Android archive policy is owned by Java `ZipFile` boundaries, not shell parsing
 of line-oriented ZIP listings or wildcard extraction. Native verification
 rejects duplicate, absolute, control-character, backslash, dot-segment, nested,

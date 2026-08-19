@@ -98,8 +98,8 @@ ios-native-test: verify-generated ios-dependencies
 	xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner -configuration Debug -destination "platform=iOS Simulator,id=$(IOS_SIMULATOR_ID)" -quiet clean test
 
 android-native-test: verify-generated
-	fvm flutter build apk --debug --config-only --no-pub
-	cd android && ./gradlew :app:testDebugUnitTest
+	fvm flutter build apk --debug --no-pub
+	cd android && ./gradlew :app:testDebugUnitTest --no-daemon
 
 # Flutter integration tests temporarily rewrite ignored iOS build settings to a
 # disposable listener target. The wrapper restores lib/main.dart on every exit.

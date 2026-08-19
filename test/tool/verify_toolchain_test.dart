@@ -159,6 +159,8 @@ void main() {
           'ios-native-test: verify-generated ios-dependencies\n'
           '\tBUNDLE_FROZEN=true BUNDLE_PATH="\$(BUNDLE_PATH)" bundle exec fvm flutter build ios --simulator --debug --config-only --no-pub\n'
           'android-native-test: verify-generated\n'
+          '\tfvm flutter build apk --debug --no-pub\n'
+          '\tcd android && ./gradlew :app:testDebugUnitTest --no-daemon\n'
           'ios-storage-test: verify-generated ios-dependencies\n'
           'android-storage-test: verify-generated\n'
           'android-presentation-performance-test: verify-generated\n'
@@ -1473,6 +1475,30 @@ esac''');
       result.failures,
       contains(
         'Makefile dependency setup must enforce the committed Pub lockfile.',
+      ),
+    );
+  });
+
+  test('rejects partial Android native bootstrap', () {
+    final makefile = File('${repository.path}/Makefile');
+    makefile.writeAsStringSync(
+      makefile.readAsStringSync().replaceFirst(
+        'fvm flutter build apk --debug --no-pub',
+        'fvm flutter build apk --debug --config-only --no-pub',
+      ),
+    );
+
+    final result = _verify(
+      repository,
+      flutterVersionMetadata,
+      flutterExtension,
+      flutterGradleUtils,
+    );
+
+    expect(
+      result.failures,
+      contains(
+        'Android native tests must compile the complete Debug APK before one no-daemon host-test run.',
       ),
     );
   });
