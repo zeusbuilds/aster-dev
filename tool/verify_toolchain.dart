@@ -2048,7 +2048,7 @@ ToolchainVerification verifyToolchain({
     }
   }
 
-  _verifyBoundedShellExecution(root, failures);
+  _verifyBoundedShellExecution(root, flutterVersion, failures);
   _verifyProcessApiOwnership(root, failures);
 
   failures.sort();
@@ -2699,7 +2699,11 @@ void _requireNixVersionList(
   }
 }
 
-void _verifyBoundedShellExecution(String root, List<String> failures) {
+void _verifyBoundedShellExecution(
+  String root,
+  String? flutterVersion,
+  List<String> failures,
+) {
   final boundary = _readRequired(
     File('$root/scripts/bounded-command.sh'),
     'scripts/bounded-command.sh',
@@ -2717,6 +2721,47 @@ void _verifyBoundedShellExecution(String root, List<String> failures) {
           RegExp.escape(r'.fvm/flutter_sdk/bin/cache/dart-sdk/bin/dart'),
         ),
         failure: 'Bounded shell execution must pin the repository Dart VM.',
+      ),
+      (
+        pattern: RegExp(
+          RegExp.escape(
+            r'${_utexo_bounded_flutter_root}/bin/cache/dart-sdk/bin/dart',
+          ),
+        ),
+        failure:
+            'Bounded shell execution must support the pinned CI Flutter root.',
+      ),
+      (
+        pattern: RegExp(
+          r'_utexo_bounded_dart="\$\{UTEXO_BOUNDED_LOCAL_DART\}"\s*'
+          r'if \[\[ ! -x "\$\{_utexo_bounded_dart\}" \]\]; then',
+        ),
+        failure:
+            'Bounded shell execution must prefer the repository Flutter VM.',
+      ),
+      (
+        pattern: RegExp(
+          r'"\$\{_utexo_bounded_flutter_root\}" == /\* &&\s*'
+          r'-f "\$\{_utexo_bounded_flutter_version_file\}"',
+        ),
+        failure:
+            'Bounded shell execution must reject relative CI Flutter roots.',
+      ),
+      (
+        pattern: RegExp(
+          r'_utexo_bounded_flutter_version="\$\(<"\$\{'
+          r'_utexo_bounded_flutter_version_file\}"\)"',
+        ),
+        failure:
+            'Bounded shell execution must read the CI Flutter version file.',
+      ),
+      (
+        pattern: RegExp(
+          r'"\$\{_utexo_bounded_flutter_version\}" ==\s*'
+          r'"\$\{UTEXO_BOUNDED_FLUTTER_VERSION\}"',
+        ),
+        failure:
+            'Bounded shell execution must reject mismatched CI Flutter roots.',
       ),
       (
         pattern: RegExp(
@@ -2796,10 +2841,28 @@ void _verifyBoundedShellExecution(String root, List<String> failures) {
       'Both bounded shell modes must bypass mutable Dart tooling.',
       failures,
     );
+    if (flutterVersion != null) {
+      _requireSinglePattern(
+        boundary,
+        RegExp(
+          '^readonly UTEXO_BOUNDED_FLUTTER_VERSION='
+          '${RegExp.escape(flutterVersion)}\$',
+          multiLine: true,
+        ),
+        'Bounded shell execution must pin Flutter $flutterVersion.',
+        failures,
+      );
+    }
     if (boundary.contains('UTEXO_BOUNDED_DART:-') ||
         boundary.contains('UTEXO_BOUNDED_RUNNER:-')) {
       failures.add(
         'Bounded shell execution must not accept environment-selected owners.',
+      );
+    }
+    if (boundary.contains('command -v dart') ||
+        boundary.contains('which dart')) {
+      failures.add(
+        'Bounded shell execution must not discover Dart from ambient PATH.',
       );
     }
   }

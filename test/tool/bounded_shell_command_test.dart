@@ -40,6 +40,19 @@ void main() {
     );
   }
 
+  Directory createFlutterRoot(String name, {required String version}) {
+    final root = Directory('${fixture.path}/$name')..createSync();
+    File('${root.path}/version').writeAsStringSync('$version\n');
+    final dart = Link('${root.path}/bin/cache/dart-sdk/bin/dart');
+    dart.parent.createSync(recursive: true);
+    dart.createSync(testDartExecutable());
+    return root;
+  }
+
+  void removeLocalFlutterRuntime() {
+    Directory('${fixture.path}/.fvm').deleteSync(recursive: true);
+  }
+
   test('reinitializes instead of trusting an inherited guard', () async {
     final result = await runSource(
       r'''
@@ -64,6 +77,65 @@ utexo_capture_quick /bin/sh -c "printf ready"
 
     expect(result.exitCode, 0, reason: result.stderr);
     expect(result.stdout, 'ready');
+  });
+
+  test('uses an exact pinned absolute FLUTTER_ROOT in CI', () async {
+    final flutterRoot = createFlutterRoot('ci-flutter', version: '3.47.0');
+    removeLocalFlutterRuntime();
+
+    final result = await runSource(
+      r'''
+source scripts/bounded-command.sh
+utexo_capture_quick /bin/sh -c "printf ci-ready"
+''',
+      environment: <String, String>{'FLUTTER_ROOT': flutterRoot.path},
+    );
+
+    expect(result.exitCode, 0, reason: result.stderr);
+    expect(result.stdout, 'ci-ready');
+  });
+
+  test('rejects a mismatched FLUTTER_ROOT version', () async {
+    final flutterRoot = createFlutterRoot('wrong-flutter', version: '3.46.0');
+    removeLocalFlutterRuntime();
+
+    final result = await runSource(
+      'source scripts/bounded-command.sh\n'
+      'utexo_capture_quick /bin/sh -c "printf unreachable"\n',
+      environment: <String, String>{'FLUTTER_ROOT': flutterRoot.path},
+    );
+
+    expect(result.exitCode, 69);
+    expect(result.stdout, isEmpty);
+  });
+
+  test('rejects a relative FLUTTER_ROOT', () async {
+    createFlutterRoot('relative-flutter', version: '3.47.0');
+    removeLocalFlutterRuntime();
+
+    final result = await runSource(
+      'source scripts/bounded-command.sh\n'
+      'utexo_capture_quick /bin/sh -c "printf unreachable"\n',
+      environment: const <String, String>{'FLUTTER_ROOT': 'relative-flutter'},
+    );
+
+    expect(result.exitCode, 69);
+    expect(result.stdout, isEmpty);
+  });
+
+  test('prefers repository FVM over a mismatched FLUTTER_ROOT', () async {
+    final flutterRoot = createFlutterRoot('ignored-flutter', version: '3.46.0');
+
+    final result = await runSource(
+      r'''
+source scripts/bounded-command.sh
+utexo_capture_quick /bin/sh -c "printf local-ready"
+''',
+      environment: <String, String>{'FLUTTER_ROOT': flutterRoot.path},
+    );
+
+    expect(result.exitCode, 0, reason: result.stderr);
+    expect(result.stdout, 'local-ready');
   });
 
   test('rejects direct execution of the source-only boundary', () async {

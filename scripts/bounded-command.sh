@@ -24,8 +24,29 @@ readonly UTEXO_BOUNDED_ROOT="$(
   cd "${_utexo_bounded_source_directory}/.."
   pwd -P
 )"
-readonly UTEXO_BOUNDED_DART="${UTEXO_BOUNDED_ROOT}/.fvm/flutter_sdk/bin/cache/dart-sdk/bin/dart"
+readonly UTEXO_BOUNDED_FLUTTER_VERSION=3.47.0
+readonly UTEXO_BOUNDED_LOCAL_DART="${UTEXO_BOUNDED_ROOT}/.fvm/flutter_sdk/bin/cache/dart-sdk/bin/dart"
+_utexo_bounded_dart="${UTEXO_BOUNDED_LOCAL_DART}"
+if [[ ! -x "${_utexo_bounded_dart}" ]]; then
+  _utexo_bounded_flutter_root="${FLUTTER_ROOT:-}"
+  _utexo_bounded_flutter_version_file="${_utexo_bounded_flutter_root}/version"
+  _utexo_bounded_flutter_version=''
+  if [[ "${_utexo_bounded_flutter_root}" == /* &&
+    -f "${_utexo_bounded_flutter_version_file}" ]]; then
+    _utexo_bounded_flutter_version="$(<"${_utexo_bounded_flutter_version_file}")"
+  fi
+  if [[ "${_utexo_bounded_flutter_version}" == "${UTEXO_BOUNDED_FLUTTER_VERSION}" ]]; then
+    _utexo_bounded_dart="${_utexo_bounded_flutter_root}/bin/cache/dart-sdk/bin/dart"
+  else
+    _utexo_bounded_dart=''
+  fi
+fi
+readonly UTEXO_BOUNDED_DART="${_utexo_bounded_dart}"
 readonly UTEXO_BOUNDED_RUNNER="${UTEXO_BOUNDED_ROOT}/tool/run_bounded_command.dart"
+unset _utexo_bounded_dart
+unset _utexo_bounded_flutter_root
+unset _utexo_bounded_flutter_version
+unset _utexo_bounded_flutter_version_file
 
 readonly UTEXO_QUICK_TIMEOUT_SECONDS=120
 readonly UTEXO_INSPECT_TIMEOUT_SECONDS=600

@@ -43,6 +43,16 @@ jobs:
       - name: Test
         run: flutter test --no-pub
 
+      - name: Upload golden failure evidence
+        if: ${{ failure() && hashFiles('test/goldens/failures/**') != '' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: golden-failures-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test/goldens/failures/
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 9
+
       - name: Validate Dart API documentation
         run: dart run tool/verify_dartdoc.dart
 

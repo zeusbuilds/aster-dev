@@ -1611,6 +1611,34 @@ esac''');
             '/usr/bin/dart',
           )
           .replaceFirst(
+            r'${_utexo_bounded_flutter_root}/bin/cache/dart-sdk/bin/dart',
+            '/usr/bin/dart',
+          )
+          .replaceFirst(
+            'readonly UTEXO_BOUNDED_FLUTTER_VERSION=3.47.0',
+            'readonly UTEXO_BOUNDED_FLUTTER_VERSION=3.46.0',
+          )
+          .replaceFirst(
+            r'_utexo_bounded_dart="${UTEXO_BOUNDED_LOCAL_DART}"',
+            r'_utexo_bounded_dart="${FLUTTER_ROOT}/bin/dart"',
+          )
+          .replaceFirst(
+            r'"${_utexo_bounded_flutter_root}" == /* &&',
+            r'-n "${_utexo_bounded_flutter_root}" &&',
+          )
+          .replaceFirst(
+            r'_utexo_bounded_flutter_version="$(<"${_utexo_bounded_flutter_version_file}")"',
+            '_utexo_bounded_flutter_version=3.47.0',
+          )
+          .replaceFirst(
+            r'"${_utexo_bounded_flutter_version}" ==',
+            r'-n "${_utexo_bounded_flutter_version}" &&',
+          )
+          .replaceFirst(
+            'readonly UTEXO_BOUNDED_COMMAND_LOADED=1',
+            'readonly UTEXO_BOUNDED_COMMAND_LOADED=1\ncommand -v dart',
+          )
+          .replaceFirst(
             r'if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then',
             r'if [[ "${BASH_SOURCE[0]}" == "disabled" ]]; then',
           )
@@ -1668,6 +1696,13 @@ esac''');
       result.failures,
       containsAll(<Matcher>[
         contains('must pin the repository Dart VM'),
+        contains('must support the pinned CI Flutter root'),
+        contains('must prefer the repository Flutter VM'),
+        contains('must reject relative CI Flutter roots'),
+        contains('must read the CI Flutter version file'),
+        contains('must reject mismatched CI Flutter roots'),
+        contains('must pin Flutter 3.47.0'),
+        contains('must not discover Dart from ambient PATH'),
         contains('must reject direct helper execution'),
         contains('must discard an inherited mutable guard'),
         contains('must establish one immutable local guard'),

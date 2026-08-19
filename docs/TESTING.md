@@ -30,6 +30,20 @@ UTF-8, overflow, launch, child-status, and cleanup assertions must remain real
 process tests rather than mocks. A timed-out mutation is never retried or
 reported as successful merely because the test harness reclaimed its process.
 
+Repository shell wrappers prefer the checkout's `.fvm/flutter_sdk` runtime.
+Source-only CI accepts the absolute `FLUTTER_ROOT` exported by the pinned
+Flutter setup action only when its `version` file exactly matches `.fvmrc`.
+Tests cover local-runtime precedence plus missing, relative, malformed, and
+mismatched CI roots; ambient `PATH` lookup is never a fallback.
+
+Pixel goldens use an explicitly reviewed exact baseline for each supported
+raster host because Flutter text and icon rasterization can differ between
+macOS and Linux. A new host is unsupported until its output is inspected and
+committed as a named baseline. Tests do not use pixel tolerances, silently
+update images, or select a baseline by environment variable. When a CI golden
+fails, the workflow retains only the deterministic fixture's failure images for
+seven days; inspect those artifacts before approving or replacing a baseline.
+
 ## Native And Platform Gates
 
 An exact release candidate additionally requires:
