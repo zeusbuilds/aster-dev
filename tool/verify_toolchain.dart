@@ -1,6 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:analyzer/dart/analysis/features.dart';
+import 'package:analyzer/dart/analysis/utilities.dart';
+import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/ast/visitor.dart';
+
 import 'gradle_verification_metadata.dart';
 
 const _reviewedGradleDistributionSha256 = <String, String>{
@@ -696,12 +701,12 @@ ToolchainVerification verifyToolchain({
       ),
       (
         pattern: RegExp(
-          r'shell pm path \\\s*\n\s*"\$\{package_name\}" 2>/dev/null',
-          multiLine: true,
+          r'utexo_bounded_capture[\s\S]*?'
+          r'"\$1" -s "\$2" shell pm path "\$3"',
         ),
         failure:
             'Android package-state inspection must query the exact '
-            'package through adb.',
+            'package through its bounded adb boundary.',
       ),
       (
         pattern: RegExp(r'consumed \+= length\(\$0\) \+ 1'),
@@ -728,7 +733,7 @@ ToolchainVerification verifyToolchain({
             'package-manager output.',
       ),
       (
-        pattern: RegExp(r'LC_ALL=C sort -u'),
+        pattern: RegExp(r'LC_ALL=C "\$5" -u'),
         failure:
             'Android package-state inspection must canonicalize one exact '
             'path set.',
@@ -750,18 +755,14 @@ ToolchainVerification verifyToolchain({
   if (iosIntegration != null) {
     _requireSinglePattern(
       iosIntegration,
-      RegExp(
-        r'^\s*installed_apps="\$\(xcrun simctl listapps '
-        r'"\$\{simulator_id\}" 2>/dev/null\)" \|\|\s*$',
-        multiLine: true,
-      ),
+      RegExp(r'"\$1" simctl listapps "\$2" >"\$\{temporary_file\}"'),
       'iOS integration must query installed applications through a '
-      'status-bearing machine-readable simctl boundary.',
+      'status-bearing bounded simctl boundary.',
       failures,
     );
     _requireSinglePattern(
       iosIntegration,
-      RegExp(r'plutil -lint - >/dev/null 2>&1 \|\|'),
+      RegExp(r'"\$3" -lint "\$\{temporary_file\}" >/dev/null'),
       'iOS integration must validate the complete simctl application plist.',
       failures,
     );
@@ -776,9 +777,7 @@ ToolchainVerification verifyToolchain({
     );
     _requireSinglePattern(
       iosIntegration,
-      RegExp(
-        RegExp.escape(r'plutil -extract "${escaped_identifier}.Path" raw -'),
-      ),
+      RegExp(RegExp.escape(r'"$3" -extract "$6.Path" raw "${temporary_file}"')),
       'iOS integration must read the installed bundle path from validated '
       'plist data.',
       failures,
@@ -840,14 +839,15 @@ ToolchainVerification verifyToolchain({
     );
     _requireSinglePattern(
       iosIntegration,
-      RegExp(r'plutil -extract CFBundleIdentifier raw'),
+      RegExp(r'"\$\{plutil_bin\}" -extract CFBundleIdentifier raw'),
       'iOS integration must inspect the built test bundle identifier.',
       failures,
     );
     _requireSinglePattern(
       iosIntegration,
       RegExp(
-        r'xcrun simctl install "\$\{simulator_id\}" "\$\{built_test_app\}"',
+        r'"\$\{xcrun_bin\}" simctl install '
+        r'"\$\{simulator_id\}" "\$\{built_test_app\}"',
       ),
       'iOS integration must install the exact built debug artifact.',
       failures,
@@ -864,7 +864,10 @@ ToolchainVerification verifyToolchain({
     );
     _requireSinglePattern(
       iosIntegration,
-      RegExp(r'xcrun simctl install "\$\{simulator_id\}" "\$\{restored_app\}"'),
+      RegExp(
+        r'"\$\{xcrun_bin\}" simctl install '
+        r'"\$\{simulator_id\}" "\$\{restored_app\}"',
+      ),
       'iOS integration must restore the ordinary installed debug app.',
       failures,
     );
@@ -1115,7 +1118,11 @@ ToolchainVerification verifyToolchain({
     );
     _requireSinglePattern(
       iosIntegration,
-      RegExp(r'^bundle check >/dev/null 2>&1 \|\|\s*$', multiLine: true),
+      RegExp(
+        r'^utexo_run_quick "\$\{bundle_bin\}" check '
+        r'>/dev/null 2>&1 \|\|\s*$',
+        multiLine: true,
+      ),
       'iOS integration must fail closed when locked gems are unavailable.',
       failures,
     );
@@ -1126,7 +1133,10 @@ ToolchainVerification verifyToolchain({
     ]) {
       _requireSinglePattern(
         iosIntegration,
-        RegExp('bundle exec fvm flutter ${RegExp.escape(command)}'),
+        RegExp(
+          RegExp.escape(r'"${bundle_bin}" exec fvm flutter ') +
+              RegExp.escape(command),
+        ),
         'iOS integration must run `$command` inside the Ruby bundle.',
         failures,
       );
@@ -1216,7 +1226,11 @@ ToolchainVerification verifyToolchain({
   if (apkVerifier != null) {
     _requireSinglePattern(
       apkVerifier,
-      RegExp(r'fvm dart run tool/verify_android_release_identity\.dart'),
+      RegExp(
+        r'utexo_run_inspector[\s\S]*?'
+        r'"\$\{UTEXO_BOUNDED_DART\}" --disable-dart-dev[\s\S]*?'
+        r'tool/verify_android_release_identity\.dart',
+      ),
       'APK verification must enforce committed release identity.',
       failures,
     );
@@ -1229,7 +1243,7 @@ ToolchainVerification verifyToolchain({
     _requireSinglePattern(
       apkVerifier,
       RegExp(
-        r'\./scripts/verify-android-native-libraries\.sh\s*\\\s*\n'
+        r'"\$\{root\}/scripts/verify-android-native-libraries\.sh"\s*\\\s*\n'
         r'\s*"\$\{apk_path\}"\s*\\\s*\n'
         r'\s*lib\s*\\\s*\n'
         r'\s*apk\s*\\\s*\n'
@@ -1257,7 +1271,11 @@ ToolchainVerification verifyToolchain({
   if (bundleVerifier != null) {
     _requireSinglePattern(
       bundleVerifier,
-      RegExp(r'fvm dart run tool/verify_android_release_identity\.dart'),
+      RegExp(
+        r'utexo_run_inspector[\s\S]*?'
+        r'"\$\{UTEXO_BOUNDED_DART\}" --disable-dart-dev[\s\S]*?'
+        r'tool/verify_android_release_identity\.dart',
+      ),
       'Bundle verification must enforce committed release identity.',
       failures,
     );
@@ -1276,7 +1294,7 @@ ToolchainVerification verifyToolchain({
     _requireSinglePattern(
       bundleVerifier,
       RegExp(
-        r'java scripts/AndroidArchiveEntryExtractor\.java\s*\\\s*\n'
+        r'"\$\{java_bin\}" scripts/AndroidArchiveEntryExtractor\.java\s*\\\s*\n'
         r'\s*"\$\{bundle_path\}"\s*\\\s*\n'
         r'\s*BundleConfig\.pb\s*\\\s*\n'
         r'\s*"\$\{bundle_config_path\}"\s*\\\s*\n'
@@ -1303,14 +1321,38 @@ ToolchainVerification verifyToolchain({
     );
     _requireSinglePattern(
       bundleVerifier,
-      RegExp(r'mktemp -d "\$\{TMPDIR:-/tmp\}/utexo-aab-config\.XXXXXX"'),
+      RegExp(r'^\s*local cleanup_status=0$', multiLine: true),
+      'Bundle verification must track cleanup failure independently.',
+      failures,
+    );
+    _requireSinglePattern(
+      bundleVerifier,
+      RegExp(r'^\s*trap - EXIT HUP INT TERM$', multiLine: true),
+      'Bundle verification cleanup must disarm every installed trap.',
+      failures,
+    );
+    _requireSinglePattern(
+      bundleVerifier,
+      RegExp(
+        RegExp.escape(r'((status != 0)) && exit "${status}"'),
+        multiLine: true,
+      ),
+      'Bundle verification must preserve its first qualification failure.',
+      failures,
+    );
+    _requireSinglePattern(
+      bundleVerifier,
+      RegExp(
+        r'"\$\{mktemp_bin\}" -d '
+        r'"\$\{TMPDIR:-/tmp\}/utexo-aab-config\.XXXXXX"',
+      ),
       'Bundle verification must use an isolated owned inspection directory.',
       failures,
     );
     _requireSinglePattern(
       bundleVerifier,
       RegExp(
-        r'java scripts/AndroidJarSignatureInspector\.java '
+        r'"\$\{java_bin\}" scripts/AndroidJarSignatureInspector\.java '
         r'"\$\{bundle_path\}"',
       ),
       'Bundle verification must inspect signing coverage for every entry.',
@@ -1324,7 +1366,7 @@ ToolchainVerification verifyToolchain({
     _requireSinglePattern(
       bundleVerifier,
       RegExp(
-        r'\./scripts/verify-android-native-libraries\.sh\s*\\\s*\n'
+        r'"\$\{root\}/scripts/verify-android-native-libraries\.sh"\s*\\\s*\n'
         r'\s*"\$\{bundle_path\}"\s*\\\s*\n'
         r'\s*base/lib\s*\\\s*\n'
         r'\s*aab\s*\\\s*\n'
@@ -1345,7 +1387,7 @@ ToolchainVerification verifyToolchain({
     _requireSinglePattern(
       apkSignatureVerifier,
       RegExp(
-        r'java scripts/AndroidJarSignatureInspector\.java\s*\\\s*\n'
+        r'"\$\{java_bin\}" scripts/AndroidJarSignatureInspector\.java\s*\\\s*\n'
         r'\s*--signature-evidence\s*\\\s*\n'
         r'\s*"\$\{apk_path\}"',
         multiLine: true,
@@ -1364,7 +1406,7 @@ ToolchainVerification verifyToolchain({
     _requireSinglePattern(
       nativeLibraryVerifier,
       RegExp(
-        r'java scripts/AndroidNativeLibraryExtractor\.java\s*\\\s*\n'
+        r'"\$\{java_bin\}" scripts/AndroidNativeLibraryExtractor\.java\s*\\\s*\n'
         r'\s*"\$\{archive_path\}"\s*\\\s*\n'
         r'\s*"\$\{native_root\}"\s*\\\s*\n'
         r'\s*"\$\{temporary_directory\}"\s*\\\s*\n'
@@ -1407,11 +1449,10 @@ ToolchainVerification verifyToolchain({
     _requireSinglePattern(
       nativeLibraryVerifier,
       RegExp(
-        r'^if ! find "\$\{temporary_directory\}" -mindepth 2 -maxdepth 2 '
-        r'\\\s*$\n'
-        r"\s*-type f -name '\*\.so' -print \| LC_ALL=C sort "
-        r'>"\$\{library_inventory\}"; then\s*$',
-        multiLine: true,
+        r'utexo_capture_inspector[\s\S]*?'
+        r'"\$1" "\$3" -mindepth 2 -maxdepth 2 '
+        r'-type f -name "\*\.so" -print \|[\s\S]*?'
+        r'LC_ALL=C "\$2"',
       ),
       'Native-library verification must materialize one status-bearing exact '
       'inventory.',
@@ -1596,7 +1637,8 @@ ToolchainVerification verifyToolchain({
           r'_readBoundedUtf8\(\s*process\.stdout,\s*'
           r"streamName: 'stdout',\s*"
           r'maximumBytes: maxStdoutBytes,\s*'
-          r'onLimit: requestTermination,\s*\)',
+          r'onLimit: requestTermination,\s*'
+          r'onDecodedChunk: onStdout,\s*\)',
         ),
         failure: 'Bounded subprocess execution must enforce its stdout limit.',
       ),
@@ -1605,7 +1647,8 @@ ToolchainVerification verifyToolchain({
           r'_readBoundedUtf8\(\s*process\.stderr,\s*'
           r"streamName: 'stderr',\s*"
           r'maximumBytes: maxStderrBytes,\s*'
-          r'onLimit: requestTermination,\s*\)',
+          r'onLimit: requestTermination,\s*'
+          r'onDecodedChunk: onStderr,\s*\)',
         ),
         failure: 'Bounded subprocess execution must enforce its stderr limit.',
       ),
@@ -1615,7 +1658,7 @@ ToolchainVerification verifyToolchain({
             'Bounded subprocess execution must count bytes before capture.',
       ),
       (
-        pattern: RegExp(r'utf8\.decode\(output\.takeBytes\(\)\)'),
+        pattern: RegExp(r'utf8\.decoder\.startChunkedConversion\('),
         failure: 'Bounded subprocess output must use strict UTF-8 decoding.',
       ),
       (
@@ -2005,6 +2048,9 @@ ToolchainVerification verifyToolchain({
     }
   }
 
+  _verifyBoundedShellExecution(root, failures);
+  _verifyProcessApiOwnership(root, failures);
+
   failures.sort();
   return ToolchainVerification(
     flutterVersion: flutterVersion,
@@ -2383,7 +2429,7 @@ void _verifyAndroidPerformanceWrapper(
     );
   }
   for (final option in <String>[
-    r'^fvm flutter drive --no-pub \\$',
+    r'^utexo_run_build fvm flutter drive --no-pub \\$',
     r'^  --no-dds \\$',
     r'^  --driver=test_driver/integration_test\.dart \\$',
     r'^  --target="\$\{target\}" \\$',
@@ -2413,7 +2459,8 @@ void _verifyAndroidPerformanceWrapper(
   _requireSinglePattern(
     contents,
     RegExp(
-      r'^"\$\{root\}/scripts/verify-android-performance-renderer\.sh" \\$'
+      r'^utexo_run_quick "\$\{root\}/scripts/'
+      r'verify-android-performance-renderer\.sh" \\$'
       r'\n  "\$\{adb\}" "\$\{device_id\}"$',
       multiLine: true,
     ),
@@ -2436,9 +2483,12 @@ void _verifyAndroidPerformanceWrapper(
     );
     _requireSinglePattern(
       rendererVerifier,
-      RegExp(r'if \(consumed > maximum\) exit 65'),
+      RegExp(
+        r'utexo_bounded_capture[\s\S]*?'
+        r'"\$\{maximum_diagnostic_bytes\}"',
+      ),
       'Android performance renderer verification must enforce its byte limit '
-      'while streaming.',
+      'at the process boundary.',
       failures,
     );
     _requireSinglePattern(
@@ -2450,18 +2500,22 @@ void _verifyAndroidPerformanceWrapper(
     );
     _requireSinglePattern(
       rendererVerifier,
-      RegExp(
-        r'^\)" \|\| fail "could not inspect bounded SurfaceFlinger diagnostics',
-        multiLine: true,
-      ),
-      'Android performance renderer verification must preserve pipeline '
-      'failure status.',
+      RegExp(r'consumed \+= length\(\$0\) \+ 1'),
+      'Android performance renderer verification must count every diagnostic '
+      'byte while streaming.',
+      failures,
+    );
+    _requireSinglePattern(
+      rendererVerifier,
+      RegExp(r'set -o pipefail'),
+      'Android performance renderer verification must preserve every pipeline '
+      'status.',
       failures,
     );
     if (rendererVerifier.contains('surface_dump=')) {
       failures.add(
-        'Android performance renderer verification must not buffer the full '
-        'SurfaceFlinger dump.',
+        'Android performance renderer verification must not retain the full '
+        'SurfaceFlinger diagnostic payload.',
       );
     }
     for (final softwareRenderer in <String>[
@@ -2494,15 +2548,19 @@ void _verifyAndroidPerformanceWrapper(
   );
   _requireSinglePattern(
     contents,
-    RegExp(r'^fvm flutter pub get --enforce-lockfile$', multiLine: true),
+    RegExp(
+      r'^utexo_run_build fvm flutter pub get --enforce-lockfile$',
+      multiLine: true,
+    ),
     'Android performance wrapper must enforce the committed Pub lock.',
     failures,
   );
   _requireSinglePattern(
     contents,
     RegExp(
-      '^${RegExp.escape(r'''readonly built_package="$("${UTEXO_AAPT2}" dump packagename "${apk}")"''')}\\s*\$',
-      multiLine: true,
+      r'readonly built_package="\$\([\s\S]*?'
+      r'utexo_capture_inspector "\$\{UTEXO_AAPT2\}" '
+      r'dump packagename "\$\{apk\}"[\s\S]*?\)"',
     ),
     'Android performance wrapper must inspect the exact built APK identity.',
     failures,
@@ -2638,6 +2696,266 @@ void _requireNixVersionList(
   ).allMatches(flake).map((match) => match.group(1)).toList();
   if (versions.length != 1 || versions.single != expected) {
     failures.add('flake.nix must declare exactly $label $expected.');
+  }
+}
+
+void _verifyBoundedShellExecution(String root, List<String> failures) {
+  final boundary = _readRequired(
+    File('$root/scripts/bounded-command.sh'),
+    'scripts/bounded-command.sh',
+    failures,
+  );
+  final runner = _readRequired(
+    File('$root/tool/run_bounded_command.dart'),
+    'tool/run_bounded_command.dart',
+    failures,
+  );
+  if (boundary != null) {
+    for (final contract in <({RegExp pattern, String failure})>[
+      (
+        pattern: RegExp(
+          RegExp.escape(r'.fvm/flutter_sdk/bin/cache/dart-sdk/bin/dart'),
+        ),
+        failure: 'Bounded shell execution must pin the repository Dart VM.',
+      ),
+      (
+        pattern: RegExp(
+          RegExp.escape(r'if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then'),
+        ),
+        failure: 'Bounded shell execution must reject direct helper execution.',
+      ),
+      (
+        pattern: RegExp(
+          r'^\s*unset UTEXO_BOUNDED_COMMAND_LOADED$',
+          multiLine: true,
+        ),
+        failure:
+            'Bounded shell execution must discard an inherited mutable guard.',
+      ),
+      (
+        pattern: RegExp(
+          r'^readonly UTEXO_BOUNDED_COMMAND_LOADED=1$',
+          multiLine: true,
+        ),
+        failure:
+            'Bounded shell execution must establish one immutable local guard.',
+      ),
+      (
+        pattern: RegExp(r'^\s*--stream-output \\$', multiLine: true),
+        failure: 'Bounded shell execution must support live build output.',
+      ),
+      (
+        pattern: RegExp(
+          r'^\s*readonly UTEXO_QUICK_TIMEOUT_SECONDS=120$',
+          multiLine: true,
+        ),
+        failure: 'Bounded shell quick operations must use a 120-second limit.',
+      ),
+      (
+        pattern: RegExp(
+          r'^\s*readonly UTEXO_INSPECT_TIMEOUT_SECONDS=600$',
+          multiLine: true,
+        ),
+        failure:
+            'Bounded shell artifact inspection must use a 600-second limit.',
+      ),
+      (
+        pattern: RegExp(
+          r'^\s*readonly UTEXO_BUILD_TIMEOUT_SECONDS=3600$',
+          multiLine: true,
+        ),
+        failure: 'Bounded shell builds must use a 3600-second limit.',
+      ),
+      (
+        pattern: RegExp(r'^\s*utexo_bounded_capture\(\) \{$', multiLine: true),
+        failure: 'Bounded shell execution must expose one capture boundary.',
+      ),
+      (
+        pattern: RegExp(r'^\s*utexo_bounded_stream\(\) \{$', multiLine: true),
+        failure: 'Bounded shell execution must expose one streaming boundary.',
+      ),
+    ]) {
+      _requireSinglePattern(
+        boundary,
+        contract.pattern,
+        contract.failure,
+        failures,
+      );
+    }
+    _requirePatternCount(
+      boundary,
+      RegExp(r'utexo_bounded_boundary_available \|\| return 69'),
+      2,
+      'Both bounded shell modes must fail closed when their runner is absent.',
+      failures,
+    );
+    _requirePatternCount(
+      boundary,
+      RegExp(r'"\$\{UTEXO_BOUNDED_DART\}" --disable-dart-dev \\'),
+      2,
+      'Both bounded shell modes must bypass mutable Dart tooling.',
+      failures,
+    );
+    if (boundary.contains('UTEXO_BOUNDED_DART:-') ||
+        boundary.contains('UTEXO_BOUNDED_RUNNER:-')) {
+      failures.add(
+        'Bounded shell execution must not accept environment-selected owners.',
+      );
+    }
+  }
+  if (runner != null) {
+    for (final contract in <({RegExp pattern, String failure})>[
+      (
+        pattern: RegExp(r"import 'bounded_process\.dart';"),
+        failure: 'Bounded command CLI must use the sole process owner.',
+      ),
+      (
+        pattern: RegExp(r'const _maximumTimeoutSeconds = 2 \* 60 \* 60;'),
+        failure:
+            'Bounded command CLI must cap accepted deadlines at two hours.',
+      ),
+      (
+        pattern: RegExp(r'const _maximumOutputBytes = 128 \* 1024 \* 1024;'),
+        failure: 'Bounded command CLI must cap each output stream at 128 MiB.',
+      ),
+      (
+        pattern: RegExp(r'killProcessTree: true'),
+        failure: 'Bounded command CLI must own the complete process tree.',
+      ),
+      (
+        pattern: RegExp(r'onStdout: invocation\.streamOutput'),
+        failure:
+            'Bounded command CLI must forward validated stdout on request.',
+      ),
+      (
+        pattern: RegExp(r'onStderr: invocation\.streamOutput'),
+        failure:
+            'Bounded command CLI must forward validated stderr on request.',
+      ),
+      (
+        pattern: RegExp(r"RegExp\(r'\^\[1-9\]\[0-9\]\*\$'\)"),
+        failure:
+            'Bounded command CLI must accept only positive decimal bounds.',
+      ),
+      (
+        pattern: RegExp(r'exitCode = _deadlineExitCode;'),
+        failure: 'Bounded command CLI must expose a stable deadline status.',
+      ),
+      (
+        pattern: RegExp(r'exitCode = _outputLimitExitCode;'),
+        failure: 'Bounded command CLI must expose a stable overflow status.',
+      ),
+    ]) {
+      _requireSinglePattern(
+        runner,
+        contract.pattern,
+        contract.failure,
+        failures,
+      );
+    }
+    if (runner.contains('invocation.executable}') ||
+        runner.contains('invocation.arguments}')) {
+      failures.add(
+        'Bounded command CLI watchdog errors must not interpolate child input.',
+      );
+    }
+  }
+
+  final scriptsDirectory = Directory('$root/scripts');
+  if (!scriptsDirectory.existsSync()) {
+    failures.add('Missing scripts directory for shell ownership verification.');
+    return;
+  }
+  final shellOwners = <({String path, String source})>[];
+  final scriptFiles =
+      scriptsDirectory
+          .listSync(recursive: true, followLinks: false)
+          .whereType<File>()
+          .toList(growable: false)
+        ..sort((left, right) => left.path.compareTo(right.path));
+  for (final file in scriptFiles) {
+    final path = file.path
+        .substring(root.length + 1)
+        .replaceAll(Platform.pathSeparator, '/');
+    final source = _readRequired(file, path, failures);
+    if (source == null ||
+        !RegExp(r'^#!(?:/usr/bin/env bash|/bin/bash|/bin/sh)\r?\n')
+            .hasMatch(source) ||
+        path == 'scripts/bounded-command.sh') {
+      continue;
+    }
+    shellOwners.add((path: path, source: source));
+  }
+  if (shellOwners.isEmpty) {
+    failures.add('No repository shell entrypoints were found for ownership.');
+  }
+  for (final owner in shellOwners) {
+    final path = owner.path;
+    final source = owner.source;
+    final ownsBoundary =
+        source.contains('bounded-command.sh') ||
+        source.contains('android-artifact-toolchain.sh');
+    if (!ownsBoundary) {
+      failures.add('$path must source the bounded shell execution boundary.');
+    }
+    if (!RegExp(r'utexo_(?:bounded|capture|run)_').hasMatch(source)) {
+      failures.add('$path must execute its external work through a bound.');
+    }
+    if (source.contains('fvm dart run ')) {
+      failures.add('$path must not launch Dart through unbounded FVM startup.');
+    }
+  }
+}
+
+void _verifyProcessApiOwnership(String root, List<String> failures) {
+  const sourceRoots = <String>['integration_test', 'lib', 'test', 'tool'];
+  const owner = 'tool/bounded_process.dart';
+  final featureSet = FeatureSet.latestLanguageVersion();
+  for (final sourceRoot in sourceRoots) {
+    final directory = Directory('$root/$sourceRoot');
+    if (!directory.existsSync()) continue;
+    final sources =
+        directory
+            .listSync(recursive: true, followLinks: false)
+            .whereType<File>()
+            .where((file) => file.path.endsWith('.dart'))
+            .toList(growable: false)
+          ..sort((left, right) => left.path.compareTo(right.path));
+    for (final source in sources) {
+      final relativePath = source.path
+          .substring(root.length + 1)
+          .replaceAll(Platform.pathSeparator, '/');
+      if (relativePath == owner) continue;
+      final parsed = parseFile(
+        path: source.path,
+        featureSet: featureSet,
+        throwIfDiagnostics: false,
+      );
+      final visitor = _ProcessInvocationVisitor();
+      parsed.unit.accept(visitor);
+      for (final invocation in visitor.invocations) {
+        final line = parsed.lineInfo.getLocation(invocation.offset).lineNumber;
+        failures.add(
+          '$relativePath:$line must delegate ${invocation.methodName.name} '
+          'to $owner.',
+        );
+      }
+    }
+  }
+}
+
+final class _ProcessInvocationVisitor extends RecursiveAstVisitor<void> {
+  final List<MethodInvocation> invocations = <MethodInvocation>[];
+
+  @override
+  void visitMethodInvocation(MethodInvocation node) {
+    final method = node.methodName.name;
+    if (node.target case SimpleIdentifier(name: 'Process')) {
+      if (method == 'run' || method == 'runSync' || method == 'start') {
+        invocations.add(node);
+      }
+    }
+    super.visitMethodInvocation(node);
   }
 }
 

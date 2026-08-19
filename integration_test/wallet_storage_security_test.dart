@@ -8,6 +8,8 @@ import 'package:integration_test/integration_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../tool/bounded_process.dart';
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -176,16 +178,16 @@ void main() {
       );
       await looseAncestor.create();
       await secureParent.create();
-      final chmodLoose = await Process.run('/system/bin/chmod', [
+      final chmodLoose = await _runSystemCommand('/system/bin/chmod', [
         '0777',
         looseAncestor.path,
       ]);
-      final chmodSecure = await Process.run('/system/bin/chmod', [
+      final chmodSecure = await _runSystemCommand('/system/bin/chmod', [
         '0700',
         secureParent.path,
       ]);
-      expect(chmodLoose.exitCode, 0, reason: '${chmodLoose.stderr}');
-      expect(chmodSecure.exitCode, 0, reason: '${chmodSecure.stderr}');
+      expect(chmodLoose.exitCode, 0, reason: chmodLoose.stderr);
+      expect(chmodSecure.exitCode, 0, reason: chmodSecure.stderr);
       await expectLater(
         security.createDirectory(
           '${secureParent.path}${Platform.pathSeparator}wallet',
@@ -196,7 +198,7 @@ void main() {
       final hardLink = File(
         '${root.path}${Platform.pathSeparator}wallet_registry.hard.json',
       );
-      final linkResult = await Process.run('/system/bin/ln', [
+      final linkResult = await _runSystemCommand('/system/bin/ln', [
         metadata.path,
         hardLink.path,
       ]);
@@ -212,7 +214,7 @@ void main() {
         await hardLink.delete();
       } else {
         expect(
-          linkResult.stderr.toString(),
+          linkResult.stderr,
           anyOf(
             contains('Permission denied'),
             contains('Operation not permitted'),
@@ -223,4 +225,17 @@ void main() {
       await security.verifyFile(metadata.path);
     }
   });
+}
+
+Future<BoundedProcessResult> _runSystemCommand(
+  String executable,
+  List<String> arguments,
+) {
+  return runBoundedProcess(
+    executable,
+    arguments,
+    maxStdoutBytes: 64 * 1024,
+    maxStderrBytes: 64 * 1024,
+    timeout: const Duration(seconds: 10),
+  );
 }

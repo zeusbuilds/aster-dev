@@ -48,9 +48,10 @@ from a clean worktree and record commands/results in the production tracker.
 - [ ] APK/AAB archive inspection rejects unsafe/duplicate names and resource
       over-expansion, proves the exact ABI/required-library matrix, and extracts
       native libraries only through the owned structured ZIP boundary
-- [ ] every directly invoked Android identity inspector uses the owned streamed
-      process boundary with independent output ceilings, strict decoding, a
-      deadline, and forced child termination
+- [ ] every repository-owned shell entrypoint uses the pinned bounded-command
+      adapter for all external work; quick, inspection, and build/platform
+      profiles retain independent output ceilings, strict decoding, deadlines,
+      first-failure cleanup, and complete descendant termination
 - [ ] every directly distributed APK verifies with Signature Scheme v2 or v3;
       v1/JAR-only signatures are rejected
 - [ ] AAB requests `PAGE_ALIGNMENT_16K`, every 64-bit native library has 16 KiB

@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/bounded_test_process.dart';
+
 void main() {
   late Directory fixtureRoot;
   late Directory repository;
@@ -9,16 +11,28 @@ void main() {
   late File trackedFile;
   late File hook;
 
-  setUp(() {
+  setUp(() async {
     fixtureRoot = Directory.systemTemp.createTempSync('utexo_pre_commit_');
     repository = Directory('${fixtureRoot.path}/repository')..createSync();
     fakeBin = Directory('${fixtureRoot.path}/bin')..createSync();
-    hook = File('${Directory.current.path}/scripts/git-hooks/pre-commit');
+    for (final relativePath in <String>[
+      'scripts/git-hooks/pre-commit',
+      'scripts/bounded-command.sh',
+      'tool/run_bounded_command.dart',
+      'tool/bounded_process.dart',
+    ]) {
+      final target = File('${repository.path}/$relativePath');
+      target.parent.createSync(recursive: true);
+      File('${Directory.current.path}/$relativePath').copySync(target.path);
+    }
+    linkTestDartRuntime(repository);
+    hook = File('${repository.path}/scripts/git-hooks/pre-commit');
+    await makeTestExecutable(hook);
 
-    _runGit(repository, const ['init', '--quiet']);
+    await _runGit(repository, const ['init', '--quiet']);
     trackedFile = File('${repository.path}/tracked.txt')
       ..writeAsStringSync('staged\n');
-    _runGit(repository, const ['add', 'tracked.txt']);
+    await _runGit(repository, const ['add', '.']);
 
     final make = File('${fakeBin.path}/make')
       ..writeAsStringSync(r'''#!/bin/sh
@@ -45,60 +59,57 @@ case "${HOOK_TEST_ACTION:-pass}" in
     ;;
 esac
 ''');
-    final chmod = Process.runSync('chmod', ['+x', make.path]);
-    if (chmod.exitCode != 0) {
-      throw StateError('Could not make the fixture command executable.');
-    }
+    await makeTestExecutable(make);
   });
 
   tearDown(() {
     fixtureRoot.deleteSync(recursive: true);
   });
 
-  test('accepts a worktree that exactly matches the staged snapshot', () {
-    final result = _runHook(
+  test('accepts a worktree that exactly matches the staged snapshot', () async {
+    final result = await _runHook(
       hook: hook,
       repository: repository,
       fakeBin: fakeBin,
     );
 
     expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
-    expect('${result.stdout}', contains('Quality gates passed'));
+    expect(result.stdout, contains('Quality gates passed'));
   });
 
-  test('rejects unstaged tracked input before lint', () {
+  test('rejects unstaged tracked input before lint', () async {
     trackedFile.writeAsStringSync('unstaged\n', mode: FileMode.append);
 
-    final result = _runHook(
+    final result = await _runHook(
       hook: hook,
       repository: repository,
       fakeBin: fakeBin,
     );
 
     expect(result.exitCode, 1);
-    expect('${result.stderr}', contains('Unstaged tracked changes'));
+    expect(result.stderr, contains('Unstaged tracked changes'));
   });
 
-  test('rejects untracked non-ignored input before lint', () {
+  test('rejects untracked non-ignored input before lint', () async {
     File('${repository.path}/untracked_test.dart')
         .writeAsStringSync('void main() {}');
 
-    final result = _runHook(
+    final result = await _runHook(
       hook: hook,
       repository: repository,
       fakeBin: fakeBin,
     );
 
     expect(result.exitCode, 1);
-    expect('${result.stderr}', contains('Untracked non-ignored files'));
+    expect(result.stderr, contains('Untracked non-ignored files'));
   });
 
-  test('allows ignored local development artifacts', () {
+  test('allows ignored local development artifacts', () async {
     File('${repository.path}/.gitignore').writeAsStringSync('ignored.local\n');
-    _runGit(repository, const ['add', '.gitignore']);
+    await _runGit(repository, const ['add', '.gitignore']);
     File('${repository.path}/ignored.local').writeAsStringSync('local only\n');
 
-    final result = _runHook(
+    final result = await _runHook(
       hook: hook,
       repository: repository,
       fakeBin: fakeBin,
@@ -107,8 +118,8 @@ esac
     expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
   });
 
-  test('rejects a tracked worktree mutation made by the gate', () {
-    final result = _runHook(
+  test('rejects a tracked worktree mutation made by the gate', () async {
+    final result = await _runHook(
       hook: hook,
       repository: repository,
       fakeBin: fakeBin,
@@ -116,11 +127,11 @@ esac
     );
 
     expect(result.exitCode, 1);
-    expect('${result.stderr}', contains('Unstaged tracked changes'));
+    expect(result.stderr, contains('Unstaged tracked changes'));
   });
 
-  test('rejects an untracked input created by the gate', () {
-    final result = _runHook(
+  test('rejects an untracked input created by the gate', () async {
+    final result = await _runHook(
       hook: hook,
       repository: repository,
       fakeBin: fakeBin,
@@ -128,11 +139,11 @@ esac
     );
 
     expect(result.exitCode, 1);
-    expect('${result.stderr}', contains('Untracked non-ignored files'));
+    expect(result.stderr, contains('Untracked non-ignored files'));
   });
 
-  test('rejects a staged-tree mutation made by the gate', () {
-    final result = _runHook(
+  test('rejects a staged-tree mutation made by the gate', () async {
+    final result = await _runHook(
       hook: hook,
       repository: repository,
       fakeBin: fakeBin,
@@ -140,11 +151,11 @@ esac
     );
 
     expect(result.exitCode, 1);
-    expect('${result.stderr}', contains('staged tree changed'));
+    expect(result.stderr, contains('staged tree changed'));
   });
 
-  test('preserves a failing lint command status', () {
-    final result = _runHook(
+  test('preserves a failing lint command status', () async {
+    final result = await _runHook(
       hook: hook,
       repository: repository,
       fakeBin: fakeBin,
@@ -152,17 +163,17 @@ esac
     );
 
     expect(result.exitCode, 23);
-    expect('${result.stdout}', isNot(contains('Quality gates passed')));
+    expect(result.stdout, isNot(contains('Quality gates passed')));
   });
 }
 
-ProcessResult _runHook({
+Future<BoundedProcessResult> _runHook({
   required File hook,
   required Directory repository,
   required Directory fakeBin,
   String action = 'pass',
 }) {
-  return Process.runSync(
+  return runTestProcess(
     hook.path,
     const [],
     workingDirectory: repository.path,
@@ -174,8 +185,8 @@ ProcessResult _runHook({
   );
 }
 
-void _runGit(Directory repository, List<String> arguments) {
-  final result = Process.runSync(
+Future<void> _runGit(Directory repository, List<String> arguments) async {
+  final result = await runTestProcess(
     'git',
     arguments,
     workingDirectory: repository.path,

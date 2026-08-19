@@ -20,6 +20,16 @@ Coverage is a diagnostic. New assertions must target behavior and failure
 boundaries; assertion-free tests or tests added only to raise a percentage are
 not accepted.
 
+Real fixture subprocesses use `test/support/bounded_test_process.dart`, with a
+30-second default deadline, 32 MiB independent stream ceilings, and complete
+descendant ownership on supported POSIX hosts. Tests must narrow those values
+when practical and may widen them only for an evidenced operation class. Do not
+use `Process.run`, `Process.runSync`, or ad hoc timeout wrappers in tests; the
+toolchain policy enforces the sole owner with analyzer ASTs. Timeout, malformed
+UTF-8, overflow, launch, child-status, and cleanup assertions must remain real
+process tests rather than mocks. A timed-out mutation is never retried or
+reported as successful merely because the test harness reclaimed its process.
+
 ## Native And Platform Gates
 
 An exact release candidate additionally requires:

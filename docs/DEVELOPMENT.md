@@ -104,6 +104,17 @@ working tree from masking different bytes in the commit. Commit or otherwise
 separate unrelated work before invoking `git commit`; ignored local overrides
 and generated/build outputs do not violate this check.
 
+Repository-owned shell entrypoints execute external commands through
+`scripts/bounded-command.sh`. It pins the checkout's Dart VM and delegates to
+the sole process-tree owner in `tool/bounded_process.dart`; do not invoke the
+helper directly or add raw `git`, `fvm`, Android, Java, Bundler, or simulator
+subprocesses to a script. Quick operations use a 120-second/8 MiB-per-stream
+profile, artifact inspection uses 10 minutes/16 MiB, and builds or platform
+tests use one hour/64 MiB. A limit, malformed UTF-8 response, launch failure, or
+deadline fails the owning command and terminates its remaining descendants.
+Choose the narrowest existing profile that covers the operation; changing a
+limit is a reviewed tool-policy change with fault tests, not an inline escape.
+
 ### Manual commands
 
 - `make format` - Format Dart code

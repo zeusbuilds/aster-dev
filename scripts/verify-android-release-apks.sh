@@ -2,7 +2,10 @@
 
 set -euo pipefail
 
-readonly root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+script_directory="${BASH_SOURCE[0]%/*}"
+[[ "${script_directory}" != "${BASH_SOURCE[0]}" ]] || script_directory=.
+readonly root="$(cd "${script_directory}/.." && pwd -P)"
+cd "${root}"
 source "${root}/scripts/android-artifact-toolchain.sh"
 utexo_resolve_android_artifact_toolchain
 
@@ -16,7 +19,8 @@ fail() {
 verify_signature() {
   local apk_path="$1"
 
-  ./scripts/verify-android-apk-signature.sh "${apk_path}"
+  utexo_run_inspector \
+    "${root}/scripts/verify-android-apk-signature.sh" "${apk_path}"
 }
 
 verify_apk() {
@@ -24,13 +28,16 @@ verify_apk() {
   local expected_abi="$2"
   [[ -f "${apk_path}" ]] || fail "missing ${apk_path}"
 
-  fvm dart run tool/verify_android_release_identity.dart \
+  utexo_run_inspector \
+    "${UTEXO_BOUNDED_DART}" --disable-dart-dev \
+    tool/verify_android_release_identity.dart \
     --apk "${apk_path}" \
     --aapt2 "${UTEXO_AAPT2}" ||
     fail "${apk_path} does not match committed release identity"
 
   verify_signature "${apk_path}"
-  ./scripts/verify-android-native-libraries.sh \
+  utexo_run_inspector \
+    "${root}/scripts/verify-android-native-libraries.sh" \
     "${apk_path}" \
     lib \
     apk \

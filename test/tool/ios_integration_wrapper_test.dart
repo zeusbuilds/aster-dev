@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/bounded_test_process.dart';
+
 void main() {
   late Directory root;
   late Directory bin;
@@ -10,7 +12,7 @@ void main() {
   late File listAppsCount;
   late File installedDebugMarker;
 
-  setUp(() {
+  setUp(() async {
     root = Directory.systemTemp.createTempSync('utexo_ios_wrapper_');
     bin = Directory('${root.path}/bin')..createSync();
     bundleLog = File('${root.path}/bundle.log');
@@ -21,6 +23,14 @@ void main() {
     final scripts = Directory('${root.path}/scripts')..createSync();
     File('scripts/run-ios-integration-test.sh')
         .copySync('${scripts.path}/run-ios-integration-test.sh');
+    File('scripts/bounded-command.sh')
+        .copySync('${scripts.path}/bounded-command.sh');
+    Directory('${root.path}/tool').createSync();
+    File('tool/run_bounded_command.dart')
+        .copySync('${root.path}/tool/run_bounded_command.dart');
+    File('tool/bounded_process.dart')
+        .copySync('${root.path}/tool/bounded_process.dart');
+    linkTestDartRuntime(root);
     File('${root.path}/integration_test/wallet_storage_security_test.dart')
         .createSync(recursive: true);
     File('${root.path}/build/ios/iphonesimulator/Runner.app/Info.plist')
@@ -29,7 +39,7 @@ void main() {
         '{ CFBundleIdentifier = "com.example.asterdev.debug"; }',
       );
 
-    _writeExecutable(File('${bin.path}/bundle'), r'''#!/bin/sh
+    await _writeExecutable(File('${bin.path}/bundle'), r'''#!/bin/sh
 printf '%s\n' "$*" >> "${UTEXO_TEST_BUNDLE_LOG}"
 case "$*" in
   "--version")
@@ -49,7 +59,7 @@ case "$*" in
     ;;
 esac
 ''');
-    _writeExecutable(File('${bin.path}/xcrun'), r'''#!/bin/sh
+    await _writeExecutable(File('${bin.path}/xcrun'), r'''#!/bin/sh
 printf '%s\n' "$*" >> "${UTEXO_TEST_XCRUN_LOG}"
 case "$*" in
   "simctl getenv test-simulator SIMULATOR_UDID")
@@ -94,12 +104,12 @@ esac
     root.deleteSync(recursive: true);
   });
 
-  ProcessResult run({
+  Future<BoundedProcessResult> run({
     String listAppsMode = 'empty',
     String? failListAppsCall,
     int testStatus = 17,
   }) {
-    return Process.runSync(
+    return runTestProcess(
       'bash',
       [
         'scripts/run-ios-integration-test.sh',
@@ -121,8 +131,8 @@ esac
     );
   }
 
-  test('fails before Flutter work when listapps transport fails', () {
-    final result = run(failListAppsCall: '1');
+  test('fails before Flutter work when listapps transport fails', () async {
+    final result = await run(failListAppsCall: '1');
 
     expect(result.exitCode, 64);
     expect(result.stderr, contains('release bundle before'));
@@ -132,8 +142,8 @@ esac
     );
   });
 
-  test('fails before Flutter work when listapps output is malformed', () {
-    final result = run(listAppsMode: 'malformed');
+  test('fails before Flutter work when listapps output is malformed', () async {
+    final result = await run(listAppsMode: 'malformed');
 
     expect(result.exitCode, 64);
     expect(result.stderr, contains('release bundle before'));
@@ -143,29 +153,32 @@ esac
     );
   });
 
-  test('rejects an installed release bundle without a path', () {
-    final result = run(listAppsMode: 'missing-path');
+  test('rejects an installed release bundle without a path', () async {
+    final result = await run(listAppsMode: 'missing-path');
 
     expect(result.exitCode, 64);
     expect(result.stderr, contains('release bundle before'));
   });
 
-  test('accepts an absent release app and preserves test failure status', () {
-    final result = run();
+  test(
+    'accepts an absent release app and preserves test failure status',
+    () async {
+      final result = await run();
 
-    expect(result.exitCode, 17);
-    expect(
-      bundleLog.readAsLinesSync(),
-      contains('exec fvm flutter build ios --simulator --debug --no-pub'),
-    );
-    expect(
-      xcrunLog.readAsLinesSync(),
-      contains(startsWith('simctl install test-simulator ')),
-    );
-  });
+      expect(result.exitCode, 17);
+      expect(
+        bundleLog.readAsLinesSync(),
+        contains('exec fvm flutter build ios --simulator --debug --no-pub'),
+      );
+      expect(
+        xcrunLog.readAsLinesSync(),
+        contains(startsWith('simctl install test-simulator ')),
+      );
+    },
+  );
 
-  test('fails when the post-run release query fails', () {
-    final result = run(
+  test('fails when the post-run release query fails', () async {
+    final result = await run(
       listAppsMode: 'present',
       failListAppsCall: '2',
       testStatus: 0,
@@ -175,22 +188,22 @@ esac
     expect(result.stderr, contains('release bundle after the integration'));
   });
 
-  test('fails when the installed debug query fails', () {
-    final result = run(failListAppsCall: '3', testStatus: 0);
+  test('fails when the installed debug query fails', () async {
+    final result = await run(failListAppsCall: '3', testStatus: 0);
 
     expect(result.exitCode, 64);
     expect(result.stderr, contains('installed debug bundle'));
   });
 
-  test('fails when the post-install release query fails', () {
-    final result = run(failListAppsCall: '4', testStatus: 0);
+  test('fails when the post-install release query fails', () async {
+    final result = await run(failListAppsCall: '4', testStatus: 0);
 
     expect(result.exitCode, 64);
     expect(result.stderr, contains('release bundle after debug installation'));
   });
 
-  test('completes with exact debug and preserved release identities', () {
-    final result = run(listAppsMode: 'present', testStatus: 0);
+  test('completes with exact debug and preserved release identities', () async {
+    final result = await run(listAppsMode: 'present', testStatus: 0);
 
     expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
     expect(result.stdout, contains('used com.example.asterdev.debug'));
@@ -198,11 +211,8 @@ esac
   });
 }
 
-void _writeExecutable(File file, String contents) {
+Future<void> _writeExecutable(File file, String contents) async {
   file.createSync(recursive: true);
   file.writeAsStringSync(contents);
-  final chmod = Process.runSync('chmod', ['755', file.path]);
-  if (chmod.exitCode != 0) {
-    throw StateError('Could not make ${file.path} executable: ${chmod.stderr}');
-  }
+  await makeTestExecutable(file);
 }

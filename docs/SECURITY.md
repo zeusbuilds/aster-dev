@@ -80,10 +80,17 @@ rejects duplicate and unsafe entry names, bounds archive and expansion
 resources, proves the exact native ABI/runtime-library matrix, and writes only
 validated native basenames beneath an owned temporary directory. Line-oriented
 ZIP output and wildcard extraction are not trusted security boundaries.
-Direct Android identity inspectors run through one streamed subprocess boundary
-with independent stdout/stderr byte ceilings, strict UTF-8 decoding, a fixed
-deadline, and forced child termination. Inspector output is never accumulated
-without a bound, and launch failures do not echo artifact arguments.
+Every repository-owned shell entrypoint runs external work through one pinned
+Dart subprocess boundary with independent stdout/stderr byte ceilings, strict
+incremental UTF-8 decoding, an operation-class deadline, redacted watchdog
+errors, and complete POSIX process-group cleanup on success or failure. Quick,
+artifact-inspection, and build/platform profiles are fixed centrally; callers
+cannot select a different runner through the environment. Nested pipelines run
+inside that owned process group, preserve every status with `pipefail`, and
+retain only the bounded result needed for the decision. Android identity,
+signature, archive, ELF, package-state, renderer, Git-hook, and iOS simulator
+paths all use this contract. A watchdog failure invalidates evidence; it does
+not justify an automatic mutation retry.
 
 ## Open Security Decisions
 

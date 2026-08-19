@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../tool/resolve_android_artifact_toolchain.dart';
+import '../support/bounded_test_process.dart';
 
 const _agpMetadataLimitBytes = 1024 * 1024;
 
@@ -15,7 +16,7 @@ void main() {
   late Directory androidSdk;
   late File flutterExtension;
 
-  setUp(() {
+  setUp(() async {
     root = Directory.systemTemp.createTempSync('utexo_android_artifacts_');
     repository = Directory('${root.path}/repository')..createSync();
     gradleHome = Directory('${root.path}/gradle')..createSync();
@@ -63,9 +64,9 @@ void main() {
       'build-tools/36.0.0/aapt2',
       'build-tools/36.0.0/zipalign',
     ]) {
-      _executable(androidSdk, path);
+      await _executable(androidSdk, path);
     }
-    _executable(
+    await _executable(
       androidSdk,
       'ndk/28.2.13676358/toolchains/llvm/prebuilt/test/bin/llvm-readobj',
     );
@@ -90,15 +91,15 @@ void main() {
     );
   }
 
-  test('resolves only the exact owned AGP and Android toolchain', () {
+  test('resolves only the exact owned AGP and Android toolchain', () async {
     _write(
       gradleHome,
       'caches/modules-2/files-2.1/com.google.protobuf/'
           'protobuf-java/3.22.3/stale/protobuf-java-3.22.3.jar',
       '',
     );
-    _executable(androidSdk, 'build-tools/99.0.0/apksigner');
-    _executable(
+    await _executable(androidSdk, 'build-tools/99.0.0/apksigner');
+    await _executable(
       androidSdk,
       'ndk/99.0.0/toolchains/llvm/prebuilt/test/bin/llvm-readelf',
     );
@@ -240,27 +241,30 @@ void main() {
     );
   });
 
-  test('rejects an NDK tool symlink escaping the configured revision', () {
-    final outside = _executable(root, 'outside/llvm-readobj');
-    final readelf = Link(
-      '${androidSdk.path}/ndk/28.2.13676358/toolchains/llvm/prebuilt/'
-      'test/bin/llvm-readelf',
-    );
-    readelf.deleteSync();
-    readelf.createSync(outside.path);
+  test(
+    'rejects an NDK tool symlink escaping the configured revision',
+    () async {
+      final outside = await _executable(root, 'outside/llvm-readobj');
+      final readelf = Link(
+        '${androidSdk.path}/ndk/28.2.13676358/toolchains/llvm/prebuilt/'
+        'test/bin/llvm-readelf',
+      );
+      readelf.deleteSync();
+      readelf.createSync(outside.path);
 
-    final result = resolve();
+      final result = resolve();
 
-    expect(
-      result.failures,
-      contains(
+      expect(
+        result.failures,
         contains(
-          'Expected one executable Android NDK 28.2.13676358 '
-          'llvm-readelf, found 0',
+          contains(
+            'Expected one executable Android NDK 28.2.13676358 '
+            'llvm-readelf, found 0',
+          ),
         ),
-      ),
-    );
-  });
+      );
+    },
+  );
 
   test('rejects cache bytes that differ from committed checksums', () {
     File(
@@ -511,12 +515,9 @@ File _write(Directory root, String relativePath, String contents) {
   return file;
 }
 
-File _executable(Directory root, String relativePath) {
+Future<File> _executable(Directory root, String relativePath) async {
   final file = _write(root, relativePath, '#!/bin/sh\n');
-  final result = Process.runSync('chmod', ['755', file.path]);
-  if (result.exitCode != 0) {
-    throw StateError('Could not make fixture executable: ${result.stderr}');
-  }
+  await makeTestExecutable(file);
   return file;
 }
 

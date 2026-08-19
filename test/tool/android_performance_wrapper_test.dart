@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/bounded_test_process.dart';
+
 void main() {
   late Directory root;
   late Directory bin;
@@ -12,7 +14,7 @@ void main() {
   late File debugQueryCount;
   late File profileQueryCount;
 
-  setUp(() {
+  setUp(() async {
     root = Directory.systemTemp.createTempSync('utexo_performance_wrapper_');
     bin = Directory('${root.path}/bin')..createSync();
     sdk = Directory('${root.path}/sdk')..createSync();
@@ -21,7 +23,7 @@ void main() {
     releaseQueryCount = File('${root.path}/release-query-count');
     debugQueryCount = File('${root.path}/debug-query-count');
     profileQueryCount = File('${root.path}/profile-query-count');
-    _writeExecutable(File('${bin.path}/fvm'), r'''#!/bin/sh
+    await _writeExecutable(File('${bin.path}/fvm'), r'''#!/bin/sh
 printf '%s\n' "$*" >> "${UTEXO_TEST_FVM_LOG}"
 if [ "$1 $2 $3" = "flutter pub get" ]; then
   exit 0
@@ -31,7 +33,7 @@ if [ "$1 $2" = "flutter drive" ]; then
 fi
 exit 99
 ''');
-    _writeExecutable(File('${sdk.path}/platform-tools/adb'), r'''#!/bin/sh
+    await _writeExecutable(File('${sdk.path}/platform-tools/adb'), r'''#!/bin/sh
 printf '%s\n' "$*" >> "${UTEXO_TEST_ADB_LOG}"
 case "$*" in
   "-s test-device get-state")
@@ -98,14 +100,14 @@ esac
     root.deleteSync(recursive: true);
   });
 
-  ProcessResult run({
+  Future<BoundedProcessResult> run({
     String? failReleaseQueryCall,
     String? failDebugQueryCall,
     String? failProfileQueryCall,
     int driveStatus = 17,
     bool malformedReleaseQuery = false,
   }) {
-    return Process.runSync(
+    return runTestProcess(
       'bash',
       ['scripts/run-android-presentation-performance-test.sh', 'test-device'],
       workingDirectory: Directory.current.path,
@@ -127,58 +129,64 @@ esac
     );
   }
 
-  test('fails before measurement when release identity query fails', () {
-    final result = run(failReleaseQueryCall: '1');
+  test('fails before measurement when release identity query fails', () async {
+    final result = await run(failReleaseQueryCall: '1');
 
     expect(result.exitCode, 64);
     expect(result.stderr, contains('release package before measurement'));
     expect(fvmLog.existsSync(), isFalse);
   });
 
-  test('fails before measurement when Profile state cannot be queried', () {
-    final result = run(failProfileQueryCall: '1');
+  test(
+    'fails before measurement when Profile state cannot be queried',
+    () async {
+      final result = await run(failProfileQueryCall: '1');
 
-    expect(result.exitCode, 64);
-    expect(result.stderr, contains('could not reset the isolated profile'));
-    expect(fvmLog.existsSync(), isFalse);
-  });
+      expect(result.exitCode, 64);
+      expect(result.stderr, contains('could not reset the isolated profile'));
+      expect(fvmLog.existsSync(), isFalse);
+    },
+  );
 
-  test('fails before measurement when package output is malformed', () {
-    final result = run(malformedReleaseQuery: true);
+  test('fails before measurement when package output is malformed', () async {
+    final result = await run(malformedReleaseQuery: true);
 
     expect(result.exitCode, 64);
     expect(result.stderr, contains('release package before measurement'));
     expect(fvmLog.existsSync(), isFalse);
   });
 
-  test('fails before measurement when debug identity query fails', () {
-    final result = run(failDebugQueryCall: '1');
+  test('fails before measurement when debug identity query fails', () async {
+    final result = await run(failDebugQueryCall: '1');
 
     expect(result.exitCode, 64);
     expect(result.stderr, contains('debug package before measurement'));
     expect(fvmLog.existsSync(), isFalse);
   });
 
-  test('reports cleanup query failure without replacing drive status', () {
-    final result = run(failReleaseQueryCall: '2');
+  test(
+    'reports cleanup query failure without replacing drive status',
+    () async {
+      final result = await run(failReleaseQueryCall: '2');
 
-    expect(result.exitCode, 17);
-    expect(result.stderr, contains('release package during cleanup'));
-    expect(fvmLog.readAsLinesSync(), contains(startsWith('flutter drive')));
-  });
+      expect(result.exitCode, 17);
+      expect(result.stderr, contains('release package during cleanup'));
+      expect(fvmLog.readAsLinesSync(), contains(startsWith('flutter drive')));
+    },
+  );
 
   test(
     'reports cleanup debug-query failure without replacing drive status',
-    () {
-      final result = run(failDebugQueryCall: '2');
+    () async {
+      final result = await run(failDebugQueryCall: '2');
 
       expect(result.exitCode, 17);
       expect(result.stderr, contains('debug package during cleanup'));
     },
   );
 
-  test('fails after measurement when Profile identity query fails', () {
-    final result = run(failProfileQueryCall: '2', driveStatus: 0);
+  test('fails after measurement when Profile identity query fails', () async {
+    final result = await run(failProfileQueryCall: '2', driveStatus: 0);
 
     expect(result.exitCode, 64);
     expect(result.stderr, contains('Profile package after measurement'));
@@ -186,11 +194,8 @@ esac
   });
 }
 
-void _writeExecutable(File file, String contents) {
+Future<void> _writeExecutable(File file, String contents) async {
   file.createSync(recursive: true);
   file.writeAsStringSync(contents);
-  final chmod = Process.runSync('chmod', ['755', file.path]);
-  if (chmod.exitCode != 0) {
-    throw StateError('Could not make ${file.path} executable: ${chmod.stderr}');
-  }
+  await makeTestExecutable(file);
 }

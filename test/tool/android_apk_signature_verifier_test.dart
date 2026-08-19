@@ -2,30 +2,52 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/bounded_test_process.dart';
+
 void main() {
   late Directory root;
   late Directory bin;
 
-  setUp(() {
+  setUp(() async {
     root = Directory.systemTemp.createTempSync('utexo_apk_signature_');
     bin = Directory('${root.path}/bin')..createSync();
+    for (final relativePath in <String>[
+      'scripts/verify-android-apk-signature.sh',
+      'scripts/android-artifact-toolchain.sh',
+      'scripts/bounded-command.sh',
+      'scripts/AndroidJarSignatureInspector.java',
+      'tool/run_bounded_command.dart',
+      'tool/bounded_process.dart',
+    ]) {
+      final target = File('${root.path}/$relativePath');
+      target.parent.createSync(recursive: true);
+      File('${Directory.current.path}/$relativePath').copySync(target.path);
+    }
+    linkTestDartRuntime(root);
     final apksigner = File('${bin.path}/apksigner');
-    _writeExecutable(apksigner, '#!/bin/sh\nexit 1\n');
-    _writeExecutable(File('${bin.path}/fvm'), '''#!/bin/sh
-printf '\n'
-printf 'UTEXO_AGP_VERSION=9.1.0\n'
-printf 'UTEXO_BUILD_TOOLS_VERSION=36.0.0\n'
-printf 'UTEXO_NDK_VERSION=28.2.13676358\n'
-printf 'UTEXO_AAPT2_PROTO_VERSION=9.1.0\n'
-printf 'UTEXO_BUNDLETOOL_VERSION=1.18.3\n'
-printf 'UTEXO_PROTOBUF_VERSION=3.25.5\n'
-printf 'UTEXO_AAPT2_PROTO_JAR=/dev/null\n'
-printf 'UTEXO_BUNDLETOOL_JAR=/dev/null\n'
-printf 'UTEXO_PROTOBUF_JAR=/dev/null\n'
-printf 'UTEXO_APKSIGNER=${apksigner.path}\n'
-printf 'UTEXO_AAPT2=/dev/null\n'
-printf 'UTEXO_ZIPALIGN=/dev/null\n'
-printf 'UTEXO_LLVM_READELF=/dev/null\n'
+    await _writeExecutable(apksigner, '#!/bin/sh\nexit 1\n');
+    File('${root.path}/tool/resolve_android_artifact_toolchain.dart')
+        .writeAsStringSync('''
+void main() {
+  const fixed = <String>[
+    'UTEXO_AGP_VERSION=9.1.0',
+    'UTEXO_BUILD_TOOLS_VERSION=36.0.0',
+    'UTEXO_NDK_VERSION=28.2.13676358',
+    'UTEXO_AAPT2_PROTO_VERSION=9.1.0',
+    'UTEXO_BUNDLETOOL_VERSION=1.18.3',
+    'UTEXO_PROTOBUF_VERSION=3.25.5',
+    'UTEXO_AAPT2_PROTO_JAR=/dev/null',
+    'UTEXO_BUNDLETOOL_JAR=/dev/null',
+    'UTEXO_PROTOBUF_JAR=/dev/null',
+    'UTEXO_APKSIGNER=${apksigner.path}',
+    'UTEXO_AAPT2=/dev/null',
+    'UTEXO_ZIPALIGN=/dev/null',
+    'UTEXO_LLVM_READELF=/dev/null',
+  ];
+  for (final value in fixed) {
+    print(value);
+  }
+}
 ''');
   });
 
@@ -33,11 +55,10 @@ printf 'UTEXO_LLVM_READELF=/dev/null\n'
     root.deleteSync(recursive: true);
   });
 
-  ProcessResult verify(File archive) {
-    return Process.runSync(
+  Future<BoundedProcessResult> verify(File archive) {
+    return runTestProcess(
       'bash',
-      ['scripts/verify-android-apk-signature.sh', archive.path],
-      workingDirectory: Directory.current.path,
+      ['${root.path}/scripts/verify-android-apk-signature.sh', archive.path],
       environment: {
         ...Platform.environment,
         'PATH': '${bin.path}:${Platform.environment['PATH']}',
@@ -45,44 +66,48 @@ printf 'UTEXO_LLVM_READELF=/dev/null\n'
     );
   }
 
-  test('accepts an honestly unsigned candidate', () {
-    final archive = _createArchive(root, 'unsigned.apk');
+  test('accepts an honestly unsigned candidate', () async {
+    final archive = await _createArchive(root, 'unsigned.apk');
 
-    final result = verify(archive);
+    final result = await verify(archive);
 
-    expect(result.exitCode, 0, reason: '${result.stderr}');
-    expect('${result.stdout}', contains('unsigned candidate artifact'));
+    expect(result.exitCode, 0, reason: result.stderr);
+    expect(result.stdout, contains('unsigned candidate artifact'));
   });
 
-  test('rejects case-varied v1 signature remnants', () {
-    final archive = _createArchive(
+  test('rejects case-varied v1 signature remnants', () async {
+    final archive = await _createArchive(
       root,
       'remnant.apk',
       signatureEntry: 'META-INF/fixture.sf',
     );
 
-    final result = verify(archive);
+    final result = await verify(archive);
 
     expect(result.exitCode, isNot(0));
-    expect('${result.stderr}', contains('contains an invalid APK signature'));
+    expect(result.stderr, contains('contains an invalid APK signature'));
   });
 
-  test('rejects control characters in archive entry names', () {
-    final archive = _createArchive(
+  test('rejects control characters in archive entry names', () async {
+    final archive = await _createArchive(
       root,
       'control.apk',
       signatureEntry: 'META-INF/fixture.sf\nforged-entry',
     );
 
-    final result = verify(archive);
+    final result = await verify(archive);
 
     expect(result.exitCode, isNot(0));
-    expect('${result.stderr}', contains('could not inspect'));
-    expect('${result.stderr}', contains('control character'));
+    expect(result.stderr, contains('could not inspect'));
+    expect(result.stderr, contains('control character'));
   });
 }
 
-File _createArchive(Directory root, String name, {String? signatureEntry}) {
+Future<File> _createArchive(
+  Directory root,
+  String name, {
+  String? signatureEntry,
+}) async {
   final content = Directory('${root.path}/$name-content')..createSync();
   File('${content.path}/payload.txt').writeAsStringSync('payload');
   if (signatureEntry != null) {
@@ -91,7 +116,7 @@ File _createArchive(Directory root, String name, {String? signatureEntry}) {
     signature.writeAsStringSync('corrupt signature metadata');
   }
   final archive = File('${root.path}/$name');
-  _runRequired('jar', [
+  await _runRequired('jar', [
     '--create',
     '--file',
     archive.path,
@@ -102,14 +127,17 @@ File _createArchive(Directory root, String name, {String? signatureEntry}) {
   return archive;
 }
 
-void _writeExecutable(File file, String contents) {
+Future<void> _writeExecutable(File file, String contents) async {
   file.createSync(recursive: true);
   file.writeAsStringSync(contents);
-  _runRequired('chmod', ['755', file.path]);
+  await makeTestExecutable(file);
 }
 
-ProcessResult _runRequired(String executable, List<String> arguments) {
-  final result = Process.runSync(executable, arguments);
+Future<BoundedProcessResult> _runRequired(
+  String executable,
+  List<String> arguments,
+) async {
+  final result = await runTestProcess(executable, arguments);
   if (result.exitCode != 0) {
     throw StateError(
       '$executable failed (${result.exitCode}):\n'

@@ -2,13 +2,16 @@
 
 set -euo pipefail
 
-readonly root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+script_directory="${BASH_SOURCE[0]%/*}"
+[[ "${script_directory}" != "${BASH_SOURCE[0]}" ]] || script_directory=.
+readonly root="$(cd "${script_directory}/.." && pwd -P)"
 readonly target="${1:-integration_test/wallet_storage_security_test.dart}"
 readonly device_id="${2:-${ANDROID_DEVICE_ID:-}}"
 readonly release_package="com.example.asterdev"
 readonly test_package="${release_package}.debug"
 
 cd "${root}"
+source "${root}/scripts/bounded-command.sh"
 
 fail() {
   printf 'Android integration test failed: %s\n' "$1" >&2
@@ -20,15 +23,21 @@ fail() {
 [[ -f "${target}" ]] || fail "target does not exist: ${target}"
 [[ -n "${device_id}" ]] ||
   fail "pass a device ID or set ANDROID_DEVICE_ID"
+utexo_bounded_boundary_available || fail "bounded command runner is unavailable"
 
 sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
 if [[ -z "${sdk_root}" && -f android/local.properties ]]; then
-  sdk_root="$(sed -n 's/^sdk\.dir=//p' android/local.properties | tail -n 1)"
+  while IFS= read -r property || [[ -n "${property}" ]]; do
+    if [[ "${property}" == sdk.dir=* ]]; then
+      sdk_root="${property#sdk.dir=}"
+      sdk_root="${sdk_root%$'\r'}"
+    fi
+  done <android/local.properties
 fi
 readonly sdk_root
 readonly adb="${sdk_root}/platform-tools/adb"
 [[ -x "${adb}" ]] || fail "Android adb is unavailable"
-"${adb}" -s "${device_id}" get-state >/dev/null 2>&1 ||
+utexo_run_quick "${adb}" -s "${device_id}" get-state >/dev/null 2>&1 ||
   fail "device is not attached: ${device_id}"
 source "${root}/scripts/android-package-state.sh"
 
@@ -40,7 +49,7 @@ release_path_before="$(package_path "${release_package}")" ||
   fail "could not inspect the release package before the integration run"
 readonly release_path_before
 
-fvm flutter pub get --enforce-lockfile
+utexo_run_build fvm flutter pub get --enforce-lockfile
 
 cleanup() {
   local command_status=$?
@@ -50,7 +59,8 @@ cleanup() {
   trap - EXIT
   set +e
 
-  if ! "${adb}" -s "${device_id}" get-state >/dev/null 2>&1; then
+  if ! utexo_run_quick \
+    "${adb}" -s "${device_id}" get-state >/dev/null 2>&1; then
     printf 'Android device detached before integration cleanup.\n' >&2
     cleanup_status=1
   else
@@ -58,7 +68,8 @@ cleanup() {
       printf 'Could not inspect the debug package during cleanup.\n' >&2
       cleanup_status=1
     elif [[ -n "${test_path_after}" ]]; then
-      "${adb}" -s "${device_id}" shell am force-stop \
+      utexo_run_quick \
+        "${adb}" -s "${device_id}" shell am force-stop \
         "${test_package}" >/dev/null || cleanup_status=1
     fi
     if ! release_path_after="$(package_path "${release_package}")"; then
@@ -80,7 +91,7 @@ trap cleanup EXIT
 # Flutter does not account for the build-type suffix when stopping this run.
 # Keep it alive so the EXIT owner can stop only the isolated debug identity.
 set +e
-fvm flutter drive --no-pub \
+utexo_run_build fvm flutter drive --no-pub \
   --driver=test_driver/integration_test.dart \
   --target="${target}" \
   --keep-app-running \
@@ -105,7 +116,9 @@ readonly apk="build/app/outputs/flutter-apk/app-debug.apk"
 source "${root}/scripts/android-artifact-toolchain.sh"
 utexo_resolve_android_artifact_toolchain ||
   fail "the exact Android artifact toolchain is unavailable"
-readonly built_package="$("${UTEXO_AAPT2}" dump packagename "${apk}")"
+readonly built_package="$(
+  utexo_capture_inspector "${UTEXO_AAPT2}" dump packagename "${apk}"
+)"
 [[ "${built_package}" == "${test_package}" ]] ||
   fail "debug APK uses ${built_package}, expected ${test_package}"
 

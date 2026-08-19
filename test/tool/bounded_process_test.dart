@@ -26,6 +26,21 @@ void main() {
     expect(result.stderr, 'err');
   });
 
+  test('forwards strictly decoded chunks without changing capture', () async {
+    final forwardedStdout = StringBuffer();
+    final forwardedStderr = StringBuffer();
+    final result = await _runDart(
+      "stdout.write('alpha'); stderr.write('beta');",
+      onStdout: forwardedStdout.write,
+      onStderr: forwardedStderr.write,
+    );
+
+    expect(result.stdout, 'alpha');
+    expect(result.stderr, 'beta');
+    expect(forwardedStdout.toString(), result.stdout);
+    expect(forwardedStderr.toString(), result.stderr);
+  });
+
   test('rejects stdout beyond its independent byte ceiling', () async {
     await expectLater(
       _runDart("stdout.write('123456789');", maxStdoutBytes: 8),
@@ -267,6 +282,8 @@ Future<BoundedProcessResult> _runDart(
   int maxStderrBytes = 4096,
   Duration timeout = const Duration(seconds: 2),
   bool killProcessTree = false,
+  ProcessOutputCallback? onStdout,
+  ProcessOutputCallback? onStderr,
 }) async {
   final directory = Directory.systemTemp.createTempSync('utexo_process_');
   try {
@@ -281,6 +298,8 @@ Future<BoundedProcessResult> _runDart(
       _dartExecutable(),
       [script.path],
       killProcessTree: killProcessTree,
+      onStdout: onStdout,
+      onStderr: onStderr,
       maxStdoutBytes: maxStdoutBytes,
       maxStderrBytes: maxStderrBytes,
       timeout: timeout,

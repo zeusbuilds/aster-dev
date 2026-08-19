@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/bounded_test_process.dart';
+
 void main() {
   late Directory fixture;
   late File verifier;
@@ -31,8 +33,7 @@ if [[ -n "\${UTEXO_TEST_DIAGNOSTIC_LINES:-}" ]]; then
 fi
 printf '%s\n' "\${UTEXO_TEST_SURFACE_FLINGER_OUTPUT:-}"
 ''');
-    final chmod = await Process.run('chmod', ['755', fakeAdb.path]);
-    expect(chmod.exitCode, 0, reason: '${chmod.stderr}');
+    await makeTestExecutable(fakeAdb);
   });
 
   tearDown(() {
@@ -47,7 +48,7 @@ printf '%s\n' "\${UTEXO_TEST_SURFACE_FLINGER_OUTPUT:-}"
       '(Apple M4 Pro), OpenGL ES 3.0',
     );
 
-    expect(result.exitCode, 0, reason: '${result.stderr}');
+    expect(result.exitCode, 0, reason: result.stderr);
     expect(
       result.stdout,
       contains('Android Emulator OpenGL ES Translator (Apple M4 Pro)'),
@@ -80,6 +81,24 @@ printf '%s\n' "\${UTEXO_TEST_SURFACE_FLINGER_OUTPUT:-}"
     expect(result.stderr, contains('did not report a GLES renderer'));
   });
 
+  test(
+    'retains only the renderer while validating later diagnostics',
+    () async {
+      final result = await _verify(
+        verifier,
+        fakeAdb,
+        '',
+        diagnosticLines: 1000,
+      );
+
+      expect(result.exitCode, 0, reason: result.stderr);
+      expect(
+        result.stdout,
+        'Android performance renderer: hardware renderer\n',
+      );
+    },
+  );
+
   test('rejects oversized SurfaceFlinger diagnostics', () async {
     final result = await _verify(
       verifier,
@@ -93,13 +112,13 @@ printf '%s\n' "\${UTEXO_TEST_SURFACE_FLINGER_OUTPUT:-}"
   });
 }
 
-Future<ProcessResult> _verify(
+Future<BoundedProcessResult> _verify(
   File verifier,
   File adb,
   String surfaceFlingerOutput, {
   int? diagnosticLines,
 }) {
-  return Process.run(
+  return runTestProcess(
     'bash',
     [verifier.path, adb.path, 'emulator-5554'],
     environment: <String, String>{

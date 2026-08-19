@@ -1,33 +1,52 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # Pre-commit: validate exactly the staged repository inputs.
 # Install with: ./scripts/install-git-hooks.sh
 
-set -eu
-cd "$(git rev-parse --show-toplevel)"
+set -euo pipefail
+
+script_directory="${BASH_SOURCE[0]%/*}"
+[[ "${script_directory}" != "${BASH_SOURCE[0]}" ]] || script_directory=.
+readonly expected_root="$(cd "${script_directory}/../.." && pwd -P)"
+source "${expected_root}/scripts/bounded-command.sh"
+repository_root="$(
+  utexo_capture_quick git -C "${expected_root}" rev-parse --show-toplevel
+)"
+readonly repository_root
+[[ "${repository_root}" == "${expected_root}" ]] || {
+  printf '[pre-commit] Could not establish the expected repository root.\n' >&2
+  exit 1
+}
+cd "${repository_root}"
 
 fail() {
-  echo "[pre-commit] $1" >&2
+  printf '[pre-commit] %s\n' "$1" >&2
   exit 1
 }
 
 require_index_worktree_parity() {
-  git diff --quiet -- ||
+  utexo_run_quick git diff --quiet -- ||
     fail "Unstaged tracked changes would make lint differ from the commit."
-  if [ -n "$(git ls-files --others --exclude-standard)" ]; then
+  if [[ -n "$(
+    utexo_capture_quick git ls-files --others --exclude-standard
+  )" ]]; then
     fail "Untracked non-ignored files would make lint differ from the commit."
   fi
 }
 
 require_index_worktree_parity
-STAGED_TREE="$(git write-tree)" || fail "Could not snapshot the staged tree."
+STAGED_TREE="$(utexo_capture_quick git write-tree)" ||
+  fail "Could not snapshot the staged tree."
+readonly STAGED_TREE
 
-echo "[pre-commit] Running format, generation, analysis, docs, and policy gates..."
-make lint
+printf '[pre-commit] Running format, generation, analysis, docs, and policy gates...\n'
+utexo_run_build make lint
 
-CURRENT_TREE="$(git write-tree)" || fail "Could not re-read the staged tree."
-[ "$CURRENT_TREE" = "$STAGED_TREE" ] ||
+CURRENT_TREE="$(utexo_capture_quick git write-tree)" ||
+  fail "Could not re-read the staged tree."
+readonly CURRENT_TREE
+[[ "${CURRENT_TREE}" == "${STAGED_TREE}" ]] ||
   fail "The staged tree changed while lint was running."
 require_index_worktree_parity
 
-echo "[pre-commit] Quality gates passed."
+printf '[pre-commit] Quality gates passed.\n'
 exit 0

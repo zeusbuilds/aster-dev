@@ -1,13 +1,20 @@
 #!/usr/bin/env bash
 
+_utexo_artifact_script_directory="${BASH_SOURCE[0]%/*}"
+[[ "${_utexo_artifact_script_directory}" != "${BASH_SOURCE[0]}" ]] ||
+  _utexo_artifact_script_directory=.
+source "${_utexo_artifact_script_directory}/bounded-command.sh"
+
 # Resolves release-verification tools from exact repository/AGP declarations.
 utexo_resolve_android_artifact_toolchain() {
-  local script_root repository output key line value
-  script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  repository="$(cd "${script_root}/.." && pwd)"
+  local repository output key candidate value match_count
+  repository="${UTEXO_BOUNDED_ROOT}"
   output="$(
     cd "${repository}"
-    fvm dart run tool/resolve_android_artifact_toolchain.dart
+    utexo_capture_inspector \
+      "${UTEXO_BOUNDED_DART}" \
+      --disable-dart-dev \
+      tool/resolve_android_artifact_toolchain.dart
   )" || return 1
 
   for key in \
@@ -24,13 +31,19 @@ utexo_resolve_android_artifact_toolchain() {
     UTEXO_AAPT2 \
     UTEXO_ZIPALIGN \
     UTEXO_LLVM_READELF; do
-    line="$(printf '%s\n' "${output}" | grep -E "^${key}=" || true)"
-    if [[ -z "${line}" || "${line}" == *$'\n'* ]]; then
+    match_count=0
+    value=''
+    while IFS= read -r candidate || [[ -n "${candidate}" ]]; do
+      if [[ "${candidate}" == "${key}="* ]]; then
+        match_count=$((match_count + 1))
+        value="${candidate#*=}"
+      fi
+    done <<<"${output}"
+    if ((match_count != 1)) || [[ -z "${value}" ]]; then
       printf 'Android artifact toolchain resolution failed for %s.\n' \
         "${key}" >&2
       return 1
     fi
-    value="${line#*=}"
     printf -v "${key}" '%s' "${value}"
     export "${key}"
   done

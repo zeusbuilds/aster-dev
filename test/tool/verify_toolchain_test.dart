@@ -603,6 +603,34 @@ library_count=1
           '!files.add(path);\n'
           'value < 0x20 || value == 0x7f;',
     );
+    for (final relativePath in <String>[
+      'scripts/android-artifact-toolchain.sh',
+      'scripts/android-package-state.sh',
+      'scripts/bounded-command.sh',
+      'scripts/git-hooks/pre-commit',
+      'scripts/install-git-hooks.sh',
+      'scripts/run-android-integration-test.sh',
+      'scripts/run-android-presentation-performance-test.sh',
+      'scripts/run-ios-integration-test.sh',
+      'scripts/test-android-apk-signature-policy.sh',
+      'scripts/verify-android-apk-signature.sh',
+      'scripts/verify-android-native-libraries.sh',
+      'scripts/verify-android-performance-renderer.sh',
+      'scripts/verify-android-release-apks.sh',
+      'scripts/verify-android-release-bundle.sh',
+      'tool/bounded_process.dart',
+      'tool/run_bounded_command.dart',
+    ]) {
+      final source = File('${Directory.current.path}/$relativePath');
+      _write(
+        repository,
+        relativePath,
+        source.readAsStringSync().replaceAll(
+          'com.example.asterdev',
+          'com.example.utexo',
+        ),
+      );
+    }
     _write(
       repository,
       'pubspec.yaml',
@@ -914,7 +942,8 @@ library_count=1
             'readonly test_bundle="\${release_bundle}.profile"',
           )
           .replaceFirst(
-            'xcrun simctl install "\${simulator_id}" "\${built_test_app}"\n',
+            '"\${xcrun_bin}" simctl install '
+                '"\${simulator_id}" "\${built_test_app}"\n',
             '',
           ),
     );
@@ -1044,9 +1073,8 @@ esac''');
     );
     iosIntegration.writeAsStringSync(
       iosIntegration.readAsStringSync().replaceFirst(
-        r'''installed_apps="$(xcrun simctl listapps "${simulator_id}" 2>/dev/null)" ||
-    return 1''',
-        r'''installed_apps="$(xcrun simctl get_app_container "${simulator_id}" "${bundle_identifier}")" || true''',
+        r'''"$1" simctl listapps "$2" >"${temporary_file}"''',
+        r'''"$1" simctl get_app_container "$2" "$6" >"${temporary_file}" || true''',
       ),
     );
     final nativeVerifier = File(
@@ -1079,9 +1107,12 @@ esac''');
         contains('must account for every input byte'),
         contains('must reject malformed package-manager output'),
         contains('must bound diagnostics'),
-        contains('must enforce its byte limit while streaming'),
-        contains('must not buffer the full SurfaceFlinger dump'),
-        contains('status-bearing machine-readable simctl boundary'),
+        contains('must enforce its byte limit at the process boundary'),
+        contains('must retain only the first GLES backend line'),
+        contains('must count every diagnostic byte while streaming'),
+        contains('must preserve every pipeline status'),
+        contains('must not retain the full SurfaceFlinger diagnostic payload'),
+        contains('status-bearing bounded simctl boundary'),
         contains('must not infer installation state from get_app_container'),
         contains('must not mask simulator or bundle-inspection failures'),
         contains('must inspect every extracted library'),
@@ -1566,6 +1597,87 @@ esac''');
         contains('launch failures must redact arguments'),
         contains('must not use buffered Process.run'),
         contains('must reject malformed UTF-8'),
+      ]),
+    );
+  });
+
+  test('rejects shell-boundary and process-owner bypasses', () {
+    final boundary = File('${repository.path}/scripts/bounded-command.sh');
+    boundary.writeAsStringSync(
+      boundary
+          .readAsStringSync()
+          .replaceFirst(
+            '.fvm/flutter_sdk/bin/cache/dart-sdk/bin/dart',
+            '/usr/bin/dart',
+          )
+          .replaceFirst(
+            r'if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then',
+            r'if [[ "${BASH_SOURCE[0]}" == "disabled" ]]; then',
+          )
+          .replaceFirst(
+            '  unset UTEXO_BOUNDED_COMMAND_LOADED',
+            '  : # inherited guard left trusted',
+          )
+          .replaceFirst(
+            'readonly UTEXO_BOUNDED_COMMAND_LOADED=1',
+            'UTEXO_BOUNDED_COMMAND_LOADED=1',
+          )
+          .replaceFirst('readonly UTEXO_BUILD_TIMEOUT_SECONDS=3600', ''),
+    );
+    final runner = File('${repository.path}/tool/run_bounded_command.dart');
+    runner.writeAsStringSync(
+      runner.readAsStringSync().replaceFirst(
+        'killProcessTree: true',
+        'killProcessTree: false',
+      ),
+    );
+    final hook = File('${repository.path}/scripts/git-hooks/pre-commit');
+    hook.writeAsStringSync(
+      hook.readAsStringSync().replaceFirst(
+        'source "\${expected_root}/scripts/bounded-command.sh"',
+        '',
+      ),
+    );
+    final bundleVerifier = File(
+      '${repository.path}/scripts/verify-android-release-bundle.sh',
+    );
+    bundleVerifier.writeAsStringSync(
+      bundleVerifier
+          .readAsStringSync()
+          .replaceFirst('  local cleanup_status=0\n', '')
+          .replaceFirst('  trap - EXIT HUP INT TERM', '  trap - EXIT')
+          .replaceFirst(r'  ((status != 0)) && exit "${status}"', ''),
+    );
+    _write(
+      repository,
+      'test/unbounded_process_test.dart',
+      "import 'dart:io';\n"
+          'Future<void> main() async {\n'
+          "  await Process.run('tool', const <String>[]);\n"
+          '}\n',
+    );
+
+    final result = _verify(
+      repository,
+      flutterVersionMetadata,
+      flutterExtension,
+      flutterGradleUtils,
+    );
+
+    expect(
+      result.failures,
+      containsAll(<Matcher>[
+        contains('must pin the repository Dart VM'),
+        contains('must reject direct helper execution'),
+        contains('must discard an inherited mutable guard'),
+        contains('must establish one immutable local guard'),
+        contains('builds must use a 3600-second limit'),
+        contains('CLI must own the complete process tree'),
+        contains('pre-commit must source the bounded shell execution boundary'),
+        contains('must track cleanup failure independently'),
+        contains('cleanup must disarm every installed trap'),
+        contains('must preserve its first qualification failure'),
+        contains('must delegate run to tool/bounded_process.dart'),
       ]),
     );
   });

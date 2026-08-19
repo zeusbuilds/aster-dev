@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/bounded_test_process.dart';
+
 void main() {
   late Directory root;
   late File zipWriter;
@@ -39,13 +41,13 @@ public final class ZipFixtureWriter {
     root.deleteSync(recursive: true);
   });
 
-  ProcessResult extract({
+  Future<BoundedProcessResult> extract({
     required File archive,
     required String entry,
     required File output,
     int maximumBytes = 64,
   }) {
-    return Process.runSync('java', [
+    return runTestProcess('java', [
       'scripts/AndroidArchiveEntryExtractor.java',
       archive.path,
       entry,
@@ -54,71 +56,82 @@ public final class ZipFixtureWriter {
     ], workingDirectory: Directory.current.path);
   }
 
-  test('extracts exactly one validated entry', () {
-    final archive = _createArchive(root, zipWriter, 'valid.aab', <String>[
+  test('extracts exactly one validated entry', () async {
+    final archive = await _createArchive(root, zipWriter, 'valid.aab', <String>[
       'BundleConfig.pb:7',
       'base/manifest/AndroidManifest.xml:11',
     ]);
     final output = File('${root.path}/output/BundleConfig.pb');
     output.parent.createSync();
 
-    final result = extract(
+    final result = await extract(
       archive: archive,
       entry: 'BundleConfig.pb',
       output: output,
     );
 
-    expect(result.exitCode, 0, reason: '${result.stderr}');
-    expect('${result.stdout}', contains('EXTRACTED_ENTRY_BYTES=7'));
+    expect(result.exitCode, 0, reason: result.stderr);
+    expect(result.stdout, contains('EXTRACTED_ENTRY_BYTES=7'));
     expect(output.readAsBytesSync(), everyElement('x'.codeUnitAt(0)));
   });
 
-  test('rejects a missing requested entry without creating output', () {
-    final archive = _createArchive(root, zipWriter, 'missing.aab', <String>[
-      'base/manifest/AndroidManifest.xml:11',
-    ]);
+  test('rejects a missing requested entry without creating output', () async {
+    final archive = await _createArchive(
+      root,
+      zipWriter,
+      'missing.aab',
+      <String>['base/manifest/AndroidManifest.xml:11'],
+    );
     final output = File('${root.path}/missing/BundleConfig.pb');
     output.parent.createSync();
 
-    final result = extract(
+    final result = await extract(
       archive: archive,
       entry: 'BundleConfig.pb',
       output: output,
     );
 
     expect(result.exitCode, isNot(0));
-    expect('${result.stderr}', contains('requested archive entry is missing'));
+    expect(result.stderr, contains('requested archive entry is missing'));
     expect(output.existsSync(), isFalse);
   });
 
-  test('validates every archive path before writing the requested entry', () {
-    final archive = _createArchive(root, zipWriter, 'traversal.aab', <String>[
-      'BundleConfig.pb:7',
-      'base/../outside.pb:3',
-    ]);
-    final output = File('${root.path}/traversal/BundleConfig.pb');
-    output.parent.createSync();
+  test(
+    'validates every archive path before writing the requested entry',
+    () async {
+      final archive = await _createArchive(
+        root,
+        zipWriter,
+        'traversal.aab',
+        <String>['BundleConfig.pb:7', 'base/../outside.pb:3'],
+      );
+      final output = File('${root.path}/traversal/BundleConfig.pb');
+      output.parent.createSync();
 
-    final result = extract(
-      archive: archive,
-      entry: 'BundleConfig.pb',
-      output: output,
+      final result = await extract(
+        archive: archive,
+        entry: 'BundleConfig.pb',
+        output: output,
+      );
+
+      expect(result.exitCode, isNot(0));
+      expect(result.stderr, contains('unsafe path'));
+      expect(output.existsSync(), isFalse);
+      expect(File('${root.path}/outside.pb').existsSync(), isFalse);
+    },
+  );
+
+  test('enforces the caller-specific expanded byte limit', () async {
+    final archive = await _createArchive(
+      root,
+      zipWriter,
+      'oversize.aab',
+      <String>['BundleConfig.pb:9'],
     );
-
-    expect(result.exitCode, isNot(0));
-    expect('${result.stderr}', contains('unsafe path'));
-    expect(output.existsSync(), isFalse);
-    expect(File('${root.path}/outside.pb').existsSync(), isFalse);
-  });
-
-  test('enforces the caller-specific expanded byte limit', () {
-    final archive = _createArchive(root, zipWriter, 'oversize.aab', <String>[
-      'BundleConfig.pb:9',
-    ]);
     final output = File('${root.path}/oversize/BundleConfig.pb');
     output.parent.createSync();
 
-    final result = extract(
+    final result = await extract(
       archive: archive,
       entry: 'BundleConfig.pb',
       output: output,
@@ -126,12 +139,12 @@ public final class ZipFixtureWriter {
     );
 
     expect(result.exitCode, isNot(0));
-    expect('${result.stderr}', contains('requested archive entry exceeds'));
+    expect(result.stderr, contains('requested archive entry exceeds'));
     expect(output.existsSync(), isFalse);
   });
 
-  test('rejects a symlinked archive', () {
-    final archive = _createArchive(root, zipWriter, 'real.aab', <String>[
+  test('rejects a symlinked archive', () async {
+    final archive = await _createArchive(root, zipWriter, 'real.aab', <String>[
       'BundleConfig.pb:7',
     ]);
     final linkedArchive = Link('${root.path}/linked.aab')
@@ -139,65 +152,71 @@ public final class ZipFixtureWriter {
     final output = File('${root.path}/linked/BundleConfig.pb');
     output.parent.createSync();
 
-    final result = extract(
+    final result = await extract(
       archive: File(linkedArchive.path),
       entry: 'BundleConfig.pb',
       output: output,
     );
 
     expect(result.exitCode, isNot(0));
-    expect('${result.stderr}', contains('not a regular file'));
+    expect(result.stderr, contains('not a regular file'));
     expect(output.existsSync(), isFalse);
   });
 
-  test('rejects a symlinked output parent', () {
-    final archive = _createArchive(root, zipWriter, 'parent.aab', <String>[
-      'BundleConfig.pb:7',
-    ]);
+  test('rejects a symlinked output parent', () async {
+    final archive = await _createArchive(
+      root,
+      zipWriter,
+      'parent.aab',
+      <String>['BundleConfig.pb:7'],
+    );
     final realParent = Directory('${root.path}/real-output')..createSync();
     final linkedParent = Link('${root.path}/linked-output')
       ..createSync(realParent.path);
     final output = File('${linkedParent.path}/BundleConfig.pb');
 
-    final result = extract(
+    final result = await extract(
       archive: archive,
       entry: 'BundleConfig.pb',
       output: output,
     );
 
     expect(result.exitCode, isNot(0));
-    expect('${result.stderr}', contains('non-symlink directory'));
+    expect(result.stderr, contains('non-symlink directory'));
     expect(realParent.listSync(), isEmpty);
   });
 
-  test('never overwrites an existing output path', () {
-    final archive = _createArchive(root, zipWriter, 'existing.aab', <String>[
-      'BundleConfig.pb:7',
-    ]);
+  test('never overwrites an existing output path', () async {
+    final archive = await _createArchive(
+      root,
+      zipWriter,
+      'existing.aab',
+      <String>['BundleConfig.pb:7'],
+    );
     final output = File('${root.path}/existing/BundleConfig.pb')
       ..createSync(recursive: true)
       ..writeAsStringSync('preserve');
 
-    final result = extract(
+    final result = await extract(
       archive: archive,
       entry: 'BundleConfig.pb',
       output: output,
     );
 
     expect(result.exitCode, isNot(0));
-    expect('${result.stderr}', contains('must not already exist'));
+    expect(result.stderr, contains('must not already exist'));
     expect(output.readAsStringSync(), 'preserve');
   });
 }
 
-File _createArchive(
+Future<File> _createArchive(
   Directory root,
   File zipWriter,
   String name,
   List<String> entries,
-) {
+) async {
   final archive = File('${root.path}/$name');
-  final result = Process.runSync('java', [
+  final result = await runTestProcess('java', [
     zipWriter.path,
     archive.path,
     ...entries,

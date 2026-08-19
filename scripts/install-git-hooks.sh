@@ -1,20 +1,40 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # Configure this repository to use its versioned hook directory.
 
-set -eu
-ROOT="$(git -C "$(dirname "$0")/.." rev-parse --show-toplevel)"
-HOOKS_PATH="scripts/git-hooks"
-CURRENT="$(git -C "$ROOT" config --local --get core.hooksPath || true)"
+set -euo pipefail
 
-if [ ! -x "$ROOT/$HOOKS_PATH/pre-commit" ]; then
-  echo "Versioned pre-commit hook is missing or not executable." >&2
+script_directory="${BASH_SOURCE[0]%/*}"
+[[ "${script_directory}" != "${BASH_SOURCE[0]}" ]] || script_directory=.
+readonly root="$(cd "${script_directory}/.." && pwd -P)"
+source "${root}/scripts/bounded-command.sh"
+readonly hooks_path="scripts/git-hooks"
+
+repository_root="$(utexo_capture_quick git -C "${root}" rev-parse --show-toplevel)"
+readonly repository_root
+[[ "${repository_root}" == "${root}" ]] || {
+  printf 'Could not establish the expected repository root.\n' >&2
+  exit 1
+}
+
+set +e
+current="$(
+  utexo_capture_quick git -C "${root}" config --local --get core.hooksPath
+)"
+current_status=$?
+set -e
+((current_status == 0 || current_status == 1)) || exit "${current_status}"
+readonly current
+
+if [[ ! -x "${root}/${hooks_path}/pre-commit" ]]; then
+  printf 'Versioned pre-commit hook is missing or not executable.\n' >&2
   exit 1
 fi
 
-if [ -n "$CURRENT" ] && [ "$CURRENT" != "$HOOKS_PATH" ]; then
-  echo "Refusing to replace existing local core.hooksPath: $CURRENT" >&2
+if [[ -n "${current}" && "${current}" != "${hooks_path}" ]]; then
+  printf 'Refusing to replace existing local core.hooksPath: %s\n' \
+    "${current}" >&2
   exit 1
 fi
 
-git -C "$ROOT" config --local core.hooksPath "$HOOKS_PATH"
-echo "Git hooks path configured for this repository: $HOOKS_PATH"
+utexo_run_quick git -C "${root}" config --local core.hooksPath "${hooks_path}"
+printf 'Git hooks path configured for this repository: %s\n' "${hooks_path}"

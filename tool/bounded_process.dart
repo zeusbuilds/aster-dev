@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 const _terminationGrace = Duration(seconds: 2);
 const _posixProcessTreeSupervisor = r'''
@@ -51,6 +50,13 @@ trap - HUP INT TERM
 stop_owned_groups
 exit "$status"
 ''';
+
+/// Receives one strictly decoded text chunk from a bounded process stream.
+///
+/// The callback runs synchronously while the stream is consumed. Throwing from
+/// it aborts the operation and triggers the same deterministic child cleanup as
+/// a deadline or output-limit failure.
+typedef ProcessOutputCallback = void Function(String chunk);
 
 /// Captured output from a subprocess executed within explicit resource bounds.
 final class BoundedProcessResult {
@@ -124,7 +130,10 @@ Future<BoundedProcessResult> runBoundedProcess(
   String executable,
   List<String> arguments, {
   String? workingDirectory,
+  Map<String, String>? environment,
   bool killProcessTree = false,
+  ProcessOutputCallback? onStdout,
+  ProcessOutputCallback? onStderr,
   required int maxStdoutBytes,
   required int maxStderrBytes,
   required Duration timeout,
@@ -161,6 +170,7 @@ Future<BoundedProcessResult> runBoundedProcess(
             ]
           : List.unmodifiable(arguments),
       workingDirectory: workingDirectory,
+      environment: environment,
     );
   } on ProcessException {
     throw const ProcessLaunchException();
@@ -209,12 +219,14 @@ Future<BoundedProcessResult> runBoundedProcess(
     streamName: 'stdout',
     maximumBytes: maxStdoutBytes,
     onLimit: requestTermination,
+    onDecodedChunk: onStdout,
   );
   final stderrFuture = _readBoundedUtf8(
     process.stderr,
     streamName: 'stderr',
     maximumBytes: maxStderrBytes,
     onLimit: requestTermination,
+    onDecodedChunk: onStderr,
   );
 
   try {
@@ -246,8 +258,12 @@ Future<String> _readBoundedUtf8(
   required String streamName,
   required int maximumBytes,
   required void Function() onLimit,
+  ProcessOutputCallback? onDecodedChunk,
 }) async {
-  final output = BytesBuilder(copy: false);
+  final output = StringBuffer();
+  final decoder = utf8.decoder.startChunkedConversion(
+    _DecodedOutputSink(output, onDecodedChunk),
+  );
   var totalBytes = 0;
   await for (final chunk in input) {
     totalBytes += chunk.length;
@@ -255,7 +271,24 @@ Future<String> _readBoundedUtf8(
       onLimit();
       throw ProcessOutputLimitException(streamName, maximumBytes);
     }
-    output.add(chunk);
+    decoder.add(chunk);
   }
-  return utf8.decode(output.takeBytes());
+  decoder.close();
+  return output.toString();
+}
+
+final class _DecodedOutputSink implements Sink<String> {
+  _DecodedOutputSink(this._output, this._onDecodedChunk);
+
+  final StringBuffer _output;
+  final ProcessOutputCallback? _onDecodedChunk;
+
+  @override
+  void add(String data) {
+    _output.write(data);
+    _onDecodedChunk?.call(data);
+  }
+
+  @override
+  void close() {}
 }
