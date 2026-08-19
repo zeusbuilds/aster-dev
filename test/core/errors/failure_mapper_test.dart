@@ -75,19 +75,6 @@ void main() {
     expect(failure.userMessage, isNot(contains('injected failure')));
   });
 
-  test('requires explicit recovery for pre-native wallet metadata', () {
-    final failure = FailureMapper.from(
-      const LegacyWalletDataException(),
-      StackTrace.current,
-    );
-
-    expect(failure.code, 'wallet_recovery_required');
-    expect(failure.kind, AppFailureKind.storage);
-    expect(failure.retryable, isFalse);
-    expect(failure.requiresReconciliation, isTrue);
-    expect(failure.outcomeUnknown, isFalse);
-  });
-
   test('requires reconciliation after a wallet filesystem failure', () {
     final failure = FailureMapper.from(
       const FileSystemException('private filesystem detail', '/secret/path'),

@@ -107,7 +107,7 @@ final class IoWalletDirectoryManager implements WalletDirectoryManager {
   );
 
   static File _ownershipFile(Directory directory) =>
-      File('${directory.path}${Platform.pathSeparator}.utexo-storage-owner');
+      File('${directory.path}${Platform.pathSeparator}.aster-storage-owner');
 
   static Future<void> _deleteRecursively(Directory directory) =>
       directory.delete(recursive: true);

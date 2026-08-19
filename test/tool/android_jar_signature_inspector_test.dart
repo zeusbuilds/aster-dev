@@ -10,7 +10,7 @@ void main() {
   late String inspector;
 
   setUp(() async {
-    root = Directory.systemTemp.createTempSync('utexo_jar_signatures_');
+    root = Directory.systemTemp.createTempSync('aster_jar_signatures_');
     keystore = File('${root.path}/signing.p12');
     inspector =
         '${Directory.current.path}/scripts/'
@@ -117,7 +117,7 @@ Future<void> _createSigner(File keystore, String alias) async {
     '-validity',
     '3650',
     '-dname',
-    'CN=UTEXO Test $alias',
+    'CN=Aster Test $alias',
     '-keystore',
     keystore.path,
     '-storetype',

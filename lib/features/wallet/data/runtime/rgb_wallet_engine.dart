@@ -781,7 +781,7 @@ final class RgbWalletEngine implements WalletEngine {
     }
     final BlockchainEnvironment environment;
     try {
-      environment = BlockchainEnvironment.parse(raw);
+      environment = _sdkBlockchainEnvironment(raw);
     } on AppConfigurationException {
       throw NativeProtocolException(
         'Native payment request has an unknown network.',
@@ -1208,7 +1208,7 @@ final class RgbWalletEngine implements WalletEngine {
     }
     final BlockchainEnvironment nativeEnvironment;
     try {
-      nativeEnvironment = BlockchainEnvironment.parse(network.network);
+      nativeEnvironment = _sdkBlockchainEnvironment(network.network);
     } on AppConfigurationException {
       throw NativeProtocolException(
         'Native wallet returned an unknown network.',
@@ -1468,4 +1468,14 @@ final class RgbWalletEngine implements WalletEngine {
       );
     }
   }
+}
+
+BlockchainEnvironment _sdkBlockchainEnvironment(String value) {
+  return switch (value) {
+    // These values belong to the pinned SDK wire contract. They must not leak
+    // into Aster's app-owned chain-environment representation.
+    'bitcoin' => BlockchainEnvironment.mainnet,
+    'utexo' => BlockchainEnvironment.signet,
+    _ => BlockchainEnvironment.parse(value),
+  };
 }

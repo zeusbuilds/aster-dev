@@ -120,9 +120,9 @@ void main() {
     addTearDown(container.dispose);
     final notifier = container.read(walletLifecycleViewModelProvider.notifier);
     const failure = AppFailure(
-      code: 'wallet_recovery_required',
+      code: 'wallet_storage_unavailable',
       kind: AppFailureKind.storage,
-      userMessage: 'Recovery is required.',
+      userMessage: 'Wallet storage is unavailable.',
       retryable: false,
     );
 

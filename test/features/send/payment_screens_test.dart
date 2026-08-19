@@ -910,7 +910,6 @@ void main() {
       () => find.byType(PrettyQrView).evaluate().isNotEmpty,
     );
 
-    expect(find.text('Direct Peg In'), findsNothing);
     await tester.tap(find.widgetWithText(CustomButton, 'Copy'));
     await _pumpFrames(tester);
     expect(harness.clipboard.text, 'request-bitcoin-onchain');

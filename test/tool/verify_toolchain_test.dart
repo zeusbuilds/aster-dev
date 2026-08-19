@@ -11,7 +11,7 @@ void main() {
   late File flutterGradleUtils;
 
   setUp(() {
-    repository = Directory.systemTemp.createTempSync('utexo_toolchain_');
+    repository = Directory.systemTemp.createTempSync('aster_toolchain_');
     flutterVersionMetadata = _write(
       repository,
       'flutter/bin/cache/flutter.version.json',
@@ -49,15 +49,15 @@ void main() {
     _write(
       repository,
       'android/app/build.gradle.kts',
-      'val utexoApplicationId = '
-          'providers.gradleProperty("utexo.applicationId").get()\n'
+      'val asterApplicationId = '
+          'providers.gradleProperty("aster.applicationId").get()\n'
           'android {\n'
-          '  namespace = utexoApplicationId\n'
+          '  namespace = asterApplicationId\n'
           '  compileSdk = flutter.compileSdkVersion\n'
           '  buildToolsVersion = "36.0.0"\n'
           '  ndkVersion = flutter.ndkVersion\n'
           '  defaultConfig {\n'
-          '    applicationId = utexoApplicationId\n'
+          '    applicationId = asterApplicationId\n'
           '    minSdk = flutter.minSdkVersion\n'
           '    targetSdk = flutter.targetSdkVersion\n'
           '  }\n'
@@ -67,7 +67,7 @@ void main() {
       repository,
       'android/gradle.properties',
       'android.useAndroidX=true\n'
-          'utexo.applicationId=com.example.utexo\n',
+          'aster.applicationId=com.example.asterdev\n',
     );
     _write(
       repository,
@@ -179,17 +179,20 @@ void main() {
     _write(
       repository,
       'ios/Runner.xcodeproj/project.pbxproj',
-      'PRODUCT_BUNDLE_IDENTIFIER = com.example.utexo;\n'
-          'PRODUCT_BUNDLE_IDENTIFIER = com.example.utexo.debug;\n'
-          'PRODUCT_BUNDLE_IDENTIFIER = com.example.utexo.profile;\n'
-          'PRODUCT_BUNDLE_IDENTIFIER = com.example.utexo.tests;\n'
-          'PRODUCT_BUNDLE_IDENTIFIER = com.example.utexo.debug.tests;\n'
-          'PRODUCT_BUNDLE_IDENTIFIER = com.example.utexo.profile.tests;',
+      'PRODUCT_BUNDLE_IDENTIFIER = com.example.asterdev;\n'
+          'PRODUCT_BUNDLE_IDENTIFIER = com.example.asterdev.debug;\n'
+          'PRODUCT_BUNDLE_IDENTIFIER = com.example.asterdev.profile;\n'
+          'PRODUCT_BUNDLE_IDENTIFIER = com.example.asterdev.tests;\n'
+          'PRODUCT_BUNDLE_IDENTIFIER = com.example.asterdev.debug.tests;\n'
+          'PRODUCT_BUNDLE_IDENTIFIER = com.example.asterdev.profile.tests;\n'
+          'ASSETCATALOG_COMPILER_APPICON_NAME = AsterIcon;\n'
+          'ASSETCATALOG_COMPILER_APPICON_NAME = AsterIcon;\n'
+          'ASSETCATALOG_COMPILER_APPICON_NAME = AsterIcon;',
     );
     _write(
       repository,
       'scripts/android-package-state.sh',
-      r'''utexo_android_package_paths() {
+      r'''aster_android_package_paths() {
   set -o pipefail
   [[ "${package_name}" =~ ^[A-Za-z] ]]
   normalized_paths="$({
@@ -210,11 +213,11 @@ void main() {
     _write(
       repository,
       'scripts/run-android-integration-test.sh',
-      'readonly release_package="com.example.utexo"\n'
+      'readonly release_package="com.example.asterdev"\n'
           'readonly test_package="\${release_package}.debug"\n'
           'source "\${root}/scripts/android-package-state.sh"\n'
           'package_path() {\n'
-          '  utexo_android_package_paths "\${adb}" '
+          '  aster_android_package_paths "\${adb}" '
           '"\${device_id}" "\$1"\n'
           '}\n'
           'cleanup() {\n'
@@ -236,14 +239,14 @@ void main() {
       repository,
       'scripts/run-android-presentation-performance-test.sh',
       r'''readonly target="integration_test/presentation_performance_test.dart"
-readonly release_package="com.example.utexo"
+readonly release_package="com.example.asterdev"
 readonly debug_package="${release_package}.debug"
 readonly profile_package="${release_package}.profile"
 "${root}/scripts/verify-android-performance-renderer.sh" \
   "${adb}" "${device_id}"
 source "${root}/scripts/android-package-state.sh"
 package_path() {
-  utexo_android_package_paths "${adb}" "${device_id}" "$1"
+  aster_android_package_paths "${adb}" "${device_id}" "$1"
 }
 clear_profile_state() {
   local installed_path
@@ -274,13 +277,13 @@ fvm flutter drive --no-pub \
   --driver=test_driver/integration_test.dart \
   --target="${target}" \
   --keep-app-running \
-  --dart-define=UTEXO_ISOLATED_PROFILE_BENCHMARK=true \
+  --dart-define=ASTER_ISOLATED_PROFILE_BENCHMARK=true \
   -d "${device_id}" \
   --profile
 profile_path_after="$(package_path "${profile_package}")" ||
   fail "profile query failed"
 readonly profile_path_after
-readonly built_package="$("${UTEXO_AAPT2}" dump packagename "${apk}")"''',
+readonly built_package="$("${ASTER_AAPT2}" dump packagename "${apk}")"''',
     );
     _write(
       repository,
@@ -304,7 +307,7 @@ esac''',
       repository,
       'integration_test/presentation_performance_test.dart',
       "const _isIsolatedProfileBenchmark = bool.fromEnvironment(\n"
-          "  'UTEXO_ISOLATED_PROFILE_BENCHMARK',\n"
+          "  'ASTER_ISOLATED_PROFILE_BENCHMARK',\n"
           ');\n'
           'void main() {\n'
           '  expect(\n'
@@ -317,7 +320,7 @@ esac''',
     _write(
       repository,
       'scripts/run-ios-integration-test.sh',
-      r'''readonly release_bundle="com.example.utexo"
+      r'''readonly release_bundle="com.example.asterdev"
 readonly test_bundle="${release_bundle}.debug"
 readonly bundler_version="4.0.10"
 export BUNDLE_FROZEN=true
@@ -387,7 +390,7 @@ fail "the isolated debug bundle was not installed"''',
       'scripts/verify-android-release-apks.sh',
       'fvm dart run tool/verify_android_release_identity.dart \\\n'
           '  --apk "\${apk_path}" \\\n'
-          '  --aapt2 "\${UTEXO_AAPT2}"\n'
+          '  --aapt2 "\${ASTER_AAPT2}"\n'
           './scripts/verify-android-native-libraries.sh \\\n'
           '  "\${apk_path}" \\\n'
           '  lib \\\n'
@@ -399,10 +402,10 @@ fail "the isolated debug bundle was not installed"''',
       'scripts/verify-android-release-bundle.sh',
       'fvm dart run tool/verify_android_release_identity.dart \\\n'
           '  --bundle "\${bundle_path}" \\\n'
-          '  --aapt2-proto "\${UTEXO_AAPT2_PROTO_JAR}" \\\n'
-          '  --protobuf "\${UTEXO_PROTOBUF_JAR}"\n'
+          '  --aapt2-proto "\${ASTER_AAPT2_PROTO_JAR}" \\\n'
+          '  --protobuf "\${ASTER_PROTOBUF_JAR}"\n'
           'trap cleanup EXIT\n'
-          'mktemp -d "\${TMPDIR:-/tmp}/utexo-aab-config.XXXXXX"\n'
+          'mktemp -d "\${TMPDIR:-/tmp}/aster-aab-config.XXXXXX"\n'
           'java scripts/AndroidArchiveEntryExtractor.java \\\n'
           '  "\${bundle_path}" \\\n'
           '  BundleConfig.pb \\\n'
@@ -538,7 +541,7 @@ library_count=1
           'killProcessTree && (!Platform.isMacOS && !Platform.isLinux);\n'
           "killProcessTree ? '/bin/bash' : executable;\n"
           "'--noprofile', '--norc', '-p', '-c',\n"
-          "_posixProcessTreeSupervisor, 'utexo-bounded-process',\n"
+          "_posixProcessTreeSupervisor, 'aster-bounded-process',\n"
           'executable, ...arguments,\n'
           'Process.start(\n'
           '_readBoundedUtf8(\n'
@@ -622,21 +625,59 @@ library_count=1
       'tool/run_bounded_command.dart',
     ]) {
       final source = File('${Directory.current.path}/$relativePath');
-      _write(
-        repository,
-        relativePath,
-        source.readAsStringSync().replaceAll(
-          'com.example.asterdev',
-          'com.example.utexo',
-        ),
-      );
+      _write(repository, relativePath, source.readAsStringSync());
     }
     _write(
       repository,
       'pubspec.yaml',
-      'environment:\n'
+      'name: aster\n'
+          'description: Aster test wallet\n'
+          'environment:\n'
           '  sdk: ">=3.13.0 <4.0.0"\n'
-          '  flutter: ">=3.47.0"',
+          '  flutter: ">=3.47.0"\n'
+          'flutter:\n'
+          '  assets:\n'
+          '    - assets/brand/aster-mark.svg',
+    );
+    _write(
+      repository,
+      'lib/core/constants/app_constants.dart',
+      "class AppConstants { static const String appName = 'Aster'; }",
+    );
+    _write(
+      repository,
+      'lib/main.dart',
+      'class AsterApp extends ConsumerStatefulWidget {}',
+    );
+    _write(
+      repository,
+      'lib/core/config/app_environment.dart',
+      "const value = String.fromEnvironment('ASTER_NETWORK');",
+    );
+    _write(
+      repository,
+      'lib/core/storage/secure_storage_service.dart',
+      "accountName: 'com.aster.wallet.secrets'\n"
+          "storageNamespace: 'aster_wallet_secrets'\n"
+          'migrateOnAlgorithmChange: true\n'
+          'migrateWithBackup: false',
+    );
+    _write(
+      repository,
+      'android/app/src/main/AndroidManifest.xml',
+      '<application android:label="Aster"/>',
+    );
+    _write(
+      repository,
+      'android/app/src/main/java/io/flutter/plugins/'
+          'GeneratedPluginRegistrant.java',
+      'import com.utexo.rgb_sdk_flutter.RgbSdkFlutterPlugin;',
+    );
+    _write(
+      repository,
+      'ios/Runner/Info.plist',
+      '<key>CFBundleDisplayName</key><string>Aster</string>\n'
+          '<key>CFBundleName</key><string>Aster</string>',
     );
     _write(
       repository,
@@ -646,9 +687,9 @@ library_count=1
           '- Gradle 9.3.1, Android Gradle Plugin 9.1.0, and Kotlin 2.4.0\n'
           '- Flutter 3.47.0 and Dart 3.13.0\n'
           '- CocoaPods 1.16.2 through Bundler 4.0.10\n'
-          '- Debug `com.example.utexo.debug`\n'
-          '- Profile `com.example.utexo.profile`\n'
-          '- Release `com.example.utexo`',
+          '- Debug `com.example.asterdev.debug`\n'
+          '- Profile `com.example.asterdev.profile`\n'
+          '- Release `com.example.asterdev`',
     );
   });
 
@@ -681,9 +722,146 @@ library_count=1
     expect(result.androidVerifiedArtifacts, 1);
     expect(result.androidBuildToolsVersion, '36.0.0');
     expect(result.androidPlatformToolsVersion, '36.0.0');
-    expect(result.androidApplicationId, 'com.example.utexo');
+    expect(result.androidApplicationId, 'com.example.asterdev');
     expect(result.cocoaPodsVersion, '1.16.2');
     expect(result.bundlerVersion, '4.0.10');
+  });
+
+  test(
+    'rejects product, platform, configuration, and storage identity drift',
+    () {
+      _write(
+        repository,
+        'pubspec.yaml',
+        'name: other\n'
+            'description: Other wallet\n'
+            'environment:\n'
+            '  sdk: ">=3.13.0 <4.0.0"\n'
+            '  flutter: ">=3.47.0"',
+      );
+      _write(
+        repository,
+        'lib/core/constants/app_constants.dart',
+        "class AppConstants { static const String appName = 'Other'; }",
+      );
+      _write(repository, 'lib/main.dart', 'class OtherApp {}');
+      _write(
+        repository,
+        'lib/core/config/app_environment.dart',
+        "const value = String.fromEnvironment('OTHER_NETWORK');",
+      );
+      _write(
+        repository,
+        'lib/core/storage/secure_storage_service.dart',
+        "accountName: 'com.other.wallet.secrets'\n"
+            "storageNamespace: 'other_wallet_secrets'\n"
+            'migrateOnAlgorithmChange: false\n'
+            'migrateWithBackup: true',
+      );
+      _write(
+        repository,
+        'android/app/src/main/AndroidManifest.xml',
+        '<application android:label="Other"/>',
+      );
+      _write(
+        repository,
+        'ios/Runner/Info.plist',
+        '<key>CFBundleDisplayName</key><string>Other</string>\n'
+            '<key>CFBundleName</key><string>Other</string>',
+      );
+      final iosProject = File(
+        '${repository.path}/ios/Runner.xcodeproj/project.pbxproj',
+      );
+      iosProject.writeAsStringSync(
+        iosProject.readAsStringSync().replaceAll('AsterIcon', 'OtherIcon'),
+      );
+
+      final result = _verify(
+        repository,
+        flutterVersionMetadata,
+        flutterExtension,
+        flutterGradleUtils,
+      );
+
+      expect(
+        result.failures,
+        containsAll(<Matcher>[
+          contains('must identify the Aster package'),
+          contains('must identify Aster as the product'),
+          contains('must bundle the Aster product mark'),
+          contains('Flutter product identity must be exactly Aster'),
+          contains('Flutter application root must be owned by Aster'),
+          contains('Android application label must be exactly Aster'),
+          contains('iOS CFBundleDisplayName must be exactly Aster'),
+          contains('iOS CFBundleName must be exactly Aster'),
+          contains('must use the Aster icon catalog'),
+          contains('must use the Aster environment namespace'),
+          contains('iOS secure storage must use the Aster wallet namespace'),
+          contains(
+            'Android secure storage must use the Aster wallet namespace',
+          ),
+          contains('must permit the pinned plugin to bootstrap'),
+          contains('must not enable the plugin backup compatibility path'),
+        ]),
+      );
+    },
+  );
+
+  test('rejects protocol and asset aliases in the app-owned chain parser', () {
+    _write(
+      repository,
+      'lib/core/config/app_environment.dart',
+      "const value = String.fromEnvironment('ASTER_NETWORK');\n"
+          "final alias = switch (value) {\n"
+          "  'bitcoin' => BlockchainEnvironment.mainnet,\n"
+          "  'utexo' => BlockchainEnvironment.signet,\n"
+          '};',
+    );
+
+    final result = _verify(
+      repository,
+      flutterVersionMetadata,
+      flutterExtension,
+      flutterGradleUtils,
+    );
+
+    expect(
+      result.failures,
+      contains(
+        'The app-owned chain parser must not accept asset or protocol names '
+        'as blockchain environments.',
+      ),
+    );
+  });
+
+  test('rejects retired wallet identity and protocol-branded product copy', () {
+    final retiredStackName = String.fromCharCodes(const [71, 68, 75]);
+    final protocolName = String.fromCharCodes(const [85, 84, 69, 88, 79]);
+    _write(
+      repository,
+      'lib/features/wallet/data/retired_stack.dart',
+      "const retiredStack = '$retiredStackName';",
+    );
+    _write(
+      repository,
+      'lib/features/home/presentation/protocol_brand.dart',
+      "const productLabel = '$protocolName Wallet';",
+    );
+
+    final result = _verify(
+      repository,
+      flutterVersionMetadata,
+      flutterExtension,
+      flutterGradleUtils,
+    );
+
+    expect(
+      result.failures,
+      containsAll(<Matcher>[
+        contains('contains retired wallet-stack vocabulary'),
+        contains('presents the protocol name as Aster product identity'),
+      ]),
+    );
   });
 
   test('rejects omitted NDK and divergent Nix revisions', () {
@@ -917,7 +1095,7 @@ library_count=1
     );
     project.writeAsStringSync(
       project.readAsStringSync().replaceFirst(
-        'com.example.utexo.profile;',
+        'com.example.asterdev.profile;',
         'com.example.other.profile;',
       ),
     );
@@ -934,7 +1112,7 @@ library_count=1
       iosIntegration
           .readAsStringSync()
           .replaceFirst(
-            'readonly release_bundle="com.example.utexo"',
+            'readonly release_bundle="com.example.asterdev"',
             'readonly release_bundle="com.example.other"',
           )
           .replaceFirst(
@@ -950,7 +1128,7 @@ library_count=1
     final development = File('${repository.path}/docs/DEVELOPMENT.md');
     development.writeAsStringSync(
       development.readAsStringSync().replaceFirst(
-        '`com.example.utexo.debug`',
+        '`com.example.asterdev.debug`',
         '`com.example.other.debug`',
       ),
     );
@@ -971,7 +1149,7 @@ library_count=1
         contains('iOS integration wrapper must use release identity'),
         contains('iOS integration wrapper must derive its debug identity'),
         contains('iOS integration must install the exact built debug artifact'),
-        contains('must document platform identity com.example.utexo.debug'),
+        contains('must document platform identity com.example.asterdev.debug'),
       ]),
     );
   });
@@ -1045,7 +1223,7 @@ library_count=1
     );
     androidPerformance.writeAsStringSync(
       androidPerformance.readAsStringSync().replaceFirst(
-        r'''utexo_android_package_paths "${adb}" "${device_id}" "$1"''',
+        r'''aster_android_package_paths "${adb}" "${device_id}" "$1"''',
         r'''printf 'package:/unvalidated.apk\n' || true''',
       ),
     );
@@ -1401,8 +1579,8 @@ esac''');
       'scripts/verify-android-release-bundle.sh',
       'fvm dart run tool/verify_android_release_identity.dart \\\n'
           '  --bundle "\${bundle_path}" \\\n'
-          '  --aapt2-proto "\${UTEXO_AAPT2_PROTO_JAR}" \\\n'
-          '  --protobuf "\${UTEXO_PROTOBUF_JAR}"\n'
+          '  --aapt2-proto "\${ASTER_AAPT2_PROTO_JAR}" \\\n'
+          '  --protobuf "\${ASTER_PROTOBUF_JAR}"\n'
           'jarsigner -verify "\${bundle_path}"',
     );
 
@@ -1611,50 +1789,50 @@ esac''');
             '/usr/bin/dart',
           )
           .replaceFirst(
-            r'${_utexo_bounded_flutter_root}/bin/cache/dart-sdk/bin/dart',
+            r'${_aster_bounded_flutter_root}/bin/cache/dart-sdk/bin/dart',
             '/usr/bin/dart',
           )
           .replaceFirst(
-            'readonly UTEXO_BOUNDED_FLUTTER_VERSION=3.47.0',
-            'readonly UTEXO_BOUNDED_FLUTTER_VERSION=3.46.0',
+            'readonly ASTER_BOUNDED_FLUTTER_VERSION=3.47.0',
+            'readonly ASTER_BOUNDED_FLUTTER_VERSION=3.46.0',
           )
           .replaceFirst(
-            r'_utexo_bounded_dart="${UTEXO_BOUNDED_LOCAL_DART}"',
-            r'_utexo_bounded_dart="${FLUTTER_ROOT}/bin/dart"',
+            r'_aster_bounded_dart="${ASTER_BOUNDED_LOCAL_DART}"',
+            r'_aster_bounded_dart="${FLUTTER_ROOT}/bin/dart"',
           )
           .replaceFirst(
-            r'"${_utexo_bounded_flutter_root}" == /* &&',
-            r'-n "${_utexo_bounded_flutter_root}" &&',
+            r'"${_aster_bounded_flutter_root}" == /* &&',
+            r'-n "${_aster_bounded_flutter_root}" &&',
           )
           .replaceFirst(
-            r'${_utexo_bounded_flutter_root}/bin/cache/flutter.version.json',
-            r'${_utexo_bounded_flutter_root}/version',
+            r'${_aster_bounded_flutter_root}/bin/cache/flutter.version.json',
+            r'${_aster_bounded_flutter_root}/version',
           )
           .replaceFirst(
-            r'_utexo_bounded_flutter_version_count=$((_utexo_bounded_flutter_version_count + 1))',
-            '_utexo_bounded_flutter_version_count=1',
+            r'_aster_bounded_flutter_version_count=$((_aster_bounded_flutter_version_count + 1))',
+            '_aster_bounded_flutter_version_count=1',
           )
           .replaceFirst(
-            r'"${_utexo_bounded_flutter_version_count}" == 1 &&',
-            r'-n "${_utexo_bounded_flutter_version}" &&',
+            r'"${_aster_bounded_flutter_version_count}" == 1 &&',
+            r'-n "${_aster_bounded_flutter_version}" &&',
           )
           .replaceFirst(
-            'readonly UTEXO_BOUNDED_COMMAND_LOADED=1',
-            'readonly UTEXO_BOUNDED_COMMAND_LOADED=1\ncommand -v dart',
+            'readonly ASTER_BOUNDED_COMMAND_LOADED=1',
+            'readonly ASTER_BOUNDED_COMMAND_LOADED=1\ncommand -v dart',
           )
           .replaceFirst(
             r'if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then',
             r'if [[ "${BASH_SOURCE[0]}" == "disabled" ]]; then',
           )
           .replaceFirst(
-            '  unset UTEXO_BOUNDED_COMMAND_LOADED',
+            '  unset ASTER_BOUNDED_COMMAND_LOADED',
             '  : # inherited guard left trusted',
           )
           .replaceFirst(
-            'readonly UTEXO_BOUNDED_COMMAND_LOADED=1',
-            'UTEXO_BOUNDED_COMMAND_LOADED=1',
+            'readonly ASTER_BOUNDED_COMMAND_LOADED=1',
+            'ASTER_BOUNDED_COMMAND_LOADED=1',
           )
-          .replaceFirst('readonly UTEXO_BUILD_TIMEOUT_SECONDS=3600', ''),
+          .replaceFirst('readonly ASTER_BUILD_TIMEOUT_SECONDS=3600', ''),
     );
     final runner = File('${repository.path}/tool/run_bounded_command.dart');
     runner.writeAsStringSync(
@@ -1824,7 +2002,7 @@ esac''');
     _write(
       repository,
       'scripts/run-android-integration-test.sh',
-      'readonly release_package="com.example.utexo"\n'
+      'readonly release_package="com.example.asterdev"\n'
           'readonly test_package="\${release_package}.debug"',
     );
 

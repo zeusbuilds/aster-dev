@@ -6,7 +6,6 @@ import 'package:aster/features/wallet/data/runtime/runtime.dart';
 import 'package:aster/features/wallet/data/storage/storage.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/wallet_fakes.dart';
 
@@ -57,7 +56,7 @@ void main() {
   );
 
   test('marks an unverifiable secure write outcome as unknown', () async {
-    final key = 'utexo_wallet_secret_v2.$firstId';
+    final key = 'aster.wallet.secret.$firstId';
     final raw = MemorySecureStore()
       ..writeError = StateError('injected write response failure')
       ..commitWriteBeforeError = true
@@ -101,7 +100,7 @@ void main() {
   test('corrupt secure record fails closed and is not deleted', () async {
     final raw = MemorySecureStore();
     final store = WalletSecretStore(raw);
-    raw.values['utexo_wallet_secret_v2.$firstId'] = '{not-json';
+    raw.values['aster.wallet.secret.$firstId'] = '{not-json';
 
     final result = await store.read(firstId, expectedStorageToken: firstToken);
 
@@ -113,10 +112,31 @@ void main() {
     expect(raw.values, hasLength(1));
   });
 
+  test('credential store rejects every non-current schema', () async {
+    final raw = MemorySecureStore();
+    final store = WalletSecretStore(raw);
+    final key = 'aster.wallet.secret.$firstId';
+    raw.values[key] = jsonEncode({
+      'version': 2,
+      'databasePassword': 'database-password',
+      'mnemonic': 'valid mnemonic words',
+      'storageToken': firstToken,
+    });
+
+    final result = await store.read(firstId, expectedStorageToken: firstToken);
+
+    expect(result, isA<AppFailureResult<WalletSecret>>());
+    expect(
+      (result as AppFailureResult<WalletSecret>).failure.code,
+      'stored_data_invalid',
+    );
+    expect(raw.values[key], isNotNull);
+  });
+
   test('oversized secure records are rejected before JSON decoding', () async {
     final raw = MemorySecureStore();
     final store = WalletSecretStore(raw);
-    raw.values['utexo_wallet_secret_v2.$firstId'] = 'x' * 4097;
+    raw.values['aster.wallet.secret.$firstId'] = 'x' * 4097;
 
     final result = await store.read(firstId, expectedStorageToken: firstToken);
 
@@ -133,8 +153,8 @@ void main() {
     () async {
       final raw = MemorySecureStore();
       final store = WalletSecretStore(raw);
-      raw.values['utexo_wallet_secret_v2.$firstId'] = jsonEncode({
-        'version': 2,
+      raw.values['aster.wallet.secret.$firstId'] = jsonEncode({
+        'version': 1,
         'storageToken': firstToken,
       });
 
@@ -203,49 +223,32 @@ void main() {
   });
 
   test(
-    'unowned legacy credentials require recovery and cannot be deleted',
+    'credential inventory returns only valid Aster wallet records',
     () async {
-      final raw = MemorySecureStore();
-      raw.values['utexo_wallet_secret_v1.$firstId'] = jsonEncode({
-        'version': 1,
-        'databasePassword': 'legacy-password',
-        'mnemonic': 'legacy mnemonic',
-      });
+      final raw = MemorySecureStore()..values['unrelated.key'] = 'retained';
       final store = WalletSecretStore(raw);
-
-      final read = await store.read(firstId, expectedStorageToken: firstToken);
-      final deletion = await store.delete(firstId, storageToken: firstToken);
-
-      expect(read, isA<AppFailureResult<WalletSecret>>());
-      final readFailure = (read as AppFailureResult<WalletSecret>).failure;
-      expect(readFailure.code, 'wallet_recovery_required');
-      expect(readFailure.requiresReconciliation, isTrue);
-      expect(readFailure.outcomeUnknown, isFalse);
-      expect(deletion, isA<AppFailureResult<void>>());
-      expect(
-        (deletion as AppFailureResult<void>).failure.requiresReconciliation,
-        isTrue,
+      await store.write(
+        firstId,
+        const WalletSecret(
+          databasePassword: 'database-password',
+          mnemonic: 'valid mnemonic words',
+          storageToken: firstToken,
+        ),
       );
-      expect(raw.values, hasLength(1));
-      final inventory = await store.walletIds();
-      expect(inventory, isA<AppFailureResult<Set<String>>>());
-      expect(
-        (inventory as AppFailureResult<Set<String>>).failure.code,
-        'wallet_recovery_required',
-      );
+
+      final result = await store.walletIds();
+
+      expect(result, isA<AppSuccess<Set<String>>>());
+      expect((result as AppSuccess<Set<String>>).value, {firstId});
+      expect(raw.values['unrelated.key'], 'retained');
     },
   );
 
   test(
     'profile mutations serialize without losing concurrent writes',
     () async {
-      SharedPreferences.setMockInitialValues({});
-      final preferences = await SharedPreferences.getInstance();
       final documents = MemoryWalletRegistryDocumentStore();
-      final store = WalletProfileStore(
-        documents,
-        PreferencesService(preferences),
-      );
+      final store = WalletProfileStore(documents);
       final now = DateTime.utc(2026, 8, 8);
       final first = WalletProfile(
         id: firstId,
@@ -283,13 +286,10 @@ void main() {
   );
 
   test('committing provisioning advances the profile update time', () async {
-    SharedPreferences.setMockInitialValues({});
-    final preferences = await SharedPreferences.getInstance();
     final createdAt = DateTime.utc(2026, 8, 8);
     final committedAt = DateTime.utc(2026, 8, 9);
     final store = WalletProfileStore(
       MemoryWalletRegistryDocumentStore(),
-      PreferencesService(preferences),
       clock: () => committedAt,
     );
     await store.stageProvision(
@@ -312,12 +312,7 @@ void main() {
   });
 
   test('profile state races return explicit redacted conflicts', () async {
-    SharedPreferences.setMockInitialValues({});
-    final preferences = await SharedPreferences.getInstance();
-    final store = WalletProfileStore(
-      MemoryWalletRegistryDocumentStore(),
-      PreferencesService(preferences),
-    );
+    final store = WalletProfileStore(MemoryWalletRegistryDocumentStore());
     final now = DateTime.utc(2026, 8, 8);
     final profile = WalletProfile(
       id: firstId,
@@ -357,12 +352,7 @@ void main() {
   });
 
   test('profile rollback removal is idempotent', () async {
-    SharedPreferences.setMockInitialValues({});
-    final preferences = await SharedPreferences.getInstance();
-    final store = WalletProfileStore(
-      MemoryWalletRegistryDocumentStore(),
-      PreferencesService(preferences),
-    );
+    final store = WalletProfileStore(MemoryWalletRegistryDocumentStore());
 
     final result = await store.remove(firstId);
 
@@ -373,14 +363,9 @@ void main() {
   });
 
   test('corrupt profile registry fails without overwriting evidence', () async {
-    SharedPreferences.setMockInitialValues({});
-    final preferences = await SharedPreferences.getInstance();
     final documents = MemoryWalletRegistryDocumentStore()
       ..document = '{corrupt';
-    final store = WalletProfileStore(
-      documents,
-      PreferencesService(preferences),
-    );
+    final store = WalletProfileStore(documents);
 
     final result = await store.read();
 
@@ -388,11 +373,30 @@ void main() {
     expect(documents.document, '{corrupt');
   });
 
+  test('profile store rejects every non-current schema', () async {
+    final encoded = jsonEncode({
+      'version': 2,
+      'activeWalletId': null,
+      'profiles': <Object?>[],
+    });
+    final documents = MemoryWalletRegistryDocumentStore()..document = encoded;
+    final store = WalletProfileStore(documents);
+
+    final result = await store.read();
+
+    expect(result, isA<AppFailureResult<WalletRegistry>>());
+    expect(
+      (result as AppFailureResult<WalletRegistry>).failure.code,
+      'stored_data_invalid',
+    );
+    expect(documents.document, encoded);
+  });
+
   test(
     'wrongly typed profile fields are classified as stored corruption',
     () async {
       final encoded = jsonEncode({
-        'version': 3,
+        'version': 1,
         'activeWalletId': firstId,
         'profiles': [
           {
@@ -405,13 +409,8 @@ void main() {
           },
         ],
       });
-      SharedPreferences.setMockInitialValues({});
-      final preferences = await SharedPreferences.getInstance();
       final documents = MemoryWalletRegistryDocumentStore()..document = encoded;
-      final store = WalletProfileStore(
-        documents,
-        PreferencesService(preferences),
-      );
+      final store = WalletProfileStore(documents);
 
       final result = await store.read();
 
@@ -427,11 +426,9 @@ void main() {
   test(
     'non-UTC profile timestamps are rejected as stored corruption',
     () async {
-      SharedPreferences.setMockInitialValues({});
-      final preferences = await SharedPreferences.getInstance();
       final documents = MemoryWalletRegistryDocumentStore()
         ..document = jsonEncode({
-          'version': 3,
+          'version': 1,
           'activeWalletId': firstId,
           'profiles': [
             {
@@ -445,10 +442,7 @@ void main() {
             },
           ],
         });
-      final store = WalletProfileStore(
-        documents,
-        PreferencesService(preferences),
-      );
+      final store = WalletProfileStore(documents);
 
       final result = await store.read();
 
@@ -460,97 +454,9 @@ void main() {
     },
   );
 
-  test('unowned v2 registry requires recovery and remains untouched', () async {
-    final now = DateTime.utc(2026, 8, 8).toIso8601String();
-    SharedPreferences.setMockInitialValues({
-      StorageKeys.legacyWalletRegistryV2: jsonEncode({
-        'version': 2,
-        'activeWalletId': firstId,
-        'profiles': [
-          {
-            'id': firstId,
-            'name': 'Legacy',
-            'createdAt': now,
-            'updatedAt': now,
-            'environment': 'regtest',
-          },
-        ],
-      }),
-    });
-    final preferences = await SharedPreferences.getInstance();
-    final documents = MemoryWalletRegistryDocumentStore();
-    final store = WalletProfileStore(
-      documents,
-      PreferencesService(preferences),
-    );
-
-    final result = await store.read();
-
-    expect(result, isA<AppFailureResult<WalletRegistry>>());
-    final failure = (result as AppFailureResult<WalletRegistry>).failure;
-    expect(failure.code, 'wallet_recovery_required');
-    expect(failure.requiresReconciliation, isTrue);
-    expect(failure.outcomeUnknown, isFalse);
-    expect(documents.document, isNull);
-    expect(
-      preferences.getString(StorageKeys.legacyWalletRegistryV2),
-      isNotNull,
-    );
-  });
-
-  test(
-    'metadata-only v1 registry requires recovery and remains untouched',
-    () async {
-      const legacy = '{"version":1,"profiles":[]}';
-      SharedPreferences.setMockInitialValues({
-        StorageKeys.legacyWalletRegistryV1: legacy,
-      });
-      final preferences = await SharedPreferences.getInstance();
-      final documents = MemoryWalletRegistryDocumentStore();
-      final store = WalletProfileStore(
-        documents,
-        PreferencesService(preferences),
-      );
-
-      final result = await store.read();
-
-      expect(result, isA<AppFailureResult<WalletRegistry>>());
-      expect(
-        (result as AppFailureResult<WalletRegistry>).failure.code,
-        'wallet_recovery_required',
-      );
-      expect(preferences.getString(StorageKeys.legacyWalletRegistryV1), legacy);
-      expect(documents.document, isNull);
-    },
-  );
-
-  test('a current journal never masks legacy wallet metadata', () async {
-    const legacy = '{"version":1,"profiles":[]}';
-    const current = '{"version":3,"activeWalletId":null,"profiles":[]}';
-    SharedPreferences.setMockInitialValues({
-      StorageKeys.legacyWalletRegistryV1: legacy,
-    });
-    final preferences = await SharedPreferences.getInstance();
-    final documents = MemoryWalletRegistryDocumentStore()..document = current;
-    final store = WalletProfileStore(
-      documents,
-      PreferencesService(preferences),
-    );
-
-    final result = await store.read();
-
-    expect(result, isA<AppFailureResult<WalletRegistry>>());
-    expect(
-      (result as AppFailureResult<WalletRegistry>).failure.code,
-      'wallet_recovery_required',
-    );
-    expect(preferences.getString(StorageKeys.legacyWalletRegistryV1), legacy);
-    expect(documents.document, current);
-  });
-
   test('wallet registry journal restores its newest flushed slot', () async {
     final root = await Directory.systemTemp.createTemp(
-      'utexo-registry-journal-',
+      'aster-registry-journal-',
     );
     addTearDown(() => root.delete(recursive: true));
     final security = MemoryWalletStorageSecurity();
@@ -567,7 +473,7 @@ void main() {
 
   test('wallet registry journal retries one uncertain atomic commit', () async {
     final root = await Directory.systemTemp.createTemp(
-      'utexo-registry-journal-',
+      'aster-registry-journal-',
     );
     addTearDown(() => root.delete(recursive: true));
     final security = MemoryWalletStorageSecurity()
@@ -584,7 +490,7 @@ void main() {
     'wallet registry journal falls back from a corrupt newest slot',
     () async {
       final root = await Directory.systemTemp.createTemp(
-        'utexo-registry-journal-',
+        'aster-registry-journal-',
       );
       addTearDown(() => root.delete(recursive: true));
       final store = IoWalletRegistryDocumentStore(
@@ -604,7 +510,7 @@ void main() {
     'wallet registry journal fails closed when every slot is corrupt',
     () async {
       final root = await Directory.systemTemp.createTemp(
-        'utexo-registry-journal-',
+        'aster-registry-journal-',
       );
       addTearDown(() => root.delete(recursive: true));
       final store = IoWalletRegistryDocumentStore(
@@ -627,7 +533,7 @@ void main() {
 
   test('failed journal replacement retains the previous valid slot', () async {
     final root = await Directory.systemTemp.createTemp(
-      'utexo-registry-journal-',
+      'aster-registry-journal-',
     );
     addTearDown(() => root.delete(recursive: true));
     final store = IoWalletRegistryDocumentStore(
@@ -649,7 +555,7 @@ void main() {
 
   test('orphan journal temporary files never become committed data', () async {
     final root = await Directory.systemTemp.createTemp(
-      'utexo-registry-journal-',
+      'aster-registry-journal-',
     );
     addTearDown(() => root.delete(recursive: true));
     await File(
@@ -666,7 +572,7 @@ void main() {
   });
 
   test('wallet directories distinguish create, open, and collision', () async {
-    final root = await Directory.systemTemp.createTemp('utexo-wallet-test-');
+    final root = await Directory.systemTemp.createTemp('aster-wallet-test-');
     addTearDown(() => root.delete(recursive: true));
     final security = MemoryWalletStorageSecurity();
     final manager = IoWalletDirectoryManager(root.path, security);
@@ -679,7 +585,7 @@ void main() {
     expect(await manager.open(firstId, storageToken: firstToken), created);
     expect(security.verifiedDirectories, [root.path, created]);
     expect(security.verifiedFiles, [
-      '$created${Platform.pathSeparator}.utexo-storage-owner',
+      '$created${Platform.pathSeparator}.aster-storage-owner',
     ]);
     await expectLater(
       manager.open(firstId, storageToken: secondToken),
@@ -702,7 +608,7 @@ void main() {
   });
 
   test('wallet directory preserves an ambiguous marker rollback', () async {
-    final root = await Directory.systemTemp.createTemp('utexo-wallet-test-');
+    final root = await Directory.systemTemp.createTemp('aster-wallet-test-');
     addTearDown(() => root.delete(recursive: true));
     final security = MemoryWalletStorageSecurity()
       ..replaceFailuresRemaining = 1;
@@ -737,63 +643,5 @@ void main() {
       await Directory('${root.path}${Platform.pathSeparator}$firstId').exists(),
       isTrue,
     );
-  });
-
-  test(
-    'legacy preflight rechecks an empty namespace on every startup',
-    () async {
-      final source = MemoryLegacyWalletSeedSource()
-        ..values['access_token'] = 'must remain';
-      final preflight = LegacyWalletSeedMigrationGuard(source);
-
-      expect(await preflight.verify(), isA<AppSuccess<void>>());
-      expect(source.values, {'access_token': 'must remain'});
-
-      expect(await preflight.verify(), isA<AppSuccess<void>>());
-      expect(source.readCount, 2);
-    },
-  );
-
-  test(
-    'legacy preflight detects a seed introduced after an empty check',
-    () async {
-      final source = MemoryLegacyWalletSeedSource();
-      final preflight = LegacyWalletSeedMigrationGuard(source);
-
-      expect(await preflight.verify(), isA<AppSuccess<void>>());
-      source.values['wallet_seed_0123456789ABCDEF'] = 'secret words';
-      final result = await preflight.verify();
-
-      expect(result, isA<AppFailureResult<void>>());
-      final failure = (result as AppFailureResult<void>).failure;
-      expect(failure.code, 'wallet_recovery_required');
-      expect(failure.requiresReconciliation, isTrue);
-      expect(failure.outcomeUnknown, isFalse);
-    },
-  );
-
-  test('legacy preflight preserves seeds and requires recovery', () async {
-    final source = MemoryLegacyWalletSeedSource()
-      ..values['wallet_seed_0123456789ABCDEF'] = 'secret words';
-    final preflight = LegacyWalletSeedMigrationGuard(source);
-
-    final result = await preflight.verify();
-
-    expect(result, isA<AppFailureResult<void>>());
-    final failure = (result as AppFailureResult<void>).failure;
-    expect(failure.code, 'wallet_recovery_required');
-    expect(failure.requiresReconciliation, isTrue);
-    expect(failure.outcomeUnknown, isFalse);
-    expect(source.values, {'wallet_seed_0123456789ABCDEF': 'secret words'});
-  });
-
-  test('legacy preflight reports a source read failure', () async {
-    final source = MemoryLegacyWalletSeedSource()
-      ..readError = StateError('injected read failure');
-    final preflight = LegacyWalletSeedMigrationGuard(source);
-
-    final result = await preflight.verify();
-
-    expect(result, isA<AppFailureResult<void>>());
   });
 }

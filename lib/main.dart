@@ -18,7 +18,7 @@ void main() async {
   // Run ASAP so we can show the startup animation while bootstrapping.
   runApp(
     AppLoader(
-      child: const UtexoApp(),
+      child: const AsterApp(),
       initialize: () async {
         final sharedPreferences = await SharedPreferences.getInstance();
         return bootstrapApplication(sharedPreferences);
@@ -27,15 +27,15 @@ void main() async {
   );
 }
 
-/// Root UTEXO application and authoritative app-lifecycle observer.
-class UtexoApp extends ConsumerStatefulWidget {
-  const UtexoApp({super.key});
+/// Root Aster application and authoritative app-lifecycle observer.
+class AsterApp extends ConsumerStatefulWidget {
+  const AsterApp({super.key});
 
   @override
-  ConsumerState<UtexoApp> createState() => _UtexoAppState();
+  ConsumerState<AsterApp> createState() => _AsterAppState();
 }
 
-class _UtexoAppState extends ConsumerState<UtexoApp>
+class _AsterAppState extends ConsumerState<AsterApp>
     with WidgetsBindingObserver {
   @override
   void initState() {

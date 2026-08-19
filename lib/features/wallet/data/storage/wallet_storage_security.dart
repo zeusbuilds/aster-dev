@@ -31,7 +31,7 @@ abstract interface class WalletStorageSecurity {
 final class PlatformWalletStorageSecurity implements WalletStorageSecurity {
   const PlatformWalletStorageSecurity();
 
-  static const _channel = MethodChannel('com.utexo.wallet/storage_security');
+  static const _channel = MethodChannel('com.aster.wallet/storage_security');
 
   @override
   Future<void> prepareRoot(String path) => _invoke('prepareRoot', path);

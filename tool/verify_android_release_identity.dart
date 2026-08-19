@@ -48,7 +48,7 @@ AndroidReleaseIdentity parseExpectedAndroidReleaseIdentity({
 
   final applicationIds = <String>[];
   final propertyPattern = RegExp(
-    r'^utexo\.applicationId='
+    r'^aster\.applicationId='
     r'([A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+)$',
   );
   for (final rawLine in gradleProperties.split('\n')) {
@@ -56,18 +56,18 @@ AndroidReleaseIdentity parseExpectedAndroidReleaseIdentity({
     if (line.isEmpty || line.startsWith('#') || line.startsWith('!')) {
       continue;
     }
-    if (!line.startsWith('utexo.applicationId=')) continue;
+    if (!line.startsWith('aster.applicationId=')) continue;
     final match = propertyPattern.firstMatch(line);
     if (match == null) {
       throw const FormatException(
-        'utexo.applicationId is malformed in android/gradle.properties.',
+        'aster.applicationId is malformed in android/gradle.properties.',
       );
     }
     applicationIds.add(match.group(1)!);
   }
   if (applicationIds.length != 1) {
     throw const FormatException(
-      'android/gradle.properties must declare one utexo.applicationId.',
+      'android/gradle.properties must declare one aster.applicationId.',
     );
   }
 
@@ -128,9 +128,9 @@ AndroidReleaseIdentity parseAapt2Badging(String output) {
 /// Parses the constrained output of `AndroidManifestInspector.java`.
 AndroidReleaseIdentity parseBundleManifestIdentity(String output) {
   const expectedKeys = {
-    'UTEXO_APPLICATION_ID',
-    'UTEXO_VERSION_NAME',
-    'UTEXO_VERSION_CODE',
+    'ASTER_APPLICATION_ID',
+    'ASTER_VERSION_NAME',
+    'ASTER_VERSION_CODE',
   };
   final values = <String, String>{};
   for (final rawLine in output.split('\n')) {
@@ -155,9 +155,9 @@ AndroidReleaseIdentity parseBundleManifestIdentity(String output) {
     throw const FormatException('Bundle inspector output is incomplete.');
   }
   return _identityFromValues(
-    applicationId: values['UTEXO_APPLICATION_ID'],
-    versionName: values['UTEXO_VERSION_NAME'],
-    versionCode: values['UTEXO_VERSION_CODE'],
+    applicationId: values['ASTER_APPLICATION_ID'],
+    versionName: values['ASTER_VERSION_NAME'],
+    versionCode: values['ASTER_VERSION_CODE'],
     source: 'bundle inspector',
   );
 }
@@ -259,7 +259,7 @@ Future<AndroidReleaseIdentity> _inspectArtifact(
     _requireFile(aapt2Proto, 'aapt2-proto jar');
     _requireFile(protobuf, 'protobuf jar');
     final temporaryDirectory = await Directory.systemTemp.createTemp(
-      'utexo_android_manifest_',
+      'aster_android_manifest_',
     );
     try {
       final manifest = File('${temporaryDirectory.path}/AndroidManifest.pb');

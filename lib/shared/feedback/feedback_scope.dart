@@ -39,7 +39,7 @@ extension AsterFeedbackContext on BuildContext {
     final service = AsterFeedbackScope.maybeOf(this)?.toasts;
     if (service == null) {
       throw FlutterError(
-        'Missing AsterFeedbackScope. Compose feature UI below the UTEXO app '
+        'Missing AsterFeedbackScope. Compose feature UI below the Aster app '
         'root or provide an explicit scope in widget tests.',
       );
     }

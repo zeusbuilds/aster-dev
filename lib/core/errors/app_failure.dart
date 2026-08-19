@@ -179,15 +179,3 @@ final class DurableStorageCommitException implements Exception {
   @override
   String toString() => 'DurableStorageCommitException';
 }
-
-/// Marker for metadata from the pre-native wallet architecture.
-///
-/// Those records contain no credential ownership proof, so callers must ask
-/// the user to restore from their recovery phrase rather than inventing a
-/// migration or silently discarding the record.
-final class LegacyWalletDataException implements Exception {
-  const LegacyWalletDataException();
-
-  @override
-  String toString() => 'LegacyWalletDataException';
-}

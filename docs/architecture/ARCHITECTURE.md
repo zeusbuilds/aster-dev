@@ -1,7 +1,20 @@
-# UTEXO Wallet Architecture
+# Aster Wallet Architecture
 
 This document describes the architecture that exists in this repository. It is
 an implementation contract, not an aspirational component list.
+
+## Product And Protocol Identity
+
+Aster is the wallet and owns every user-visible name plus every app-controlled
+identifier: Dart root types, native resources, storage namespaces, environment
+variables, logs, tooling, and documentation. UTEXO is the RGB protocol and SDK
+integration. Its name appears only where an external protocol contract requires
+it, including SDK public types, the signet service profile, service endpoints,
+artifact coordinates, and the pinned source repository.
+
+App code must never rename an external SDK symbol to hide its origin, and it
+must never reuse a protocol identifier as Aster product branding. This keeps
+the adapter boundary honest in both directions.
 
 ## Dependency Rule
 
@@ -56,9 +69,10 @@ initialization, unlock, sync, suspend, resume, reinitialization, switching, and
 destruction. The queue is not released while an uncancellable SDK future may
 still be running.
 
-`RgbWalletEngine` is the only adapter that retains `UtexoWallet`. It validates
-and converts native models to app-owned domain values. SDK DTOs, Pigeon maps,
-and native exception payloads do not reach repositories, ViewModels, or UI.
+`RgbWalletEngine` is the only adapter that retains the UTEXO protocol SDK's
+`UtexoWallet`. It validates and converts native models to app-owned domain
+values. SDK DTOs, Pigeon maps, and native exception payloads do not reach
+repositories, ViewModels, or UI.
 
 Provisioning is transactional:
 
@@ -68,8 +82,9 @@ Provisioning is transactional:
 4. Commit the profile as ready only after native activation succeeds.
 5. Roll back only resources whose ownership token is proven.
 
-Bootstrap reconciles interrupted states before opening the durable active
-wallet. Ambiguous or legacy data fails closed and remains preserved.
+Bootstrap reconciles interrupted current-schema provisioning before opening
+the durable active wallet. Aster has not shipped, so it carries no previous
+wallet format, compatibility reader, or data-migration path.
 
 ## Domain Model
 
@@ -118,7 +133,7 @@ request-generation, or publication-generation contracts.
 Market data is a typed repository boundary. Bitcoin and Tether quotes carry one
 selected ISO identity, integer minor units, provider timestamps, bounded
 freshness, and explicit unavailable state. Debug/profile may use CoinGecko's
-keyless pool; release mode makes no request without an approved UTEXO-owned
+keyless pool; release mode makes no request without an approved Aster-owned
 proxy because a mobile binary cannot protect a provider credential.
 
 ## Routing

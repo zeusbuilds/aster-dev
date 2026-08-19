@@ -17,17 +17,17 @@ fail() {
 
 [[ -x "${adb}" ]] || fail "adb is unavailable: ${adb}"
 [[ -n "${device_id}" ]] || fail "a device ID is required"
-utexo_bounded_boundary_available || fail "bounded command runner is unavailable"
+aster_bounded_boundary_available || fail "bounded command runner is unavailable"
 awk_bin="$(command -v awk)" || fail "awk is unavailable"
 readonly awk_bin
 
 readonly maximum_diagnostic_bytes=$((4 * 1024 * 1024))
 readonly maximum_renderer_output_bytes=4096
 renderer_line="$(
-  utexo_bounded_capture \
-    "${UTEXO_QUICK_TIMEOUT_SECONDS}" \
+  aster_bounded_capture \
+    "${ASTER_QUICK_TIMEOUT_SECONDS}" \
     "${maximum_renderer_output_bytes}" \
-    "${UTEXO_QUICK_OUTPUT_BYTES}" \
+    "${ASTER_QUICK_OUTPUT_BYTES}" \
     -- \
     /bin/bash --noprofile --norc -p -c '
       set -o pipefail
@@ -49,7 +49,7 @@ renderer_line="$(
             if (overflow) exit 65
           }
         '\''
-    ' utexo-android-performance-renderer \
+    ' aster-android-performance-renderer \
     "${adb}" \
     "${device_id}" \
     "${awk_bin}" \

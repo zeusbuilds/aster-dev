@@ -95,16 +95,6 @@ abstract final class FailureMapper {
         stackTrace: stackTrace,
       );
     }
-    if (error is LegacyWalletDataException) {
-      return _failure(
-        code: 'wallet_recovery_required',
-        kind: AppFailureKind.storage,
-        message: 'Restore this wallet with its recovery phrase to continue.',
-        requiresReconciliation: true,
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
     if (error is StorageOperationException) {
       return _failure(
         code: 'storage_operation_failed',

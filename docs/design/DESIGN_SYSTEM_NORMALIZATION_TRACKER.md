@@ -1,6 +1,6 @@
 # Design System Contract
 
-This document defines how UTEXO presentation code consumes the design system.
+This document defines how Aster presentation code consumes the design system.
 The authoritative release status and finding history live in
 `docs/PRODUCTION_REFACTOR_TRACKER.md`; this guide must not claim that a partial
 audit is a repository-wide clean bill of health.

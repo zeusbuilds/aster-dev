@@ -83,15 +83,11 @@ final class OnboardingTestHarness {
       ..generationError = generationError
       ..validationError = validationError;
     final repository = WalletRepository(
-      WalletProfileStore(
-        MemoryWalletRegistryDocumentStore(),
-        PreferencesService(preferences),
-      ),
+      WalletProfileStore(MemoryWalletRegistryDocumentStore()),
       runtime,
       keyGenerator,
       FakeWalletIdentityGenerator(walletId: '11111111111111111111111111111111'),
       services,
-      const SuccessfulLegacyWalletSeedPreflight(),
     );
     var clipboardText = '';
     final clipboard = PlatformSensitiveClipboardService(

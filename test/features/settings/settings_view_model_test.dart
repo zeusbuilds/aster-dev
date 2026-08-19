@@ -21,10 +21,10 @@ void main() {
 
   test('suppresses overlapping settings mutations', () async {
     SharedPreferences.setMockInitialValues({
-      'utexo.settings.v1.currency': 'USD',
-      'utexo.settings.v1.region': 'US',
-      'utexo.settings.v1.bitcoin_unit': 'btc',
-      'utexo.settings.v1.balances_visible': true,
+      'aster.settings.v1.currency': 'USD',
+      'aster.settings.v1.region': 'US',
+      'aster.settings.v1.bitcoin_unit': 'btc',
+      'aster.settings.v1.balances_visible': true,
     });
     final preferences = _DelayedPreferencesService(
       await SharedPreferences.getInstance(),
@@ -62,10 +62,10 @@ void main() {
 
   test('stale preference mutation cannot overwrite a rebuilt state', () async {
     SharedPreferences.setMockInitialValues({
-      'utexo.settings.v1.currency': 'USD',
-      'utexo.settings.v1.region': 'US',
-      'utexo.settings.v1.bitcoin_unit': 'btc',
-      'utexo.settings.v1.balances_visible': true,
+      'aster.settings.v1.currency': 'USD',
+      'aster.settings.v1.region': 'US',
+      'aster.settings.v1.bitcoin_unit': 'btc',
+      'aster.settings.v1.balances_visible': true,
     });
     final preferences = _DelayedPreferencesService(
       await SharedPreferences.getInstance(),
@@ -242,10 +242,10 @@ void main() {
 
   test('initial retry is inert for already-loaded settings', () async {
     SharedPreferences.setMockInitialValues({
-      'utexo.settings.v1.currency': 'USD',
-      'utexo.settings.v1.region': 'US',
-      'utexo.settings.v1.bitcoin_unit': 'btc',
-      'utexo.settings.v1.balances_visible': true,
+      'aster.settings.v1.currency': 'USD',
+      'aster.settings.v1.region': 'US',
+      'aster.settings.v1.bitcoin_unit': 'btc',
+      'aster.settings.v1.balances_visible': true,
     });
     final repository = SettingsRepository(
       PreferencesService(await SharedPreferences.getInstance()),

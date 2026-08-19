@@ -10,12 +10,12 @@ void main() {
   late File adbLog;
 
   setUp(() async {
-    root = Directory.systemTemp.createTempSync('utexo_android_package_state_');
+    root = Directory.systemTemp.createTempSync('aster_android_package_state_');
     adb = File('${root.path}/adb');
     adbLog = File('${root.path}/adb.log');
     await _writeExecutable(adb, r'''#!/bin/sh
-printf '%s\n' "$*" >> "${UTEXO_TEST_ADB_LOG}"
-case "${UTEXO_TEST_PACKAGE_MODE:-absent}" in
+printf '%s\n' "$*" >> "${ASTER_TEST_ADB_LOG}"
+case "${ASTER_TEST_PACKAGE_MODE:-absent}" in
   absent)
     ;;
   paths)
@@ -55,15 +55,15 @@ esac
     const command =
         'set -euo pipefail; '
         'source scripts/android-package-state.sh; '
-        'utexo_android_package_paths "\$1" test-device "\$2"';
+        'aster_android_package_paths "\$1" test-device "\$2"';
     return runTestProcess(
       'bash',
       ['-c', command, 'android-package-state-test', adb.path, packageName],
       workingDirectory: Directory.current.path,
       environment: <String, String>{
         ...Platform.environment,
-        'UTEXO_TEST_ADB_LOG': adbLog.path,
-        'UTEXO_TEST_PACKAGE_MODE': mode,
+        'ASTER_TEST_ADB_LOG': adbLog.path,
+        'ASTER_TEST_PACKAGE_MODE': mode,
       },
     );
   }

@@ -26,7 +26,7 @@ final class MarketDataConfiguration {
   /// Resolves compile-time configuration for the current build mode.
   factory MarketDataConfiguration.fromEnvironment() {
     return MarketDataConfiguration.resolve(
-      configuredBase: const String.fromEnvironment('UTEXO_MARKET_API_BASE_URL'),
+      configuredBase: const String.fromEnvironment('ASTER_MARKET_API_BASE_URL'),
       releaseMode: kReleaseMode,
     );
   }

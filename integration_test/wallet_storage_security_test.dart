@@ -29,7 +29,7 @@ void main() {
   testWidgets('secure wallet namespace round-trips without destructive reset', (
     tester,
   ) async {
-    const key = 'utexo.integration-test.secure-storage';
+    const key = 'aster.integration-test.secure-storage';
     const value = 'non-secret-storage-probe';
     final storage = SecureStorageService();
     await storage.delete(key: key);
@@ -50,7 +50,7 @@ void main() {
   ) async {
     final support = await getApplicationSupportDirectory();
     final root = Directory(
-      '${support.path}${Platform.pathSeparator}utexo_storage_policy_test',
+      '${support.path}${Platform.pathSeparator}aster_storage_policy_test',
     );
     if (await root.exists()) await root.delete(recursive: true);
     addTearDown(() async {

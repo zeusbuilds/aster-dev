@@ -43,22 +43,22 @@ final class PublicLinkConfiguration {
   factory PublicLinkConfiguration.fromEnvironment() {
     return PublicLinkConfiguration(
       contactSupport: _parseOptionalPublicUri(
-        const String.fromEnvironment('UTEXO_SUPPORT_URL'),
+        const String.fromEnvironment('ASTER_SUPPORT_URL'),
       ),
       termsOfService: _parseOptionalPublicUri(
-        const String.fromEnvironment('UTEXO_TERMS_URL'),
+        const String.fromEnvironment('ASTER_TERMS_URL'),
       ),
       privacyPolicy: _parseOptionalPublicUri(
-        const String.fromEnvironment('UTEXO_PRIVACY_URL'),
+        const String.fromEnvironment('ASTER_PRIVACY_URL'),
       ),
       twitter: _parseOptionalPublicUri(
-        const String.fromEnvironment('UTEXO_TWITTER_URL'),
+        const String.fromEnvironment('ASTER_TWITTER_URL'),
       ),
       telegram: _parseOptionalPublicUri(
-        const String.fromEnvironment('UTEXO_TELEGRAM_URL'),
+        const String.fromEnvironment('ASTER_TELEGRAM_URL'),
       ),
       instagram: _parseOptionalPublicUri(
-        const String.fromEnvironment('UTEXO_INSTAGRAM_URL'),
+        const String.fromEnvironment('ASTER_INSTAGRAM_URL'),
       ),
     );
   }

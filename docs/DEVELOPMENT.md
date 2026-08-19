@@ -1,6 +1,6 @@
 # Development Setup
 
-This guide explains how to set up the UTEXO wallet development environment.
+This guide explains how to set up the Aster wallet development environment.
 
 ## First-Time Setup
 
@@ -284,7 +284,7 @@ temporary directory before ELF inspection.
 
 ## Local SDK Development
 
-The committed dependency always points to the immutable public UTEXO SDK
+The committed dependency always points to the immutable public UTEXO protocol SDK
 commit. For temporary SDK development only, see
 `docs/architecture/SDK_INTEGRATION.md`. Never commit a path dependency or a
 `dependency_overrides` entry.
@@ -321,8 +321,8 @@ for regtest therefore requires explicit TLS-protected service endpoints; an
 unconfigured Release build fails closed instead of silently relying on a
 transport Android packaging already forbids.
 
-RGB USDT requires both `UTEXO_USDT_ASSET_ID` and
-`UTEXO_USDT_PRECISION` for the selected environment. These are non-secret
+RGB USDT requires both `ASTER_USDT_ASSET_ID` and
+`ASTER_USDT_PRECISION` for the selected environment. These are non-secret
 deployment identity values and must be supplied together. When either is
 missing, the app keeps both USDT rails visible but unavailable; it never infers
 an asset contract or decimal precision from the `USDT` ticker.
@@ -336,7 +336,7 @@ retains the required `Powered by CoinGecko` attribution. See CoinGecko's
 [keyless API policy](https://docs.coingecko.com/docs/keyless-public-api) and
 [API terms](https://www.coingecko.com/en/api_terms).
 
-Release builds fail closed unless `UTEXO_MARKET_API_BASE_URL` identifies a
+Release builds fail closed unless `ASTER_MARKET_API_BASE_URL` identifies a
 deployment-owned public HTTPS proxy that preserves the required CoinGecko API
 paths. The proxy owner must hold the appropriate data/API rights, keep provider
 credentials server-side, enforce its own abuse and availability policy, and
@@ -348,7 +348,7 @@ protect it.
 Example non-secret release identity:
 
 ```sh
---dart-define=UTEXO_MARKET_API_BASE_URL=https://market.utexo.example/api/v3
+--dart-define=ASTER_MARKET_API_BASE_URL=https://market.aster.example/api/v3
 ```
 
 The `.example` hostname above is documentation only and is deliberately
@@ -361,12 +361,12 @@ a guessed URL or enabled no-op command.
 
 | Define | Settings action |
 | --- | --- |
-| `UTEXO_SUPPORT_URL` | Contact Support |
-| `UTEXO_TERMS_URL` | Terms of Service |
-| `UTEXO_PRIVACY_URL` | Privacy Policy |
-| `UTEXO_TWITTER_URL` | Twitter |
-| `UTEXO_TELEGRAM_URL` | Telegram |
-| `UTEXO_INSTAGRAM_URL` | Instagram |
+| `ASTER_SUPPORT_URL` | Contact Support |
+| `ASTER_TERMS_URL` | Terms of Service |
+| `ASTER_PRIVACY_URL` | Privacy Policy |
+| `ASTER_TWITTER_URL` | Twitter |
+| `ASTER_TELEGRAM_URL` | Telegram |
+| `ASTER_INSTAGRAM_URL` | Instagram |
 
 Each configured destination must be a bounded public HTTPS URL without
 embedded credentials, a query, or a fragment. Literal IPs, localhost,

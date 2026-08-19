@@ -164,7 +164,7 @@ Future<BoundedProcessResult> runBoundedProcess(
               '-p',
               '-c',
               _posixProcessTreeSupervisor,
-              'utexo-bounded-process',
+              'aster-bounded-process',
               executable,
               ...arguments,
             ]

@@ -15,7 +15,7 @@ void main() {
   late File profileQueryCount;
 
   setUp(() async {
-    root = Directory.systemTemp.createTempSync('utexo_performance_wrapper_');
+    root = Directory.systemTemp.createTempSync('aster_performance_wrapper_');
     bin = Directory('${root.path}/bin')..createSync();
     sdk = Directory('${root.path}/sdk')..createSync();
     adbLog = File('${root.path}/adb.log');
@@ -24,17 +24,17 @@ void main() {
     debugQueryCount = File('${root.path}/debug-query-count');
     profileQueryCount = File('${root.path}/profile-query-count');
     await _writeExecutable(File('${bin.path}/fvm'), r'''#!/bin/sh
-printf '%s\n' "$*" >> "${UTEXO_TEST_FVM_LOG}"
+printf '%s\n' "$*" >> "${ASTER_TEST_FVM_LOG}"
 if [ "$1 $2 $3" = "flutter pub get" ]; then
   exit 0
 fi
 if [ "$1 $2" = "flutter drive" ]; then
-  exit "${UTEXO_TEST_DRIVE_STATUS:-17}"
+  exit "${ASTER_TEST_DRIVE_STATUS:-17}"
 fi
 exit 99
 ''');
     await _writeExecutable(File('${sdk.path}/platform-tools/adb'), r'''#!/bin/sh
-printf '%s\n' "$*" >> "${UTEXO_TEST_ADB_LOG}"
+printf '%s\n' "$*" >> "${ASTER_TEST_ADB_LOG}"
 case "$*" in
   "-s test-device get-state")
     printf 'device\n'
@@ -44,15 +44,15 @@ case "$*" in
     ;;
   "-s test-device shell pm path com.example.asterdev")
     count=0
-    if [ -f "${UTEXO_TEST_RELEASE_QUERY_COUNT}" ]; then
-      count="$(cat "${UTEXO_TEST_RELEASE_QUERY_COUNT}")"
+    if [ -f "${ASTER_TEST_RELEASE_QUERY_COUNT}" ]; then
+      count="$(cat "${ASTER_TEST_RELEASE_QUERY_COUNT}")"
     fi
     count=$((count + 1))
-    printf '%s' "${count}" > "${UTEXO_TEST_RELEASE_QUERY_COUNT}"
-    if [ "${UTEXO_TEST_FAIL_RELEASE_QUERY_CALL:-}" = "${count}" ]; then
+    printf '%s' "${count}" > "${ASTER_TEST_RELEASE_QUERY_COUNT}"
+    if [ "${ASTER_TEST_FAIL_RELEASE_QUERY_CALL:-}" = "${count}" ]; then
       exit 42
     fi
-    if [ "${UTEXO_TEST_MALFORMED_RELEASE_QUERY:-}" = "1" ]; then
+    if [ "${ASTER_TEST_MALFORMED_RELEASE_QUERY:-}" = "1" ]; then
       printf 'Error: package manager unavailable\n'
       exit 0
     fi
@@ -60,24 +60,24 @@ case "$*" in
     ;;
   "-s test-device shell pm path com.example.asterdev.debug")
     count=0
-    if [ -f "${UTEXO_TEST_DEBUG_QUERY_COUNT}" ]; then
-      count="$(cat "${UTEXO_TEST_DEBUG_QUERY_COUNT}")"
+    if [ -f "${ASTER_TEST_DEBUG_QUERY_COUNT}" ]; then
+      count="$(cat "${ASTER_TEST_DEBUG_QUERY_COUNT}")"
     fi
     count=$((count + 1))
-    printf '%s' "${count}" > "${UTEXO_TEST_DEBUG_QUERY_COUNT}"
-    if [ "${UTEXO_TEST_FAIL_DEBUG_QUERY_CALL:-}" = "${count}" ]; then
+    printf '%s' "${count}" > "${ASTER_TEST_DEBUG_QUERY_COUNT}"
+    if [ "${ASTER_TEST_FAIL_DEBUG_QUERY_CALL:-}" = "${count}" ]; then
       exit 44
     fi
     printf 'package:/debug/base.apk\n'
     ;;
   "-s test-device shell pm path com.example.asterdev.profile")
     count=0
-    if [ -f "${UTEXO_TEST_PROFILE_QUERY_COUNT}" ]; then
-      count="$(cat "${UTEXO_TEST_PROFILE_QUERY_COUNT}")"
+    if [ -f "${ASTER_TEST_PROFILE_QUERY_COUNT}" ]; then
+      count="$(cat "${ASTER_TEST_PROFILE_QUERY_COUNT}")"
     fi
     count=$((count + 1))
-    printf '%s' "${count}" > "${UTEXO_TEST_PROFILE_QUERY_COUNT}"
-    if [ "${UTEXO_TEST_FAIL_PROFILE_QUERY_CALL:-}" = "${count}" ]; then
+    printf '%s' "${count}" > "${ASTER_TEST_PROFILE_QUERY_COUNT}"
+    if [ "${ASTER_TEST_FAIL_PROFILE_QUERY_CALL:-}" = "${count}" ]; then
       exit 43
     fi
     if [ "${count}" -ge 2 ]; then
@@ -114,16 +114,16 @@ esac
       environment: <String, String>{
         ...Platform.environment,
         'ANDROID_SDK_ROOT': sdk.path,
-        'UTEXO_TEST_ADB_LOG': adbLog.path,
-        'UTEXO_TEST_FVM_LOG': fvmLog.path,
-        'UTEXO_TEST_RELEASE_QUERY_COUNT': releaseQueryCount.path,
-        'UTEXO_TEST_DEBUG_QUERY_COUNT': debugQueryCount.path,
-        'UTEXO_TEST_PROFILE_QUERY_COUNT': profileQueryCount.path,
-        'UTEXO_TEST_FAIL_RELEASE_QUERY_CALL': ?failReleaseQueryCall,
-        'UTEXO_TEST_FAIL_DEBUG_QUERY_CALL': ?failDebugQueryCall,
-        'UTEXO_TEST_FAIL_PROFILE_QUERY_CALL': ?failProfileQueryCall,
-        'UTEXO_TEST_DRIVE_STATUS': '$driveStatus',
-        if (malformedReleaseQuery) 'UTEXO_TEST_MALFORMED_RELEASE_QUERY': '1',
+        'ASTER_TEST_ADB_LOG': adbLog.path,
+        'ASTER_TEST_FVM_LOG': fvmLog.path,
+        'ASTER_TEST_RELEASE_QUERY_COUNT': releaseQueryCount.path,
+        'ASTER_TEST_DEBUG_QUERY_COUNT': debugQueryCount.path,
+        'ASTER_TEST_PROFILE_QUERY_COUNT': profileQueryCount.path,
+        'ASTER_TEST_FAIL_RELEASE_QUERY_CALL': ?failReleaseQueryCall,
+        'ASTER_TEST_FAIL_DEBUG_QUERY_CALL': ?failDebugQueryCall,
+        'ASTER_TEST_FAIL_PROFILE_QUERY_CALL': ?failProfileQueryCall,
+        'ASTER_TEST_DRIVE_STATUS': '$driveStatus',
+        if (malformedReleaseQuery) 'ASTER_TEST_MALFORMED_RELEASE_QUERY': '1',
         'PATH': '${bin.path}:${Platform.environment['PATH']}',
       },
     );

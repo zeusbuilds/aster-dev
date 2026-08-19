@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 
-_utexo_package_script_directory="${BASH_SOURCE[0]%/*}"
-[[ "${_utexo_package_script_directory}" != "${BASH_SOURCE[0]}" ]] ||
-  _utexo_package_script_directory=.
-source "${_utexo_package_script_directory}/bounded-command.sh"
+_aster_package_script_directory="${BASH_SOURCE[0]%/*}"
+[[ "${_aster_package_script_directory}" != "${BASH_SOURCE[0]}" ]] ||
+  _aster_package_script_directory=.
+source "${_aster_package_script_directory}/bounded-command.sh"
 
 # Prints the canonical installed paths for one Android package. An empty,
 # successful result means the package is absent; every malformed or failed
 # package-manager response remains a failure.
-utexo_android_package_paths() {
+aster_android_package_paths() {
   (($# == 3)) || return 64
   local package_adb="$1"
   local package_device_id="$2"
@@ -23,10 +23,10 @@ utexo_android_package_paths() {
   awk_bin="$(command -v awk)" || return 69
   sort_bin="$(command -v sort)" || return 69
   normalized_paths="$(
-    utexo_bounded_capture \
-      "${UTEXO_QUICK_TIMEOUT_SECONDS}" \
+    aster_bounded_capture \
+      "${ASTER_QUICK_TIMEOUT_SECONDS}" \
       65536 \
-      "${UTEXO_QUICK_OUTPUT_BYTES}" \
+      "${ASTER_QUICK_OUTPUT_BYTES}" \
       -- \
       /bin/bash --noprofile --norc -p -c '
         set -o pipefail
@@ -41,7 +41,7 @@ utexo_android_package_paths() {
         }
       '\'' |
           LC_ALL=C "$5" -u
-      ' utexo-android-package-paths \
+      ' aster-android-package-paths \
       "${package_adb}" \
       "${package_device_id}" \
       "${package_name}" \

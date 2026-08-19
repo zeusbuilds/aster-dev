@@ -42,7 +42,7 @@ from a clean worktree and record commands/results in the production tracker.
       or `rpc` loopback development transport survives composition
 - [ ] public app version/build number and upgrade policy are approved
 - [ ] Android APK/AAB artifacts are unsigned candidates or match the approved
-      `UTEXO_RELEASE_CERT_SHA256`; debug-signed artifacts are rejected
+      `ASTER_RELEASE_CERT_SHA256`; debug-signed artifacts are rejected
 - [ ] every signed AAB payload entry verifies under one approved certificate;
       partially signed, modified, duplicate-entry, and multi-signer bundles fail
 - [ ] APK/AAB archive inspection rejects unsafe/duplicate names and resource
@@ -58,7 +58,7 @@ from a clean worktree and record commands/results in the production tracker.
       power-of-two and offset/address-congruent ELF LOAD alignment, split APK
       ZIP alignment passes, and a 16 KiB runtime smoke passes without
       compatibility mode
-- [ ] approved `UTEXO_MARKET_API_BASE_URL`, provider license/attribution, proxy
+- [ ] approved `ASTER_MARKET_API_BASE_URL`, provider license/attribution, proxy
       availability, and server-side credential ownership
 - [ ] artifact sizes and SHA-256 digests recorded
 

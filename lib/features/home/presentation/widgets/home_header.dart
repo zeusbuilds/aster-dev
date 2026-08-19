@@ -38,9 +38,9 @@ class HomeHeader extends ConsumerWidget {
         children: [
           Semantics(
             image: true,
-            label: 'UTEXO',
+            label: 'Aster',
             child: SvgPicture.asset(
-              'assets/brand/utexo-mark.svg',
+              'assets/brand/aster-mark.svg',
               width: icons.xl,
               colorFilter: ColorFilter.mode(colors.onBrandArt, BlendMode.srcIn),
             ),

@@ -24,7 +24,7 @@ void main() {
     tester,
   ) async {
     final harness = await _harness(
-      preferenceValues: const {'utexo.settings.v1.bitcoin_unit': 'sats'},
+      preferenceValues: const {'aster.settings.v1.bitcoin_unit': 'sats'},
     );
     addTearDown(() => _disposeHarness(tester, harness));
 
@@ -136,7 +136,7 @@ void main() {
     tester,
   ) async {
     final harness = await _harness(
-      preferenceValues: const {'utexo.settings.v1.bitcoin_unit': 'sats'},
+      preferenceValues: const {'aster.settings.v1.bitcoin_unit': 'sats'},
     );
     addTearDown(() => _disposeHarness(tester, harness));
     final record = _onchainActivity();

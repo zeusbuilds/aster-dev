@@ -98,7 +98,7 @@ void main() {
 
   test('rejects malformed UTF-8 without replaying bytes', () async {
     final directory = Directory.systemTemp.createTempSync(
-      'utexo_bounded_command_utf8_',
+      'aster_bounded_command_utf8_',
     );
     try {
       final fixture = File('${directory.path}/fixture.dart')

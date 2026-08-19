@@ -7,7 +7,7 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
-        android:label="UTEXO"
+        android:label="Aster"
         android:name="${applicationName}"
         android:roundIcon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="false">

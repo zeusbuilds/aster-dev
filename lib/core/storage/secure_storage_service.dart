@@ -11,31 +11,35 @@ abstract interface class SecureKeyValueStore {
   Future<Set<String>> keys();
 }
 
-/// Platform secure-storage adapter with non-destructive wallet defaults.
+/// Platform secure-storage adapter for Aster wallet credentials.
 ///
-/// Secrets do not synchronize or migrate to another Apple device. Android
-/// corruption is surfaced instead of silently deleting all wallet secrets.
+/// Secrets do not synchronize to another Apple device. Android records live in
+/// one Aster-owned namespace and are never imported from an earlier app schema
+/// or namespace. Corruption is surfaced instead of deleting data.
 final class SecureStorageService implements SecureKeyValueStore {
   SecureStorageService({FlutterSecureStorage? storage})
     : _storage =
           storage ??
           const FlutterSecureStorage(
             iOptions: IOSOptions(
-              accountName: 'com.utexo.wallet.secrets.v1',
+              accountName: 'com.aster.wallet.secrets',
               accessibility: KeychainAccessibility.unlocked_this_device,
               synchronizable: false,
             ),
             aOptions: AndroidOptions(
               resetOnError: false,
-              // Pin the cryptographic contract instead of inheriting mutable
-              // plugin defaults. Version 10.3.1 treats absent first-install
-              // markers as legacy, so crash-safe migration must stay enabled.
+              // Version 10.3.1 treats absent cipher markers as its historical
+              // defaults, including in a fresh namespace. This initializes the
+              // selected OAEP/GCM markers inside Aster's isolated namespace; it
+              // does not import an earlier app-owned wallet contract.
               migrateOnAlgorithmChange: true,
-              migrateWithBackup: true,
+              // The plugin's backup path still addresses compatibility data.
+              // Aster has no released Android storage contract to recover.
+              migrateWithBackup: false,
               keyCipherAlgorithm:
                   KeyCipherAlgorithm.RSA_ECB_OAEPwithSHA_256andMGF1Padding,
               storageCipherAlgorithm: StorageCipherAlgorithm.AES_GCM_NoPadding,
-              storageNamespace: 'utexo_wallet_secrets_v1',
+              storageNamespace: 'aster_wallet_secrets',
             ),
           );
 

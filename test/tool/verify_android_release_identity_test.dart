@@ -4,17 +4,17 @@ import '../../tool/verify_android_release_identity.dart';
 
 void main() {
   const expected = AndroidReleaseIdentity(
-    applicationId: 'com.example.utexo',
+    applicationId: 'com.example.asterdev',
     versionName: '1.2.3',
     versionCode: 47,
   );
 
   test('parses authoritative source identity', () {
     final identity = parseExpectedAndroidReleaseIdentity(
-      pubspec: 'name: utexo\nversion: 1.2.3+47\n',
+      pubspec: 'name: aster\nversion: 1.2.3+47\n',
       gradleProperties:
           'android.useAndroidX=true\n'
-          'utexo.applicationId=com.example.utexo\n',
+          'aster.applicationId=com.example.asterdev\n',
     );
 
     expect(identity.applicationId, expected.applicationId);
@@ -26,7 +26,7 @@ void main() {
     expect(
       () => parseExpectedAndroidReleaseIdentity(
         pubspec: 'version: 1.2.3\n',
-        gradleProperties: 'utexo.applicationId=com.example.utexo\n',
+        gradleProperties: 'aster.applicationId=com.example.asterdev\n',
       ),
       throwsFormatException,
     );
@@ -34,15 +34,15 @@ void main() {
       () => parseExpectedAndroidReleaseIdentity(
         pubspec: 'version: 1.2.3+47\n',
         gradleProperties:
-            'utexo.applicationId=com.example.utexo\n'
-            'utexo.applicationId=com.example.other\n',
+            'aster.applicationId=com.example.asterdev\n'
+            'aster.applicationId=com.example.other\n',
       ),
       throwsFormatException,
     );
     expect(
       () => parseExpectedAndroidReleaseIdentity(
         pubspec: 'version: 1.2.3+47\n',
-        gradleProperties: 'utexo.applicationId=not-a-package\n',
+        gradleProperties: 'aster.applicationId=not-a-package\n',
       ),
       throwsFormatException,
     );
@@ -50,7 +50,7 @@ void main() {
 
   test('parses exact aapt2 package metadata', () {
     final identity = parseAapt2Badging(
-      "package: name='com.example.utexo' versionCode='2047' "
+      "package: name='com.example.asterdev' versionCode='2047' "
       "versionName='1.2.3' compileSdkVersion='36'\n"
       "sdkVersion:'24'\n"
       "native-code: 'arm64-v8a'\n",
@@ -66,7 +66,7 @@ void main() {
     expect(() => parseAapt2Badging('sdkVersion:\'24\''), throwsFormatException);
     expect(
       () => parseAapt2Badging(
-        "package: name='com.example.utexo' name='com.example.other' "
+        "package: name='com.example.asterdev' name='com.example.other' "
         "versionCode='2047' versionName='1.2.3'\n"
         "native-code: 'arm64-v8a'",
       ),
@@ -74,14 +74,14 @@ void main() {
     );
     expect(
       () => parseAapt2Badging(
-        "package: name='com.example.utexo' versionName='1.2.3'\n"
+        "package: name='com.example.asterdev' versionName='1.2.3'\n"
         "native-code: 'arm64-v8a'",
       ),
       throwsFormatException,
     );
     expect(
       () => parseAapt2Badging(
-        "package: name='com.example.utexo' versionCode='2047' "
+        "package: name='com.example.asterdev' versionCode='2047' "
         "versionName='1.2.3'\n"
         "native-code: 'arm64-v8a' 'x86_64'",
       ),
@@ -91,9 +91,9 @@ void main() {
 
   test('parses exact bundle manifest inspector output', () {
     final identity = parseBundleManifestIdentity(
-      'UTEXO_APPLICATION_ID=com.example.utexo\n'
-      'UTEXO_VERSION_CODE=47\n'
-      'UTEXO_VERSION_NAME=1.2.3\n',
+      'ASTER_APPLICATION_ID=com.example.asterdev\n'
+      'ASTER_VERSION_CODE=47\n'
+      'ASTER_VERSION_NAME=1.2.3\n',
     );
 
     expect(identity.applicationId, expected.applicationId);
@@ -104,26 +104,26 @@ void main() {
   test('rejects unknown, duplicate, or incomplete bundle output', () {
     expect(
       () => parseBundleManifestIdentity(
-        'UTEXO_APPLICATION_ID=com.example.utexo\n'
-        'UTEXO_VERSION_CODE=47\n',
+        'ASTER_APPLICATION_ID=com.example.asterdev\n'
+        'ASTER_VERSION_CODE=47\n',
       ),
       throwsFormatException,
     );
     expect(
       () => parseBundleManifestIdentity(
-        'UTEXO_APPLICATION_ID=com.example.utexo\n'
-        'UTEXO_VERSION_CODE=47\n'
-        'UTEXO_VERSION_NAME=1.2.3\n'
+        'ASTER_APPLICATION_ID=com.example.asterdev\n'
+        'ASTER_VERSION_CODE=47\n'
+        'ASTER_VERSION_NAME=1.2.3\n'
         'UNKNOWN=value\n',
       ),
       throwsFormatException,
     );
     expect(
       () => parseBundleManifestIdentity(
-        'UTEXO_APPLICATION_ID=com.example.utexo\n'
-        'UTEXO_VERSION_CODE=47\n'
-        'UTEXO_VERSION_CODE=48\n'
-        'UTEXO_VERSION_NAME=1.2.3\n',
+        'ASTER_APPLICATION_ID=com.example.asterdev\n'
+        'ASTER_VERSION_CODE=47\n'
+        'ASTER_VERSION_CODE=48\n'
+        'ASTER_VERSION_NAME=1.2.3\n',
       ),
       throwsFormatException,
     );

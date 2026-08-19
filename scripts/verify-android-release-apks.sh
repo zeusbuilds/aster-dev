@@ -7,7 +7,7 @@ script_directory="${BASH_SOURCE[0]%/*}"
 readonly root="$(cd "${script_directory}/.." && pwd -P)"
 cd "${root}"
 source "${root}/scripts/android-artifact-toolchain.sh"
-utexo_resolve_android_artifact_toolchain
+aster_resolve_android_artifact_toolchain
 
 readonly output_dir="${1:-build/app/outputs/flutter-apk}"
 
@@ -19,7 +19,7 @@ fail() {
 verify_signature() {
   local apk_path="$1"
 
-  utexo_run_inspector \
+  aster_run_inspector \
     "${root}/scripts/verify-android-apk-signature.sh" "${apk_path}"
 }
 
@@ -28,15 +28,15 @@ verify_apk() {
   local expected_abi="$2"
   [[ -f "${apk_path}" ]] || fail "missing ${apk_path}"
 
-  utexo_run_inspector \
-    "${UTEXO_BOUNDED_DART}" --disable-dart-dev \
+  aster_run_inspector \
+    "${ASTER_BOUNDED_DART}" --disable-dart-dev \
     tool/verify_android_release_identity.dart \
     --apk "${apk_path}" \
-    --aapt2 "${UTEXO_AAPT2}" ||
+    --aapt2 "${ASTER_AAPT2}" ||
     fail "${apk_path} does not match committed release identity"
 
   verify_signature "${apk_path}"
-  utexo_run_inspector \
+  aster_run_inspector \
     "${root}/scripts/verify-android-native-libraries.sh" \
     "${apk_path}" \
     lib \

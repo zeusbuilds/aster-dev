@@ -164,10 +164,10 @@ void main() {
 
   test('repairs a stored currency removed by the quote policy', () async {
     SharedPreferences.setMockInitialValues({
-      'utexo.settings.v1.currency': 'ALL',
-      'utexo.settings.v1.region': 'US',
-      'utexo.settings.v1.bitcoin_unit': 'btc',
-      'utexo.settings.v1.balances_visible': true,
+      'aster.settings.v1.currency': 'ALL',
+      'aster.settings.v1.region': 'US',
+      'aster.settings.v1.bitcoin_unit': 'btc',
+      'aster.settings.v1.balances_visible': true,
     });
     final shared = await SharedPreferences.getInstance();
     final repository = SettingsRepository(
@@ -182,15 +182,15 @@ void main() {
       (result as AppSuccess<SettingsSnapshot>).value.preferences.currencyCode,
       'USD',
     );
-    expect(shared.getString('utexo.settings.v1.currency'), 'USD');
+    expect(shared.getString('aster.settings.v1.currency'), 'USD');
   });
 
   test('serializes concurrent preference writes', () async {
     final shared = await SharedPreferences.getInstance();
-    await shared.setString('utexo.settings.v1.currency', 'USD');
-    await shared.setString('utexo.settings.v1.region', 'US');
-    await shared.setString('utexo.settings.v1.bitcoin_unit', 'btc');
-    await shared.setBool('utexo.settings.v1.balances_visible', true);
+    await shared.setString('aster.settings.v1.currency', 'USD');
+    await shared.setString('aster.settings.v1.region', 'US');
+    await shared.setString('aster.settings.v1.bitcoin_unit', 'btc');
+    await shared.setBool('aster.settings.v1.balances_visible', true);
     final preferences = _TrackingPreferencesService(shared);
     final repository = SettingsRepository(preferences, _validCatalog());
     await repository.load();

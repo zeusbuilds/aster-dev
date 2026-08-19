@@ -2,15 +2,24 @@ import 'package:aster/core/core.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test(
-    'rejects unknown blockchain environments with typed configuration error',
-    () {
+  test('accepts only canonical app-owned blockchain environments', () {
+    expect(
+      BlockchainEnvironment.parse('mainnet'),
+      BlockchainEnvironment.mainnet,
+    );
+    expect(BlockchainEnvironment.parse('signet'), BlockchainEnvironment.signet);
+    expect(
+      BlockchainEnvironment.parse('regtest'),
+      BlockchainEnvironment.regtest,
+    );
+    for (final alias in ['bitcoin', 'utexo', 'production-ish']) {
       expect(
-        () => BlockchainEnvironment.parse('production-ish'),
+        () => BlockchainEnvironment.parse(alias),
         throwsA(isA<AppConfigurationException>()),
+        reason: alias,
       );
-    },
-  );
+    }
+  });
 
   test('market data is keyless only outside release builds', () {
     final development = MarketDataConfiguration.resolve(
@@ -37,14 +46,14 @@ void main() {
 
   test('market release configuration accepts only an owned public proxy', () {
     final configuration = MarketDataConfiguration.resolve(
-      configuredBase: 'https://market.utexo.com/coingecko/v3',
+      configuredBase: 'https://market.aster.com/coingecko/v3',
       releaseMode: true,
     );
 
     expect(configuration.access, MarketDataAccess.deploymentProxy);
     expect(
       configuration.endpoint('simple/price').toString(),
-      'https://market.utexo.com/coingecko/v3/simple/price',
+      'https://market.aster.com/coingecko/v3/simple/price',
     );
     expect(
       () => configuration.endpoint('../secret'),
@@ -54,9 +63,9 @@ void main() {
 
   test('market release configuration rejects unsafe and direct API bases', () {
     for (final base in [
-      'http://market.utexo.com/api/v3',
-      'https://token@market.utexo.com/api/v3',
-      'https://market.utexo.com/api/v3?token=secret',
+      'http://market.aster.com/api/v3',
+      'https://token@market.aster.com/api/v3',
+      'https://market.aster.com/api/v3?token=secret',
       'https://127.0.0.1/api/v3',
       'https://127.1/api/v3',
       'https://127.0.1/api/v3',
@@ -65,10 +74,10 @@ void main() {
       'https://2130706433/api/v3',
       'https://0x7f000001/api/v3',
       'https://market.internal/api/v3',
-      'https://market..utexo.com/api/v3',
-      'https://-market.utexo.com/api/v3',
-      'https://market.utexo.com/%2e%2e/private',
-      'https://market.utexo.com/api//v3',
+      'https://market..aster.com/api/v3',
+      'https://-market.aster.com/api/v3',
+      'https://market.aster.com/%2e%2e/private',
+      'https://market.aster.com/api//v3',
       'https://api.coingecko.com/api/v3',
       'https://pro-api.coingecko.com/api/v3',
     ]) {

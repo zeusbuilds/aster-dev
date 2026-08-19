@@ -287,19 +287,19 @@ void main() {
 
   final toolchain = result.toolchain!;
   stdout.writeln();
-  _emit('UTEXO_AGP_VERSION', toolchain.agpVersion);
-  _emit('UTEXO_BUILD_TOOLS_VERSION', toolchain.buildToolsVersion);
-  _emit('UTEXO_NDK_VERSION', toolchain.ndkVersion);
-  _emit('UTEXO_AAPT2_PROTO_VERSION', toolchain.aapt2ProtoVersion);
-  _emit('UTEXO_BUNDLETOOL_VERSION', toolchain.bundletoolVersion);
-  _emit('UTEXO_PROTOBUF_VERSION', toolchain.protobufVersion);
-  _emit('UTEXO_AAPT2_PROTO_JAR', toolchain.aapt2ProtoJar.path);
-  _emit('UTEXO_BUNDLETOOL_JAR', toolchain.bundletoolJar.path);
-  _emit('UTEXO_PROTOBUF_JAR', toolchain.protobufJar.path);
-  _emit('UTEXO_APKSIGNER', toolchain.apksigner.path);
-  _emit('UTEXO_AAPT2', toolchain.aapt2.path);
-  _emit('UTEXO_ZIPALIGN', toolchain.zipalign.path);
-  _emit('UTEXO_LLVM_READELF', toolchain.llvmReadelf.path);
+  _emit('ASTER_AGP_VERSION', toolchain.agpVersion);
+  _emit('ASTER_BUILD_TOOLS_VERSION', toolchain.buildToolsVersion);
+  _emit('ASTER_NDK_VERSION', toolchain.ndkVersion);
+  _emit('ASTER_AAPT2_PROTO_VERSION', toolchain.aapt2ProtoVersion);
+  _emit('ASTER_BUNDLETOOL_VERSION', toolchain.bundletoolVersion);
+  _emit('ASTER_PROTOBUF_VERSION', toolchain.protobufVersion);
+  _emit('ASTER_AAPT2_PROTO_JAR', toolchain.aapt2ProtoJar.path);
+  _emit('ASTER_BUNDLETOOL_JAR', toolchain.bundletoolJar.path);
+  _emit('ASTER_PROTOBUF_JAR', toolchain.protobufJar.path);
+  _emit('ASTER_APKSIGNER', toolchain.apksigner.path);
+  _emit('ASTER_AAPT2', toolchain.aapt2.path);
+  _emit('ASTER_ZIPALIGN', toolchain.zipalign.path);
+  _emit('ASTER_LLVM_READELF', toolchain.llvmReadelf.path);
 }
 
 Map<String, Object?>? _agpModuleMetadata(

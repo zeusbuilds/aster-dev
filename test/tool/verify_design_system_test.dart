@@ -8,7 +8,7 @@ void main() {
   late Directory repository;
 
   setUp(() {
-    repository = Directory.systemTemp.createTempSync('utexo_design_system_');
+    repository = Directory.systemTemp.createTempSync('aster_design_system_');
   });
 
   tearDown(() {

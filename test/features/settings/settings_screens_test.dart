@@ -405,10 +405,10 @@ void main() {
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({
-      'utexo.settings.v1.currency': 'USD',
-      'utexo.settings.v1.region': 'US',
-      'utexo.settings.v1.bitcoin_unit': 'btc',
-      'utexo.settings.v1.balances_visible': true,
+      'aster.settings.v1.currency': 'USD',
+      'aster.settings.v1.region': 'US',
+      'aster.settings.v1.bitcoin_unit': 'btc',
+      'aster.settings.v1.balances_visible': true,
     });
     final repository = SettingsRepository(
       _FailingPreferencesService(await SharedPreferences.getInstance()),
@@ -770,13 +770,13 @@ void main() {
     expect(find.text('Primary wallet'), findsOneWidget);
     expect(find.text(_walletProfile.displayId), findsOneWidget);
     expect(find.text('Main'), findsNothing);
-    expect(find.text('UTEXO • Version 1.0.0'), findsNothing);
+    expect(find.text('Aster • Version 1.0.0'), findsNothing);
 
     await tester.scrollUntilVisible(
       find.byKey(const ValueKey('settings-version-label')),
       300,
     );
-    expect(find.text('UTEXO • Version 2.3.4 (81)'), findsOneWidget);
+    expect(find.text('Aster • Version 2.3.4 (81)'), findsOneWidget);
     for (final key in [
       'settings-link-contactSupport',
       'settings-link-termsOfService',
@@ -963,17 +963,17 @@ void main() {
     final retryButton = find.text('Retry version');
     await tester.scrollUntilVisible(retryButton, 300);
 
-    expect(find.text('UTEXO • Version unavailable'), findsOneWidget);
+    expect(find.text('Aster • Version unavailable'), findsOneWidget);
     await tester.tap(retryButton);
     await tester.pump();
-    expect(find.text('UTEXO • Version loading'), findsOneWidget);
+    expect(find.text('Aster • Version loading'), findsOneWidget);
     retry.complete(
       const AppResult.success(
         AppBuildMetadata(version: '3.0.0', buildNumber: ''),
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('UTEXO • Version 3.0.0'), findsOneWidget);
+    expect(find.text('Aster • Version 3.0.0'), findsOneWidget);
     expect(find.text('Retry version'), findsNothing);
   });
 

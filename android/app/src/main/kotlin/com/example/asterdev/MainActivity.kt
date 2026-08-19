@@ -30,7 +30,7 @@ class MainActivity : FlutterActivity() {
         val session = StorageChannelSession()
         val policy = WalletStoragePolicy(filesDir)
         val executor = Executors.newSingleThreadExecutor { operation ->
-            Thread(operation, "utexo-wallet-storage").apply { isDaemon = true }
+            Thread(operation, "aster-wallet-storage").apply { isDaemon = true }
         }
         walletStorageExecutor = executor
         val channel = MethodChannel(
@@ -196,7 +196,7 @@ private class WalletStoragePolicy(private val filesRoot: File) {
         }
         val parent = requireSecureParent(file)
         metadataOrNull(file)?.let(::requireOwnedFile)
-        val temporary = File.createTempFile(".utexo-", ".tmp", parent)
+        val temporary = File.createTempFile(".aster-", ".tmp", parent)
         try {
             Os.chmod(temporary.path, ownerOnlyFilePermissions)
             FileOutputStream(temporary).use { output ->
@@ -320,7 +320,7 @@ private class WalletStoragePolicy(private val filesRoot: File) {
     private fun fail(reason: PolicyError): Nothing = throw WalletStoragePolicyException(reason)
 
     companion object {
-        const val channelName = "com.utexo.wallet/storage_security"
+        const val channelName = "com.aster.wallet/storage_security"
         private const val ownerOnlyPermissions = 0x1C0
         private const val ownerOnlyFilePermissions = 0x180
         private const val permissionMask = 0x1FF

@@ -382,7 +382,7 @@ void main() {
   test(
     'uncertain credential write preserves staged native resources',
     () async {
-      final key = 'utexo_wallet_secret_v2.$firstId';
+      final key = 'aster.wallet.secret.$firstId';
       final rawSecrets = MemorySecureStore()
         ..writeError = StateError('injected write response failure')
         ..commitWriteBeforeError = true
@@ -687,7 +687,7 @@ void main() {
           storageToken: secondToken,
         ),
       );
-      rawSecrets.readErrors['utexo_wallet_secret_v2.$firstId'] = StateError(
+      rawSecrets.readErrors['aster.wallet.secret.$firstId'] = StateError(
         'secure storage unavailable',
       );
 

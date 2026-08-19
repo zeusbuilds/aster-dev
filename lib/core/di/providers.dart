@@ -128,7 +128,7 @@ Future<void> _closeScanSession(ScanSession session) async {
     FlutterErrorDetails(
       exception: AppFailureException(failure),
       stack: failure.stackTrace,
-      library: 'UTEXO scan lifecycle',
+      library: 'Aster scan lifecycle',
       context: ErrorDescription('while releasing a native scan session'),
     ),
   );
@@ -185,7 +185,7 @@ WalletStorageSecurity walletStorageSecurity(Ref ref) {
 Future<WalletDirectoryManager> walletDirectoryManager(Ref ref) async {
   final support = await getApplicationSupportDirectory();
   return IoWalletDirectoryManager(
-    '${support.path}${Platform.pathSeparator}utexo_wallets',
+    '${support.path}${Platform.pathSeparator}aster_wallets',
     ref.watch(walletStorageSecurityProvider),
   );
 }
@@ -194,37 +194,20 @@ Future<WalletDirectoryManager> walletDirectoryManager(Ref ref) async {
 Future<WalletRegistryDocumentStore> walletRegistryDocumentStore(Ref ref) async {
   final support = await getApplicationSupportDirectory();
   return IoWalletRegistryDocumentStore(
-    '${support.path}${Platform.pathSeparator}utexo_wallet_metadata',
+    '${support.path}${Platform.pathSeparator}aster_wallet_metadata',
     ref.watch(walletStorageSecurityProvider),
   );
 }
 
 @riverpod
 Future<WalletProfilePersistence> walletProfileStore(Ref ref) async {
-  final preferences = await ref.watch(preferencesServiceProvider.future);
   final documents = await ref.watch(walletRegistryDocumentStoreProvider.future);
-  return WalletProfileStore(
-    documents,
-    preferences,
-    clock: ref.watch(utcClockProvider),
-  );
+  return WalletProfileStore(documents, clock: ref.watch(utcClockProvider));
 }
 
 @riverpod
 WalletSecretStore walletSecretStore(Ref ref) {
   return WalletSecretStore(ref.watch(secureStorageServiceProvider));
-}
-
-@riverpod
-LegacyWalletSeedSource legacyWalletSeedSource(Ref ref) {
-  return FlutterLegacyWalletSeedSource();
-}
-
-@riverpod
-LegacyWalletSeedPreflight legacyWalletSeedPreflight(Ref ref) {
-  return LegacyWalletSeedMigrationGuard(
-    ref.watch(legacyWalletSeedSourceProvider),
-  );
 }
 
 /// The only app-owned native wallet runtime.
@@ -255,14 +238,12 @@ Future<WalletRepository> walletRepository(Ref ref) async {
   final keyGenerator = ref.watch(walletKeyGeneratorProvider);
   final identityGenerator = ref.watch(walletIdentityGeneratorProvider);
   final services = ref.watch(walletServiceConfigurationProvider);
-  final legacySeedPreflight = ref.watch(legacyWalletSeedPreflightProvider);
   return WalletRepository(
     await profiles,
     await runtime,
     keyGenerator,
     identityGenerator,
     services,
-    legacySeedPreflight,
     bitcoinInstructions: ref.watch(bitcoinPaymentInstructionDecoderProvider),
     clock: ref.watch(utcClockProvider),
   );

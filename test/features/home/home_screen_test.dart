@@ -82,7 +82,7 @@ void main() {
       engine: engine,
       clock: () => now,
       httpClient: httpClient,
-      preferenceValues: const {'utexo.settings.v1.bitcoin_unit': 'sats'},
+      preferenceValues: const {'aster.settings.v1.bitcoin_unit': 'sats'},
     );
     addTearDown(httpClient.close);
     addTearDown(() => _disposeHarness(tester, harness));
@@ -130,7 +130,7 @@ void main() {
       final harness = await PaymentFlowTestHarness.create(
         clock: () => now,
         httpClient: httpClient,
-        preferenceValues: const {'utexo.settings.v1.balances_visible': true},
+        preferenceValues: const {'aster.settings.v1.balances_visible': true},
         preferenceServiceBuilder: (preferences) =>
             _BlockingVisibilityPreferencesService(
               preferences,
@@ -1086,7 +1086,7 @@ final class _BlockingVisibilityPreferencesService extends PreferencesService {
 
   @override
   Future<void> setBool(String key, bool value) async {
-    if (key == 'utexo.settings.v1.balances_visible') {
+    if (key == 'aster.settings.v1.balances_visible') {
       if (!writeStarted.isCompleted) writeStarted.complete();
       await releaseWrite.future;
     }

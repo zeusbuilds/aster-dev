@@ -95,7 +95,7 @@ final class _AsterNavigationScopeState extends State<AsterNavigationScope>
         FlutterErrorDetails(
           exception: AppFailureException(failure),
           stack: stackTrace,
-          library: 'UTEXO navigation',
+          library: 'Aster navigation',
           context: ErrorDescription('while changing application routes'),
         ),
       );

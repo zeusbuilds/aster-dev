@@ -2,9 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import '../../../../core/config/app_environment.dart';
-import '../../../../core/constants/storage_keys.dart';
 import '../../../../core/errors/errors.dart';
-import '../../../../core/storage/preferences_service.dart';
 import '../../domain/models/models.dart';
 import 'wallet_registry_document_store.dart';
 
@@ -16,18 +14,16 @@ abstract interface class WalletProfilePersistence {
   Future<AppResult<WalletRegistry>> remove(String walletId);
 }
 
-/// Serialized, versioned storage for non-secret wallet metadata.
+/// Serialized, versioned storage for current non-secret wallet metadata.
 final class WalletProfileStore implements WalletProfilePersistence {
-  WalletProfileStore(
-    this._documents,
-    this._legacyPreferences, {
-    DateTime Function()? clock,
-  }) : _clock = clock ?? _utcNow;
+  WalletProfileStore(this._documents, {DateTime Function()? clock})
+    : _clock = clock ?? _utcNow;
 
   final WalletRegistryDocumentStore _documents;
-  final PreferencesService _legacyPreferences;
   final DateTime Function() _clock;
   Future<void> _tail = Future<void>.value();
+
+  static const _schemaVersion = 1;
 
   @override
   Future<AppResult<WalletRegistry>> read() {
@@ -143,27 +139,20 @@ final class WalletProfileStore implements WalletProfilePersistence {
   }
 
   Future<WalletRegistry> _readUnsafe() async {
-    if (await _legacyPreferences.containsKey(
-          StorageKeys.legacyWalletRegistryV2,
-        ) ||
-        await _legacyPreferences.containsKey(
-          StorageKeys.legacyWalletRegistryV1,
-        )) {
-      throw const LegacyWalletDataException();
-    }
     final current = await _documents.read();
-    if (current != null) return _decode(current, version: 3);
+    if (current != null) return _decode(current);
     return WalletRegistry(profiles: const [], activeWalletId: null);
   }
 
-  static WalletRegistry _decode(String encoded, {required int version}) {
+  static WalletRegistry _decode(String encoded) {
     final Object? decoded;
     try {
       decoded = jsonDecode(encoded);
     } on FormatException {
       throw const StoredDataCorruptionException();
     }
-    if (decoded is! Map<String, Object?> || decoded['version'] != version) {
+    if (decoded is! Map<String, Object?> ||
+        decoded['version'] != _schemaVersion) {
       throw const StoredDataCorruptionException();
     }
     final rawProfiles = decoded['profiles'];
@@ -193,7 +182,7 @@ final class WalletProfileStore implements WalletProfilePersistence {
   Future<void> _writeUnsafe(WalletRegistry snapshot) async {
     await _documents.write(
       jsonEncode({
-        'version': 3,
+        'version': _schemaVersion,
         'activeWalletId': snapshot.activeWalletId,
         'profiles': [
           for (final profile in snapshot.profiles) _profileToJson(profile),

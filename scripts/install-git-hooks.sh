@@ -9,7 +9,7 @@ readonly root="$(cd "${script_directory}/.." && pwd -P)"
 source "${root}/scripts/bounded-command.sh"
 readonly hooks_path="scripts/git-hooks"
 
-repository_root="$(utexo_capture_quick git -C "${root}" rev-parse --show-toplevel)"
+repository_root="$(aster_capture_quick git -C "${root}" rev-parse --show-toplevel)"
 readonly repository_root
 [[ "${repository_root}" == "${root}" ]] || {
   printf 'Could not establish the expected repository root.\n' >&2
@@ -18,7 +18,7 @@ readonly repository_root
 
 set +e
 current="$(
-  utexo_capture_quick git -C "${root}" config --local --get core.hooksPath
+  aster_capture_quick git -C "${root}" config --local --get core.hooksPath
 )"
 current_status=$?
 set -e
@@ -36,5 +36,5 @@ if [[ -n "${current}" && "${current}" != "${hooks_path}" ]]; then
   exit 1
 fi
 
-utexo_run_quick git -C "${root}" config --local core.hooksPath "${hooks_path}"
+aster_run_quick git -C "${root}" config --local core.hooksPath "${hooks_path}"
 printf 'Git hooks path configured for this repository: %s\n' "${hooks_path}"

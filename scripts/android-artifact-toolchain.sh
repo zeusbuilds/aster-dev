@@ -1,36 +1,36 @@
 #!/usr/bin/env bash
 
-_utexo_artifact_script_directory="${BASH_SOURCE[0]%/*}"
-[[ "${_utexo_artifact_script_directory}" != "${BASH_SOURCE[0]}" ]] ||
-  _utexo_artifact_script_directory=.
-source "${_utexo_artifact_script_directory}/bounded-command.sh"
+_aster_artifact_script_directory="${BASH_SOURCE[0]%/*}"
+[[ "${_aster_artifact_script_directory}" != "${BASH_SOURCE[0]}" ]] ||
+  _aster_artifact_script_directory=.
+source "${_aster_artifact_script_directory}/bounded-command.sh"
 
 # Resolves release-verification tools from exact repository/AGP declarations.
-utexo_resolve_android_artifact_toolchain() {
+aster_resolve_android_artifact_toolchain() {
   local repository output key candidate value match_count
-  repository="${UTEXO_BOUNDED_ROOT}"
+  repository="${ASTER_BOUNDED_ROOT}"
   output="$(
     cd "${repository}"
-    utexo_capture_inspector \
-      "${UTEXO_BOUNDED_DART}" \
+    aster_capture_inspector \
+      "${ASTER_BOUNDED_DART}" \
       --disable-dart-dev \
       tool/resolve_android_artifact_toolchain.dart
   )" || return 1
 
   for key in \
-    UTEXO_AGP_VERSION \
-    UTEXO_BUILD_TOOLS_VERSION \
-    UTEXO_NDK_VERSION \
-    UTEXO_AAPT2_PROTO_VERSION \
-    UTEXO_BUNDLETOOL_VERSION \
-    UTEXO_PROTOBUF_VERSION \
-    UTEXO_AAPT2_PROTO_JAR \
-    UTEXO_BUNDLETOOL_JAR \
-    UTEXO_PROTOBUF_JAR \
-    UTEXO_APKSIGNER \
-    UTEXO_AAPT2 \
-    UTEXO_ZIPALIGN \
-    UTEXO_LLVM_READELF; do
+    ASTER_AGP_VERSION \
+    ASTER_BUILD_TOOLS_VERSION \
+    ASTER_NDK_VERSION \
+    ASTER_AAPT2_PROTO_VERSION \
+    ASTER_BUNDLETOOL_VERSION \
+    ASTER_PROTOBUF_VERSION \
+    ASTER_AAPT2_PROTO_JAR \
+    ASTER_BUNDLETOOL_JAR \
+    ASTER_PROTOBUF_JAR \
+    ASTER_APKSIGNER \
+    ASTER_AAPT2 \
+    ASTER_ZIPALIGN \
+    ASTER_LLVM_READELF; do
     match_count=0
     value=''
     while IFS= read -r candidate || [[ -n "${candidate}" ]]; do

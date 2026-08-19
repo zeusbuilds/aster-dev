@@ -82,7 +82,6 @@ final class PaymentFlowTestHarness {
     }
     final profileStore = WalletProfileStore(
       MemoryWalletRegistryDocumentStore(),
-      preferenceService,
       clock: effectiveClock,
     );
     final staged = await profileStore.stageProvision(profile);
@@ -99,7 +98,6 @@ final class PaymentFlowTestHarness {
       FakeWalletKeyGenerator(),
       FakeWalletIdentityGenerator(walletId: walletId),
       services,
-      const SuccessfulLegacyWalletSeedPreflight(),
       clock: effectiveClock,
     );
     final settings = SettingsRepository(

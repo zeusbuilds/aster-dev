@@ -9,7 +9,6 @@ import 'package:aster/features/wallet/presentation/models/models.dart';
 import 'package:aster/features/wallet/presentation/view_model/wallet_view_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/wallet_fakes.dart';
 
@@ -267,10 +266,8 @@ Future<_WalletViewModelHarness> _createHarness({
   bool seedWalletProfiles = false,
   List<FakeWalletEngine> engines = const [],
 }) async {
-  SharedPreferences.setMockInitialValues({});
-  final preferences = PreferencesService(await SharedPreferences.getInstance());
   final documents = MemoryWalletRegistryDocumentStore()..readError = readError;
-  final profiles = WalletProfileStore(documents, preferences);
+  final profiles = WalletProfileStore(documents);
   final secureStorage = MemorySecureStore();
   final secrets = WalletSecretStore(secureStorage);
   final directories = FakeWalletDirectoryManager();
@@ -306,7 +303,6 @@ Future<_WalletViewModelHarness> _createHarness({
     FakeWalletKeyGenerator(),
     FakeWalletIdentityGenerator(walletId: '11111111111111111111111111111111'),
     _services,
-    const SuccessfulLegacyWalletSeedPreflight(),
   );
   final container = ProviderContainer(
     retry: (retryCount, error) => null,

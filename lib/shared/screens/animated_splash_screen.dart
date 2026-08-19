@@ -23,7 +23,7 @@ class AnimatedSplashScreen extends StatelessWidget {
       child: Semantics(
         container: true,
         liveRegion: true,
-        label: 'Opening UTEXO',
+        label: 'Opening Aster',
         excludeSemantics: true,
         child: RepaintBoundary(
           child: Stack(

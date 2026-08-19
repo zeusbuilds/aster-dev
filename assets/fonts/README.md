@@ -1,6 +1,6 @@
 # Bundled Fonts
 
-UTEXO uses DM Sans for UI copy and Public Sans for numeric spans. The variable
+Aster uses DM Sans for UI copy and Public Sans for numeric spans. The variable
 font files and OFL licenses in this directory are pinned from the Google Fonts
 repository at commit `2d85e20401920891efb7cd6272d6339685df2820`.
 

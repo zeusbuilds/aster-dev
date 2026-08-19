@@ -12,7 +12,7 @@ void main() {
   late File hook;
 
   setUp(() async {
-    fixtureRoot = Directory.systemTemp.createTempSync('utexo_pre_commit_');
+    fixtureRoot = Directory.systemTemp.createTempSync('aster_pre_commit_');
     repository = Directory('${fixtureRoot.path}/repository')..createSync();
     fakeBin = Directory('${fixtureRoot.path}/bin')..createSync();
     for (final relativePath in <String>[

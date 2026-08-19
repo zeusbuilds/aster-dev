@@ -9,7 +9,7 @@ void main() {
   late Directory bin;
 
   setUp(() async {
-    root = Directory.systemTemp.createTempSync('utexo_apk_signature_');
+    root = Directory.systemTemp.createTempSync('aster_apk_signature_');
     bin = Directory('${root.path}/bin')..createSync();
     for (final relativePath in <String>[
       'scripts/verify-android-apk-signature.sh',
@@ -30,19 +30,19 @@ void main() {
         .writeAsStringSync('''
 void main() {
   const fixed = <String>[
-    'UTEXO_AGP_VERSION=9.1.0',
-    'UTEXO_BUILD_TOOLS_VERSION=36.0.0',
-    'UTEXO_NDK_VERSION=28.2.13676358',
-    'UTEXO_AAPT2_PROTO_VERSION=9.1.0',
-    'UTEXO_BUNDLETOOL_VERSION=1.18.3',
-    'UTEXO_PROTOBUF_VERSION=3.25.5',
-    'UTEXO_AAPT2_PROTO_JAR=/dev/null',
-    'UTEXO_BUNDLETOOL_JAR=/dev/null',
-    'UTEXO_PROTOBUF_JAR=/dev/null',
-    'UTEXO_APKSIGNER=${apksigner.path}',
-    'UTEXO_AAPT2=/dev/null',
-    'UTEXO_ZIPALIGN=/dev/null',
-    'UTEXO_LLVM_READELF=/dev/null',
+    'ASTER_AGP_VERSION=9.1.0',
+    'ASTER_BUILD_TOOLS_VERSION=36.0.0',
+    'ASTER_NDK_VERSION=28.2.13676358',
+    'ASTER_AAPT2_PROTO_VERSION=9.1.0',
+    'ASTER_BUNDLETOOL_VERSION=1.18.3',
+    'ASTER_PROTOBUF_VERSION=3.25.5',
+    'ASTER_AAPT2_PROTO_JAR=/dev/null',
+    'ASTER_BUNDLETOOL_JAR=/dev/null',
+    'ASTER_PROTOBUF_JAR=/dev/null',
+    'ASTER_APKSIGNER=${apksigner.path}',
+    'ASTER_AAPT2=/dev/null',
+    'ASTER_ZIPALIGN=/dev/null',
+    'ASTER_LLVM_READELF=/dev/null',
   ];
   for (final value in fixed) {
     print(value);

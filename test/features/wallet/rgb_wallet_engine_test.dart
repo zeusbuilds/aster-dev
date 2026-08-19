@@ -253,6 +253,30 @@ void main() {
   });
 
   test(
+    'contains the UTEXO signet wire carrier inside the SDK adapter',
+    () async {
+      const signetServices = WalletServiceConfiguration(
+        environment: BlockchainEnvironment.signet,
+        sdkNetwork: 'utexo',
+      );
+      final wallet = MockUtexoWallet();
+      when(() => wallet.getNetworkInfo()).thenAnswer(
+        (_) async => const WalletNetworkInfo(network: 'utexo', height: 42),
+      );
+      when(() => wallet.getNodeInfo()).thenAnswer((_) async => _nodeInfo);
+      final engine = RgbWalletEngine(
+        wallet,
+        signetServices,
+        UtexoUnlockConfig(),
+      );
+
+      final status = await engine.getNetworkStatus();
+
+      expect(status.environment, BlockchainEnvironment.signet);
+    },
+  );
+
+  test(
     'rejects a native network that differs from app configuration',
     () async {
       final wallet = MockUtexoWallet();

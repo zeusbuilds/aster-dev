@@ -51,19 +51,6 @@ final class MemorySecureStore implements SecureKeyValueStore {
   }
 }
 
-final class MemoryLegacyWalletSeedSource implements LegacyWalletSeedSource {
-  final values = <String, String>{};
-  Object? readError;
-  var readCount = 0;
-
-  @override
-  Future<Set<String>> keys() async {
-    readCount += 1;
-    if (readError case final Object error) throw error;
-    return values.keys.toSet();
-  }
-}
-
 final class MemoryWalletRegistryDocumentStore
     implements WalletRegistryDocumentStore {
   String? document;
@@ -145,32 +132,6 @@ final class MemoryWalletStorageSecurity implements WalletStorageSecurity {
     if (await target.exists()) await target.delete();
     await temporary.rename(path);
   }
-}
-
-final class SuccessfulLegacyWalletSeedPreflight
-    implements LegacyWalletSeedPreflight {
-  const SuccessfulLegacyWalletSeedPreflight();
-
-  @override
-  Future<AppResult<void>> verify() async => const AppResult.success(null);
-}
-
-final class FailingLegacyWalletSeedPreflight
-    implements LegacyWalletSeedPreflight {
-  const FailingLegacyWalletSeedPreflight([this.failure]);
-
-  final AppFailure? failure;
-
-  @override
-  Future<AppResult<void>> verify() async => AppResult.failure(
-    failure ??
-        const AppFailure(
-          code: 'wallet_recovery_required',
-          kind: AppFailureKind.storage,
-          userMessage: 'An older wallet must be recovered.',
-          retryable: false,
-        ),
-  );
 }
 
 final class FakeWalletDirectoryManager implements WalletDirectoryManager {

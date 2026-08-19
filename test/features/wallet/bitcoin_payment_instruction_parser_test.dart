@@ -147,7 +147,7 @@ void main() {
     final destination = _success(
       parser.decodeOnchain(
         'BITCOIN:$address?AMOUNT=20.3&LABEL=Luke-Jr&'
-        'MESSAGE=Donation%20for%20UTEXO&lightning=lnbc1ignored',
+        'MESSAGE=Donation%20for%20Aster&lightning=lnbc1ignored',
         BlockchainEnvironment.mainnet,
       ),
     );
@@ -156,7 +156,7 @@ void main() {
     expect(destination.amount?.units, 2030000000);
     expect(destination.amount?.unit, WalletAmountUnit.satoshi);
     expect(destination.recipientLabel, 'Luke-Jr');
-    expect(destination.message, 'Donation for UTEXO');
+    expect(destination.message, 'Donation for Aster');
     expect(destination.wasUri, isTrue);
     expect(destination.toString(), isNot(contains(address)));
 

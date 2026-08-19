@@ -10,10 +10,14 @@ enum BlockchainEnvironment {
   signet,
   regtest;
 
+  /// Parses the canonical app-owned chain-environment representation.
+  ///
+  /// Asset names and protocol-specific network carriers are deliberately not
+  /// accepted here. Native wire aliases are translated inside the SDK adapter.
   static BlockchainEnvironment parse(String value) {
     return switch (value.trim().toLowerCase()) {
-      'mainnet' || 'bitcoin' => BlockchainEnvironment.mainnet,
-      'signet' || 'utexo' => BlockchainEnvironment.signet,
+      'mainnet' => BlockchainEnvironment.mainnet,
+      'signet' => BlockchainEnvironment.signet,
       'regtest' => BlockchainEnvironment.regtest,
       _ => throw const AppConfigurationException(),
     };
@@ -81,7 +85,7 @@ final class WalletServiceConfiguration {
   /// become a funds-bearing mainnet wallet by accident.
   factory WalletServiceConfiguration.fromEnvironment() {
     const networkValue = String.fromEnvironment(
-      'UTEXO_NETWORK',
+      'ASTER_NETWORK',
       defaultValue: 'regtest',
     );
     if (networkValue != networkValue.trim()) {
@@ -93,21 +97,21 @@ final class WalletServiceConfiguration {
       sdkNetwork: environment == BlockchainEnvironment.signet
           ? 'utexo'
           : environment.name,
-      indexerUrl: _optionalEnvironment('UTEXO_INDEXER_URL'),
-      rgbTransportProxy: _optionalEnvironment('UTEXO_RGB_PROXY_URL'),
-      lspBaseUrl: _optionalEnvironment('UTEXO_LSP_URL'),
-      vssUrl: _optionalEnvironment('UTEXO_VSS_URL'),
+      indexerUrl: _optionalEnvironment('ASTER_INDEXER_URL'),
+      rgbTransportProxy: _optionalEnvironment('ASTER_RGB_PROXY_URL'),
+      lspBaseUrl: _optionalEnvironment('ASTER_LSP_URL'),
+      vssUrl: _optionalEnvironment('ASTER_VSS_URL'),
       explorerBaseUrl:
-          _optionalEnvironment('UTEXO_EXPLORER_URL') ??
+          _optionalEnvironment('ASTER_EXPLORER_URL') ??
           switch (environment) {
             BlockchainEnvironment.mainnet => 'https://mempool.space',
             BlockchainEnvironment.signet => 'https://mempool.space/signet',
             BlockchainEnvironment.regtest => null,
           },
       usdtAsset: _rgbAssetEnvironment(
-        contractId: const String.fromEnvironment('UTEXO_USDT_ASSET_ID'),
+        contractId: const String.fromEnvironment('ASTER_USDT_ASSET_ID'),
         precision: const int.fromEnvironment(
-          'UTEXO_USDT_PRECISION',
+          'ASTER_USDT_PRECISION',
           defaultValue: -1,
         ),
       ),
@@ -116,8 +120,8 @@ final class WalletServiceConfiguration {
 
   final BlockchainEnvironment environment;
 
-  /// Stable SDK network carrier. UTEXO-hosted signet uses the SDK's `utexo`
-  /// service profile while the product-facing chain remains signet.
+  /// Stable SDK network carrier. UTEXO protocol signet uses the SDK's `utexo`
+  /// service profile while Aster still reports the chain as `signet`.
   final String sdkNetwork;
   final String? indexerUrl;
   final String? rgbTransportProxy;
@@ -317,13 +321,13 @@ enum _EndpointKind { indexer, rgbTransport, webService, explorer }
 
 String? _optionalEnvironment(String name) {
   final value = switch (name) {
-    'UTEXO_INDEXER_URL' => const String.fromEnvironment('UTEXO_INDEXER_URL'),
-    'UTEXO_RGB_PROXY_URL' => const String.fromEnvironment(
-      'UTEXO_RGB_PROXY_URL',
+    'ASTER_INDEXER_URL' => const String.fromEnvironment('ASTER_INDEXER_URL'),
+    'ASTER_RGB_PROXY_URL' => const String.fromEnvironment(
+      'ASTER_RGB_PROXY_URL',
     ),
-    'UTEXO_LSP_URL' => const String.fromEnvironment('UTEXO_LSP_URL'),
-    'UTEXO_VSS_URL' => const String.fromEnvironment('UTEXO_VSS_URL'),
-    'UTEXO_EXPLORER_URL' => const String.fromEnvironment('UTEXO_EXPLORER_URL'),
+    'ASTER_LSP_URL' => const String.fromEnvironment('ASTER_LSP_URL'),
+    'ASTER_VSS_URL' => const String.fromEnvironment('ASTER_VSS_URL'),
+    'ASTER_EXPLORER_URL' => const String.fromEnvironment('ASTER_EXPLORER_URL'),
     _ => '',
   };
   return value.isEmpty ? null : value;

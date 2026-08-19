@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import '../../../../core/constants/storage_keys.dart';
 import '../../../../core/errors/errors.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 
@@ -27,16 +26,15 @@ final class WalletSecretStore {
 
   final SecureKeyValueStore _storage;
 
+  static const _schemaVersion = 1;
+
   /// Returns wallet IDs with current ownership-bound credential records.
   Future<AppResult<Set<String>>> walletIds() async {
     try {
       final ids = <String>{};
       for (final key in await _storage.keys()) {
-        if (key.startsWith(StorageKeys.legacyWalletSecretPrefix)) {
-          throw const LegacyWalletDataException();
-        }
-        if (!key.startsWith(StorageKeys.walletSecretPrefix)) continue;
-        final walletId = key.substring(StorageKeys.walletSecretPrefix.length);
+        if (!key.startsWith(_walletSecretPrefix)) continue;
+        final walletId = key.substring(_walletSecretPrefix.length);
         if (!_walletIdPattern.hasMatch(walletId)) {
           throw const StoredDataCorruptionException();
         }
@@ -75,8 +73,7 @@ final class WalletSecretStore {
       _validateWalletId(walletId);
       _validateSecret(secret);
       _validateStorageToken(secret.storageToken);
-      if (await _storage.containsKey(key: _key(walletId)) ||
-          await _storage.containsKey(key: _legacyKey(walletId))) {
+      if (await _storage.containsKey(key: _key(walletId))) {
         return AppResult.failure(
           const AppFailure(
             code: 'wallet_secret_already_exists',
@@ -88,7 +85,7 @@ final class WalletSecretStore {
         );
       }
       final encoded = jsonEncode({
-        'version': 2,
+        'version': _schemaVersion,
         'databasePassword': secret.databasePassword,
         'mnemonic': secret.mnemonic,
         'storageToken': secret.storageToken,
@@ -118,9 +115,6 @@ final class WalletSecretStore {
       _validateStorageToken(expectedStorageToken);
       final current = await _storage.read(key: _key(walletId));
       if (current == null) {
-        if (await _storage.containsKey(key: _legacyKey(walletId))) {
-          throw const LegacyWalletDataException();
-        }
         return AppResult.failure(
           const AppFailure(
             code: 'wallet_secret_missing',
@@ -156,9 +150,6 @@ final class WalletSecretStore {
       _validateStorageToken(storageToken);
       final encoded = await _storage.read(key: _key(walletId));
       if (encoded == null) {
-        if (await _storage.containsKey(key: _legacyKey(walletId))) {
-          return AppResult.failure(_ownershipFailure());
-        }
         return const AppResult.success(null);
       }
       final secret = _decodeSecret(encoded);
@@ -178,11 +169,9 @@ final class WalletSecretStore {
     }
   }
 
-  static String _key(String walletId) =>
-      '${StorageKeys.walletSecretPrefix}$walletId';
+  static const _walletSecretPrefix = 'aster.wallet.secret.';
 
-  static String _legacyKey(String walletId) =>
-      '${StorageKeys.legacyWalletSecretPrefix}$walletId';
+  static String _key(String walletId) => '$_walletSecretPrefix$walletId';
 
   Future<void> _writeVerified(String key, String encoded) async {
     Object? writeError;
@@ -291,7 +280,8 @@ final class WalletSecretStore {
     } on FormatException {
       throw const StoredDataCorruptionException();
     }
-    if (decoded is! Map<String, Object?> || decoded['version'] != 2) {
+    if (decoded is! Map<String, Object?> ||
+        decoded['version'] != _schemaVersion) {
       throw const StoredDataCorruptionException();
     }
     final password = decoded['databasePassword'];

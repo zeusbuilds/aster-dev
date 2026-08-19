@@ -1,8 +1,8 @@
-# UTEXO Wallet
+# Aster Wallet
 
-UTEXO is a Flutter wallet for Bitcoin, RGB USDT, and Lightning. The app uses
-Riverpod MVVM and the public `rgb_sdk_flutter` API pinned to immutable commit
-`3dd82e23d80bb4bb6a2d2526c6c6741ac1ea1236`.
+Aster is a Flutter wallet for Bitcoin, RGB USDT, and Lightning. It is powered
+by the UTEXO protocol through the public `rgb_sdk_flutter` API, pinned to
+immutable commit `3dd82e23d80bb4bb6a2d2526c6c6741ac1ea1236`, and uses Riverpod MVVM.
 
 ## Release Status
 
@@ -12,8 +12,8 @@ eligible for a funds-bearing mainnet release.
 - The SDK's accepted PKG-006 native-artifact provenance constraint permits
   development and internal beta, not a mainnet production claim.
 - Final application identifiers, signing ownership, authentication for secret
-  disclosure, legacy-wallet recovery, screen-capture policy, and store privacy /
-  export declarations remain product, security, or release-owner decisions.
+  disclosure, screen-capture policy, and store privacy/export declarations
+  remain product, security, or release-owner decisions.
 - The pinned SDK's Android native library is still 4 KiB ELF-aligned. Android
   16 KiB page-size qualification and a compatible SDK artifact remain blocked.
 - `1.0.0+1` is a provisional app version until release ownership defines the
@@ -21,7 +21,7 @@ eligible for a funds-bearing mainnet release.
 - RGB USDT stays unavailable unless a deployment supplies a validated asset ID
   and precision for the selected environment.
 - Release market estimates stay unavailable unless a deployment supplies an
-  approved UTEXO-owned market proxy. CoinGecko's keyless pool is development
+  approved Aster-owned market proxy. CoinGecko's keyless pool is development
   only and no third-party API secret is embedded in the mobile binary.
 - Swap has no execution backend and never simulates a quote or success.
 
@@ -52,10 +52,10 @@ View -> ViewModel -> Repository -> SDK/service/storage/network
 ```
 
 `WalletRuntime` is the single app-owned native lifecycle owner.
-`RgbWalletEngine` is the only adapter that holds `UtexoWallet`; SDK DTOs do not
-cross that boundary. Repositories and ViewModels use one typed `AppResult` /
-`AppFailure` contract, and feature UI does not call plugins or infrastructure
-directly.
+`RgbWalletEngine` is the only adapter that holds the UTEXO SDK's
+`UtexoWallet`; SDK DTOs do not cross that boundary. Repositories and ViewModels
+use one typed `AppResult` / `AppFailure` contract, and feature UI does not call
+plugins or infrastructure directly.
 
 See `docs/architecture/ARCHITECTURE.md` and
 `docs/architecture/SDK_INTEGRATION.md`.

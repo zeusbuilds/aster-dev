@@ -13,7 +13,7 @@ void main() {
   late File installedDebugMarker;
 
   setUp(() async {
-    root = Directory.systemTemp.createTempSync('utexo_ios_wrapper_');
+    root = Directory.systemTemp.createTempSync('aster_ios_wrapper_');
     bin = Directory('${root.path}/bin')..createSync();
     bundleLog = File('${root.path}/bundle.log');
     xcrunLog = File('${root.path}/xcrun.log');
@@ -40,7 +40,7 @@ void main() {
       );
 
     await _writeExecutable(File('${bin.path}/bundle'), r'''#!/bin/sh
-printf '%s\n' "$*" >> "${UTEXO_TEST_BUNDLE_LOG}"
+printf '%s\n' "$*" >> "${ASTER_TEST_BUNDLE_LOG}"
 case "$*" in
   "--version")
     printf '4.0.10\n'
@@ -50,7 +50,7 @@ case "$*" in
   "exec fvm flutter pub get --enforce-lockfile")
     ;;
   "exec fvm flutter test --no-pub integration_test/wallet_storage_security_test.dart -d test-simulator")
-    exit "${UTEXO_TEST_TEST_STATUS:-17}"
+    exit "${ASTER_TEST_TEST_STATUS:-17}"
     ;;
   "exec fvm flutter build ios --simulator --debug --no-pub")
     ;;
@@ -60,38 +60,38 @@ case "$*" in
 esac
 ''');
     await _writeExecutable(File('${bin.path}/xcrun'), r'''#!/bin/sh
-printf '%s\n' "$*" >> "${UTEXO_TEST_XCRUN_LOG}"
+printf '%s\n' "$*" >> "${ASTER_TEST_XCRUN_LOG}"
 case "$*" in
   "simctl getenv test-simulator SIMULATOR_UDID")
     printf 'test-simulator\n'
     ;;
   "simctl listapps test-simulator")
     count=0
-    if [ -f "${UTEXO_TEST_LISTAPPS_COUNT}" ]; then
-      count="$(cat "${UTEXO_TEST_LISTAPPS_COUNT}")"
+    if [ -f "${ASTER_TEST_LISTAPPS_COUNT}" ]; then
+      count="$(cat "${ASTER_TEST_LISTAPPS_COUNT}")"
     fi
     count=$((count + 1))
-    printf '%s' "${count}" > "${UTEXO_TEST_LISTAPPS_COUNT}"
-    if [ "${UTEXO_TEST_FAIL_LISTAPPS_CALL:-}" = "${count}" ]; then
+    printf '%s' "${count}" > "${ASTER_TEST_LISTAPPS_COUNT}"
+    if [ "${ASTER_TEST_FAIL_LISTAPPS_CALL:-}" = "${count}" ]; then
       exit 42
     fi
-    if [ "${UTEXO_TEST_LISTAPPS_MODE:-}" = "malformed" ]; then
+    if [ "${ASTER_TEST_LISTAPPS_MODE:-}" = "malformed" ]; then
       printf 'not a plist\n'
       exit 0
     fi
     printf '{\n'
-    if [ "${UTEXO_TEST_LISTAPPS_MODE:-}" = "missing-path" ]; then
+    if [ "${ASTER_TEST_LISTAPPS_MODE:-}" = "missing-path" ]; then
       printf '  "com.example.asterdev" = { };\n'
-    elif [ "${UTEXO_TEST_LISTAPPS_MODE:-}" = "present" ]; then
+    elif [ "${ASTER_TEST_LISTAPPS_MODE:-}" = "present" ]; then
       printf '  "com.example.asterdev" = { Path = "/Applications/Release.app"; };\n'
     fi
-    if [ -f "${UTEXO_TEST_INSTALLED_DEBUG_MARKER}" ]; then
+    if [ -f "${ASTER_TEST_INSTALLED_DEBUG_MARKER}" ]; then
       printf '  "com.example.asterdev.debug" = { Path = "/Applications/Debug.app"; };\n'
     fi
     printf '}\n'
     ;;
   "simctl install test-simulator "*)
-    : > "${UTEXO_TEST_INSTALLED_DEBUG_MARKER}"
+    : > "${ASTER_TEST_INSTALLED_DEBUG_MARKER}"
     ;;
   *)
     exit 99
@@ -168,13 +168,13 @@ esac
       workingDirectory: root.path,
       environment: <String, String>{
         ...Platform.environment,
-        'UTEXO_TEST_BUNDLE_LOG': bundleLog.path,
-        'UTEXO_TEST_XCRUN_LOG': xcrunLog.path,
-        'UTEXO_TEST_LISTAPPS_COUNT': listAppsCount.path,
-        'UTEXO_TEST_INSTALLED_DEBUG_MARKER': installedDebugMarker.path,
-        'UTEXO_TEST_LISTAPPS_MODE': listAppsMode,
-        'UTEXO_TEST_FAIL_LISTAPPS_CALL': ?failListAppsCall,
-        'UTEXO_TEST_TEST_STATUS': '$testStatus',
+        'ASTER_TEST_BUNDLE_LOG': bundleLog.path,
+        'ASTER_TEST_XCRUN_LOG': xcrunLog.path,
+        'ASTER_TEST_LISTAPPS_COUNT': listAppsCount.path,
+        'ASTER_TEST_INSTALLED_DEBUG_MARKER': installedDebugMarker.path,
+        'ASTER_TEST_LISTAPPS_MODE': listAppsMode,
+        'ASTER_TEST_FAIL_LISTAPPS_CALL': ?failListAppsCall,
+        'ASTER_TEST_TEST_STATUS': '$testStatus',
         'PATH': '${bin.path}:${Platform.environment['PATH']}',
       },
     );

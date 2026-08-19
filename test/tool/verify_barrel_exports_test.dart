@@ -8,7 +8,7 @@ void main() {
   late Directory repository;
 
   setUp(() {
-    repository = Directory.systemTemp.createTempSync('utexo_barrels_');
+    repository = Directory.systemTemp.createTempSync('aster_barrels_');
   });
 
   tearDown(() {

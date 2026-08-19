@@ -1,5 +1,5 @@
 {
-  description = "UTEXO Bitcoin, RGB, and Lightning wallet development shell";
+  description = "Aster Bitcoin, RGB, and Lightning wallet development shell";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/ffcdcf99d65c61956d882df249a9be53e5902ea5";

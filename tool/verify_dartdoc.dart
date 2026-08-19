@@ -41,7 +41,7 @@ DartdocVerification evaluateDartdocResult({
 
 /// Generates Dart API documentation into an isolated directory.
 Future<void> main() async {
-  final output = Directory.systemTemp.createTempSync('utexo-dartdoc-');
+  final output = Directory.systemTemp.createTempSync('aster-dartdoc-');
   try {
     final result = await runBoundedProcess(
       Platform.resolvedExecutable,

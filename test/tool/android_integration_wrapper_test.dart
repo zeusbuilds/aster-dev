@@ -12,13 +12,13 @@ void main() {
   late File fvmLog;
 
   setUp(() async {
-    root = Directory.systemTemp.createTempSync('utexo_android_wrapper_');
+    root = Directory.systemTemp.createTempSync('aster_android_wrapper_');
     bin = Directory('${root.path}/bin')..createSync();
     sdk = Directory('${root.path}/sdk')..createSync();
     adbLog = File('${root.path}/adb.log');
     fvmLog = File('${root.path}/fvm.log');
     await _writeExecutable(File('${bin.path}/fvm'), '''#!/bin/sh
-printf '%s\n' "\$*" >> "\${UTEXO_TEST_FVM_LOG}"
+printf '%s\n' "\$*" >> "\${ASTER_TEST_FVM_LOG}"
 if [ "\$1 \$2 \$3" = "flutter pub get" ]; then
   exit 0
 fi
@@ -28,16 +28,16 @@ fi
 exit 99
 ''');
     await _writeExecutable(File('${sdk.path}/platform-tools/adb'), '''#!/bin/sh
-printf '%s\n' "\$*" >> "\${UTEXO_TEST_ADB_LOG}"
+printf '%s\n' "\$*" >> "\${ASTER_TEST_ADB_LOG}"
 case "\$*" in
   "-s test-device get-state")
     printf 'device\n'
     ;;
   "-s test-device shell pm path com.example.asterdev")
-    if [ "\${UTEXO_TEST_FAIL_RELEASE_QUERY:-}" = "1" ]; then
+    if [ "\${ASTER_TEST_FAIL_RELEASE_QUERY:-}" = "1" ]; then
       exit 42
     fi
-    if [ "\${UTEXO_TEST_MALFORMED_RELEASE_QUERY:-}" = "1" ]; then
+    if [ "\${ASTER_TEST_MALFORMED_RELEASE_QUERY:-}" = "1" ]; then
       printf 'Error: package manager unavailable\n'
       exit 0
     fi
@@ -73,8 +73,8 @@ esac
         environment: {
           ...Platform.environment,
           'ANDROID_SDK_ROOT': sdk.path,
-          'UTEXO_TEST_ADB_LOG': adbLog.path,
-          'UTEXO_TEST_FVM_LOG': fvmLog.path,
+          'ASTER_TEST_ADB_LOG': adbLog.path,
+          'ASTER_TEST_FVM_LOG': fvmLog.path,
           'PATH': '${bin.path}:${Platform.environment['PATH']}',
         },
       );
@@ -113,9 +113,9 @@ esac
       environment: {
         ...Platform.environment,
         'ANDROID_SDK_ROOT': sdk.path,
-        'UTEXO_TEST_ADB_LOG': adbLog.path,
-        'UTEXO_TEST_FVM_LOG': fvmLog.path,
-        'UTEXO_TEST_FAIL_RELEASE_QUERY': '1',
+        'ASTER_TEST_ADB_LOG': adbLog.path,
+        'ASTER_TEST_FVM_LOG': fvmLog.path,
+        'ASTER_TEST_FAIL_RELEASE_QUERY': '1',
         'PATH': '${bin.path}:${Platform.environment['PATH']}',
       },
     );
@@ -142,9 +142,9 @@ esac
         environment: {
           ...Platform.environment,
           'ANDROID_SDK_ROOT': sdk.path,
-          'UTEXO_TEST_ADB_LOG': adbLog.path,
-          'UTEXO_TEST_FVM_LOG': fvmLog.path,
-          'UTEXO_TEST_MALFORMED_RELEASE_QUERY': '1',
+          'ASTER_TEST_ADB_LOG': adbLog.path,
+          'ASTER_TEST_FVM_LOG': fvmLog.path,
+          'ASTER_TEST_MALFORMED_RELEASE_QUERY': '1',
           'PATH': '${bin.path}:${Platform.environment['PATH']}',
         },
       );

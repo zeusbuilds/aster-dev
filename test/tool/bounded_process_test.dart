@@ -81,7 +81,7 @@ void main() {
     'process-tree success terminates a surviving grandchild',
     () async {
       final directory = Directory.systemTemp.createTempSync(
-        'utexo_process_tree_success_',
+        'aster_process_tree_success_',
       );
       try {
         final fixture = _writeProcessTreeFixture(
@@ -97,7 +97,7 @@ void main() {
             r'''"$1" "$2" "$3" "$4" &
 while [ ! -e "$3" ]; do sleep 0.01; done
 exit 0''',
-            'utexo-process-tree-fixture',
+            'aster-process-tree-fixture',
             _dartExecutable(),
             fixture.grandchild.path,
             fixture.readyMarker.path,
@@ -130,7 +130,7 @@ exit 0''',
     'process-tree deadline terminates the parent and grandchild',
     () async {
       final directory = Directory.systemTemp.createTempSync(
-        'utexo_process_tree_',
+        'aster_process_tree_',
       );
       try {
         final fixture = _writeProcessTreeFixture(
@@ -187,7 +187,7 @@ exit 0''',
     Object? failure;
     try {
       await runBoundedProcess(
-        '/definitely/missing/utexo-release-inspector',
+        '/definitely/missing/aster-release-inspector',
         const [secretMarker],
         maxStdoutBytes: 1,
         maxStderrBytes: 1,
@@ -285,7 +285,7 @@ Future<BoundedProcessResult> _runDart(
   ProcessOutputCallback? onStdout,
   ProcessOutputCallback? onStderr,
 }) async {
-  final directory = Directory.systemTemp.createTempSync('utexo_process_');
+  final directory = Directory.systemTemp.createTempSync('aster_process_');
   try {
     final script = File('${directory.path}/fixture.dart')
       ..writeAsStringSync(

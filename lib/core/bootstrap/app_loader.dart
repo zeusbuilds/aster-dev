@@ -25,7 +25,7 @@ class AppLoader extends StatefulWidget {
   final Future<ProviderContainer> Function() initialize;
 
   /// The root widget of the application to display once initialization
-  /// completes (typically `const UtexoApp()`).
+  /// completes (typically `const AsterApp()`).
   final Widget child;
 
   @override
@@ -104,7 +104,7 @@ class _AppLoaderState extends State<AppLoader>
       if (kDebugMode) {
         developer.log(
           'Bootstrap failed: ${failure.code} (${failure.kind.name})',
-          name: 'utexo.bootstrap',
+          name: 'aster.bootstrap',
         );
       }
       _failure.value = failure;

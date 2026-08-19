@@ -17,7 +17,7 @@ void main() {
   late File flutterExtension;
 
   setUp(() async {
-    root = Directory.systemTemp.createTempSync('utexo_android_artifacts_');
+    root = Directory.systemTemp.createTempSync('aster_android_artifacts_');
     repository = Directory('${root.path}/repository')..createSync();
     gradleHome = Directory('${root.path}/gradle')..createSync();
     androidSdk = Directory('${root.path}/android-sdk')..createSync();

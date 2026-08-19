@@ -23,7 +23,7 @@ fail() {
 [[ -f "${target}" ]] || fail "target does not exist: ${target}"
 [[ -n "${device_id}" ]] ||
   fail "pass a device ID or set ANDROID_DEVICE_ID"
-utexo_bounded_boundary_available || fail "bounded command runner is unavailable"
+aster_bounded_boundary_available || fail "bounded command runner is unavailable"
 
 sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
 if [[ -z "${sdk_root}" && -f android/local.properties ]]; then
@@ -37,19 +37,19 @@ fi
 readonly sdk_root
 readonly adb="${sdk_root}/platform-tools/adb"
 [[ -x "${adb}" ]] || fail "Android adb is unavailable"
-utexo_run_quick "${adb}" -s "${device_id}" get-state >/dev/null 2>&1 ||
+aster_run_quick "${adb}" -s "${device_id}" get-state >/dev/null 2>&1 ||
   fail "device is not attached: ${device_id}"
 source "${root}/scripts/android-package-state.sh"
 
 package_path() {
-  utexo_android_package_paths "${adb}" "${device_id}" "$1"
+  aster_android_package_paths "${adb}" "${device_id}" "$1"
 }
 
 release_path_before="$(package_path "${release_package}")" ||
   fail "could not inspect the release package before the integration run"
 readonly release_path_before
 
-utexo_run_build fvm flutter pub get --enforce-lockfile
+aster_run_build fvm flutter pub get --enforce-lockfile
 
 cleanup() {
   local command_status=$?
@@ -59,7 +59,7 @@ cleanup() {
   trap - EXIT
   set +e
 
-  if ! utexo_run_quick \
+  if ! aster_run_quick \
     "${adb}" -s "${device_id}" get-state >/dev/null 2>&1; then
     printf 'Android device detached before integration cleanup.\n' >&2
     cleanup_status=1
@@ -68,7 +68,7 @@ cleanup() {
       printf 'Could not inspect the debug package during cleanup.\n' >&2
       cleanup_status=1
     elif [[ -n "${test_path_after}" ]]; then
-      utexo_run_quick \
+      aster_run_quick \
         "${adb}" -s "${device_id}" shell am force-stop \
         "${test_package}" >/dev/null || cleanup_status=1
     fi
@@ -91,7 +91,7 @@ trap cleanup EXIT
 # Flutter does not account for the build-type suffix when stopping this run.
 # Keep it alive so the EXIT owner can stop only the isolated debug identity.
 set +e
-utexo_run_build fvm flutter drive --no-pub \
+aster_run_build fvm flutter drive --no-pub \
   --driver=test_driver/integration_test.dart \
   --target="${target}" \
   --keep-app-running \
@@ -114,10 +114,10 @@ readonly test_path_after
 readonly apk="build/app/outputs/flutter-apk/app-debug.apk"
 [[ -f "${apk}" ]] || fail "Flutter did not produce ${apk}"
 source "${root}/scripts/android-artifact-toolchain.sh"
-utexo_resolve_android_artifact_toolchain ||
+aster_resolve_android_artifact_toolchain ||
   fail "the exact Android artifact toolchain is unavailable"
 readonly built_package="$(
-  utexo_capture_inspector "${UTEXO_AAPT2}" dump packagename "${apk}"
+  aster_capture_inspector "${ASTER_AAPT2}" dump packagename "${apk}"
 )"
 [[ "${built_package}" == "${test_package}" ]] ||
   fail "debug APK uses ${built_package}, expected ${test_package}"

@@ -20,7 +20,7 @@ void main() {
       ),
     );
 
-    expect(find.bySemanticsLabel('Opening UTEXO'), findsOneWidget);
+    expect(find.bySemanticsLabel('Opening Aster'), findsOneWidget);
     expect(find.bySemanticsLabel('Ready'), findsNothing);
 
     initialization.complete(ProviderContainer());
@@ -28,14 +28,14 @@ void main() {
     await tester.pump();
 
     expect(find.text('Ready'), findsOneWidget);
-    expect(find.bySemanticsLabel('Opening UTEXO'), findsOneWidget);
+    expect(find.bySemanticsLabel('Opening Aster'), findsOneWidget);
     expect(find.bySemanticsLabel('Ready'), findsNothing);
 
     const motion = AsterMotion();
     await tester.pump(motion.bootstrapRevealDelay);
     await tester.pump();
     await tester.pumpAndSettle(motion.splashRevealDuration);
-    expect(find.bySemanticsLabel('Opening UTEXO'), findsNothing);
+    expect(find.bySemanticsLabel('Opening Aster'), findsNothing);
     expect(find.bySemanticsLabel('Ready'), findsOneWidget);
   });
 

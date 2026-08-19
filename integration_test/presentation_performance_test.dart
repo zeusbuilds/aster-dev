@@ -16,7 +16,7 @@ const _setupTimeout = Duration(seconds: 45);
 const _routeCycles = 6;
 const _pageCycles = 5;
 const _isIsolatedProfileBenchmark = bool.fromEnvironment(
-  'UTEXO_ISOLATED_PROFILE_BENCHMARK',
+  'ASTER_ISOLATED_PROFILE_BENCHMARK',
 );
 
 void main() {

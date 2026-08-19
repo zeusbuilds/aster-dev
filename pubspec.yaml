@@ -1,5 +1,5 @@
 name: aster
-description: UTEXO Bitcoin, RGB, and Lightning wallet
+description: Aster Bitcoin, RGB, and Lightning wallet powered by UTEXO
 
 publish_to: "none"
 
@@ -89,7 +89,7 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/brand/utexo-mark.svg
+    - assets/brand/aster-mark.svg
     - assets/data/bip39_english.txt
     - assets/data/countries.json
     - assets/data/currencies.json

@@ -1,6 +1,6 @@
 # Security Model
 
-UTEXO is wallet software. Security changes require evidence across Dart,
+Aster is wallet software. Security changes require evidence across Dart,
 native storage, SDK lifecycle, platform packaging, and user experience.
 
 ## Secret Classes
@@ -21,7 +21,9 @@ or transient toasts. Tests use synthetic values that cannot spend funds.
 - iOS uses non-synchronizing, this-device-only Keychain storage and protected,
   backup-excluded wallet files.
 - Android uses namespaced AES-GCM secure storage with destructive reset
-  disabled; cloud backup and device transfer are disabled.
+  disabled; cloud backup and device transfer are disabled. The pinned plugin
+  initializes its cipher markers within that namespace and cannot read a
+  previous app schema or namespace.
 - Native wallet-file policy validates every app-owned ancestor back to the
   trusted platform storage root, rejects symbolic and multi-hard-link aliases,
   requires owner-only modes below that root, and bounds metadata replacement.
@@ -29,7 +31,7 @@ or transient toasts. Tests use synthetic values that cannot spend funds.
   serialized off the platform thread, obsolete-engine completions are
   suppressed, and concurrent calls fail closed without mutating storage.
 - Metadata uses a checksummed two-slot journal and ownership-bound recovery.
-- Corrupt, unknown, or legacy records are preserved and fail closed.
+- Corrupt or non-current records are preserved as evidence and fail closed.
 
 Dart strings cannot be reliably zeroized. Keep secret objects route-scoped and
 inside the narrowest asynchronous scope; release references deterministically.
@@ -100,7 +102,6 @@ not justify an automatic mutation retry.
 - Authentication for seed viewing and xpub export is not selected.
 - Recovery-screen screenshot/screen-recording policy is not selected and has
   platform asymmetry.
-- Legacy wallet recovery requires an explicit migration/support policy.
 - SDK native artifact provenance is accepted for internal beta only.
 - No public security-reporting contact is configured in this repository.
 - Store privacy/data-safety disclosures, an owned privacy-policy destination,

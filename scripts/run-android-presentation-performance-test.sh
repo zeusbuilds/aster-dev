@@ -21,7 +21,7 @@ fail() {
 
 [[ -n "${device_id}" ]] ||
   fail "pass a device ID or set ANDROID_DEVICE_ID"
-utexo_bounded_boundary_available || fail "bounded command runner is unavailable"
+aster_bounded_boundary_available || fail "bounded command runner is unavailable"
 
 sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
 if [[ -z "${sdk_root}" && -f android/local.properties ]]; then
@@ -35,25 +35,25 @@ fi
 readonly sdk_root
 readonly adb="${sdk_root}/platform-tools/adb"
 [[ -x "${adb}" ]] || fail "Android adb is unavailable"
-utexo_run_quick "${adb}" -s "${device_id}" get-state >/dev/null 2>&1 ||
+aster_run_quick "${adb}" -s "${device_id}" get-state >/dev/null 2>&1 ||
   fail "device is not attached: ${device_id}"
-utexo_run_quick "${root}/scripts/verify-android-performance-renderer.sh" \
+aster_run_quick "${root}/scripts/verify-android-performance-renderer.sh" \
   "${adb}" "${device_id}"
 source "${root}/scripts/android-package-state.sh"
 
 package_path() {
-  utexo_android_package_paths "${adb}" "${device_id}" "$1"
+  aster_android_package_paths "${adb}" "${device_id}" "$1"
 }
 
 clear_profile_state() {
   local installed_path
   installed_path="$(package_path "${profile_package}")" || return 1
   [[ -n "${installed_path}" ]] || return 0
-  utexo_run_quick "${adb}" -s "${device_id}" shell am force-stop \
+  aster_run_quick "${adb}" -s "${device_id}" shell am force-stop \
     "${profile_package}" >/dev/null
   local output
   output="$(
-    utexo_capture_quick \
+    aster_capture_quick \
       "${adb}" -s "${device_id}" shell pm clear "${profile_package}"
   )" || return 1
   output="${output//$'\r'/}"
@@ -102,13 +102,13 @@ cleanup() {
 trap cleanup EXIT
 clear_profile_state || fail "could not reset the isolated profile package"
 
-utexo_run_build fvm flutter pub get --enforce-lockfile
-utexo_run_build fvm flutter drive --no-pub \
+aster_run_build fvm flutter pub get --enforce-lockfile
+aster_run_build fvm flutter drive --no-pub \
   --no-dds \
   --driver=test_driver/integration_test.dart \
   --target="${target}" \
   --keep-app-running \
-  --dart-define=UTEXO_ISOLATED_PROFILE_BENCHMARK=true \
+  --dart-define=ASTER_ISOLATED_PROFILE_BENCHMARK=true \
   -d "${device_id}" \
   --profile
 
@@ -121,10 +121,10 @@ readonly profile_path_after
 readonly apk="build/app/outputs/flutter-apk/app-profile.apk"
 [[ -f "${apk}" ]] || fail "Flutter did not produce ${apk}"
 source "${root}/scripts/android-artifact-toolchain.sh"
-utexo_resolve_android_artifact_toolchain ||
+aster_resolve_android_artifact_toolchain ||
   fail "the exact Android artifact toolchain is unavailable"
 readonly built_package="$(
-  utexo_capture_inspector "${UTEXO_AAPT2}" dump packagename "${apk}"
+  aster_capture_inspector "${ASTER_AAPT2}" dump packagename "${apk}"
 )"
 [[ "${built_package}" == "${profile_package}" ]] ||
   fail "profile APK uses ${built_package}, expected ${profile_package}"

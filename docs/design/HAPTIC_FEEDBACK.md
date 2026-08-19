@@ -1,6 +1,6 @@
 # Haptic Feedback
 
-UTEXO uses semantic haptic intents. Presentation code requests what happened;
+Aster uses semantic haptic intents. Presentation code requests what happened;
 the app-owned adapter decides which platform pattern represents that intent.
 Feature code must not import `haptic_feedback` or call `Haptics` directly.
 

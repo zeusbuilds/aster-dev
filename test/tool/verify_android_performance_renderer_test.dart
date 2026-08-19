@@ -11,7 +11,7 @@ void main() {
 
   setUp(() async {
     fixture = Directory.systemTemp.createTempSync(
-      'utexo_android_performance_renderer_',
+      'aster_android_performance_renderer_',
     );
     verifier = File(
       '${Directory.current.path}/scripts/'
@@ -22,8 +22,8 @@ void main() {
 #!/usr/bin/env bash
 set -euo pipefail
 [[ "\$*" == "-s emulator-5554 shell dumpsys SurfaceFlinger" ]]
-if [[ -n "\${UTEXO_TEST_DIAGNOSTIC_LINES:-}" ]]; then
-  awk -v count="\${UTEXO_TEST_DIAGNOSTIC_LINES}" 'BEGIN {
+if [[ -n "\${ASTER_TEST_DIAGNOSTIC_LINES:-}" ]]; then
+  awk -v count="\${ASTER_TEST_DIAGNOSTIC_LINES}" 'BEGIN {
     print "GLES: hardware renderer"
     for (line = 0; line < count; line++) {
       print "SurfaceFlinger bounded diagnostic fixture line"
@@ -31,7 +31,7 @@ if [[ -n "\${UTEXO_TEST_DIAGNOSTIC_LINES:-}" ]]; then
   }'
   exit 0
 fi
-printf '%s\n' "\${UTEXO_TEST_SURFACE_FLINGER_OUTPUT:-}"
+printf '%s\n' "\${ASTER_TEST_SURFACE_FLINGER_OUTPUT:-}"
 ''');
     await makeTestExecutable(fakeAdb);
   });
@@ -123,9 +123,9 @@ Future<BoundedProcessResult> _verify(
     [verifier.path, adb.path, 'emulator-5554'],
     environment: <String, String>{
       ...Platform.environment,
-      'UTEXO_TEST_SURFACE_FLINGER_OUTPUT': surfaceFlingerOutput,
+      'ASTER_TEST_SURFACE_FLINGER_OUTPUT': surfaceFlingerOutput,
       if (diagnosticLines != null)
-        'UTEXO_TEST_DIAGNOSTIC_LINES': '$diagnosticLines',
+        'ASTER_TEST_DIAGNOSTIC_LINES': '$diagnosticLines',
     },
   );
 }

@@ -92,7 +92,7 @@ when API-level sandbox policy prevents constructing a hard link; any other
 construction failure fails the test.
 
 Android release APK and AAB verification rejects every signed candidate unless
-`UTEXO_RELEASE_CERT_SHA256` identifies the one approved certificate. With no
+`ASTER_RELEASE_CERT_SHA256` identifies the one approved certificate. With no
 approved fingerprint configured, only unsigned candidate artifacts pass; they
 are build evidence and cannot be distributed. An AAB is signed only when every
 non-signature payload entry verifies against exactly one common certificate.

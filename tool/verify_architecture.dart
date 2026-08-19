@@ -6,10 +6,7 @@ import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 
 const _infrastructureOwners = <String, Set<String>>{
-  'flutter_secure_storage': {
-    'lib/core/storage/secure_storage_service.dart',
-    'lib/features/wallet/data/storage/legacy_wallet_seed_preflight.dart',
-  },
+  'flutter_secure_storage': {'lib/core/storage/secure_storage_service.dart'},
   'haptic_feedback': {'lib/shared/feedback/haptic_feedback_service.dart'},
   'http': {'lib/core/network/resilient_http_client.dart'},
   'image_picker': {'lib/features/scan/data/services/mobile_scan_adapters.dart'},

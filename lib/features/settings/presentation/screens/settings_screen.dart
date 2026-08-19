@@ -269,7 +269,7 @@ class SettingsScreen extends ConsumerWidget {
 
                   Center(
                     child: SvgPicture.asset(
-                      'assets/brand/utexo-mark.svg',
+                      'assets/brand/aster-mark.svg',
                       width: metrics.brandMarkSize,
                       colorFilter: ColorFilter.mode(
                         context.colorScheme.onSurface,

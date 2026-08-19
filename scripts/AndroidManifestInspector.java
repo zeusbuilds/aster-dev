@@ -31,12 +31,12 @@ public final class AndroidManifestInspector {
         throw new IllegalStateException("Bundle manifest root is not <manifest>");
       }
       XmlElement manifest = root.getElement();
-      emit("UTEXO_APPLICATION_ID", requireAttribute(manifest, "", "package"));
+      emit("ASTER_APPLICATION_ID", requireAttribute(manifest, "", "package"));
       emit(
-          "UTEXO_VERSION_CODE",
+          "ASTER_VERSION_CODE",
           requireAttribute(manifest, ANDROID_NAMESPACE, "versionCode"));
       emit(
-          "UTEXO_VERSION_NAME",
+          "ASTER_VERSION_NAME",
           requireAttribute(manifest, ANDROID_NAMESPACE, "versionName"));
     }
   }

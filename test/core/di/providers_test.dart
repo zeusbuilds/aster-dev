@@ -57,9 +57,6 @@ void main() {
             sdkNetwork: 'regtest',
           ),
         ),
-        legacyWalletSeedSourceProvider.overrideWithValue(
-          MemoryLegacyWalletSeedSource(),
-        ),
       ],
     );
     addTearDown(container.dispose);
@@ -119,7 +116,7 @@ void main() {
         reported.single.exceptionAsString(),
         'AppFailureException(scan_cleanup_failed)',
       );
-      expect(reported.single.library, 'UTEXO scan lifecycle');
+      expect(reported.single.library, 'Aster scan lifecycle');
     },
   );
 }

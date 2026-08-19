@@ -8,7 +8,7 @@ void main() {
   late Directory fixture;
 
   setUp(() {
-    fixture = Directory.systemTemp.createTempSync('utexo_bounded_shell_');
+    fixture = Directory.systemTemp.createTempSync('aster_bounded_shell_');
     for (final relativePath in <String>[
       'scripts/bounded-command.sh',
       'tool/run_bounded_command.dart',
@@ -67,10 +67,10 @@ void main() {
     final result = await runSource(
       r'''
 source scripts/bounded-command.sh
-utexo_bounded_capture 2 8 8 -- /bin/sh -c "printf 123456789"
+aster_bounded_capture 2 8 8 -- /bin/sh -c "printf 123456789"
 ''',
       environment: const <String, String>{
-        'UTEXO_BOUNDED_COMMAND_LOADED': 'inherited-bypass',
+        'ASTER_BOUNDED_COMMAND_LOADED': 'inherited-bypass',
       },
     );
 
@@ -82,7 +82,7 @@ utexo_bounded_capture 2 8 8 -- /bin/sh -c "printf 123456789"
     final result = await runSource(r'''
 source scripts/bounded-command.sh
 source scripts/bounded-command.sh
-utexo_capture_quick /bin/sh -c "printf ready"
+aster_capture_quick /bin/sh -c "printf ready"
 ''');
 
     expect(result.exitCode, 0, reason: result.stderr);
@@ -96,7 +96,7 @@ utexo_capture_quick /bin/sh -c "printf ready"
     final result = await runSource(
       r'''
 source scripts/bounded-command.sh
-utexo_capture_quick /bin/sh -c "printf ci-ready"
+aster_capture_quick /bin/sh -c "printf ci-ready"
 ''',
       environment: <String, String>{'FLUTTER_ROOT': flutterRoot.path},
     );
@@ -111,7 +111,7 @@ utexo_capture_quick /bin/sh -c "printf ci-ready"
 
     final result = await runSource(
       'source scripts/bounded-command.sh\n'
-      'utexo_capture_quick /bin/sh -c "printf unreachable"\n',
+      'aster_capture_quick /bin/sh -c "printf unreachable"\n',
       environment: <String, String>{'FLUTTER_ROOT': flutterRoot.path},
     );
 
@@ -125,7 +125,7 @@ utexo_capture_quick /bin/sh -c "printf ci-ready"
 
     final result = await runSource(
       'source scripts/bounded-command.sh\n'
-      'utexo_capture_quick /bin/sh -c "printf unreachable"\n',
+      'aster_capture_quick /bin/sh -c "printf unreachable"\n',
       environment: <String, String>{'FLUTTER_ROOT': flutterRoot.path},
     );
 
@@ -142,7 +142,7 @@ utexo_capture_quick /bin/sh -c "printf ci-ready"
 
     final result = await runSource(
       'source scripts/bounded-command.sh\n'
-      'utexo_capture_quick /bin/sh -c "printf unreachable"\n',
+      'aster_capture_quick /bin/sh -c "printf unreachable"\n',
       environment: <String, String>{'FLUTTER_ROOT': flutterRoot.path},
     );
 
@@ -163,7 +163,7 @@ utexo_capture_quick /bin/sh -c "printf ci-ready"
 
     final result = await runSource(
       'source scripts/bounded-command.sh\n'
-      'utexo_capture_quick /bin/sh -c "printf unreachable"\n',
+      'aster_capture_quick /bin/sh -c "printf unreachable"\n',
       environment: <String, String>{'FLUTTER_ROOT': flutterRoot.path},
     );
 
@@ -177,7 +177,7 @@ utexo_capture_quick /bin/sh -c "printf ci-ready"
 
     final result = await runSource(
       'source scripts/bounded-command.sh\n'
-      'utexo_capture_quick /bin/sh -c "printf unreachable"\n',
+      'aster_capture_quick /bin/sh -c "printf unreachable"\n',
       environment: const <String, String>{'FLUTTER_ROOT': 'relative-flutter'},
     );
 
@@ -191,7 +191,7 @@ utexo_capture_quick /bin/sh -c "printf ci-ready"
     final result = await runSource(
       r'''
 source scripts/bounded-command.sh
-utexo_capture_quick /bin/sh -c "printf local-ready"
+aster_capture_quick /bin/sh -c "printf local-ready"
 ''',
       environment: <String, String>{'FLUTTER_ROOT': flutterRoot.path},
     );

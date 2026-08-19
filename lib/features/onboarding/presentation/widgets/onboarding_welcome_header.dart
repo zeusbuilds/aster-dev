@@ -16,13 +16,13 @@ class OnboardingWelcomeHeader extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.start,
       children: [
         SvgPicture.asset(
-          'assets/brand/utexo-mark.svg',
+          'assets/brand/aster-mark.svg',
           width: icons.lg,
           colorFilter: ColorFilter.mode(colors.onBrandArt, BlendMode.srcIn),
         ),
         SizedBox(width: context.spacing.sm),
         Text(
-          'UTEXO',
+          'Aster',
           style: context.type.brandTitle.copyWith(color: colors.onBrandArt),
         ),
       ],

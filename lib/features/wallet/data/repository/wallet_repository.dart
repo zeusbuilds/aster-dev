@@ -20,8 +20,7 @@ final class WalletRepository implements WalletLifecycleRepository {
     this._runtime,
     this._keyGenerator,
     this._identityGenerator,
-    this._services,
-    this._legacySeedPreflight, {
+    this._services, {
     this._bitcoinInstructions = const BitcoinPaymentInstructionParser(),
     DateTime Function()? clock,
   }) : _clock = clock ?? _utcNow {
@@ -33,7 +32,6 @@ final class WalletRepository implements WalletLifecycleRepository {
   final WalletKeyGenerator _keyGenerator;
   final WalletIdentityGenerator _identityGenerator;
   final WalletServiceConfiguration _services;
-  final LegacyWalletSeedPreflight _legacySeedPreflight;
   final BitcoinPaymentInstructionDecoder _bitcoinInstructions;
   final DateTime Function() _clock;
   Future<void> _operationTail = Future<void>.value();
@@ -120,10 +118,6 @@ final class WalletRepository implements WalletLifecycleRepository {
   }
 
   Future<AppResult<WalletRegistry>> _bootstrapUnsafe() async {
-    final legacyPreflight = await _legacySeedPreflight.verify();
-    if (legacyPreflight case AppFailureResult<void>(:final failure)) {
-      return AppResult.failure(failure);
-    }
     final registryResult = await _profiles.read();
     if (registryResult case AppFailureResult<WalletRegistry>()) {
       return registryResult;

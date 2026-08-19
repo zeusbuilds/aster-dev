@@ -1,6 +1,6 @@
 # Design System Usage Guide
 
-UTEXO uses Flutter `ThemeData` as the runtime design contract. Feature UI should
+Aster uses Flutter `ThemeData` as the runtime design contract. Feature UI should
 read like product intent: Material roles for standard Flutter surfaces, and
 the deliberately named `Aster*` semantic extensions for app-specific decisions.
 
@@ -184,7 +184,7 @@ DecoratedBox(
 );
 ```
 
-## Migration Examples
+## Refactor Examples
 
 ```dart
 // Before

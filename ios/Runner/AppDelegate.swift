@@ -7,7 +7,7 @@ import UIKit
   private var walletStorageChannel: FlutterMethodChannel?
   private var walletStorageSession: StorageChannelSession?
   private let walletStorageQueue = DispatchQueue(
-    label: "com.utexo.wallet.storage-security",
+    label: "com.aster.wallet.storage-security",
     qos: .utility
   )
 
@@ -93,7 +93,7 @@ final class StorageChannelSession {
 }
 
 enum WalletStoragePolicy {
-  static let channelName = "com.utexo.wallet/storage_security"
+  static let channelName = "com.aster.wallet/storage_security"
   private static let ownerOnlyPermissions: mode_t = 0o700
 
   static func handle(_ call: FlutterMethodCall) throws {
@@ -221,7 +221,7 @@ enum WalletStoragePolicy {
     }
 
     let temporary = url.deletingLastPathComponent().appendingPathComponent(
-      ".utexo-\(UUID().uuidString).tmp",
+      ".aster-\(UUID().uuidString).tmp",
       isDirectory: false
     )
     var descriptor = open(

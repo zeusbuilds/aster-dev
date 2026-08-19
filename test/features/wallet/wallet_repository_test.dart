@@ -7,7 +7,6 @@ import 'package:aster/features/wallet/data/storage/storage.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rgb_sdk_flutter/rgb_sdk_flutter.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/wallet_fakes.dart';
 
@@ -38,7 +37,6 @@ void main() {
       FakeWalletKeyGenerator(),
       FakeWalletIdentityGenerator(walletId: walletId),
       services,
-      const SuccessfulLegacyWalletSeedPreflight(),
     );
 
     expect(
@@ -83,7 +81,6 @@ void main() {
       FakeWalletKeyGenerator(),
       FakeWalletIdentityGenerator(walletId: walletId),
       configured,
-      const SuccessfulLegacyWalletSeedPreflight(),
     );
 
     final result = repository.resolvePaymentTarget(
@@ -549,7 +546,6 @@ void main() {
       keyGenerator,
       FakeWalletIdentityGenerator(walletId: walletId),
       services,
-      const SuccessfulLegacyWalletSeedPreflight(),
     );
 
     final result = await repository.generateMnemonic();
@@ -581,7 +577,6 @@ void main() {
         keyGenerator,
         FakeWalletIdentityGenerator(walletId: walletId),
         services,
-        const SuccessfulLegacyWalletSeedPreflight(),
       );
 
       final result = await repository.generateMnemonic();
@@ -610,7 +605,6 @@ void main() {
       keyGenerator,
       FakeWalletIdentityGenerator(walletId: walletId),
       services,
-      const SuccessfulLegacyWalletSeedPreflight(),
     );
 
     final result = await repository.validateMnemonic(
@@ -637,7 +631,6 @@ void main() {
       keyGenerator,
       FakeWalletIdentityGenerator(walletId: walletId),
       services,
-      const SuccessfulLegacyWalletSeedPreflight(),
     );
 
     final malformed = await repository.validateMnemonic('too short');
@@ -667,11 +660,8 @@ void main() {
   });
 
   test('commits metadata only after native provisioning succeeds', () async {
-    SharedPreferences.setMockInitialValues({});
-    final preferences = await SharedPreferences.getInstance();
     final profileStore = WalletProfileStore(
       MemoryWalletRegistryDocumentStore(),
-      PreferencesService(preferences),
     );
     final rawSecrets = MemorySecureStore();
     final engine = FakeWalletEngine();
@@ -688,7 +678,6 @@ void main() {
       FakeWalletKeyGenerator(),
       FakeWalletIdentityGenerator(walletId: walletId),
       services,
-      const SuccessfulLegacyWalletSeedPreflight(),
     );
 
     final result = await repository.createFromMnemonic(
@@ -726,7 +715,6 @@ void main() {
       FakeWalletKeyGenerator(),
       FakeWalletIdentityGenerator(walletId: walletId),
       services,
-      const SuccessfulLegacyWalletSeedPreflight(),
     );
 
     final result = await repository.createFromMnemonic(
@@ -759,7 +747,6 @@ void main() {
         FakeWalletKeyGenerator(),
         FakeWalletIdentityGenerator(walletId: walletId),
         services,
-        const SuccessfulLegacyWalletSeedPreflight(),
       );
 
       final result = await repository.createFromMnemonic(
@@ -780,14 +767,9 @@ void main() {
   );
 
   test('stages uncertain credential writes for startup recovery', () async {
-    SharedPreferences.setMockInitialValues({});
-    final preferences = await SharedPreferences.getInstance();
     final documents = MemoryWalletRegistryDocumentStore();
-    final profileStore = WalletProfileStore(
-      documents,
-      PreferencesService(preferences),
-    );
-    final key = 'utexo_wallet_secret_v2.$walletId';
+    final profileStore = WalletProfileStore(documents);
+    final key = 'aster.wallet.secret.$walletId';
     final rawSecrets = MemorySecureStore()
       ..writeError = StateError('injected write response failure')
       ..commitWriteBeforeError = true
@@ -805,7 +787,6 @@ void main() {
       FakeWalletKeyGenerator(),
       FakeWalletIdentityGenerator(walletId: walletId),
       services,
-      const SuccessfulLegacyWalletSeedPreflight(),
     );
     addTearDown(repository.dispose);
 
@@ -838,11 +819,8 @@ void main() {
   test(
     'stages known retained resources for typed startup reconciliation',
     () async {
-      SharedPreferences.setMockInitialValues({});
-      final preferences = await SharedPreferences.getInstance();
       final profileStore = WalletProfileStore(
         MemoryWalletRegistryDocumentStore(),
-        PreferencesService(preferences),
       );
       final rawSecrets = MemorySecureStore()
         ..writeError = StateError('injected credential write failure');
@@ -860,7 +838,6 @@ void main() {
         FakeWalletKeyGenerator(),
         FakeWalletIdentityGenerator(walletId: walletId),
         services,
-        const SuccessfulLegacyWalletSeedPreflight(),
       );
       addTearDown(repository.dispose);
 
@@ -914,7 +891,6 @@ void main() {
       FakeWalletKeyGenerator(),
       FakeWalletIdentityGenerator(walletId: walletId),
       services,
-      const SuccessfulLegacyWalletSeedPreflight(),
     );
 
     final result = await repository.createFromMnemonic(
@@ -959,7 +935,6 @@ void main() {
         FakeWalletKeyGenerator(),
         FakeWalletIdentityGenerator(walletId: walletId),
         services,
-        const SuccessfulLegacyWalletSeedPreflight(),
       );
 
       final result = await repository.createFromMnemonic(
@@ -983,11 +958,8 @@ void main() {
   );
 
   test('stages uncertain directory creation for startup recovery', () async {
-    SharedPreferences.setMockInitialValues({});
-    final preferences = await SharedPreferences.getInstance();
     final profileStore = WalletProfileStore(
       MemoryWalletRegistryDocumentStore(),
-      PreferencesService(preferences),
     );
     final directories = FakeWalletDirectoryManager()
       ..createError = DurableStorageCommitException([
@@ -1007,7 +979,6 @@ void main() {
       FakeWalletKeyGenerator(),
       FakeWalletIdentityGenerator(walletId: walletId),
       services,
-      const SuccessfulLegacyWalletSeedPreflight(),
     );
     addTearDown(repository.dispose);
 
@@ -1035,11 +1006,8 @@ void main() {
   });
 
   test('wallet ID collision cannot overwrite an existing wallet', () async {
-    SharedPreferences.setMockInitialValues({});
-    final preferences = await SharedPreferences.getInstance();
     final profileStore = WalletProfileStore(
       MemoryWalletRegistryDocumentStore(),
-      PreferencesService(preferences),
     );
     final now = DateTime.utc(2026, 8, 8);
     await profileStore.stageProvision(
@@ -1075,7 +1043,6 @@ void main() {
       FakeWalletKeyGenerator(),
       FakeWalletIdentityGenerator(walletId: walletId),
       services,
-      const SuccessfulLegacyWalletSeedPreflight(),
     );
 
     final result = await repository.createFromMnemonic(
@@ -1096,46 +1063,9 @@ void main() {
     expect(retained.databasePassword, existingSecret.databasePassword);
   });
 
-  test(
-    'bootstrap stops before profile access when migration is required',
-    () async {
-      SharedPreferences.setMockInitialValues({});
-      final preferences = await SharedPreferences.getInstance();
-      final documents = MemoryWalletRegistryDocumentStore()
-        ..document = '{corrupt';
-      final runtime = WalletRuntime(
-        FakeWalletEngineFactory(const []),
-        FakeWalletDirectoryManager(),
-        WalletSecretStore(MemorySecureStore()),
-        services,
-      );
-      addTearDown(runtime.dispose);
-      final repository = WalletRepository(
-        WalletProfileStore(documents, PreferencesService(preferences)),
-        runtime,
-        FakeWalletKeyGenerator(),
-        FakeWalletIdentityGenerator(walletId: walletId),
-        services,
-        const FailingLegacyWalletSeedPreflight(),
-      );
-
-      final result = await repository.bootstrap();
-
-      expect(result, isA<AppFailureResult<WalletRegistry>>());
-      expect(
-        (result as AppFailureResult<WalletRegistry>).failure.code,
-        'wallet_recovery_required',
-      );
-      expect(documents.readCount, 0);
-    },
-  );
-
   test('bootstrap rolls back an interrupted staged wallet', () async {
-    SharedPreferences.setMockInitialValues({});
-    final preferences = await SharedPreferences.getInstance();
     final profileStore = WalletProfileStore(
       MemoryWalletRegistryDocumentStore(),
-      PreferencesService(preferences),
     );
     final now = DateTime.utc(2026, 8, 8);
     await profileStore.stageProvision(
@@ -1173,7 +1103,6 @@ void main() {
       FakeWalletKeyGenerator(),
       FakeWalletIdentityGenerator(walletId: walletId),
       services,
-      const SuccessfulLegacyWalletSeedPreflight(),
     );
 
     final result = await repository.bootstrap();
@@ -1187,8 +1116,6 @@ void main() {
   test(
     'bootstrap fails closed when current wallet resources are orphaned',
     () async {
-      SharedPreferences.setMockInitialValues({});
-      final preferences = await SharedPreferences.getInstance();
       final rawSecrets = MemorySecureStore();
       await WalletSecretStore(rawSecrets).write(
         walletId,
@@ -1206,15 +1133,11 @@ void main() {
       );
       addTearDown(runtime.dispose);
       final repository = WalletRepository(
-        WalletProfileStore(
-          MemoryWalletRegistryDocumentStore(),
-          PreferencesService(preferences),
-        ),
+        WalletProfileStore(MemoryWalletRegistryDocumentStore()),
         runtime,
         FakeWalletKeyGenerator(),
         FakeWalletIdentityGenerator(walletId: walletId),
         services,
-        const SuccessfulLegacyWalletSeedPreflight(),
       );
 
       final result = await repository.bootstrap();
@@ -1229,11 +1152,8 @@ void main() {
   );
 
   test('selected metadata reopens a missing native runtime', () async {
-    SharedPreferences.setMockInitialValues({});
-    final preferences = await SharedPreferences.getInstance();
     final profileStore = WalletProfileStore(
       MemoryWalletRegistryDocumentStore(),
-      PreferencesService(preferences),
     );
     final now = DateTime.utc(2026, 8, 8);
     final profile = WalletProfile(
@@ -1272,7 +1192,6 @@ void main() {
       FakeWalletKeyGenerator(),
       FakeWalletIdentityGenerator(walletId: walletId),
       services,
-      const SuccessfulLegacyWalletSeedPreflight(),
     );
 
     final result = await repository.switchWallet(walletId);
@@ -1285,11 +1204,8 @@ void main() {
   test(
     'resume reconciles a failed shutdown from durable active state',
     () async {
-      SharedPreferences.setMockInitialValues({});
-      final preferences = await SharedPreferences.getInstance();
       final profileStore = WalletProfileStore(
         MemoryWalletRegistryDocumentStore(),
-        PreferencesService(preferences),
       );
       final active = FakeWalletEngine();
       final recovered = FakeWalletEngine();
@@ -1306,7 +1222,6 @@ void main() {
         FakeWalletKeyGenerator(),
         FakeWalletIdentityGenerator(walletId: walletId),
         services,
-        const SuccessfulLegacyWalletSeedPreflight(),
       );
       expect(
         await repository.createFromMnemonic(
@@ -1331,11 +1246,8 @@ void main() {
   test(
     'resume never launders reconciliation through durable-profile recovery',
     () async {
-      SharedPreferences.setMockInitialValues({});
-      final preferences = await SharedPreferences.getInstance();
       final profileStore = WalletProfileStore(
         MemoryWalletRegistryDocumentStore(),
-        PreferencesService(preferences),
       );
       final active = FakeWalletEngine();
       final failedRecovery = FakeWalletEngine()
@@ -1354,7 +1266,6 @@ void main() {
         FakeWalletKeyGenerator(),
         FakeWalletIdentityGenerator(walletId: walletId),
         services,
-        const SuccessfulLegacyWalletSeedPreflight(),
       );
       expect(
         await repository.createFromMnemonic(
@@ -1467,7 +1378,6 @@ void main() {
         FakeWalletKeyGenerator(),
         FakeWalletIdentityGenerator(walletId: walletId),
         services,
-        const SuccessfulLegacyWalletSeedPreflight(),
       );
 
       final result = await repository.switchWallet(secondWalletId);
@@ -1553,7 +1463,6 @@ void main() {
       FakeWalletKeyGenerator(),
       FakeWalletIdentityGenerator(walletId: walletId),
       services,
-      const SuccessfulLegacyWalletSeedPreflight(),
     );
 
     final switching = repository.switchWallet(secondWalletId);
@@ -1623,7 +1532,6 @@ Future<_ActiveRepositoryHarness> _createActiveRepository({
       FakeWalletKeyGenerator(),
       FakeWalletIdentityGenerator(walletId: walletId),
       services,
-      const SuccessfulLegacyWalletSeedPreflight(),
     ),
     runtime: runtime,
     engine: selectedEngine,

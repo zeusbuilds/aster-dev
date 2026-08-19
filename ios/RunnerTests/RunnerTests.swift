@@ -15,7 +15,7 @@ final class RunnerTests: XCTestCase {
       ).first
     )
     let root = support.appendingPathComponent(
-      "utexo-native-test-\(UUID().uuidString)",
+      "aster-native-test-\(UUID().uuidString)",
       isDirectory: true
     )
     try invokeStorage("prepareRoot", at: root)
@@ -59,7 +59,7 @@ final class RunnerTests: XCTestCase {
   func testWalletStorageChannelUsesStableProductNamespace() {
     XCTAssertEqual(
       WalletStoragePolicy.channelName,
-      "com.utexo.wallet/storage_security"
+      "com.aster.wallet/storage_security"
     )
   }
 

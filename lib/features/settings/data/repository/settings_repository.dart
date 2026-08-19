@@ -13,10 +13,10 @@ import '../../domain/models/models.dart';
 final class SettingsRepository {
   SettingsRepository(this._preferences, this._assets);
 
-  static const _currencyKey = 'utexo.settings.v1.currency';
-  static const _regionKey = 'utexo.settings.v1.region';
-  static const _bitcoinUnitKey = 'utexo.settings.v1.bitcoin_unit';
-  static const _balancesVisibleKey = 'utexo.settings.v1.balances_visible';
+  static const _currencyKey = 'aster.settings.v1.currency';
+  static const _regionKey = 'aster.settings.v1.region';
+  static const _bitcoinUnitKey = 'aster.settings.v1.bitcoin_unit';
+  static const _balancesVisibleKey = 'aster.settings.v1.balances_visible';
 
   final PreferencesService _preferences;
   final AssetBundle _assets;

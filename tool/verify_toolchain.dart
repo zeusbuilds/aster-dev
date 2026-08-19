@@ -249,7 +249,7 @@ ToolchainVerification verifyToolchain({
       : _readSingleCapture(
           androidProperties,
           RegExp(
-            r'^utexo\.applicationId='
+            r'^aster\.applicationId='
             r'([A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+)\s*$',
             multiLine: true,
           ),
@@ -261,21 +261,21 @@ ToolchainVerification verifyToolchain({
     _requireSinglePattern(
       android,
       RegExp(
-        r'val\s+utexoApplicationId\s*=\s*providers\.gradleProperty\('
-        r'"utexo\.applicationId"\)\.get\(\)',
+        r'val\s+asterApplicationId\s*=\s*providers\.gradleProperty\('
+        r'"aster\.applicationId"\)\.get\(\)',
       ),
       'Android application ID must come from the owned Gradle property.',
       failures,
     );
     _requireSinglePattern(
       android,
-      RegExp(r'\bnamespace\s*=\s*utexoApplicationId\b'),
+      RegExp(r'\bnamespace\s*=\s*asterApplicationId\b'),
       'Android namespace must use the owned application ID.',
       failures,
     );
     _requireSinglePattern(
       android,
-      RegExp(r'\bapplicationId\s*=\s*utexoApplicationId\b'),
+      RegExp(r'\bapplicationId\s*=\s*asterApplicationId\b'),
       'Android release application ID must use the owned property.',
       failures,
     );
@@ -671,7 +671,7 @@ ToolchainVerification verifyToolchain({
       wrapper.contents!,
       RegExp(
         RegExp.escape(
-          r'utexo_android_package_paths "${adb}" "${device_id}" "$1"',
+          r'aster_android_package_paths "${adb}" "${device_id}" "$1"',
         ),
       ),
       '${wrapper.label} must delegate package discovery to the shared '
@@ -683,7 +683,7 @@ ToolchainVerification verifyToolchain({
     for (final contract in <({RegExp pattern, String failure})>[
       (
         pattern: RegExp(
-          r'^utexo_android_package_paths\(\) \{$',
+          r'^aster_android_package_paths\(\) \{$',
           multiLine: true,
         ),
         failure: 'Android package-state inspection must expose one owned API.',
@@ -701,7 +701,7 @@ ToolchainVerification verifyToolchain({
       ),
       (
         pattern: RegExp(
-          r'utexo_bounded_capture[\s\S]*?'
+          r'aster_bounded_capture[\s\S]*?'
           r'"\$1" -s "\$2" shell pm path "\$3"',
         ),
         failure:
@@ -1119,7 +1119,7 @@ ToolchainVerification verifyToolchain({
     _requireSinglePattern(
       iosIntegration,
       RegExp(
-        r'^utexo_run_quick "\$\{bundle_bin\}" check '
+        r'^aster_run_quick "\$\{bundle_bin\}" check '
         r'>/dev/null 2>&1 \|\|\s*$',
         multiLine: true,
       ),
@@ -1227,8 +1227,8 @@ ToolchainVerification verifyToolchain({
     _requireSinglePattern(
       apkVerifier,
       RegExp(
-        r'utexo_run_inspector[\s\S]*?'
-        r'"\$\{UTEXO_BOUNDED_DART\}" --disable-dart-dev[\s\S]*?'
+        r'aster_run_inspector[\s\S]*?'
+        r'"\$\{ASTER_BOUNDED_DART\}" --disable-dart-dev[\s\S]*?'
         r'tool/verify_android_release_identity\.dart',
       ),
       'APK verification must enforce committed release identity.',
@@ -1236,7 +1236,7 @@ ToolchainVerification verifyToolchain({
     );
     _requireSinglePattern(
       apkVerifier,
-      RegExp(r'--aapt2 "\$\{UTEXO_AAPT2\}"'),
+      RegExp(r'--aapt2 "\$\{ASTER_AAPT2\}"'),
       'APK identity verification must use the resolved aapt2 binary.',
       failures,
     );
@@ -1272,8 +1272,8 @@ ToolchainVerification verifyToolchain({
     _requireSinglePattern(
       bundleVerifier,
       RegExp(
-        r'utexo_run_inspector[\s\S]*?'
-        r'"\$\{UTEXO_BOUNDED_DART\}" --disable-dart-dev[\s\S]*?'
+        r'aster_run_inspector[\s\S]*?'
+        r'"\$\{ASTER_BOUNDED_DART\}" --disable-dart-dev[\s\S]*?'
         r'tool/verify_android_release_identity\.dart',
       ),
       'Bundle verification must enforce committed release identity.',
@@ -1281,13 +1281,13 @@ ToolchainVerification verifyToolchain({
     );
     _requireSinglePattern(
       bundleVerifier,
-      RegExp(r'--aapt2-proto "\$\{UTEXO_AAPT2_PROTO_JAR\}"'),
+      RegExp(r'--aapt2-proto "\$\{ASTER_AAPT2_PROTO_JAR\}"'),
       'Bundle identity verification must use the resolved aapt2 schema.',
       failures,
     );
     _requireSinglePattern(
       bundleVerifier,
-      RegExp(r'--protobuf "\$\{UTEXO_PROTOBUF_JAR\}"'),
+      RegExp(r'--protobuf "\$\{ASTER_PROTOBUF_JAR\}"'),
       'Bundle identity verification must use the resolved protobuf runtime.',
       failures,
     );
@@ -1344,7 +1344,7 @@ ToolchainVerification verifyToolchain({
       bundleVerifier,
       RegExp(
         r'"\$\{mktemp_bin\}" -d '
-        r'"\$\{TMPDIR:-/tmp\}/utexo-aab-config\.XXXXXX"',
+        r'"\$\{TMPDIR:-/tmp\}/aster-aab-config\.XXXXXX"',
       ),
       'Bundle verification must use an isolated owned inspection directory.',
       failures,
@@ -1449,7 +1449,7 @@ ToolchainVerification verifyToolchain({
     _requireSinglePattern(
       nativeLibraryVerifier,
       RegExp(
-        r'utexo_capture_inspector[\s\S]*?'
+        r'aster_capture_inspector[\s\S]*?'
         r'"\$1" "\$3" -mindepth 2 -maxdepth 2 '
         r'-type f -name "\*\.so" -print \|[\s\S]*?'
         r'LC_ALL=C "\$2"',
@@ -1694,7 +1694,7 @@ ToolchainVerification verifyToolchain({
         pattern: RegExp(
           r"'--noprofile',\s*'--norc',\s*'-p',\s*'-c',\s*"
           r'_posixProcessTreeSupervisor,\s*'
-          r"'utexo-bounded-process',\s*executable,\s*\.\.\.arguments,",
+          r"'aster-bounded-process',\s*executable,\s*\.\.\.arguments,",
         ),
         failure: 'The POSIX subprocess supervisor must ignore shell startup code and forward positional arguments.',
       ),
@@ -1981,6 +1981,8 @@ ToolchainVerification verifyToolchain({
       failures,
     );
   }
+
+  _verifyAsterProductIdentity(root, pubspec, iosProject, failures);
 
   final development = _readRequired(
     File('$root/docs/DEVELOPMENT.md'),
@@ -2416,7 +2418,7 @@ void _verifyAndroidPerformanceWrapper(
       benchmark,
       RegExp(
         r'bool\.fromEnvironment\(\s*'
-        r"'UTEXO_ISOLATED_PROFILE_BENCHMARK'\s*,\s*\)",
+        r"'ASTER_ISOLATED_PROFILE_BENCHMARK'\s*,\s*\)",
       ),
       'Presentation benchmark must require the wrapper isolation marker.',
       failures,
@@ -2429,12 +2431,12 @@ void _verifyAndroidPerformanceWrapper(
     );
   }
   for (final option in <String>[
-    r'^utexo_run_build fvm flutter drive --no-pub \\$',
+    r'^aster_run_build fvm flutter drive --no-pub \\$',
     r'^  --no-dds \\$',
     r'^  --driver=test_driver/integration_test\.dart \\$',
     r'^  --target="\$\{target\}" \\$',
     r'^  --keep-app-running \\$',
-    r'^  --dart-define=UTEXO_ISOLATED_PROFILE_BENCHMARK=true \\$',
+    r'^  --dart-define=ASTER_ISOLATED_PROFILE_BENCHMARK=true \\$',
     r'^  -d "\$\{device_id\}" \\$',
     r'^  --profile$',
   ]) {
@@ -2459,7 +2461,7 @@ void _verifyAndroidPerformanceWrapper(
   _requireSinglePattern(
     contents,
     RegExp(
-      r'^utexo_run_quick "\$\{root\}/scripts/'
+      r'^aster_run_quick "\$\{root\}/scripts/'
       r'verify-android-performance-renderer\.sh" \\$'
       r'\n  "\$\{adb\}" "\$\{device_id\}"$',
       multiLine: true,
@@ -2484,7 +2486,7 @@ void _verifyAndroidPerformanceWrapper(
     _requireSinglePattern(
       rendererVerifier,
       RegExp(
-        r'utexo_bounded_capture[\s\S]*?'
+        r'aster_bounded_capture[\s\S]*?'
         r'"\$\{maximum_diagnostic_bytes\}"',
       ),
       'Android performance renderer verification must enforce its byte limit '
@@ -2549,7 +2551,7 @@ void _verifyAndroidPerformanceWrapper(
   _requireSinglePattern(
     contents,
     RegExp(
-      r'^utexo_run_build fvm flutter pub get --enforce-lockfile$',
+      r'^aster_run_build fvm flutter pub get --enforce-lockfile$',
       multiLine: true,
     ),
     'Android performance wrapper must enforce the committed Pub lock.',
@@ -2559,7 +2561,7 @@ void _verifyAndroidPerformanceWrapper(
     contents,
     RegExp(
       r'readonly built_package="\$\([\s\S]*?'
-      r'utexo_capture_inspector "\$\{UTEXO_AAPT2\}" '
+      r'aster_capture_inspector "\$\{ASTER_AAPT2\}" '
       r'dump packagename "\$\{apk\}"[\s\S]*?\)"',
     ),
     'Android performance wrapper must inspect the exact built APK identity.',
@@ -2632,6 +2634,344 @@ int? _readKotlinIntProperty(
     failures,
   );
   return value == null ? null : int.parse(value);
+}
+
+void _verifyAsterProductIdentity(
+  String root,
+  String? pubspec,
+  String? iosProject,
+  List<String> failures,
+) {
+  _verifyRetiredProductIdentity(root, failures);
+
+  if (pubspec != null) {
+    for (final contract in <({RegExp pattern, String failure})>[
+      (
+        pattern: RegExp(r'^name: aster$', multiLine: true),
+        failure: 'pubspec.yaml must identify the Aster package.',
+      ),
+      (
+        pattern: RegExp(r'^description: Aster\b.*$', multiLine: true),
+        failure: 'pubspec.yaml must identify Aster as the product.',
+      ),
+      (
+        pattern: RegExp(
+          r'^    - assets/brand/aster-mark\.svg$',
+          multiLine: true,
+        ),
+        failure: 'pubspec.yaml must bundle the Aster product mark.',
+      ),
+    ]) {
+      _requireSinglePattern(
+        pubspec,
+        contract.pattern,
+        contract.failure,
+        failures,
+      );
+    }
+  }
+
+  final appConstants = _readRequired(
+    File('$root/lib/core/constants/app_constants.dart'),
+    'lib/core/constants/app_constants.dart',
+    failures,
+  );
+  if (appConstants != null) {
+    _requireSinglePattern(
+      appConstants,
+      RegExp(r"static const String appName = 'Aster';"),
+      'Flutter product identity must be exactly Aster.',
+      failures,
+    );
+  }
+
+  final mainSource = _readRequired(
+    File('$root/lib/main.dart'),
+    'lib/main.dart',
+    failures,
+  );
+  if (mainSource != null) {
+    _requireSinglePattern(
+      mainSource,
+      RegExp(r'class AsterApp extends ConsumerStatefulWidget'),
+      'The Flutter application root must be owned by Aster.',
+      failures,
+    );
+  }
+
+  final androidManifest = _readRequired(
+    File('$root/android/app/src/main/AndroidManifest.xml'),
+    'android/app/src/main/AndroidManifest.xml',
+    failures,
+  );
+  if (androidManifest != null) {
+    _requireSinglePattern(
+      androidManifest,
+      RegExp(r'android:label="Aster"'),
+      'The Android application label must be exactly Aster.',
+      failures,
+    );
+  }
+
+  final iosInfo = _readRequired(
+    File('$root/ios/Runner/Info.plist'),
+    'ios/Runner/Info.plist',
+    failures,
+  );
+  if (iosInfo != null) {
+    for (final key in const ['CFBundleDisplayName', 'CFBundleName']) {
+      _requireSinglePattern(
+        iosInfo,
+        RegExp('<key>$key</key>\\s*<string>Aster</string>'),
+        'iOS $key must be exactly Aster.',
+        failures,
+      );
+    }
+  }
+  if (iosProject != null) {
+    _requirePatternCount(
+      iosProject,
+      RegExp(r'ASSETCATALOG_COMPILER_APPICON_NAME = AsterIcon;'),
+      3,
+      'Every iOS application build mode must use the Aster icon catalog.',
+      failures,
+    );
+  }
+
+  final environment = _readRequired(
+    File('$root/lib/core/config/app_environment.dart'),
+    'lib/core/config/app_environment.dart',
+    failures,
+  );
+  if (environment != null) {
+    _requireSinglePattern(
+      environment,
+      RegExp(r"String\.fromEnvironment\(\s*'ASTER_NETWORK'"),
+      'Wallet build configuration must use the Aster environment namespace.',
+      failures,
+    );
+    if (RegExp(
+      r"'(?:bitcoin|utexo)'\s*=>\s*BlockchainEnvironment\.(?:mainnet|signet)",
+    ).hasMatch(environment)) {
+      failures.add(
+        'The app-owned chain parser must not accept asset or protocol names '
+        'as blockchain environments.',
+      );
+    }
+  }
+
+  final secureStorage = _readRequired(
+    File('$root/lib/core/storage/secure_storage_service.dart'),
+    'lib/core/storage/secure_storage_service.dart',
+    failures,
+  );
+  if (secureStorage != null) {
+    for (final contract in <({RegExp pattern, String failure})>[
+      (
+        pattern: RegExp(r"accountName: 'com\.aster\.wallet\.secrets'"),
+        failure: 'iOS secure storage must use the Aster wallet namespace.',
+      ),
+      (
+        pattern: RegExp(r"storageNamespace: 'aster_wallet_secrets'"),
+        failure: 'Android secure storage must use the Aster wallet namespace.',
+      ),
+      (
+        pattern: RegExp(r'migrateOnAlgorithmChange: true'),
+        failure:
+            'Android secure storage must permit the pinned plugin to bootstrap '
+            'the configured cipher markers inside the isolated Aster namespace.',
+      ),
+      (
+        pattern: RegExp(r'migrateWithBackup: false'),
+        failure:
+            'Android secure storage must not enable the plugin backup '
+            'compatibility path.',
+      ),
+    ]) {
+      _requireSinglePattern(
+        secureStorage,
+        contract.pattern,
+        contract.failure,
+        failures,
+      );
+    }
+  }
+}
+
+void _verifyRetiredProductIdentity(String root, List<String> failures) {
+  const roots = <String>[
+    'README.md',
+    'pubspec.yaml',
+    'lib',
+    'android/app/src/main',
+    'ios/Runner',
+    'assets/brand',
+    'docs',
+    'scripts',
+    'tool',
+    'integration_test',
+    'test',
+  ];
+  final retiredStackTokens = <String>[
+    String.fromCharCodes(const [103, 100, 107]),
+    String.fromCharCodes(const [
+      103,
+      114,
+      101,
+      101,
+      110,
+      97,
+      100,
+      100,
+      114,
+      101,
+      115,
+      115,
+    ]),
+    String.fromCharCodes(const [
+      103,
+      114,
+      101,
+      101,
+      110,
+      32,
+      97,
+      100,
+      100,
+      114,
+      101,
+      115,
+      115,
+    ]),
+    String.fromCharCodes(const [98, 111, 108, 116, 122]),
+    String.fromCharCodes(const [108, 105, 113, 117, 105, 100]),
+    String.fromCharCodes(const [108, 98, 116, 99]),
+    String.fromCharCodes(const [108, 45, 98, 116, 99]),
+  ];
+  final retiredStackPatterns = <RegExp>[
+    for (final token in retiredStackTokens)
+      RegExp('\\b${RegExp.escape(token)}\\b', caseSensitive: false),
+    RegExp(
+      '\\b${String.fromCharCodes(const [112, 101, 103])}'
+      r'[ _-]?(?:in|out)\b',
+      caseSensitive: false,
+    ),
+  ];
+  final retiredAppIdentifier = RegExp(
+    '${String.fromCharCodes(const [85, 84, 69, 88, 79, 95])}[A-Z0-9_]+'
+    '|\\b${String.fromCharCodes(const [117, 116, 101, 120, 111])}[_-]'
+    '[a-z0-9_]+'
+    '|${String.fromCharCodes(const [85, 116, 101, 120, 111])}(?:App|Icon)\\b',
+  );
+  final protocolProductCopy = RegExp(
+    '\\b${String.fromCharCodes(const [117, 116, 101, 120, 111])}\\b',
+    caseSensitive: false,
+  );
+
+  final files = <File>[];
+  for (final relativeRoot in roots) {
+    final entity = FileSystemEntity.typeSync('$root/$relativeRoot');
+    if (entity == FileSystemEntityType.file) {
+      files.add(File('$root/$relativeRoot'));
+    } else if (entity == FileSystemEntityType.directory) {
+      files.addAll(
+        Directory('$root/$relativeRoot')
+            .listSync(recursive: true, followLinks: false)
+            .whereType<File>()
+            .where(_isProductIdentityTextFile),
+      );
+    }
+  }
+  files.sort((left, right) => left.path.compareTo(right.path));
+
+  for (final file in files) {
+    final relativePath = file.path
+        .substring(root.length + 1)
+        .replaceAll(Platform.pathSeparator, '/');
+    if (_isGeneratedProductIdentityFile(relativePath)) continue;
+    final source = _readRequired(file, relativePath, failures);
+    if (source == null) continue;
+
+    final pathValue = relativePath.toLowerCase();
+    final retiredPath = retiredStackPatterns.any(
+      (pattern) => pattern.hasMatch(pathValue),
+    );
+    if (retiredPath || retiredAppIdentifier.hasMatch(relativePath)) {
+      failures.add('$relativePath uses a retired wallet product identifier.');
+    }
+
+    for (final pattern in retiredStackPatterns) {
+      final match = pattern.firstMatch(source);
+      if (match == null) continue;
+      failures.add(
+        '$relativePath:${_lineNumberAt(source, match.start)} contains retired '
+        'wallet-stack vocabulary.',
+      );
+      break;
+    }
+    final appIdentifier = retiredAppIdentifier.firstMatch(source);
+    if (appIdentifier != null) {
+      failures.add(
+        '$relativePath:${_lineNumberAt(source, appIdentifier.start)} uses a '
+        'retired app-owned identifier.',
+      );
+    }
+    if (_isProductPresentationSurface(relativePath)) {
+      final productCopy = protocolProductCopy.firstMatch(source);
+      if (productCopy != null) {
+        failures.add(
+          '$relativePath:${_lineNumberAt(source, productCopy.start)} presents '
+          'the protocol name as Aster product identity.',
+        );
+      }
+    }
+  }
+}
+
+bool _isGeneratedProductIdentityFile(String path) {
+  return path.endsWith('/GeneratedPluginRegistrant.java') ||
+      path.endsWith('/GeneratedPluginRegistrant.h') ||
+      path.endsWith('/GeneratedPluginRegistrant.m') ||
+      path.endsWith('/GeneratedPluginRegistrant.swift');
+}
+
+bool _isProductIdentityTextFile(File file) {
+  final name = file.uri.pathSegments.last;
+  if (name == 'Makefile' || name == 'pre-commit' || name == '.fvmrc') {
+    return true;
+  }
+  return const {
+    '.dart',
+    '.gradle',
+    '.java',
+    '.json',
+    '.kt',
+    '.kts',
+    '.md',
+    '.nix',
+    '.plist',
+    '.properties',
+    '.sh',
+    '.storyboard',
+    '.swift',
+    '.svg',
+    '.xcconfig',
+    '.xml',
+    '.yaml',
+    '.yml',
+  }.any(name.endsWith);
+}
+
+bool _isProductPresentationSurface(String path) {
+  return path == 'lib/main.dart' ||
+      path.startsWith('lib/shared/screens/') ||
+      (path.startsWith('lib/features/') && path.contains('/presentation/')) ||
+      path.startsWith('android/app/src/main/') ||
+      path.startsWith('ios/Runner/');
+}
+
+int _lineNumberAt(String source, int offset) {
+  return '\n'.allMatches(source.substring(0, offset)).length + 1;
 }
 
 String? _readSingleCapture(
@@ -2725,7 +3065,7 @@ void _verifyBoundedShellExecution(
       (
         pattern: RegExp(
           RegExp.escape(
-            r'${_utexo_bounded_flutter_root}/bin/cache/dart-sdk/bin/dart',
+            r'${_aster_bounded_flutter_root}/bin/cache/dart-sdk/bin/dart',
           ),
         ),
         failure:
@@ -2733,16 +3073,16 @@ void _verifyBoundedShellExecution(
       ),
       (
         pattern: RegExp(
-          r'_utexo_bounded_dart="\$\{UTEXO_BOUNDED_LOCAL_DART\}"\s*'
-          r'if \[\[ ! -x "\$\{_utexo_bounded_dart\}" \]\]; then',
+          r'_aster_bounded_dart="\$\{ASTER_BOUNDED_LOCAL_DART\}"\s*'
+          r'if \[\[ ! -x "\$\{_aster_bounded_dart\}" \]\]; then',
         ),
         failure:
             'Bounded shell execution must prefer the repository Flutter VM.',
       ),
       (
         pattern: RegExp(
-          r'"\$\{_utexo_bounded_flutter_root\}" == /\* &&\s*'
-          r'-f "\$\{_utexo_bounded_flutter_metadata_file\}"',
+          r'"\$\{_aster_bounded_flutter_root\}" == /\* &&\s*'
+          r'-f "\$\{_aster_bounded_flutter_metadata_file\}"',
         ),
         failure:
             'Bounded shell execution must reject relative CI Flutter roots.',
@@ -2750,7 +3090,7 @@ void _verifyBoundedShellExecution(
       (
         pattern: RegExp(
           RegExp.escape(
-            r'${_utexo_bounded_flutter_root}/bin/cache/flutter.version.json',
+            r'${_aster_bounded_flutter_root}/bin/cache/flutter.version.json',
           ),
         ),
         failure:
@@ -2758,17 +3098,17 @@ void _verifyBoundedShellExecution(
       ),
       (
         pattern: RegExp(
-          r'_utexo_bounded_flutter_version_count='
-          r'\$\(\(_utexo_bounded_flutter_version_count \+ 1\)\)',
+          r'_aster_bounded_flutter_version_count='
+          r'\$\(\(_aster_bounded_flutter_version_count \+ 1\)\)',
         ),
         failure:
             'Bounded shell execution must reject duplicate CI version fields.',
       ),
       (
         pattern: RegExp(
-          r'"\$\{_utexo_bounded_flutter_version_count\}" == 1 &&\s*'
-          r'"\$\{_utexo_bounded_flutter_version\}" ==\s*'
-          r'"\$\{UTEXO_BOUNDED_FLUTTER_VERSION\}"',
+          r'"\$\{_aster_bounded_flutter_version_count\}" == 1 &&\s*'
+          r'"\$\{_aster_bounded_flutter_version\}" ==\s*'
+          r'"\$\{ASTER_BOUNDED_FLUTTER_VERSION\}"',
         ),
         failure: 'Bounded shell execution must reject malformed or mismatched CI Flutter roots.',
       ),
@@ -2780,7 +3120,7 @@ void _verifyBoundedShellExecution(
       ),
       (
         pattern: RegExp(
-          r'^\s*unset UTEXO_BOUNDED_COMMAND_LOADED$',
+          r'^\s*unset ASTER_BOUNDED_COMMAND_LOADED$',
           multiLine: true,
         ),
         failure:
@@ -2788,7 +3128,7 @@ void _verifyBoundedShellExecution(
       ),
       (
         pattern: RegExp(
-          r'^readonly UTEXO_BOUNDED_COMMAND_LOADED=1$',
+          r'^readonly ASTER_BOUNDED_COMMAND_LOADED=1$',
           multiLine: true,
         ),
         failure:
@@ -2800,14 +3140,14 @@ void _verifyBoundedShellExecution(
       ),
       (
         pattern: RegExp(
-          r'^\s*readonly UTEXO_QUICK_TIMEOUT_SECONDS=120$',
+          r'^\s*readonly ASTER_QUICK_TIMEOUT_SECONDS=120$',
           multiLine: true,
         ),
         failure: 'Bounded shell quick operations must use a 120-second limit.',
       ),
       (
         pattern: RegExp(
-          r'^\s*readonly UTEXO_INSPECT_TIMEOUT_SECONDS=600$',
+          r'^\s*readonly ASTER_INSPECT_TIMEOUT_SECONDS=600$',
           multiLine: true,
         ),
         failure:
@@ -2815,17 +3155,17 @@ void _verifyBoundedShellExecution(
       ),
       (
         pattern: RegExp(
-          r'^\s*readonly UTEXO_BUILD_TIMEOUT_SECONDS=3600$',
+          r'^\s*readonly ASTER_BUILD_TIMEOUT_SECONDS=3600$',
           multiLine: true,
         ),
         failure: 'Bounded shell builds must use a 3600-second limit.',
       ),
       (
-        pattern: RegExp(r'^\s*utexo_bounded_capture\(\) \{$', multiLine: true),
+        pattern: RegExp(r'^\s*aster_bounded_capture\(\) \{$', multiLine: true),
         failure: 'Bounded shell execution must expose one capture boundary.',
       ),
       (
-        pattern: RegExp(r'^\s*utexo_bounded_stream\(\) \{$', multiLine: true),
+        pattern: RegExp(r'^\s*aster_bounded_stream\(\) \{$', multiLine: true),
         failure: 'Bounded shell execution must expose one streaming boundary.',
       ),
     ]) {
@@ -2838,14 +3178,14 @@ void _verifyBoundedShellExecution(
     }
     _requirePatternCount(
       boundary,
-      RegExp(r'utexo_bounded_boundary_available \|\| return 69'),
+      RegExp(r'aster_bounded_boundary_available \|\| return 69'),
       2,
       'Both bounded shell modes must fail closed when their runner is absent.',
       failures,
     );
     _requirePatternCount(
       boundary,
-      RegExp(r'"\$\{UTEXO_BOUNDED_DART\}" --disable-dart-dev \\'),
+      RegExp(r'"\$\{ASTER_BOUNDED_DART\}" --disable-dart-dev \\'),
       2,
       'Both bounded shell modes must bypass mutable Dart tooling.',
       failures,
@@ -2854,7 +3194,7 @@ void _verifyBoundedShellExecution(
       _requireSinglePattern(
         boundary,
         RegExp(
-          '^readonly UTEXO_BOUNDED_FLUTTER_VERSION='
+          '^readonly ASTER_BOUNDED_FLUTTER_VERSION='
           '${RegExp.escape(flutterVersion)}\$',
           multiLine: true,
         ),
@@ -2862,8 +3202,8 @@ void _verifyBoundedShellExecution(
         failures,
       );
     }
-    if (boundary.contains('UTEXO_BOUNDED_DART:-') ||
-        boundary.contains('UTEXO_BOUNDED_RUNNER:-')) {
+    if (boundary.contains('ASTER_BOUNDED_DART:-') ||
+        boundary.contains('ASTER_BOUNDED_RUNNER:-')) {
       failures.add(
         'Bounded shell execution must not accept environment-selected owners.',
       );
@@ -2970,7 +3310,7 @@ void _verifyBoundedShellExecution(
     if (!ownsBoundary) {
       failures.add('$path must source the bounded shell execution boundary.');
     }
-    if (!RegExp(r'utexo_(?:bounded|capture|run)_').hasMatch(source)) {
+    if (!RegExp(r'aster_(?:bounded|capture|run)_').hasMatch(source)) {
       failures.add('$path must execute its external work through a bound.');
     }
     if (source.contains('fvm dart run ')) {

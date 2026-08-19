@@ -9,7 +9,7 @@ void main() {
   late File zipWriter;
 
   setUp(() {
-    root = Directory.systemTemp.createTempSync('utexo_native_archive_');
+    root = Directory.systemTemp.createTempSync('aster_native_archive_');
     zipWriter = File('${root.path}/ZipFixtureWriter.java');
     zipWriter.writeAsStringSync(r'''
 import java.io.FileOutputStream;

@@ -7,7 +7,7 @@ script_directory="${BASH_SOURCE[0]%/*}"
 readonly root="$(cd "${script_directory}/.." && pwd -P)"
 cd "${root}"
 source "${root}/scripts/android-artifact-toolchain.sh"
-utexo_resolve_android_artifact_toolchain
+aster_resolve_android_artifact_toolchain
 
 readonly archive_path="${1:-}"
 readonly native_root="${2:-}"
@@ -36,24 +36,24 @@ rm_bin="$(command -v rm)" || fail "rm is required"
 find_bin="$(command -v find)" || fail "find is required"
 sort_bin="$(command -v sort)" || fail "sort is required"
 readonly java_bin mktemp_bin rm_bin find_bin sort_bin
-readonly readelf_bin="${UTEXO_LLVM_READELF}"
+readonly readelf_bin="${ASTER_LLVM_READELF}"
 
 if [[ "${archive_kind}" == "apk" ]]; then
-  readonly zipalign_bin="${UTEXO_ZIPALIGN}"
-  utexo_run_inspector \
+  readonly zipalign_bin="${ASTER_ZIPALIGN}"
+  aster_run_inspector \
     "${zipalign_bin}" -c -P 16 4 "${archive_path}" >/dev/null ||
     fail "${archive_path} does not use 16 KiB APK alignment"
   printf 'Verified %s uses 16 KiB APK alignment\n' "${archive_path}"
 fi
 
-temporary_directory="$(utexo_capture_quick "${mktemp_bin}" -d)" ||
+temporary_directory="$(aster_capture_quick "${mktemp_bin}" -d)" ||
   fail "could not create an isolated native-library directory"
 readonly temporary_directory
 cleanup() {
   local status=$?
   local cleanup_status=0
   trap - EXIT HUP INT TERM
-  utexo_run_quick "${rm_bin}" -rf -- "${temporary_directory}" \
+  aster_run_quick "${rm_bin}" -rf -- "${temporary_directory}" \
     >/dev/null 2>&1 || cleanup_status=1
   ((status != 0)) && exit "${status}"
   exit "${cleanup_status}"
@@ -64,7 +64,7 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 extraction_output="$({
-  utexo_capture_inspector \
+  aster_capture_inspector \
     "${java_bin}" scripts/AndroidNativeLibraryExtractor.java \
     "${archive_path}" \
     "${native_root}" \
@@ -78,12 +78,12 @@ readonly extraction_output
 readonly extracted_library_count="${BASH_REMATCH[1]}"
 readonly library_inventory="${temporary_directory}/.native-library-inventory"
 if ! inventory_output="$(
-  utexo_capture_inspector \
+  aster_capture_inspector \
     /bin/bash --noprofile --norc -p -c '
       set -o pipefail
       "$1" "$3" -mindepth 2 -maxdepth 2 -type f -name "*.so" -print |
         LC_ALL=C "$2"
-    ' utexo-native-library-inventory \
+    ' aster-native-library-inventory \
     "${find_bin}" \
     "${sort_bin}" \
     "${temporary_directory}"
@@ -106,7 +106,7 @@ while IFS= read -r library_path; do
   fi
 
   program_headers="$(
-    utexo_capture_inspector "${readelf_bin}" -lW "${library_path}"
+    aster_capture_inspector "${readelf_bin}" -lW "${library_path}"
   )" ||
     fail "could not inspect ELF headers for ${abi}/${library_name}"
   load_segments=''
@@ -141,7 +141,7 @@ while IFS= read -r library_path; do
 
   if [[ "${program_headers}" != *GNU_RELRO* ]]; then
     dynamic_headers="$(
-      utexo_capture_inspector "${readelf_bin}" -dW "${library_path}"
+      aster_capture_inspector "${readelf_bin}" -dW "${library_path}"
     )" ||
       fail "could not inspect dynamic headers for ${abi}/${library_name}"
     if [[ "${dynamic_headers}" =~ \((REL|RELA|JMPREL|PLTREL)\) ]]; then
