@@ -29,7 +29,7 @@ dependencies:
 
   # Storage
   # 11.0.0 requires Android compile SDK 37, ahead of Flutter 3.47.0's SDK 36.
-  flutter_secure_storage: 10.3.1
+  flutter_secure_storage: 11.0.0
   package_info_plus: ^10.2.1
   path_provider: ^2.1.5
   share_plus: ^13.3.0
