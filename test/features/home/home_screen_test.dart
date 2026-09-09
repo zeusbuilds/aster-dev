@@ -28,6 +28,44 @@ import '../../support/wallet_fakes.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  testWidgets('hidden balance values align with the asset row trailing edge', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 380,
+              child: AssetRow(
+                kind: WalletAssetKind.bitcoin,
+                title: 'Bitcoin',
+                totalText: '1 sats',
+                availableText: '1 sats',
+                fiatContext: r'$0.00',
+                balancesVisible: false,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    final rowRight = tester.getRect(find.byType(AssetRow)).right;
+    final masks = find.byWidgetPredicate(
+      (widget) => widget is AmountText && widget.text == '••••',
+    );
+    expect(masks, findsNWidgets(2));
+    for (final mask in masks.evaluate()) {
+      expect(
+        tester
+            .getRect(find.byElementPredicate((element) => element == mask))
+            .right,
+        rowRight,
+      );
+    }
+  });
+
   testWidgets('Home loading surfaces announce one truthful status each', (
     tester,
   ) async {

@@ -27,48 +27,55 @@ class HomeActionButtons extends StatelessWidget {
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: spacing.screenPadding),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          Expanded(
-            flex: 1,
-            child: CustomButton.compact(
-              text: 'Send',
-              width: double.infinity,
-              suffixIcon: RemixIcons.arrow_right_up_line,
-              variant: ButtonVariant.translucent,
-              enabled: !navigation.inFlight,
-              hapticIntent: null,
-              onTap: () => open(RoutePaths.send, 'Send could not open'),
-            ),
-          ),
-          SizedBox(width: spacing.md),
-          Expanded(
-            flex: 1,
-            child: CustomButton.compact(
-              text: 'Receive',
-              width: double.infinity,
-              suffixIcon: RemixIcons.arrow_right_down_line,
-              variant: ButtonVariant.translucent,
-              enabled: !navigation.inFlight,
-              hapticIntent: null,
-              onTap: () => open(RoutePaths.receive, 'Receive could not open'),
-            ),
-          ),
-          SizedBox(width: spacing.md),
-          Expanded(
-            flex: 1,
-            child: CustomButton.compact(
-              text: 'Swap',
-              width: double.infinity,
-              suffixIcon: RemixIcons.token_swap_line,
-              variant: ButtonVariant.translucent,
-              enabled: !navigation.inFlight,
-              hapticIntent: null,
-              onTap: () => open(RoutePaths.swap, 'Swap could not open'),
-            ),
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final minimumButtonWidth =
+              unwrappedTextWidth(
+                context,
+                'Receive',
+                context.type.compactButtonLabel,
+              ) +
+              context.icons.sm +
+              spacing.xs +
+              spacing.md * 2;
+          final vertical =
+              constraints.maxWidth < minimumButtonWidth * 3 + spacing.md * 2;
+          final buttons = [
+            for (final (label, icon, route) in [
+              ('Send', RemixIcons.arrow_right_up_line, RoutePaths.send),
+              ('Receive', RemixIcons.arrow_right_down_line, RoutePaths.receive),
+              ('Swap', RemixIcons.token_swap_line, RoutePaths.swap),
+            ])
+              CustomButton.compact(
+                text: label,
+                width: double.infinity,
+                suffixIcon: icon,
+                variant: ButtonVariant.translucent,
+                enabled: !navigation.inFlight,
+                hapticIntent: null,
+                onTap: () => open(route, '$label could not open'),
+              ),
+          ];
+          if (vertical) {
+            return Column(
+              children: [
+                for (var index = 0; index < buttons.length; index++) ...[
+                  if (index > 0) SizedBox(height: spacing.xs),
+                  buttons[index],
+                ],
+              ],
+            );
+          }
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              for (var index = 0; index < buttons.length; index++) ...[
+                if (index > 0) SizedBox(width: spacing.md),
+                Expanded(child: buttons[index]),
+              ],
+            ],
+          );
+        },
       ),
     );
   }

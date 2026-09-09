@@ -1203,6 +1203,7 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `lib/shared/formatting/fiat_currency_policy.dart` | Dart source | verified | DEC-042, FIAT-001 | One reviewed 43-code provider/catalog intersection and ISO zero/two/three-decimal policy is shared across settings, market, and display; exact production-catalog/aggregate/platform gates pass | `d449b5d` |
 | `lib/shared/formatting/formatting.dart` | Dart source | verified | SETTINGS-001, FIAT-001 | Shared formatting boundary exports the typed fiat policy/formatter alongside Bitcoin contracts; exact barrel/aggregate/platform gates pass | `6cc7376`, `d449b5d` |
 | `lib/shared/layout/layout.dart` | Dart source | verified | SAFE-001 | Boundary barrel exports only typed runtime layout environment | `98b7a40` |
+| `lib/shared/layout/text_measurement.dart` | Dart source | unreviewed | - | - | - |
 | `lib/shared/layout/window_insets.dart` | Dart source | verified | SAFE-001 | Safe, persistent-system, and keyboard inset semantics are distinct and widget-tested | `98b7a40` |
 | `lib/shared/motion/motion.dart` | Dart source | verified | MOTION-001 | Boundary barrel exports only the effective animation policy | `98b7a40` |
 | `lib/shared/motion/motion_policy.dart` | Dart source | verified | MOTION-001 | Platform/view accessibility settings resolve deterministic effective durations and stable disabled-motion behavior | `98b7a40` |

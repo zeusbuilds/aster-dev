@@ -10,6 +10,7 @@ import 'package:aster/features/onboarding/presentation/widgets/widgets.dart';
 import 'package:aster/features/wallet/presentation/view_model/wallet_view_model.dart';
 import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -19,7 +20,17 @@ import '../../support/presentation_fakes.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUpAll(() => WidgetController.hitTestWarningShouldBeFatal = true);
+  setUpAll(() async {
+    WidgetController.hitTestWarningShouldBeFatal = true;
+    // Contrast must sample the shipped glyphs, not the widget-test Ahem blocks.
+    // Large Ahem rectangles distort color clustering over the brand mesh.
+    for (final (family, path) in [
+      ('DM Sans', 'assets/fonts/DMSans-Variable.ttf'),
+      ('Public Sans', 'assets/fonts/PublicSans-Variable.ttf'),
+    ]) {
+      await (FontLoader(family)..addFont(rootBundle.load(path))).load();
+    }
+  });
   tearDownAll(() => WidgetController.hitTestWarningShouldBeFatal = false);
 
   testWidgets('onboarding status is live without swallowing recovery actions', (
@@ -108,6 +119,43 @@ void main() {
     await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     await expectLater(tester, meetsGuideline(textContrastGuideline));
+  });
+
+  testWidgets('import hydrates a retained validated phrase on remount', (
+    tester,
+  ) async {
+    final harness = await OnboardingTestHarness.create();
+    addTearDown(() => _disposeHarness(tester, harness));
+    final subscription = harness.container.listen(
+      importWalletViewModelProvider,
+      (_, _) {},
+    );
+    addTearDown(subscription.close);
+    await _pumpScreen(tester, harness, const OnboardingImportWalletScreen());
+    harness.container
+        .read(importWalletViewModelProvider.notifier)
+        .updateWords(0, validTestMnemonicWords);
+    await _pumpUntil(
+      tester,
+      () =>
+          harness.container
+              .read(importWalletViewModelProvider)
+              .value
+              ?.canSubmit ==
+          true,
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpScreen(tester, harness, const OnboardingImportWalletScreen());
+    for (var index = 1; index <= 4; index++) {
+      final field = tester.widget<TextField>(
+        find.byKey(ValueKey('recovery-word-$index')),
+      );
+      expect(field.controller!.text, validTestMnemonicWords[index - 1]);
+    }
+    expect(
+      harness.container.read(importWalletViewModelProvider).value!.canSubmit,
+      isTrue,
+    );
   });
 
   testWidgets('create shows 1-6 and 7-12 and uses the secure copy service', (

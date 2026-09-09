@@ -38,6 +38,10 @@ truthful; historical mock quotes and obsolete assets are not a design contract.
   glass-content scrim to remain legible over the brightest existing mesh.
 - Keypads use `radii.keypad`, not input/card radii. Numeric fields label their
   actual displayed unit, which is independent from the Bitcoin asset identity.
+- `unwrappedTextWidth` measures the active font, locale and accessibility scale
+  when a row must choose between horizontal and stacked layouts. Home commands
+  remain equal-width pills; they stack only when the longest label cannot fit.
+  Never squeeze accessibility text or let short values shift trailing edges.
 
 The original palette and bundled DM Sans/Public Sans families are unchanged.
 Do not substitute a different screen composition while normalizing tokens.
@@ -59,6 +63,11 @@ under `build/visual-restoration/ios`. Use a dedicated simulator; never reuse
 another task's device. The driver exports images before test-app cleanup.
 The catalog includes all four payment rails, sheets, readiness/error/loading
 variants, activity details, hidden balances, onboarding, settings and 2x text.
+The import keyboard-inset scene simulates obstruction geometry; it does not
+claim to capture the native keyboard. Native camera frames, real balances and
+funded-payment proof are deliberately outside this fixture-only catalog.
+The driver disables raw protocol logging to avoid writing the complete image
+payload repeatedly. The PNG export and small result summary are retained.
 
 ## Toasts
 

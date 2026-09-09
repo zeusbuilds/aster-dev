@@ -13,6 +13,62 @@ import 'package:remixicon/remixicon.dart';
 import '../support/presentation_fakes.dart';
 
 void main() {
+  testWidgets('toast has Material text styling outside the route navigator', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        builder: (context, child) => CustomToast(
+          title: 'Copied',
+          message: 'Address copied',
+          variant: ToastVariant.success,
+          onDismiss: () {},
+        ),
+        home: const SizedBox.shrink(),
+      ),
+    );
+    final text = tester.element(find.text('Address copied'));
+    expect(DefaultTextStyle.of(text).style.decoration, TextDecoration.none);
+    expect(
+      find.ancestor(
+        of: find.text('Address copied'),
+        matching: find.byType(Material),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets(
+    'option rows reflow long values instead of clipping at large text',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 280,
+                child: MediaQuery(
+                  data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+                  child: AsterOptionRow(
+                    title: 'Wallet details',
+                    details: 'Unavailable',
+                    prefixIcon: Icons.info_outline,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      final title = tester.getRect(find.text('Wallet details'));
+      final value = tester.getRect(find.text('Unavailable'));
+      expect(value.top, greaterThanOrEqualTo(title.bottom));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('theme extensions fail fast outside an Aster theme root', (
     tester,
   ) async {

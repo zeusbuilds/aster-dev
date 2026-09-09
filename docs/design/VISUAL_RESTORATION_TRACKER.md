@@ -23,10 +23,10 @@
 
 | Phase | Scope | Status | Verification / commit |
 | --- | --- | --- | --- |
-| V1 | Shared geometry, controls, Home, shell | fixing | Implementation and 59 focused tests pass; final iOS visual check remains V4 |
-| V2 | Send, Receive, Swap, selection, sheets | fixing | Restyled; focused regression suite and screenshots in progress |
-| V3 | Onboarding, wallet access, settings, activity, scanner, market | fixing | Source review complete; 23 onboarding checks pass |
-| V4 | Independent visual audit, responsive tests, iOS screenshots of all screens and states | fixing | Shared host/native catalog implemented; screenshot review underway |
+| V1 | Shared geometry, controls, Home, shell | verified | 2f522c8 plus native QA corrections; Home/reference compared; full host suite passes |
+| V2 | Send, Receive, Swap, selection, sheets | verified | All four rails and sheets captured; QR payload decode 4/4; real behavior preserved |
+| V3 | Onboarding, wallet access, settings, activity, scanner, market | verified | 143 source/boundary rows reviewed; 24 real-font onboarding checks; native catalog reviewed |
+| V4 | Independent visual audit, responsive tests, iOS screenshots of all screens and states | fixing | 91 native PNGs reviewed; final Linux CI verification pending |
 
 ## Findings
 
@@ -46,6 +46,12 @@
 | VIS-011 | fixing | Small recovery text over the brightest glass/mesh failed contrast. Use a semantic glass-content scrim from existing palette and opaque number labels. | Automated contrast checks pass at phone and compact scaled sizes. |
 | VIS-012 | fixing | Send amount entered in sats was labeled BTC. Display the formatter's denomination, keeping asset identity distinct. | Four-rail amount screenshots and payment tests. |
 | VIS-013 | fixing | Wallet-unavailable container swallowed Retry semantics; route error used an inconsistent, non-scrolling layout. Keep explicit child semantics, shared app bar and scrollable safe-area recovery. | Shared/widget suite and catalog. |
+| VIS-014 | fixing | Linux presentation golden needs the actual reviewed engine raster for the intentional shadow/outline change. | macOS verified; Linux CI evidence pending. |
+| VIS-015 | fixing | Import controllers hydrate only on subsequent provider changes, so a remounted valid form can show empty fields with green checks. Hydrate the owned controllers immediately when subscribing. | Native catalog discovered; remount regression added. |
+| VIS-016 | fixing | Hidden/short balances drift left; accessibility-sized Home commands and option-row values truncate or split words. Keep trailing alignment and reflow when text no longer fits. | Native and compact screenshots; geometry regressions. |
+| VIS-017 | fixing | Toasts outside a route's Material inherit the debug fallback text decoration. Establish a transparent Material text environment inside the shared toast. | Native four-variant screenshots and text-style regression. |
+| VIS-018 | fixing | Catalog reused cached activity state, mislabeled carousel pages, and retained a debug banner. Assert each intended state before capturing; distinguish simulated keyboard insets from native keyboard evidence. | Host and iOS recapture required. |
+| VIS-019 | fixing | Linux onboarding contrast checks use Ahem test rectangles rather than the shipped fonts, producing a wordmark contrast failure. Load the exact bundled fonts for these checks, retain the strict contrast assertion, and verify on Linux. | Local real-font test run and Linux CI pending. |
 
 ## File Review
 
@@ -181,6 +187,66 @@ checked in its containing screen; an unchanged file can be reviewed-clean.
 | `lib/features/home/presentation/formatting/home_asset_display_formatter.dart` | fixing | Exact compact fiat estimate plus full currency/availability semantics; no monetary arithmetic changed. |
 
 ## Evidence
+
+### Final Boundary Review
+
+The independent inventory cross-check also includes presentation barrels and
+the camera lifecycle adapter. These were read, not just matched by a search.
+The adapter owns no styling and preserves attachment/disposal behavior.
+
+| File | Status | Evidence |
+| --- | --- | --- |
+| `lib/shared/layout/text_measurement.dart` | fixing | Scoped paragraph measurement with locale/scaling and deterministic disposal; responsive regressions. |
+| `lib/shared/layout/layout.dart` | reviewed-clean | Sorted boundary export, no internal/self barrel imports. |
+| `lib/features/scan/data/services/scan_lifecycle_surface.dart` | reviewed-clean | Read lifecycle forwarding, observer removal and owner replacement. No visual styling to change; existing scan tests. |
+| `lib/features/home/presentation/screens/screens.dart` | reviewed-clean | Read exports; boundary policy. |
+| `lib/features/home/presentation/widgets/widgets.dart` | reviewed-clean | Read exports; boundary policy. |
+| `lib/features/market/presentation/screens/screens.dart` | reviewed-clean | Read exports; boundary policy. |
+| `lib/features/market/presentation/widgets/widgets.dart` | reviewed-clean | Read exports; boundary policy. |
+| `lib/features/onboarding/presentation/screens/screens.dart` | reviewed-clean | Read exports; boundary policy. |
+| `lib/features/onboarding/presentation/widgets/widgets.dart` | reviewed-clean | Read exports; boundary policy. |
+| `lib/features/receive/presentation/screens/screens.dart` | reviewed-clean | Read exports; boundary policy. |
+| `lib/features/receive/presentation/widgets/widgets.dart` | reviewed-clean | Read exports; boundary policy. |
+| `lib/features/scan/presentation/screens/screens.dart` | reviewed-clean | Read exports; boundary policy. |
+| `lib/features/scan/presentation/widgets/widgets.dart` | reviewed-clean | Read exports; boundary policy. |
+| `lib/features/send/presentation/screens/screens.dart` | reviewed-clean | Read exports; boundary policy. |
+| `lib/features/send/presentation/widgets/widgets.dart` | reviewed-clean | Read exports; boundary policy. |
+| `lib/features/settings/presentation/screens/screens.dart` | reviewed-clean | Read exports; boundary policy. |
+| `lib/features/settings/presentation/widgets/widgets.dart` | reviewed-clean | Read exports; boundary policy. |
+| `lib/features/shell/presentation/screens/screens.dart` | reviewed-clean | Read exports; boundary policy. |
+| `lib/features/shell/presentation/widgets/widgets.dart` | reviewed-clean | Read exports; boundary policy. |
+| `lib/features/swap/presentation/screens/screens.dart` | reviewed-clean | Read exports; boundary policy. |
+| `lib/features/swap/presentation/widgets/widgets.dart` | reviewed-clean | Read exports; boundary policy. |
+| `lib/features/transaction/presentation/screens/screens.dart` | reviewed-clean | Read exports; boundary policy. |
+| `lib/features/transaction/presentation/widgets/widgets.dart` | reviewed-clean | Read exports; boundary policy. |
+| `lib/features/wallet/presentation/pages/pages.dart` | reviewed-clean | Read exports; boundary policy. |
+| `lib/features/wallet/presentation/widgets/widgets.dart` | reviewed-clean | Read exports; boundary policy. |
+| `lib/shared/screens/screens.dart` | reviewed-clean | Read exports; boundary policy. |
+| `lib/shared/widgets/widgets.dart` | reviewed-clean | Read exports; boundary policy. |
+
+### Run Log
+
+- `2f522c8` was committed and pushed as Zeus after format, generation,
+  strict analysis, dartdoc, toolchain, architecture, design, barrel, governance,
+  release-configuration and inventory gates passed.
+- Final local suite: **879 tests pass with coverage**, 1m37s. An additional
+  real-font onboarding rerun passes all 24 tests. Assertions were not relaxed.
+- Reviewed native catalog: **91 PNGs**, four groups pass, 10.4s iOS build and
+  2m22s test run on the dedicated iPhone Air / iOS 26.5. Six contact sheets and
+  full-size Home/reference compared. Empty/error/valid-page states are asserted.
+- Apple Vision independently decodes all four Receive screenshots to exactly
+  their test fixture strings, including the centered asset logos.
+- Native raw protocol logging is disabled; it duplicated screenshot payloads
+  into multi-gigabyte files. Only PNGs and a compact summary are retained.
+- Linux run `34320894225` had three failures: the expected 0.88% golden drift
+  (centered loader and unclipped toast shadow), and two wordmark contrast checks
+  using Ahem. The exact Linux golden raster was downloaded, inspected and
+  adopted; contrast tests now load the shipped DM Sans/Public Sans glyphs.
+  A new Linux run must pass before VIS-014 / VIS-019 are called verified.
+- No palette, SDK dependency, wallet repository or monetary contract was
+  changed. Physical haptic feel, native camera capture, live/funded payments,
+  Android visual parity and native keyboard appearance are not certified by
+  this styling catalog. Existing release constraints remain authoritative.
 
 - V1: 59 focused Home, presentation-system, keypad, and exact-fiat-format tests
   pass. Strict analysis and semantic design-system policy pass. Compact controls

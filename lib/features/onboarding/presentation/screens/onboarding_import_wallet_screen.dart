@@ -41,6 +41,19 @@ class _OnboardingImportWalletScreenState
       ImportWalletState.wordCount,
       (index) => FocusNode(debugLabel: 'recovery-word-${index + 1}'),
     );
+    // Hydrate on attachment as well as updates: the ViewModel can outlive a
+    // temporarily unmounted page while retaining a validated phrase.
+    ref.listenManual(importWalletViewModelProvider, (_, next) {
+      final words = next.value?.words;
+      if (words == null) return;
+      for (var index = 0; index < words.length; index += 1) {
+        if (_controllers[index].text == words[index]) continue;
+        _controllers[index].value = TextEditingValue(
+          text: words[index],
+          selection: TextSelection.collapsed(offset: words[index].length),
+        );
+      }
+    }, fireImmediately: true);
   }
 
   @override
@@ -59,17 +72,6 @@ class _OnboardingImportWalletScreenState
   @override
   Widget build(BuildContext context) {
     final asyncState = ref.watch(importWalletViewModelProvider);
-    ref.listen(importWalletViewModelProvider, (_, next) {
-      final words = next.value?.words;
-      if (words == null) return;
-      for (var index = 0; index < words.length; index += 1) {
-        if (_controllers[index].text == words[index]) continue;
-        _controllers[index].value = TextEditingValue(
-          text: words[index],
-          selection: TextSelection.collapsed(offset: words[index].length),
-        );
-      }
-    });
     final value = asyncState.value;
     return AsterNavigationScope(
       child: Builder(

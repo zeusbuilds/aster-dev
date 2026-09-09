@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:remixicon/remixicon.dart';
 
 import '../feedback/feedback.dart';
+import '../layout/layout.dart';
 import '../theme/theme.dart';
 
 /// Accessible full-width action row for grouped option surfaces.
@@ -58,45 +59,74 @@ class AsterOptionRow extends StatelessWidget {
               horizontal: spacing.screenPadding,
               vertical: spacing.lg,
             ),
-            child: Row(
-              children: [
-                if (prefixIcon case final icon?) ...[
-                  Icon(
-                    icon,
-                    size: context.icons.sm,
-                    color: colors.textSecondary,
-                  ),
-                  SizedBox(width: spacing.md),
-                ],
-                Expanded(
-                  child: Text(
-                    title,
-                    style: context.type.rowTitle,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (details != null || suffixIcon != null || onTap != null)
-                  SizedBox(width: spacing.lg),
-                if (details case final value?) ...[
-                  Expanded(
-                    child: Text(
-                      value,
-                      style: context.type.rowValue,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.end,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final trailingIcon = suffixIcon != null || onTap != null;
+                final availableWidth =
+                    constraints.maxWidth -
+                    (prefixIcon == null ? 0 : context.icons.sm + spacing.md) -
+                    (trailingIcon ? context.icons.sm + spacing.sm : 0);
+                final value = details;
+                final valueNeedsStack =
+                    value != null &&
+                    (unwrappedTextWidth(context, title, context.type.rowTitle) +
+                            unwrappedTextWidth(
+                              context,
+                              value,
+                              context.type.rowValue,
+                            ) +
+                            spacing.lg >
+                        availableWidth);
+                final titleWidget = Text(title, style: context.type.rowTitle);
+                final valueWidget = value == null
+                    ? null
+                    : Text(
+                        value,
+                        style: context.type.rowValue,
+                        textAlign: TextAlign.end,
+                      );
+                return Row(
+                  children: [
+                    if (prefixIcon case final icon?) ...[
+                      Icon(
+                        icon,
+                        size: context.icons.sm,
+                        color: colors.textSecondary,
+                      ),
+                      SizedBox(width: spacing.md),
+                    ],
+                    Expanded(
+                      child: valueNeedsStack
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                titleWidget,
+                                SizedBox(height: spacing.xs),
+                                valueWidget!,
+                              ],
+                            )
+                          : Row(
+                              children: [
+                                Expanded(child: titleWidget),
+                                if (valueWidget != null) ...[
+                                  SizedBox(width: spacing.lg),
+                                  valueWidget,
+                                ],
+                              ],
+                            ),
                     ),
-                  ),
-                  SizedBox(width: spacing.sm),
-                ],
-                if (suffixIcon != null || onTap != null)
-                  Icon(
-                    suffixIcon ?? RemixIcons.arrow_right_s_line,
-                    size: context.icons.sm,
-                    color: suffixIconColor ?? colors.textTertiary,
-                  ),
-              ],
+                    if (trailingIcon) ...[
+                      SizedBox(width: spacing.sm),
+                      Icon(
+                        suffixIcon ?? RemixIcons.arrow_right_s_line,
+                        size: context.icons.sm,
+                        color: suffixIconColor ?? colors.textTertiary,
+                      ),
+                    ],
+                  ],
+                );
+              },
             ),
           ),
         ),

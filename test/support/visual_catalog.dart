@@ -14,6 +14,7 @@ import 'package:aster/features/receive/presentation/widgets/widgets.dart';
 import 'package:aster/features/scan/data/services/scan_session_contract.dart';
 import 'package:aster/features/scan/domain/models/models.dart';
 import 'package:aster/features/scan/presentation/screens/screens.dart';
+import 'package:aster/features/scan/presentation/view_model/view_models.dart';
 import 'package:aster/features/send/presentation/models/models.dart';
 import 'package:aster/features/send/presentation/screens/screens.dart';
 import 'package:aster/features/send/presentation/view_model/view_models.dart';
@@ -21,6 +22,7 @@ import 'package:aster/features/settings/presentation/screens/screens.dart';
 import 'package:aster/features/shell/presentation/screens/screens.dart';
 import 'package:aster/features/swap/presentation/screens/screens.dart';
 import 'package:aster/features/transaction/presentation/screens/screens.dart';
+import 'package:aster/features/transaction/presentation/view_model/view_models.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:aster/features/wallet/presentation/pages/pages.dart';
 import 'package:aster/shared/shared.dart';
@@ -171,16 +173,49 @@ void registerVisualCatalog({required VisualCapture capture}) {
       );
       FocusManager.instance.primaryFocus?.unfocus();
       await _settle(tester);
+      // Full-phrase paste focuses word twelve. Deliberately return to page one.
+      for (var page = 3; page > 1; page--) {
+        await tester.drag(find.byType(PageView), const Offset(420, 0));
+        await _settle(tester);
+      }
+      expect(
+        tester
+            .getSemantics(find.bySemanticsLabel('Recovery phrase page'))
+            .value,
+        '1 of 3',
+      );
       await _shot(tester, capture, '01-onboarding/import-valid-page-1');
       for (var page = 2; page <= 3; page++) {
         await tester.drag(find.byType(PageView), const Offset(-420, 0));
         await _settle(tester);
+        expect(
+          tester
+              .getSemantics(find.bySemanticsLabel('Recovery phrase page'))
+              .value,
+          '$page of 3',
+        );
         await _shot(tester, capture, '01-onboarding/import-valid-page-$page');
       }
-      await scene('import-keyboard', const OnboardingImportWalletScreen());
-      await tester.tap(find.byKey(const ValueKey('recovery-word-1')));
-      await _settle(tester);
-      await _shot(tester, capture, '01-onboarding/import-keyboard-focused');
+      await _mount(
+        tester,
+        harness.container,
+        toasts,
+        router,
+        const OnboardingShell(child: OnboardingImportWalletScreen()),
+        keyboardInset: 320,
+      );
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('recovery-word-1')))
+            .controller!
+            .text,
+        'abandon',
+      );
+      await _shot(
+        tester,
+        capture,
+        '01-onboarding/import-keyboard-inset-layout',
+      );
       FocusManager.instance.primaryFocus?.unfocus();
       await tester.pumpWidget(const SizedBox.shrink());
     } finally {
@@ -266,8 +301,15 @@ void registerVisualCatalog({required VisualCapture capture}) {
           overrides: [
             scanSessionProvider(ScanPurpose.destinationPicker)
                 .overrideWith((ref) => session),
+            scanViewModelProvider(ScanPurpose.destinationPicker)
+                .overrideWith(ScanViewModel.new),
           ],
         );
+        if (unavailable) {
+          session.replaceSnapshot(const ScanSessionSnapshot(failure: _failure));
+          await _settle(tester);
+          expect(find.text(_failure.userMessage), findsOneWidget);
+        }
         await _shot(
           tester,
           capture,
@@ -299,10 +341,11 @@ void registerVisualCatalog({required VisualCapture capture}) {
         harness.container,
         toasts,
         router,
-        const WalletUnavailableScreen(
+        WalletUnavailableScreen(
           failure: _failure,
           title: 'Wallet access unavailable',
           retrying: false,
+          onRetry: () {},
         ),
       );
       await _shot(tester, capture, '00-startup/wallet-unavailable');
@@ -451,6 +494,10 @@ void registerVisualCatalog({required VisualCapture capture}) {
           toasts,
           router,
           TransactionListScreen(assetKind: asset.kind),
+          overrides: [
+            activityViewModelProvider(asset.kind)
+                .overrideWith(ActivityViewModel.new),
+          ],
         );
         await _shot(tester, capture, '06-activity/${asset.kind.name}');
         for (final activity in engine.activities.take(2)) {
@@ -488,7 +535,13 @@ void registerVisualCatalog({required VisualCapture capture}) {
         toasts,
         router,
         const TransactionListScreen(assetKind: WalletAssetKind.bitcoin),
+        overrides: [
+          activityViewModelProvider(WalletAssetKind.bitcoin)
+              .overrideWith(ActivityViewModel.new),
+        ],
       );
+      expect(find.textContaining('No '), findsWidgets);
+      expect(find.text('Received'), findsNothing);
       await _shot(tester, capture, '06-activity/empty');
       engine.activityError = const AppFailureException(_failure);
       await _mount(
@@ -497,7 +550,13 @@ void registerVisualCatalog({required VisualCapture capture}) {
         toasts,
         router,
         const TransactionListScreen(assetKind: WalletAssetKind.bitcoin),
+        overrides: [
+          activityViewModelProvider(WalletAssetKind.bitcoin)
+              .overrideWith(ActivityViewModel.new),
+        ],
       );
+      expect(find.text(_failure.userMessage), findsOneWidget);
+      expect(find.text('Retry'), findsOneWidget);
       await _shot(tester, capture, '06-activity/failure');
       engine.activityError = null;
       if (tester.binding is AutomatedTestWidgetsFlutterBinding) {
@@ -518,6 +577,9 @@ void registerVisualCatalog({required VisualCapture capture}) {
           textScale: 2,
         );
         await _shot(tester, capture, '10-accessibility/$name-2x');
+        await tester.drag(find.byType(Scrollable).first, const Offset(0, -650));
+        await _settle(tester);
+        await _shot(tester, capture, '10-accessibility/$name-2x-scrolled');
       }
     } finally {
       await tester.pumpWidget(const SizedBox.shrink());
@@ -551,6 +613,7 @@ Future<void> _mount(
   Widget screen, {
   List<Override> overrides = const [],
   double textScale = 1,
+  double keyboardInset = 0,
 }) async {
   await tester.pumpWidget(const SizedBox.shrink());
   await tester.pump();
@@ -561,6 +624,7 @@ Future<void> _mount(
       child: ProviderScope(
         overrides: overrides,
         child: MaterialApp(
+          debugShowCheckedModeBanner: false,
           theme: AppTheme.light(),
           home: screen,
           builder: (context, child) {
@@ -571,8 +635,12 @@ Future<void> _mount(
                 data: media.copyWith(
                   textScaler: TextScaler.linear(textScale),
                   disableAnimations: true,
-                  padding: const EdgeInsets.only(top: 62, bottom: 34),
+                  padding: EdgeInsets.only(
+                    top: 62,
+                    bottom: keyboardInset > 0 ? 0 : 34,
+                  ),
                   viewPadding: const EdgeInsets.only(top: 62, bottom: 34),
+                  viewInsets: EdgeInsets.only(bottom: keyboardInset),
                 ),
                 child: InheritedGoRouter(
                   goRouter: router,

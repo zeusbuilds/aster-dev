@@ -98,55 +98,85 @@ class AssetRow extends StatelessWidget {
             constraints: BoxConstraints(
               minHeight: context.metrics.minTouchTarget,
             ),
-            child: Row(
-              children: [
-                WalletAssetIcon(kind: kind, size: context.icons.xl),
-                SizedBox(width: context.spacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(title, style: context.type.assetTitle),
-                      SizedBox(height: context.spacing.xxs),
-                      Text(
-                        denomination ??
-                            (kind == WalletAssetKind.bitcoin ? 'BTC' : 'USDT'),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final columnWidth =
+                    (constraints.maxWidth -
+                        context.icons.xl -
+                        context.spacing.md * 2) /
+                    3;
+                final stacked =
+                    unwrappedTextWidth(
+                      context,
+                      title,
+                      context.type.assetTitle,
+                    ) >
+                    columnWidth;
+                final identity = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(title, style: context.type.assetTitle),
+                    SizedBox(height: context.spacing.xxs),
+                    Text(
+                      denomination ??
+                          (kind == WalletAssetKind.bitcoin ? 'BTC' : 'USDT'),
+                      style: context.type.assetMeta,
+                    ),
+                  ],
+                );
+                final values = Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AppSkeletonizer(
+                      enabled: loading || (fiatLoading && !hidden),
+                      child: _BalanceValue(
+                        value: hidden ? '••••' : fiatContext,
+                        style: context.type.assetValue,
+                        maxLines: 2,
+                        textAlign: TextAlign.end,
+                      ),
+                    ),
+                    SizedBox(height: context.spacing.xxs),
+                    AppSkeletonizer(
+                      enabled: loading,
+                      child: _BalanceValue(
+                        value: hidden ? '••••' : totalText,
                         style: context.type.assetMeta,
+                        maxLines: 2,
+                        textAlign: TextAlign.end,
                       ),
-                    ],
-                  ),
-                ),
-                SizedBox(width: context.spacing.md),
-                Flexible(
-                  flex: 2,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      AppSkeletonizer(
-                        enabled: loading || (fiatLoading && !hidden),
-                        child: _BalanceValue(
-                          value: hidden ? '••••' : fiatContext,
-                          style: context.type.assetValue,
-                          maxLines: 2,
-                          textAlign: TextAlign.end,
+                    ),
+                  ],
+                );
+                return Row(
+                  crossAxisAlignment: stacked
+                      ? CrossAxisAlignment.start
+                      : CrossAxisAlignment.center,
+                  children: [
+                    WalletAssetIcon(kind: kind, size: context.icons.xl),
+                    SizedBox(width: context.spacing.md),
+                    if (stacked)
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            identity,
+                            SizedBox(height: context.spacing.sm),
+                            values,
+                          ],
                         ),
-                      ),
-                      SizedBox(height: context.spacing.xxs),
-                      AppSkeletonizer(
-                        enabled: loading,
-                        child: _BalanceValue(
-                          value: hidden ? '••••' : totalText,
-                          style: context.type.assetMeta,
-                          maxLines: 2,
-                          textAlign: TextAlign.end,
-                        ),
-                      ),
+                      )
+                    else ...[
+                      Expanded(child: identity),
+                      SizedBox(width: context.spacing.md),
+                      Expanded(flex: 2, child: values),
                     ],
-                  ),
-                ),
-              ],
+                  ],
+                );
+              },
             ),
           ),
         ),

@@ -1,10 +1,12 @@
 import 'dart:io';
 
+import 'package:flutter_driver/flutter_driver.dart';
 import 'package:integration_test/integration_test_driver_extended.dart';
 
 /// Exports native screenshots to the host before Flutter uninstalls its test
 /// app. Run only with the fixture-only visual catalog, never a funded wallet.
-Future<void> main() => integrationDriver(
+Future<void> main() async => integrationDriver(
+  driver: await FlutterDriver.connect(logCommunicationToFile: false),
   onScreenshot: (name, bytes, [args]) async {
     if (!RegExp(r'^[a-z0-9-]+/[a-z0-9-]+$').hasMatch(name)) {
       throw ArgumentError.value(

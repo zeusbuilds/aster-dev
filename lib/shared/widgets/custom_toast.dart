@@ -52,57 +52,60 @@ class CustomToast extends StatelessWidget {
       if (message case final message? when message.isNotEmpty) message,
     ].join('. ');
 
-    return SafeArea(
-      top: false,
-      minimum: EdgeInsets.only(bottom: spacing.lg),
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: spacing.screenPadding),
-        child: Semantics(
-          container: true,
-          explicitChildNodes: true,
-          liveRegion: true,
-          label: semanticLabel,
-          child: Squircle(
-            color: context.colorScheme.surface,
-            padding: EdgeInsets.symmetric(
-              horizontal: spacing.lg,
-              vertical: spacing.md,
-            ),
-            shadows: context.shadows.raised,
-            child: Row(
-              children: [
-                ExcludeSemantics(
-                  child: Icon(
-                    _icon,
-                    color: _iconColor(context),
-                    size: context.icons.md,
-                  ),
-                ),
-                SizedBox(width: spacing.md),
-                Expanded(
-                  child: ExcludeSemantics(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(title, style: context.type.toastTitle),
-                        if (message case final message?
-                            when message.isNotEmpty) ...[
-                          SizedBox(height: spacing.xxs),
-                          Text(message, style: context.type.toastMessage),
-                        ],
-                      ],
+    return Material(
+      type: MaterialType.transparency,
+      child: SafeArea(
+        top: false,
+        minimum: EdgeInsets.only(bottom: spacing.lg),
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: spacing.screenPadding),
+          child: Semantics(
+            container: true,
+            explicitChildNodes: true,
+            liveRegion: true,
+            label: semanticLabel,
+            child: Squircle(
+              color: context.colorScheme.surface,
+              padding: EdgeInsets.symmetric(
+                horizontal: spacing.lg,
+                vertical: spacing.md,
+              ),
+              shadows: context.shadows.raised,
+              child: Row(
+                children: [
+                  ExcludeSemantics(
+                    child: Icon(
+                      _icon,
+                      color: _iconColor(context),
+                      size: context.icons.md,
                     ),
                   ),
-                ),
-                SizedBox(width: spacing.sm),
-                AsterIconButton(
-                  onPressed: onDismiss,
-                  tooltip: 'Dismiss',
-                  icon: MingCuteIcons.mgc_close_line,
-                  showTooltip: false,
-                ),
-              ],
+                  SizedBox(width: spacing.md),
+                  Expanded(
+                    child: ExcludeSemantics(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(title, style: context.type.toastTitle),
+                          if (message case final message?
+                              when message.isNotEmpty) ...[
+                            SizedBox(height: spacing.xxs),
+                            Text(message, style: context.type.toastMessage),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: spacing.sm),
+                  AsterIconButton(
+                    onPressed: onDismiss,
+                    tooltip: 'Dismiss',
+                    icon: MingCuteIcons.mgc_close_line,
+                    showTooltip: false,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
