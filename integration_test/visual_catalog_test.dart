@@ -14,8 +14,8 @@ void main() {
   binding.reportData = {'screenshots': screenshots};
   registerVisualCatalog(
     capture: (tester, name) async {
-      // Capture the mounted Flutter layer explicitly: iOS's multi-window
-      // capture can return a retained launch view from another engine. This
+      // Capture the mounted Flutter layer explicitly: iOS window capture
+      // returned a stale launch view during a previous catalog run. This
       // includes the actual on-device Flutter raster, not OS/platform views.
       final boundary = tester.renderObject<RenderRepaintBoundary>(
         find.byKey(visualCatalogBoundary),

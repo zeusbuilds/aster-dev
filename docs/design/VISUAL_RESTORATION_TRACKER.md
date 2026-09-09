@@ -26,7 +26,7 @@
 | V1 | Shared geometry, controls, Home, shell | verified | 2f522c8 plus native QA corrections; Home/reference compared; full host suite passes |
 | V2 | Send, Receive, Swap, selection, sheets | verified | All four rails and sheets captured; QR payload decode 4/4; real behavior preserved |
 | V3 | Onboarding, wallet access, settings, activity, scanner, market | verified | 143 source/boundary rows reviewed; 24 real-font onboarding checks; native catalog reviewed |
-| V4 | Independent visual audit, responsive tests, iOS screenshots of all screens and states | fixing | 91 native PNGs reviewed; final Linux CI verification pending |
+| V4 | Independent visual audit, responsive tests, iOS screenshots of all screens and states | verified | 94 iOS-engine PNGs reviewed; 883 local tests, Linux tests/golden/contrast and exact platform CI pass at 7798642 |
 
 ## Findings
 
@@ -49,10 +49,10 @@
 | VIS-015 | verified | Import controllers hydrate only on subsequent provider changes, so a remounted valid form can show empty fields with green checks. Hydrate the owned controllers immediately when subscribing. | Native catalog discovered; remount regression added. |
 | VIS-016 | verified | Hidden/short balances drift left; accessibility-sized Home commands and option-row values truncate or split words. Keep trailing alignment and reflow when text no longer fits. | Native and compact screenshots; geometry regressions. |
 | VIS-017 | verified | Toasts outside a route's Material inherit the debug fallback text decoration. Establish a transparent Material text environment inside the shared toast. | Native four-variant screenshots and text-style regression. |
-| VIS-018 | verified | Catalog reused cached activity state, mislabeled carousel pages, and retained a debug banner. Assert each intended state before capturing; distinguish simulated keyboard insets from native keyboard evidence. | Host and iOS recapture required. |
-| VIS-019 | fixing | Linux onboarding contrast histogram mistakes two mesh background colors for text. Real fonts corrected the wordmark case but two body labels still fail the naive histogram. Independently measure resolved text against every live backdrop pixel under those labels at 4.5:1; retain the standard check for other labels and add failing contrast controls. | All 24 onboarding tests pass locally with backdrop measurement; checker regression tests and Linux CI pending. No palette or threshold changes. |
-| VIS-020 | fixing | Standalone Market/Settings/Scan screenshots do not show their persistent-shell context. Capture actual navigation taps to all three tabs, assert the selected destination, and retain both embedded and standalone views. Explicitly isolate the shell scanner using its test-only session, not the platform camera. | Host and 94-image iOS catalog pass; inspect new shell images before closure. No production code change. |
-| VIS-021 | fixing | The 94-scene native run passed widget assertions but iOS window capture returned 94 identical launch images. Reject the batch. Capture the actual mounted Flutter layer on the iOS engine, dispose image handles, and verify distinct Home/hidden/Market/Settings hashes before accepting an export. | Earlier 91-image Desktop gallery remains intact. New capture excludes OS/platform views explicitly; recapture and visual inspection pending. |
+| VIS-018 | verified | Catalog reused cached activity state, mislabeled carousel pages, and retained a debug banner. Assert each intended state before capturing; distinguish simulated keyboard insets from native keyboard evidence. | Host and final 94-image iOS-engine catalog pass at 7798642; images inspected. |
+| VIS-019 | verified | Linux onboarding contrast histogram mistakes two mesh background colors for text. Real fonts corrected the wordmark case but two body labels still fail the naive histogram. Independently measure resolved text against every live backdrop pixel under those labels at 4.5:1; retain the standard check for other labels and add failing contrast controls. | All 24 onboarding tests, four checker controls, and full 883-test suite pass locally; Linux Test step passes in run 34324442536 at 7798642. No palette or threshold changes. |
+| VIS-020 | verified | Standalone Market/Settings/Scan screenshots do not show their persistent-shell context. Capture actual navigation taps to all three tabs, assert the selected destination, and retain both embedded and standalone views. Explicitly isolate the shell scanner using its test-only session, not the platform camera. | Host and 94-image iOS-engine catalog pass at 7798642; all three shell images inspected full-size. No production code change. |
+| VIS-021 | verified | The 94-scene native run passed widget assertions but iOS window capture returned 94 identical launch images. Reject the batch. Capture the actual mounted Flutter layer on the iOS engine, dispose image handles, and verify distinct Home/hidden/Market/Settings hashes before accepting an export. | 7798642 produces 94 captures with 91 distinct rasters; identical loading/non-scrolling states are intentional. Six contact sheets reviewed; four QR payloads independently decoded. OS/platform views explicitly excluded. |
 
 ## File Review
 
@@ -180,7 +180,6 @@ checked in its containing screen; an unchanged file can be reviewed-clean.
 | `lib/shared/widgets/detail_row.dart` | verified | Read source; semantic type, palette, motion, shape and layout ownership checked. Reviewed in the containing UI/test scope; see native evidence limits below. |
 | `lib/shared/widgets/grid_loader.dart` | reviewed-clean | Read source; semantic type, palette, motion, shape and layout ownership checked. Reviewed in the containing UI/test scope; see native evidence limits below. |
 | `lib/shared/widgets/squircle.dart` | verified | Read source; semantic type, palette, motion, shape and layout ownership checked. Reviewed in the containing UI/test scope; see native evidence limits below. |
-
 | `lib/shared/widgets/aster_form_body.dart` | verified | Shared bottom action anchoring with scroll fallback for keyboard and large text. |
 | `lib/shared/widgets/aster_split_card.dart` | verified | Single squircle boundary for content/footer; semantic padding and tonal treatment. |
 | `lib/shared/widgets/aster_sheet_header.dart` | verified | Shared handle/title/close alignment and minimum target. |
@@ -226,12 +225,46 @@ The adapter owns no styling and preserves attachment/disposal behavior.
 
 ### Run Log
 
+- Code/QA candidate: `7798642b0913ac60e84d14c2596baaffef15e5d1`.
+  Production styling is unchanged since `1b79465`; this follow-up strengthens
+  fixture isolation, screenshot integrity and cross-host contrast measurement.
+- Final image batch: 94 original iOS-engine Flutter-layer PNGs at 1260x2736,
+  captured on `Aster-UI-Baseline-QA` / iPhone Air / iOS 26.5. Four catalog groups
+  pass in 2m26s after a 10.4s build. All six contact sheets plus full-size shell
+  screens were inspected. Apple Vision decodes all four Receive QR payloads
+  exactly. The rejected identical-launch-image batch was not delivered.
+- File review: 143 UI/system/boundary sources, 98 reviewed-clean and 45 verified.
+  The architecture policy covers 315 Dart sources / 1042 imports / 239 exports;
+  the semantic design policy checks all 121 UI implementation sources.
+- All 21 visual findings are verified. This closes styling implementation and
+  technical visual QA, not the author's final aesthetic approval or the app's
+  separate funds-bearing release blockers.
+- Exact platform CI run `34324442561` passes at `7798642`; Linux quality run
+  `34324442536` passes its Test step, including the presentation golden and
+  strict real-font/backdrop contrast cases.
+- Strict pre-commit gates pass, including zero generated changes, fatal
+  analysis, warning-free dartdoc for 315 public libraries, barrel/architecture/
+  design/governance/configuration policy and the 574-file tracker inventory.
+- The first aggregate rerun had one 8-second infrastructure subprocess timeout
+  while native capture and code-generation gates ran concurrently. No product
+  assertion failed. The unchanged complete suite then passes **883/883** with
+  coverage at `--concurrency=2` in 3m02s. Its deadline was not relaxed.
+  LCOV reports 13,354 / 15,159 instrumented lines (88.09%), SHA-256
+  `a6356711f181fc1e4a38ce89c71e6f5bed16dd6986cffcb20255e1e3c7ef1544`.
+- Normal `lib/main.dart` Simulator Debug build passes in 18.2s and launches
+  successfully on the dedicated simulator; the actual native welcome view
+  was inspected after replacing the catalog app. The SDK SwiftPM warning
+  remains the pre-existing SDK-002 constraint, not a new styling regression.
+- Gallery: `~/Desktop/Aster-Restored-UI-2026-09-09/Reviewed/index.html`.
+  This evidence is test-fixture presentation, not live wallet, native camera,
+  OS keyboard, physical haptic or funded payment qualification.
+
 - `2f522c8` was committed and pushed as Zeus after format, generation,
   strict analysis, dartdoc, toolchain, architecture, design, barrel, governance,
   release-configuration and inventory gates passed.
-- Final local suite: **879 tests pass with coverage**, 1m37s. An additional
+- Previous local suite at `1b79465`: **879 tests pass with coverage**, 1m37s. An additional
   real-font onboarding rerun passes all 24 tests. Assertions were not relaxed.
-- Reviewed native catalog: **91 PNGs**, four groups pass, 10.4s iOS build and
+- Earlier reviewed native catalog: **91 PNGs**, four groups pass, 10.4s iOS build and
   2m22s test run on the dedicated iPhone Air / iOS 26.5. Six contact sheets and
   full-size Home/reference compared. Empty/error/valid-page states are asserted.
 - Apple Vision independently decodes all four Receive screenshots to exactly
@@ -242,7 +275,8 @@ The adapter owns no styling and preserves attachment/disposal behavior.
   (centered loader and unclipped toast shadow), and two wordmark contrast checks
   using Ahem. The exact Linux golden raster was downloaded, inspected and
   adopted; contrast tests now load the shipped DM Sans/Public Sans glyphs.
-  A new Linux run must pass before VIS-014 / VIS-019 are called verified.
+  VIS-014 then passes at `1b79465`; VIS-019's stricter backdrop measurement is
+  verified locally and passes Linux run `34324442536`'s Test step at `7798642`.
 - No palette, SDK dependency, wallet repository or monetary contract was
   changed. Physical haptic feel, native camera capture, live/funded payments,
   Android visual parity and native keyboard appearance are not certified by

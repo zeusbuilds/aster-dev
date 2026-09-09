@@ -1018,7 +1018,7 @@ void main() {
 
 Future<void> _expectOnboardingContrast(WidgetTester tester) async {
   // Inspect the live composition, not an unpainted subtree beneath a retained
-  // snapshot. Snapshot readiness and equivalence have separate render tests.
+  // snapshot. Snapshot readiness and density have separate render tests.
   final snapshot = tester.widget<SnapshotWidget>(find.byType(SnapshotWidget));
   snapshot.controller.allowSnapshotting = false;
   await tester.pumpAndSettle();
