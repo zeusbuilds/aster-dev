@@ -15,6 +15,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../support/backdrop_text_contrast.dart';
 import '../../support/onboarding_harness.dart';
 import '../../support/presentation_fakes.dart';
 
@@ -118,7 +119,7 @@ void main() {
     await tester.pump();
     await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
-    await expectLater(tester, meetsGuideline(textContrastGuideline));
+    await _expectOnboardingContrast(tester);
   });
 
   testWidgets('import hydrates a retained validated phrase on remount', (
@@ -181,7 +182,7 @@ void main() {
     expect(harness.toasts.messages.single.title, 'Recovery phrase copied');
     await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
-    await expectLater(tester, meetsGuideline(textContrastGuideline));
+    await _expectOnboardingContrast(tester);
     await _disposeHarness(tester, harness);
   });
 
@@ -1010,9 +1011,35 @@ void main() {
       );
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
-      await expectLater(tester, meetsGuideline(textContrastGuideline));
+      await _expectOnboardingContrast(tester);
     });
   }
+}
+
+Future<void> _expectOnboardingContrast(WidgetTester tester) async {
+  // Inspect the live composition, not an unpainted subtree beneath a retained
+  // snapshot. Snapshot readiness and equivalence have separate render tests.
+  final snapshot = tester.widget<SnapshotWidget>(find.byType(SnapshotWidget));
+  snapshot.controller.allowSnapshotting = false;
+  await tester.pumpAndSettle();
+  await expectLater(
+    tester,
+    meetsGuideline(
+      BackdropTextContrastGuideline(
+        backdrop: find
+            .descendant(
+              of: find.byType(OnboardingWelcomeMeshBackground),
+              matching: find.byType(RepaintBoundary),
+            )
+            .first,
+        labels: const {
+          'Enter your 12-word recovery phrase in order.',
+          'Never share your recovery phrase',
+        },
+        underlay: AppTheme.light().extension<AsterColors>()!.brandArtDark,
+      ),
+    ),
+  );
 }
 
 final class _FailingImportWalletViewModel extends ImportWalletViewModel {

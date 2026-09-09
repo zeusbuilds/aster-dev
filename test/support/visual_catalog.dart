@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' show Tristate;
 
 import 'package:aster/core/core.dart';
 import 'package:aster/features/home/presentation/screens/screens.dart';
@@ -259,7 +260,25 @@ void registerVisualCatalog({required VisualCapture capture}) {
         ('05-swap/swap', const SwapScreen()),
       ];
       for (final (name, screen) in scenes) {
-        await _mount(tester, harness.container, toasts, router, screen);
+        await _mount(
+          tester,
+          harness.container,
+          toasts,
+          router,
+          screen,
+          overrides: screen is AppShellScreen
+              ? [
+                  scanSessionProvider(ScanPurpose.sendLauncher)
+                      .overrideWith((ref) {
+                        final session = FakeScanSession();
+                        ref.onDispose(() => unawaited(session.close()));
+                        return session;
+                      }),
+                  scanViewModelProvider(ScanPurpose.sendLauncher)
+                      .overrideWith(ScanViewModel.new),
+                ]
+              : const [],
+        );
         await _shot(tester, capture, name);
         if (screen is SettingsScreen ||
             screen is NetworkConfigurationScreen ||
@@ -276,6 +295,22 @@ void registerVisualCatalog({required VisualCapture capture}) {
           await _settle(tester);
           await _shot(tester, capture, '02-home/home-hidden');
           await tester.tap(find.byTooltip('Show balances'));
+          await _settle(tester);
+          for (final (tab, name) in [
+            ('scan', '07-scan/shell'),
+            ('market', '02-home/market-shell'),
+            ('settings', '08-settings/settings-shell'),
+          ]) {
+            final destination = find.byKey(ValueKey('bottom-nav-$tab'));
+            await tester.tap(destination);
+            await _settle(tester);
+            expect(
+              tester.getSemantics(destination).flagsCollection.isSelected,
+              Tristate.isTrue,
+            );
+            await _shot(tester, capture, name);
+          }
+          await tester.tap(find.byKey(const ValueKey('bottom-nav-home')));
           await _settle(tester);
         }
         if (screen is SwapScreen) {
