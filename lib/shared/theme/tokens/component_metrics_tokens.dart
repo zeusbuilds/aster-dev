@@ -14,7 +14,6 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
     this.scanFrameSizeFactor = 0.7,
     this.scanFrameMaximumSize = 320,
     this.scanHeaderExtent = 172,
-    this.marketTileMinHeight = 156,
     this.marketTextureSize = 128,
     this.marketBadgeDotSize = 20,
     this.selectionIndicatorSize = 16,
@@ -54,7 +53,6 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
   final double scanFrameSizeFactor;
   final double scanFrameMaximumSize;
   final double scanHeaderExtent;
-  final double marketTileMinHeight;
   final double marketTextureSize;
   final double marketBadgeDotSize;
   final double selectionIndicatorSize;
@@ -95,7 +93,6 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
     double? scanFrameSizeFactor,
     double? scanFrameMaximumSize,
     double? scanHeaderExtent,
-    double? marketTileMinHeight,
     double? marketTextureSize,
     double? marketBadgeDotSize,
     double? selectionIndicatorSize,
@@ -135,7 +132,6 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
       scanFrameSizeFactor: scanFrameSizeFactor ?? this.scanFrameSizeFactor,
       scanFrameMaximumSize: scanFrameMaximumSize ?? this.scanFrameMaximumSize,
       scanHeaderExtent: scanHeaderExtent ?? this.scanHeaderExtent,
-      marketTileMinHeight: marketTileMinHeight ?? this.marketTileMinHeight,
       marketTextureSize: marketTextureSize ?? this.marketTextureSize,
       marketBadgeDotSize: marketBadgeDotSize ?? this.marketBadgeDotSize,
       selectionIndicatorSize:
@@ -214,11 +210,6 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
         t,
       ),
       scanHeaderExtent: _lerp(scanHeaderExtent, other.scanHeaderExtent, t),
-      marketTileMinHeight: _lerp(
-        marketTileMinHeight,
-        other.marketTileMinHeight,
-        t,
-      ),
       marketTextureSize: _lerp(marketTextureSize, other.marketTextureSize, t),
       marketBadgeDotSize: _lerp(
         marketBadgeDotSize,

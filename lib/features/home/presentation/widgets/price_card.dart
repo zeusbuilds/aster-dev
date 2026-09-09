@@ -231,19 +231,6 @@ class _PriceCardState extends ConsumerState<PriceCard> {
             isSkeleton: false,
           ),
         },
-        Padding(
-          padding: EdgeInsets.only(
-            top: spacing.xs,
-            right: spacing.screenPadding,
-          ),
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: Text(
-              'Powered by CoinGecko',
-              style: type.supportingMeta.copyWith(color: colors.onBrandArt),
-            ),
-          ),
-        ),
       ],
     );
   }
@@ -281,9 +268,9 @@ class _PriceCardState extends ConsumerState<PriceCard> {
     required BitcoinMarketSnapshot? snapshot,
     required int? changeBasisPoints,
   }) {
-    if (loading) return 'Bitcoin price loading. Powered by CoinGecko.';
+    if (loading) return 'Bitcoin price loading.';
     if (snapshot == null) {
-      return 'Bitcoin price unavailable. Powered by CoinGecko.';
+      return 'Bitcoin price unavailable.';
     }
     final change = switch (changeBasisPoints) {
       null => '24-hour change unavailable',
@@ -292,8 +279,7 @@ class _PriceCardState extends ConsumerState<PriceCard> {
       > 0 => 'up ${_formatBasisPoints(changeBasisPoints)} over 24 hours',
       _ => 'down ${_formatBasisPoints(changeBasisPoints)} over 24 hours',
     };
-    return 'Bitcoin price ${_formatPrice(snapshot)}. $change. '
-        'Powered by CoinGecko.';
+    return 'Bitcoin price ${_formatPrice(snapshot)}. $change.';
   }
 
   static AppFailure _failure(Object error, StackTrace stackTrace) =>

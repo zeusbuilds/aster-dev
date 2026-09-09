@@ -136,7 +136,8 @@ void main() {
       findsOneWidget,
     );
     expect(find.text(r'≈ $1.00'), findsOneWidget);
-    expect(find.text('Powered by CoinGecko'), findsOneWidget);
+    expect(find.text('Powered by CoinGecko'), findsNothing);
+    expect(find.bySemanticsLabel(RegExp('CoinGecko')), findsNothing);
     expect(find.text('Unavailable on this network'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Hide balances'));
@@ -474,10 +475,8 @@ void main() {
     await _pump(tester, harness, const HomeScreen());
     await _pumpUntil(
       tester,
-      () => find
-          .bySemanticsLabel('Bitcoin price loading. Powered by CoinGecko.')
-          .evaluate()
-          .isNotEmpty,
+      () =>
+          find.bySemanticsLabel('Bitcoin price loading.').evaluate().isNotEmpty,
     );
     final loadingSize = tester.getSize(find.byType(PriceCard));
     expect(
@@ -500,8 +499,7 @@ void main() {
       _currentResponse(observedAt: observed, bitcoinPrice: 100000),
     );
     const loadedLabel =
-        r'Bitcoin price $100,000.00 USD. up 1.01% over 24 hours. '
-        'Powered by CoinGecko.';
+        r'Bitcoin price $100,000.00 USD. up 1.01% over 24 hours.';
     await _pumpUntil(
       tester,
       () => find.bySemanticsLabel(loadedLabel).evaluate().isNotEmpty,
@@ -562,8 +560,7 @@ void main() {
     addTearDown(() => _disposeHarness(tester, harness));
     await _pump(tester, harness, const PriceCard());
     const loadedLabel =
-        r'Bitcoin price $100,000.00 USD. up 1.01% over 24 hours. '
-        'Powered by CoinGecko.';
+        r'Bitcoin price $100,000.00 USD. up 1.01% over 24 hours.';
     await _pumpUntil(
       tester,
       () => find.bySemanticsLabel(loadedLabel).evaluate().isNotEmpty,
@@ -651,8 +648,7 @@ void main() {
     await _pump(tester, harness, const HomeScreen());
 
     const unchangedLabel =
-        r'Bitcoin price $100,000.00 USD. unchanged at 0.0% over 24 hours. '
-        'Powered by CoinGecko.';
+        r'Bitcoin price $100,000.00 USD. unchanged at 0.0% over 24 hours.';
     await _pumpUntil(
       tester,
       () => find.bySemanticsLabel(unchangedLabel).evaluate().isNotEmpty,
@@ -699,8 +695,7 @@ void main() {
     );
     await _pump(tester, fallingHarness, const HomeScreen());
     const fallingLabel =
-        r'Bitcoin price $98,000.00 USD. down 1.01% over 24 hours. '
-        'Powered by CoinGecko.';
+        r'Bitcoin price $98,000.00 USD. down 1.01% over 24 hours.';
     await _pumpUntil(
       tester,
       () => find.bySemanticsLabel(fallingLabel).evaluate().isNotEmpty,
@@ -722,7 +717,7 @@ void main() {
     await _pumpUntil(
       tester,
       () => find
-          .bySemanticsLabel('Bitcoin price unavailable. Powered by CoinGecko.')
+          .bySemanticsLabel('Bitcoin price unavailable.')
           .evaluate()
           .isNotEmpty,
     );

@@ -44,7 +44,6 @@ void main() {
     expect(icons.xxs, 12);
     expect(icons.md, 24);
     expect(metrics.minTouchTarget, 48);
-    expect(metrics.marketTileMinHeight, 156);
     expect(metrics.flagSize, 32);
     expect(metrics.selectionIndicatorSize, 16);
     expect(metrics.paymentTargetTileMinHeight, 80);

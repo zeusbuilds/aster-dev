@@ -109,14 +109,13 @@ class _CreateWalletContent extends ConsumerWidget {
                 OnboardingImportWalletWordGrid(words: state.words),
                 SizedBox(height: spacing.lg),
                 Center(
-                  child: CustomButton.compact(
-                    text: 'Copy recovery phrase',
-                    prefixIcon: MingCuteIcons.mgc_copy_2_line,
-                    variant: ButtonVariant.translucent,
+                  child: OnboardingTextAction(
+                    label: 'Copy recovery phrase',
+                    icon: MingCuteIcons.mgc_copy_2_line,
                     enabled: state.canCopy && !navigation.inFlight,
                     loading: state.copying,
                     hapticIntent: null,
-                    onTap: () => unawaited(_copy(context, ref)),
+                    onPressed: () => unawaited(_copy(context, ref)),
                   ),
                 ),
                 if (state.failure case final failure?) ...[

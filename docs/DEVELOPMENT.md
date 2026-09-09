@@ -403,8 +403,11 @@ an asset contract or decimal precision from the `USDT` ticker.
 
 Debug and profile builds use CoinGecko's keyless public API when no market
 endpoint is supplied. That pool is intended for testing and prototyping, is
-dynamically rate-limited, and is not a production reliability contract. The UI
-retains the required `Powered by CoinGecko` attribution. See CoinGecko's
+dynamically rate-limited, and is not a production reliability contract. Home's
+provider credit was removed following the author's visual review. This does not
+waive attribution obligations: an approved placement or contractual exception
+must be resolved before distribution under the existing FIAT-002 release gate.
+See CoinGecko's
 [keyless API policy](https://docs.coingecko.com/docs/keyless-public-api) and
 [API terms](https://www.coingecko.com/en/api_terms).
 

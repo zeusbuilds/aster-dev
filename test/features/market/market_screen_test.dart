@@ -8,6 +8,31 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
 void main() {
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('Market tiles end after the status chip at ${scale}x', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(420, 932);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      final router = _router();
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        _app(router, _RecordingHaptics(), textScaler: TextScaler.linear(scale)),
+      );
+      await tester.pumpAndSettle();
+      final tile = find.widgetWithText(MarketTile, 'Buy');
+      final chip = find.descendant(of: tile, matching: find.byType(AsterPill));
+      expect(chip, findsOneWidget);
+      expect(
+        tester.getBottomLeft(tile).dy - tester.getBottomLeft(chip).dy,
+        closeTo(tester.element(tile).spacing.lg, 0.01),
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('unsupported market actions are disabled without claims', (
     tester,
   ) async {

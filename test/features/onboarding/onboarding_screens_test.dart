@@ -159,6 +159,76 @@ void main() {
     );
   });
 
+  testWidgets('import fields follow copy while only the footer tracks height', (
+    tester,
+  ) async {
+    final harness = await OnboardingTestHarness.create();
+    addTearDown(() => _disposeHarness(tester, harness));
+    await _pumpScreen(tester, harness, const OnboardingImportWalletScreen());
+    final description = find.text(
+      'Enter your 12-word recovery phrase in order.',
+    );
+    final first = find.byKey(const ValueKey('recovery-word-1'));
+    final warning = find.text('Never share your recovery phrase');
+    final spacing = tester.element(first).spacing;
+    final fieldTop = tester.getTopLeft(first);
+    final footerTop = tester.getTopLeft(warning);
+    expect(fieldTop.dx, tester.getTopLeft(description).dx);
+    expect(
+      fieldTop.dy - tester.getBottomLeft(description).dy,
+      closeTo(spacing.xxxl, 0.01),
+    );
+    expect(
+      footerTop.dy - tester.getBottomLeft(find.byType(PageView)).dy,
+      greaterThan(spacing.sectionGap),
+    );
+
+    tester.view.physicalSize += const Offset(0, 120);
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(first), fieldTop);
+    expect(tester.getTopLeft(warning).dy, closeTo(footerTop.dy + 120, 0.01));
+  });
+
+  testWidgets('onboarding text action stays plain and blocks loading taps', (
+    tester,
+  ) async {
+    var taps = 0;
+    Future<void> pumpAction({required bool loading}) => tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Scaffold(
+          body: OnboardingTextAction(
+            label: 'Copy recovery phrase',
+            icon: Icons.copy,
+            loading: loading,
+            hapticIntent: null,
+            onPressed: () => taps++,
+          ),
+        ),
+      ),
+    );
+    await pumpAction(loading: false);
+    final button = find.byType(TextButton);
+    final size = tester.getSize(button);
+    final style = tester.widget<TextButton>(button).style!;
+    expect(style.backgroundColor, isNull);
+    expect(style.side, isNull);
+    expect(find.byIcon(Icons.copy), findsOneWidget);
+    expect(size.height, greaterThanOrEqualTo(48));
+    await tester.tap(button);
+    expect(taps, 1);
+
+    await pumpAction(loading: true);
+    expect(tester.getSize(button), size);
+    expect(tester.widget<TextButton>(button).onPressed, isNull);
+    expect(
+      tester.getSemantics(find.byType(OnboardingTextAction)).value,
+      'Loading',
+    );
+    await tester.tap(button);
+    expect(taps, 1);
+  });
+
   testWidgets('create shows 1-6 and 7-12 and uses the secure copy service', (
     tester,
   ) async {
@@ -175,6 +245,14 @@ void main() {
     expect(find.text('about'), findsOneWidget);
 
     final copy = find.text('Copy recovery phrase');
+    expect(
+      find.widgetWithText(CustomButton, 'Copy recovery phrase'),
+      findsNothing,
+    );
+    expect(
+      find.widgetWithText(OnboardingTextAction, 'Copy recovery phrase'),
+      findsOneWidget,
+    );
     await tester.ensureVisible(copy);
     await tester.tap(copy);
     await tester.pump();

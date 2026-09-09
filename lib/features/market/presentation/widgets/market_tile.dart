@@ -80,102 +80,97 @@ class MarketTile extends StatelessWidget {
           color: colors.transparentSurface,
           child: InkWell(
             onTap: onTap == null ? null : activate,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: metrics.marketTileMinHeight,
-              ),
-              child: Stack(
-                children: [
-                  Positioned(
-                    top: -spacing.md,
-                    right: -spacing.xxxl,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        boxShadow: shadowColor != null
-                            ? shadows.modal
-                                  .map((s) => s.copyWith(color: shadowColor!))
-                                  .toList(growable: false)
-                            : shadows.modal,
-                      ),
-                      child: ExcludeSemantics(
-                        child: Image.asset(
-                          'assets/texture/shape.png',
-                          width: metrics.marketTextureSize,
-                          height: metrics.marketTextureSize,
-                          cacheWidth: textureDecodeDimension,
-                          cacheHeight: textureDecodeDimension,
-                          filterQuality: FilterQuality.medium,
-                        ),
+            child: Stack(
+              children: [
+                Positioned(
+                  top: -spacing.md,
+                  right: -spacing.xxxl,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      boxShadow: shadowColor != null
+                          ? shadows.modal
+                                .map((s) => s.copyWith(color: shadowColor!))
+                                .toList(growable: false)
+                          : shadows.modal,
+                    ),
+                    child: ExcludeSemantics(
+                      child: Image.asset(
+                        'assets/texture/shape.png',
+                        width: metrics.marketTextureSize,
+                        height: metrics.marketTextureSize,
+                        cacheWidth: textureDecodeDimension,
+                        cacheHeight: textureDecodeDimension,
+                        filterQuality: FilterQuality.medium,
                       ),
                     ),
                   ),
-                  Padding(
-                    padding: EdgeInsets.all(spacing.lg),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(label, style: type.marketLabel),
-                              if (subtitle case final value?)
-                                Text(value, style: type.marketTitle),
+                ),
+                Padding(
+                  padding: EdgeInsets.all(spacing.lg),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(label, style: type.marketLabel),
+                            if (subtitle case final value?)
+                              Text(value, style: type.marketTitle),
+                            if (tipText case final value?) ...[
                               SizedBox(height: spacing.xxl),
-                              if (tipText case final value?)
-                                AsterPill(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: spacing.sm,
-                                    vertical: spacing.xs,
-                                  ),
-                                  color: colors.onMarketTile.withValues(
-                                    alpha: effects.marketPillSurfaceOpacity,
-                                  ),
-                                  child: Wrap(
-                                    spacing: spacing.sm,
-                                    runSpacing: spacing.xxs,
-                                    crossAxisAlignment:
-                                        WrapCrossAlignment.center,
-                                    children: [
-                                      Container(
-                                        decoration: BoxDecoration(
-                                          color: colors.onMarketTile.withValues(
-                                            alpha: effects.marketPillDotOpacity,
-                                          ),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        width: metrics.marketBadgeDotSize,
-                                        height: metrics.marketBadgeDotSize,
-                                      ),
-                                      Text(
-                                        value,
-                                        style: type.marketTip.copyWith(
-                                          color: colors.onMarketTile.withValues(
-                                            alpha: effects
-                                                .marketContentMutedOpacity,
-                                          ),
-                                        ),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
-                                  ),
+                              AsterPill(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: spacing.sm,
+                                  vertical: spacing.xs,
                                 ),
+                                color: colors.onMarketTile.withValues(
+                                  alpha: effects.marketPillSurfaceOpacity,
+                                ),
+                                child: Wrap(
+                                  spacing: spacing.sm,
+                                  runSpacing: spacing.xxs,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        color: colors.onMarketTile.withValues(
+                                          alpha: effects.marketPillDotOpacity,
+                                        ),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      width: metrics.marketBadgeDotSize,
+                                      height: metrics.marketBadgeDotSize,
+                                    ),
+                                    Text(
+                                      value,
+                                      style: type.marketTip.copyWith(
+                                        color: colors.onMarketTile.withValues(
+                                          alpha:
+                                              effects.marketContentMutedOpacity,
+                                        ),
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ],
-                          ),
+                          ],
                         ),
-                        SizedBox(width: spacing.md),
-                        Icon(
-                          icon,
-                          size: context.icons.lg,
-                          color: colors.onMarketTile,
-                        ),
-                      ],
-                    ),
+                      ),
+                      SizedBox(width: spacing.md),
+                      Icon(
+                        icon,
+                        size: context.icons.lg,
+                        color: colors.onMarketTile,
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),

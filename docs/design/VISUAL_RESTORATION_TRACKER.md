@@ -41,7 +41,7 @@
 | VIS-007 | verified | Compact pills expanded under loose constraints and changed width while loading. Preserve content sizing and stable loading geometry; make the full 48px hit target interactive without duplicate haptics. | Added geometry, edge-tap, loading and haptic regression checks. |
 | VIS-008 | verified | Split-card children could overpaint outlines, while clipping could cut shadows. Shared Squircle now paints background/shadows outside child clipping and the outline in the foreground. | Foreground shape/theme test; rendered catalog review. |
 | VIS-009 | verified | Settings chevrons and DetailRow values drifted inward for short values; inset dividers were asymmetric. Reserve a stable trailing column and equal divider insets. | Shared trailing-edge regression. |
-| VIS-010 | verified | Recovery wordmark was reduced to label size; generated words could truncate with large type. Restore semantic 40px wordmark, recovery field shape, untruncated words and bottom-anchored import. | 23 onboarding tests pass. |
+| VIS-010 | verified | Recovery wordmark was reduced to label size; generated words could truncate with large type. Restore semantic 40px wordmark, recovery field shape and untruncated words. The initial bottom-anchored import was subsequently corrected by author direction in VIS-024. | 23 initial onboarding tests pass; VIS-024 verifies the revised field/footer anchoring. |
 | VIS-011 | verified | Small recovery text over the brightest glass/mesh failed contrast. Use a semantic glass-content scrim from existing palette and opaque number labels. | Automated contrast checks pass at phone and compact scaled sizes. |
 | VIS-012 | verified | Send amount entered in sats was labeled BTC. Display the formatter's denomination, keeping asset identity distinct. | Four-rail amount screenshots and payment tests. |
 | VIS-013 | verified | Wallet-unavailable container swallowed Retry semantics; route error used an inconsistent, non-scrolling layout. Keep explicit child semantics, shared app bar and scrollable safe-area recovery. | Shared/widget suite and catalog. |
@@ -55,6 +55,20 @@
 | VIS-021 | verified | The 94-scene native run passed widget assertions but iOS window capture returned 94 identical launch images. Reject the batch. Capture the actual mounted Flutter layer on the iOS engine, dispose image handles, and verify distinct Home/hidden/Market/Settings hashes before accepting an export. | 7798642 produces 94 captures with 91 distinct rasters; identical loading/non-scrolling states are intentional. Six contact sheets reviewed; four QR payloads independently decoded. OS/platform views explicitly excluded. |
 
 ## File Review
+
+### Author Review Corrections
+
+| ID | Status | Requested correction | Verification |
+| --- | --- | --- | --- |
+| VIS-022 | verified | Remove the CoinGecko credit from Home, including its screen-reader header labels; preserve real market data. | Home visible/semantic absence and signed price regressions pass; refreshed iOS Home inspected. Attribution placement/licensing remains the existing FIAT-002 release decision; no unrequested Settings UI was added. |
+| VIS-023 | verified | Recovery copy must be a plain clickable icon and label, not a filled capsule. | Shared onboarding text action supports an icon and stable loading, blocks duplicate activation, preserves semantic labels and 48px targets; copy/security tests pass and refreshed iOS Create inspected. |
+| VIS-024 | verified | Import fields must follow the description, with the remaining space before the safety message and Continue/Back. | Carousel/indicator belong to form content; only the footer belongs to bottom actions. Regression proves the 32px content gap and stable field position when viewport height grows; compact/large/keyboard and validation tests pass. Refreshed empty, final-page and keyboard-inset iOS captures inspected. |
+| VIS-025 | verified | Market tiles must end with normal padding after their status capsule rather than leaving a large empty footer. | Removed the fixed minimum-height token and sized tiles to content. Geometry tests require exactly `spacing.lg` below the pill at normal and 2x text; refreshed iOS Market shell inspected. |
+
+Provider attribution is a separate release requirement, not silently removed
+from governance: [CoinGecko attribution guide](https://brand.coingecko.com/resources/attribution-guide).
+These four changes are scoped to presentation; palette, fonts, repositories,
+wallet operations and protected infrastructure are unchanged.
 
 Linux golden follow-up: the shared outline/shadow/loader changes intentionally
 change the presentation golden. The macOS and exact Linux rasters have been visually reviewed. The Linux
@@ -86,7 +100,7 @@ checked in its containing screen; an unchanged file can be reviewed-clean.
 | `lib/features/onboarding/presentation/widgets/onboarding_import_wallet_word_grid.dart` | verified | Compared wordmark, mesh, field curves and anchoring; 23 onboarding tests pass, including compact text and contrast. |
 | `lib/features/onboarding/presentation/widgets/onboarding_import_wallet_word_page.dart` | verified | Compared wordmark, mesh, field curves and anchoring; 23 onboarding tests pass, including compact text and contrast. |
 | `lib/features/onboarding/presentation/widgets/onboarding_status_panel.dart` | reviewed-clean | Compared wordmark, mesh, field curves and anchoring; 23 onboarding tests pass, including compact text and contrast. |
-| `lib/features/onboarding/presentation/widgets/onboarding_text_action.dart` | reviewed-clean | Compared wordmark, mesh, field curves and anchoring; 23 onboarding tests pass, including compact text and contrast. |
+| `lib/features/onboarding/presentation/widgets/onboarding_text_action.dart` | verified | VIS-023: plain icon/text copy, stable loading geometry, explicit accessible activation and disabled/loading tap prevention; focused and full suites pass. |
 | `lib/features/onboarding/presentation/widgets/onboarding_welcome_header.dart` | verified | Compared wordmark, mesh, field curves and anchoring; 23 onboarding tests pass, including compact text and contrast. |
 | `lib/features/onboarding/presentation/widgets/onboarding_welcome_icon_grid.dart` | reviewed-clean | Compared wordmark, mesh, field curves and anchoring; 23 onboarding tests pass, including compact text and contrast. |
 | `lib/features/onboarding/presentation/widgets/onboarding_welcome_mesh_background.dart` | reviewed-clean | Compared wordmark, mesh, field curves and anchoring; 23 onboarding tests pass, including compact text and contrast. |
@@ -225,6 +239,25 @@ The adapter owns no styling and preserves attachment/disposal behavior.
 
 ### Run Log
 
+#### Author Review Refinement
+
+- VIS-022 through VIS-025 implement the four requested corrections. All 25
+  visual findings are now verified; file coverage remains 143 sources with
+  97 reviewed-clean and 46 verified. The original palette, fonts, SDK and
+  wallet operation contracts are unchanged.
+- Full local suite: **887/887 tests pass with coverage**, 3m04s at
+  `--concurrency=2`. The 53 focused tests, fatal analysis, semantic design
+  policy and whitespace checks also pass.
+- Refreshed iOS-engine catalog: all four groups pass in 2m25s after a 17.1s
+  build; 94 PNGs with 91 distinct rasters. Home, Create, Import empty/final
+  carousel/keyboard-inset and Market shell inspected full-size. Apple Vision
+  again decodes all four Receive QR payloads exactly.
+- This is local/native presentation evidence for the refinement, not a new
+  claim about remote CI or live wallet qualification. The gallery manifest
+  records the resulting source commit. Previous candidate evidence follows.
+
+#### Initial Restoration
+
 - Code/QA candidate: `7798642b0913ac60e84d14c2596baaffef15e5d1`.
   Production styling is unchanged since `1b79465`; this follow-up strengthens
   fixture isolation, screenshot integrity and cross-host contrast measurement.
@@ -236,7 +269,7 @@ The adapter owns no styling and preserves attachment/disposal behavior.
 - File review: 143 UI/system/boundary sources, 98 reviewed-clean and 45 verified.
   The architecture policy covers 315 Dart sources / 1042 imports / 239 exports;
   the semantic design policy checks all 121 UI implementation sources.
-- All 21 visual findings are verified. This closes styling implementation and
+- All initial 21 visual findings are verified. This closes styling implementation and
   technical visual QA, not the author's final aesthetic approval or the app's
   separate funds-bearing release blockers.
 - Exact platform CI run `34324442561` passes at `7798642`; Linux quality run
