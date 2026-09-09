@@ -1215,11 +1215,16 @@ void main() {
 
     await tester.pump(const Duration(milliseconds: 20));
     expect(find.text('This payment request has expired.'), findsNothing);
+    expect(find.text('Bitcoin · Lightning'), findsOneWidget);
+    expect(find.textContaining('Expires '), findsOneWidget);
 
     clockNow = expiresAt;
     await tester.pump(const Duration(milliseconds: 12));
 
     expect(find.text('This payment request has expired.'), findsOneWidget);
+    expect(find.byType(PrettyQrView), findsNothing);
+    expect(find.textContaining('Expires '), findsNothing);
+    expect(find.text('lnbcrt1expiring'), findsNothing);
     expect(
       tester
           .getSemantics(
@@ -1235,6 +1240,49 @@ void main() {
           .enabled,
       isFalse,
     );
+  });
+
+  testWidgets('UXA-011 foreground resume removes an expired payment QR', (
+    tester,
+  ) async {
+    var now = DateTime.utc(2026, 9, 9);
+    final expiry = now.add(const Duration(hours: 1));
+    final engine = FakeWalletEngine()
+      ..createdReceiveRequest = WalletReceiveRequest(
+        route: const PaymentRoute(
+          asset: WalletAsset.bitcoin,
+          rail: PaymentRail.lightning,
+        ),
+        encodedRequest: 'lnbcrt1testexpiry',
+        displayValue: 'lnbcrt1testexpiry',
+        expiresAt: expiry,
+      );
+    final harness = await PaymentFlowTestHarness.create(
+      engine: engine,
+      clock: () => now,
+    );
+    addTearDown(() => _disposeHarness(tester, harness));
+    addTearDown(
+      () => tester.binding.handleAppLifecycleStateChanged(
+        AppLifecycleState.resumed,
+      ),
+    );
+    await _pumpWidget(
+      tester,
+      harness,
+      const ReceiveRequestScreen(target: WalletPaymentTarget.bitcoinLightning),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byType(PrettyQrView).evaluate().isNotEmpty,
+    );
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    now = expiry;
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    expect(find.byType(PrettyQrView), findsNothing);
+    expect(find.text('This payment request has expired.'), findsOneWidget);
+    expect(find.text('Generate new request'), findsOneWidget);
   });
 
   testWidgets('initial Receive failure is live on request and amount views', (
@@ -1525,7 +1573,10 @@ void main() {
     await _pumpFrames(tester);
     expect(sendButton, findsOneWidget);
     expect(find.text('Wallet home'), findsNothing);
-    await tester.tap(sendButton);
+    await tester.ensureVisible(sendButton);
+    // Loading deliberately removes the button from hit testing. Dispatch a
+    // pointer at its visible bounds to prove it cannot admit a second send.
+    await tester.tapAt(tester.getCenter(sendButton));
     await _pumpFrames(tester);
     expect(
       engine.calls.where((call) => call == 'sendPayment:start'),

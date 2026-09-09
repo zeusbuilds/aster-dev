@@ -13,6 +13,20 @@ class ToastController extends _$ToastController
   static const int maximumTitleCharacters = 80;
   static const int maximumMessageCharacters = 240;
   static const Duration maximumVisibleDuration = Duration(seconds: 10);
+  static const Duration _readingTimePerWord = Duration(milliseconds: 350);
+  static const Duration _readingOrientationTime = Duration(seconds: 1);
+
+  /// A bounded default for visual reading. Assistive navigation is untimed in
+  /// ToastHost; this estimate is not used as a screen-reader speech deadline.
+  static Duration _readingDuration(String title, String? message) {
+    final words = '$title ${message ?? ''}'.trim().split(RegExp(r'\s+')).length;
+    final estimate = _readingOrientationTime + _readingTimePerWord * words;
+    final minimum = const AsterMotion().toastVisibleDuration;
+    if (estimate < minimum) return minimum;
+    return estimate > maximumVisibleDuration
+        ? maximumVisibleDuration
+        : estimate;
+  }
 
   int _nextId = 0;
 
@@ -41,7 +55,8 @@ class ToastController extends _$ToastController
           ? null
           : normalizedMessage,
       variant: variant,
-      duration: duration ?? const AsterMotion().toastVisibleDuration,
+      duration:
+          duration ?? _readingDuration(normalizedTitle, normalizedMessage),
     );
     if (candidate.duration <= Duration.zero ||
         candidate.duration > maximumVisibleDuration ||

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -32,6 +33,18 @@ class _ToastHostState extends ConsumerState<ToastHost>
   Duration? _remainingVisibility;
   int? _scheduledMessageId;
   late bool _isForeground;
+  bool _dependenciesReady = false;
+  bool _accessibleNavigation = false;
+  bool _keyboardFocused = false;
+  bool _assistiveFocused = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _dependenciesReady = true;
+    _accessibleNavigation = MediaQuery.accessibleNavigationOf(context);
+    _updateCountdown();
+  }
 
   @override
   void initState() {
@@ -51,6 +64,8 @@ class _ToastHostState extends ConsumerState<ToastHost>
     if (_scheduledMessageId == message?.id) return;
     _cancelCountdown();
     _scheduledMessageId = message?.id;
+    _keyboardFocused = false;
+    _assistiveFocused = false;
     if (message == null) return;
     _remainingVisibility = message.duration;
     _startCountdown();
@@ -60,6 +75,10 @@ class _ToastHostState extends ConsumerState<ToastHost>
     final id = _scheduledMessageId;
     final remaining = _remainingVisibility;
     if (!_isForeground ||
+        !_dependenciesReady ||
+        _accessibleNavigation ||
+        _keyboardFocused ||
+        _assistiveFocused ||
         id == null ||
         remaining == null ||
         _dismissTimer != null) {
@@ -69,6 +88,28 @@ class _ToastHostState extends ConsumerState<ToastHost>
     _visibilityStopwatch = GestureBinding.instance.samplingClock.stopwatch()
       ..start();
     _dismissTimer = Timer(remaining, () => _completeCountdown(id));
+  }
+
+  void _updateCountdown() {
+    if (_accessibleNavigation || _keyboardFocused || _assistiveFocused) {
+      _pauseCountdown();
+    } else {
+      _startCountdown();
+    }
+  }
+
+  void _onKeyboardFocus(int id, bool focused) {
+    if (id != _scheduledMessageId) return;
+    _keyboardFocused = focused;
+    _updateCountdown();
+  }
+
+  void _onAssistiveFocus(int id) {
+    if (id != _scheduledMessageId) return;
+    // Speech completion is not observable. Once assistive focus reaches a
+    // message, retain it until explicit dismissal, even if focus moves away.
+    _assistiveFocused = true;
+    _updateCountdown();
   }
 
   void _pauseCountdown() {
@@ -132,46 +173,61 @@ class _ToastHostState extends ConsumerState<ToastHost>
       context.motion.toastTransitionDuration,
     );
 
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        widget.child,
-        Align(
-          alignment: Alignment.bottomCenter,
-          child: AnimatedPadding(
-            duration: transitionDuration,
-            curve: context.motion.toastCurve,
-            padding: EdgeInsets.only(bottom: context.windowInsets.keyboard),
-            child: AnimatedSwitcher(
+    return CallbackShortcuts(
+      bindings: {
+        if (current != null)
+          const SingleActivator(LogicalKeyboardKey.escape): () => ref
+              .read(toastControllerProvider.notifier)
+              .dismissCurrent(id: current.id),
+      },
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          widget.child,
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: AnimatedPadding(
               duration: transitionDuration,
-              reverseDuration: transitionDuration,
-              switchInCurve: context.motion.toastCurve,
-              switchOutCurve: context.motion.toastCurve,
-              transitionBuilder: (child, animation) {
-                final slide = Tween<Offset>(
-                  begin: const Offset(0, 1),
-                  end: Offset.zero,
-                ).animate(animation);
-                return FadeTransition(
-                  opacity: animation,
-                  child: SlideTransition(position: slide, child: child),
-                );
-              },
-              child: current == null
-                  ? const SizedBox.shrink(key: ValueKey('toast-empty'))
-                  : CustomToast(
-                      key: ValueKey(current.id),
-                      title: current.title,
-                      message: current.message,
-                      variant: current.variant,
-                      onDismiss: () => ref
-                          .read(toastControllerProvider.notifier)
-                          .dismissCurrent(id: current.id),
-                    ),
+              curve: context.motion.toastCurve,
+              padding: EdgeInsets.only(bottom: context.windowInsets.keyboard),
+              child: AnimatedSwitcher(
+                duration: transitionDuration,
+                reverseDuration: transitionDuration,
+                switchInCurve: context.motion.toastCurve,
+                switchOutCurve: context.motion.toastCurve,
+                transitionBuilder: (child, animation) {
+                  final slide = Tween<Offset>(
+                    begin: const Offset(0, 1),
+                    end: Offset.zero,
+                  ).animate(animation);
+                  return FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(position: slide, child: child),
+                  );
+                },
+                child: current == null
+                    ? const SizedBox.shrink(key: ValueKey('toast-empty'))
+                    : Focus(
+                        key: ValueKey(current.id),
+                        canRequestFocus: false,
+                        onFocusChange: (focused) =>
+                            _onKeyboardFocus(current.id, focused),
+                        child: CustomToast(
+                          title: current.title,
+                          message: current.message,
+                          variant: current.variant,
+                          onAccessibilityFocus: () =>
+                              _onAssistiveFocus(current.id),
+                          onDismiss: () => ref
+                              .read(toastControllerProvider.notifier)
+                              .dismissCurrent(id: current.id),
+                        ),
+                      ),
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

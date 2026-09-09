@@ -40,9 +40,10 @@ class AppShellScreen extends ConsumerWidget {
                   enabled: screenIndex == index,
                   child: IgnorePointer(
                     ignoring: screenIndex != index,
-                    child: screenIndex == index
-                        ? screens[screenIndex]
-                        : ExcludeSemantics(child: screens[screenIndex]),
+                    child: ExcludeSemantics(
+                      excluding: screenIndex != index,
+                      child: screens[screenIndex],
+                    ),
                   ),
                 ),
             ],

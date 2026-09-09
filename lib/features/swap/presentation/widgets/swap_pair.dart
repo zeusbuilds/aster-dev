@@ -23,6 +23,7 @@ class SwapPair extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
+      onTap: onTap,
       label: '$label, ${target.semanticLabel}',
       excludeSemantics: true,
       child: Material(

@@ -87,13 +87,14 @@ class AssetRow extends StatelessWidget {
               '${fiatLoading ? 'fiat estimate loading' : fiatSemanticContext ?? fiatContext}';
     return Semantics(
       button: onTap != null,
-      enabled: onTap != null,
+      enabled: onTap != null && !loading,
+      onTap: loading ? null : onTap,
       label: semanticValue,
       excludeSemantics: true,
       child: Material(
         color: context.appColors.transparentSurface,
         child: InkWell(
-          onTap: onTap,
+          onTap: loading ? null : onTap,
           child: ConstrainedBox(
             constraints: BoxConstraints(
               minHeight: context.metrics.minTouchTarget,

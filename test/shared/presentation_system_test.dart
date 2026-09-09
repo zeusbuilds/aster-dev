@@ -865,6 +865,104 @@ void main() {
     expect(find.text('First'), findsNothing);
     expect(find.text('Second'), findsOneWidget);
   });
+
+  testWidgets('UXA-015 accessible toast queue requires explicit dismissal', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const ProviderScope(child: _ToastHarness(accessibleNavigation: true)),
+    );
+    await tester.tap(find.text('Show'));
+    await tester.pump();
+    await tester.pump(const Duration(minutes: 1));
+    expect(find.text('First'), findsOneWidget);
+    expect(find.text('Second'), findsNothing);
+    await tester.tap(find.bySemanticsLabel('Dismiss'));
+    await tester.pump();
+    await tester.pump(const Duration(minutes: 1));
+    expect(find.text('Second'), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('Dismiss'));
+    await tester.pump();
+    expect(find.text('Second'), findsNothing);
+  });
+
+  testWidgets('UXA-015 accessibility setting changes preserve remaining time', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const ProviderScope(child: _ToastHarness()));
+    await tester.tap(find.text('Show'));
+    await tester.pump(const Duration(milliseconds: 40));
+    await tester.pumpWidget(
+      const ProviderScope(child: _ToastHarness(accessibleNavigation: true)),
+    );
+    await tester.pump(const Duration(minutes: 1));
+    expect(find.text('First'), findsOneWidget);
+    await tester.pumpWidget(const ProviderScope(child: _ToastHarness()));
+    await tester.pump(const Duration(milliseconds: 59));
+    expect(find.text('First'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 2));
+    expect(find.text('Second'), findsOneWidget);
+  });
+
+  testWidgets('UXA-015 focused dismissal pauses countdown while reading', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const ProviderScope(child: _ToastHarness()));
+    await tester.tap(find.text('Show'));
+    await tester.pump();
+    final dismissIcon = find.descendant(
+      of: find.byType(AsterIconButton),
+      matching: find.byType(Icon),
+    );
+    Focus.of(tester.element(dismissIcon)).requestFocus();
+    await tester.pump();
+    expect(Focus.of(tester.element(find.byType(CustomToast))).hasFocus, isTrue);
+    await tester.pump(const Duration(minutes: 1));
+    expect(find.text('First'), findsOneWidget);
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 101));
+    expect(find.text('Second'), findsOneWidget);
+  });
+
+  testWidgets('UXA-015 Escape dismisses a toast from the focused route', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const ProviderScope(child: _ToastHarness(accessibleNavigation: true)),
+    );
+    await tester.tap(find.text('Show'));
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pump();
+    expect(find.text('First'), findsNothing);
+    expect(find.text('Second'), findsOneWidget);
+  });
+
+  testWidgets(
+    'UXA-015 assistive focus latches visibility without stealing focus',
+    (tester) async {
+      await tester.pumpWidget(const ProviderScope(child: _ToastHarness()));
+      await tester.tap(find.text('Show'));
+      await tester.pump();
+      final node = tester.getSemantics(
+        find.bySemanticsLabel('Information. First. Details'),
+      );
+      node.owner!.performAction(
+        node.id,
+        ui.SemanticsAction.didGainAccessibilityFocus,
+      );
+      await tester.pump(const Duration(minutes: 1));
+      expect(find.text('First'), findsOneWidget);
+      await tester.tap(find.bySemanticsLabel('Dismiss'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 101));
+      await tester.pump();
+      expect(find.text('Second'), findsNothing);
+    },
+  );
 }
 
 Widget _themedHarness(
@@ -1028,7 +1126,9 @@ final class _PopGuardRoute extends StatelessWidget {
 }
 
 class _ToastHarness extends ConsumerWidget {
-  const _ToastHarness();
+  const _ToastHarness({this.accessibleNavigation = false});
+
+  final bool accessibleNavigation;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1038,7 +1138,10 @@ class _ToastHarness extends ConsumerWidget {
       theme: AppTheme.light(),
       builder: (context, child) {
         return MediaQuery(
-          data: MediaQuery.of(context).copyWith(disableAnimations: true),
+          data: MediaQuery.of(context).copyWith(
+            disableAnimations: true,
+            accessibleNavigation: accessibleNavigation,
+          ),
           child: AsterFeedbackScope(
             haptics: haptics,
             toasts: controller,

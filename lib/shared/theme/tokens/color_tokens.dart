@@ -48,6 +48,7 @@ class AsterColors extends ThemeExtension<AsterColors> {
     required this.surfaceSubtle,
     required this.borderSubtle,
     required this.overlay,
+    required this.statusForeground,
     required this.success,
     required this.onSuccess,
     required this.successContainer,
@@ -67,6 +68,7 @@ class AsterColors extends ThemeExtension<AsterColors> {
     required this.scanControlSurface,
     required this.onScan,
     required this.onMarketTile,
+    required this.marketDarkText,
     required this.brandArtDark,
     required this.brandArtDeep,
     required this.brandArtMain,
@@ -81,6 +83,10 @@ class AsterColors extends ThemeExtension<AsterColors> {
   final Color surfaceSubtle;
   final Color borderSubtle;
   final Color overlay;
+
+  /// Readable status copy on light surfaces and all status containers.
+  /// Accent colors remain reserved for icons and background emphasis.
+  final Color statusForeground;
   final Color success;
   final Color onSuccess;
   final Color successContainer;
@@ -100,6 +106,9 @@ class AsterColors extends ThemeExtension<AsterColors> {
   final Color scanControlSurface;
   final Color onScan;
   final Color onMarketTile;
+
+  /// Dark text on the lighter Market artwork; decorative icons remain white.
+  final Color marketDarkText;
   final Color brandArtDark;
   final Color brandArtDeep;
   final Color brandArtMain;
@@ -114,6 +123,7 @@ class AsterColors extends ThemeExtension<AsterColors> {
     surfaceSubtle: _AsterPalette.neutral100,
     borderSubtle: _AsterPalette.neutral200,
     overlay: Color(0x991D2129),
+    statusForeground: _AsterPalette.ink,
     success: _AsterPalette.success,
     onSuccess: _AsterPalette.white,
     successContainer: _AsterPalette.successContainer,
@@ -133,6 +143,7 @@ class AsterColors extends ThemeExtension<AsterColors> {
     scanControlSurface: _AsterPalette.black,
     onScan: _AsterPalette.white,
     onMarketTile: _AsterPalette.white,
+    marketDarkText: _AsterPalette.black,
     brandArtDark: _AsterPalette.black,
     brandArtDeep: _AsterPalette.meshDeep,
     brandArtMain: _AsterPalette.meshMain,
@@ -185,6 +196,7 @@ class AsterColors extends ThemeExtension<AsterColors> {
     Color? surfaceSubtle,
     Color? borderSubtle,
     Color? overlay,
+    Color? statusForeground,
     Color? success,
     Color? onSuccess,
     Color? successContainer,
@@ -204,6 +216,7 @@ class AsterColors extends ThemeExtension<AsterColors> {
     Color? scanControlSurface,
     Color? onScan,
     Color? onMarketTile,
+    Color? marketDarkText,
     Color? brandArtDark,
     Color? brandArtDeep,
     Color? brandArtMain,
@@ -218,6 +231,7 @@ class AsterColors extends ThemeExtension<AsterColors> {
       surfaceSubtle: surfaceSubtle ?? this.surfaceSubtle,
       borderSubtle: borderSubtle ?? this.borderSubtle,
       overlay: overlay ?? this.overlay,
+      statusForeground: statusForeground ?? this.statusForeground,
       success: success ?? this.success,
       onSuccess: onSuccess ?? this.onSuccess,
       successContainer: successContainer ?? this.successContainer,
@@ -237,6 +251,7 @@ class AsterColors extends ThemeExtension<AsterColors> {
       scanControlSurface: scanControlSurface ?? this.scanControlSurface,
       onScan: onScan ?? this.onScan,
       onMarketTile: onMarketTile ?? this.onMarketTile,
+      marketDarkText: marketDarkText ?? this.marketDarkText,
       brandArtDark: brandArtDark ?? this.brandArtDark,
       brandArtDeep: brandArtDeep ?? this.brandArtDeep,
       brandArtMain: brandArtMain ?? this.brandArtMain,
@@ -256,6 +271,11 @@ class AsterColors extends ThemeExtension<AsterColors> {
       surfaceSubtle: Color.lerp(surfaceSubtle, other.surfaceSubtle, t)!,
       borderSubtle: Color.lerp(borderSubtle, other.borderSubtle, t)!,
       overlay: Color.lerp(overlay, other.overlay, t)!,
+      statusForeground: Color.lerp(
+        statusForeground,
+        other.statusForeground,
+        t,
+      )!,
       success: Color.lerp(success, other.success, t)!,
       onSuccess: Color.lerp(onSuccess, other.onSuccess, t)!,
       successContainer: Color.lerp(
@@ -291,6 +311,7 @@ class AsterColors extends ThemeExtension<AsterColors> {
       )!,
       onScan: Color.lerp(onScan, other.onScan, t)!,
       onMarketTile: Color.lerp(onMarketTile, other.onMarketTile, t)!,
+      marketDarkText: Color.lerp(marketDarkText, other.marketDarkText, t)!,
       brandArtDark: Color.lerp(brandArtDark, other.brandArtDark, t)!,
       brandArtDeep: Color.lerp(brandArtDeep, other.brandArtDeep, t)!,
       brandArtMain: Color.lerp(brandArtMain, other.brandArtMain, t)!,

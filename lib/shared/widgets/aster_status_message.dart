@@ -50,13 +50,13 @@ class AsterStatusMessage extends StatelessWidget {
     final style = switch (tone) {
       AsterStatusTone.neutral => context.type.statusMessage,
       AsterStatusTone.warning => context.type.errorMessage.copyWith(
-        color: context.appColors.warning,
+        color: context.appColors.statusForeground,
       ),
       AsterStatusTone.danger => context.type.errorMessage.copyWith(
-        color: context.appColors.danger,
+        color: context.appColors.statusForeground,
       ),
       AsterStatusTone.success => context.type.statusMessage.copyWith(
-        color: context.appColors.success,
+        color: context.appColors.statusForeground,
       ),
     };
 

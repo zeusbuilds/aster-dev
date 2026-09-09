@@ -82,6 +82,7 @@ class MarketScreen extends StatelessWidget {
               subtitle: 'Bitcoin or USDT',
               icon: RemixIcons.arrow_right_up_line,
               gradient: gradients.marketSend,
+              contentTone: MarketContentTone.dark,
               shadowColor: colors.danger.withValues(
                 alpha: effects.marketShadowOpacity,
               ),
@@ -94,6 +95,7 @@ class MarketScreen extends StatelessWidget {
               subtitle: 'Bitcoin or USDT',
               icon: RemixIcons.arrow_right_down_line,
               gradient: gradients.marketReceive,
+              contentTone: MarketContentTone.dark,
               shadowColor: colors.success.withValues(
                 alpha: effects.marketShadowOpacity,
               ),

@@ -235,5 +235,22 @@ void main() {
         isFalse,
       );
     });
+
+    test('UXA-015 long messages receive a bounded visual reading duration', () {
+      controller.show(
+        title: 'A completed action',
+        message: List.filled(30, 'word').join(' '),
+        variant: ToastVariant.info,
+      );
+      final duration = container
+          .read(toastControllerProvider)
+          .current!
+          .duration;
+      expect(duration, greaterThan(const Duration(seconds: 3)));
+      expect(
+        duration,
+        lessThanOrEqualTo(ToastController.maximumVisibleDuration),
+      );
+    });
   });
 }

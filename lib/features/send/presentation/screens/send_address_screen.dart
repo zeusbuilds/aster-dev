@@ -26,9 +26,45 @@ class SendAddressScreen extends ConsumerStatefulWidget {
 
 class _SendAddressScreenState extends ConsumerState<SendAddressScreen> {
   final _destinationController = TextEditingController();
+  late ProviderSubscription<AsyncValue<SendFlowState>> _destinationSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _listenToDestination();
+  }
+
+  @override
+  void didUpdateWidget(SendAddressScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.target == widget.target) return;
+    _destinationSubscription.close();
+    _destinationController.clear();
+    _listenToDestination();
+  }
+
+  // State owns the value; the controller owns selection/composition only.
+  // Hydration also runs when a retained flow attaches to a new screen.
+  void _listenToDestination() {
+    _destinationSubscription = ref.listenManual(
+      sendFlowViewModelProvider(widget.target),
+      (_, next) {
+        final destination = next.value?.destination;
+        if (destination == null || destination == _destinationController.text) {
+          return;
+        }
+        _destinationController.value = TextEditingValue(
+          text: destination,
+          selection: TextSelection.collapsed(offset: destination.length),
+        );
+      },
+      fireImmediately: true,
+    );
+  }
 
   @override
   void dispose() {
+    _destinationSubscription.close();
     _destinationController.dispose();
     super.dispose();
   }
@@ -104,16 +140,6 @@ class _SendAddressScreenState extends ConsumerState<SendAddressScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = sendFlowViewModelProvider(widget.target);
-    ref.listen(provider, (previous, next) {
-      final destination = next.value?.destination;
-      if (destination == null || destination == _destinationController.text) {
-        return;
-      }
-      _destinationController.value = TextEditingValue(
-        text: destination,
-        selection: TextSelection.collapsed(offset: destination.length),
-      );
-    });
     final flow = ref.watch(provider);
     final current = flow.value;
     final controlsEnabled = current?.canChangeDestination ?? false;

@@ -6,6 +6,7 @@ import 'package:aster/features/settings/domain/models/models.dart';
 import 'package:aster/features/settings/presentation/models/models.dart';
 import 'package:aster/features/settings/presentation/view_model/view_models.dart';
 import 'package:aster/features/transaction/presentation/screens/screens.dart';
+import 'package:aster/features/transaction/presentation/view_model/view_models.dart';
 import 'package:aster/features/transaction/presentation/widgets/widgets.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:aster/shared/shared.dart';
@@ -19,6 +20,79 @@ import '../../support/wallet_fakes.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets(
+    'UXA-013 details retain content through refresh, failure and recovery',
+    (tester) async {
+      final pending = WalletActivity(
+        id: 'activity-${'a' * 64}',
+        txid: 'a' * 64,
+        source: WalletActivitySource.bitcoinTransaction,
+        operation: WalletActivityOperation.bitcoinReceive,
+        asset: WalletAsset.bitcoin,
+        rail: PaymentRail.onchain,
+        direction: WalletActivityDirection.received,
+        status: WalletActivityStatus.pending,
+        amount: WalletAmount.onchain(
+          assetId: WalletAsset.bitcoin.id,
+          units: 100,
+        ),
+      );
+      final gate = Completer<void>();
+      final engine = FakeWalletEngine()
+        ..activities = [pending]
+        ..syncGate = gate;
+      final harness = await _harness(engine: engine);
+      addTearDown(() => _disposeHarness(tester, harness));
+      await _pump(
+        tester,
+        harness,
+        TransactionDetailsScreen(
+          assetKind: WalletAssetKind.bitcoin,
+          activityId: pending.id,
+        ),
+      );
+      await _pumpUntil(
+        tester,
+        () => find.text('Pending').evaluate().isNotEmpty,
+      );
+      expect(find.byType(RefreshIndicator), findsOneWidget);
+      await tester.tap(find.byTooltip('Refresh transaction'));
+      await tester.pump();
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      expect(find.text('Received'), findsOneWidget);
+      const failure = AppFailure(
+        code: 'test_offline',
+        kind: AppFailureKind.connectivity,
+        userMessage: 'Network unavailable. Try again.',
+        retryable: true,
+      );
+      engine.syncError = AppFailureException(failure);
+      gate.complete();
+      await _pumpUntil(
+        tester,
+        () => find.text(failure.userMessage).evaluate().isNotEmpty,
+      );
+      expect(find.text('Received'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(
+        harness.container
+            .read(activityViewModelProvider(WalletAssetKind.bitcoin))
+            .requireValue
+            .refreshing,
+        isFalse,
+      );
+      engine.syncError = null;
+      engine.activities = [_onchainActivity()];
+      await tester.tap(find.byTooltip('Refresh transaction'));
+      await _pumpUntil(
+        tester,
+        () => find.text('Completed').evaluate().isNotEmpty,
+      );
+      expect(find.text(failure.userMessage), findsNothing);
+      expect(engine.calls.where((call) => call == 'sync'), hasLength(2));
+    },
+  );
 
   testWidgets('Activity renders exact cross-rail records and privacy state', (
     tester,

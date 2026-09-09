@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
 
 import '../../../../core/core.dart';
@@ -29,13 +30,26 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
     with WidgetsBindingObserver {
   Timer? _expiryTimer;
   late DateTime _now;
+  late ProviderSubscription<AsyncValue<ReceiveFlowState>> _requestSubscription;
 
   @override
   void initState() {
     super.initState();
     _now = ref.read(utcClockProvider)();
     WidgetsBinding.instance.addObserver(this);
-    ref.listenManual(
+    _listenToRequest();
+  }
+
+  @override
+  void didUpdateWidget(ReceiveRequestScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.target == widget.target) return;
+    _requestSubscription.close();
+    _listenToRequest();
+  }
+
+  void _listenToRequest() {
+    _requestSubscription = ref.listenManual(
       receiveFlowViewModelProvider(widget.target),
       (previous, next) => _scheduleExpiry(next.value),
       fireImmediately: true,
@@ -45,6 +59,7 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _requestSubscription.close();
     _expiryTimer?.cancel();
     super.dispose();
   }
@@ -70,7 +85,7 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
     if (expiry == null) return;
     final delay = expiry.difference(now);
     if (delay <= Duration.zero) return;
-    _expiryTimer = Timer(delay + const Duration(milliseconds: 1), () {
+    _expiryTimer = Timer(delay, () {
       if (!mounted) return;
       _scheduleExpiry(state, notify: true);
     });
@@ -259,6 +274,14 @@ final class _RequestBody extends StatelessWidget {
           );
     return ListView(
       children: [
+        Padding(
+          padding: EdgeInsets.only(bottom: context.spacing.lg),
+          child: Text(
+            '${state.route.target.assetLabel} · ${state.route.target.railLabel}',
+            style: context.type.sectionLabel,
+            textAlign: TextAlign.center,
+          ),
+        ),
         if (request == null)
           _AmountRequiredCard(target: state.route.target)
         else
@@ -267,19 +290,34 @@ final class _RequestBody extends StatelessWidget {
             padding: EdgeInsets.all(context.spacing.xxl),
             child: Column(
               children: [
-                ReceiveRequestQr(
-                  encodedRequest: request.encodedRequest,
-                  semanticLabel: '${state.route.target.requestLabel} QR code',
-                  assetKind: state.route.asset.kind,
-                ),
+                if (expired)
+                  AspectRatio(
+                    aspectRatio: 1,
+                    child: Center(
+                      child: Icon(
+                        MingCuteIcons.mgc_time_line,
+                        size: context.icons.xl,
+                        color: context.appColors.textSecondary,
+                        semanticLabel:
+                            'Expired payment request, QR code removed',
+                      ),
+                    ),
+                  )
+                else
+                  ReceiveRequestQr(
+                    encodedRequest: request.encodedRequest,
+                    semanticLabel: '${state.route.target.requestLabel} QR code',
+                    assetKind: state.route.asset.kind,
+                  ),
                 SizedBox(height: context.spacing.lg),
-                Text(
-                  request.displayValue,
-                  style: context.type.addressSmall,
-                  textAlign: TextAlign.center,
-                  maxLines: 4,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                if (!expired)
+                  Text(
+                    request.displayValue,
+                    style: context.type.addressSmall,
+                    textAlign: TextAlign.center,
+                    maxLines: 4,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 if (appliedAmount != null) ...[
                   SizedBox(height: context.spacing.sm),
                   AmountText(
@@ -294,6 +332,15 @@ final class _RequestBody extends StatelessWidget {
                     'This payment request has expired.',
                     tone: AsterStatusTone.warning,
                     announce: true,
+                  ),
+                ] else if (request.expiresAt case final expiry?) ...[
+                  SizedBox(height: context.spacing.sm),
+                  NumericText(
+                    'Expires ${DateFormat.yMMMd(Localizations.localeOf(context).toString()).add_jms().format(expiry.toLocal())}',
+                    style: context.type.rowMeta.copyWith(
+                      color: context.appColors.textSecondary,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
                 ],
                 SizedBox(height: context.spacing.md),
@@ -317,7 +364,7 @@ final class _RequestBody extends StatelessWidget {
             children: [
               AsterOptionRow(
                 title: 'Set amount',
-                details: appliedAmount?.text,
+                amountDetails: appliedAmount?.text,
                 prefixIcon: MingCuteIcons.mgc_edit_2_line,
                 onTap: commandsEnabled && state.canEditAmount
                     ? onSetAmount

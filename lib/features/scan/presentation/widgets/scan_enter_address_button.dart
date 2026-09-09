@@ -35,29 +35,34 @@ class ScanEnterAddressButton extends StatelessWidget {
         color: colors.transparentSurface,
         child: InkWell(
           onTap: enabled ? activate : null,
-          child: Opacity(
-            opacity: enabled ? stateLayers.visible : stateLayers.disabled,
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: spacing.md),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Flexible(
-                    child: Text(
-                      label,
-                      style: context.type.scanCta,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: context.metrics.minTouchTarget,
+            ),
+            child: Opacity(
+              opacity: enabled ? stateLayers.visible : stateLayers.disabled,
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: spacing.md),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        label,
+                        style: context.type.scanCta,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                      ),
                     ),
-                  ),
-                  SizedBox(width: spacing.xxs),
-                  Icon(
-                    RemixIcons.arrow_right_s_line,
-                    color: context.type.scanCta.color,
-                    size: icons.sm,
-                  ),
-                ],
+                    SizedBox(width: spacing.xxs),
+                    Icon(
+                      RemixIcons.arrow_right_s_line,
+                      color: context.type.scanCta.color,
+                      size: icons.sm,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

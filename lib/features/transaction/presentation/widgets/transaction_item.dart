@@ -112,7 +112,7 @@ class TransactionItem extends StatelessWidget {
                     ),
                   ),
                   SizedBox(width: context.spacing.sm),
-                  Flexible(
+                  Expanded(
                     child: AmountText(
                       valuesVisible ? amount ?? '--' : '••••',
                       style: context.type.amountInline,

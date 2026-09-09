@@ -118,97 +118,133 @@ class _DetailsBody extends ConsumerWidget {
       formatter: formatter,
     );
     final actionsNotifier = ref.read(actionsProvider.notifier);
+    Future<void> refresh() async {
+      await ref.read(activityViewModelProvider(assetKind).notifier).refresh();
+    }
 
-    return CustomScrollView(
-      slivers: [
-        SliverPadding(
-          padding: EdgeInsets.fromLTRB(
-            context.spacing.screenPadding,
-            context.spacing.xl,
-            context.spacing.screenPadding,
-            context.spacing.xxl,
-          ),
-          sliver: SliverList.list(
-            children: [
-              Semantics(
-                label:
-                    '${formatter.assetTitle(record.asset.kind)}, '
-                    '${formatter.activityTitle(record)}, '
-                    '${valuesVisible ? amount ?? 'Amount unavailable' : 'Amount hidden'}, '
-                    '${formatter.statusLabel(record.status)}',
-                excludeSemantics: true,
-                child: Column(
-                  children: [
-                    WalletAssetIcon(
-                      kind: record.asset.kind,
-                      size: context.icons.xl,
-                    ),
-                    SizedBox(height: context.spacing.md),
-                    Text(
-                      formatter.activityTitle(record),
-                      style: context.type.title,
-                      textAlign: TextAlign.center,
-                    ),
-                    SizedBox(height: context.spacing.xs),
-                    AmountText(
-                      valuesVisible ? amount ?? '--' : '••••',
-                      style: context.type.amountLarge,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                    ),
-                    SizedBox(height: context.spacing.md),
-                    _StatusBadge(
-                      status: record.status,
-                      label: formatter.statusLabel(record.status),
-                    ),
-                  ],
+    return RefreshIndicator(
+      onRefresh: refresh,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(
+              context.spacing.screenPadding,
+              context.spacing.xl,
+              context.spacing.screenPadding,
+              context.spacing.xxl,
+            ),
+            sliver: SliverList.list(
+              children: [
+                if (state.refreshFailure case final failure?) ...[
+                  AsterStatusMessage(
+                    failure.userMessage,
+                    tone: AsterStatusTone.danger,
+                    announce: true,
+                  ),
+                  SizedBox(height: context.spacing.md),
+                ],
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: AsterIconButton(
+                    tooltip: state.refreshing
+                        ? 'Refreshing transaction'
+                        : 'Refresh transaction',
+                    icon: RemixIcons.refresh_line,
+                    onPressed: state.refreshing ? null : refresh,
+                    hapticIntent: null,
+                  ),
                 ),
-              ),
-              SizedBox(height: context.spacing.sectionGap),
-              Squircle(
-                color: context.appColors.surfaceRaised,
-                padding: EdgeInsets.symmetric(horizontal: context.spacing.lg),
-                child: Column(
-                  children: [
-                    for (var index = 0; index < entries.length; index += 1) ...[
-                      TransactionDetailRow(
-                        label: entries[index].label,
-                        value: entries[index].value,
-                        monetary: entries[index].monetary,
-                        identifier: entries[index].identifier,
-                        copying:
-                            actions.copyingField == entries[index].copyField,
-                        copyEnabled: actions.copyingField == null,
-                        onCopy: entries[index].copyValue == null
-                            ? null
-                            : () => _copy(
-                                context,
-                                actionsNotifier,
-                                entries[index].copyField!,
-                                entries[index].label,
-                                entries[index].copyValue!,
-                              ),
+                if (state.refreshing) ...[
+                  const LinearProgressIndicator(
+                    semanticsLabel: 'Refreshing transaction',
+                  ),
+                  SizedBox(height: context.spacing.md),
+                ],
+                Semantics(
+                  label:
+                      '${formatter.assetTitle(record.asset.kind)}, '
+                      '${formatter.activityTitle(record)}, '
+                      '${valuesVisible ? amount ?? 'Amount unavailable' : 'Amount hidden'}, '
+                      '${formatter.statusLabel(record.status)}',
+                  excludeSemantics: true,
+                  child: Column(
+                    children: [
+                      WalletAssetIcon(
+                        kind: record.asset.kind,
+                        size: context.icons.xl,
                       ),
-                      if (index < entries.length - 1) const AsterDivider(),
+                      SizedBox(height: context.spacing.md),
+                      Text(
+                        formatter.activityTitle(record),
+                        style: context.type.title,
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: context.spacing.xs),
+                      AmountText(
+                        valuesVisible ? amount ?? '--' : '••••',
+                        style: context.type.amountLarge,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: context.spacing.md),
+                      _StatusBadge(
+                        status: record.status,
+                        label: formatter.statusLabel(record.status),
+                      ),
                     ],
-                  ],
+                  ),
                 ),
-              ),
-              if (actions.explorerUri != null) ...[
                 SizedBox(height: context.spacing.sectionGap),
-                CustomButton(
-                  text: 'View in explorer',
-                  suffixIcon: RemixIcons.external_link_line,
-                  loading: actions.openingExplorer,
-                  hapticIntent: null,
-                  onTap: () => _openExplorer(context, actionsNotifier),
+                Squircle(
+                  color: context.appColors.surfaceRaised,
+                  padding: EdgeInsets.symmetric(horizontal: context.spacing.lg),
+                  child: Column(
+                    children: [
+                      for (
+                        var index = 0;
+                        index < entries.length;
+                        index += 1
+                      ) ...[
+                        TransactionDetailRow(
+                          label: entries[index].label,
+                          value: entries[index].value,
+                          monetary: entries[index].monetary,
+                          identifier: entries[index].identifier,
+                          copying:
+                              actions.copyingField == entries[index].copyField,
+                          copyEnabled: actions.copyingField == null,
+                          onCopy: entries[index].copyValue == null
+                              ? null
+                              : () => _copy(
+                                  context,
+                                  actionsNotifier,
+                                  entries[index].copyField!,
+                                  entries[index].label,
+                                  entries[index].copyValue!,
+                                ),
+                        ),
+                        if (index < entries.length - 1) const AsterDivider(),
+                      ],
+                    ],
+                  ),
                 ),
+                if (actions.explorerUri != null) ...[
+                  SizedBox(height: context.spacing.sectionGap),
+                  CustomButton(
+                    text: 'View in explorer',
+                    suffixIcon: RemixIcons.external_link_line,
+                    loading: actions.openingExplorer,
+                    hapticIntent: null,
+                    onTap: () => _openExplorer(context, actionsNotifier),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -442,13 +478,13 @@ class _StatusBadge extends StatelessWidget {
     final (background, foreground) = switch (status) {
       WalletActivityStatus.succeeded => (
         context.appColors.successContainer,
-        context.appColors.success,
+        context.appColors.statusForeground,
       ),
       WalletActivityStatus.failed ||
       WalletActivityStatus.cancelled ||
       WalletActivityStatus.expired => (
         context.appColors.dangerContainer,
-        context.appColors.danger,
+        context.appColors.statusForeground,
       ),
       WalletActivityStatus.pending ||
       WalletActivityStatus.waitingCounterparty ||
@@ -457,7 +493,7 @@ class _StatusBadge extends StatelessWidget {
       WalletActivityStatus.claimable ||
       WalletActivityStatus.claiming => (
         context.appColors.warningContainer,
-        context.appColors.warning,
+        context.appColors.statusForeground,
       ),
     };
     return AsterPill(

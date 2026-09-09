@@ -18,7 +18,6 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
     this.scanAvatarSurfaceOpacity = 0.25,
     this.scanSecondaryContentOpacity = 0.75,
     this.marketShadowOpacity = 0.16,
-    this.marketContentMutedOpacity = 0.75,
     this.marketPillSurfaceOpacity = 0.15,
     this.marketPillDotOpacity = 0.5,
     this.artNoiseOpacity = 0.05,
@@ -49,7 +48,6 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
   final double scanAvatarSurfaceOpacity;
   final double scanSecondaryContentOpacity;
   final double marketShadowOpacity;
-  final double marketContentMutedOpacity;
   final double marketPillSurfaceOpacity;
   final double marketPillDotOpacity;
   final double artNoiseOpacity;
@@ -86,7 +84,6 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
     double? scanAvatarSurfaceOpacity,
     double? scanSecondaryContentOpacity,
     double? marketShadowOpacity,
-    double? marketContentMutedOpacity,
     double? marketPillSurfaceOpacity,
     double? marketPillDotOpacity,
     double? artNoiseOpacity,
@@ -127,8 +124,6 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
       scanSecondaryContentOpacity:
           scanSecondaryContentOpacity ?? this.scanSecondaryContentOpacity,
       marketShadowOpacity: marketShadowOpacity ?? this.marketShadowOpacity,
-      marketContentMutedOpacity:
-          marketContentMutedOpacity ?? this.marketContentMutedOpacity,
       marketPillSurfaceOpacity:
           marketPillSurfaceOpacity ?? this.marketPillSurfaceOpacity,
       marketPillDotOpacity: marketPillDotOpacity ?? this.marketPillDotOpacity,
@@ -221,11 +216,6 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
       marketShadowOpacity: _lerp(
         marketShadowOpacity,
         other.marketShadowOpacity,
-        t,
-      ),
-      marketContentMutedOpacity: _lerp(
-        marketContentMutedOpacity,
-        other.marketContentMutedOpacity,
         t,
       ),
       marketPillSurfaceOpacity: _lerp(

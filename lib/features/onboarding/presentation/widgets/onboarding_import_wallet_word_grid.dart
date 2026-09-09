@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 
 import '../../../../shared/shared.dart';
 
@@ -49,33 +50,39 @@ class _RecoveryWordTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final effects = context.effects;
-    return Squircle(
-      padding: EdgeInsets.symmetric(
-        horizontal: context.spacing.md,
-        vertical: context.spacing.sm,
-      ),
-      borderRadius: context.radii.recoveryWord,
-      color: effects.brandGlassContentSurface(context.colorScheme),
-      borderColor: context.colorScheme.surface.withValues(
-        alpha: effects.brandGlassBorderOpacity,
-      ),
-      borderWidth: context.strokes.hairline,
-      child: Row(
-        children: [
-          Text(
-            '${index + 1}.',
-            style: context.type.assetMeta
-                .copyWith(color: colors.onBrandArt)
-                .toNumeric(context),
-          ),
-          SizedBox(width: context.spacing.sm),
-          Expanded(
-            child: Text(
-              word,
-              style: context.type.rowTitle.copyWith(color: colors.onBrandArt),
+    return Semantics(
+      container: true,
+      sortKey: OrdinalSortKey(index.toDouble()),
+      label: '${index + 1}. $word',
+      excludeSemantics: true,
+      child: Squircle(
+        padding: EdgeInsets.symmetric(
+          horizontal: context.spacing.md,
+          vertical: context.spacing.sm,
+        ),
+        borderRadius: context.radii.recoveryWord,
+        color: effects.brandGlassContentSurface(context.colorScheme),
+        borderColor: context.colorScheme.surface.withValues(
+          alpha: effects.brandGlassBorderOpacity,
+        ),
+        borderWidth: context.strokes.hairline,
+        child: Row(
+          children: [
+            Text(
+              '${index + 1}.',
+              style: context.type.assetMeta
+                  .copyWith(color: colors.onBrandArt)
+                  .toNumeric(context),
             ),
-          ),
-        ],
+            SizedBox(width: context.spacing.sm),
+            Expanded(
+              child: Text(
+                word,
+                style: context.type.rowTitle.copyWith(color: colors.onBrandArt),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

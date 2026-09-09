@@ -114,9 +114,6 @@ class AsterTypeRoles extends ThemeExtension<AsterTypeRoles> {
     final brandStrong = colors.onBrandArt.withValues(
       alpha: effects.brandContentStrongOpacity,
     );
-    final marketMuted = colors.onMarketTile.withValues(
-      alpha: effects.marketContentMutedOpacity,
-    );
     final scanSecondary = colors.onScan.withValues(
       alpha: effects.scanSecondaryContentOpacity,
     );
@@ -291,13 +288,21 @@ class AsterTypeRoles extends ThemeExtension<AsterTypeRoles> {
         FontWeight.w600,
         colorScheme.onSurface,
       ),
-      marketLabel: role(textTheme.bodyMedium, FontWeight.w500, marketMuted),
+      marketLabel: role(
+        textTheme.bodyMedium,
+        FontWeight.w500,
+        colors.onMarketTile,
+      ),
       marketTitle: role(
         textTheme.titleLarge,
         FontWeight.w600,
         colors.onMarketTile,
       ),
-      marketTip: role(textTheme.bodyMedium, FontWeight.w600, marketMuted),
+      marketTip: role(
+        textTheme.bodyMedium,
+        FontWeight.w600,
+        colors.onMarketTile,
+      ),
       scanControl: role(textTheme.bodyMedium, FontWeight.w600, colors.onScan),
       scanCta: role(textTheme.bodyMedium, FontWeight.w500, scanSecondary),
       scanHeaderTitle: role(

@@ -54,6 +54,227 @@
 | VIS-020 | verified | Standalone Market/Settings/Scan screenshots do not show their persistent-shell context. Capture actual navigation taps to all three tabs, assert the selected destination, and retain both embedded and standalone views. Explicitly isolate the shell scanner using its test-only session, not the platform camera. | Host and 94-image iOS-engine catalog pass at 7798642; all three shell images inspected full-size. No production code change. |
 | VIS-021 | verified | The 94-scene native run passed widget assertions but iOS window capture returned 94 identical launch images. Reject the batch. Capture the actual mounted Flutter layer on the iOS engine, dispose image handles, and verify distinct Home/hidden/Market/Settings hashes before accepting an export. | 7798642 produces 94 captures with 91 distinct rasters; identical loading/non-scrolling states are intentional. Six contact sheets reviewed; four QR payloads independently decoded. OS/platform views explicitly excluded. |
 
+## Independent UI/UX Audit
+
+Date: 2026-09-09. Audited application commit:
+`1fe2c1f84b18a4da4e58884885185cd0abec2e2c`.
+
+**Audit verdict: keep the restored design; do not sign off the UI/UX yet.**
+The audit identified 15 corrections: 3 P1 and 12 P2. All 15 code defects are
+now corrected and host-verified as recorded in Implementation Closeout below;
+the three recommendations are explicitly out of scope. Physical qualification
+remains outstanding. The original evidence below is the baseline, not
+implementation verification.
+The historical file-review statuses and VIS findings elsewhere in this document
+describe the prior restoration pass only. A prior `verified` or `reviewed-clean`
+file can have a new finding below.
+
+### Scope And Evidence
+
+- Read the feature screens, their UI components, shared controls, navigation,
+  typography/color/layout contracts, motion and feedback ownership. Followed
+  relevant ViewModel contracts where needed to distinguish visual behavior from
+  repository/SDK limitations. This is a UI/UX review, not a new SDK/security audit.
+- Inspected all six contact sheets of the current 94-scene iOS-engine catalog,
+  including all four Send/Receive routes and loading, failure, expired, empty,
+  submitting, selector, settings, transaction and shell variants. This is the
+  existing capture batch corresponding to the audited source, not a fresh device
+  walkthrough. Older contact sheets with superseded UI were excluded.
+- Re-ran 200 existing UI, presentation, feedback, routing and catalog tests:
+  **200 passed**. This is not a rerun of the historical full 887-test suite.
+- Final strict `fvm flutter analyze` passes with no issues. `git diff --check`
+  passes. The production-tracker schema validator passes for 574 owned files
+  and its existing 415 findings; the 15 UXA corrections are separately counted
+  in this linked visual-audit backlog, not included in that validator's total.
+- Added 11 local diagnostic probes using bundled DM Sans/Public Sans. All
+  completed. Some deliberately assert the presence of a defect; their passing
+  result is reproduction evidence, **not** a clean regression gate.
+- Probe source: `build/ui-ux-audit/probe_test.dart`; output:
+  `/tmp/aster-ui-ux-probes.log`. Existing-test output:
+  `/tmp/aster-ui-ux-audit-tests.log`. Contact sheets:
+  `build/ui-ux-audit/contact/`. These ignored/local artifacts are not committed
+  release evidence and may be removed by cleaning the workspace.
+- No production Dart, platform code, palette, fonts, SDK, wallet data or backend
+  was changed. No emulator or protected regtest resource was started or modified.
+- The dedicated Aster simulator was shut down. Permission to boot it was requested
+  but not received during this pass; no other task's device was used. Native OS
+  keyboard, camera and physical assistive-technology behavior are not newly proved.
+
+### Correction Baseline
+
+The following table preserves the original defects and requested corrections.
+The subsequent Implementation Closeout records actual fixes and verification;
+these are also formal UXA findings in the production tracker. Palette primitives
+and authored gradient recipes have not changed. Physical assistive-technology
+evidence remains a separate verification limitation.
+
+| ID | Priority | Finding / affected behavior | Evidence | Required correction and closure |
+| --- | --- | --- | --- | --- |
+| UXA-001 | P1 | Enabled Home wallet selector, Home asset rows, Market actions and Swap selectors lose their screen-reader activation action. | `home_header.dart:50`, `asset_row.dart:88`, `market_tile.dart:68`, `swap_pair.dart:24`: `excludeSemantics: true` discards the inner InkWell semantics without an outer `onTap`. Probes return `SemanticsAction.tap == false` for all four components. | Expose one explicit accessible activation through the same enabled/command/haptic path as a pointer tap, or retain correctly merged child actions. Test semantic action dispatch, disabled/loading behavior and keyboard activation, not labels alone. |
+| UXA-002 | P1 | Amount entry can conceal significant digits before submission. | `send_card.dart:60` restricts input to one line with clipping. At 320x568 and 2x text, `0.12345678` needs 282.68 logical px but receives 115.45 px. `receive_amount_sheet.dart:209` has the same one-line pattern with ellipsis. The underlying amount remains longer than what is visible. | Give monetary input a shared responsive layout that preserves access to the entire exact amount, including its fractional tail. Reflow the asset/unit or provide an accessible horizontally scrollable editing surface; do not silently abbreviate, round or suppress user text scaling. Test valid BTC/USDT extremes and both units in Send and Receive. |
+| UXA-003 | P1 | Generated recovery words have the wrong assistive reading order. | `onboarding_import_wallet_word_grid.dart:18` builds rows containing words 1/7, 2/8, etc. The actual semantic label is `1, word1, 7, word7, 2, word2, 8, word8, ...`. | Preserve the approved six-left/six-right visual layout, but group each numbered word and provide explicit semantic traversal from 1 through 12. Test the emitted semantic order and verify it with VoiceOver/TalkBack. Never change the phrase itself or expose it to logs. |
+| UXA-004 | P2 | Changing tabs destroys screen-local state despite IndexedStack. | `app_shell_screen.dart:43` alternates between a screen widget and an ExcludeSemantics wrapper. The probe scrolls Settings to 150 px, switches away/back, and observes a different ScrollableState at offset 0. | Keep a stable wrapper tree and vary `excluding`, `ignoring` and TickerMode properties. Test scroll retention and scanner mount/disposal behavior across repeated tab switches; do not remove offscreen suppression. |
+| UXA-005 | P2 | Transaction amounts do not share a trailing alignment edge. | `transaction_item.dart:115` uses a loose Flexible for the amount after an Expanded leading section. At 390 px, amounts of 1 and 100,000,000 sats end 99.98 and 22.48 px before the row edge respectively. `TextAlign.end` only aligns inside that smaller loose child. | Give the value a bounded trailing slot that reaches the row edge, with deliberate reflow for long values. Assert equal right edges for short, long, hidden, pending and Lightning rows at normal/large text. |
+| UXA-006 | P2 | A remounted Send address form can show a blank field while its ViewModel still contains a destination. | `send_address_screen.dart:28,107`: an empty controller is synchronized only on later provider changes. A retained populated provider mounts with state `bcrt1qexample` and empty field text. The Continue eligibility reads state rather than the visible controller. This test demonstrates hydration, not validity of that placeholder address. | Hydrate on subscription immediately, reconcile target changes, and keep one ownership rule for editing, scanner handoff and paste. Add a remount test with a fully valid address and assert that visible text and the destination used for validation agree. |
+| UXA-007 | P2 | Status colors are used as text colors where they do not have enough contrast. | `aster_status_message.dart:50`, `_StatusBadge` in `transaction_details_screen.dart:434`, and health text in `network_configuration_screen.dart:95`. Actual token contrast on containers: success 2.51:1, warning 2.41:1, danger 3.25:1; on white: 2.78:1, 2.57:1, 3.71:1 respectively. | Preserve palette values. Separate status accents/backgrounds from readable semantic status foregrounds, reusing an existing dark foreground where appropriate. Check inline errors, expiry notices, health labels and badges against their actual surfaces with normal-text contrast tests. |
+| UXA-008 | P2 | Active Market tiles have insufficient text contrast; the issue is not limited to disabled tiles. | `market_tile.dart:118,121,148`, `type_role_tokens.dart:294`, `gradient_tokens.dart:124`. Even fully opaque white contrasts only 2.40:1 to 3.60:1 against the Receive gradient endpoints. Labels/tips further reduce white to 75% opacity; tips also sit on a lightened capsule. The enabled Receive tile therefore cannot meet 4.5:1 across its text area. | Retain the authored gradient colors/art and composition. Use a readable existing foreground or a narrowly scoped semantic contrast treatment beneath text. Measure actual rendered text/backdrops, including Send, instead of assuming white-on-color is accessible. Disabled controls are not used as the basis for this finding. |
+| UXA-009 | P2 | Max is permanently disabled with no local explanation. | `send_card.dart:136` renders an inert Max pill. The existing SEND-002 blocker requires a truthful fee-aware SDK quote and an honest explanation; the latter is absent from this restored screen. | Keep Max disabled until the real quote contract exists. Explain the limitation near the control or with an accessible discoverable explanation, including fixed-amount invoices where appropriate. This UI fix must not invent a send-max calculation. |
+| UXA-010 | P2 | A generated Receive screen drops important payment context. | `receive_request_screen.dart:184,270`: the heading identifies the asset but not the rail; the ready card shows QR/request/amount but no visible rail or future expiry. On-chain and Lightning Bitcoin requests look effectively the same to a user who cannot decode the string. | Keep the selected rail visible and show the actual expiry where the model provides one. Use consistent asset/rail terminology across selection, request, copy/share and expired states. Do not invent expiry for an address without one. |
+| UXA-011 | P2 | An expired invoice remains prominently scannable. | `_RequestBody` always builds ReceiveRequestQr before checking expiry. The expired catalog scene retains the intact QR while only copy/share are disabled and a small warning is added. Another device can still scan that expired request. | Replace or clearly invalidate the code surface once expired, while retaining necessary context and a regenerate action. Test the expiry boundary and foreground resume with the injectable clock; verify that a stale payment QR is no longer presented as usable. |
+| UXA-012 | P2 | The amount in the Receive action group uses the wrong font. | `receive_request_screen.dart:320` passes `appliedAmount.text` to AsterOptionRow.details; `aster_option_row.dart:81` renders it with ordinary Text/rowValue. The QR-card amount above correctly uses AmountText, so the same value has two different numeric treatments. | Add a typed monetary/detail-content contract to the shared row, retaining layout measurement and semantics. Use Public Sans only for numeric spans; do not indiscriminately apply the numeric font to identifiers, units or all option values. |
+| UXA-013 | P2 | A pending transaction has no in-place refresh affordance, and retained-feed refresh failures are invisible when the record exists. | `transaction_details_screen.dart:89,122`: refreshing/refreshFailure are handled only when the ID is absent. The normal CustomScrollView has no RefreshIndicator or refresh control. ActivityViewModel.refresh exposes both progress and retained-data failure. | Allow an explicit idempotent refresh with stale content retained, visible progress and inline failure/retry. Handle all three states even when the record exists. Test a pending-to-confirmed update and a failed refresh without making the user leave/re-enter details. |
+| UXA-014 | P2 | Scanner manual-entry target is smaller than the app/Android minimum. | `scan_enter_address_button.dart:36` sizes its InkWell from text plus padding without the shared minimum constraint. The measured target is 390x44 logical px at normal type. It meets the common iOS 44-point guideline, but not the app's 48px target contract or Flutter's Android guideline. | Preserve the text-only visual style and apply the shared minimum interactive height. Assert edge taps and both platform target guidelines, including the destination-picker version. |
+| UXA-015 | P2 | Toast dismissal is not adapted to assistive reading. | `toast_host.dart:50,59` always counts down the configured duration; the default is 3 seconds in `motion_tokens.dart:11`. Only app backgrounding pauses the timer. Accessible navigation and accessibility focus do not affect it, although up to 80 title and 240 message characters are accepted. | Define a testable accessibility-aware presentation lifetime and focus/dismissal policy. Keep persistent errors on-screen. Test long messages, queue advancement, reduced motion, background/resume and accessibility settings; validate announcements on devices rather than claiming timer tests prove screen-reader usability. |
+
+References above are relative to feature `presentation/screens` or
+`presentation/widgets` and shared `widgets`, `feedback`, or `theme/tokens` as
+appropriate. They refer to the audited commit, not future edited line numbers.
+
+Normal-size text is evaluated against the 4.5:1 guidance in
+[W3C Contrast (Minimum)](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html).
+Touch targets and assistive interaction follow
+[Flutter accessibility guidance](https://docs.flutter.dev/ui/accessibility).
+These thresholds are applied to functional text/actions, not decorative art.
+
+### Baseline Flow Review
+
+The Remaining work column records the audit baseline. UXA code defects are
+resolved by the closeout below; native/external constraints remain open.
+
+| Flow | What is sound in the reviewed scope | Remaining work |
+| --- | --- | --- |
+| Startup / welcome | Existing brand mesh, splash ownership, safe-area failure recovery and reduced-motion policy are retained. | Native cold-start/foreground timing still needs a fresh device pass; host results do not establish frame pacing. |
+| Create wallet | Approved header/background, plain icon/text Copy, numbered two-column words, operation-owned Continue and explicit failures. | UXA-003; physical-device privacy/clipboard/haptic checks remain separate. |
+| Import wallet | Fields follow the explanatory text; free space belongs before the footer. Lowercase validation, paged focus and current-screen submission remain. | No new defect reproduced in the manual-swipe focus probe. Actual OS keyboard/accessibility traversal remains unverified here. |
+| Home / wallet selector | Original price/chart hero, equal pill actions, two-line assets, persistent balance-visibility and honest missing-price states. | UXA-001 and shell retention UXA-004. |
+| Send, four targets | Asset/rail selection, typed validation, explicit fee/balance retries and current-screen submission states are present. | UXA-002, UXA-006, UXA-007, UXA-009. No new funded-send proof in this pass. |
+| Receive, four targets | Real request state, amount sheet, conditional amount requirement, copy/share/generation gating and expiry timer are present. | UXA-002, UXA-007, UXA-010, UXA-011, UXA-012. |
+| Swap | Four supported target choices and an explicit unavailable execution state; no fabricated success. | UXA-001 for selection; real execution remains CON-002, not a styling fix. |
+| Market | Content-height tiles and approved decorative texture/gradient composition match the latest direction. | UXA-001 and UXA-008. |
+| Activity / details | Cross-rail rows, Lightning marker, stable ID routing, omitted unavailable details, sensitive-value copy actions and empty/error states are present. | UXA-005, UXA-007, UXA-013. |
+| Settings / unit / region / currency / advanced | Shared grouped rows, one flag implementation, persisted unit settings and truthful restricted disclosures are retained. | UXA-004, UXA-007; selector discoverability recommendation below. |
+| Scan, launcher and destination picker | Explicit capture ownership, manual fallback, gallery cancellation, permission failure/retry and inactive-camera gating exist. | UXA-014; native permission/camera/back behavior needs device verification. |
+| Shared feedback / overlays / navigation | Bounded toast queue, deduplication, result-owned feedback, button loading geometry and reduced-motion support are useful foundations. | UXA-015; UXA-001 requires actual semantic action tests, not merely labeled nodes. |
+
+### Design Recommendations
+
+These are not counted as reproduced defects. The author explicitly excluded
+all three from this implementation; none was implemented or silently accepted.
+
+1. **Selector discoverability:** Region and currency open long lists at the top
+   without search or a selected-item jump (`country_selection_screen.dart:71`,
+   `currency_selection_screen.dart:71`). Add search by name/code and make the
+   saved choice easy to locate, while preserving current row/flag styling.
+2. **Explicit scanner cancellation:** The destination picker offers manual entry
+   and system back, but no clearly named Close action (`scan_screen.dart:283`).
+   A small accessible close control would make cancel-without-changing-input
+   distinct from switching entry mode. Do not clutter the persistent scan tab.
+3. **Shared recovery layout:** Several feature failure bodies duplicate
+   non-scrollable Center/Column arrangements, whereas Settings/bootstrap use
+   scrollable recovery surfaces. Consolidate the invariant only after testing
+   actual long safe messages at large text and keyboard-obstructed heights.
+   Overflow was not reproduced for these bodies in this pass; this is targeted
+   hardening, not a claim that every current failure screen overflows.
+
+### Verification Gaps And Rejected Suspicions
+
+- Fresh iOS and Android walkthroughs must cover the actual OS keyboard, edge
+  back/predictive back, sheet dismissal, safe-area changes, platform permission
+  dialogs, gallery/share sheets and camera capture. The 94 screenshots exclude
+  platform views and must not be called full native end-to-end evidence.
+- Run VoiceOver/TalkBack and keyboard/switch navigation across every enabled
+  control after UXA-001/003 fixes. Host semantic trees prove structural defects,
+  not how long a physical screen reader takes to speak each phrase/toast.
+- Physical haptic feel, motion/frame pacing, GPU effects, memory under repeated
+  navigation and lifecycle restarts were not measured in this audit. Existing
+  source ownership patterns or unit tests are not substituted for profiling.
+- Funded/unfunded real wallet flows, request regeneration across process restart
+  and real payment settlement were not executed here. Existing SDK, fee-aware
+  Max, swap backend, signing/disclosure, attribution and release constraints
+  remain authoritative in the production tracker.
+- The suspected hidden import-field focus after a manual carousel swipe did not
+  reproduce: focus returned to the modal scope. Do not file it as a confirmed bug.
+- The basic Receive amount sheet at 320x568 and 2x text produced no layout
+  exception. This does not clear long numeric-value truncation in UXA-002.
+
+### Fix Order And Sign-Off
+
+1. Interaction safety: UXA-001, UXA-002, UXA-003, UXA-004, UXA-006.
+2. Visual correctness: UXA-005, UXA-007, UXA-008, UXA-012, UXA-014.
+3. Flow clarity and recovery: UXA-009, UXA-010, UXA-011, UXA-013, UXA-015.
+4. The author excluded the three optional recommendations. Run the missing
+   native and physical accessibility checks on a committed candidate; the fresh
+   host captures below do not substitute for those checks.
+
+No new spacing/radius ramp, font replacement, broad redesign or palette change
+is justified by this audit. The missing reusable contracts are accessible action
+ownership, exact amount-entry geometry, readable status foregrounds, stable
+trailing values, payment-request lifecycle presentation, and accessible feedback
+timing. Add narrowly scoped semantic roles only where these contracts require it.
+
+### Implementation Closeout
+
+- Source: UI/UX implementation commit; immutable hash recorded after commit.
+- Scope: all **15** UXA code defects (3 P1, 12 P2) implemented and reviewed;
+  **3** optional recommendations excluded. No new backend, SDK, palette,
+  gradient recipe, shape policy or wallet operation was introduced.
+- Production tracker reconciliation: **430 findings: 399 verified, 31 blocked**.
+  File inventory: **576 files: 512 verified, 46 reviewed-clean, 18 blocked**;
+  no unreviewed/fixing rows. These totals include historical work, not 576 fresh
+  reviews in this implementation pass. The 35 changed files were re-reviewed.
+- Verification: **907 passing tests**, including new semantic-action dispatch,
+  exact amount geometry, recovery order, tab retention, hydration, contrast,
+  expiry/resume, refresh/retry, hit-target and feedback-lifetime regressions.
+  Coverage is **13,529 / 15,316 lines (88.33%)**; this is aggregate host coverage,
+  not complete real-wallet or native-platform behavioral coverage.
+- `make lint` covers code-generation consistency, formatting, fatal analysis,
+  warning-free Dart documentation and repository policy validators. Final
+  gate output: `/tmp/aster-ux-final-lint.log`; full tests:
+  `/tmp/aster-ux-final-tests.log`.
+- iOS Simulator Debug and Android Debug builds pass. Commands:
+  `BUNDLE_FROZEN=true BUNDLE_PATH="$PWD/.bundle" bundle exec fvm flutter build ios --simulator --debug --no-pub`
+  and `fvm flutter build apk --debug --no-pub`. CocoaPods remains necessary for
+  the pinned SDK (SDK-002); legacy KGP warnings remain PLAT-002, not new app
+  failures. Neither build is an application launch or signed release archive.
+  Logs: `/tmp/aster-ux-final-ios-build.log` and
+  `/tmp/aster-ux-final-android-build.log`.
+- Toolchain: Flutter **3.47.0**, Dart **3.13.0**. No device was booted and no
+  simulator, emulator or protected regtest data belonging to another task was
+  touched. The SDK workspace is unchanged.
+- **94 fresh host-engine captures** were generated in
+  `build/ui-ux-fixes-2026-09-09/host/`, with six reviewed contact sheets in
+  `build/ui-ux-fixes-2026-09-09/contact/`. These are deterministic test-fixture
+  rasters, not new iOS OS captures or funded wallet evidence. The existing
+  Desktop gallery is historical and was not replaced by this batch.
+- Code review rejected two intermediate approaches: amount reflow moved the
+  keypad during entry, and outlined Market glyphs degraded the authored style.
+  Neither ships. Amounts instead have a stable-height, visibly scrollable
+  viewport; Market uses existing dark/light foregrounds with readable capsules.
+
+| IDs | Implemented contract | Verification |
+| --- | --- | --- |
+| UXA-001 | Enabled outer semantic actions share the guarded pointer path. Disabled/loading controls cannot activate. | Real semantic tap dispatch, pointer, Tab/Enter and guarded Home navigation tests. |
+| UXA-002 | Exact numeric entry can scroll through every digit; changes reveal the fractional tail without moving the keypad. Receive content can scroll at large text. | Bundled DM Sans/Public Sans, BTC/sats/USDT extremes, 320px viewport at 1x/2x, full paragraph/scroll/geometry assertions. |
+| UXA-003 | Numbered recovery words traverse 1 through 12 while retaining six-left/six-right placement. | Emitted semantic-node ordering and visual-column assertions. Physical speech remains ACCESS-019. |
+| UXA-004 | Indexed screens keep stable wrappers and local state with offscreen input/semantics/tickers suppressed. | Repeated Settings scroll-state identity/offset retention and existing scanner lifecycle tests. |
+| UXA-005 | Transaction values share a tight trailing slot. | Equal right-edge checks for short, long and hidden amounts at normal/large text. |
+| UXA-006 | Immediate state hydration, explicit target resubscription and deterministic disposal keep the visible address consistent. | Valid regtest address validation, remount, target switch/back and controller text assertions. |
+| UXA-007 | Readable statusForeground uses existing ink; accents and containers keep their colors. | All status foreground/container contrast ratios meet 4.5:1; copyWith/lerp and widget checks. |
+| UXA-008 | Active Market tiles use opaque, appropriately polarized text/capsules; obsolete muted-text opacity is removed. | Rendered Send/Receive/Swap contrast guidelines at normal and 2x text, reviewed catalog; gradient recipes unchanged. |
+| UXA-009 | Disabled Max explains missing fee-aware support or a fixed invoice amount locally. | Unlocked and fixed-invoice Send states; SEND-002 remains blocked. No fabricated max calculation. |
+| UXA-010 | Receive names the selected asset/rail and actual localized expiry, if any. | Four-rail catalog and timed/address request assertions. |
+| UXA-011 | Expiry removes QR and encoded text, keeps context and offers regeneration. | Exact deadline and inactive/resume clock tests; timers/subscriptions have one screen owner. |
+| UXA-012 | Monetary option details measure/render numeric spans in Public Sans, leaving units and ordinary values in DM Sans. | Leaf-span font and compact reflow assertions. |
+| UXA-013 | Details can refresh without losing current content, and show progress and refresh failure/retry. | Real ViewModel pending-to-failure-to-success sequence through the fake test engine; no production fake. |
+| UXA-014 | The full manual-entry hit surface meets the existing 48px metric. | Edge tap plus Android/iOS target guidelines. |
+| UXA-015 | Accessible messages remain until dismissal; keyboard focus pauses visual time; Escape and dismiss semantics work without stealing route focus. | Five assistive/focus/queue regressions plus long-message duration and existing foreground/background/reduced-motion checks. Physical speech timing remains ACCESS-019. |
+
+**Remaining qualification:** TEST-019, ACCESS-019 and PERF-015 retain native
+walkthrough, funded integration, physical assistive/haptic and measured
+performance/leak requirements. All other deployment, authentication, Max,
+attribution, SDK artifact and swap constraints in the production tracker remain.
+These UI corrections do not establish signet or funds-bearing mainnet readiness.
+
 ## File Review
 
 ### Author Review Corrections

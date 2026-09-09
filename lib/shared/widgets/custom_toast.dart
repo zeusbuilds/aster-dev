@@ -15,12 +15,16 @@ class CustomToast extends StatelessWidget {
     required this.variant,
     required this.onDismiss,
     this.message,
+    this.onAccessibilityFocus,
   });
 
   final String title;
   final String? message;
   final ToastVariant variant;
   final VoidCallback onDismiss;
+
+  /// Called when assistive traversal reaches this message; never steals focus.
+  final VoidCallback? onAccessibilityFocus;
 
   IconData get _icon => switch (variant) {
     ToastVariant.success => MingCuteIcons.mgc_check_circle_fill,
@@ -64,6 +68,8 @@ class CustomToast extends StatelessWidget {
             explicitChildNodes: true,
             liveRegion: true,
             label: semanticLabel,
+            onDidGainAccessibilityFocus: onAccessibilityFocus,
+            onDismiss: onDismiss,
             child: Squircle(
               color: context.colorScheme.surface,
               padding: EdgeInsets.symmetric(

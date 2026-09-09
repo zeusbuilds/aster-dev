@@ -6,6 +6,9 @@ import '../../../../shared/shared.dart';
 
 const _marketTextureSourceDimension = 600;
 
+/// Foreground polarity for the authored light or dark Market artwork.
+enum MarketContentTone { light, dark }
+
 /// Semantic Market action with stable squircle geometry and status capsule.
 class MarketTile extends StatelessWidget {
   /// Short action name.
@@ -31,6 +34,7 @@ class MarketTile extends StatelessWidget {
 
   /// Optional tint applied to the decorative texture shadow.
   final Color? shadowColor;
+  final MarketContentTone contentTone;
 
   const MarketTile({
     super.key,
@@ -42,6 +46,7 @@ class MarketTile extends StatelessWidget {
     this.hapticIntent = HapticIntent.lightImpact,
     required this.gradient,
     this.shadowColor,
+    this.contentTone = MarketContentTone.light,
   });
 
   @override
@@ -53,12 +58,20 @@ class MarketTile extends StatelessWidget {
     final radius = context.radii;
     final shadows = context.shadows;
     final type = context.type;
+    final darkContent = contentTone == MarketContentTone.dark;
+    final foreground = darkContent
+        ? colors.marketDarkText
+        : colors.onMarketTile;
+    final capsuleBase = darkContent
+        ? colors.onMarketTile
+        : colors.marketDarkText;
     final textureDecodeDimension =
         (metrics.marketTextureSize * MediaQuery.devicePixelRatioOf(context))
             .ceil()
             .clamp(1, _marketTextureSourceDimension);
 
     void activate() {
+      if (onTap == null) return;
       if (hapticIntent case final intent?) {
         unawaited(context.haptics.trigger(intent));
       }
@@ -68,6 +81,7 @@ class MarketTile extends StatelessWidget {
     return Semantics(
       button: true,
       enabled: onTap != null,
+      onTap: onTap == null ? null : activate,
       label: [label, subtitle, tipText].whereType<String>().join(', '),
       excludeSemantics: true,
       child: Squircle(
@@ -115,9 +129,19 @@ class MarketTile extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(label, style: type.marketLabel),
+                            Text(
+                              label,
+                              style: type.marketLabel.copyWith(
+                                color: foreground,
+                              ),
+                            ),
                             if (subtitle case final value?)
-                              Text(value, style: type.marketTitle),
+                              Text(
+                                value,
+                                style: type.marketTitle.copyWith(
+                                  color: foreground,
+                                ),
+                              ),
                             if (tipText case final value?) ...[
                               SizedBox(height: spacing.xxl),
                               AsterPill(
@@ -125,7 +149,7 @@ class MarketTile extends StatelessWidget {
                                   horizontal: spacing.sm,
                                   vertical: spacing.xs,
                                 ),
-                                color: colors.onMarketTile.withValues(
+                                color: capsuleBase.withValues(
                                   alpha: effects.marketPillSurfaceOpacity,
                                 ),
                                 child: Wrap(
@@ -146,13 +170,8 @@ class MarketTile extends StatelessWidget {
                                     Text(
                                       value,
                                       style: type.marketTip.copyWith(
-                                        color: colors.onMarketTile.withValues(
-                                          alpha:
-                                              effects.marketContentMutedOpacity,
-                                        ),
+                                        color: foreground,
                                       ),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ],
                                 ),

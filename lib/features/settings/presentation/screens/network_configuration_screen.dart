@@ -91,9 +91,7 @@ class _NetworkConfigurationContent extends ConsumerWidget {
               _ConfigurationRow(
                 label: 'Status',
                 value: status == null ? 'Unavailable' : 'Responding',
-                valueColor: status == null
-                    ? context.appColors.warning
-                    : context.appColors.success,
+                valueColor: context.appColors.statusForeground,
               ),
               if (status != null) ...[
                 _ConfigurationRow(

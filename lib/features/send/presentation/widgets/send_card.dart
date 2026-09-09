@@ -54,22 +54,10 @@ class SendCard extends StatelessWidget {
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: NumericText(
-                  content == null || content.amountText.isEmpty
-                      ? '0'
-                      : content.amountText,
-                  style: context.type.amountLarge,
-                  maxLines: 1,
-                ),
-              ),
-              SizedBox(width: context.spacing.md),
-              WalletAssetIcon(kind: target.assetKind, size: context.icons.lg),
-              SizedBox(width: context.spacing.sm),
-              Text(displaySymbol, style: context.type.title),
-            ],
+          WalletAmountEntry(
+            value: content?.amountText ?? '',
+            unit: displaySymbol,
+            assetKind: target.assetKind,
           ),
           SizedBox(height: context.spacing.xs),
           Row(
@@ -112,32 +100,51 @@ class SendCard extends StatelessWidget {
           ],
         ],
       ),
-      footer: Row(
+      footer: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: Text(target.railLabel, style: context.type.rowTitleStrong),
-          ),
-          if (amountLocked) ...[
-            AsterPill(
-              color: context.colorScheme.primaryContainer,
-              padding: EdgeInsets.symmetric(
-                horizontal: context.spacing.md,
-                vertical: context.spacing.xs,
-              ),
-              child: Text(
-                'Invoice amount',
-                style: context.type.badgeLabel.copyWith(
-                  color: context.colorScheme.primary,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  target.railLabel,
+                  style: context.type.rowTitleStrong,
                 ),
               ),
-            ),
-            SizedBox(width: context.spacing.sm),
-          ],
-          const CustomButton.compact(
-            text: 'Max',
-            variant: ButtonVariant.neutral,
-            enabled: false,
+              if (amountLocked) ...[
+                AsterPill(
+                  color: context.colorScheme.primaryContainer,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: context.spacing.md,
+                    vertical: context.spacing.xs,
+                  ),
+                  child: Text(
+                    'Invoice amount',
+                    style: context.type.badgeLabel.copyWith(
+                      color: context.colorScheme.primary,
+                    ),
+                  ),
+                ),
+                SizedBox(width: context.spacing.sm),
+              ],
+              const CustomButton.compact(
+                text: 'Max',
+                variant: ButtonVariant.neutral,
+                enabled: false,
+              ),
+            ],
           ),
+          if (content != null) ...[
+            SizedBox(height: context.spacing.sm),
+            Text(
+              amountLocked
+                  ? 'Max unavailable: fixed invoice amount.'
+                  : 'Max unavailable: fee-aware quote needed.',
+              style: context.type.rowMeta.copyWith(
+                color: context.appColors.textSecondary,
+              ),
+            ),
+          ],
         ],
       ),
     );

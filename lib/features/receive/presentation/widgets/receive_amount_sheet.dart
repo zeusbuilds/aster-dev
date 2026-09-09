@@ -193,7 +193,7 @@ final class _AmountSheetBody extends StatelessWidget {
         : state.amountText.isEmpty && !state.amountRequired
         ? 'Clear amount'
         : 'Set amount';
-    return Padding(
+    return SingleChildScrollView(
       padding: EdgeInsets.symmetric(horizontal: context.spacing.screenPadding),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -202,29 +202,12 @@ final class _AmountSheetBody extends StatelessWidget {
           Squircle(
             borderRadius: context.radii.card,
             padding: EdgeInsets.all(context.spacing.lg),
-            child: Row(
-              children: [
-                Expanded(
-                  child: NumericText(
-                    state.amountText.isEmpty ? '0' : state.amountText,
-                    style: context.type.amountLarge,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                SizedBox(width: context.spacing.md),
-                WalletAssetIcon(
-                  kind: state.route.asset.kind,
-                  size: context.icons.md,
-                ),
-                SizedBox(width: context.spacing.sm),
-                Text(
-                  state.route.asset.kind == WalletAssetKind.bitcoin
-                      ? state.bitcoinUnit.label
-                      : state.route.asset.symbol,
-                  style: context.type.title,
-                ),
-              ],
+            child: WalletAmountEntry(
+              value: state.amountText,
+              unit: state.route.asset.kind == WalletAssetKind.bitcoin
+                  ? state.bitcoinUnit.label
+                  : state.route.asset.symbol,
+              assetKind: state.route.asset.kind,
             ),
           ),
           if (visibleMessage case final message?) ...[
@@ -236,16 +219,12 @@ final class _AmountSheetBody extends StatelessWidget {
             ),
           ],
           SizedBox(height: context.spacing.lg),
-          Flexible(
-            child: SingleChildScrollView(
-              child: AsterNumericKeypad(
-                value: state.amountText,
-                enabled: commandsEnabled && state.canEditAmount,
-                allowDecimal:
-                    codec.displayPrecision(state.route, state.bitcoinUnit) > 0,
-                onChanged: onChanged,
-              ),
-            ),
+          AsterNumericKeypad(
+            value: state.amountText,
+            enabled: commandsEnabled && state.canEditAmount,
+            allowDecimal:
+                codec.displayPrecision(state.route, state.bitcoinUnit) > 0,
+            onChanged: onChanged,
           ),
           SizedBox(height: context.spacing.lg),
           CustomButton(

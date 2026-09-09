@@ -6,6 +6,7 @@ import 'package:remixicon/remixicon.dart';
 import '../feedback/feedback.dart';
 import '../layout/layout.dart';
 import '../theme/theme.dart';
+import 'amount_text.dart';
 
 /// Accessible full-width action row for grouped option surfaces.
 class AsterOptionRow extends StatelessWidget {
@@ -14,15 +15,20 @@ class AsterOptionRow extends StatelessWidget {
     required this.title,
     this.prefixIcon,
     this.details,
+    this.amountDetails,
     this.suffixIcon,
     this.suffixIconColor,
     this.onTap,
     this.hapticIntent = HapticIntent.lightImpact,
-  });
+  }) : assert(details == null || amountDetails == null);
 
   final String title;
   final IconData? prefixIcon;
   final String? details;
+
+  /// Formatted monetary detail. Only numeric spans use the numeric family.
+  /// Mutually exclusive with ordinary [details] such as labels/identifiers.
+  final String? amountDetails;
   final IconData? suffixIcon;
   final Color? suffixIconColor;
   final VoidCallback? onTap;
@@ -34,6 +40,7 @@ class AsterOptionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final spacing = context.spacing;
+    final value = details ?? amountDetails;
 
     void activate() {
       if (hapticIntent case final intent?) {
@@ -45,7 +52,7 @@ class AsterOptionRow extends StatelessWidget {
     return Semantics(
       button: true,
       enabled: onTap != null,
-      label: details == null ? title : '$title, $details',
+      label: value == null ? title : '$title, $value',
       onTap: onTap == null ? null : activate,
       excludeSemantics: true,
       child: InkWell(
@@ -66,20 +73,34 @@ class AsterOptionRow extends StatelessWidget {
                     constraints.maxWidth -
                     (prefixIcon == null ? 0 : context.icons.sm + spacing.md) -
                     (trailingIcon ? context.icons.sm + spacing.sm : 0);
-                final value = details;
                 final valueNeedsStack =
                     value != null &&
                     (unwrappedTextWidth(context, title, context.type.rowTitle) +
-                            unwrappedTextWidth(
+                            unwrappedSpanWidth(
                               context,
-                              value,
-                              context.type.rowValue,
+                              TextSpan(
+                                style: context.type.rowValue,
+                                text: amountDetails == null ? value : null,
+                                children: amountDetails == null
+                                    ? null
+                                    : NumericTextSpans.build(
+                                        context,
+                                        value,
+                                        context.type.rowValue,
+                                      ),
+                              ),
                             ) +
                             spacing.lg >
                         availableWidth);
                 final titleWidget = Text(title, style: context.type.rowTitle);
                 final valueWidget = value == null
                     ? null
+                    : amountDetails != null
+                    ? AmountText(
+                        value,
+                        style: context.type.rowValue,
+                        textAlign: TextAlign.end,
+                      )
                     : Text(
                         value,
                         style: context.type.rowValue,

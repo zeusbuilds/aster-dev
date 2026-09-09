@@ -30,6 +30,15 @@ class HomeHeader extends ConsumerWidget {
       AsyncData(:final value) when value.wallets.isNotEmpty => true,
       _ => false,
     };
+    final VoidCallback? selectWallet = !canSelectWallet || navigation.inFlight
+        ? null
+        : () => unawaited(
+            navigation.run(
+              command: () =>
+                  context.pushNamed<void>(RouteNames.walletSelection),
+              failureTitle: 'Wallet selector could not open',
+            ),
+          );
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: spacing.screenPadding),
@@ -57,21 +66,11 @@ class HomeHeader extends ConsumerWidget {
                   ? 'Wallet unavailable'
                   : 'Select wallet, $walletName',
               excludeSemantics: true,
+              onTap: selectWallet,
               child: Material(
                 color: colors.transparentSurface,
                 child: InkWell(
-                  onTap: !canSelectWallet || navigation.inFlight
-                      ? null
-                      : () {
-                          unawaited(
-                            navigation.run(
-                              command: () => context.pushNamed<void>(
-                                RouteNames.walletSelection,
-                              ),
-                              failureTitle: 'Wallet selector could not open',
-                            ),
-                          );
-                        },
+                  onTap: selectWallet,
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
                       minHeight: context.metrics.minTouchTarget,

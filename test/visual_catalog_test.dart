@@ -19,7 +19,11 @@ void main() {
         final image = await boundary.toImage(pixelRatio: 2);
         try {
           final bytes = await image.toByteData(format: ImageByteFormat.png);
-          final file = File('build/visual-restoration/host/$name.png');
+          const output = String.fromEnvironment(
+            'ASTER_VISUAL_OUTPUT',
+            defaultValue: 'build/visual-restoration/host',
+          );
+          final file = File('$output/$name.png');
           await file.parent.create(recursive: true);
           await file.writeAsBytes(bytes!.buffer.asUint8List(), flush: true);
         } finally {
