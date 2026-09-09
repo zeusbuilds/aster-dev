@@ -214,7 +214,10 @@ timing. Add narrowly scoped semantic roles only where these contracts require it
 
 ### Implementation Closeout
 
-- Source: UI/UX implementation commit; immutable hash recorded after commit.
+- Implementation: `a487bbad812c3cb0c855766b3ff767c052d37eb0`. The full host tests and
+  both builds ran on the source that became this commit; the pre-commit gate
+  additionally checked the exact staged snapshot. This closeout only records
+  evidence and immutable references; it does not change executable inputs.
 - Scope: all **15** UXA code defects (3 P1, 12 P2) implemented and reviewed;
   **3** optional recommendations excluded. No new backend, SDK, palette,
   gradient recipe, shape policy or wallet operation was introduced.
