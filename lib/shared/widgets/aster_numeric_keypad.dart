@@ -151,7 +151,7 @@ final class _NumericKey extends StatelessWidget {
     final isDelete = value.kind == _KeypadKind.delete;
     final label = isDelete ? 'Delete digit' : value.label!;
     final shape = RoundedSuperellipseBorder(
-      borderRadius: BorderRadius.circular(context.radii.input),
+      borderRadius: BorderRadius.circular(context.radii.keypad),
     );
     return Semantics(
       button: true,

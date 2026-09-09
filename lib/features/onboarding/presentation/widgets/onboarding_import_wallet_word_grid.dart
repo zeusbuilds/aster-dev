@@ -54,10 +54,8 @@ class _RecoveryWordTile extends StatelessWidget {
         horizontal: context.spacing.md,
         vertical: context.spacing.sm,
       ),
-      borderRadius: context.radii.input,
-      color: context.colorScheme.surface.withValues(
-        alpha: effects.brandGlassSurfaceOpacity,
-      ),
+      borderRadius: context.radii.recoveryWord,
+      color: effects.brandGlassContentSurface(context.colorScheme),
       borderColor: context.colorScheme.surface.withValues(
         alpha: effects.brandGlassBorderOpacity,
       ),
@@ -67,11 +65,7 @@ class _RecoveryWordTile extends StatelessWidget {
           Text(
             '${index + 1}.',
             style: context.type.assetMeta
-                .copyWith(
-                  color: colors.onBrandArt.withValues(
-                    alpha: effects.brandContentMutedOpacity,
-                  ),
-                )
+                .copyWith(color: colors.onBrandArt)
                 .toNumeric(context),
           ),
           SizedBox(width: context.spacing.sm),
@@ -79,8 +73,6 @@ class _RecoveryWordTile extends StatelessWidget {
             child: Text(
               word,
               style: context.type.rowTitle.copyWith(color: colors.onBrandArt),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

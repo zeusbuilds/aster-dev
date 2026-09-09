@@ -30,6 +30,7 @@ class AsterTypeRoles extends ThemeExtension<AsterTypeRoles> {
     required this.assetMeta,
     required this.brandHero,
     required this.brandTitle,
+    required this.brandWordmark,
     required this.brandAmount,
     required this.brandMetric,
     required this.brandBody,
@@ -73,6 +74,7 @@ class AsterTypeRoles extends ThemeExtension<AsterTypeRoles> {
   final TextStyle assetMeta;
   final TextStyle brandHero;
   final TextStyle brandTitle;
+  final TextStyle brandWordmark;
   final TextStyle brandAmount;
   final TextStyle brandMetric;
   final TextStyle brandBody;
@@ -215,6 +217,11 @@ class AsterTypeRoles extends ThemeExtension<AsterTypeRoles> {
         FontWeight.w500,
         colors.onBrandArt,
       ),
+      brandWordmark: role(
+        textTheme.displaySmall,
+        FontWeight.w600,
+        colors.onBrandArt,
+      ),
       brandAmount: role(
         textTheme.displaySmall,
         FontWeight.w500,
@@ -323,6 +330,7 @@ class AsterTypeRoles extends ThemeExtension<AsterTypeRoles> {
     TextStyle? assetMeta,
     TextStyle? brandHero,
     TextStyle? brandTitle,
+    TextStyle? brandWordmark,
     TextStyle? brandAmount,
     TextStyle? brandMetric,
     TextStyle? brandBody,
@@ -366,6 +374,7 @@ class AsterTypeRoles extends ThemeExtension<AsterTypeRoles> {
       assetMeta: assetMeta ?? this.assetMeta,
       brandHero: brandHero ?? this.brandHero,
       brandTitle: brandTitle ?? this.brandTitle,
+      brandWordmark: brandWordmark ?? this.brandWordmark,
       brandAmount: brandAmount ?? this.brandAmount,
       brandMetric: brandMetric ?? this.brandMetric,
       brandBody: brandBody ?? this.brandBody,
@@ -418,6 +427,7 @@ class AsterTypeRoles extends ThemeExtension<AsterTypeRoles> {
       assetMeta: TextStyle.lerp(assetMeta, other.assetMeta, t)!,
       brandHero: TextStyle.lerp(brandHero, other.brandHero, t)!,
       brandTitle: TextStyle.lerp(brandTitle, other.brandTitle, t)!,
+      brandWordmark: TextStyle.lerp(brandWordmark, other.brandWordmark, t)!,
       brandAmount: TextStyle.lerp(brandAmount, other.brandAmount, t)!,
       brandMetric: TextStyle.lerp(brandMetric, other.brandMetric, t)!,
       brandBody: TextStyle.lerp(brandBody, other.brandBody, t)!,

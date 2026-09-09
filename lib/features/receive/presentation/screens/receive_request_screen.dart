@@ -263,13 +263,14 @@ final class _RequestBody extends StatelessWidget {
           _AmountRequiredCard(target: state.route.target)
         else
           Squircle(
-            borderRadius: context.radii.sheet,
+            borderRadius: context.radii.card,
             padding: EdgeInsets.all(context.spacing.xxl),
             child: Column(
               children: [
                 ReceiveRequestQr(
                   encodedRequest: request.encodedRequest,
                   semanticLabel: '${state.route.target.requestLabel} QR code',
+                  assetKind: state.route.asset.kind,
                 ),
                 SizedBox(height: context.spacing.lg),
                 Text(
@@ -298,6 +299,7 @@ final class _RequestBody extends StatelessWidget {
                 SizedBox(height: context.spacing.md),
                 CustomButton.compact(
                   text: 'Copy',
+                  variant: ButtonVariant.secondary,
                   prefixIcon: MingCuteIcons.mgc_copy_2_line,
                   loading:
                       state.operation == ReceiveFlowOperation.copyingRequest,
@@ -370,7 +372,7 @@ final class _AmountRequiredCard extends StatelessWidget {
       label: 'Amount required before creating ${target.semanticLabel} request',
       excludeSemantics: true,
       child: Squircle(
-        borderRadius: context.radii.sheet,
+        borderRadius: context.radii.card,
         padding: EdgeInsets.all(context.spacing.xxl),
         child: Column(
           children: [
@@ -408,7 +410,7 @@ final class _RequestLoading extends StatelessWidget {
       child: AppSkeletonizer(
         enabled: true,
         child: Squircle(
-          borderRadius: context.radii.sheet,
+          borderRadius: context.radii.card,
           child: AspectRatio(
             aspectRatio: 1,
             child: ColoredBox(color: context.appColors.surfaceSubtle),

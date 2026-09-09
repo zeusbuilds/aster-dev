@@ -109,7 +109,7 @@ class _RecoveryWordField extends StatelessWidget {
         width: strokes.hairline,
       ),
       shape: RoundedSuperellipseBorder(
-        borderRadius: BorderRadius.circular(radii.input),
+        borderRadius: BorderRadius.circular(radii.recoveryWord),
       ),
     );
     final focusedBorder = ShapedInputBorder(
@@ -118,7 +118,7 @@ class _RecoveryWordField extends StatelessWidget {
         width: strokes.focusBorder,
       ),
       shape: RoundedSuperellipseBorder(
-        borderRadius: BorderRadius.circular(radii.input),
+        borderRadius: BorderRadius.circular(radii.recoveryWord),
       ),
     );
 
@@ -151,20 +151,14 @@ class _RecoveryWordField extends StatelessWidget {
             decoration: InputDecoration(
               constraints: BoxConstraints(minHeight: height),
               filled: true,
-              fillColor: context.colorScheme.surface.withValues(
-                alpha: effects.brandGlassSurfaceOpacity,
-              ),
+              fillColor: effects.brandGlassContentSurface(context.colorScheme),
               prefixIcon: ExcludeSemantics(
                 child: Center(
                   widthFactor: 1,
                   child: Text(
                     '${index + 1}.',
                     style: context.type.assetMeta
-                        .copyWith(
-                          color: colors.onBrandArt.withValues(
-                            alpha: effects.brandContentMutedOpacity,
-                          ),
-                        )
+                        .copyWith(color: colors.onBrandArt)
                         .toNumeric(context),
                   ),
                 ),

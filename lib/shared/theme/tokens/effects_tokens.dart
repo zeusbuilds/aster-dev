@@ -10,6 +10,7 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
     this.brandIndicatorInactiveOpacity = 0.35,
     this.brandGlassSurfaceOpacity = 0.15,
     this.brandGlassBorderOpacity = 0.1,
+    this.brandGlassContentScrimOpacity = 0.28,
     this.onboardingIconTileStrongOpacity = 0.3,
     this.onboardingIconTileFaintOpacity = 0.05,
     this.bitcoinIconOpacity = 0.8,
@@ -38,6 +39,9 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
   final double brandIndicatorInactiveOpacity;
   final double brandGlassSurfaceOpacity;
   final double brandGlassBorderOpacity;
+
+  /// Dark underlay keeps small white text readable over the brightest mesh.
+  final double brandGlassContentScrimOpacity;
   final double onboardingIconTileStrongOpacity;
   final double onboardingIconTileFaintOpacity;
   final double bitcoinIconOpacity;
@@ -60,6 +64,13 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
   final double chartLoadingOpacityAmplitude;
   final double chartContentOpacity;
 
+  /// Readable glass behind recovery words, using the existing palette and a
+  /// semantic underlay instead of deriving colors independently in each field.
+  Color brandGlassContentSurface(ColorScheme scheme) => Color.alphaBlend(
+    scheme.surface.withValues(alpha: brandGlassSurfaceOpacity),
+    scheme.scrim.withValues(alpha: brandGlassContentScrimOpacity),
+  );
+
   @override
   AsterEffects copyWith({
     double? brandContentStrongOpacity,
@@ -67,6 +78,7 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
     double? brandIndicatorInactiveOpacity,
     double? brandGlassSurfaceOpacity,
     double? brandGlassBorderOpacity,
+    double? brandGlassContentScrimOpacity,
     double? onboardingIconTileStrongOpacity,
     double? onboardingIconTileFaintOpacity,
     double? bitcoinIconOpacity,
@@ -100,6 +112,8 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
           brandGlassSurfaceOpacity ?? this.brandGlassSurfaceOpacity,
       brandGlassBorderOpacity:
           brandGlassBorderOpacity ?? this.brandGlassBorderOpacity,
+      brandGlassContentScrimOpacity:
+          brandGlassContentScrimOpacity ?? this.brandGlassContentScrimOpacity,
       onboardingIconTileStrongOpacity:
           onboardingIconTileStrongOpacity ??
           this.onboardingIconTileStrongOpacity,
@@ -167,6 +181,11 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
       brandGlassBorderOpacity: _lerp(
         brandGlassBorderOpacity,
         other.brandGlassBorderOpacity,
+        t,
+      ),
+      brandGlassContentScrimOpacity: _lerp(
+        brandGlassContentScrimOpacity,
+        other.brandGlassContentScrimOpacity,
         t,
       ),
       onboardingIconTileStrongOpacity: _lerp(

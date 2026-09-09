@@ -7,6 +7,7 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
     this.buttonHeight = 48,
     this.compactButtonHeight = 40,
     this.minTouchTarget = 48,
+    this.appBarHeight = 64,
     this.appBarLeadingWidth = 48,
     this.floatingNavClearance = 64,
     this.homeHeroHeightFactor = 0.4,
@@ -22,7 +23,7 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
     this.keypadButtonHeight = 60,
     this.keypadGap = 10,
     this.bottomNavHeight = 56,
-    this.bottomNavMaxWidth = 320,
+    this.bottomNavMaxWidth = 280,
     this.bottomNavIndicatorWidth = 56,
     this.bottomNavIndicatorHeight = 40,
     this.sheetHandleWidth = 56,
@@ -39,12 +40,14 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
     this.brandMarkSize = 48,
     this.flagSize = 32,
     this.walletAvatarSize = 64,
-    this.paymentTargetTileMinHeight = 64,
+    this.qrLogoSizeFactor = 0.16,
+    this.paymentTargetTileMinHeight = 80,
   });
 
   final double buttonHeight;
   final double compactButtonHeight;
   final double minTouchTarget;
+  final double appBarHeight;
   final double appBarLeadingWidth;
   final double floatingNavClearance;
   final double homeHeroHeightFactor;
@@ -77,6 +80,7 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
   final double brandMarkSize;
   final double flagSize;
   final double walletAvatarSize;
+  final double qrLogoSizeFactor;
   final double paymentTargetTileMinHeight;
 
   @override
@@ -84,6 +88,7 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
     double? buttonHeight,
     double? compactButtonHeight,
     double? minTouchTarget,
+    double? appBarHeight,
     double? appBarLeadingWidth,
     double? floatingNavClearance,
     double? homeHeroHeightFactor,
@@ -116,12 +121,14 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
     double? brandMarkSize,
     double? flagSize,
     double? walletAvatarSize,
+    double? qrLogoSizeFactor,
     double? paymentTargetTileMinHeight,
   }) {
     return AsterComponentMetrics(
       buttonHeight: buttonHeight ?? this.buttonHeight,
       compactButtonHeight: compactButtonHeight ?? this.compactButtonHeight,
       minTouchTarget: minTouchTarget ?? this.minTouchTarget,
+      appBarHeight: appBarHeight ?? this.appBarHeight,
       appBarLeadingWidth: appBarLeadingWidth ?? this.appBarLeadingWidth,
       floatingNavClearance: floatingNavClearance ?? this.floatingNavClearance,
       homeHeroHeightFactor: homeHeroHeightFactor ?? this.homeHeroHeightFactor,
@@ -160,6 +167,7 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
       brandMarkSize: brandMarkSize ?? this.brandMarkSize,
       flagSize: flagSize ?? this.flagSize,
       walletAvatarSize: walletAvatarSize ?? this.walletAvatarSize,
+      qrLogoSizeFactor: qrLogoSizeFactor ?? this.qrLogoSizeFactor,
       paymentTargetTileMinHeight:
           paymentTargetTileMinHeight ?? this.paymentTargetTileMinHeight,
     );
@@ -179,6 +187,7 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
         t,
       ),
       minTouchTarget: _lerp(minTouchTarget, other.minTouchTarget, t),
+      appBarHeight: _lerp(appBarHeight, other.appBarHeight, t),
       appBarLeadingWidth: _lerp(
         appBarLeadingWidth,
         other.appBarLeadingWidth,
@@ -287,6 +296,7 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
       brandMarkSize: _lerp(brandMarkSize, other.brandMarkSize, t),
       flagSize: _lerp(flagSize, other.flagSize, t),
       walletAvatarSize: _lerp(walletAvatarSize, other.walletAvatarSize, t),
+      qrLogoSizeFactor: _lerp(qrLogoSizeFactor, other.qrLogoSizeFactor, t),
       paymentTargetTileMinHeight: _lerp(
         paymentTargetTileMinHeight,
         other.paymentTargetTileMinHeight,

@@ -47,7 +47,11 @@ void main() {
     expect(metrics.marketTileMinHeight, 156);
     expect(metrics.flagSize, 32);
     expect(metrics.selectionIndicatorSize, 16);
-    expect(metrics.paymentTargetTileMinHeight, 64);
+    expect(metrics.paymentTargetTileMinHeight, 80);
+    expect(metrics.appBarHeight, 64);
+    expect(metrics.qrLogoSizeFactor, 0.16);
+    expect(radii.recoveryWord, 24);
+    expect(radii.keypad, 18);
     expect(art.onboardingIconTileRadius, 4);
     expect(stateLayers.visible, 1);
     expect(stateLayers.hidden, 0);

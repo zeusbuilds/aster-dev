@@ -32,11 +32,9 @@ class ActivityBalanceCard extends StatelessWidget {
       excludeSemantics: true,
       child: Squircle(
         color: context.appColors.surfaceRaised,
-        padding: EdgeInsets.all(context.spacing.lg),
+        padding: EdgeInsets.all(context.spacing.screenPadding),
         child: Row(
           children: [
-            WalletAssetIcon(kind: balance.asset.kind, size: context.icons.xl),
-            SizedBox(width: context.spacing.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -59,6 +57,8 @@ class ActivityBalanceCard extends StatelessWidget {
                 ],
               ),
             ),
+            SizedBox(width: context.spacing.lg),
+            WalletAssetIcon(kind: balance.asset.kind, size: context.icons.xl),
           ],
         ),
       ),

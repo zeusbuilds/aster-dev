@@ -67,10 +67,13 @@ class DetailRow extends StatelessWidget {
               ),
             ],
             SizedBox(width: spacing.sm),
-            NumericText(
-              value,
-              style: type.rowValue.copyWith(
-                color: valueColor ?? context.colorScheme.onSurface,
+            Expanded(
+              child: NumericText(
+                value,
+                textAlign: TextAlign.end,
+                style: type.rowValue.copyWith(
+                  color: valueColor ?? context.colorScheme.onSurface,
+                ),
               ),
             ),
           ],

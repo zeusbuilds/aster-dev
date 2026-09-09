@@ -21,10 +21,7 @@ class OnboardingWelcomeHeader extends StatelessWidget {
           colorFilter: ColorFilter.mode(colors.onBrandArt, BlendMode.srcIn),
         ),
         SizedBox(width: context.spacing.sm),
-        Text(
-          'Aster',
-          style: context.type.brandTitle.copyWith(color: colors.onBrandArt),
-        ),
+        Flexible(child: Text('Aster', style: context.type.brandWordmark)),
       ],
     );
   }

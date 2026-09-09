@@ -43,11 +43,17 @@ void main() {
     expect(find.text('SideSwap service fee'), findsNothing);
     expect(find.text('Conversion rate'), findsNothing);
     expect(find.text(r'$160,000'), findsNothing);
+    await tester.scrollUntilVisible(
+      find.widgetWithText(CustomButton, 'Swap unavailable'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     final action = tester.widget<CustomButton>(
       find.widgetWithText(CustomButton, 'Swap unavailable'),
     );
     expect(action.enabled, isFalse);
 
+    await tester.ensureVisible(find.text('Bitcoin · On-chain'));
     await tester.tap(find.text('Bitcoin · On-chain'));
     await tester.pumpAndSettle();
     expect(find.byType(AssetSelectorSheet), findsOneWidget);

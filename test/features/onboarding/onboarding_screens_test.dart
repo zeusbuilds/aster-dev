@@ -105,9 +105,9 @@ void main() {
     tester.testTextInput.hide();
     FocusManager.instance.primaryFocus?.unfocus();
     await tester.pump();
-    expect(tester, meetsGuideline(androidTapTargetGuideline));
-    expect(tester, meetsGuideline(labeledTapTargetGuideline));
-    expect(tester, meetsGuideline(textContrastGuideline));
+    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(textContrastGuideline));
   });
 
   testWidgets('create shows 1-6 and 7-12 and uses the secure copy service', (
@@ -131,9 +131,9 @@ void main() {
     await tester.pump();
     expect(harness.clipboardText, validTestMnemonic);
     expect(harness.toasts.messages.single.title, 'Recovery phrase copied');
-    expect(tester, meetsGuideline(androidTapTargetGuideline));
-    expect(tester, meetsGuideline(labeledTapTargetGuideline));
-    expect(tester, meetsGuideline(textContrastGuideline));
+    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(textContrastGuideline));
     await _disposeHarness(tester, harness);
   });
 
@@ -936,8 +936,12 @@ void main() {
         textScaler: textScaler,
       );
       expect(find.text('12.'), findsOneWidget);
-      await tester.drag(find.byType(CustomScrollView), const Offset(0, -2000));
-      await tester.pump();
+      await tester.scrollUntilVisible(
+        find.widgetWithText(CustomButton, 'Continue'),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
       expect(find.bySemanticsLabel('Continue'), findsOneWidget);
 
       await _pumpScreen(
@@ -946,13 +950,19 @@ void main() {
         const OnboardingImportWalletScreen(),
         textScaler: textScaler,
       );
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('recovery-word-1')),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
       expect(
         tester.getSize(find.byKey(const ValueKey('recovery-word-1'))).height,
         greaterThanOrEqualTo(48),
       );
-      expect(tester, meetsGuideline(androidTapTargetGuideline));
-      expect(tester, meetsGuideline(labeledTapTargetGuideline));
-      expect(tester, meetsGuideline(textContrastGuideline));
+      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(textContrastGuideline));
     });
   }
 }
@@ -993,6 +1003,14 @@ Future<void> _pumpScreen(
   Widget screen, {
   TextScaler textScaler = TextScaler.noScaling,
 }) async {
+  // These mobile screens need a phone viewport; compact/large scenarios above
+  // set their own dimensions and exercise scrolling explicitly.
+  if (tester.view.physicalSize == const Size(2400, 1800)) {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(420, 932);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+  }
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: harness.container,

@@ -302,134 +302,133 @@ final class _AmountBody extends StatelessWidget {
     final submitting = state.operation == SendFlowOperation.submitting;
     final canSubmit = state.canSubmitAt(now);
 
-    return Column(
-      children: [
-        Expanded(
-          child: SingleChildScrollView(
+    return AsterFormBody(
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SendCard(
+            route: state.route,
+            amountText: state.amountText,
+            available: available,
+            fiatText: fiatText,
+            amountLocked: state.amountIsLocked,
+            validationMessage: inputMessage,
+            announceValidation:
+                submissionFailure != null || state.isExpiredAt(now),
+          ),
+          SizedBox(height: context.spacing.md),
+          Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: context.spacing.xl,
+              vertical: context.spacing.sm,
+            ),
             child: Column(
               children: [
-                SendCard(
-                  route: state.route,
-                  amountText: state.amountText,
-                  available: available,
-                  fiatText: fiatText,
-                  amountLocked: state.amountIsLocked,
-                  validationMessage: inputMessage,
-                  announceValidation:
-                      submissionFailure != null || state.isExpiredAt(now),
+                DetailRow(
+                  title: state.route.rail == PaymentRail.onchain
+                      ? 'Network fee rate'
+                      : 'Payment rail',
+                  value: state.route.rail == PaymentRail.onchain
+                      ? fee == null
+                            ? 'Unavailable'
+                            : '${fee.satsPerVbyte} sats/vbyte'
+                      : 'Lightning',
                 ),
-                SizedBox(height: context.spacing.md),
-                Squircle(
-                  borderRadius: context.radii.input,
-                  padding: EdgeInsets.all(context.spacing.lg),
-                  child: Column(
-                    children: [
-                      DetailRow(
-                        title: state.route.rail == PaymentRail.onchain
-                            ? 'Network fee rate'
-                            : 'Payment rail',
-                        value: state.route.rail == PaymentRail.onchain
-                            ? fee == null
-                                  ? 'Unavailable'
-                                  : '${fee.satsPerVbyte} sats/vbyte'
-                            : 'Lightning',
-                      ),
-                      if (feeStale || state.feeFailure != null) ...[
-                        SizedBox(height: context.spacing.sm),
-                        AsterStatusMessage(
-                          state.feeFailure?.userMessage ??
-                              'Refresh the network fee before sending.',
-                          tone: AsterStatusTone.warning,
-                          announce: true,
-                        ),
-                        if (state.feeFailure?.retryable != false) ...[
-                          SizedBox(height: context.spacing.sm),
-                          CustomButton.compact(
-                            text: 'Refresh fee',
-                            loading:
-                                state.operation ==
-                                SendFlowOperation.refreshingFee,
-                            enabled: state.canRefreshFee,
-                            hapticIntent: null,
-                            onTap: onRefreshFee,
-                          ),
-                        ],
-                      ],
-                      if (onRetryQuote case final retry?) ...[
-                        SizedBox(height: context.spacing.sm),
-                        CustomButton.compact(
-                          text: 'Retry fiat quote',
-                          enabled: state.canEditPayment,
-                          hapticIntent: null,
-                          onTap: retry,
-                        ),
-                      ],
-                      SizedBox(height: context.spacing.sm),
-                      if (balanceFailure case final failure?) ...[
-                        AsterStatusMessage(
-                          failure.userMessage,
-                          tone: AsterStatusTone.danger,
-                          announce: true,
-                        ),
-                        SizedBox(height: context.spacing.sm),
-                      ],
-                      CustomButton.compact(
-                        text: 'Refresh balance',
-                        loading:
-                            state.operation ==
-                            SendFlowOperation.refreshingBalance,
-                        enabled: state.canStart(
-                          SendFlowOperation.refreshingBalance,
-                        ),
-                        hapticIntent: null,
-                        onTap: onRefreshBalance,
-                      ),
-                    ],
+                if (feeStale || state.feeFailure != null) ...[
+                  SizedBox(height: context.spacing.sm),
+                  AsterStatusMessage(
+                    state.feeFailure?.userMessage ??
+                        'Refresh the network fee before sending.',
+                    tone: AsterStatusTone.warning,
+                    announce: true,
                   ),
-                ),
-                SizedBox(height: context.spacing.md),
-                Squircle(
-                  borderRadius: context.radii.input,
-                  padding: EdgeInsets.all(context.spacing.lg),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Recipient', style: context.type.sectionLabel),
-                      SizedBox(height: context.spacing.xs),
-                      Text(
-                        preview.displayDestination,
-                        style: context.type.addressSmall,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (preview.recipientLabel case final label?) ...[
-                        SizedBox(height: context.spacing.md),
-                        Text('Payment label', style: context.type.sectionLabel),
-                        SizedBox(height: context.spacing.xs),
-                        Text(label, style: context.type.statusMessage),
-                      ],
-                      if (preview.message case final message?) ...[
-                        SizedBox(height: context.spacing.md),
-                        Text('Message', style: context.type.sectionLabel),
-                        SizedBox(height: context.spacing.xs),
-                        Text(message, style: context.type.statusMessage),
-                      ],
-                    ],
+                  if (state.feeFailure?.retryable != false) ...[
+                    SizedBox(height: context.spacing.sm),
+                    CustomButton.compact(
+                      text: 'Refresh fee',
+                      variant: ButtonVariant.tonal,
+                      loading:
+                          state.operation == SendFlowOperation.refreshingFee,
+                      enabled: state.canRefreshFee,
+                      hapticIntent: null,
+                      onTap: onRefreshFee,
+                    ),
+                  ],
+                ],
+                if (onRetryQuote case final retry?) ...[
+                  SizedBox(height: context.spacing.sm),
+                  CustomButton.compact(
+                    text: 'Retry fiat quote',
+                    variant: ButtonVariant.tonal,
+                    enabled: state.canEditPayment,
+                    hapticIntent: null,
+                    onTap: retry,
                   ),
+                ],
+                SizedBox(height: context.spacing.sm),
+                if (balanceFailure case final failure?) ...[
+                  AsterStatusMessage(
+                    failure.userMessage,
+                    tone: AsterStatusTone.danger,
+                    announce: true,
+                  ),
+                  SizedBox(height: context.spacing.sm),
+                ],
+                CustomButton.compact(
+                  text: 'Refresh balance',
+                  variant: ButtonVariant.tonal,
+                  loading:
+                      state.operation == SendFlowOperation.refreshingBalance,
+                  enabled: state.canStart(SendFlowOperation.refreshingBalance),
+                  hapticIntent: null,
+                  onTap: onRefreshBalance,
                 ),
               ],
             ),
           ),
+          SizedBox(height: context.spacing.md),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: context.spacing.xl),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Recipient', style: context.type.sectionLabel),
+                SizedBox(height: context.spacing.xs),
+                Text(
+                  preview.displayDestination,
+                  style: context.type.addressSmall,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (preview.recipientLabel case final label?) ...[
+                  SizedBox(height: context.spacing.md),
+                  Text('Payment label', style: context.type.sectionLabel),
+                  SizedBox(height: context.spacing.xs),
+                  Text(label, style: context.type.statusMessage),
+                ],
+                if (preview.message case final message?) ...[
+                  SizedBox(height: context.spacing.md),
+                  Text('Message', style: context.type.sectionLabel),
+                  SizedBox(height: context.spacing.xs),
+                  Text(message, style: context.type.statusMessage),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: context.spacing.xxl),
+          child: AsterNumericKeypad(
+            value: state.amountText,
+            enabled: state.canChangeAmount && !state.amountIsLocked,
+            allowDecimal:
+                inputCodec.displayPrecision(state.route, state.bitcoinUnit) > 0,
+            onChanged: onAmountChanged,
+          ),
         ),
-        SizedBox(height: context.spacing.md),
-        AsterNumericKeypad(
-          value: state.amountText,
-          enabled: state.canChangeAmount && !state.amountIsLocked,
-          allowDecimal:
-              inputCodec.displayPrecision(state.route, state.bitcoinUnit) > 0,
-          onChanged: onAmountChanged,
-        ),
-        SizedBox(height: context.spacing.md),
+        SizedBox(height: context.spacing.xxxl),
         CustomButton(
           text: 'Send',
           loading: submitting,
@@ -551,12 +550,14 @@ final class _AmountLoading extends StatelessWidget {
       liveRegion: true,
       label: 'Loading payment amount',
       excludeSemantics: true,
-      child: Column(
-        children: [
-          SendCard.loading(target: target),
-          const Spacer(),
-          const AsterNumericKeypad.loading(),
-          SizedBox(height: context.spacing.md),
+      child: AsterFormBody(
+        content: SendCard.loading(target: target),
+        actions: [
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: context.spacing.xxl),
+            child: const AsterNumericKeypad.loading(),
+          ),
+          SizedBox(height: context.spacing.xxxl),
           const CustomButton(text: 'Send'),
         ],
       ),

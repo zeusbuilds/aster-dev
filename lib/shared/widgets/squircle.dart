@@ -43,24 +43,33 @@ class Squircle extends StatelessWidget {
     final effectivePadding = padding ?? EdgeInsets.all(spacing.sm);
     final effectiveBorderWidth = borderWidth ?? context.strokes.border;
 
-    final content = DecoratedBox(
+    final shape = RoundedSuperellipseBorder(
+      borderRadius: effectiveBorderRadius,
+    );
+    return DecoratedBox(
       decoration: ShapeDecoration(
         color: gradient == null ? effectiveColor : null,
         gradient: gradient,
-        shape: RoundedSuperellipseBorder(
-          borderRadius: effectiveBorderRadius,
-          side: BorderSide(
-            color: effectiveBorderColor,
-            width: effectiveBorderWidth,
-          ),
-        ),
+        shape: shape,
         shadows: shadows,
       ),
-      child: Padding(padding: effectivePadding, child: child),
-    );
-    return ClipRSuperellipse(
-      borderRadius: effectiveBorderRadius,
-      child: content,
+      child: ClipRSuperellipse(
+        borderRadius: effectiveBorderRadius,
+        child: DecoratedBox(
+          // Paint the outline after filled footers and ink, keeping shadows
+          // outside the clip while every child shares its exact boundary.
+          position: DecorationPosition.foreground,
+          decoration: ShapeDecoration(
+            shape: shape.copyWith(
+              side: BorderSide(
+                color: effectiveBorderColor,
+                width: effectiveBorderWidth,
+              ),
+            ),
+          ),
+          child: Padding(padding: effectivePadding, child: child),
+        ),
+      ),
     );
   }
 }

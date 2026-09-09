@@ -29,8 +29,7 @@ class WalletUnavailableScreen extends StatelessWidget {
             child: Semantics(
               container: true,
               liveRegion: true,
-              label: '$title. ${failure.userMessage}',
-              excludeSemantics: true,
+              explicitChildNodes: true,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [

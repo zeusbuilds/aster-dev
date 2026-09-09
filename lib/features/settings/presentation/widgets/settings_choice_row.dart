@@ -46,7 +46,7 @@ class SettingsChoiceRow extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(title, style: context.type.rowTitle),
-                      Text(subtitle, style: context.type.supportingMeta),
+                      AmountText(subtitle, style: context.type.supportingMeta),
                     ],
                   ),
                 ),

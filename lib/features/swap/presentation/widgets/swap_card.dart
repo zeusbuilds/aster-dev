@@ -34,13 +34,20 @@ class SwapCard extends StatelessWidget {
             children: [
               SwapPair(label: 'From', target: state.from, onTap: onSelectFrom),
               const AsterDivider(),
-              SwapPair(label: 'To', target: state.to, onTap: onSelectTo),
+              ColoredBox(
+                color: context.appColors.surfaceSubtle,
+                child: SwapPair(
+                  label: 'To',
+                  target: state.to,
+                  onTap: onSelectTo,
+                ),
+              ),
             ],
           ),
         ),
         DecoratedBox(
           decoration: BoxDecoration(
-            color: context.appColors.surfaceRaised,
+            color: context.appColors.surfaceSubtle,
             shape: BoxShape.circle,
             border: Border.all(
               color: context.colorScheme.surface,

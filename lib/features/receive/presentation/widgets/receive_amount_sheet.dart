@@ -2,11 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:remixicon/remixicon.dart';
 
 import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
 import '../../../wallet/domain/models/models.dart';
+import '../../../wallet/presentation/widgets/widgets.dart';
 import '../models/models.dart';
 import '../view_model/view_models.dart';
 
@@ -107,7 +107,9 @@ class ReceiveAmountSheet extends ConsumerWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _AmountSheetHeader(
+                        AsterSheetHeader(
+                          title: 'Set amount',
+                          closeLabel: 'Close amount editor',
                           onClose: generationOwnsRoute
                               ? null
                               : () => _close(context, navigation),
@@ -156,40 +158,6 @@ class ReceiveAmountSheet extends ConsumerWidget {
   }
 }
 
-final class _AmountSheetHeader extends StatelessWidget {
-  const _AmountSheetHeader({required this.onClose});
-
-  final VoidCallback? onClose;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: context.metrics.minTouchTarget + context.spacing.sm,
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: context.spacing.screenPadding,
-          right: context.spacing.sm,
-          top: context.spacing.sm,
-        ),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Text('Set amount', style: context.type.title),
-            Align(
-              alignment: Alignment.centerRight,
-              child: AsterIconButton(
-                icon: RemixIcons.close_line,
-                tooltip: 'Close amount editor',
-                onPressed: onClose,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 final class _AmountSheetBody extends StatelessWidget {
   const _AmountSheetBody({
     required this.state,
@@ -232,7 +200,7 @@ final class _AmountSheetBody extends StatelessWidget {
         children: [
           SizedBox(height: context.spacing.lg),
           Squircle(
-            borderRadius: context.radii.input,
+            borderRadius: context.radii.card,
             padding: EdgeInsets.all(context.spacing.lg),
             child: Row(
               children: [
@@ -245,7 +213,17 @@ final class _AmountSheetBody extends StatelessWidget {
                   ),
                 ),
                 SizedBox(width: context.spacing.md),
-                Text(state.route.asset.symbol, style: context.type.title),
+                WalletAssetIcon(
+                  kind: state.route.asset.kind,
+                  size: context.icons.md,
+                ),
+                SizedBox(width: context.spacing.sm),
+                Text(
+                  state.route.asset.kind == WalletAssetKind.bitcoin
+                      ? state.bitcoinUnit.label
+                      : state.route.asset.symbol,
+                  style: context.type.title,
+                ),
               ],
             ),
           ),

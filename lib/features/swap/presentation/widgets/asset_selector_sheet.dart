@@ -62,29 +62,7 @@ class AssetSelectorSheet extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              SizedBox(height: context.spacing.md),
-              SizedBox(
-                width: context.metrics.sheetHandleWidth,
-                height: context.metrics.sheetHandleHeight,
-                child: AsterPill(
-                  color: context.colorScheme.surfaceContainerHigh,
-                  child: const SizedBox.expand(),
-                ),
-              ),
-              SizedBox(height: context.spacing.lg),
-              Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: context.spacing.screenPadding,
-                ),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Select payment option',
-                    style: context.type.title,
-                  ),
-                ),
-              ),
-              SizedBox(height: context.spacing.md),
+              const AsterSheetHeader(title: 'Select payment option'),
               Flexible(
                 child: ListView.builder(
                   shrinkWrap: true,

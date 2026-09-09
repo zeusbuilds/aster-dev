@@ -79,7 +79,7 @@ class AsterOptionRow extends StatelessWidget {
                 if (details != null || suffixIcon != null || onTap != null)
                   SizedBox(width: spacing.lg),
                 if (details case final value?) ...[
-                  Flexible(
+                  Expanded(
                     child: Text(
                       value,
                       style: context.type.rowValue,

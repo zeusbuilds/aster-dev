@@ -61,8 +61,8 @@ class PaymentTargetTile extends StatelessWidget {
               ),
               child: Padding(
                 padding: EdgeInsets.symmetric(
-                  horizontal: context.spacing.lg,
-                  vertical: context.spacing.md,
+                  horizontal: context.spacing.xl,
+                  vertical: context.spacing.lg,
                 ),
                 child: Row(
                   children: [

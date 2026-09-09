@@ -23,6 +23,7 @@ class MeshGradientBackground extends StatelessWidget {
             imageFilter: ImageFilter.blur(
               sigmaX: art.brandMeshBlurSigma,
               sigmaY: art.brandMeshBlurSigma,
+              tileMode: TileMode.clamp,
             ),
             child: OMeshGradient(
               mesh: OMeshRect(

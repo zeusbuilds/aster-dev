@@ -45,113 +45,88 @@ class SendAddressCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final input = _behavior?.controller;
     final hasValue = input?.text.isNotEmpty ?? false;
-    final card = Column(
-      children: [
-        Squircle(
-          border: BorderRadius.only(
-            topLeft: Radius.circular(context.radii.card),
-            topRight: Radius.circular(context.radii.card),
+    final card = AsterSplitCard(
+      tonalFooter: false,
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            target.destinationLabel,
+            style: context.type.addressLabel.copyWith(
+              color: context.appColors.textSecondary,
+            ),
           ),
-          padding: EdgeInsets.symmetric(
-            vertical: context.spacing.lg,
-            horizontal: context.spacing.xl,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                target.destinationLabel,
-                style: context.type.addressLabel.copyWith(
-                  color: context.appColors.textSecondary,
-                ),
-              ),
-              SizedBox(height: context.spacing.xs),
-              TextField(
-                controller: input,
-                enabled: enabled,
-                style: context.type.address,
-                cursorColor: context.colorScheme.primary,
-                keyboardType: TextInputType.url,
-                textInputAction: TextInputAction.done,
-                autocorrect: false,
-                enableSuggestions: false,
-                enableIMEPersonalizedLearning: false,
-                smartDashesType: SmartDashesType.disabled,
-                smartQuotesType: SmartQuotesType.disabled,
-                inputFormatters: <TextInputFormatter>[
-                  LengthLimitingTextInputFormatter(
-                    WalletProtocolText.maximumEncodedCharacters,
-                    maxLengthEnforcement: MaxLengthEnforcement.enforced,
-                  ),
-                ],
-                minLines: 2,
-                maxLines: 4,
-                decoration: InputDecoration(
-                  hintText: target.destinationHint,
-                  hintStyle: context.type.addressHint,
-                  filled: false,
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  errorBorder: InputBorder.none,
-                  focusedErrorBorder: InputBorder.none,
-                  disabledBorder: InputBorder.none,
-                  contentPadding: EdgeInsets.zero,
-                  isDense: true,
-                ),
-                onChanged: _behavior?.onChanged,
-                onSubmitted: enabled
-                    ? (value) {
-                        if (value.trim().isNotEmpty) {
-                          _behavior?.onSubmitted();
-                        }
-                      }
-                    : null,
-              ),
-              if (failureMessage case final message?) ...[
-                SizedBox(height: context.spacing.sm),
-                AsterStatusMessage(
-                  message,
-                  tone: AsterStatusTone.danger,
-                  announce: true,
-                  textAlign: TextAlign.start,
-                ),
-              ],
-            ],
-          ),
-        ),
-        Squircle(
-          color: context.appColors.surfaceSubtle,
-          borderColor: context.appColors.surfaceSubtle,
-          border: BorderRadius.only(
-            bottomLeft: Radius.circular(context.radii.card),
-            bottomRight: Radius.circular(context.radii.card),
-          ),
-          padding: EdgeInsets.symmetric(
-            vertical: context.spacing.sm,
-            horizontal: context.spacing.xl,
-          ),
-          child: Row(
-            children: [
-              WalletAssetIcon(kind: target.assetKind, size: context.icons.md),
-              SizedBox(width: context.spacing.sm),
-              Expanded(
-                child: Text(
-                  target.railLabel,
-                  style: context.type.rowTitleStrong,
-                ),
-              ),
-              CustomButton.compact(
-                text: hasValue ? 'Clear' : 'Paste',
-                loading: pasting,
-                enabled: enabled,
-                hapticIntent: hasValue ? HapticIntent.lightImpact : null,
-                onTap: hasValue ? _behavior?.onClear : _behavior?.onPaste,
+          SizedBox(height: context.spacing.xs),
+          TextField(
+            controller: input,
+            enabled: enabled,
+            style: context.type.address,
+            cursorColor: context.colorScheme.primary,
+            keyboardType: TextInputType.url,
+            textInputAction: TextInputAction.done,
+            autocorrect: false,
+            enableSuggestions: false,
+            enableIMEPersonalizedLearning: false,
+            smartDashesType: SmartDashesType.disabled,
+            smartQuotesType: SmartQuotesType.disabled,
+            inputFormatters: <TextInputFormatter>[
+              LengthLimitingTextInputFormatter(
+                WalletProtocolText.maximumEncodedCharacters,
+                maxLengthEnforcement: MaxLengthEnforcement.enforced,
               ),
             ],
+            minLines: 2,
+            maxLines: 4,
+            decoration: InputDecoration(
+              hintText: target.destinationHint,
+              hintStyle: context.type.addressHint,
+              filled: false,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              errorBorder: InputBorder.none,
+              focusedErrorBorder: InputBorder.none,
+              disabledBorder: InputBorder.none,
+              contentPadding: EdgeInsets.zero,
+              isDense: true,
+            ),
+            onChanged: _behavior?.onChanged,
+            onSubmitted: enabled
+                ? (value) {
+                    if (value.trim().isNotEmpty) {
+                      _behavior?.onSubmitted();
+                    }
+                  }
+                : null,
           ),
-        ),
-      ],
+          if (failureMessage case final message?) ...[
+            SizedBox(height: context.spacing.sm),
+            AsterStatusMessage(
+              message,
+              tone: AsterStatusTone.danger,
+              announce: true,
+              textAlign: TextAlign.start,
+            ),
+          ],
+        ],
+      ),
+      footer: Row(
+        children: [
+          WalletAssetIcon(kind: target.assetKind, size: context.icons.md),
+          SizedBox(width: context.spacing.sm),
+          Expanded(
+            child: Text(target.assetLabel, style: context.type.rowTitleStrong),
+          ),
+          CustomButton.compact(
+            text: hasValue ? 'Clear' : 'Paste',
+            variant: ButtonVariant.tonal,
+            loading: pasting,
+            enabled: enabled,
+            hapticIntent: hasValue ? HapticIntent.lightImpact : null,
+            onTap: hasValue ? _behavior?.onClear : _behavior?.onPaste,
+          ),
+        ],
+      ),
     );
     if (_behavior != null) return card;
     return Semantics(

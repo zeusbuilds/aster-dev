@@ -48,6 +48,7 @@ final class PaymentFlowTestHarness {
     preferenceServiceBuilder,
     ResilientHttpClient? httpClient,
     UtcClock? clock,
+    AssetBundle? settingsAssets,
   }) async {
     SharedPreferences.setMockInitialValues(preferenceValues);
     final preferences = await SharedPreferences.getInstance();
@@ -102,7 +103,7 @@ final class PaymentFlowTestHarness {
     );
     final settings = SettingsRepository(
       preferenceService,
-      PaymentSettingsAssetBundle(),
+      settingsAssets ?? PaymentSettingsAssetBundle(),
     );
     final haptics = RecordingHapticFeedbackService();
     final toasts = RecordingToastPresentationService();

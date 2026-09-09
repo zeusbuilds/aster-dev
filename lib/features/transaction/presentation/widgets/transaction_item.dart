@@ -38,12 +38,6 @@ class TransactionItem extends StatelessWidget {
       WalletActivityDirection.internal => RemixIcons.exchange_2_line,
       WalletActivityDirection.unknown => RemixIcons.flashlight_line,
     };
-    final iconColor = switch (activity.direction) {
-      WalletActivityDirection.sent => context.appColors.danger,
-      WalletActivityDirection.received => context.appColors.success,
-      WalletActivityDirection.internal => context.colorScheme.primary,
-      WalletActivityDirection.unknown => context.appColors.warning,
-    };
 
     return Semantics(
       button: true,
@@ -53,85 +47,81 @@ class TransactionItem extends StatelessWidget {
           '$amountLabel, $status, $time',
       onTap: onTap,
       excludeSemantics: true,
-      child: Squircle(
-        padding: EdgeInsets.zero,
-        color: context.appColors.surfaceRaised,
-        child: Material(
-          color: context.appColors.transparentSurface,
-          child: InkWell(
-            onTap: onTap,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: context.metrics.minTouchTarget,
-              ),
-              child: Padding(
-                padding: EdgeInsets.all(context.spacing.lg),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: EdgeInsets.all(context.spacing.sm),
-                      decoration: BoxDecoration(
-                        color: context.appColors.surfaceSubtle,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: context.appColors.borderSubtle,
-                          width: context.strokes.divider,
-                        ),
-                      ),
-                      child: Icon(
-                        icon,
-                        size: context.icons.sm,
-                        color: iconColor,
+      child: Material(
+        color: context.appColors.transparentSurface,
+        child: InkWell(
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: context.metrics.minTouchTarget,
+            ),
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: context.spacing.sm),
+              child: Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(context.spacing.sm),
+                    decoration: BoxDecoration(
+                      color: context.appColors.surfaceSubtle,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: context.appColors.borderSubtle,
+                        width: context.strokes.divider,
                       ),
                     ),
-                    SizedBox(width: context.spacing.md),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  title,
-                                  style: context.type.rowTitle,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                    child: Icon(
+                      icon,
+                      size: context.icons.sm,
+                      color: context.appColors.textSecondary,
+                    ),
+                  ),
+                  SizedBox(width: context.spacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                title,
+                                style: context.type.rowTitle,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              if (lightning) ...[
-                                SizedBox(width: context.spacing.xs),
-                                Icon(
-                                  RemixIcons.flashlight_fill,
-                                  size: context.icons.xxs,
-                                  color: context.appColors.warning,
-                                  semanticLabel: 'Lightning',
-                                ),
-                              ],
+                            ),
+                            if (lightning) ...[
+                              SizedBox(width: context.spacing.xs),
+                              Icon(
+                                RemixIcons.flashlight_fill,
+                                size: context.icons.xxs,
+                                color: context.appColors.warning,
+                                semanticLabel: 'Lightning',
+                              ),
                             ],
-                          ),
-                          SizedBox(height: context.spacing.xxs),
-                          NumericText(
-                            '$time, $status',
-                            style: context.type.rowMeta,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
+                        SizedBox(height: context.spacing.xxs),
+                        NumericText(
+                          '$time, $status',
+                          style: context.type.rowMeta,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ),
-                    SizedBox(width: context.spacing.sm),
-                    Flexible(
-                      child: AmountText(
-                        valuesVisible ? amount ?? '--' : '••••',
-                        style: context.type.amountInline,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.end,
-                      ),
+                  ),
+                  SizedBox(width: context.spacing.sm),
+                  Flexible(
+                    child: AmountText(
+                      valuesVisible ? amount ?? '--' : '••••',
+                      style: context.type.amountInline,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.end,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),

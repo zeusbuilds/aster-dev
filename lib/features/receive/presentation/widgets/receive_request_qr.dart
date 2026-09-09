@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 
 import '../../../../shared/shared.dart';
+import '../../../wallet/domain/models/models.dart';
+import '../../../wallet/presentation/widgets/wallet_asset_icon.dart';
 
 /// Accessible Receive QR surface with a non-secret encoder fallback.
 final class ReceiveRequestQr extends StatefulWidget {
@@ -9,10 +11,12 @@ final class ReceiveRequestQr extends StatefulWidget {
     super.key,
     required this.encodedRequest,
     required this.semanticLabel,
+    this.assetKind,
   });
 
   final String encodedRequest;
   final String semanticLabel;
+  final WalletAssetKind? assetKind;
 
   @override
   State<ReceiveRequestQr> createState() => _ReceiveRequestQrState();
@@ -38,7 +42,7 @@ final class _ReceiveRequestQrState extends State<ReceiveRequestQr> {
       _image = QrImage(
         QrCode.fromData(
           data: widget.encodedRequest,
-          errorCorrectLevel: QrErrorCorrectLevel.L,
+          errorCorrectLevel: QrErrorCorrectLevel.H,
         ),
       );
     } on Exception {
@@ -56,11 +60,35 @@ final class _ReceiveRequestQrState extends State<ReceiveRequestQr> {
       excludeSemantics: true,
       child: Padding(
         padding: EdgeInsets.all(context.spacing.lg),
-        child: PrettyQrView(
-          qrImage: image,
-          decoration: PrettyQrDecoration(
-            shape: PrettyQrDotsSymbol(color: context.colorScheme.onSurface),
-          ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            PrettyQrView(
+              qrImage: image,
+              decoration: PrettyQrDecoration(
+                shape: PrettyQrDotsSymbol(color: context.colorScheme.onSurface),
+              ),
+            ),
+            if (widget.assetKind case final kind?)
+              FractionallySizedBox(
+                widthFactor: context.metrics.qrLogoSizeFactor,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: context.colorScheme.surface,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.all(context.spacing.xs),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) => WalletAssetIcon(
+                        kind: kind,
+                        size: constraints.maxWidth,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );

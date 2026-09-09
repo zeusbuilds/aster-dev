@@ -4,6 +4,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../features/wallet/presentation/view_model/wallet_view_model.dart';
 import '../theme/theme.dart';
+import '../widgets/custom_app_bar.dart';
 import '../widgets/custom_button.dart';
 import 'route_config.dart';
 import 'route_guards.dart';
@@ -46,33 +47,36 @@ class ErrorScreen extends StatelessWidget {
     final colors = context.appColors;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Error')),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.error_outline,
-              size: context.icons.xl,
-              color: colors.danger,
+      appBar: const CustomAppBar(title: 'Page unavailable'),
+      body: SafeArea(
+        top: false,
+        child: Center(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.all(spacing.screenPadding),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: context.icons.xl,
+                  color: colors.danger,
+                ),
+                SizedBox(height: spacing.lg),
+                Text('Route Error', style: context.type.title),
+                SizedBox(height: spacing.sm),
+                Text(
+                  'This page is unavailable.',
+                  style: context.type.statusMessage,
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: spacing.xxl),
+                CustomButton(
+                  text: 'Go to Home',
+                  onTap: () => context.go(RoutePaths.home),
+                ),
+              ],
             ),
-            SizedBox(height: spacing.lg),
-            Text('Route Error', style: context.type.title),
-            SizedBox(height: spacing.sm),
-            Text(
-              'This page is unavailable.',
-              style: context.type.statusMessage,
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: spacing.xxl),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: spacing.screenPadding),
-              child: CustomButton(
-                text: 'Go to Home',
-                onTap: () => context.go(RoutePaths.home),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

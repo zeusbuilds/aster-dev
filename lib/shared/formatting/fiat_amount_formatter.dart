@@ -12,11 +12,16 @@ final class FiatAmountFormatter {
   final NumberFormat _integer;
 
   /// Formats [minorUnits] with a curated [symbol] and ISO [minorUnitDigits].
+  ///
+  /// [wholeUnitsOnly] is for indicative market headlines, using integer
+  /// half-up rounding. Balances and payment amounts retain the exact default.
   String format({
     required int minorUnits,
     required String symbol,
     required String code,
     required int minorUnitDigits,
+    bool includeCurrencyCode = true,
+    bool wholeUnitsOnly = false,
   }) {
     if (minorUnits < 0) {
       throw ArgumentError.value(minorUnits, 'minorUnits');
@@ -33,8 +38,9 @@ final class FiatAmountFormatter {
 
     final scale = BigInt.from(10).pow(minorUnitDigits);
     final value = BigInt.from(minorUnits);
-    final whole = value ~/ scale;
-    final fraction = minorUnitDigits == 0
+    final whole =
+        (value + (wholeUnitsOnly ? scale ~/ BigInt.two : BigInt.zero)) ~/ scale;
+    final fraction = minorUnitDigits == 0 || wholeUnitsOnly
         ? ''
         : value.remainder(scale).toString().padLeft(minorUnitDigits, '0');
     final localizedNumber =
@@ -48,7 +54,7 @@ final class FiatAmountFormatter {
       decimalDigits: minorUnitDigits,
     );
     return '${currencyLayout.positivePrefix}$localizedNumber'
-        '${currencyLayout.positiveSuffix} $code';
+        '${currencyLayout.positiveSuffix}${includeCurrencyCode ? ' $code' : ''}';
   }
 
   String _localizeDigits(String value) {

@@ -207,22 +207,21 @@ final class _DestinationBody extends StatelessWidget {
     final validating =
         state.operation == SendFlowOperation.validatingDestination;
     final pasting = state.operation == SendFlowOperation.readingClipboard;
-    return Column(
-      children: [
-        SendAddressCard(
-          target: state.route.target,
-          controller: controller,
-          enabled: commandsEnabled && state.canChangeDestination,
-          pasting: pasting,
-          failureMessage: state
-              .failureFor(SendFlowOperation.validatingDestination)
-              ?.userMessage,
-          onChanged: onChanged,
-          onClear: onClear,
-          onPaste: onPaste,
-          onSubmitted: onSubmitted,
-        ),
-        const Spacer(),
+    return AsterFormBody(
+      content: SendAddressCard(
+        target: state.route.target,
+        controller: controller,
+        enabled: commandsEnabled && state.canChangeDestination,
+        pasting: pasting,
+        failureMessage: state
+            .failureFor(SendFlowOperation.validatingDestination)
+            ?.userMessage,
+        onChanged: onChanged,
+        onClear: onClear,
+        onPaste: onPaste,
+        onSubmitted: onSubmitted,
+      ),
+      actions: [
         CustomButton(
           text: 'Continue',
           loading: validating,
@@ -250,12 +249,9 @@ final class _DestinationLoading extends StatelessWidget {
       liveRegion: true,
       label: 'Loading recipient form',
       excludeSemantics: true,
-      child: Column(
-        children: [
-          SendAddressCard.loading(target: target),
-          const Spacer(),
-          const CustomButton(text: 'Continue'),
-        ],
+      child: AsterFormBody(
+        content: SendAddressCard.loading(target: target),
+        actions: const [CustomButton(text: 'Continue')],
       ),
     );
   }

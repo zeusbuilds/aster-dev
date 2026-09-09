@@ -5,6 +5,14 @@ build is necessary but is not sufficient: every repository-owned file must be
 reviewed, every finding must have evidence, and every claimed behavior must be
 verified on the exact candidate commit.
 
+## Visual Restoration Follow-Up
+
+The author approved historical commit `bbbc315` as the visual reference on
+2026-09-09. Current visual restoration coverage, findings, and screenshot
+evidence are tracked in `docs/design/VISUAL_RESTORATION_TRACKER.md`. Existing
+release constraints below remain in force. Prior functional verification does
+not constitute approval of the refactored styling.
+
 ## Scope And Status
 
 - Baseline commit: `bbbc315634bba975ed767de378ff155e08a0ba15`
@@ -894,6 +902,7 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `docs/design/HAPTIC_FEEDBACK.md` | Documentation | verified | UX-001, UX-003 | Semantic intent matrix, no-op rules, ownership, failure isolation, and testing match the implemented service | `98b7a40` |
 | `docs/design/PRESENTATION_SYSTEMS.md` | Documentation | verified | UX-001, UX-002, UX-006, SAFE-001, MOTION-001 | Foreground-visible toast budgets, haptic, inset, loading, and reduced-motion contracts match exact implementation and tests | `98b7a40`, `bef699d` |
 | `docs/design/TYPOGRAPHY_USAGE.md` | Documentation | verified | DOC-009, DS-002, DS-015, DS-016, DS-017, DS-018, TOOL-011, ACCESS-003 | Monetary and generic numeric component guidance preserves the Public Sans span boundary without classifying fee-rate metadata as money | `938bc77` |
+| `docs/design/VISUAL_RESTORATION_TRACKER.md` | Documentation | unreviewed | - | - | - |
 | `docs/release/RELEASE_CHECKLIST.md` | Documentation | verified | DOC-005, TEST-001, TEST-006, TEST-015, PERF-001, BUILD-006, BUILD-009, BUILD-015, BUILD-017, BUILD-018, BUILD-019, BUILD-020, BUILD-021, BUILD-024, BUILD-025, BUILD-026, BUILD-027, BUILD-028, BUILD-033, BUILD-035, BUILD-040, BUILD-042, BUILD-043, BUILD-044, BUILD-046, BUILD-047, SDK-004, PLAT-011, PLAT-012, PLAT-015, PLAT-017, PLAT-018, STORE-012, SEC-015, FIAT-002, CONFIG-009, CI-001, CI-002 | Checklist requires exact manifest/workflow/artifact/signature evidence while preserving every runtime, legal, owner, physical-device, and immutable-SDK blocker | `de09b2c` |
 | `docs/release/evidence/baseline/ios-home-bbbc315.jpg` | Documentation | reviewed-clean | HOME-001, DATA-001 | Captured from exact baseline commit on iPhone Air | `163a3cf` |
 | `docs/release/evidence/baseline/ios-import-bbbc315.jpg` | Documentation | reviewed-clean | ONB-001, ACCESS-001 | Captured from exact baseline commit on iPhone Air | `163a3cf` |
@@ -903,6 +912,7 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `flake.lock` | Project configuration | blocked | BUILD-003 | Version-7 graph is valid JSON with immutable 40-character revisions and nar hashes matching `flake.nix`; executable Nix evaluation remains unavailable on this host | - |
 | `flake.nix` | Project configuration | blocked | BUILD-003, BUILD-010, BUILD-016, BUILD-021 | The macOS shell supplies Ruby/Bundler while CocoaPods remains owned by the committed lock; static executable policy passes and host Nix evaluation remains independently blocked | `3398545`, `de928a8`, `60cc8ad` |
 | `integration_test/presentation_performance_test.dart` | Test | verified | PERF-001, PERF-004, PERF-006, PERF-007, TEST-004, TEST-008, PERF-012, TOOL-005, MOTION-003 | The benchmark fails closed outside its isolated wrapper, proves the mounted Import painter is the retained painted snapshot, preserves split frame/retention budgets, and passes twice on exact `59cba0a` with a verified host renderer. | `a2530ff`, `7a2ca03`, `ba34011`, `59cba0a` |
+| `integration_test/visual_catalog_test.dart` | Test | unreviewed | - | - | - |
 | `integration_test/wallet_storage_security_test.dart` | Test | verified | TEST-002, TEST-015, CODE-012, SEC-005, PLAT-004, PLAT-016, STORE-012 | Platform policy coverage remains intact and Android chmod/symlink fixture operations now use typed, lint-clean process deadlines and output bounds | `de09b2c` |
 | `ios/.gitignore` | iOS platform | reviewed-clean | SDK-001 | CocoaPods, Flutter-generated, user, build, and derived outputs are excluded without hiding owned platform source | - |
 | `ios/Flutter/AppFrameworkInfo.plist` | iOS platform | reviewed-clean | SDK-001 | Flutter-owned app framework metadata parses and retains the standard framework identity/version contract | - |
@@ -1229,12 +1239,15 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `lib/shared/widgets/amount_text.dart` | Dart source | verified | DS-002, DS-010 | Unicode decimal chunks use Public Sans while currency symbols, labels, addresses, and units remain DM Sans | `0da3695` |
 | `lib/shared/widgets/app_skeletonizer.dart` | Dart source | verified | MOTION-001 | Shimmer respects reduced motion and preserves truthful loading geometry | `98b7a40` |
 | `lib/shared/widgets/aster_divider.dart` | Dart source | reviewed-clean | DS-001, DS-004 | Divider consumes semantic border, stroke, and inset roles without raw feature geometry | `98b7a40` |
+| `lib/shared/widgets/aster_form_body.dart` | Dart source | unreviewed | - | - | - |
 | `lib/shared/widgets/aster_icon_button.dart` | Dart source | verified | ACCESS-002, ACCESS-006, UX-001, UX-003, MOTION-001 | Shared semantics own the tap action only while enabled so excluded native descendants cannot make icon commands inaccessible; focused and aggregate semantic tests pass | `98b7a40`, `acd42ab`, `e9d7fab` |
 | `lib/shared/widgets/aster_noise_texture.dart` | Dart source | verified | PERF-003, PERF-006 | Viewport/DPR-aware decode width is clamped to source bounds, decorative semantics are excluded, and exactly-once async/synchronous frame readiness prevents blank retained snapshots; focused, aggregate, and exact Profile gates pass | `31b5264`, `a2530ff` |
 | `lib/shared/widgets/aster_numeric_keypad.dart` | Dart source | verified | DEP-006, PAY-004, DS-001, DS-017, UX-001, ACCESS-002, ACCESS-008, ACCESS-016 | Loaded edit semantics remain unchanged and loading excludes all twelve inert keys beneath its screen-owned status. | `9b6a9dc` |
 | `lib/shared/widgets/aster_option_row.dart` | Dart source | verified | ARCH-006, DS-001, ACCESS-002, SETTINGS-004 | Reusable action row omits a navigation chevron when no action exists while retaining disabled semantics, stable layout, keyboard activation, and accepted-action haptics; exact candidate tests pass | `db844ac`, `89c8d7f` |
 | `lib/shared/widgets/aster_pill.dart` | Dart source | verified | DS-001 | True stadium geometry is encapsulated for pill-only surfaces | `98b7a40` |
 | `lib/shared/widgets/aster_selection_indicator.dart` | Dart source | verified | DEP-010, DS-017, ACCESS-001, MOTION-001 | Decorative reduced-motion behavior is unchanged; visible/hidden animation endpoints are state-owned and all gates pass | `0da3695`, `a649c55` |
+| `lib/shared/widgets/aster_sheet_header.dart` | Dart source | unreviewed | - | - | - |
+| `lib/shared/widgets/aster_split_card.dart` | Dart source | unreviewed | - | - | - |
 | `lib/shared/widgets/aster_status_message.dart` | Dart source | verified | ACCESS-018, DS-015 | Semantic tone owns status color while one explicit label controls traversal and optional live announcement; sensitive diagnostics remain excluded by contract | `4009ed3` |
 | `lib/shared/widgets/custom_app_bar.dart` | Dart source | verified | ACCESS-002, ARCH-012, ROUTE-006, UX-014, NAV-006, SEC-019 | Back consumes the nearest screen owner, or a narrow local owner on single-command surfaces, with redacted route-failure handling | `938bc77` |
 | `lib/shared/widgets/custom_button.dart` | Dart source | verified | DS-001, DS-017, ACCESS-002, ACCESS-004, UX-003, MOTION-001, MOTION-004 | Async/loading/pressed semantics are unchanged; the local opacity derives wholly from state roles and all gates pass | `0da3695`, `a649c55` |
@@ -1318,6 +1331,7 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `test/shared/app_router_test.dart` | Test | verified | ARCH-012, DOC-010, ROUTE-001, ROUTE-002, ROUTE-003, ROUTE-005, ROUTE-006, ROUTE-007, ROUTE-008, HOME-002, DEC-034, DEC-036, PERF-004, PERF-007, TEST-004, MOTION-003 | Startup, invalid links, Back fallbacks, removed skeleton/Market locations, and bounded recovery all return through the sole canonical `/home` shell; 14 direct vectors pass | `518b077`, `db844ac`, `e9d7fab`, `a2530ff`, `7a2ca03`, `56fc972`, `bef699d`, `01ac798`, `203afb9`, `4009ed3` |
 | `test/shared/bitcoin_amount_formatter_test.dart` | Test | verified | SETTINGS-001, FORMAT-001 | Locale-script vectors pass alongside exact integer boundaries and no-precision-loss cases | `0da3695` |
 | `test/shared/feedback_system_test.dart` | Test | verified | UX-001, UX-002, UX-003, CODE-006, CODE-010 | Message/queue equal-hash and duration/pending difference vectors pass beside existing ownership/FIFO behavior | `0da3695`, `e2da5b2` |
+| `test/shared/fiat_amount_formatter_test.dart` | Test | unreviewed | - | - | - |
 | `test/shared/numeric_keypad_test.dart` | Test | verified | DEP-006, PAY-004, UX-001, ACCESS-002, ACCESS-008, ACCESS-016 | Loaded inert-command vectors remain green and loading mode exposes no key semantics. | `9b6a9dc` |
 | `test/shared/presentation_system_test.dart` | Test | verified | ARCH-012, DS-001, DS-002, DS-003, DS-010, DS-012, DS-014, DS-015, DS-018, DS-019, DEP-010, ACCESS-002, ACCESS-004, ACCESS-006, ACCESS-014, ACCESS-018, MOTION-001, MOTION-004, NAV-001, NAV-002, NAV-003, NAV-006, UX-006, UX-016, SAFE-001, SETTINGS-004, PERF-011 | Semantic status vectors prove exactly one label, live asynchronous failure, and non-live ordinary validation beside the existing shared interaction contract | `938bc77`, `dd6a1c5`, `4009ed3` |
 | `test/shared/route_guards_test.dart` | Test | verified | ARCH-012, DOC-010, ROUTE-002 | Unresolved, empty, and active durable-wallet vectors resolve active wallets to canonical `/home` with no obsolete skeleton route identity. | `05c7edf`, `203afb9` |
@@ -1326,6 +1340,7 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `test/support/payment_flow_harness.dart` | Test | verified | TEST-001, TEST-010, TX-001, DEC-037, HOME-005 | Teardown releases Riverpod consumers before external repository/platform ownership; all payment and aggregate paths pass | `fcb0f8d` |
 | `test/support/presentation_fakes.dart` | Test | verified | TEST-001, UX-001, UX-002, ARCH-005, DEC-037 | Test-only recorders include external URI observation without entering release code | `715e671`, `db844ac`, `e9d7fab` |
 | `test/support/scan_fakes.dart` | Test | verified | DEC-038, SCAN-001, SCAN-002, SCAN-004, SCAN-006, SCAN-007, SCAN-008 | Test-only close-result injection proves composition teardown observability without entering release behavior | `755b3d9`, `d2f2e97`, `fdd90af` |
+| `test/support/visual_catalog.dart` | Test | unreviewed | - | - | - |
 | `test/support/wallet_fakes.dart` | Test | verified | TEST-001, PAY-002, TX-001, SETTINGS-005, STORE-009 | Test-only directory fault mode models an owned resource that commits before its create call reports failure; no fixture enters release behavior | `1b3273a`, `605b50c`, `acd42ab`, `e9d7fab`, `9a9dbdb`, `96330dd` |
 | `test/tool/android_apk_signature_verifier_test.dart` | Test | verified | BUILD-025, BUILD-027, TEST-015, CODE-012 | Signature-policy fixtures retain their real archive matrix and execute every Java, JDK, and shell child through the typed lint-clean bounded owner | `de09b2c` |
 | `test/tool/android_archive_entry_extractor_test.dart` | Test | verified | BUILD-029, TEST-015, CODE-012 | Real Java ZIP fault vectors preserve exact typed assertions with lint-clean process-tree, deadline, and output bounds | `de09b2c` |
@@ -1357,8 +1372,10 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `test/tool/verify_release_configuration_contract_test.dart` | Test | verified | BUILD-042, CONFIG-012 | Exact-current, AST runtime-key/comment, build, example, and ignore drift vectors pass focused and 863-test aggregate execution | - |
 | `test/tool/verify_repository_governance_test.dart` | Test | verified | CI-001, CI-002, CI-003, GIT-002 | Twelve focused and 868 aggregate tests prove action pins, exact YAML jobs/commands, permissions, secrets, timeouts, post-test cleanup, ownership overrides, dependency drift, and adversarial fixtures | - |
 | `test/tool/verify_toolchain_test.dart` | Test | verified | BUILD-010, BUILD-011, BUILD-013, BUILD-015, BUILD-016, BUILD-017, BUILD-018, BUILD-019, BUILD-020, BUILD-021, BUILD-022, BUILD-025, BUILD-027, BUILD-029, BUILD-030, BUILD-031, BUILD-033, BUILD-034, BUILD-035, BUILD-036, BUILD-037, BUILD-038, BUILD-039, BUILD-040, BUILD-041, BUILD-045, BUILD-048, TEST-008, TEST-009, TEST-012, TEST-013, TEST-014, TEST-015, CODE-012, PERF-012, PERF-013, PERF-014, TOOL-012, TOOL-013, TRACK-006, TRACK-009, BRAND-003, ARCH-013 | Dedicated fault rejects a partial Android native bootstrap; all 36 focused and 864 aggregate tests pass | `fbf3603`, `bbb6d8f`, `3f4985b` |
+| `test/visual_catalog_test.dart` | Test | unreviewed | - | - | - |
 | `test/widget_test.dart` | Test | verified | TEST-001, MOTION-002, MARKET-002, DS-007, DS-011, DS-016, DS-017 | Compact-token assertions cover every active component/art radius and both repeated state endpoints; focused and 571-test aggregates pass | `0da3695`, `a649c55` |
 | `test_driver/integration_test.dart` | Project configuration | verified | TEST-002 | Standard integration-test driver compiled and executed on both platforms | `1b3273a` |
+| `test_driver/visual_catalog.dart` | Project configuration | unreviewed | - | - | - |
 | `tool/bounded_process.dart` | Tooling | verified | BUILD-033, BUILD-035, BUILD-037, TEST-015 | The sole process owner now also accepts explicit fixture environments and forwards strictly decoded, byte-accounted chunks without changing capture or cleanup semantics | `de09b2c` |
 | `tool/gradle_verification_metadata.dart` | Tooling | verified | BUILD-020, BUILD-024 | One pure strict parser owns metadata structure, SHA-256 policy, artifact counts, and exact lookup for repository and point-of-use gates | `fcb0f8d` |
 | `tool/prepare_android_release.dart` | Tooling | verified | BUILD-015, BUILD-017, BUILD-034, BUILD-037 | Config-only generation owns a 20-minute process-group deadline and independent 32 MiB channels; the real run preserves exact dependency state and reports 12 production plugins with one development plugin excluded | `9c6dd4e`, `dc70e12` |

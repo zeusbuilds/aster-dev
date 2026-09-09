@@ -232,12 +232,78 @@ void main() {
     final decoratedBox = tester.widget<DecoratedBox>(
       find.descendant(
         of: find.byType(Squircle),
-        matching: find.byType(DecoratedBox),
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is DecoratedBox &&
+              widget.position == DecorationPosition.foreground,
+        ),
       ),
     );
     final decoration = decoratedBox.decoration as ShapeDecoration;
     final shape = decoration.shape as RoundedSuperellipseBorder;
     expect(shape.side.width, 2.5);
+    expect(find.byType(ClipRSuperellipse), findsOneWidget);
+  });
+
+  testWidgets('compact pills retain width while loading and full hit height', (
+    tester,
+  ) async {
+    var activations = 0;
+    final haptics = _RecordingHaptics();
+    Widget button({bool loading = false}) => _themedHarness(
+      Center(
+        child: CustomButton.compact(
+          text: 'Copy address',
+          loading: loading,
+          onTap: () => activations++,
+        ),
+      ),
+      haptics: haptics,
+    );
+    await tester.pumpWidget(button());
+    final finder = find.byType(CustomButton);
+    final before = tester.getRect(finder);
+    expect(before.height, 48);
+    expect(before.width, lessThan(250));
+    await tester.tapAt(Offset(before.center.dx, before.top + 1));
+    await tester.tap(finder);
+    await tester.pumpAndSettle();
+    expect(activations, 2);
+    expect(haptics.intents, hasLength(2));
+    await tester.pumpWidget(button(loading: true));
+    await tester.pump();
+    expect(tester.getRect(finder), before);
+    await tester.tapAt(Offset(before.center.dx, before.top + 1));
+    expect(activations, 2);
+    expect(haptics.intents, hasLength(2));
+  });
+
+  testWidgets('option values and chevrons share a stable trailing edge', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _themedHarness(
+        Column(
+          children: [
+            AsterOptionRow(title: 'Currency', details: 'USD', onTap: () {}),
+            AsterOptionRow(
+              title: 'Region',
+              details: 'United States',
+              onTap: () {},
+            ),
+          ],
+        ),
+      ),
+    );
+    final rows = find.byType(AsterOptionRow);
+    final icons = [
+      for (var i = 0; i < 2; i++)
+        tester.getRect(
+          find.descendant(of: rows.at(i), matching: find.byType(Icon)),
+        ),
+    ];
+    expect(icons[0].right, icons[1].right);
+    expect(tester.getRect(rows.first).right - icons[0].right, 20);
   });
 
   testWidgets('selection indicator is decorative and token-sized', (

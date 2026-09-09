@@ -99,7 +99,7 @@ class _PriceCardState extends ConsumerState<PriceCard> {
           child: Padding(
             padding: EdgeInsets.symmetric(
               vertical: spacing.lg,
-              horizontal: spacing.lg,
+              horizontal: spacing.screenPadding,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -123,7 +123,7 @@ class _PriceCardState extends ConsumerState<PriceCard> {
                     ),
                     SizedBox(width: spacing.xs),
                     Flexible(
-                      flex: 3,
+                      flex: 2,
                       child: Text(
                         'Bitcoin Price',
                         style: type.brandTitle,
@@ -133,7 +133,7 @@ class _PriceCardState extends ConsumerState<PriceCard> {
                     ),
                     SizedBox(width: spacing.md),
                     Expanded(
-                      flex: 4,
+                      flex: 3,
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
                         alignment: Alignment.centerRight,
@@ -148,7 +148,7 @@ class _PriceCardState extends ConsumerState<PriceCard> {
                           child: NumericText(
                             headerLoading
                                 ? '000,000.00'
-                                : _formatPrice(snapshot),
+                                : _formatPrice(snapshot, headline: true),
                             style: type.brandAmount,
                             maxLines: 1,
                           ),
@@ -160,14 +160,6 @@ class _PriceCardState extends ConsumerState<PriceCard> {
                 _PriceChangeVisual(
                   changeBasisPoints: change,
                   loading: headerLoading,
-                ),
-                Text(
-                  'Powered by CoinGecko',
-                  style: type.brandMetric.copyWith(
-                    color: colors.onBrandArt.withValues(
-                      alpha: effects.chartContentOpacity,
-                    ),
-                  ),
                 ),
               ],
             ),
@@ -239,17 +231,35 @@ class _PriceCardState extends ConsumerState<PriceCard> {
             isSkeleton: false,
           ),
         },
+        Padding(
+          padding: EdgeInsets.only(
+            top: spacing.xs,
+            right: spacing.screenPadding,
+          ),
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              'Powered by CoinGecko',
+              style: type.supportingMeta.copyWith(color: colors.onBrandArt),
+            ),
+          ),
+        ),
       ],
     );
   }
 
-  static String _formatPrice(BitcoinMarketSnapshot? snapshot) {
+  static String _formatPrice(
+    BitcoinMarketSnapshot? snapshot, {
+    bool headline = false,
+  }) {
     if (snapshot == null) return '';
     return _fiatFormatter.format(
       minorUnits: snapshot.currentBitcoinPrice.minorUnits,
       symbol: snapshot.quoteCurrency.symbol,
       code: snapshot.quoteCurrency.code,
       minorUnitDigits: snapshot.quoteCurrency.minorUnitDigits,
+      includeCurrencyCode: !headline,
+      wholeUnitsOnly: headline,
     );
   }
 
@@ -415,19 +425,27 @@ class _MarketUnavailable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
-    return Padding(
-      padding: EdgeInsets.all(spacing.lg),
-      child: Column(
-        children: [
-          Semantics(
-            liveRegion: true,
-            child: Text(message, style: context.type.brandMetric),
-          ),
-          if (onRetry case final retry?) ...[
-            SizedBox(height: spacing.md),
-            CustomButton.compact(text: 'Retry', onTap: retry),
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: context.metrics.chartHeight),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: spacing.screenPadding),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Semantics(
+              liveRegion: true,
+              child: Text(message, style: context.type.brandMetric),
+            ),
+            if (onRetry case final retry?) ...[
+              SizedBox(height: spacing.md),
+              CustomButton.compact(
+                text: 'Retry',
+                variant: ButtonVariant.translucent,
+                onTap: retry,
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

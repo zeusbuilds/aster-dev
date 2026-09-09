@@ -71,45 +71,39 @@ class _SwapContent extends ConsumerWidget {
       }
     }
 
-    return Column(
-      children: [
-        Expanded(
-          child: ListView(
-            children: [
-              SwapCard(
-                state: state,
-                onSelectFrom: () => select(from: true),
-                onSelectTo: () => select(from: false),
-                onReverse: () =>
-                    ref.read(swapViewModelProvider.notifier).reverse(),
-              ),
-              SizedBox(height: context.spacing.xl),
-              Squircle(
-                color: context.appColors.surfaceSubtle,
-                borderColor: context.appColors.borderSubtle,
-                padding: EdgeInsets.all(context.spacing.lg),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      MingCuteIcons.mgc_information_line,
-                      size: context.icons.sm,
-                      color: context.colorScheme.primary,
-                    ),
-                    SizedBox(width: context.spacing.md),
-                    Expanded(
-                      child: Text(
-                        'Swap execution is not available in this build.',
-                        style: context.type.statusMessage,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+    return AsterFormBody(
+      content: Column(
+        children: [
+          SwapCard(
+            state: state,
+            onSelectFrom: () => select(from: true),
+            onSelectTo: () => select(from: false),
+            onReverse: () => ref.read(swapViewModelProvider.notifier).reverse(),
           ),
-        ),
-        SizedBox(height: context.spacing.lg),
+          SizedBox(height: context.spacing.xl),
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: context.spacing.sm),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  MingCuteIcons.mgc_information_line,
+                  size: context.icons.sm,
+                  color: context.colorScheme.primary,
+                ),
+                SizedBox(width: context.spacing.md),
+                Expanded(
+                  child: Text(
+                    'Swap execution is not available in this build.',
+                    style: context.type.statusMessage,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      actions: [
         const CustomButton(text: 'Swap unavailable', enabled: false),
         SizedBox(height: context.spacing.lg),
       ],

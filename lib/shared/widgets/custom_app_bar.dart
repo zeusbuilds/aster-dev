@@ -17,7 +17,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.title,
     this.leadingIcon = false,
     this.leadingEnabled = true,
-    this.centerTitle = true,
+    this.centerTitle = false,
     this.leadingIconData,
     this.action,
     this.fallbackLocation = RoutePaths.home,
@@ -41,7 +41,8 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String fallbackLocation;
 
   @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+  Size get preferredSize =>
+      Size.fromHeight(const AsterComponentMetrics().appBarHeight);
 
   @override
   Widget build(BuildContext context) {
@@ -77,6 +78,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     }
 
     return AppBar(
+      toolbarHeight: metrics.appBarHeight,
       backgroundColor: context.colorScheme.surface,
       elevation: 0,
       centerTitle: centerTitle,
@@ -87,7 +89,12 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                 : AsterNavigationScope(child: Builder(builder: buildLeading))
           : null,
       leadingWidth: metrics.appBarLeadingWidth,
-      actions: action != null ? [action!] : null,
+      titleSpacing: leadingIcon
+          ? context.spacing.xs
+          : context.spacing.screenPadding,
+      actions: action != null
+          ? [action!, SizedBox(width: context.spacing.sm)]
+          : null,
     );
   }
 }

@@ -92,8 +92,12 @@ void main() {
       () => find.text('1,001.5 sats').evaluate().isNotEmpty,
     );
 
-    expect(find.text('Available 901.25 sats'), findsOneWidget);
-    expect(find.text(r'$1.00 USD estimated'), findsOneWidget);
+    expect(find.text('Available 901.25 sats'), findsNothing);
+    expect(
+      find.bySemanticsLabel(RegExp('Bitcoin total .*available 901.25 sats')),
+      findsOneWidget,
+    );
+    expect(find.text(r'≈ $1.00'), findsOneWidget);
     expect(find.text('Powered by CoinGecko'), findsOneWidget);
     expect(find.text('Unavailable on this network'), findsOneWidget);
 
@@ -273,7 +277,7 @@ void main() {
       tester
           .widgetList<AppSkeletonizer>(find.byType(AppSkeletonizer))
           .map((widget) => widget.enabled),
-      [false, true, false],
+      [true, false],
     );
     expect(
       find.bySemanticsLabel(
@@ -326,20 +330,20 @@ void main() {
     await _pump(tester, harness, const HomeScreen());
     await _pumpUntil(
       tester,
-      () => find.text(r'$125.00 USD estimated').evaluate().isNotEmpty,
+      () => find.text(r'≈ $125.00').evaluate().isNotEmpty,
     );
-    expect(find.text(r'$1.00 USD estimated'), findsOneWidget);
+    expect(find.text(r'≈ $1.00'), findsOneWidget);
     expect(find.text('Retry fiat quote'), findsNothing);
 
     clockNow = clockNow.add(const Duration(seconds: 2));
     await tester.pump(const Duration(seconds: 2));
-    expect(find.text(r'$1.00 USD estimated'), findsOneWidget);
+    expect(find.text(r'≈ $1.00'), findsOneWidget);
     expect(find.text('USD estimate unavailable'), findsOneWidget);
     expect(find.text('Retry fiat quote'), findsOneWidget);
 
     clockNow = clockNow.add(const Duration(seconds: 2));
     await tester.pump(const Duration(seconds: 2));
-    expect(find.text(r'$1.00 USD estimated'), findsNothing);
+    expect(find.text(r'≈ $1.00'), findsNothing);
     expect(find.text('USD estimate unavailable'), findsNWidgets(2));
     expect(find.text('Market quote expired'), findsOneWidget);
   });

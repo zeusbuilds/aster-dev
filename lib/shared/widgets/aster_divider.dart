@@ -20,6 +20,7 @@ class AsterDivider extends StatelessWidget {
       height: strokes.divider,
       thickness: strokes.divider,
       indent: resolvedIndent,
+      endIndent: resolvedIndent,
     );
   }
 }

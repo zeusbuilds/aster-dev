@@ -14,6 +14,52 @@ show artificial loading.
 Controls are disabled when prerequisites are incomplete or an incompatible
 operation is active. A disabled or loading control emits no haptic.
 
+Compact actions are true pills with a 40-point visual inside a 48-point hit
+target. Use translucent pills over brand art, tonal pills for contextual
+actions such as Paste/Refresh, and neutral pills for dark secondary controls.
+Primary submission buttons retain the authored rounded-superellipse shape.
+
+## Authored Layouts
+
+The visual reference is commit `bbbc315`. Keep its price/chart Home, equal-width
+Send/Receive/Swap pills, two-line asset rows and compact floating navigation.
+Real values, loading, expiry, errors and unavailable operations must remain
+truthful; historical mock quotes and obsolete assets are not a design contract.
+
+- `AsterSplitCard`: one outlined squircle containing a main area and footer.
+  Do not stack independently rounded halves.
+- `AsterFormBody`: bottom-anchored actions with one scrolling form when space
+  is constrained. The owner supplies SafeArea and horizontal padding. Do not
+  put Expanded children or unconstrained scroll views inside its children.
+- `AsterSheetHeader`: shared handle, left-aligned title and optional close.
+- `Squircle`: clips children to the same boundary, paints outlines in front of
+  filled children, and leaves shadows outside the clipping layer.
+- Recovery fields use `radii.recoveryWord`; the small text uses a semantic
+  glass-content scrim to remain legible over the brightest existing mesh.
+- Keypads use `radii.keypad`, not input/card radii. Numeric fields label their
+  actual displayed unit, which is independent from the Bitcoin asset identity.
+
+The original palette and bundled DM Sans/Public Sans families are unchanged.
+Do not substitute a different screen composition while normalizing tokens.
+
+## Visual Evidence
+
+The test-only catalog renders production screens with isolated wallet, market
+and camera fixtures. It is UI evidence, not proof of live payments. Its recovery
+phrase is a public BIP39 test vector and must never hold funds.
+
+```sh
+fvm flutter test --dart-define=ASTER_CAPTURE_VISUALS=true test/visual_catalog_test.dart
+fvm flutter drive --driver=test_driver/visual_catalog.dart \
+  --target=integration_test/visual_catalog_test.dart -d <dedicated-ios-simulator-udid>
+```
+
+Host layouts export under `build/visual-restoration/host`; native PNGs export
+under `build/visual-restoration/ios`. Use a dedicated simulator; never reuse
+another task's device. The driver exports images before test-app cleanup.
+The catalog includes all four payment rails, sheets, readiness/error/loading
+variants, activity details, hidden balances, onboarding, settings and 2x text.
+
 ## Toasts
 
 Transient feedback goes through `context.toasts`. The Riverpod controller owns

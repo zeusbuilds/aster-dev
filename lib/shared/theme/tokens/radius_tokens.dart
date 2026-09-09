@@ -7,6 +7,8 @@ class AsterRadii extends ThemeExtension<AsterRadii> {
     this.sheet = 28,
     this.button = 18,
     this.input = 12,
+    this.keypad = 18,
+    this.recoveryWord = 24,
     this.badge = 8,
     this.checkbox = 4,
     this.snackbar = 12,
@@ -17,6 +19,12 @@ class AsterRadii extends ThemeExtension<AsterRadii> {
   final double sheet;
   final double button;
   final double input;
+
+  /// Broad, soft keys follow the original amount-entry surface.
+  final double keypad;
+
+  /// Soft glass recovery fields share one curve with generated-word tiles.
+  final double recoveryWord;
   final double badge;
   final double checkbox;
   final double snackbar;
@@ -28,6 +36,8 @@ class AsterRadii extends ThemeExtension<AsterRadii> {
     double? sheet,
     double? button,
     double? input,
+    double? keypad,
+    double? recoveryWord,
     double? badge,
     double? checkbox,
     double? snackbar,
@@ -38,6 +48,8 @@ class AsterRadii extends ThemeExtension<AsterRadii> {
       sheet: sheet ?? this.sheet,
       button: button ?? this.button,
       input: input ?? this.input,
+      keypad: keypad ?? this.keypad,
+      recoveryWord: recoveryWord ?? this.recoveryWord,
       badge: badge ?? this.badge,
       checkbox: checkbox ?? this.checkbox,
       snackbar: snackbar ?? this.snackbar,
@@ -53,6 +65,8 @@ class AsterRadii extends ThemeExtension<AsterRadii> {
       sheet: _lerp(sheet, other.sheet, t),
       button: _lerp(button, other.button, t),
       input: _lerp(input, other.input, t),
+      keypad: _lerp(keypad, other.keypad, t),
+      recoveryWord: _lerp(recoveryWord, other.recoveryWord, t),
       badge: _lerp(badge, other.badge, t),
       checkbox: _lerp(checkbox, other.checkbox, t),
       snackbar: _lerp(snackbar, other.snackbar, t),

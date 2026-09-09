@@ -140,156 +140,149 @@ class _OnboardingImportWalletScreenState
       scaledLineHeight + spacing.lg,
     );
 
-    return SingleChildScrollView(
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: EdgeInsets.fromLTRB(
-              spacing.xxl,
-              keyboardVisible ? spacing.md : spacing.xxl,
-              spacing.xxl,
-              0,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (!keyboardVisible) ...[
-                  const OnboardingWelcomeHeader(),
-                  SizedBox(height: spacing.huge),
-                ],
-                Text(
-                  'Import with recovery phrase',
-                  style: context.type.brandHero,
-                ),
-                if (!keyboardVisible) ...[
-                  SizedBox(height: spacing.md),
-                  Text(
-                    'Enter your 12-word recovery phrase in order.',
-                    style: context.type.brandBody.copyWith(
-                      color: colors.onBrandArt.withValues(
-                        alpha: effects.brandContentStrongOpacity,
-                      ),
-                    ),
-                  ),
-                ],
-                SizedBox(height: keyboardVisible ? spacing.lg : spacing.xxxl),
-              ],
-            ),
-          ),
-          SizedBox(
-            height:
-                wordFieldHeight * ImportWalletState.wordsPerPage +
-                spacing.md * (ImportWalletState.wordsPerPage - 1),
-            child: PageView.builder(
-              controller: _pageController,
-              physics:
-                  state.submitting ||
-                      state.requiresReconciliation ||
-                      navigation.inFlight
-                  ? const NeverScrollableScrollPhysics()
-                  : const PageScrollPhysics(),
-              itemCount:
-                  ImportWalletState.wordCount ~/ ImportWalletState.wordsPerPage,
-              onPageChanged: (page) => setState(() => _currentPage = page),
-              itemBuilder: (context, pageIndex) {
-                final start = pageIndex * ImportWalletState.wordsPerPage;
-                final end = start + ImportWalletState.wordsPerPage;
-                return Center(
-                  child: OnboardingImportWalletWordPage(
-                    controllers: _controllers.sublist(start, end),
-                    focusNodes: _focusNodes.sublist(start, end),
-                    statuses: state.wordStatuses.sublist(start, end),
-                    startIndex: start,
-                    fieldHeight: wordFieldHeight,
-                    enabled:
-                        !state.submitting &&
-                        !state.requiresReconciliation &&
-                        !navigation.inFlight,
-                    canSubmit: state.canSubmit,
-                    onChanged: _handleWordInput,
-                    onSubmitted: (index) =>
-                        unawaited(_handleSubmitted(index, state, navigation)),
-                  ),
-                );
-              },
-            ),
-          ),
-          SizedBox(height: spacing.sm),
-          Semantics(
-            container: true,
-            label: 'Recovery phrase page',
-            value:
-                '${_currentPage + 1} of '
-                '${ImportWalletState.wordCount ~/ ImportWalletState.wordsPerPage}',
-            child: ExcludeSemantics(
-              child: Center(
-                child: SmoothPageIndicator(
-                  controller: _pageController,
-                  count:
-                      ImportWalletState.wordCount ~/
-                      ImportWalletState.wordsPerPage,
-                  effect: ExpandingDotsEffect(
-                    activeDotColor: colors.onBrandArt,
-                    dotColor: colors.onBrandArt.withValues(
-                      alpha: effects.brandIndicatorInactiveOpacity,
-                    ),
-                    dotHeight: spacing.sm,
-                    dotWidth: spacing.sm,
-                    expansionFactor:
-                        context.art.onboardingIndicatorExpansionFactor,
-                    spacing: spacing.sm,
+    return AsterFormBody(
+      content: Padding(
+        padding: EdgeInsets.fromLTRB(
+          spacing.xxl,
+          keyboardVisible ? spacing.md : spacing.xxl,
+          spacing.xxl,
+          0,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (!keyboardVisible) ...[
+              const OnboardingWelcomeHeader(),
+              SizedBox(height: spacing.huge),
+            ],
+            Text('Import with recovery phrase', style: context.type.brandHero),
+            if (!keyboardVisible) ...[
+              SizedBox(height: spacing.md),
+              Text(
+                'Enter your 12-word recovery phrase in order.',
+                style: context.type.brandBody.copyWith(
+                  color: colors.onBrandArt.withValues(
+                    alpha: effects.brandContentStrongOpacity,
                   ),
                 ),
               ),
-            ),
-          ),
-          _PhraseStatus(
-            state: state,
-            onRetry:
-                state.checksumStatus == MnemonicChecksumStatus.incomplete &&
-                    state.failure?.retryable == true &&
-                    !navigation.inFlight
-                ? () => unawaited(
-                    ref
-                        .read(importWalletViewModelProvider.notifier)
-                        .retryChecksum(),
-                  )
-                : null,
-          ),
-          Padding(
-            padding: EdgeInsets.fromLTRB(
-              spacing.xxl,
-              spacing.sm,
-              spacing.xxl,
-              spacing.lg,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                CustomButton(
-                  text: 'Continue',
-                  variant: ButtonVariant.translucent,
-                  enabled: state.canSubmit && !navigation.inFlight,
-                  loading: state.submitting,
-                  hapticIntent: null,
-                  onTap: () => unawaited(_submit(navigation)),
-                ),
-                OnboardingTextAction(
-                  label: 'Back',
+            ],
+            SizedBox(height: keyboardVisible ? spacing.lg : spacing.xxxl),
+          ],
+        ),
+      ),
+      actions: [
+        SizedBox(
+          height:
+              wordFieldHeight * ImportWalletState.wordsPerPage +
+              spacing.md * (ImportWalletState.wordsPerPage - 1),
+          child: PageView.builder(
+            controller: _pageController,
+            physics:
+                state.submitting ||
+                    state.requiresReconciliation ||
+                    navigation.inFlight
+                ? const NeverScrollableScrollPhysics()
+                : const PageScrollPhysics(),
+            itemCount:
+                ImportWalletState.wordCount ~/ ImportWalletState.wordsPerPage,
+            onPageChanged: (page) => setState(() => _currentPage = page),
+            itemBuilder: (context, pageIndex) {
+              final start = pageIndex * ImportWalletState.wordsPerPage;
+              final end = start + ImportWalletState.wordsPerPage;
+              return Center(
+                child: OnboardingImportWalletWordPage(
+                  controllers: _controllers.sublist(start, end),
+                  focusNodes: _focusNodes.sublist(start, end),
+                  statuses: state.wordStatuses.sublist(start, end),
+                  startIndex: start,
+                  fieldHeight: wordFieldHeight,
                   enabled:
                       !state.submitting &&
                       !state.requiresReconciliation &&
                       !navigation.inFlight,
-                  hapticIntent: null,
-                  onPressed: () => _navigateToWelcome(context, navigation),
+                  canSubmit: state.canSubmit,
+                  onChanged: _handleWordInput,
+                  onSubmitted: (index) =>
+                      unawaited(_handleSubmitted(index, state, navigation)),
                 ),
-              ],
+              );
+            },
+          ),
+        ),
+        SizedBox(height: spacing.xxl),
+        Semantics(
+          container: true,
+          label: 'Recovery phrase page',
+          value:
+              '${_currentPage + 1} of '
+              '${ImportWalletState.wordCount ~/ ImportWalletState.wordsPerPage}',
+          child: ExcludeSemantics(
+            child: Center(
+              child: SmoothPageIndicator(
+                controller: _pageController,
+                count:
+                    ImportWalletState.wordCount ~/
+                    ImportWalletState.wordsPerPage,
+                effect: ExpandingDotsEffect(
+                  activeDotColor: colors.onBrandArt,
+                  dotColor: colors.onBrandArt.withValues(
+                    alpha: effects.brandIndicatorInactiveOpacity,
+                  ),
+                  dotHeight: spacing.sm,
+                  dotWidth: spacing.sm,
+                  expansionFactor:
+                      context.art.onboardingIndicatorExpansionFactor,
+                  spacing: spacing.sm,
+                ),
+              ),
             ),
           ),
-        ],
-      ),
+        ),
+        _PhraseStatus(
+          state: state,
+          onRetry:
+              state.checksumStatus == MnemonicChecksumStatus.incomplete &&
+                  state.failure?.retryable == true &&
+                  !navigation.inFlight
+              ? () => unawaited(
+                  ref
+                      .read(importWalletViewModelProvider.notifier)
+                      .retryChecksum(),
+                )
+              : null,
+        ),
+        Padding(
+          padding: EdgeInsets.fromLTRB(
+            spacing.xxl,
+            spacing.sm,
+            spacing.xxl,
+            spacing.lg,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              CustomButton(
+                text: 'Continue',
+                variant: ButtonVariant.translucent,
+                enabled: state.canSubmit && !navigation.inFlight,
+                loading: state.submitting,
+                hapticIntent: null,
+                onTap: () => unawaited(_submit(navigation)),
+              ),
+              OnboardingTextAction(
+                label: 'Back',
+                enabled:
+                    !state.submitting &&
+                    !state.requiresReconciliation &&
+                    !navigation.inFlight,
+                hapticIntent: null,
+                onPressed: () => _navigateToWelcome(context, navigation),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

@@ -16,8 +16,10 @@ class AssetRow extends StatelessWidget {
     required this.fiatContext,
     required this.balancesVisible,
     this.onTap,
+    this.denomination,
     this.loading = false,
     this.fiatLoading = false,
+    this.fiatSemanticContext,
   });
 
   factory AssetRow.loading({
@@ -52,18 +54,23 @@ class AssetRow extends StatelessWidget {
       title: display.title,
       totalText: display.total.text,
       availableText: display.available.text,
-      fiatContext: display.fiatContext,
+      fiatContext: display.fiatLabel ?? display.fiatContext,
+      fiatSemanticContext: display.fiatContext,
+      denomination: display.total.unit,
       balancesVisible: balancesVisible,
       fiatLoading: fiatLoading,
       onTap: onTap,
     );
   }
 
+  /// Display denomination follows the persisted Bitcoin unit preference.
+  final String? denomination;
   final WalletAssetKind kind;
   final String title;
   final String totalText;
   final String availableText;
   final String fiatContext;
+  final String? fiatSemanticContext;
   final bool balancesVisible;
   final VoidCallback? onTap;
   final bool loading;
@@ -77,7 +84,7 @@ class AssetRow extends StatelessWidget {
         : hidden
         ? '$title balance hidden'
         : '$title total $totalText, available $availableText, '
-              '${fiatLoading ? 'fiat estimate loading' : fiatContext}';
+              '${fiatLoading ? 'fiat estimate loading' : fiatSemanticContext ?? fiatContext}';
     return Semantics(
       button: onTap != null,
       enabled: onTap != null,
@@ -98,61 +105,43 @@ class AssetRow extends StatelessWidget {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          Expanded(
-                            child: Text(title, style: context.type.assetTitle),
-                          ),
-                          SizedBox(width: context.spacing.md),
-                          Expanded(
-                            child: AppSkeletonizer(
-                              enabled: loading,
-                              child: _BalanceValue(
-                                value: hidden ? '••••' : totalText,
-                                style: context.type.assetValue,
-                                textAlign: TextAlign.end,
-                              ),
-                            ),
-                          ),
-                        ],
+                      Text(title, style: context.type.assetTitle),
+                      SizedBox(height: context.spacing.xxs),
+                      Text(
+                        denomination ??
+                            (kind == WalletAssetKind.bitcoin ? 'BTC' : 'USDT'),
+                        style: context.type.assetMeta,
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(width: context.spacing.md),
+                Flexible(
+                  flex: 2,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AppSkeletonizer(
+                        enabled: loading || (fiatLoading && !hidden),
+                        child: _BalanceValue(
+                          value: hidden ? '••••' : fiatContext,
+                          style: context.type.assetValue,
+                          maxLines: 2,
+                          textAlign: TextAlign.end,
+                        ),
                       ),
                       SizedBox(height: context.spacing.xxs),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: AppSkeletonizer(
-                              enabled: loading || (fiatLoading && !hidden),
-                              child: Text(
-                                hidden ? 'Balance hidden' : fiatContext,
-                                style: context.type.assetMeta.copyWith(
-                                  color: context.appColors.textSecondary,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ),
-                          SizedBox(width: context.spacing.md),
-                          Expanded(
-                            child: AppSkeletonizer(
-                              enabled: loading,
-                              child: _BalanceValue(
-                                value: hidden
-                                    ? 'Available ••••'
-                                    : 'Available $availableText',
-                                style: context.type.assetMeta.copyWith(
-                                  color: context.appColors.textSecondary,
-                                ),
-                                maxLines: 2,
-                                textAlign: TextAlign.end,
-                              ),
-                            ),
-                          ),
-                        ],
+                      AppSkeletonizer(
+                        enabled: loading,
+                        child: _BalanceValue(
+                          value: hidden ? '••••' : totalText,
+                          style: context.type.assetMeta,
+                          maxLines: 2,
+                          textAlign: TextAlign.end,
+                        ),
                       ),
                     ],
                   ),

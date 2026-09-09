@@ -65,9 +65,10 @@ final class _PaymentTargetList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView.separated(
+      padding: EdgeInsets.only(top: context.spacing.md),
       itemCount: capabilities.length,
       separatorBuilder: (context, index) =>
-          SizedBox(height: context.spacing.sm),
+          SizedBox(height: context.spacing.md),
       itemBuilder: (context, index) => PaymentTargetTile(
         capability: capabilities[index],
         onSelected: onSelected,

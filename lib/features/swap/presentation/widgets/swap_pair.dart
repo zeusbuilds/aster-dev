@@ -35,35 +35,39 @@ class SwapPair extends StatelessWidget {
             ),
             child: Padding(
               padding: EdgeInsets.symmetric(
-                horizontal: context.spacing.lg,
-                vertical: context.spacing.lg,
+                horizontal: context.spacing.screenPadding,
+                vertical: context.spacing.xxl,
               ),
               child: Row(
                 children: [
-                  WalletAssetIcon(
-                    kind: target.assetKind,
-                    size: context.icons.xl,
-                  ),
-                  SizedBox(width: context.spacing.md),
+                  Text(label, style: context.type.rowMeta),
+                  SizedBox(width: context.spacing.lg),
                   Expanded(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          label,
-                          style: context.type.rowMeta.copyWith(
-                            color: context.appColors.textSecondary,
-                          ),
-                        ),
-                        SizedBox(height: context.spacing.xxs),
-                        Text(
-                          '${target.assetLabel} · ${target.railLabel}',
-                          style: context.type.title,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            WalletAssetIcon(
+                              kind: target.assetKind,
+                              size: context.icons.lg,
+                            ),
+                            SizedBox(width: context.spacing.sm),
+                            Flexible(
+                              child: Text(
+                                '${target.assetLabel} · ${target.railLabel}',
+                                style: context.type.rowTitleStrong,
+                                textAlign: TextAlign.end,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ),
+                  SizedBox(width: context.spacing.xs),
                   Icon(
                     RemixIcons.arrow_right_s_line,
                     size: context.icons.sm,

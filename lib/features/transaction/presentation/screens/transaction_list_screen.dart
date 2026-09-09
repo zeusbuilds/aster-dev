@@ -201,7 +201,7 @@ class _ActivityBody extends StatelessWidget {
         SliverPadding(
           padding: EdgeInsets.fromLTRB(
             context.spacing.screenPadding,
-            context.spacing.lg,
+            context.spacing.none,
             context.spacing.screenPadding,
             context.spacing.none,
           ),
@@ -221,9 +221,7 @@ class _ActivityBody extends StatelessWidget {
             context.spacing.screenPadding,
             context.spacing.md,
           ),
-          sliver: SliverToBoxAdapter(
-            child: Text('Activity', style: context.type.sectionTitle),
-          ),
+          sliver: SliverToBoxAdapter(child: const SizedBox.shrink()),
         ),
         if (records.isEmpty)
           SliverFillRemaining(
@@ -248,7 +246,7 @@ class _ActivityBody extends StatelessWidget {
                   children: [
                     if (group != previousGroup) ...[
                       if (index > 0) SizedBox(height: context.spacing.lg),
-                      Text(group, style: context.type.sectionLabel),
+                      Text(group, style: context.type.rowMeta),
                       SizedBox(height: context.spacing.sm),
                     ],
                     TransactionItem(
@@ -443,18 +441,9 @@ class _ActivityBalanceLoading extends StatelessWidget {
     return Squircle(
       key: const ValueKey('activity-loading-balance'),
       color: context.appColors.surfaceRaised,
-      padding: EdgeInsets.all(context.spacing.lg),
+      padding: EdgeInsets.all(context.spacing.screenPadding),
       child: Row(
         children: [
-          Container(
-            width: context.icons.xl,
-            height: context.icons.xl,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: context.appColors.surfaceSubtle,
-            ),
-          ),
-          SizedBox(width: context.spacing.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -477,6 +466,15 @@ class _ActivityBalanceLoading extends StatelessWidget {
               ],
             ),
           ),
+          SizedBox(width: context.spacing.lg),
+          Container(
+            width: context.icons.xl,
+            height: context.icons.xl,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: context.appColors.surfaceSubtle,
+            ),
+          ),
         ],
       ),
     );
@@ -490,50 +488,46 @@ class _ActivityItemLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Squircle(
+    return ConstrainedBox(
       key: ValueKey('activity-loading-item-$index'),
-      color: context.appColors.surfaceRaised,
-      padding: EdgeInsets.zero,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(minHeight: context.metrics.minTouchTarget),
-        child: Padding(
-          padding: EdgeInsets.all(context.spacing.lg),
-          child: Row(
-            children: [
-              Container(
-                width: context.icons.xl,
-                height: context.icons.xl,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: context.appColors.surfaceSubtle,
-                ),
+      constraints: BoxConstraints(minHeight: context.metrics.minTouchTarget),
+      child: Padding(
+        padding: EdgeInsets.all(context.spacing.lg),
+        child: Row(
+          children: [
+            Container(
+              width: context.icons.xl,
+              height: context.icons.xl,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: context.appColors.surfaceSubtle,
               ),
-              SizedBox(width: context.spacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Activity loading', style: context.type.rowTitle),
-                    SizedBox(height: context.spacing.xxs),
-                    NumericText(
-                      '00:00, Status loading',
-                      style: context.type.rowMeta,
-                    ),
-                  ],
-                ),
+            ),
+            SizedBox(width: context.spacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Activity loading', style: context.type.rowTitle),
+                  SizedBox(height: context.spacing.xxs),
+                  NumericText(
+                    '00:00, Status loading',
+                    style: context.type.rowMeta,
+                  ),
+                ],
               ),
-              SizedBox(width: context.spacing.sm),
-              Flexible(
-                child: AmountText(
-                  '000 sats',
-                  style: context.type.amountInline,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.end,
-                ),
+            ),
+            SizedBox(width: context.spacing.sm),
+            Flexible(
+              child: AmountText(
+                '000 sats',
+                style: context.type.amountInline,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.end,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
