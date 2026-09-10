@@ -33,10 +33,10 @@ hover, custom button scale, haptics, real wallet operations, palette values,
 fonts, and layout content are preserved. Active implementation verification is
 tracked as UXA-016, UXA-017, and DS-021 in the production tracker.
 
-The follow-up author decision keeps the Aster mark and wordmark only at the top
-of the blue Welcome screen. Create and Import begin directly with their existing
-titles on white; all recovery content, geometry, controls, state, and behavior
-remain unchanged. Verification is tracked as UXA-018 at `32670b5`.
+The author subsequently reviewed and rejected a Welcome-only wordmark
+experiment. The original Aster mark and text remain at the top of Welcome,
+Create, and Import; white recovery surfaces and every other onboarding layout
+and behavior remain unchanged.
 
 | Phase | Scope | Status | Verification / commit |
 | --- | --- | --- | --- |

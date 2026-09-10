@@ -96,6 +96,8 @@ class _CreateWalletContent extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const OnboardingWelcomeHeader(),
+                SizedBox(height: spacing.huge),
                 Text(
                   'Secure your wallet',
                   style: context.type.brandHero.copyWith(

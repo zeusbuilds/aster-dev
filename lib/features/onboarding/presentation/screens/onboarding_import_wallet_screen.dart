@@ -155,6 +155,10 @@ class _OnboardingImportWalletScreenState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (!keyboardVisible) ...[
+                  const OnboardingWelcomeHeader(),
+                  SizedBox(height: spacing.huge),
+                ],
                 Text(
                   'Import with recovery phrase',
                   style: context.type.brandHero.copyWith(
