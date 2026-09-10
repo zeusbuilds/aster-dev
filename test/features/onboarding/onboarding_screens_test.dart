@@ -79,6 +79,7 @@ void main() {
     await harness.container.read(walletViewModelProvider.future);
     await _pumpScreen(tester, harness, const OnboardingImportWalletScreen());
 
+    expect(find.text('Aster'), findsNothing);
     final first = find.byKey(const ValueKey('recovery-word-1'));
     await tester.enterText(first, 'ABANDON1');
     await tester.pump();
@@ -261,6 +262,7 @@ void main() {
     await harness.container.read(walletViewModelProvider.future);
     await _pumpScreen(tester, harness, const OnboardingCreateWalletScreen());
 
+    expect(find.text('Aster'), findsNothing);
     expect(
       tester.widget<Scaffold>(find.byType(Scaffold).last).backgroundColor,
       AppTheme.light().colorScheme.surface,
@@ -966,6 +968,7 @@ void main() {
     );
     await tester.pump();
 
+    expect(find.text('Aster'), findsOneWidget);
     final grid = find.byType(OnboardingWelcomeIconGrid);
     final filters = find.descendant(
       of: grid,
