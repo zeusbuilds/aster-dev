@@ -21,6 +21,18 @@
 
 ## Phases
 
+### Author Refinement: White Onboarding And No Tap Ink
+
+2026-09-10: the author's current request supersedes the historical glass/mesh
+recovery styling and VIS-011/VIS-023's earlier transparent-button solution.
+Only Welcome keeps the mesh; Create/Import are real separate routes with white
+surfaces and dark content. Copy/Back/Import text actions use plain tappable
+content with keyboard/semantic parity, not TextButton. Tap ink is disabled in
+the app theme and Material component state policy on both platforms. Focus,
+hover, custom button scale, haptics, real wallet operations, palette values,
+fonts, and layout content are preserved. Active implementation verification is
+tracked as UXA-016, UXA-017, and DS-021 in the production tracker.
+
 | Phase | Scope | Status | Verification / commit |
 | --- | --- | --- | --- |
 | V1 | Shared geometry, controls, Home, shell | verified | 2f522c8 plus native QA corrections; Home/reference compared; full host suite passes |

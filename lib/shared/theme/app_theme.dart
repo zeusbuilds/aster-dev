@@ -37,6 +37,13 @@ class AppTheme {
 
     return ThemeData(
       useMaterial3: true,
+      // Ripple creation and pressed highlights are independent in Material.
+      // Disable both without removing keyboard focus or pointer-hover cues.
+      splashFactory: NoSplash.splashFactory,
+      splashColor: _colors.transparentSurface,
+      highlightColor: _colors.transparentSurface,
+      focusColor: scheme.primary.withValues(alpha: _stateLayers.focusOverlay),
+      hoverColor: scheme.primary.withValues(alpha: _stateLayers.hoverOverlay),
       brightness: Brightness.light,
       colorScheme: scheme,
       scaffoldBackgroundColor: scheme.surface,
@@ -105,6 +112,16 @@ class AppTheme {
           textStyle: typeRoles.buttonLabel,
         ),
       ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: ButtonStyle(
+          overlayColor: _stateLayers.interactionOverlay(scheme.primary),
+        ),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: ButtonStyle(
+          overlayColor: _stateLayers.interactionOverlay(scheme.primary),
+        ),
+      ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: _buttonStyle(
           background: _colors.transparentSurface,
@@ -114,17 +131,20 @@ class AppTheme {
         ),
       ),
       textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(
-          foregroundColor: scheme.primary,
-          padding: EdgeInsets.symmetric(
-            horizontal: _spacing.lg,
-            vertical: _spacing.md,
-          ),
-          shape: RoundedSuperellipseBorder(
-            borderRadius: BorderRadius.circular(_radii.button),
-          ),
-          textStyle: typeRoles.buttonLabel,
-        ),
+        style:
+            TextButton.styleFrom(
+              foregroundColor: scheme.primary,
+              padding: EdgeInsets.symmetric(
+                horizontal: _spacing.lg,
+                vertical: _spacing.md,
+              ),
+              shape: RoundedSuperellipseBorder(
+                borderRadius: BorderRadius.circular(_radii.button),
+              ),
+              textStyle: typeRoles.buttonLabel,
+            ).copyWith(
+              overlayColor: _stateLayers.interactionOverlay(scheme.primary),
+            ),
       ),
       iconTheme: IconThemeData(color: scheme.onSurface, size: _icons.md),
       dividerTheme: DividerThemeData(
@@ -140,6 +160,12 @@ class AppTheme {
         unselectedLabelStyle: textTheme.labelSmall,
         type: BottomNavigationBarType.fixed,
         elevation: 0,
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        overlayColor: _stateLayers.interactionOverlay(scheme.primary),
+      ),
+      tabBarTheme: TabBarThemeData(
+        overlayColor: _stateLayers.interactionOverlay(scheme.primary),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: _colors.surfaceRaised,
@@ -185,6 +211,7 @@ class AppTheme {
         ),
       ),
       switchTheme: SwitchThemeData(
+        overlayColor: _stateLayers.interactionOverlay(scheme.primary),
         thumbColor: WidgetStateProperty.resolveWith((states) {
           return states.contains(WidgetState.selected)
               ? scheme.primary
@@ -197,6 +224,7 @@ class AppTheme {
         }),
       ),
       checkboxTheme: CheckboxThemeData(
+        overlayColor: _stateLayers.interactionOverlay(scheme.primary),
         fillColor: WidgetStateProperty.resolveWith((states) {
           return states.contains(WidgetState.selected)
               ? scheme.primary
@@ -212,6 +240,7 @@ class AppTheme {
         ),
       ),
       radioTheme: RadioThemeData(
+        overlayColor: _stateLayers.interactionOverlay(scheme.primary),
         fillColor: WidgetStateProperty.resolveWith((states) {
           return states.contains(WidgetState.selected)
               ? scheme.primary
@@ -222,9 +251,7 @@ class AppTheme {
         activeTrackColor: scheme.primary,
         inactiveTrackColor: _colors.surfaceSubtle,
         thumbColor: scheme.primary,
-        overlayColor: scheme.primary.withValues(
-          alpha: _stateLayers.primaryOverlay,
-        ),
+        overlayColor: _stateLayers.interactionOverlay(scheme.primary),
         valueIndicatorColor: scheme.primary,
         valueIndicatorTextStyle: textTheme.labelSmall?.copyWith(
           color: scheme.onPrimary,
@@ -271,6 +298,7 @@ class AppTheme {
         ),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
+        splashColor: _colors.transparentSurface,
         backgroundColor: scheme.primary,
         foregroundColor: scheme.onPrimary,
         elevation: 0,
@@ -333,6 +361,6 @@ class AppTheme {
         borderRadius: BorderRadius.circular(_radii.button),
       ),
       textStyle: textStyle,
-    );
+    ).copyWith(overlayColor: _stateLayers.interactionOverlay(foreground));
   }
 }

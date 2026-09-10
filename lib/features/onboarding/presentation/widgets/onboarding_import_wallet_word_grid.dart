@@ -49,7 +49,6 @@ class _RecoveryWordTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final effects = context.effects;
     return Semantics(
       container: true,
       sortKey: OrdinalSortKey(index.toDouble()),
@@ -61,26 +60,17 @@ class _RecoveryWordTile extends StatelessWidget {
           vertical: context.spacing.sm,
         ),
         borderRadius: context.radii.recoveryWord,
-        color: effects.brandGlassContentSurface(context.colorScheme),
-        borderColor: context.colorScheme.surface.withValues(
-          alpha: effects.brandGlassBorderOpacity,
-        ),
+        color: colors.surfaceSubtle,
+        borderColor: colors.borderSubtle,
         borderWidth: context.strokes.hairline,
         child: Row(
           children: [
             Text(
               '${index + 1}.',
-              style: context.type.assetMeta
-                  .copyWith(color: colors.onBrandArt)
-                  .toNumeric(context),
+              style: context.type.assetMeta.toNumeric(context),
             ),
             SizedBox(width: context.spacing.sm),
-            Expanded(
-              child: Text(
-                word,
-                style: context.type.rowTitle.copyWith(color: colors.onBrandArt),
-              ),
-            ),
+            Expanded(child: Text(word, style: context.type.rowTitle)),
           ],
         ),
       ),

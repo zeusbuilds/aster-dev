@@ -7,15 +7,16 @@ import 'package:flutter/rendering.dart';
 import '../../../../shared/shared.dart';
 import '../widgets/widgets.dart';
 
-/// Keeps the branded onboarding background alive across its nested routes.
+/// Retains the welcome artwork beneath the onboarding navigator.
 ///
 /// The mesh owns fragment shaders and a full-screen filtered layer. Housing it
 /// above the onboarding navigator prevents route transitions from composing
-/// two copies or recreating those resources for every step.
+/// two copies during transitions. Subsequent routes own opaque white Scaffolds;
+/// only Welcome exposes this background, including when popping back to it.
 class OnboardingShell extends StatefulWidget {
   const OnboardingShell({super.key, required this.child});
 
-  /// Active onboarding route rendered over the retained background.
+  /// Active onboarding route; only Welcome has a transparent surface.
   final Widget child;
 
   @override
@@ -58,18 +59,6 @@ class _OnboardingShellState extends State<OnboardingShell> {
       mediaQuery.devicePixelRatio,
       _maximumBackgroundSnapshotPixelRatio,
     );
-    final baseTheme = Theme.of(context);
-    final transitionBuilders =
-        Map<TargetPlatform, PageTransitionsBuilder>.unmodifiable({
-          ...baseTheme.pageTransitionsTheme.builders,
-          TargetPlatform.android:
-              PredictiveBackFullscreenPageTransitionsBuilder(
-                fallbackColor: colors.transparentSurface,
-              ),
-        });
-    final onboardingTheme = baseTheme.copyWith(
-      pageTransitionsTheme: PageTransitionsTheme(builders: transitionBuilders),
-    );
 
     return ColoredBox(
       color: colors.brandArtDark,
@@ -87,7 +76,7 @@ class _OnboardingShellState extends State<OnboardingShell> {
               ),
             ),
           ),
-          Theme(data: onboardingTheme, child: widget.child),
+          widget.child,
         ],
       ),
     );

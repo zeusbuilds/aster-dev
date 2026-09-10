@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../shared/shared.dart';
 import 'onboarding_text_action.dart';
 
-/// Branded loading or failure state used by onboarding routes.
+/// Loading or failure state on the white wallet-setup pages.
 class OnboardingStatusPanel extends StatelessWidget {
   const OnboardingStatusPanel.loading({
     super.key,
@@ -52,26 +52,30 @@ class OnboardingStatusPanel extends StatelessWidget {
                   if (_loading)
                     GridLoader(
                       colorStyle: GridLoaderColorStyle.custom,
-                      color: context.appColors.onBrandArt,
+                      color: context.colorScheme.primary,
                     )
                   else
                     Icon(
                       Icons.lock_outline,
-                      color: context.appColors.onBrandArt,
+                      color: context.colorScheme.onSurface,
                       size: context.icons.xl,
                     ),
                   SizedBox(height: context.spacing.lg),
                   if (title case final title?) ...[
                     Text(
                       title,
-                      style: context.type.brandTitle,
+                      style: context.type.brandTitle.copyWith(
+                        color: context.colorScheme.onSurface,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                     SizedBox(height: context.spacing.sm),
                   ],
                   Text(
                     message,
-                    style: context.type.brandBody,
+                    style: context.type.brandBody.copyWith(
+                      color: context.appColors.textSecondary,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                 ],
@@ -81,7 +85,7 @@ class OnboardingStatusPanel extends StatelessWidget {
               SizedBox(height: context.spacing.xxl),
               CustomButton(
                 text: label,
-                variant: ButtonVariant.translucent,
+                variant: ButtonVariant.primary,
                 onTap: onPrimary,
               ),
             ],

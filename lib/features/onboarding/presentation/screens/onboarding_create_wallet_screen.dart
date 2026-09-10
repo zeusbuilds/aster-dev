@@ -30,7 +30,7 @@ class OnboardingCreateWalletScreen extends ConsumerWidget {
           return PopScope(
             canPop: !navigationLocked,
             child: Scaffold(
-              backgroundColor: context.appColors.transparentSurface,
+              backgroundColor: context.colorScheme.surface,
               body: SafeArea(
                 child: switch (asyncState) {
                   AsyncData<CreateWalletState>(:final value)
@@ -98,12 +98,19 @@ class _CreateWalletContent extends ConsumerWidget {
               children: [
                 const OnboardingWelcomeHeader(),
                 SizedBox(height: spacing.huge),
-                Text('Secure your wallet', style: context.type.brandHero),
+                Text(
+                  'Secure your wallet',
+                  style: context.type.brandHero.copyWith(
+                    color: context.colorScheme.onSurface,
+                  ),
+                ),
                 SizedBox(height: spacing.md),
                 Text(
                   'Write these 12 words down in order. Keep them offline and '
                   'never share them with anyone.',
-                  style: context.type.brandBody,
+                  style: context.type.brandBody.copyWith(
+                    color: context.appColors.textSecondary,
+                  ),
                 ),
                 SizedBox(height: spacing.xxxl),
                 OnboardingImportWalletWordGrid(words: state.words),
@@ -125,7 +132,7 @@ class _CreateWalletContent extends ConsumerWidget {
                     child: Text(
                       failure.userMessage,
                       style: context.type.errorMessage.copyWith(
-                        color: context.appColors.danger,
+                        color: context.appColors.statusForeground,
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -150,7 +157,7 @@ class _CreateWalletContent extends ConsumerWidget {
               children: [
                 CustomButton(
                   text: 'Continue',
-                  variant: ButtonVariant.translucent,
+                  variant: ButtonVariant.primary,
                   enabled: state.canSubmit && !navigation.inFlight,
                   loading: state.submitting,
                   hapticIntent: null,

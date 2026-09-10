@@ -3,13 +3,17 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../shared/shared.dart';
 
-/// Top header row for the onboarding welcome screen.
+/// Shared onboarding wordmark, white only over the welcome artwork.
 class OnboardingWelcomeHeader extends StatelessWidget {
-  const OnboardingWelcomeHeader({super.key});
+  const OnboardingWelcomeHeader({super.key, this.onBrandArt = false});
+
+  final bool onBrandArt;
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.appColors;
+    final foreground = onBrandArt
+        ? context.appColors.onBrandArt
+        : context.colorScheme.onSurface;
     final icons = context.icons;
 
     return Row(
@@ -18,10 +22,15 @@ class OnboardingWelcomeHeader extends StatelessWidget {
         SvgPicture.asset(
           'assets/brand/aster-mark.svg',
           width: icons.lg,
-          colorFilter: ColorFilter.mode(colors.onBrandArt, BlendMode.srcIn),
+          colorFilter: ColorFilter.mode(foreground, BlendMode.srcIn),
         ),
         SizedBox(width: context.spacing.sm),
-        Flexible(child: Text('Aster', style: context.type.brandWordmark)),
+        Flexible(
+          child: Text(
+            'Aster',
+            style: context.type.brandWordmark.copyWith(color: foreground),
+          ),
+        ),
       ],
     );
   }

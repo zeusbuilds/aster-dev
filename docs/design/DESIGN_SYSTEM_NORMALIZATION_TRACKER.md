@@ -27,7 +27,8 @@ the light theme.
 - `AsterStrokes`: hairline, divider, border, and focus widths.
 - `AsterComponentMetrics`: touch targets and fixed component geometry.
 - `AsterTypeRoles`: complete product typography roles.
-- `AsterStateLayers`: disabled, hover, focus, pressed, and selected treatment.
+- `AsterStateLayers`: disabled, hover/focus overlays, and visibility/surface
+  treatment. Pressed ink is prohibited; `interactionOverlay` owns that policy.
 - `AsterEffects`: named visual-effect alpha decisions.
 - `AsterMotion`: authored durations, curves, and choreography phases.
 - `AsterGradients`: reusable gradient recipes.

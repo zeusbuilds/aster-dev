@@ -93,7 +93,6 @@ class _RecoveryWordField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final effects = context.effects;
     final radii = context.radii;
     final strokes = context.strokes;
     final statusDescription = switch (status) {
@@ -103,9 +102,7 @@ class _RecoveryWordField extends StatelessWidget {
     };
     final border = ShapedInputBorder(
       borderSide: BorderSide(
-        color: context.colorScheme.surface.withValues(
-          alpha: effects.brandGlassBorderOpacity,
-        ),
+        color: colors.borderSubtle,
         width: strokes.hairline,
       ),
       shape: RoundedSuperellipseBorder(
@@ -114,7 +111,7 @@ class _RecoveryWordField extends StatelessWidget {
     );
     final focusedBorder = ShapedInputBorder(
       borderSide: BorderSide(
-        color: colors.onBrandArt,
+        color: context.colorScheme.primary,
         width: strokes.focusBorder,
       ),
       shape: RoundedSuperellipseBorder(
@@ -146,20 +143,18 @@ class _RecoveryWordField extends StatelessWidget {
                 : TextInputAction.next,
             keyboardType: TextInputType.text,
             inputFormatters: const [_RecoveryPhraseInputFormatter()],
-            style: context.type.assetValue.copyWith(color: colors.onBrandArt),
-            cursorColor: colors.onBrandArt,
+            style: context.type.assetValue,
+            cursorColor: context.colorScheme.primary,
             decoration: InputDecoration(
               constraints: BoxConstraints(minHeight: height),
               filled: true,
-              fillColor: effects.brandGlassContentSurface(context.colorScheme),
+              fillColor: colors.surfaceSubtle,
               prefixIcon: ExcludeSemantics(
                 child: Center(
                   widthFactor: 1,
                   child: Text(
                     '${index + 1}.',
-                    style: context.type.assetMeta
-                        .copyWith(color: colors.onBrandArt)
-                        .toNumeric(context),
+                    style: context.type.assetMeta.toNumeric(context),
                   ),
                 ),
               ),

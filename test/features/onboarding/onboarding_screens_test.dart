@@ -15,7 +15,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../support/backdrop_text_contrast.dart';
 import '../../support/onboarding_harness.dart';
 import '../../support/presentation_fakes.dart';
 
@@ -208,25 +207,50 @@ void main() {
       ),
     );
     await pumpAction(loading: false);
-    final button = find.byType(TextButton);
+    final button = find.byType(OnboardingTextAction);
     final size = tester.getSize(button);
-    final style = tester.widget<TextButton>(button).style!;
-    expect(style.backgroundColor, isNull);
-    expect(style.side, isNull);
+    expect(
+      find.descendant(
+        of: button,
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is ButtonStyleButton ||
+              widget is InkResponse ||
+              widget is Material,
+        ),
+      ),
+      findsNothing,
+    );
     expect(find.byIcon(Icons.copy), findsOneWidget);
     expect(size.height, greaterThanOrEqualTo(48));
     await tester.tap(button);
     expect(taps, 1);
 
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    expect(taps, 3);
+    final node = tester.getSemantics(button);
+    node.owner!.performAction(node.id, ui.SemanticsAction.tap);
+    expect(taps, 4);
+
     await pumpAction(loading: true);
     expect(tester.getSize(button), size);
-    expect(tester.widget<TextButton>(button).onPressed, isNull);
+    expect(
+      tester
+          .getSemantics(button)
+          .getSemanticsData()
+          .hasAction(ui.SemanticsAction.tap),
+      isFalse,
+    );
     expect(
       tester.getSemantics(find.byType(OnboardingTextAction)).value,
       'Loading',
     );
     await tester.tap(button);
-    expect(taps, 1);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    expect(taps, 4);
   });
 
   testWidgets('create shows 1-6 and 7-12 and uses the secure copy service', (
@@ -236,6 +260,15 @@ void main() {
     addTearDown(() => _disposeHarness(tester, harness));
     await harness.container.read(walletViewModelProvider.future);
     await _pumpScreen(tester, harness, const OnboardingCreateWalletScreen());
+
+    expect(
+      tester.widget<Scaffold>(find.byType(Scaffold).last).backgroundColor,
+      AppTheme.light().colorScheme.surface,
+    );
+    expect(
+      tester.widget<Text>(find.text('Secure your wallet')).style!.color,
+      AppTheme.light().colorScheme.onSurface,
+    );
 
     expect(find.text('1.'), findsOneWidget);
     expect(find.text('6.'), findsOneWidget);
@@ -1095,29 +1128,9 @@ void main() {
 }
 
 Future<void> _expectOnboardingContrast(WidgetTester tester) async {
-  // Inspect the live composition, not an unpainted subtree beneath a retained
-  // snapshot. Snapshot readiness and density have separate render tests.
-  final snapshot = tester.widget<SnapshotWidget>(find.byType(SnapshotWidget));
-  snapshot.controller.allowSnapshotting = false;
-  await tester.pumpAndSettle();
-  await expectLater(
-    tester,
-    meetsGuideline(
-      BackdropTextContrastGuideline(
-        backdrop: find
-            .descendant(
-              of: find.byType(OnboardingWelcomeMeshBackground),
-              matching: find.byType(RepaintBoundary),
-            )
-            .first,
-        labels: const {
-          'Enter your 12-word recovery phrase in order.',
-          'Never share your recovery phrase',
-        },
-        underlay: AppTheme.light().extension<AsterColors>()!.brandArtDark,
-      ),
-    ),
-  );
+  // Recovery routes have an opaque white Scaffold. Measure the actual visible
+  // composition, not the welcome mesh retained behind that surface.
+  await expectLater(tester, meetsGuideline(textContrastGuideline));
 }
 
 final class _FailingImportWalletViewModel extends ImportWalletViewModel {

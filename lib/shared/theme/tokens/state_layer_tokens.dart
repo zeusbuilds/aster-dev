@@ -11,20 +11,33 @@ class AsterStateLayers extends ThemeExtension<AsterStateLayers> {
     this.hidden = 0,
     this.disabled = 0.5,
     this.translucentSurface = 0.8,
-    this.primaryOverlay = 0.12,
     this.hoverOverlay = 0.08,
     this.focusOverlay = 0.12,
-    this.pressedOverlay = 0.12,
   });
 
   final double visible;
   final double hidden;
   final double disabled;
   final double translucentSurface;
-  final double primaryOverlay;
   final double hoverOverlay;
   final double focusOverlay;
-  final double pressedOverlay;
+
+  /// Focus/hover remain visible; pointer presses never paint an ink overlay.
+  /// AppTheme also disables the splash factory, since these are separate
+  /// Material mechanisms. Custom controls use the same policy.
+  WidgetStateColor interactionOverlay(Color foreground) =>
+      WidgetStateColor.resolveWith((states) {
+        if (states.contains(WidgetState.disabled)) {
+          return foreground.withValues(alpha: hidden);
+        }
+        if (states.contains(WidgetState.focused)) {
+          return foreground.withValues(alpha: focusOverlay);
+        }
+        if (states.contains(WidgetState.hovered)) {
+          return foreground.withValues(alpha: hoverOverlay);
+        }
+        return foreground.withValues(alpha: hidden);
+      });
 
   @override
   AsterStateLayers copyWith({
@@ -32,20 +45,16 @@ class AsterStateLayers extends ThemeExtension<AsterStateLayers> {
     double? hidden,
     double? disabled,
     double? translucentSurface,
-    double? primaryOverlay,
     double? hoverOverlay,
     double? focusOverlay,
-    double? pressedOverlay,
   }) {
     return AsterStateLayers(
       visible: visible ?? this.visible,
       hidden: hidden ?? this.hidden,
       disabled: disabled ?? this.disabled,
       translucentSurface: translucentSurface ?? this.translucentSurface,
-      primaryOverlay: primaryOverlay ?? this.primaryOverlay,
       hoverOverlay: hoverOverlay ?? this.hoverOverlay,
       focusOverlay: focusOverlay ?? this.focusOverlay,
-      pressedOverlay: pressedOverlay ?? this.pressedOverlay,
     );
   }
 
@@ -61,10 +70,8 @@ class AsterStateLayers extends ThemeExtension<AsterStateLayers> {
         other.translucentSurface,
         t,
       ),
-      primaryOverlay: _lerp(primaryOverlay, other.primaryOverlay, t),
       hoverOverlay: _lerp(hoverOverlay, other.hoverOverlay, t),
       focusOverlay: _lerp(focusOverlay, other.focusOverlay, t),
-      pressedOverlay: _lerp(pressedOverlay, other.pressedOverlay, t),
     );
   }
 

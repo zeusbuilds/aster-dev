@@ -19,6 +19,20 @@ target. Use translucent pills over brand art, tonal pills for contextual
 actions such as Paste/Refresh, and neutral pills for dark secondary controls.
 Primary submission buttons retain the authored rounded-superellipse shape.
 
+Tap ripples and pressed ink highlights are not part of Aster's design on any
+platform. `AppTheme` uses `NoSplash.splashFactory` and transparent splash and
+highlight colors. Material 3 component overlays and custom controls consume
+`AsterStateLayers.interactionOverlay`: focus and hover remain visible, pointer
+presses do not paint ink. Preserve the custom button's bounded scale response
+and semantic haptics. Feature-local splash overrides fail the design validator.
+Flutter documents the factory/overlay distinction in its
+[tap-ink API](https://api.flutter.dev/flutter/material/TabBar/splashFactory.html).
+
+`OnboardingTextAction` is plain icon/text content, not a transparent Material
+button. Gesture, keyboard Enter/Space, and semantic activation share the same
+guarded command; keyboard focus underlines the label. Its minimum touch target
+and loading footprint remain stable without a painted button surface.
+
 ## Authored Layouts
 
 The visual reference is commit `bbbc315`. Keep its price/chart Home, equal-width
@@ -34,8 +48,11 @@ truthful; historical mock quotes and obsolete assets are not a design contract.
 - `AsterSheetHeader`: shared handle, left-aligned title and optional close.
 - `Squircle`: clips children to the same boundary, paints outlines in front of
   filled children, and leaves shadows outside the clipping layer.
-- Recovery fields use `radii.recoveryWord`; the small text uses a semantic
-  glass-content scrim to remain legible over the brightest existing mesh.
+- Only the onboarding Welcome page exposes the retained blue mesh. Create and
+  Import, including loading/error states, own opaque `ColorScheme.surface`
+  Scaffolds and native page transitions. Recovery fields use
+  `radii.recoveryWord`, `surfaceSubtle`, `borderSubtle`, and normal dark text;
+  focus/cursor use primary blue. Do not reuse on-art text or glass here.
 - Keypads use `radii.keypad`, not input/card radii. Numeric fields label their
   actual displayed unit, which is independent from the Bitcoin asset identity.
 - `unwrappedTextWidth` measures the active font, locale and accessibility scale
@@ -127,7 +144,8 @@ double padding.
 ## Accessibility
 
 Interactive surfaces use Material controls (`InkWell`, `IconButton`, buttons)
-with keyboard/focus behavior and at least a 48-point target. Icon-only commands
+without tap ink, or guarded plain actions with equivalent keyboard/focus
+behavior and at least a 48-point target. Icon-only commands
 have a tooltip or an equivalent explicit accessibility label. Loading and toast
 changes are live regions. Inactive indexed screens are excluded from pointer
 input and semantics.

@@ -271,7 +271,7 @@ void main() {
     expect(_location(router), RoutePaths.onboardingWelcome);
   });
 
-  testWidgets('onboarding routes retain one shared mesh background', (
+  testWidgets('white onboarding pages cover the retained welcome mesh', (
     tester,
   ) async {
     final (harness, transport) = await _createHarness();
@@ -305,15 +305,20 @@ void main() {
       find.byType(OnboardingImportWalletScreen),
     );
     final transitionTheme = Theme.of(importContext).pageTransitionsTheme;
-    final androidTransition = transitionTheme.builders[TargetPlatform.android];
-    expect(
-      androidTransition,
-      isA<PredictiveBackFullscreenPageTransitionsBuilder>(),
+    expect(transitionTheme, AppTheme.light().pageTransitionsTheme);
+    final importScaffold = tester.widget<Scaffold>(
+      find.descendant(
+        of: find.byType(OnboardingImportWalletScreen),
+        matching: find.byType(Scaffold),
+      ),
     );
+    expect(importScaffold.backgroundColor, importContext.colorScheme.surface);
     expect(
-      (androidTransition! as PredictiveBackFullscreenPageTransitionsBuilder)
-          .fallbackColor,
-      importContext.appColors.transparentSurface,
+      tester
+          .widget<Text>(find.text('Import with recovery phrase'))
+          .style!
+          .color,
+      importContext.colorScheme.onSurface,
     );
     expect(
       transitionTheme.builders[TargetPlatform.iOS],

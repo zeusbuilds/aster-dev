@@ -84,7 +84,7 @@ class _OnboardingImportWalletScreenState
           return PopScope(
             canPop: !navigationLocked,
             child: Scaffold(
-              backgroundColor: context.appColors.transparentSurface,
+              backgroundColor: context.colorScheme.surface,
               resizeToAvoidBottomInset: true,
               body: SafeArea(
                 child: switch (asyncState) {
@@ -131,7 +131,6 @@ class _OnboardingImportWalletScreenState
     final context = this.context;
     final spacing = context.spacing;
     final colors = context.appColors;
-    final effects = context.effects;
     final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
     final wordStyle = context.type.assetValue;
     final scaledLineHeight =
@@ -162,16 +161,16 @@ class _OnboardingImportWalletScreenState
                 ],
                 Text(
                   'Import with recovery phrase',
-                  style: context.type.brandHero,
+                  style: context.type.brandHero.copyWith(
+                    color: context.colorScheme.onSurface,
+                  ),
                 ),
                 if (!keyboardVisible) ...[
                   SizedBox(height: spacing.md),
                   Text(
                     'Enter your 12-word recovery phrase in order.',
                     style: context.type.brandBody.copyWith(
-                      color: colors.onBrandArt.withValues(
-                        alpha: effects.brandContentStrongOpacity,
-                      ),
+                      color: colors.textSecondary,
                     ),
                   ),
                 ],
@@ -232,10 +231,8 @@ class _OnboardingImportWalletScreenState
                       ImportWalletState.wordCount ~/
                       ImportWalletState.wordsPerPage,
                   effect: ExpandingDotsEffect(
-                    activeDotColor: colors.onBrandArt,
-                    dotColor: colors.onBrandArt.withValues(
-                      alpha: effects.brandIndicatorInactiveOpacity,
-                    ),
+                    activeDotColor: context.colorScheme.primary,
+                    dotColor: colors.borderSubtle,
                     dotHeight: spacing.sm,
                     dotWidth: spacing.sm,
                     expansionFactor:
@@ -274,7 +271,7 @@ class _OnboardingImportWalletScreenState
             children: [
               CustomButton(
                 text: 'Continue',
-                variant: ButtonVariant.translucent,
+                variant: ButtonVariant.primary,
                 enabled: state.canSubmit && !navigation.inFlight,
                 loading: state.submitting,
                 hapticIntent: null,
@@ -405,21 +402,24 @@ class _PhraseStatus extends StatelessWidget {
     final (message, color) = switch (state.checksumStatus) {
       _ when state.failure != null => (
         state.failure!.userMessage,
-        context.appColors.danger,
+        context.appColors.statusForeground,
       ),
       MnemonicChecksumStatus.checking => (
         'Checking recovery phrase...',
-        context.appColors.onBrandArt,
+        context.appColors.textSecondary,
       ),
       MnemonicChecksumStatus.valid => (
         'Recovery phrase is valid',
-        context.appColors.success,
+        context.colorScheme.onSurface,
       ),
       MnemonicChecksumStatus.invalid => (
         'The phrase checksum does not match',
-        context.appColors.danger,
+        context.appColors.statusForeground,
       ),
-      _ => ('Never share your recovery phrase', context.appColors.onBrandArt),
+      _ => (
+        'Never share your recovery phrase',
+        context.appColors.textSecondary,
+      ),
     };
     return Semantics(
       liveRegion:

@@ -114,6 +114,21 @@ class BootstrapSurface extends StatelessWidget {
     );
   });
 
+  test('rejects feature overrides of the global no-splash policy', () {
+    _write(repository, 'lib/shared/widgets/local_ink.dart', '''
+Widget build(BuildContext context) => InkWell(
+  splashFactory: InkRipple.splashFactory,
+  splashColor: context.colorScheme.primary,
+  child: child,
+);
+''');
+    expect(verifyDesignSystem(repository).failures, hasLength(2));
+    expect(
+      verifyDesignSystem(repository).failures,
+      everyElement(contains('Tap ink policy belongs to AppTheme')),
+    );
+  });
+
   test('rejects raw geometry, opacity, motion, and legacy token access', () {
     _write(repository, 'lib/shared/screens/broken_screen.dart', '''
 Widget build(BuildContext context) => AnimatedContainer(

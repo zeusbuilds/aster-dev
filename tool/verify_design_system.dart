@@ -237,6 +237,12 @@ final class _DesignSystemVisitor extends RecursiveAstVisitor<void> {
   @override
   void visitNamedArgument(NamedArgument node) {
     final name = node.name.lexeme;
+    if (name == 'splashFactory' || name == 'splashColor') {
+      _report(
+        node,
+        'Tap ink policy belongs to AppTheme, not a local splash override.',
+      );
+    }
     if (_typographyArguments.contains(name)) {
       _report(
         node,

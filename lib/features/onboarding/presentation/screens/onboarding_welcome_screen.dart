@@ -52,7 +52,7 @@ class _OnboardingContent extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const OnboardingWelcomeHeader(),
+                const OnboardingWelcomeHeader(onBrandArt: true),
                 SizedBox(height: spacing.huge),
                 const OnboardingWelcomeIconGrid(),
                 SizedBox(height: spacing.xxxl),
@@ -93,6 +93,7 @@ class _OnboardingContent extends StatelessWidget {
                 SizedBox(height: spacing.md),
                 OnboardingTextAction(
                   label: 'Import Wallet',
+                  onBrandArt: true,
                   enabled: !navigation.inFlight,
                   hapticIntent: null,
                   onPressed: () => open(

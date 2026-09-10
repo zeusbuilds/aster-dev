@@ -166,24 +166,9 @@ class _CustomButtonState extends State<CustomButton> {
                       onTap: isEnabled ? activate : null,
                       onHighlightChanged: isEnabled ? _handleHighlight : null,
                       customBorder: shape,
-                      overlayColor: WidgetStateProperty.resolveWith((states) {
-                        if (states.contains(WidgetState.pressed)) {
-                          return foregroundColor.withValues(
-                            alpha: stateLayers.pressedOverlay,
-                          );
-                        }
-                        if (states.contains(WidgetState.focused)) {
-                          return foregroundColor.withValues(
-                            alpha: stateLayers.focusOverlay,
-                          );
-                        }
-                        if (states.contains(WidgetState.hovered)) {
-                          return foregroundColor.withValues(
-                            alpha: stateLayers.hoverOverlay,
-                          );
-                        }
-                        return colors.transparentSurface;
-                      }),
+                      overlayColor: stateLayers.interactionOverlay(
+                        foregroundColor,
+                      ),
                       child: Padding(
                         padding: EdgeInsets.symmetric(
                           horizontal: isCompact ? spacing.md : spacing.xxl,
