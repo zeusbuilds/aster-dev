@@ -36,7 +36,7 @@ tracked as UXA-016, UXA-017, and DS-021 in the production tracker.
 The author subsequently reviewed and rejected a Welcome-only wordmark
 experiment. The original Aster mark and text remain at the top of Welcome,
 Create, and Import; white recovery surfaces and every other onboarding layout
-and behavior remain unchanged.
+and behavior remain unchanged. Restoration source: `2e75a49`.
 
 | Phase | Scope | Status | Verification / commit |
 | --- | --- | --- | --- |
