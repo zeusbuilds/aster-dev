@@ -30,3 +30,11 @@ map, and new plist keys require a source-policy review.
 `ASTER_USDT_PRECISION` is the asset's canonical decimal precision from `0`
 through `18`. Negative, signed, padded, or out-of-range values fail before any
 release build starts.
+
+`ASTER_DAEMON_PORT` and `ASTER_LDK_PEER_PORT` are optional native listener
+ports, defaulting to `9735` and `9736`. They must be distinct canonical decimal
+integers from `1` through `65535`; invalid text never falls back silently.
+These configure app-process listeners, not the indexer or LSP endpoint. Local
+simulator builds use separate Aster ports to avoid other wallets; see
+[local regtest](../docs/REGTEST.md). That ignored Debug/Profile configuration
+is not a release manifest and does not weaken the TLS release policy.

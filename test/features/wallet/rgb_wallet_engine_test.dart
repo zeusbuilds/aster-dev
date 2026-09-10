@@ -50,6 +50,8 @@ void main() {
       indexerUrl: 'http://127.0.0.1:50002',
       rgbTransportProxy: 'http://127.0.0.1:3001',
       vssUrl: 'http://127.0.0.1:3200',
+      daemonListeningPort: 19735,
+      ldkPeerListeningPort: 19736,
     );
     final factory = RgbWalletEngineFactory.withSdk(sdk);
 
@@ -67,6 +69,8 @@ void main() {
             as UtexoWalletConfig;
     expect(config.vssUrl, localServices.vssUrl);
     expect(config.vssAllowHttp, isTrue);
+    expect(config.daemonListeningPort, 19735);
+    expect(config.ldkPeerListeningPort, 19736);
   });
 
   test('resolves and validates immutable SDK endpoint defaults once', () {
@@ -122,6 +126,8 @@ void main() {
       rgbTransportProxy: 'http://127.0.0.1:3001/json-rpc',
       lspBaseUrl: 'http://127.0.0.1:3100',
       vssUrl: 'http://127.0.0.1:3200',
+      daemonListeningPort: 19735,
+      ldkPeerListeningPort: 19736,
     );
 
     final resolved = RgbWalletServiceConfigurationResolver.resolve(configured);
@@ -130,6 +136,8 @@ void main() {
     expect(resolved.rgbTransportProxy, configured.rgbTransportProxy);
     expect(resolved.lspBaseUrl, configured.lspBaseUrl);
     expect(resolved.vssUrl, configured.vssUrl);
+    expect(resolved.daemonListeningPort, 19735);
+    expect(resolved.ldkPeerListeningPort, 19736);
   });
 
   test('factory rejects unresolved endpoint configuration', () {

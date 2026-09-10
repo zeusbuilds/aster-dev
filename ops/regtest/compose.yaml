@@ -1,0 +1,120 @@
+name: aster-app-regtest
+
+x-logging: &bounded-logging
+  driver: local
+  options:
+    max-size: 5m
+    max-file: '2'
+
+services:
+  bitcoind:
+    image: registry.gitlab.com/hashbeam/docker/bitcoind@sha256:3bddc2fbb5ca92e3cbf1d912a5db155d416983e23ac241d0bc05f69caf236fed
+    platform: linux/amd64
+    init: true
+    restart: unless-stopped
+    command: ['-fallbackfee=0.0002', '-rpcallowip=0.0.0.0/0', '-connect=0', '-listen=1']
+    environment:
+      MYUID: '${ASTER_LOCAL_UID:?Set the local uid}'
+      NETWORK: regtest
+      RPCAUTH: '${ASTER_REGTEST_RPC_AUTH:?Initialize independent Aster RPC credentials}'
+    ports:
+      - '127.0.0.1:19443:18443'
+    volumes:
+      - ../../.local/aster-regtest/bitcoind:/srv/app/.bitcoin
+    labels:
+      com.aster.owner: aster-dev
+    logging: *bounded-logging
+    healthcheck:
+      test: ['CMD', 'bitcoin-cli', '-regtest', '-datadir=/srv/app/.bitcoin', '-rpcclienttimeout=5', 'getblockcount']
+      interval: 5s
+      timeout: 8s
+      retries: 12
+      start_period: 15s
+
+  electrs:
+    image: registry.gitlab.com/hashbeam/docker/electrs@sha256:176fbbf1ccc010ca45f36cc358cb887edbff0cd3fe4c467adc1b08ffa8723a68
+    platform: linux/amd64
+    init: true
+    restart: unless-stopped
+    environment:
+      MYUID: '${ASTER_LOCAL_UID:?Set the local uid}'
+      NETWORK: regtest
+      BTCHOST: bitcoind
+      BTCUSER: aster
+      BTCPASS: '${ASTER_REGTEST_RPC_PASSWORD:?Initialize independent Aster RPC credentials}'
+    ports:
+      - '127.0.0.1:51001:50001'
+    volumes:
+      - ../../.local/aster-regtest/electrs:/srv/app/db
+    depends_on:
+      bitcoind:
+        condition: service_healthy
+    labels:
+      com.aster.owner: aster-dev
+    logging: *bounded-logging
+    healthcheck:
+      test: ['CMD', 'bash', '-ec', 'exec 3<>/dev/tcp/127.0.0.1/50001']
+      interval: 5s
+      timeout: 8s
+      retries: 20
+      start_period: 15s
+
+  proxy:
+    image: ghcr.io/rgb-tools/rgb-proxy-server@sha256:b06fe0f234c53030d54fe1e704daf4bc6ff2879a335124353175130a5112d313
+    platform: linux/amd64
+    init: true
+    restart: unless-stopped
+    environment:
+      APP_DATA: /var/lib/aster-proxy
+    ports:
+      - '127.0.0.1:3100:3000'
+    volumes:
+      - ../../.local/aster-regtest/proxy:/var/lib/aster-proxy
+    labels:
+      com.aster.owner: aster-dev
+    logging: *bounded-logging
+    healthcheck:
+      test: ['CMD', 'node', '-e', 'fetch("http://127.0.0.1:3000/json-rpc",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({jsonrpc:"2.0",id:1,method:"server.info"}),signal:AbortSignal.timeout(4000)}).then(r=>r.json()).then(r=>{if(!r.result?.version)process.exit(1)}).catch(()=>process.exit(1))']
+      interval: 5s
+      timeout: 8s
+      retries: 12
+
+  miner:
+    image: registry.gitlab.com/hashbeam/docker/bitcoind@sha256:3bddc2fbb5ca92e3cbf1d912a5db155d416983e23ac241d0bc05f69caf236fed
+    platform: linux/amd64
+    init: true
+    restart: unless-stopped
+    entrypoint: ['bash', '-eu', '-c']
+    command:
+      - |
+        rpc() { bitcoin-cli -regtest -rpcconnect=bitcoind -rpcport=18443 -rpcclienttimeout=30 -conf=/run/secrets/rpc-client.conf "$$@"; }
+        if ! rpc -rpcwallet=aster-faucet getwalletinfo >/dev/null 2>&1; then
+          rpc loadwallet aster-faucet >/dev/null 2>&1 || rpc createwallet aster-faucet >/dev/null
+        fi
+        address="$$(rpc -rpcwallet=aster-faucet getnewaddress)"
+        height="$$(rpc getblockcount)"
+        if [ "$$height" -lt 101 ]; then rpc generatetoaddress "$$((101-height))" "$$address" >/dev/null; fi
+        while true; do
+          rpc generatetoaddress 1 "$$address" >/dev/null
+          touch /tmp/aster-miner-ready
+          sleep 10
+        done
+    volumes:
+      - ../../.local/aster-regtest/rpc-client.conf:/run/secrets/rpc-client.conf:ro
+    depends_on:
+      bitcoind:
+        condition: service_healthy
+    labels:
+      com.aster.owner: aster-dev
+    logging: *bounded-logging
+    healthcheck:
+      test: ['CMD-SHELL', 'test -f /tmp/aster-miner-ready && test "$$(($$(date +%s)-$$(stat -c %Y /tmp/aster-miner-ready)))" -lt 45']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+networks:
+  default:
+    name: aster-app-regtest-network
+    labels:
+      com.aster.owner: aster-dev

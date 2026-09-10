@@ -8,6 +8,46 @@ import '../../tool/verify_release_configuration.dart';
 
 void main() {
   group('ReleaseConfigurationManifest', () {
+    test(
+      'optional native listener ports reject malformed and colliding values',
+      () {
+        ReleaseConfigurationManifest parse(Map<String, String> ports) =>
+            ReleaseConfigurationManifest.parse(
+              _manifest({..._baseValues, ...ports}),
+              audience: ReleaseAudience.internalBeta,
+            );
+        expect(
+          parse({'ASTER_DAEMON_PORT': '19735', 'ASTER_LDK_PEER_PORT': '19736'})
+              .values['ASTER_LDK_PEER_PORT'],
+          '19736',
+        );
+        for (final key in [
+          ReleaseConfigurationKey.daemonPort,
+          ReleaseConfigurationKey.ldkPeerPort,
+        ]) {
+          for (final value in [
+            '0',
+            '-1',
+            '65536',
+            '019735',
+            '+19735',
+            '1.5',
+            'abc',
+            ' 19735',
+          ]) {
+            expect(() => parse({key: value}), throwsFormatException);
+          }
+        }
+        for (final ports in [
+          {'ASTER_DAEMON_PORT': '9736'},
+          {'ASTER_LDK_PEER_PORT': '9735'},
+          {'ASTER_DAEMON_PORT': '19735', 'ASTER_LDK_PEER_PORT': '19735'},
+        ]) {
+          expect(() => parse(ports), throwsFormatException);
+        }
+      },
+    );
+
     test('accepts a complete sorted internal-beta manifest', () {
       final manifest = ReleaseConfigurationManifest.parse(
         _manifest(),

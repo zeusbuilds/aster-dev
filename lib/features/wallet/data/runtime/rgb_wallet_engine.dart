@@ -37,6 +37,8 @@ abstract final class RgbWalletServiceConfigurationResolver {
     final resolved = WalletServiceConfiguration(
       environment: configured.environment,
       sdkNetwork: configured.sdkNetwork,
+      daemonListeningPort: configured.daemonListeningPort,
+      ldkPeerListeningPort: configured.ldkPeerListeningPort,
       indexerUrl: indexerUrl,
       rgbTransportProxy: rgbTransportProxy,
       lspBaseUrl:
@@ -88,6 +90,8 @@ final class RgbWalletEngineFactory implements WalletEngineFactory {
       config: UtexoWalletConfig(
         storageDirPath: configuration.storageDirectory,
         network: services.sdkNetwork,
+        daemonListeningPort: services.daemonListeningPort,
+        ldkPeerListeningPort: services.ldkPeerListeningPort,
         vssUrl: services.vssUrl,
         vssAllowHttp: services.allowsInsecureLocalVss,
         lspBaseUrl: services.lspBaseUrl,

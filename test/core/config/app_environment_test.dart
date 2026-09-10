@@ -2,6 +2,39 @@ import 'package:aster/core/core.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    'native listener ports are bounded, distinct configuration identity',
+    () {
+      WalletServiceConfiguration configuration(int daemon, int peer) =>
+          WalletServiceConfiguration(
+            environment: BlockchainEnvironment.regtest,
+            sdkNetwork: 'regtest',
+            daemonListeningPort: daemon,
+            ldkPeerListeningPort: peer,
+          );
+      final local = configuration(19735, 19736);
+      expect(local.validate, returnsNormally);
+      expect(local, configuration(19735, 19736));
+      expect(local.hashCode, configuration(19735, 19736).hashCode);
+      expect(local, isNot(configuration(9735, 9736)));
+      expect(configuration(1, 65535).validate, returnsNormally);
+      for (final ports in [
+        (0, 9736),
+        (-1, 9736),
+        (65536, 9736),
+        (9735, 0),
+        (9735, -1),
+        (9735, 65536),
+        (9735, 9735),
+      ]) {
+        expect(
+          configuration(ports.$1, ports.$2).validate,
+          throwsA(isA<AppConfigurationException>()),
+        );
+      }
+    },
+  );
+
   test('accepts only canonical app-owned blockchain environments', () {
     expect(
       BlockchainEnvironment.parse('mainnet'),

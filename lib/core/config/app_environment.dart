@@ -74,6 +74,8 @@ final class WalletServiceConfiguration {
     this.vssUrl,
     this.explorerBaseUrl,
     this.usdtAsset,
+    this.daemonListeningPort = 9735,
+    this.ldkPeerListeningPort = 9736,
   });
 
   /// Maximum serialized length of any endpoint crossing the native boundary.
@@ -97,6 +99,15 @@ final class WalletServiceConfiguration {
       sdkNetwork: environment == BlockchainEnvironment.signet
           ? 'utexo'
           : environment.name,
+      daemonListeningPort: _listenerPort(
+        const String.fromEnvironment('ASTER_DAEMON_PORT', defaultValue: '9735'),
+      ),
+      ldkPeerListeningPort: _listenerPort(
+        const String.fromEnvironment(
+          'ASTER_LDK_PEER_PORT',
+          defaultValue: '9736',
+        ),
+      ),
       indexerUrl: _optionalEnvironment('ASTER_INDEXER_URL'),
       rgbTransportProxy: _optionalEnvironment('ASTER_RGB_PROXY_URL'),
       lspBaseUrl: _optionalEnvironment('ASTER_LSP_URL'),
@@ -123,6 +134,14 @@ final class WalletServiceConfiguration {
   /// Stable SDK network carrier. UTEXO protocol signet uses the SDK's `utexo`
   /// service profile while Aster still reports the chain as `signet`.
   final String sdkNetwork;
+
+  /// Native node listener, separate from the outbound service endpoints.
+  /// Local simulator builds must reserve their own port on the host.
+  final int daemonListeningPort;
+
+  /// Native Lightning peer listener. Must differ from [daemonListeningPort].
+  /// This does not provision a peer, channel, or any Lightning liquidity.
+  final int ldkPeerListeningPort;
   final String? indexerUrl;
   final String? rgbTransportProxy;
   final String? lspBaseUrl;
@@ -140,6 +159,8 @@ final class WalletServiceConfiguration {
       other is WalletServiceConfiguration &&
       other.environment == environment &&
       other.sdkNetwork == sdkNetwork &&
+      other.daemonListeningPort == daemonListeningPort &&
+      other.ldkPeerListeningPort == ldkPeerListeningPort &&
       other.indexerUrl == indexerUrl &&
       other.rgbTransportProxy == rgbTransportProxy &&
       other.lspBaseUrl == lspBaseUrl &&
@@ -151,6 +172,8 @@ final class WalletServiceConfiguration {
   int get hashCode => Object.hash(
     environment,
     sdkNetwork,
+    daemonListeningPort,
+    ldkPeerListeningPort,
     indexerUrl,
     rgbTransportProxy,
     lspBaseUrl,
@@ -187,7 +210,12 @@ final class WalletServiceConfiguration {
     final expectedSdkNetwork = environment == BlockchainEnvironment.signet
         ? 'utexo'
         : environment.name;
-    if (sdkNetwork != expectedSdkNetwork) {
+    if (sdkNetwork != expectedSdkNetwork ||
+        daemonListeningPort < 1 ||
+        daemonListeningPort > 65535 ||
+        ldkPeerListeningPort < 1 ||
+        ldkPeerListeningPort > 65535 ||
+        daemonListeningPort == ldkPeerListeningPort) {
       throw const AppConfigurationException();
     }
     _validateEndpoint(
@@ -221,6 +249,14 @@ final class WalletServiceConfiguration {
       permitsInsecureDevelopmentEndpoints,
     );
     usdtAsset?.validate();
+  }
+
+  static int _listenerPort(String value) {
+    final port = int.tryParse(value);
+    if (port == null || '$port' != value || port < 1 || port > 65535) {
+      throw const AppConfigurationException();
+    }
+    return port;
   }
 
   /// Returns a public explorer URL only for a canonical Bitcoin transaction

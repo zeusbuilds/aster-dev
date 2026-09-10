@@ -25,6 +25,8 @@ ReleaseAudience parseReleaseAudience(String value) => switch (value) {
 /// Canonical compile-time keys accepted by Aster release builds.
 abstract final class ReleaseConfigurationKey {
   static const network = 'ASTER_NETWORK';
+  static const daemonPort = 'ASTER_DAEMON_PORT';
+  static const ldkPeerPort = 'ASTER_LDK_PEER_PORT';
   static const indexerUrl = 'ASTER_INDEXER_URL';
   static const rgbProxyUrl = 'ASTER_RGB_PROXY_URL';
   static const lspUrl = 'ASTER_LSP_URL';
@@ -41,10 +43,12 @@ abstract final class ReleaseConfigurationKey {
   static const instagramUrl = 'ASTER_INSTAGRAM_URL';
 
   static const all = <String>{
+    daemonPort,
     explorerUrl,
     indexerUrl,
     instagramUrl,
     lspUrl,
+    ldkPeerPort,
     marketApiBaseUrl,
     network,
     privacyUrl,
@@ -140,6 +144,15 @@ final class ReleaseConfigurationManifest {
     }
 
     _validateNetwork(values[ReleaseConfigurationKey.network]!);
+    final daemonPort = _validateListenerPort(
+      values[ReleaseConfigurationKey.daemonPort] ?? '9735',
+    );
+    final peerPort = _validateListenerPort(
+      values[ReleaseConfigurationKey.ldkPeerPort] ?? '9736',
+    );
+    if (daemonPort == peerPort) {
+      throw const FormatException('Native listener ports must differ.');
+    }
     _validateEndpoint(
       values[ReleaseConfigurationKey.indexerUrl]!,
       key: ReleaseConfigurationKey.indexerUrl,
@@ -341,6 +354,16 @@ void _validateNetwork(String value) {
       'ASTER_NETWORK must be mainnet, signet, or regtest.',
     );
   }
+}
+
+int _validateListenerPort(String value) {
+  final port = int.tryParse(value);
+  if (port == null || '$port' != value || port < 1 || port > 65535) {
+    throw const FormatException(
+      'Native listener ports must be integers from 1 through 65535.',
+    );
+  }
+  return port;
 }
 
 void _validateAsset(String contractId, String rawPrecision) {
