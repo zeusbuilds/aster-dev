@@ -36,7 +36,7 @@ tracked as UXA-016, UXA-017, and DS-021 in the production tracker.
 The follow-up author decision keeps the Aster mark and wordmark only at the top
 of the blue Welcome screen. Create and Import begin directly with their existing
 titles on white; all recovery content, geometry, controls, state, and behavior
-remain unchanged. Verification is tracked as UXA-018.
+remain unchanged. Verification is tracked as UXA-018 at `32670b5`.
 
 | Phase | Scope | Status | Verification / commit |
 | --- | --- | --- | --- |
