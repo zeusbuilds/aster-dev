@@ -82,6 +82,23 @@ make bootstrap
    # Or: make run-android ANDROID_DEVICE_ID=<emulator-or-device-id>
    ```
 
+### Wallet lifecycle while debugging
+
+Use Flutter hot reload (`r`) for normal UI iteration. The pinned native wallet
+SDK does not yet support Flutter hot restart (`R`): hot restart replaces Dart
+without detaching the native plugin, so the previous process-owned RLN node
+cannot be adopted by the new isolate through the SDK's public API. If an
+isolate restart is needed, quit the current run with `q` and run the same
+explicit `make run-ios` or `make run-android` command again. This preserves the
+wallet store and verifies the real cold-open path.
+
+Never work around this by clearing app data, deleting the wallet directory,
+guessing native node IDs, or adding an app-private platform channel. Those
+actions either destroy useful recovery evidence or break the SDK ownership
+boundary. The release app is not affected by Flutter's development-only hot
+restart command; ordinary process relaunch is covered by the persisted-wallet
+restore path.
+
 ## Linting and Code Style
 
 Formatting and static analysis run **on every commit** (via a git hook) and **on every push/PR** (via CI).

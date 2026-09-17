@@ -12,6 +12,7 @@ import 'effects_tokens.dart';
 class AsterTypeRoles extends ThemeExtension<AsterTypeRoles> {
   const AsterTypeRoles({
     required this.appBarTitle,
+    required this.pageTitle,
     required this.buttonLabel,
     required this.compactButtonLabel,
     required this.sectionLabel,
@@ -56,6 +57,7 @@ class AsterTypeRoles extends ThemeExtension<AsterTypeRoles> {
   });
 
   final TextStyle appBarTitle;
+  final TextStyle pageTitle;
   final TextStyle buttonLabel;
   final TextStyle compactButtonLabel;
   final TextStyle sectionLabel;
@@ -122,6 +124,11 @@ class AsterTypeRoles extends ThemeExtension<AsterTypeRoles> {
       appBarTitle: role(
         textTheme.titleMedium,
         FontWeight.w600,
+        colorScheme.onSurface,
+      ),
+      pageTitle: role(
+        textTheme.headlineLarge,
+        FontWeight.w700,
         colorScheme.onSurface,
       ),
       buttonLabel: role(
@@ -317,6 +324,7 @@ class AsterTypeRoles extends ThemeExtension<AsterTypeRoles> {
   @override
   AsterTypeRoles copyWith({
     TextStyle? appBarTitle,
+    TextStyle? pageTitle,
     TextStyle? buttonLabel,
     TextStyle? compactButtonLabel,
     TextStyle? sectionLabel,
@@ -361,6 +369,7 @@ class AsterTypeRoles extends ThemeExtension<AsterTypeRoles> {
   }) {
     return AsterTypeRoles(
       appBarTitle: appBarTitle ?? this.appBarTitle,
+      pageTitle: pageTitle ?? this.pageTitle,
       buttonLabel: buttonLabel ?? this.buttonLabel,
       compactButtonLabel: compactButtonLabel ?? this.compactButtonLabel,
       sectionLabel: sectionLabel ?? this.sectionLabel,
@@ -410,6 +419,7 @@ class AsterTypeRoles extends ThemeExtension<AsterTypeRoles> {
     if (other is! AsterTypeRoles) return this;
     return AsterTypeRoles(
       appBarTitle: TextStyle.lerp(appBarTitle, other.appBarTitle, t)!,
+      pageTitle: TextStyle.lerp(pageTitle, other.pageTitle, t)!,
       buttonLabel: TextStyle.lerp(buttonLabel, other.buttonLabel, t)!,
       compactButtonLabel: TextStyle.lerp(
         compactButtonLabel,

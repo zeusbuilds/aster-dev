@@ -9,8 +9,8 @@ class AsterArt extends ThemeExtension<AsterArt> {
   const AsterArt({
     this.homeMeshColumns = 5,
     this.homeMeshRows = 7,
-    this.onboardingMeshColumns = 5,
-    this.onboardingMeshRows = 7,
+    this.onboardingMeshColumns = 4,
+    this.onboardingMeshRows = 4,
     this.brandMeshBlurSigma = 20,
     this.onboardingIconRows = 4,
     this.onboardingIconColumns = 7,

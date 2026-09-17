@@ -49,20 +49,40 @@ models at that boundary. The only other stable SDK import is the redacted error
 mapper. UI and ViewModels depend on repositories and app models and never call
 the SDK, native bridge, storage, HTTP, or platform plugins directly.
 
-The runtime serializes all native access with init, unlock, sync, suspend,
-reinit, switch, and destroy. A wallet switch destroys the old native owner,
-opens the target, and restores the previous wallet when target activation
-fails. Creation first persists a `provisioning` profile, then commits it as
-`ready` only after native activation succeeds. Bootstrap rolls back interrupted
-transactions before opening the selected ready wallet. App pause, resume, and
-detach transitions enter through the repository mutation queue so they cannot
-split native provisioning from its metadata commit. Resume may reopen a
-suspended owner or recover a known-safe retryable lifecycle failure against the
-durable active profile. It cannot clear a reconciliation-required failure:
-`WalletRuntime` preserves the first such failure and blocks normal queued work
-until a successful rollback for the owning wallet or successful disposal
-completes. An unknown native outcome is the strongest subset of this contract,
-not the only reason reconciliation can be required.
+The runtime serializes all native access with provision, open, sync, suspend,
+resume, switch, and destroy. Provisioning a new store maps to the SDK's
+one-time `init` followed by `unlock`; opening any existing store maps to
+`reinit`. Restore, wallet switching, switch rollback, foreground resume, and
+fresh-engine recovery must never send a persisted store through `init`.
+
+A wallet switch destroys the old native owner, opens the target, and restores
+the previous wallet when target activation fails. Creation first persists a
+`provisioning` profile, then commits it as `ready` only after native activation
+succeeds. Bootstrap rolls back interrupted transactions before opening the
+selected ready wallet. App pause, resume, and detach transitions enter through
+the repository mutation queue so they cannot split native provisioning from
+its metadata commit. Resume may reopen a suspended owner or recover a
+known-safe retryable lifecycle failure against the durable active profile. It
+cannot clear a reconciliation-required failure: `WalletRuntime` preserves the
+first such failure and blocks normal queued work until a successful rollback
+for the owning wallet or successful disposal completes. An unknown native
+outcome is the strongest subset of this contract, not the only reason
+reconciliation can be required.
+
+### Debug hot restart
+
+Hot reload is supported. A Flutter hot restart replaces the Dart isolate but
+does not detach the iOS or Android plugin from the still-running Flutter
+engine. The pinned SDK retains its process-owned native RLN node, while the new
+isolate has no public API with which to adopt or release that orphaned handle.
+Creating another node for the same storage directory therefore fails closed.
+
+Do not bypass the SDK with a private platform channel, guess native node IDs,
+or delete wallet storage. Quit the current `flutter run` session and start a
+new one when an isolate restart is required. A process restart releases the
+plugin store and then exercises the same persisted-wallet `reinit` path used by
+a normal app launch. Full hot-restart support requires a future immutable SDK
+revision with a public, ownership-safe isolate-reattach contract.
 
 ## Runtime Configuration
 

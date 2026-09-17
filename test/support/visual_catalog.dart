@@ -846,6 +846,19 @@ class _CatalogCreate extends CreateWalletViewModel {
     if (loading) return Completer<CreateWalletState>().future;
     return CreateWalletState(
       words: validTestMnemonicWords,
+      questions: [
+        for (final wordNumber in CreateWalletState.quizWordNumbers)
+          RecoveryPhraseQuestion(
+            wordNumber: wordNumber,
+            expectedWord: validTestMnemonicWords[wordNumber - 1],
+            options: [
+              validTestMnemonicWords[wordNumber - 1],
+              'ability',
+              'above',
+              'absent',
+            ],
+          ),
+      ],
       submitting: submitting,
       failure: failure,
     );

@@ -33,7 +33,7 @@ class HomeHeader extends ConsumerWidget {
     final VoidCallback? selectWallet = !canSelectWallet || navigation.inFlight
         ? null
         : () => unawaited(
-            navigation.run(
+            navigation.openRoute(
               command: () =>
                   context.pushNamed<void>(RouteNames.walletSelection),
               failureTitle: 'Wallet selector could not open',

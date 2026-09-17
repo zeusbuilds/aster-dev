@@ -156,7 +156,7 @@ void main() {
     await harness.container.read(homeViewModelProvider.future);
 
     expect(engine.calls.where((call) => call == 'balance'), hasLength(2));
-    expect(engine.calls, containsAllInOrder(['shutdown', 'reinitialize']));
+    expect(engine.calls, containsAllInOrder(['shutdown', 'openPersisted']));
   });
 
   test('stale refresh cannot overwrite a newer provider generation', () async {

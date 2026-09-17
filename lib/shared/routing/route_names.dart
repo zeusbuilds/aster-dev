@@ -6,7 +6,10 @@ class RouteNames {
   static const String splash = 'splash';
   static const String onboardingWelcome = 'onboardingWelcome';
   static const String onboardingCreateWallet = 'onboardingCreateWallet';
+  static const String onboardingCreateWalletQuiz = 'onboardingCreateWalletQuiz';
+  static const String onboardingCreateWalletName = 'onboardingCreateWalletName';
   static const String onboardingImportWallet = 'onboardingImportWallet';
+  static const String onboardingImportWalletName = 'onboardingImportWalletName';
 
   // Guarded wallet application.
   static const String home = 'home';
@@ -21,6 +24,9 @@ class RouteNames {
   static const String settings = 'settings';
   static const String scan = 'scan';
   static const String walletSelection = 'walletSelection';
+  static const String addWallet = 'addWallet';
+  static const String addWalletQuiz = 'addWalletQuiz';
+  static const String addWalletName = 'addWalletName';
   static const String countrySelection = 'countrySelection';
   static const String currencySelection = 'currencySelection';
   static const String bitcoinUnitSelection = 'bitcoinUnitSelection';

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:aster/core/core.dart';
+import 'package:aster/features/onboarding/data/repository/repository.dart';
 import 'package:aster/features/onboarding/domain/models/models.dart';
 import 'package:aster/features/onboarding/presentation/models/models.dart';
 import 'package:aster/features/onboarding/presentation/view_model/view_models.dart';
@@ -84,6 +85,21 @@ void main() {
                 ?.checksumStatus ==
             MnemonicChecksumStatus.valid,
       );
+      expect(
+        harness.container
+            .read(importWalletViewModelProvider)
+            .requireValue
+            .canContinue,
+        isTrue,
+      );
+      expect(
+        harness.container
+            .read(importWalletViewModelProvider)
+            .requireValue
+            .canSubmit,
+        isFalse,
+      );
+      notifier.updateWalletName('Imported savings');
 
       expect(await notifier.submit(), isTrue);
       final importState = harness.container
@@ -93,8 +109,8 @@ void main() {
       final walletState = harness.container
           .read(walletViewModelProvider)
           .value!;
-      expect(walletState.activeWallet?.name, 'Restored Wallet');
-      expect(harness.engine.initializedMnemonic, validTestMnemonic);
+      expect(walletState.activeWallet?.name, 'Imported savings');
+      expect(harness.engine.provisionedMnemonic, validTestMnemonic);
       expect(harness.haptics.intents, contains(HapticIntent.success));
     },
   );
@@ -159,6 +175,7 @@ void main() {
       for (var index = 0; index < validTestMnemonicWords.length; index += 1) {
         notifier.updateWord(index, validTestMnemonicWords[index]);
       }
+      notifier.updateWalletName('Imported wallet');
       await _waitFor(
         () =>
             harness.container
@@ -168,13 +185,13 @@ void main() {
             true,
       );
       final gate = Completer<void>();
-      harness.engine.initializeGate = gate;
+      harness.engine.provisionGate = gate;
 
       final first = notifier.submit();
       expect(await notifier.submit(), isFalse);
-      await _waitFor(() => harness.engine.calls.contains('initialize'));
+      await _waitFor(() => harness.engine.calls.contains('provision'));
       expect(
-        harness.engine.calls.where((call) => call == 'initialize'),
+        harness.engine.calls.where((call) => call == 'provision'),
         hasLength(1),
       );
 
@@ -199,6 +216,7 @@ void main() {
         importWalletViewModelProvider.notifier,
       );
       notifier.updateWords(0, validTestMnemonicWords);
+      notifier.updateWalletName('Imported wallet');
       await _waitFor(
         () =>
             harness.container
@@ -207,7 +225,7 @@ void main() {
                 ?.canSubmit ==
             true,
       );
-      harness.engine.initializeError = const AppFailureException(
+      harness.engine.provisionError = const AppFailureException(
         AppFailure(
           code: 'wallet_setup_unavailable',
           kind: AppFailureKind.unavailable,
@@ -246,6 +264,7 @@ void main() {
       importWalletViewModelProvider.notifier,
     );
     notifier.updateWords(0, validTestMnemonicWords);
+    notifier.updateWalletName('Imported wallet');
     await _waitFor(
       () =>
           harness.container
@@ -254,7 +273,7 @@ void main() {
               ?.canSubmit ==
           true,
     );
-    harness.engine.initializeError = const AppFailureException(
+    harness.engine.provisionError = const AppFailureException(
       AppFailure(
         code: 'wallet_setup_outcome_unknown',
         kind: AppFailureKind.timeout,
@@ -283,7 +302,7 @@ void main() {
     expect(quarantined, failed);
     expect(harness.engine.calls, callsAfterFailure);
     expect(
-      harness.engine.calls.where((call) => call == 'initialize'),
+      harness.engine.calls.where((call) => call == 'provision'),
       hasLength(1),
     );
   });
@@ -304,6 +323,7 @@ void main() {
         importWalletViewModelProvider.notifier,
       );
       notifier.updateWords(0, validTestMnemonicWords);
+      notifier.updateWalletName('Imported wallet');
       await _waitFor(
         () =>
             harness.container
@@ -312,7 +332,7 @@ void main() {
                 ?.canSubmit ==
             true,
       );
-      harness.engine.initializeError = const AppFailureException(
+      harness.engine.provisionError = const AppFailureException(
         AppFailure(
           code: 'wallet_setup_reconciliation_required',
           kind: AppFailureKind.storage,
@@ -505,8 +525,110 @@ void main() {
           .requireValue;
       expect(recovered.checksumStatus, MnemonicChecksumStatus.valid);
       expect(recovered.failure, isNull);
-      expect(recovered.canSubmit, isTrue);
+      expect(recovered.canContinue, isTrue);
+      expect(recovered.canSubmit, isFalse);
+      notifier.updateWalletName('Imported wallet');
+      expect(
+        harness.container
+            .read(importWalletViewModelProvider)
+            .requireValue
+            .canSubmit,
+        isTrue,
+      );
       expect(harness.keyGenerator.validatedMnemonics, hasLength(2));
+    },
+  );
+
+  test(
+    'create requires fixed backup confirmation and a valid wallet name',
+    () async {
+      final harness = await OnboardingTestHarness.create();
+      addTearDown(harness.dispose);
+      final subscription = harness.container.listen(
+        createWalletViewModelProvider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      final generated = await harness.container.read(
+        createWalletViewModelProvider.future,
+      );
+      final notifier = harness.container.read(
+        createWalletViewModelProvider.notifier,
+      );
+
+      expect(
+        generated.questions.map((question) => question.wordNumber),
+        orderedEquals(CreateWalletState.quizWordNumbers),
+      );
+      final wordListResult = await harness.container
+          .read(bip39WordListRepositoryProvider)
+          .load();
+      final wordList = switch (wordListResult) {
+        AppSuccess<Bip39WordList>(:final value) => value,
+        AppFailureResult<Bip39WordList>() => fail(
+          'The integrity-checked BIP39 list must load in the test harness.',
+        ),
+      };
+      final phraseWords = generated.words.toSet();
+      for (final question in generated.questions) {
+        expect(question.options, hasLength(RecoveryPhraseQuestion.optionCount));
+        expect(
+          question.options.toSet(),
+          hasLength(RecoveryPhraseQuestion.optionCount),
+        );
+        expect(question.options, contains(question.expectedWord));
+        expect(question.options.every(wordList.contains), isTrue);
+        expect(
+          question.options.where(phraseWords.contains),
+          orderedEquals([question.expectedWord]),
+        );
+      }
+      expect(generated.canSubmit, isFalse);
+      final first = generated.questions.first;
+      final incorrect = first.options.firstWhere(
+        (option) => option != first.expectedWord,
+      );
+      expect(notifier.selectQuizOption(incorrect), isFalse);
+      expect(
+        harness.container
+            .read(createWalletViewModelProvider)
+            .requireValue
+            .confirmedQuestionCount,
+        0,
+      );
+
+      _completeCreateQuiz(notifier, generated);
+      expect(
+        harness.container
+            .read(createWalletViewModelProvider)
+            .requireValue
+            .quizComplete,
+        isTrue,
+      );
+      expect(
+        harness.container
+            .read(createWalletViewModelProvider)
+            .requireValue
+            .canSubmit,
+        isFalse,
+      );
+      notifier.updateWalletName('   ');
+      expect(
+        harness.container
+            .read(createWalletViewModelProvider)
+            .requireValue
+            .canSubmit,
+        isFalse,
+      );
+      notifier.updateWalletName('Daily wallet');
+      expect(
+        harness.container
+            .read(createWalletViewModelProvider)
+            .requireValue
+            .canSubmit,
+        isTrue,
+      );
     },
   );
 
@@ -530,6 +652,8 @@ void main() {
       final notifier = harness.container.read(
         createWalletViewModelProvider.notifier,
       );
+      _completeCreateQuiz(notifier, generated);
+      notifier.updateWalletName('Daily wallet');
       expect(await notifier.copyMnemonic(), isA<AppSuccess<void>>());
       expect(harness.clipboardText, validTestMnemonic);
       expect(await notifier.submit(), isTrue);
@@ -546,7 +670,7 @@ void main() {
             .value!
             .activeWallet
             ?.name,
-        'Primary Wallet',
+        'Daily wallet',
       );
       expect(
         harness.haptics.intents,
@@ -576,10 +700,14 @@ void main() {
       );
       addTearDown(subscription.close);
       await harness.container.read(walletViewModelProvider.future);
-      await harness.container.read(createWalletViewModelProvider.future);
+      final generated = await harness.container.read(
+        createWalletViewModelProvider.future,
+      );
       final notifier = harness.container.read(
         createWalletViewModelProvider.notifier,
       );
+      _completeCreateQuiz(notifier, generated);
+      notifier.updateWalletName('Daily wallet');
 
       final copy = notifier.copyMnemonic();
       expect(
@@ -608,8 +736,15 @@ void main() {
     );
     addTearDown(subscription.close);
     await harness.container.read(walletViewModelProvider.future);
-    await harness.container.read(createWalletViewModelProvider.future);
-    harness.engine.initializeError = const AppFailureException(
+    final generated = await harness.container.read(
+      createWalletViewModelProvider.future,
+    );
+    final notifier = harness.container.read(
+      createWalletViewModelProvider.notifier,
+    );
+    _completeCreateQuiz(notifier, generated);
+    notifier.updateWalletName('Daily wallet');
+    harness.engine.provisionError = const AppFailureException(
       AppFailure(
         code: 'test_wallet_unavailable',
         kind: AppFailureKind.unavailable,
@@ -618,9 +753,7 @@ void main() {
       ),
     );
 
-    final created = await harness.container
-        .read(createWalletViewModelProvider.notifier)
-        .submit();
+    final created = await notifier.submit();
 
     expect(created, isFalse);
     final state = harness.container.read(createWalletViewModelProvider).value!;
@@ -632,7 +765,7 @@ void main() {
       isNull,
     );
     expect(harness.haptics.intents, contains(HapticIntent.error));
-    expect(harness.engine.calls, containsAllInOrder(['initialize', 'destroy']));
+    expect(harness.engine.calls, containsAllInOrder(['provision', 'destroy']));
   });
 
   test(
@@ -646,11 +779,15 @@ void main() {
         fireImmediately: true,
       );
       addTearDown(subscription.close);
-      await harness.container.read(createWalletViewModelProvider.future);
+      final generated = await harness.container.read(
+        createWalletViewModelProvider.future,
+      );
       final notifier = harness.container.read(
         createWalletViewModelProvider.notifier,
       );
-      harness.engine.initializeError = const AppFailureException(
+      _completeCreateQuiz(notifier, generated);
+      notifier.updateWalletName('Daily wallet');
+      harness.engine.provisionError = const AppFailureException(
         AppFailure(
           code: 'wallet_setup_outcome_unknown',
           kind: AppFailureKind.timeout,
@@ -675,7 +812,7 @@ void main() {
       expect(harness.clipboardText, validTestMnemonic);
       expect(harness.engine.calls, callsAfterFailure);
       expect(
-        harness.engine.calls.where((call) => call == 'initialize'),
+        harness.engine.calls.where((call) => call == 'provision'),
         hasLength(1),
       );
     },
@@ -692,11 +829,15 @@ void main() {
         fireImmediately: true,
       );
       addTearDown(subscription.close);
-      await harness.container.read(createWalletViewModelProvider.future);
+      final generated = await harness.container.read(
+        createWalletViewModelProvider.future,
+      );
       final notifier = harness.container.read(
         createWalletViewModelProvider.notifier,
       );
-      harness.engine.initializeError = const AppFailureException(
+      _completeCreateQuiz(notifier, generated);
+      notifier.updateWalletName('Daily wallet');
+      harness.engine.provisionError = const AppFailureException(
         AppFailure(
           code: 'wallet_setup_reconciliation_required',
           kind: AppFailureKind.storage,
@@ -723,6 +864,15 @@ void main() {
       expect(harness.engine.calls, callsAfterFailure);
     },
   );
+}
+
+void _completeCreateQuiz(
+  CreateWalletViewModel notifier,
+  CreateWalletState state,
+) {
+  for (final question in state.questions) {
+    expect(notifier.selectQuizOption(question.expectedWord), isTrue);
+  }
 }
 
 Future<void> _waitFor(bool Function() predicate) async {

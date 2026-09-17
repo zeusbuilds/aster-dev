@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:aster/core/core.dart';
+import 'package:aster/features/market/presentation/view_model/view_models.dart';
 import 'package:aster/features/settings/data/repository/repository.dart';
 import 'package:aster/features/wallet/data/repository/repository.dart';
 import 'package:aster/features/wallet/data/runtime/runtime.dart';
@@ -121,6 +122,7 @@ final class PaymentFlowTestHarness {
         externalUriServiceProvider.overrideWithValue(externalUris),
         walletServiceConfigurationProvider.overrideWithValue(services),
         utcClockProvider.overrideWithValue(effectiveClock),
+        bitcoinMarketBackgroundRetryPolicyProvider.overrideWithValue(null),
         if (httpClient != null)
           resilientHttpClientProvider.overrideWithValue(httpClient),
       ],

@@ -11,9 +11,14 @@ import '../models/models.dart';
 import '../view_model/view_models.dart';
 import '../widgets/widgets.dart';
 
-/// Generates, displays, and provisions a new 12-word wallet.
+/// Generates and displays a route-owned 12-word recovery phrase.
 class OnboardingCreateWalletScreen extends ConsumerWidget {
-  const OnboardingCreateWalletScreen({super.key});
+  const OnboardingCreateWalletScreen({
+    super.key,
+    this.origin = WalletCreationOrigin.onboarding,
+  });
+
+  final WalletCreationOrigin origin;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -35,7 +40,11 @@ class OnboardingCreateWalletScreen extends ConsumerWidget {
                 child: switch (asyncState) {
                   AsyncData<CreateWalletState>(:final value)
                       when !value.completed =>
-                    _CreateWalletContent(state: value, navigation: navigation),
+                    _CreateWalletContent(
+                      state: value,
+                      navigation: navigation,
+                      origin: origin,
+                    ),
                   AsyncError<CreateWalletState>(
                     :final error,
                     :final stackTrace,
@@ -68,57 +77,107 @@ class OnboardingCreateWalletScreen extends ConsumerWidget {
       onPrimary: failure.retryable
           ? () => ref.invalidate(createWalletViewModelProvider)
           : null,
-      onBack: () => _navigateToWelcome(context, navigation),
+      onBack: () => _navigateBack(context, navigation, origin),
     );
   }
 }
 
-class _CreateWalletContent extends ConsumerWidget {
-  const _CreateWalletContent({required this.state, required this.navigation});
+class _CreateWalletContent extends ConsumerStatefulWidget {
+  const _CreateWalletContent({
+    required this.state,
+    required this.navigation,
+    required this.origin,
+  });
 
   final CreateWalletState state;
   final AsterNavigationCommandOwner navigation;
+  final WalletCreationOrigin origin;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_CreateWalletContent> createState() =>
+      _CreateWalletContentState();
+}
+
+class _CreateWalletContentState extends ConsumerState<_CreateWalletContent>
+    with WidgetsBindingObserver {
+  bool _phraseRevealed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) _concealPhrase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final spacing = context.spacing;
+    final state = widget.state;
+    final navigation = widget.navigation;
+    final canNavigateBack =
+        !state.submitting &&
+        !state.requiresReconciliation &&
+        !navigation.inFlight;
     return CustomScrollView(
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       slivers: [
+        SliverToBoxAdapter(
+          child: SizedBox(
+            height: context.metrics.appBarHeight,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: AsterIconButton(
+                icon: MingCuteIcons.mgc_left_line,
+                tooltip: 'Back',
+                onPressed: canNavigateBack
+                    ? () => _navigateBack(context, navigation, widget.origin)
+                    : null,
+                hapticIntent: null,
+              ),
+            ),
+          ),
+        ),
         SliverPadding(
           padding: EdgeInsets.fromLTRB(
-            spacing.xxl,
-            spacing.xxl,
-            spacing.xxl,
+            spacing.screenPadding,
+            spacing.lg,
+            spacing.screenPadding,
             spacing.lg,
           ),
           sliver: SliverToBoxAdapter(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const OnboardingWelcomeHeader(),
-                SizedBox(height: spacing.huge),
                 Text(
-                  'Secure your wallet',
-                  style: context.type.brandHero.copyWith(
-                    color: context.colorScheme.onSurface,
-                  ),
+                  'Your 12-word recovery phrase',
+                  style: context.type.pageTitle,
                 ),
-                SizedBox(height: spacing.md),
+                SizedBox(height: spacing.sm),
                 Text(
-                  'Write these 12 words down in order. Keep them offline and '
-                  'never share them with anyone.',
-                  style: context.type.brandBody.copyWith(
-                    color: context.appColors.textSecondary,
-                  ),
+                  'Keep this offline and never share it with anyone.',
+                  style: context.type.rowMeta,
                 ),
-                SizedBox(height: spacing.xxxl),
-                OnboardingImportWalletWordGrid(words: state.words),
-                SizedBox(height: spacing.lg),
+                SizedBox(height: spacing.xxl),
+                OnboardingImportWalletWordGrid(
+                  words: state.words,
+                  obscured: !_phraseRevealed,
+                ),
+                SizedBox(height: spacing.xs),
                 Center(
                   child: OnboardingTextAction(
                     label: 'Copy recovery phrase',
                     icon: MingCuteIcons.mgc_copy_2_line,
+                    size: OnboardingTextActionSize.compact,
                     enabled: state.canCopy && !navigation.inFlight,
                     loading: state.copying,
                     hapticIntent: null,
@@ -146,9 +205,9 @@ class _CreateWalletContent extends ConsumerWidget {
           hasScrollBody: false,
           child: Padding(
             padding: EdgeInsets.fromLTRB(
-              spacing.xxl,
+              spacing.screenPadding,
               0,
-              spacing.xxl,
+              spacing.screenPadding,
               spacing.lg,
             ),
             child: Column(
@@ -158,19 +217,22 @@ class _CreateWalletContent extends ConsumerWidget {
                 CustomButton(
                   text: 'Continue',
                   variant: ButtonVariant.primary,
-                  enabled: state.canSubmit && !navigation.inFlight,
-                  loading: state.submitting,
-                  hapticIntent: null,
-                  onTap: () => unawaited(_submit(context, ref)),
-                ),
-                OnboardingTextAction(
-                  label: 'Back',
                   enabled:
-                      !state.submitting &&
+                      state.canCopy &&
                       !state.requiresReconciliation &&
                       !navigation.inFlight,
                   hapticIntent: null,
-                  onPressed: () => _navigateToWelcome(context, navigation),
+                  onTap: () => _openQuiz(context),
+                ),
+                SizedBox(height: spacing.md),
+                CustomButton(
+                  text: _phraseRevealed ? 'Hide phrase' : 'Reveal phrase',
+                  prefixIcon: _phraseRevealed
+                      ? MingCuteIcons.mgc_eye_close_line
+                      : MingCuteIcons.mgc_eye_2_line,
+                  variant: ButtonVariant.secondary,
+                  enabled: !state.submitting && !widget.navigation.inFlight,
+                  onTap: _togglePhraseVisibility,
                 ),
               ],
             ),
@@ -201,32 +263,61 @@ class _CreateWalletContent extends ConsumerWidget {
     }
   }
 
-  Future<void> _submit(BuildContext context, WidgetRef ref) async {
-    await navigation.run(
-      command: () => ref.read(createWalletViewModelProvider.notifier).submit(),
-      failureTitle: 'Wallet could not be created',
-      hapticIntent: null,
-      blocksRoutePop: true,
-    );
+  void _openQuiz(BuildContext context) {
+    _concealPhrase();
+    unawaited(_openQuizAndForwardResult(context));
+  }
+
+  Future<void> _openQuizAndForwardResult(BuildContext context) async {
+    final routeName = switch (widget.origin) {
+      WalletCreationOrigin.onboarding => RouteNames.onboardingCreateWalletQuiz,
+      WalletCreationOrigin.walletSelector => RouteNames.addWalletQuiz,
+    };
+    final outcome = await widget.navigation
+        .openRouteForResult<WalletCreationRouteResult>(
+          command: () =>
+              context.pushNamed<WalletCreationRouteResult>(routeName),
+          failureTitle: 'Recovery check could not open',
+        );
+    if (!outcome.accepted ||
+        outcome.value != WalletCreationRouteResult.created ||
+        widget.origin != WalletCreationOrigin.walletSelector ||
+        !context.mounted) {
+      return;
+    }
+    context.pop(WalletCreationRouteResult.created);
+  }
+
+  void _togglePhraseVisibility() {
+    setState(() => _phraseRevealed = !_phraseRevealed);
+  }
+
+  void _concealPhrase() {
+    if (!_phraseRevealed || !mounted) return;
+    setState(() => _phraseRevealed = false);
   }
 }
 
-void _navigateToWelcome(
+void _navigateBack(
   BuildContext context,
   AsterNavigationCommandOwner navigation,
+  WalletCreationOrigin origin,
 ) {
   unawaited(
     navigation.run(
-      command: () => _returnToWelcome(context),
-      failureTitle: 'Welcome screen could not open',
+      command: () => _returnToPrevious(context, origin),
+      failureTitle: 'Previous screen could not open',
     ),
   );
 }
 
-void _returnToWelcome(BuildContext context) {
+void _returnToPrevious(BuildContext context, WalletCreationOrigin origin) {
   if (context.canPop()) {
     context.pop();
   } else {
-    context.go(RoutePaths.onboardingWelcome);
+    context.go(switch (origin) {
+      WalletCreationOrigin.onboarding => RoutePaths.onboardingWelcome,
+      WalletCreationOrigin.walletSelector => RoutePaths.walletSelectionLocation,
+    });
   }
 }

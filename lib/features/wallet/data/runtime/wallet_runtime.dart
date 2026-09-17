@@ -18,6 +18,24 @@ enum WalletRuntimePhase {
 
 enum _ReconciliationAccess { blocked, audit, rollback, disposal }
 
+sealed class _WalletActivation {
+  const _WalletActivation();
+}
+
+final class _ProvisionWalletActivation extends _WalletActivation {
+  const _ProvisionWalletActivation({
+    required this.mnemonic,
+    required this.storageDirectory,
+  });
+
+  final String mnemonic;
+  final String storageDirectory;
+}
+
+final class _OpenPersistedWalletActivation extends _WalletActivation {
+  const _OpenPersistedWalletActivation();
+}
+
 /// Observable state for the single app-owned native wallet runtime.
 final class WalletRuntimeSnapshot {
   const WalletRuntimeSnapshot({
@@ -92,6 +110,7 @@ final class WalletRuntime {
         AppSuccess<WalletSecret>(:final value) => _activateReplacingUnsafe(
           profile,
           value,
+          activation: const _OpenPersistedWalletActivation(),
         ),
         AppFailureResult<WalletSecret>(:final failure) => AppResult.failure(
           failure,
@@ -187,8 +206,10 @@ final class WalletRuntime {
             mnemonic: mnemonic,
             storageToken: storageToken,
           ),
-          initializeMnemonic: mnemonic,
-          storageDirectory: storageDirectory,
+          activation: _ProvisionWalletActivation(
+            mnemonic: mnemonic,
+            storageDirectory: storageDirectory,
+          ),
         );
         if (activation is AppSuccess<void>) return activation;
 
@@ -259,6 +280,7 @@ final class WalletRuntime {
         AppSuccess<WalletSecret>(:final value) => _activateReplacingUnsafe(
           profile,
           value,
+          activation: const _OpenPersistedWalletActivation(),
         ),
         AppFailureResult<WalletSecret>(:final failure) => AppResult.failure(
           failure,
@@ -386,7 +408,7 @@ final class WalletRuntime {
         ),
       );
       try {
-        await engine.reinitialize(databasePassword: secret.databasePassword);
+        await engine.openPersisted(databasePassword: secret.databasePassword);
         _emit(
           WalletRuntimeSnapshot(
             phase: WalletRuntimePhase.active,
@@ -395,7 +417,7 @@ final class WalletRuntime {
         );
         return const AppResult.success(null);
       } catch (error, stackTrace) {
-        final reinitializeFailure = FailureMapper.from(error, stackTrace);
+        final reopenFailure = FailureMapper.from(error, stackTrace);
         final cleanup = await _destroyCurrentUnsafe();
         if (cleanup case AppFailureResult<void>(:final failure)) {
           final combined = AppFailure(
@@ -405,8 +427,8 @@ final class WalletRuntime {
             retryable: false,
             requiresReconciliation: true,
             outcomeUnknown:
-                reinitializeFailure.outcomeUnknown || failure.outcomeUnknown,
-            cause: <Object>[reinitializeFailure, failure],
+                reopenFailure.outcomeUnknown || failure.outcomeUnknown,
+            cause: <Object>[reopenFailure, failure],
             stackTrace: stackTrace,
           );
           _emit(
@@ -418,14 +440,17 @@ final class WalletRuntime {
           );
           return AppResult.failure(combined);
         }
-        final recovery = await _activateUnsafe(profile, secret);
+        final recovery = await _activateUnsafe(
+          profile,
+          secret,
+          activation: const _OpenPersistedWalletActivation(),
+        );
         if (recovery is AppSuccess<void>) return recovery;
         final recoveryFailure = (recovery as AppFailureResult<void>).failure;
         final outcomeUnknown =
-            reinitializeFailure.outcomeUnknown ||
-            recoveryFailure.outcomeUnknown;
+            reopenFailure.outcomeUnknown || recoveryFailure.outcomeUnknown;
         final requiresReconciliation =
-            reinitializeFailure.requiresReconciliation ||
+            reopenFailure.requiresReconciliation ||
             recoveryFailure.requiresReconciliation;
         final combined = AppFailure(
           code: 'wallet_resume_recovery_failed',
@@ -437,7 +462,7 @@ final class WalletRuntime {
           retryable: !requiresReconciliation,
           requiresReconciliation: requiresReconciliation,
           outcomeUnknown: outcomeUnknown,
-          cause: <AppFailure>[reinitializeFailure, recoveryFailure],
+          cause: <AppFailure>[reopenFailure, recoveryFailure],
           stackTrace: stackTrace,
         );
         _emit(
@@ -632,8 +657,7 @@ final class WalletRuntime {
   Future<AppResult<void>> _activateReplacingUnsafe(
     WalletProfile profile,
     WalletSecret secret, {
-    String? initializeMnemonic,
-    String? storageDirectory,
+    required _WalletActivation activation,
   }) async {
     if (profile.environment != _services.environment) {
       return AppResult.failure(_networkMismatchFailure());
@@ -665,23 +689,27 @@ final class WalletRuntime {
 
     final destroy = await _destroyCurrentUnsafe();
     if (destroy is AppFailureResult<void>) return destroy;
-    final activation = await _activateUnsafe(
+    final activationResult = await _activateUnsafe(
       profile,
       secret,
-      initializeMnemonic: initializeMnemonic,
-      storageDirectory: storageDirectory,
+      activation: activation,
     );
-    if (activation is AppSuccess<void> ||
+    if (activationResult is AppSuccess<void> ||
         previousProfile == null ||
         previousSecret == null) {
-      return activation;
+      return activationResult;
     }
 
-    if (_engine != null) return activation;
+    if (_engine != null) return activationResult;
 
-    final rollback = await _activateUnsafe(previousProfile, previousSecret);
+    final rollback = await _activateUnsafe(
+      previousProfile,
+      previousSecret,
+      activation: const _OpenPersistedWalletActivation(),
+    );
     if (rollback is AppFailureResult<void>) {
-      final activationFailure = (activation as AppFailureResult<void>).failure;
+      final activationFailure =
+          (activationResult as AppFailureResult<void>).failure;
       final failure = AppFailure(
         code: 'wallet_switch_rollback_failed',
         kind: AppFailureKind.storage,
@@ -690,7 +718,7 @@ final class WalletRuntime {
         requiresReconciliation: true,
         outcomeUnknown:
             activationFailure.outcomeUnknown || rollback.failure.outcomeUnknown,
-        cause: <Object>[activation, rollback],
+        cause: <Object>[activationResult, rollback],
       );
       _emit(
         WalletRuntimeSnapshot(
@@ -700,14 +728,13 @@ final class WalletRuntime {
       );
       return AppResult.failure(failure);
     }
-    return activation;
+    return activationResult;
   }
 
   Future<AppResult<void>> _activateUnsafe(
     WalletProfile profile,
     WalletSecret secret, {
-    String? initializeMnemonic,
-    String? storageDirectory,
+    required _WalletActivation activation,
   }) async {
     _emit(
       WalletRuntimeSnapshot(
@@ -717,22 +744,33 @@ final class WalletRuntime {
     );
     WalletEngine? candidate;
     try {
-      final resolvedStorageDirectory =
-          storageDirectory ??
-          await _directories.open(
+      final String resolvedStorageDirectory;
+      switch (activation) {
+        case _ProvisionWalletActivation(:final storageDirectory):
+          resolvedStorageDirectory = storageDirectory;
+        case _OpenPersistedWalletActivation():
+          resolvedStorageDirectory = await _directories.open(
             profile.id,
             storageToken: profile.storageToken,
           );
+      }
       candidate = _engineFactory.create(
         WalletEngineConfiguration(
           storageDirectory: resolvedStorageDirectory,
           services: _services,
         ),
       );
-      await candidate.initialize(
-        databasePassword: secret.databasePassword,
-        mnemonic: initializeMnemonic,
-      );
+      switch (activation) {
+        case _ProvisionWalletActivation(:final mnemonic):
+          await candidate.provision(
+            databasePassword: secret.databasePassword,
+            mnemonic: mnemonic,
+          );
+        case _OpenPersistedWalletActivation():
+          await candidate.openPersisted(
+            databasePassword: secret.databasePassword,
+          );
+      }
       _engine = candidate;
       _activeProfile = profile.state == WalletProfileState.provisioning
           ? profile.copyWith(state: WalletProfileState.ready)

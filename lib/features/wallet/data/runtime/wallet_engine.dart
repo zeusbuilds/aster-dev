@@ -14,9 +14,17 @@ final class WalletEngineConfiguration {
 
 /// Testable native wallet boundary. No SDK DTO crosses this interface.
 abstract interface class WalletEngine {
-  Future<void> initialize({required String databasePassword, String? mnemonic});
+  /// Initializes a newly provisioned native wallet store and unlocks it.
+  ///
+  /// This operation is valid exactly once for a new store. Persisted stores
+  /// must be opened with [openPersisted] instead.
+  Future<void> provision({
+    required String databasePassword,
+    required String mnemonic,
+  });
 
-  Future<void> reinitialize({required String databasePassword});
+  /// Recreates and unlocks the native node for an existing wallet store.
+  Future<void> openPersisted({required String databasePassword});
   Future<void> sync();
   Future<void> shutdown();
   Future<void> destroy();

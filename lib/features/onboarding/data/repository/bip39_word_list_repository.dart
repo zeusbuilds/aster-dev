@@ -7,15 +7,27 @@ import '../../../../core/errors/errors.dart';
 
 /// Validated canonical BIP39 English vocabulary used for per-word feedback.
 final class Bip39WordList {
-  Bip39WordList._(Set<String> words) : _words = Set<String>.unmodifiable(words);
+  Bip39WordList._(List<String> words)
+    : _words = List<String>.unmodifiable(words),
+      _wordIndexes = Map<String, int>.unmodifiable({
+        for (var index = 0; index < words.length; index += 1)
+          words[index]: index,
+      });
 
-  final Set<String> _words;
+  final List<String> _words;
+  final Map<String, int> _wordIndexes;
 
   /// Whether [word] is one canonical lowercase BIP39 English word.
-  bool contains(String word) => _words.contains(word);
+  bool contains(String word) => _wordIndexes.containsKey(word);
 
   /// Number of validated entries. BIP39 English requires exactly 2,048.
   int get length => _words.length;
+
+  /// Returns the canonical word at the zero-based BIP39 vocabulary [index].
+  String wordAt(int index) => _words[index];
+
+  /// Returns the zero-based canonical index of [word], or `null` when absent.
+  int? indexOf(String word) => _wordIndexes[word];
 }
 
 /// Loads and integrity-checks the vendored canonical BIP39 English list.
@@ -53,7 +65,7 @@ final class Bip39WordListRepository {
       final source = utf8.decode(bytes, allowMalformed: false);
       final words = const LineSplitter().convert(source);
       _validate(words);
-      return AppResult.success(Bip39WordList._(words.toSet()));
+      return AppResult.success(Bip39WordList._(words));
     } catch (error, stackTrace) {
       return AppResult.failure(
         AppFailure(

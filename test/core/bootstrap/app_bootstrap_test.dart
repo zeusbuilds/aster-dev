@@ -113,7 +113,7 @@ void main() {
         throwsA(isA<StateError>()),
       );
 
-      expect(engine.calls, containsAllInOrder(['initialize', 'destroy']));
+      expect(engine.calls, containsAllInOrder(['provision', 'destroy']));
     },
   );
 
@@ -168,7 +168,7 @@ void main() {
       ),
     );
 
-    expect(engine.calls, containsAllInOrder(['initialize', 'destroy']));
+    expect(engine.calls, containsAllInOrder(['provision', 'destroy']));
   });
 
   test('requires reconciliation when bootstrap cleanup fails known', () async {
@@ -214,7 +214,7 @@ void main() {
       ),
     );
 
-    expect(engine.calls, containsAllInOrder(['initialize', 'destroy']));
+    expect(engine.calls, containsAllInOrder(['provision', 'destroy']));
   });
 }
 

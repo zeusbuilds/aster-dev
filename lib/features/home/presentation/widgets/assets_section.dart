@@ -217,8 +217,8 @@ class _AssetsBody extends ConsumerWidget {
                 ? null
                 : () {
                     unawaited(
-                      navigation.run(
-                        command: () => context.pushNamed(
+                      navigation.openRoute(
+                        command: () => context.pushNamed<void>(
                           RouteNames.transactionList,
                           pathParameters: <String, String>{
                             RoutePaths.assetKindParameter:

@@ -153,16 +153,16 @@ final class RgbWalletEngine implements WalletEngine {
   final BitcoinAddressValidator _bitcoinAddresses;
 
   @override
-  Future<void> initialize({
+  Future<void> provision({
     required String databasePassword,
-    String? mnemonic,
+    required String mnemonic,
   }) async {
     await _wallet.init(password: databasePassword, mnemonic: mnemonic);
     await _wallet.unlock(password: databasePassword, config: _unlockConfig);
   }
 
   @override
-  Future<void> reinitialize({required String databasePassword}) {
+  Future<void> openPersisted({required String databasePassword}) {
     return _wallet.reinit(
       password: databasePassword,
       unlockConfig: _unlockConfig,
@@ -188,7 +188,7 @@ final class RgbWalletEngine implements WalletEngine {
       ).wait;
       return _balances.bitcoin(asset, balance, node, channels);
     }
-    final rgb = await _wallet.getAssetBalance(asset.id.value);
+    final rgb = await _rgbBalanceOrZero(asset.id.value);
     return _balances.rgb(asset, rgb, channels);
   }
 
@@ -202,10 +202,19 @@ final class RgbWalletEngine implements WalletEngine {
           transactions.map((item) => _activities.bitcoin(asset, item)),
         );
       } else {
-        final transfers = await _wallet.listTransfers(assetId: asset.id.value);
-        activities.addAll(
-          transfers.map((item) => _activities.rgb(asset, item)),
-        );
+        try {
+          final transfers = await _wallet.listTransfers(
+            assetId: asset.id.value,
+          );
+          activities.addAll(
+            transfers.map((item) => _activities.rgb(asset, item)),
+          );
+        } catch (error) {
+          if (!_isUnknownAssetFailure(error) ||
+              await _isRgbAssetImported(asset.id.value)) {
+            rethrow;
+          }
+        }
       }
       final payments = await _wallet.listPayments();
       activities.addAll(
@@ -404,10 +413,11 @@ final class RgbWalletEngine implements WalletEngine {
     PaymentRoute route,
     WalletAmount? amount,
   ) async {
+    final assetImported = await _isRgbAssetImported(route.asset.id.value);
     final response = await _wallet.onchainReceive(
       RgbInvoiceRequest(
-        assetId: route.asset.id.value,
-        amount: amount?.units,
+        assetId: assetImported ? route.asset.id.value : null,
+        amount: assetImported ? amount?.units : null,
         durationSeconds: _receiveLifetime.inSeconds,
       ),
     );
@@ -424,7 +434,7 @@ final class RgbWalletEngine implements WalletEngine {
       'OnchainReceiveResponse.batchTransferIdx',
     );
     final preview = await _decodeRgbInvoice(route, invoice);
-    if (preview.amount != amount ||
+    if ((assetImported ? preview.amount != amount : preview.amount != null) ||
         (nativeRecipient != null && preview.referenceId != nativeRecipient)) {
       throw const NativeProtocolException(
         'Created RGB invoice does not match the request.',
@@ -445,7 +455,9 @@ final class RgbWalletEngine implements WalletEngine {
       route: route,
       encodedRequest: preview.encodedDestination,
       displayValue: preview.displayDestination,
-      amount: preview.amount,
+      // A first-transfer invoice cannot bind an asset or amount until the
+      // receiver imports the contract from its first consignment.
+      amount: assetImported ? preview.amount : null,
       expiresAt: preview.expiresAt ?? responseExpiry,
       referenceId: preview.referenceId,
       batchTransferIndex: batchTransferIndex,
@@ -458,10 +470,17 @@ final class RgbWalletEngine implements WalletEngine {
   ) async {
     final decoded = await _wallet.decodeRgbInvoice(invoice);
     _requireNativeEnvironment(decoded.network, 'CoreInvoiceData.network');
-    if (decoded.assetId != route.asset.id.value) {
+    final encodedAssetId = decoded.assetId;
+    if (encodedAssetId != null && encodedAssetId != route.asset.id.value) {
       throw const WalletValidationException(
         'RGB invoice asset does not match the selected asset.',
         field: 'CoreInvoiceData.assetId',
+      );
+    }
+    if (encodedAssetId == null && decoded.assignment.amount != null) {
+      throw const NativeProtocolException(
+        'Asset-less RGB invoice unexpectedly binds an amount.',
+        field: 'CoreInvoiceData.assignment.amount',
       );
     }
     final amount = decoded.assignment.amount == null
@@ -486,6 +505,32 @@ final class RgbWalletEngine implements WalletEngine {
       ),
     );
   }
+
+  Future<CoreAssetBalance> _rgbBalanceOrZero(String assetId) async {
+    try {
+      return await _wallet.getAssetBalance(assetId);
+    } catch (error) {
+      if (!_isUnknownAssetFailure(error) ||
+          await _isRgbAssetImported(assetId)) {
+        rethrow;
+      }
+      return const CoreAssetBalance(
+        settled: 0,
+        future: 0,
+        spendable: 0,
+        offchainOutbound: 0,
+        offchainInbound: 0,
+      );
+    }
+  }
+
+  Future<bool> _isRgbAssetImported(String assetId) async {
+    final assets = await _wallet.listAssets();
+    return assets.assetIds.contains(assetId);
+  }
+
+  static bool _isUnknownAssetFailure(Object error) =>
+      error is NotFoundError || error is RgbNodeError;
 
   Future<WalletPaymentPreview> _decodeLightningInvoice(
     PaymentRoute route,

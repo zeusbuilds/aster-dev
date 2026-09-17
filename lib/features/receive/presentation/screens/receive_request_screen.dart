@@ -173,7 +173,7 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
     BuildContext context,
     AsterNavigationCommandOwner navigation,
   ) async {
-    await navigation.run(
+    await navigation.openRoute(
       command: () => ReceiveAmountSheet.show(context, target: widget.target),
       failureTitle: 'Amount editor could not open',
       hapticIntent: null,

@@ -197,9 +197,14 @@ final class BitcoinMarketSnapshot {
   /// Latest acceptable first observation relative to the requested start.
   static const maximumHistoryStartLag = Duration(hours: 1);
 
-  /// Maximum age of the final chart observation. This boundary is exclusive,
-  /// matching the live-price freshness contract.
-  static const maximumHistoryEndAge = maximumCurrentAge;
+  /// Maximum lag allowed between the last hourly bucket and the live quote.
+  ///
+  /// CoinGecko publishes completed hourly buckets after the represented hour,
+  /// so the newest bucket may be more than one hour behind a valid spot quote.
+  /// The repository appends that independently validated quote to the chart;
+  /// this bound only prevents a substantially truncated history from being
+  /// presented as a complete 24-hour series.
+  static const maximumHistoryTailLag = Duration(hours: 2);
 
   /// First instant at which the Bitcoin price must no longer be presented.
   DateTime get expiresAt => currentBitcoinPrice.expiresAt;

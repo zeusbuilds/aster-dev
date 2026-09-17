@@ -200,8 +200,8 @@ final class FakeWalletEngineFactory implements WalletEngineFactory {
 
 final class FakeWalletEngine implements WalletEngine {
   final calls = <String>[];
-  Object? initializeError;
-  Object? reinitializeError;
+  Object? provisionError;
+  Object? openPersistedError;
   Object? shutdownError;
   Object? destroyError;
   Object? syncError;
@@ -212,7 +212,8 @@ final class FakeWalletEngine implements WalletEngine {
   Object? balanceError;
   Object? activityError;
   Object? networkStatusError;
-  Completer<void>? initializeGate;
+  Completer<void>? provisionGate;
+  Completer<void>? openPersistedGate;
   Completer<void>? syncGate;
   Completer<void>? addressGate;
   Completer<void>? decodeInvoiceGate;
@@ -222,8 +223,9 @@ final class FakeWalletEngine implements WalletEngine {
   Completer<void>? activityGate;
   Completer<void>? networkStatusGate;
   String address = 'bcrt1qtest';
-  String? initializedPassword;
-  String? initializedMnemonic;
+  String? provisionedPassword;
+  String? provisionedMnemonic;
+  String? openedPassword;
   WalletPaymentPreview? decodedInvoice;
   WalletReceiveRequest? createdReceiveRequest;
   WalletSendResult? sentPayment;
@@ -242,21 +244,23 @@ final class FakeWalletEngine implements WalletEngine {
   WalletNetworkStatus? networkStatus;
 
   @override
-  Future<void> initialize({
+  Future<void> provision({
     required String databasePassword,
-    String? mnemonic,
+    required String mnemonic,
   }) async {
-    calls.add('initialize');
-    initializedPassword = databasePassword;
-    initializedMnemonic = mnemonic;
-    await initializeGate?.future;
-    if (initializeError case final Object error) throw error;
+    calls.add('provision');
+    provisionedPassword = databasePassword;
+    provisionedMnemonic = mnemonic;
+    await provisionGate?.future;
+    if (provisionError case final Object error) throw error;
   }
 
   @override
-  Future<void> reinitialize({required String databasePassword}) async {
-    calls.add('reinitialize');
-    if (reinitializeError case final Object error) throw error;
+  Future<void> openPersisted({required String databasePassword}) async {
+    calls.add('openPersisted');
+    openedPassword = databasePassword;
+    await openPersistedGate?.future;
+    if (openPersistedError case final Object error) throw error;
   }
 
   @override

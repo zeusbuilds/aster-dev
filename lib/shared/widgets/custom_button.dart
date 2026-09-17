@@ -61,6 +61,9 @@ class CustomButton extends StatefulWidget {
 
 class _CustomButtonState extends State<CustomButton> {
   bool _isPressed = false;
+  bool _minimumPressElapsed = true;
+  bool _releaseRequested = false;
+  Timer? _minimumPressTimer;
 
   bool get _isInteractive =>
       !widget.loading && widget.enabled && widget.onTap != null;
@@ -68,12 +71,58 @@ class _CustomButtonState extends State<CustomButton> {
   @override
   void didUpdateWidget(CustomButton oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (_isPressed && !_isInteractive) _isPressed = false;
+    if (_isPressed && !_isInteractive && !_releaseRequested) {
+      _resetPressedState(rebuild: false);
+    }
   }
 
-  void _handleHighlight(bool highlighted) {
-    if (_isPressed == highlighted) return;
-    setState(() => _isPressed = highlighted);
+  @override
+  void dispose() {
+    _minimumPressTimer?.cancel();
+    super.dispose();
+  }
+
+  void _handleHighlight(bool highlighted, Duration minimumPressedDuration) {
+    if (highlighted) {
+      _beginPress(minimumPressedDuration);
+    } else {
+      _requestPressRelease();
+    }
+  }
+
+  void _beginPress(Duration minimumPressedDuration) {
+    _minimumPressTimer?.cancel();
+    _releaseRequested = false;
+    _minimumPressElapsed = minimumPressedDuration <= Duration.zero;
+
+    if (!_minimumPressElapsed) {
+      _minimumPressTimer = Timer(minimumPressedDuration, () {
+        _minimumPressTimer = null;
+        _minimumPressElapsed = true;
+        if (_releaseRequested) _resetPressedState();
+      });
+    }
+
+    if (!_isPressed) setState(() => _isPressed = true);
+  }
+
+  void _requestPressRelease() {
+    if (!_isPressed || _releaseRequested) return;
+    _releaseRequested = true;
+    if (_minimumPressElapsed) _resetPressedState();
+  }
+
+  void _resetPressedState({bool rebuild = true}) {
+    _minimumPressTimer?.cancel();
+    _minimumPressTimer = null;
+    _minimumPressElapsed = true;
+    _releaseRequested = false;
+    if (!_isPressed) return;
+    if (rebuild && mounted) {
+      setState(() => _isPressed = false);
+    } else {
+      _isPressed = false;
+    }
   }
 
   @override
@@ -122,8 +171,15 @@ class _CustomButtonState extends State<CustomButton> {
     final effectiveDuration = context.motionPolicy.duration(
       motion.buttonPressDuration,
     );
+    final minimumPressedDuration = context.motionPolicy.duration(
+      motion.buttonMinimumPressedDuration,
+    );
 
     void activate() {
+      // InkWell normally clears its highlight before invoking onTap. This
+      // idempotent fallback queues release before an action can rebuild the
+      // button into a loading or disabled state.
+      _requestPressRelease();
       if (widget.hapticIntent case final intent?) {
         unawaited(context.haptics.trigger(intent));
       }
@@ -164,7 +220,12 @@ class _CustomButtonState extends State<CustomButton> {
                     clipBehavior: Clip.antiAlias,
                     child: InkWell(
                       onTap: isEnabled ? activate : null,
-                      onHighlightChanged: isEnabled ? _handleHighlight : null,
+                      onHighlightChanged: isEnabled
+                          ? (highlighted) => _handleHighlight(
+                              highlighted,
+                              minimumPressedDuration,
+                            )
+                          : null,
                       customBorder: shape,
                       overlayColor: stateLayers.interactionOverlay(
                         foregroundColor,

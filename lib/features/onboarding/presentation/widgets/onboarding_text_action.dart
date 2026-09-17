@@ -5,6 +5,9 @@ import 'package:flutter/services.dart';
 
 import '../../../../shared/shared.dart';
 
+/// Visual sizing for unframed onboarding actions.
+enum OnboardingTextActionSize { standard, compact }
+
 /// Unframed icon/text action with tap, keyboard, and screen-reader activation.
 ///
 /// No Material button or ink layer is created. Keyboard focus is indicated by
@@ -19,6 +22,7 @@ class OnboardingTextAction extends StatefulWidget {
     this.enabled = true,
     this.onBrandArt = false,
     this.hapticIntent = HapticIntent.lightImpact,
+    this.size = OnboardingTextActionSize.standard,
   });
 
   final String label;
@@ -30,6 +34,7 @@ class OnboardingTextAction extends StatefulWidget {
   final bool enabled;
   final bool onBrandArt;
   final HapticIntent? hapticIntent;
+  final OnboardingTextActionSize size;
 
   @override
   State<OnboardingTextAction> createState() => _OnboardingTextActionState();
@@ -57,6 +62,10 @@ class _OnboardingTextActionState extends State<OnboardingTextAction> {
     final color = _interactive || widget.loading
         ? foreground
         : foreground.withValues(alpha: context.stateLayers.disabled);
+    final compact = widget.size == OnboardingTextActionSize.compact;
+    final textStyle = compact
+        ? context.type.statusMessage
+        : context.type.brandAction;
 
     return Semantics(
       button: true,
@@ -114,14 +123,24 @@ class _OnboardingTextActionState extends State<OnboardingTextAction> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (widget.icon case final value?) ...[
-                            Icon(value, size: context.icons.sm, color: color),
-                            SizedBox(width: context.spacing.sm),
+                            Icon(
+                              value,
+                              size: compact
+                                  ? context.icons.xs
+                                  : context.icons.sm,
+                              color: color,
+                            ),
+                            SizedBox(
+                              width: compact
+                                  ? context.spacing.xs
+                                  : context.spacing.sm,
+                            ),
                           ],
                           Flexible(
                             child: Text(
                               widget.label,
                               textAlign: TextAlign.center,
-                              style: context.type.brandAction.copyWith(
+                              style: textStyle.copyWith(
                                 color: color,
                                 decoration: _interactive && _showFocusHighlight
                                     ? TextDecoration.underline

@@ -73,21 +73,25 @@ class _SendAddressScreenState extends ConsumerState<SendAddressScreen> {
     BuildContext routeContext,
     AsterNavigationCommandOwner navigation,
   ) {
-    unawaited(
-      navigation.run(
-        command: () async {
-          final result = await routeContext.push<String?>(
-            RoutePaths.scan,
-            extra: ScanPurpose.destinationPicker,
-          );
-          if (!mounted || result == null) return;
-          ref
-              .read(sendFlowViewModelProvider(widget.target).notifier)
-              .updateDestination(result.trim());
-        },
-        failureTitle: 'Scanner could not open',
+    unawaited(_openScanForResult(routeContext, navigation));
+  }
+
+  Future<void> _openScanForResult(
+    BuildContext routeContext,
+    AsterNavigationCommandOwner navigation,
+  ) async {
+    final outcome = await navigation.openRouteForResult<String>(
+      command: () => routeContext.push<String>(
+        RoutePaths.scan,
+        extra: ScanPurpose.destinationPicker,
       ),
+      failureTitle: 'Scanner could not open',
     );
+    final result = outcome.value;
+    if (!outcome.accepted || !mounted || result == null) return;
+    ref
+        .read(sendFlowViewModelProvider(widget.target).notifier)
+        .updateDestination(result.trim());
   }
 
   Future<void> _paste() async {
@@ -117,23 +121,32 @@ class _SendAddressScreenState extends ConsumerState<SendAddressScreen> {
     BuildContext routeContext,
     AsterNavigationCommandOwner navigation,
   ) {
-    unawaited(
-      navigation.run(
-        command: () async {
-          final valid = await ref
-              .read(sendFlowViewModelProvider(widget.target).notifier)
-              .validateDestination();
-          if (!mounted || !routeContext.mounted || !valid) return;
-          await routeContext.pushNamed(
-            RouteNames.sendAmount,
-            pathParameters: {
-              RoutePaths.paymentTargetParameter: widget.target.slug,
-            },
-          );
-        },
-        failureTitle: 'Amount entry could not open',
-        hapticIntent: null,
+    unawaited(_validateAndOpenAmount(routeContext, navigation));
+  }
+
+  Future<void> _validateAndOpenAmount(
+    BuildContext routeContext,
+    AsterNavigationCommandOwner navigation,
+  ) async {
+    var valid = false;
+    final accepted = await navigation.run(
+      command: () async {
+        valid = await ref
+            .read(sendFlowViewModelProvider(widget.target).notifier)
+            .validateDestination();
+      },
+      failureTitle: 'Recipient could not be validated',
+      hapticIntent: null,
+      blocksRoutePop: true,
+    );
+    if (!accepted || !valid || !mounted || !routeContext.mounted) return;
+    await navigation.openRoute(
+      command: () => routeContext.pushNamed<void>(
+        RouteNames.sendAmount,
+        pathParameters: {RoutePaths.paymentTargetParameter: widget.target.slug},
       ),
+      failureTitle: 'Amount entry could not open',
+      hapticIntent: null,
     );
   }
 

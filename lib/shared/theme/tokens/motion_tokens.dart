@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 class AsterMotion extends ThemeExtension<AsterMotion> {
   const AsterMotion({
     this.buttonPressDuration = const Duration(milliseconds: 100),
+    this.buttonMinimumPressedDuration = const Duration(milliseconds: 100),
     this.selectionTransitionDuration = const Duration(milliseconds: 150),
     this.navIndicatorDuration = const Duration(milliseconds: 150),
     this.toastTransitionDuration = const Duration(milliseconds: 300),
@@ -31,9 +32,16 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
     this.choreographyCurve = Curves.easeOutCubic,
     this.splashRevealMoveCurve = Curves.easeInOutCubic,
     this.chartTransitionCurve = Curves.easeInOut,
+    this.cupertinoPageIncomingCurve = Curves.fastEaseInToSlowEaseOut,
+    this.cupertinoPageCoveredCurve = Curves.linearToEaseOut,
+    this.cupertinoPageCoveredReverseCurve = Curves.easeInToLinear,
   });
 
   final Duration buttonPressDuration;
+
+  /// Keeps a quick tap visibly pressed long enough to render at least one
+  /// complete scale-down transition before the button returns to rest.
+  final Duration buttonMinimumPressedDuration;
   final Duration selectionTransitionDuration;
   final Duration navIndicatorDuration;
   final Duration toastTransitionDuration;
@@ -60,10 +68,14 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
   final Curve choreographyCurve;
   final Curve splashRevealMoveCurve;
   final Curve chartTransitionCurve;
+  final Curve cupertinoPageIncomingCurve;
+  final Curve cupertinoPageCoveredCurve;
+  final Curve cupertinoPageCoveredReverseCurve;
 
   @override
   AsterMotion copyWith({
     Duration? buttonPressDuration,
+    Duration? buttonMinimumPressedDuration,
     Duration? selectionTransitionDuration,
     Duration? navIndicatorDuration,
     Duration? toastTransitionDuration,
@@ -90,9 +102,14 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
     Curve? choreographyCurve,
     Curve? splashRevealMoveCurve,
     Curve? chartTransitionCurve,
+    Curve? cupertinoPageIncomingCurve,
+    Curve? cupertinoPageCoveredCurve,
+    Curve? cupertinoPageCoveredReverseCurve,
   }) {
     return AsterMotion(
       buttonPressDuration: buttonPressDuration ?? this.buttonPressDuration,
+      buttonMinimumPressedDuration:
+          buttonMinimumPressedDuration ?? this.buttonMinimumPressedDuration,
       selectionTransitionDuration:
           selectionTransitionDuration ?? this.selectionTransitionDuration,
       navIndicatorDuration: navIndicatorDuration ?? this.navIndicatorDuration,
@@ -126,6 +143,13 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
       splashRevealMoveCurve:
           splashRevealMoveCurve ?? this.splashRevealMoveCurve,
       chartTransitionCurve: chartTransitionCurve ?? this.chartTransitionCurve,
+      cupertinoPageIncomingCurve:
+          cupertinoPageIncomingCurve ?? this.cupertinoPageIncomingCurve,
+      cupertinoPageCoveredCurve:
+          cupertinoPageCoveredCurve ?? this.cupertinoPageCoveredCurve,
+      cupertinoPageCoveredReverseCurve:
+          cupertinoPageCoveredReverseCurve ??
+          this.cupertinoPageCoveredReverseCurve,
     );
   }
 
@@ -136,6 +160,11 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
       buttonPressDuration: _lerpDuration(
         buttonPressDuration,
         other.buttonPressDuration,
+        t,
+      ),
+      buttonMinimumPressedDuration: _lerpDuration(
+        buttonMinimumPressedDuration,
+        other.buttonMinimumPressedDuration,
         t,
       ),
       selectionTransitionDuration: _lerpDuration(
@@ -240,6 +269,15 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
       chartTransitionCurve: t < 0.5
           ? chartTransitionCurve
           : other.chartTransitionCurve,
+      cupertinoPageIncomingCurve: t < 0.5
+          ? cupertinoPageIncomingCurve
+          : other.cupertinoPageIncomingCurve,
+      cupertinoPageCoveredCurve: t < 0.5
+          ? cupertinoPageCoveredCurve
+          : other.cupertinoPageCoveredCurve,
+      cupertinoPageCoveredReverseCurve: t < 0.5
+          ? cupertinoPageCoveredReverseCurve
+          : other.cupertinoPageCoveredReverseCurve,
     );
   }
 

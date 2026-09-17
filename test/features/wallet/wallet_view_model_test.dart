@@ -93,7 +93,7 @@ void main() {
     'publishes switch progress and suppresses overlapping wallet changes',
     () async {
       final activationGate = Completer<void>();
-      final engine = FakeWalletEngine()..initializeGate = activationGate;
+      final engine = FakeWalletEngine()..openPersistedGate = activationGate;
       final harness = await _createHarness(
         seedWalletProfiles: true,
         engines: [engine],
@@ -130,7 +130,10 @@ void main() {
 
       activationGate.complete();
       expect(await switching, isTrue);
-      expect(engine.calls.where((call) => call == 'initialize'), hasLength(1));
+      expect(
+        engine.calls.where((call) => call == 'openPersisted'),
+        hasLength(1),
+      );
       expect(
         harness.container.read(walletViewModelProvider).requireValue,
         isA<WalletState>()
@@ -190,7 +193,9 @@ void main() {
     () async {
       final target = FakeWalletEngine();
       final rollback = FakeWalletEngine()
-        ..initializeError = StateError('injected rollback activation failure');
+        ..openPersistedError = StateError(
+          'injected rollback activation failure',
+        );
       final harness = await _createHarness(
         seedWalletProfiles: true,
         engines: [target, rollback],

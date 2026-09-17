@@ -57,7 +57,7 @@ class AdvancedSettingsScreen extends StatelessWidget {
                           onTap: navigation.inFlight
                               ? null
                               : () => unawaited(
-                                  navigation.run(
+                                  navigation.openRoute(
                                     command: () => context.pushNamed<void>(
                                       RouteNames.networkConfiguration,
                                     ),

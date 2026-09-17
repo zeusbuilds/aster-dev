@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../../../core/config/config.dart';
 import '../../../core/errors/errors.dart';
 import '../../../core/network/network.dart';
@@ -26,6 +28,32 @@ final class BitcoinMarketRepository {
     NetworkCancellationToken? cancellation,
     bool forceRefresh = false,
   }) async {
+    final result = await fetchLoad(
+      currency: currency,
+      cancellation: cancellation,
+      forceRefresh: forceRefresh,
+    );
+    return switch (result) {
+      AppSuccess<BitcoinMarketLoad>(:final value) => AppResult.success(
+        value.snapshot,
+      ),
+      AppFailureResult<BitcoinMarketLoad>(:final failure) => AppResult.failure(
+        failure,
+      ),
+    };
+  }
+
+  /// Loads the snapshot together with a typed partial-data failure.
+  ///
+  /// A valid spot quote remains useful when history is unavailable, and a
+  /// complete history can temporarily supply a current quote. The additional
+  /// failure lets presentation retry that degraded read and distinguish an
+  /// offline chart without discarding independently validated data.
+  Future<AppResult<BitcoinMarketLoad>> fetchLoad({
+    required MarketQuoteCurrency currency,
+    NetworkCancellationToken? cancellation,
+    bool forceRefresh = false,
+  }) async {
     if (_configuration.baseUri == null) {
       return const AppResult.failure(
         AppFailure(
@@ -41,8 +69,8 @@ final class BitcoinMarketRepository {
     if (!forceRefresh &&
         cached != null &&
         now.isBefore(cached.cachedAt.add(_cacheLifetime)) &&
-        cached.snapshot.isCurrentAt(now)) {
-      return AppResult.success(cached.snapshot);
+        cached.load.snapshot.isCurrentAt(now)) {
+      return AppResult.success(cached.load);
     }
     final from = now.subtract(BitcoinMarketSnapshot.historyWindow);
     final historyUri = _configuration
@@ -147,16 +175,16 @@ final class BitcoinMarketRepository {
       currentSource = BitcoinPriceSource.historyFallback;
     }
     if (currentBitcoinPrice == null) {
-      return AppResult.failure(currentFailure ?? historyFailure!);
+      return AppResult.failure(
+        _preferredFailure(currentFailure, historyFailure),
+      );
     }
-    final history =
-        _coversRequestedHistory(
-          historyCandidates,
-          requestedStart: from,
-          now: now,
-        )
-        ? historyCandidates
-        : const <BitcoinPricePoint>[];
+    final history = _buildChartHistory(
+      historyCandidates,
+      currentPrice: currentBitcoinPrice,
+      requestedStart: from,
+      now: now,
+    );
     final snapshot = BitcoinMarketSnapshot(
       quoteCurrency: currency,
       currentBitcoinPrice: currentBitcoinPrice,
@@ -164,8 +192,19 @@ final class BitcoinMarketRepository {
       currentSource: currentSource,
       history: history,
     );
-    _cacheSnapshot(snapshot, now);
-    return AppResult.success(snapshot);
+    final degradedFailure = _degradedFailure(
+      history: history,
+      historyFailure: historyFailure,
+      currentFailure: currentSource == BitcoinPriceSource.historyFallback
+          ? currentFailure
+          : null,
+    );
+    final load = BitcoinMarketLoad(
+      snapshot: snapshot,
+      degradedFailure: degradedFailure,
+    );
+    _cacheLoad(load, now);
+    return AppResult.success(load);
   }
 
   static List<BitcoinPricePoint> _decodeHistory(
@@ -220,7 +259,7 @@ final class BitcoinMarketRepository {
     }
     final points = byTimestamp.values.toList()
       ..sort((left, right) => left.timestamp.compareTo(right.timestamp));
-    return List<BitcoinPricePoint>.unmodifiable(_sampleHistory(points));
+    return List<BitcoinPricePoint>.unmodifiable(points);
   }
 
   static List<BitcoinPricePoint> _sampleHistory(
@@ -235,7 +274,34 @@ final class BitcoinMarketRepository {
     }, growable: false);
   }
 
-  static bool _coversRequestedHistory(
+  static List<BitcoinPricePoint> _buildChartHistory(
+    List<BitcoinPricePoint> points, {
+    required FiatMarketPrice currentPrice,
+    required DateTime requestedStart,
+    required DateTime now,
+  }) {
+    if (!_coversHistoricalWindow(
+      points,
+      requestedStart: requestedStart,
+      now: now,
+    )) {
+      return const <BitcoinPricePoint>[];
+    }
+
+    final currentPoint = BitcoinPricePoint(
+      timestamp: currentPrice.observedAt,
+      fiatMinorUnits: currentPrice.minorUnits,
+    );
+    final completed = <BitcoinPricePoint>[
+      for (final point in points)
+        if (point.timestamp.isBefore(currentPoint.timestamp)) point,
+      currentPoint,
+    ];
+    if (completed.length < 2) return const <BitcoinPricePoint>[];
+    return List<BitcoinPricePoint>.unmodifiable(_sampleHistory(completed));
+  }
+
+  static bool _coversHistoricalWindow(
     List<BitcoinPricePoint> points, {
     required DateTime requestedStart,
     required DateTime now,
@@ -245,7 +311,7 @@ final class BitcoinMarketRepository {
       BitcoinMarketSnapshot.maximumHistoryStartLag,
     );
     final earliestEnd = now.subtract(
-      BitcoinMarketSnapshot.maximumHistoryEndAge,
+      BitcoinMarketSnapshot.maximumHistoryTailLag,
     );
     return !points.first.timestamp.isAfter(latestStart) &&
         points.last.timestamp.isAfter(earliestEnd);
@@ -291,10 +357,10 @@ final class BitcoinMarketRepository {
     );
   }
 
-  void _cacheSnapshot(BitcoinMarketSnapshot snapshot, DateTime cachedAt) {
-    _cache.remove(snapshot.quoteCurrency);
-    _cache[snapshot.quoteCurrency] = _CachedMarketSnapshot(
-      snapshot: snapshot,
+  void _cacheLoad(BitcoinMarketLoad load, DateTime cachedAt) {
+    _cache.remove(load.snapshot.quoteCurrency);
+    _cache[load.snapshot.quoteCurrency] = _CachedMarketSnapshot(
+      load: load,
       cachedAt: cachedAt,
     );
     while (_cache.length > _maximumCachedCurrencies) {
@@ -334,6 +400,36 @@ final class BitcoinMarketRepository {
 
   static DateTime _utcNow() => DateTime.now().toUtc();
 
+  static AppFailure? _degradedFailure({
+    required List<BitcoinPricePoint> history,
+    required AppFailure? historyFailure,
+    required AppFailure? currentFailure,
+  }) {
+    final effectiveHistoryFailure = history.isEmpty
+        ? historyFailure ?? _incompleteHistory()
+        : null;
+    if (effectiveHistoryFailure == null && currentFailure == null) return null;
+    return _preferredFailure(currentFailure, effectiveHistoryFailure);
+  }
+
+  static AppFailure _preferredFailure(
+    AppFailure? primary,
+    AppFailure? secondary,
+  ) {
+    if (primary?.kind == AppFailureKind.connectivity) return primary!;
+    if (secondary?.kind == AppFailureKind.connectivity) return secondary!;
+    return primary ?? secondary ?? _incompleteHistory();
+  }
+
+  static AppFailure _incompleteHistory() {
+    return const AppFailure(
+      code: 'market_history_incomplete',
+      kind: AppFailureKind.unavailable,
+      userMessage: 'Market history is temporarily unavailable.',
+      retryable: true,
+    );
+  }
+
   static AppFailure _invalidPayload(Object error, StackTrace stackTrace) {
     return AppFailure(
       code: 'market_payload_invalid',
@@ -346,9 +442,24 @@ final class BitcoinMarketRepository {
   }
 }
 
-final class _CachedMarketSnapshot {
-  const _CachedMarketSnapshot({required this.snapshot, required this.cachedAt});
+/// A validated market snapshot and any recoverable missing-data condition.
+@immutable
+final class BitcoinMarketLoad {
+  const BitcoinMarketLoad({
+    required this.snapshot,
+    required this.degradedFailure,
+  });
 
   final BitcoinMarketSnapshot snapshot;
+
+  /// Failure for an endpoint whose data was replaced by a validated fallback
+  /// or omitted from this otherwise useful snapshot.
+  final AppFailure? degradedFailure;
+}
+
+final class _CachedMarketSnapshot {
+  const _CachedMarketSnapshot({required this.load, required this.cachedAt});
+
+  final BitcoinMarketLoad load;
   final DateTime cachedAt;
 }

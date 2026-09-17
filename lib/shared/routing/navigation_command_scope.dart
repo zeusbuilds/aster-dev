@@ -2,12 +2,27 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../../core/errors/errors.dart';
 import '../feedback/feedback.dart';
 
 /// A route-changing command owned by the currently visible screen.
 typedef AsterNavigationCommand = FutureOr<void> Function();
+
+/// Result of opening a route whose eventual pop value is meaningful.
+@immutable
+final class AsterRouteCommandResult<T extends Object> {
+  const AsterRouteCommandResult.completed(this.value) : accepted = true;
+
+  const AsterRouteCommandResult.rejected() : accepted = false, value = null;
+
+  /// Whether the route command was accepted and completed without throwing.
+  final bool accepted;
+
+  /// Value returned when the opened route was popped.
+  final T? value;
+}
 
 /// Narrow command contract exposed by [AsterNavigationScope].
 abstract interface class AsterNavigationCommandOwner {
@@ -27,6 +42,27 @@ abstract interface class AsterNavigationCommandOwner {
     required String failureTitle,
     HapticIntent? hapticIntent = HapticIntent.lightImpact,
     bool blocksRoutePop = false,
+  });
+
+  /// Opens a route while suppressing only same-turn duplicate commands.
+  ///
+  /// A pushed route can remain open indefinitely and can be removed by a
+  /// replacement navigation command. Neither case may leave the source screen
+  /// disabled. The source owner is therefore released as the next frame
+  /// begins, after the destination is installed and before it owns input. The
+  /// returned future still observes and safely reports eventual failures.
+  Future<bool> openRoute({
+    required AsterNavigationCommand command,
+    required String failureTitle,
+    HapticIntent? hapticIntent = HapticIntent.lightImpact,
+  });
+
+  /// Opens a route and returns its typed pop result without retaining the
+  /// source screen's interaction lock for the route's lifetime.
+  Future<AsterRouteCommandResult<T>> openRouteForResult<T extends Object>({
+    required Future<T?> Function() command,
+    required String failureTitle,
+    HapticIntent? hapticIntent = HapticIntent.lightImpact,
   });
 }
 
@@ -114,6 +150,91 @@ final class _AsterNavigationScopeState extends State<AsterNavigationScope>
         setState(() => _inFlight = false);
       }
     }
+  }
+
+  @override
+  Future<bool> openRoute({
+    required AsterNavigationCommand command,
+    required String failureTitle,
+    HapticIntent? hapticIntent = HapticIntent.lightImpact,
+  }) async {
+    if (!_acquire(hapticIntent)) return false;
+    final completion = Future<void>.sync(command).then(
+      (_) => true,
+      onError: (Object error, StackTrace stackTrace) {
+        _reportFailure(error, stackTrace, failureTitle);
+        return false;
+      },
+    );
+    await _releaseOnNextFrame();
+    return completion;
+  }
+
+  @override
+  Future<AsterRouteCommandResult<T>> openRouteForResult<T extends Object>({
+    required Future<T?> Function() command,
+    required String failureTitle,
+    HapticIntent? hapticIntent = HapticIntent.lightImpact,
+  }) async {
+    if (!_acquire(hapticIntent)) {
+      return const AsterRouteCommandResult.rejected();
+    }
+    final completion = Future<T?>.sync(command).then(
+      AsterRouteCommandResult<T>.completed,
+      onError: (Object error, StackTrace stackTrace) {
+        _reportFailure(error, stackTrace, failureTitle);
+        return AsterRouteCommandResult<T>.rejected();
+      },
+    );
+    await _releaseOnNextFrame();
+    return completion;
+  }
+
+  Future<void> _releaseOnNextFrame() {
+    final released = Completer<void>();
+    SchedulerBinding.instance.scheduleFrameCallback((_) {
+      _release();
+      released.complete();
+    });
+    SchedulerBinding.instance.ensureVisualUpdate();
+    return released.future;
+  }
+
+  bool _acquire(HapticIntent? hapticIntent) {
+    if (_inFlight || !mounted) return false;
+    setState(() => _inFlight = true);
+    if (hapticIntent case final intent?) {
+      unawaited(context.haptics.trigger(intent));
+    }
+    return true;
+  }
+
+  void _release() {
+    if (!mounted || !_inFlight) return;
+    setState(() => _inFlight = false);
+  }
+
+  void _reportFailure(
+    Object error,
+    StackTrace stackTrace,
+    String failureTitle,
+  ) {
+    final failure = FailureMapper.from(error, stackTrace);
+    FlutterError.reportError(
+      FlutterErrorDetails(
+        exception: AppFailureException(failure),
+        stack: stackTrace,
+        library: 'Aster navigation',
+        context: ErrorDescription('while changing application routes'),
+      ),
+    );
+    if (!mounted) return;
+    unawaited(context.haptics.trigger(HapticIntent.error));
+    AsterFeedbackScope.maybeOf(context)?.toasts.show(
+      title: failureTitle,
+      message: failure.userMessage,
+      variant: ToastVariant.failure,
+    );
   }
 
   @override

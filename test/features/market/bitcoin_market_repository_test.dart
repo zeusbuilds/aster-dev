@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:aster/core/core.dart';
 import 'package:aster/features/market/data/data.dart';
@@ -58,9 +59,10 @@ void main() {
     );
     expect(snapshot.history.map((point) => point.fiatMinorUnits), [
       6400013,
-      6500200,
+      6512346,
     ]);
     expect(snapshot.history.first.timestamp, windowFirst);
+    expect(snapshot.history.last.timestamp, recentLast);
   });
 
   test('rounds zero-, two-, and three-decimal fiat minor units', () async {
@@ -155,6 +157,33 @@ void main() {
     expect(snapshot.currentUsdtPrice, isNull);
   });
 
+  test('preserves an offline history failure beside a valid spot', () async {
+    final transport = _transport((request) async {
+      if (request.url.path.endsWith('/range')) {
+        throw const SocketException('offline');
+      }
+      return _currentResponse(
+        currency: 'usd',
+        bitcoin: 65000,
+        tether: 1,
+        observedAt: recentLast,
+      );
+    });
+    addTearDown(transport.close);
+
+    final result = await BitcoinMarketRepository(
+      transport,
+      MarketDataConfiguration.developmentKeyless(),
+      clock: () => now,
+    ).fetchLoad(currency: _usd);
+    final load = (result as AppSuccess<BitcoinMarketLoad>).value;
+
+    expect(load.snapshot.currentBitcoinPrice.minorUnits, 6500000);
+    expect(load.snapshot.history, isEmpty);
+    expect(load.degradedFailure?.kind, AppFailureKind.connectivity);
+    expect(load.degradedFailure?.code, 'http_offline');
+  });
+
   test('keeps Bitcoin when optional Tether violates domain bounds', () async {
     final transport = _transport((request) async {
       if (request.url.path.endsWith('/range')) {
@@ -233,6 +262,31 @@ void main() {
 
     expect(result, isA<AppFailureResult<BitcoinMarketSnapshot>>());
   });
+
+  test(
+    'prefers connectivity when failed endpoints have mixed causes',
+    () async {
+      final transport = _transport((request) async {
+        if (request.url.path.endsWith('/range')) {
+          throw const SocketException('offline');
+        }
+        return http.Response('unavailable', 503);
+      });
+      addTearDown(transport.close);
+
+      final result = await BitcoinMarketRepository(
+        transport,
+        MarketDataConfiguration.developmentKeyless(),
+        clock: () => now,
+      ).fetchLoad(currency: _usd);
+
+      expect(result, isA<AppFailureResult<BitcoinMarketLoad>>());
+      expect(
+        (result as AppFailureResult<BitcoinMarketLoad>).failure.kind,
+        AppFailureKind.connectivity,
+      );
+    },
+  );
 
   test(
     'fails before transport when a release market service is absent',
@@ -376,7 +430,8 @@ void main() {
 
       expect(history, hasLength(24));
       expect(history.first.timestamp, first);
-      expect(history.last.timestamp, now);
+      expect(history.last.timestamp, recentLast);
+      expect(history.last.fiatMinorUnits, 6500000);
       for (var index = 1; index < history.length; index += 1) {
         expect(
           history[index].timestamp.isAfter(history[index - 1].timestamp),
@@ -451,14 +506,14 @@ void main() {
       BitcoinMarketSnapshot.maximumHistoryStartLag,
     );
     final earliestEnd = now.subtract(
-      BitcoinMarketSnapshot.maximumHistoryEndAge,
+      BitcoinMarketSnapshot.maximumHistoryTailLag,
     );
     expect(
       await fetchHistory(
         first: latestStart,
         last: earliestEnd.add(const Duration(milliseconds: 1)),
       ),
-      hasLength(2),
+      hasLength(3),
     );
     expect(
       await fetchHistory(
@@ -469,6 +524,50 @@ void main() {
     );
     expect(await fetchHistory(first: windowFirst, last: earliestEnd), isEmpty);
   });
+
+  test(
+    'completes delayed hourly history with the validated current spot',
+    () async {
+      final hourlyTail = now.subtract(const Duration(minutes: 84));
+      final transport = _transport((request) async {
+        if (request.url.path.endsWith('/range')) {
+          return _historyResponse([
+            [
+              windowFirst
+                  .add(const Duration(minutes: 20))
+                  .millisecondsSinceEpoch,
+              64000,
+            ],
+            [hourlyTail.millisecondsSinceEpoch, 65000],
+          ]);
+        }
+        return _currentResponse(
+          currency: 'usd',
+          bitcoin: 65100,
+          tether: 1,
+          observedAt: recentLast,
+        );
+      });
+      addTearDown(transport.close);
+
+      final result = await BitcoinMarketRepository(
+        transport,
+        MarketDataConfiguration.developmentKeyless(),
+        clock: () => now,
+      ).fetch(currency: _usd);
+      final snapshot = (result as AppSuccess<BitcoinMarketSnapshot>).value;
+
+      expect(snapshot.history, hasLength(3));
+      expect(
+        snapshot.history.first.timestamp,
+        windowFirst.add(const Duration(minutes: 20)),
+      );
+      expect(snapshot.history[1].timestamp, hourlyTail);
+      expect(snapshot.history.last.timestamp, recentLast);
+      expect(snapshot.history.last.fiatMinorUnits, 6510000);
+      expect(snapshot.currentBitcoinPrice.observedAt, recentLast);
+    },
+  );
 
   test('rejects stale and out-of-skew prices as current', () async {
     final stale = now.subtract(const Duration(hours: 2));

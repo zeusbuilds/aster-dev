@@ -115,7 +115,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
 
           void openDetails(String activityId) {
             unawaited(
-              navigation.run(
+              navigation.openRoute(
                 command: () => context.pushNamed<void>(
                   RouteNames.transactionDetails,
                   pathParameters: <String, String>{

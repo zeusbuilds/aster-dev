@@ -11,7 +11,6 @@ import '../../../../shared/shared.dart';
 import '../../../market/domain/models/models.dart';
 import '../../../market/presentation/models/models.dart';
 import '../../../market/presentation/view_model/view_models.dart';
-import '../../../settings/presentation/view_model/view_models.dart';
 import 'candle_chart.dart';
 
 /// Bitcoin market card backed by injected repository state.
@@ -47,13 +46,12 @@ class _PriceCardState extends ConsumerState<PriceCard> {
     if (snapshot == null) return;
     final now = ref.read(utcClockProvider)().toUtc();
     final remaining = snapshot.expiresAt.difference(now);
-    _expiryTimer = Timer(
-      (remaining.isNegative ? Duration.zero : remaining) +
-          const Duration(milliseconds: 1),
-      () {
-        if (mounted) setState(() {});
-      },
-    );
+    if (remaining <= Duration.zero) return;
+    _expiryTimer = Timer(remaining + const Duration(milliseconds: 1), () {
+      if (!mounted) return;
+      setState(() {});
+      unawaited(ref.read(bitcoinMarketViewModelProvider.notifier).retry());
+    });
   }
 
   @override
@@ -71,166 +69,136 @@ class _PriceCardState extends ConsumerState<PriceCard> {
         : null;
     final chartData = snapshot?.history;
     final change = snapshot?.changeBasisPoints;
-    final headerLoading =
-        selectedQuote.isLoading || (market.isLoading && rawSnapshot == null);
     final ownsCurrentCurrency =
         rawSnapshot != null && rawSnapshot.quoteCurrency == selectedCurrency;
-    final refreshFailure = ownsCurrentCurrency
-        ? marketState?.refreshFailure
-        : null;
+    final visibleFailure = _visibleFailure(
+      selectedQuote: selectedQuote,
+      market: market,
+      ownsCurrentCurrency: ownsCurrentCurrency,
+    );
+    final headerLoading = snapshot == null;
+    final chartUnavailable = chartData?.isEmpty ?? true;
+    final chartOffline =
+        chartUnavailable && visibleFailure?.kind == AppFailureKind.connectivity;
     final colors = context.appColors;
     final effects = context.effects;
     final spacing = context.spacing;
     final icons = context.icons;
     final type = context.type;
+    final headlineLineHeight = unwrappedSpanSize(
+      context,
+      TextSpan(
+        style: type.brandAmount,
+        children: NumericTextSpans.build(context, r'$0', type.brandAmount),
+      ),
+    ).height;
+    final Widget chart = switch ((chartUnavailable, chartOffline)) {
+      (true, true) => _OfflineMarketChart(
+        onRetry: () => unawaited(
+          ref.read(bitcoinMarketViewModelProvider.notifier).retry(),
+        ),
+      ),
+      (true, false) => const CandleChart(data: null, isSkeleton: true),
+      (false, _) => CandleChart(data: chartData, isSkeleton: false),
+    };
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Semantics(
-          container: true,
-          liveRegion: headerLoading,
-          label: _headerSemantics(
-            loading: headerLoading,
-            snapshot: snapshot,
-            changeBasisPoints: change,
-          ),
-          excludeSemantics: true,
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              vertical: spacing.lg,
-              horizontal: spacing.screenPadding,
+        SizedBox(
+          width: double.infinity,
+          child: Semantics(
+            container: true,
+            liveRegion: headerLoading,
+            label: _headerSemantics(
+              loading: headerLoading,
+              snapshot: snapshot,
+              changeBasisPoints: change,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: context.colorScheme.surface,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        UniconsLine.bitcoin,
-                        size: icons.md,
-                        color: colors.bitcoin.withValues(
-                          alpha: effects.bitcoinIconOpacity,
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: spacing.xs),
-                    Flexible(
-                      flex: 2,
-                      child: Text(
-                        'Bitcoin Price',
-                        style: type.brandTitle,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    SizedBox(width: spacing.md),
-                    Expanded(
-                      flex: 3,
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerRight,
-                        child: AppSkeletonizer(
-                          enabled: headerLoading,
-                          baseColor: colors.onBrandArt.withValues(
-                            alpha: effects.chartLoadingBaseOpacity,
-                          ),
-                          highlightColor: colors.onBrandArt.withValues(
-                            alpha: effects.chartContentOpacity,
-                          ),
-                          child: NumericText(
-                            headerLoading
-                                ? '000,000.00'
-                                : _formatPrice(snapshot, headline: true),
-                            style: type.brandAmount,
-                            maxLines: 1,
+            excludeSemantics: true,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                spacing.lg,
+                spacing.lg,
+                spacing.screenPadding,
+                spacing.lg,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: headlineLineHeight),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: Row(
+                            children: [
+                              DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: context.colorScheme.surface,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  UniconsLine.bitcoin,
+                                  size: icons.md,
+                                  color: colors.bitcoin.withValues(
+                                    alpha: effects.bitcoinIconOpacity,
+                                  ),
+                                ),
+                              ),
+                              SizedBox(width: spacing.xs),
+                              Expanded(
+                                child: Text(
+                                  'Bitcoin Price',
+                                  style: type.brandTitle,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
+                        SizedBox(width: spacing.md),
+                        Expanded(
+                          flex: 3,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerRight,
+                            child: AppSkeletonizer(
+                              enabled: headerLoading,
+                              baseColor: colors.onBrandArt.withValues(
+                                alpha: effects.chartLoadingBaseOpacity,
+                              ),
+                              highlightColor: colors.onBrandArt.withValues(
+                                alpha: effects.chartContentOpacity,
+                              ),
+                              child: NumericText(
+                                headerLoading
+                                    ? '000,000.00'
+                                    : _formatPrice(snapshot, headline: true),
+                                style: type.brandAmount,
+                                textAlign: TextAlign.end,
+                                maxLines: 1,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                _PriceChangeVisual(
-                  changeBasisPoints: change,
-                  loading: headerLoading,
-                ),
-              ],
+                  ),
+                  _PriceChangeVisual(
+                    changeBasisPoints: change,
+                    loading: headerLoading,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
-        if (ownsCurrentCurrency && marketState!.refreshing)
-          const _MarketRefreshStatus.refreshing()
-        else if (refreshFailure case final failure?)
-          _MarketRefreshStatus.failure(
-            message: failure.userMessage,
-            onRetry: failure.retryable
-                ? () =>
-                      ref.read(bitcoinMarketViewModelProvider.notifier).retry()
-                : null,
-          ),
-        switch ((selectedQuote, market)) {
-          (AsyncLoading<MarketQuoteCurrency>(), _) => const CandleChart(
-            data: null,
-            isSkeleton: true,
-          ),
-          (
-            AsyncError<MarketQuoteCurrency>(:final error, :final stackTrace),
-            _,
-          ) =>
-            _MarketUnavailable(
-              message: _failure(error, stackTrace).userMessage,
-              onRetry: _failure(error, stackTrace).retryable
-                  ? () => ref.read(settingsViewModelProvider.notifier).retry()
-                  : null,
-            ),
-          (_, AsyncLoading<BitcoinMarketState>()) => const CandleChart(
-            data: null,
-            isSkeleton: true,
-          ),
-          (
-            _,
-            AsyncError<BitcoinMarketState>(:final error, :final stackTrace),
-          ) =>
-            _MarketUnavailable(
-              message: _failure(error, stackTrace).userMessage,
-              onRetry: _failure(error, stackTrace).retryable
-                  ? () => ref
-                        .read(bitcoinMarketViewModelProvider.notifier)
-                        .retry()
-                  : null,
-            ),
-          (_, AsyncData<BitcoinMarketState>()) when snapshot == null =>
-            _MarketUnavailable(
-              message:
-                  marketState?.refreshFailure?.userMessage ??
-                  (rawSnapshot?.quoteCurrency == selectedCurrency
-                      ? 'Market quote expired'
-                      : 'Market quote unavailable'),
-              onRetry: marketState?.refreshFailure?.retryable == false
-                  ? null
-                  : () => ref
-                        .read(bitcoinMarketViewModelProvider.notifier)
-                        .retry(),
-            ),
-          (_, AsyncData<BitcoinMarketState>())
-              when chartData?.isEmpty ?? true =>
-            _MarketUnavailable(
-              message: '24-hour chart unavailable',
-              onRetry: () =>
-                  ref.read(bitcoinMarketViewModelProvider.notifier).retry(),
-            ),
-          (_, AsyncData<BitcoinMarketState>()) => CandleChart(
-            data: chartData,
-            isSkeleton: false,
-          ),
-        },
+        chart,
       ],
     );
   }
@@ -268,10 +236,7 @@ class _PriceCardState extends ConsumerState<PriceCard> {
     required BitcoinMarketSnapshot? snapshot,
     required int? changeBasisPoints,
   }) {
-    if (loading) return 'Bitcoin price loading.';
-    if (snapshot == null) {
-      return 'Bitcoin price unavailable.';
-    }
+    if (loading || snapshot == null) return 'Bitcoin price loading.';
     final change = switch (changeBasisPoints) {
       null => '24-hour change unavailable',
       0 =>
@@ -286,67 +251,23 @@ class _PriceCardState extends ConsumerState<PriceCard> {
       error is AppFailureException
       ? error.failure
       : FailureMapper.from(error, stackTrace);
-}
 
-final class _MarketRefreshStatus extends StatelessWidget {
-  const _MarketRefreshStatus.refreshing()
-    : message = 'Refreshing market data',
-      refreshing = true,
-      onRetry = null;
-
-  const _MarketRefreshStatus.failure({
-    required this.message,
-    required this.onRetry,
-  }) : refreshing = false;
-
-  final String message;
-  final bool refreshing;
-  final VoidCallback? onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        context.spacing.lg,
-        context.spacing.xs,
-        context.spacing.lg,
-        context.spacing.sm,
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Semantics(
-              container: true,
-              liveRegion: true,
-              label: message,
-              excludeSemantics: true,
-              child: Text(
-                message,
-                style: context.type.brandMetric,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ),
-          if (refreshing) ...[
-            SizedBox(width: context.spacing.sm),
-            const GridLoader(
-              colorStyle: GridLoaderColorStyle.white,
-              style: GridLoaderStyle.plusLoop,
-            ),
-          ] else if (onRetry case final retry?) ...[
-            SizedBox(width: context.spacing.sm),
-            AsterIconButton(
-              icon: RemixIcons.refresh_line,
-              tooltip: 'Retry market refresh',
-              color: context.appColors.onBrandArt,
-              hapticIntent: null,
-              onPressed: retry,
-            ),
-          ],
-        ],
-      ),
-    );
+  static AppFailure? _visibleFailure({
+    required AsyncValue<MarketQuoteCurrency> selectedQuote,
+    required AsyncValue<BitcoinMarketState> market,
+    required bool ownsCurrentCurrency,
+  }) {
+    if (selectedQuote case AsyncError(:final error, :final stackTrace)) {
+      return _failure(error, stackTrace);
+    }
+    if (market case AsyncError(:final error, :final stackTrace)) {
+      return _failure(error, stackTrace);
+    }
+    final state = market.value;
+    if (state == null) return null;
+    return state.snapshot == null || ownsCurrentCurrency
+        ? state.refreshFailure
+        : null;
   }
 }
 
@@ -402,35 +323,40 @@ class _PriceChangeVisual extends StatelessWidget {
   }
 }
 
-class _MarketUnavailable extends StatelessWidget {
-  const _MarketUnavailable({required this.message, required this.onRetry});
+class _OfflineMarketChart extends StatelessWidget {
+  const _OfflineMarketChart({required this.onRetry});
 
-  final String message;
-  final VoidCallback? onRetry;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
-    final spacing = context.spacing;
-    return ConstrainedBox(
-      constraints: BoxConstraints(minHeight: context.metrics.chartHeight),
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: spacing.screenPadding),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Semantics(
-              liveRegion: true,
-              child: Text(message, style: context.type.brandMetric),
+    final muted = context.appColors.onBrandArt.withValues(
+      alpha: context.effects.brandContentMutedOpacity,
+    );
+    return Semantics(
+      button: true,
+      liveRegion: true,
+      label: "You're offline. Tap to try again.",
+      onTap: onRetry,
+      excludeSemantics: true,
+      child: SizedBox(
+        width: double.infinity,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: context.metrics.chartHeight),
+          child: TextButton(
+            onPressed: onRetry,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text("You're offline", style: context.type.brandTitle),
+                SizedBox(height: context.spacing.xs),
+                Text(
+                  'Tap to try again',
+                  style: context.type.brandMetric.copyWith(color: muted),
+                ),
+              ],
             ),
-            if (onRetry case final retry?) ...[
-              SizedBox(height: spacing.md),
-              CustomButton.compact(
-                text: 'Retry',
-                variant: ButtonVariant.translucent,
-                onTap: retry,
-              ),
-            ],
-          ],
+          ),
         ),
       ),
     );

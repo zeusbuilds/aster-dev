@@ -27,8 +27,8 @@ class MarketScreen extends StatelessWidget {
           VoidCallback? open(String location, String failureTitle) {
             if (navigation.inFlight) return null;
             return () => unawaited(
-              navigation.run(
-                command: () => context.push(location),
+              navigation.openRoute(
+                command: () => context.push<void>(location),
                 failureTitle: failureTitle,
               ),
             );

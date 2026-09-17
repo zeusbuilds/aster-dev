@@ -54,7 +54,7 @@ class SettingsScreen extends ConsumerWidget {
           VoidCallback? openNamed(String routeName, String failureTitle) {
             if (navigation.inFlight) return null;
             return () => unawaited(
-              navigation.run(
+              navigation.openRoute(
                 command: () => context.pushNamed<void>(routeName),
                 failureTitle: failureTitle,
               ),

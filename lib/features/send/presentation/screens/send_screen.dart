@@ -8,56 +8,45 @@ import '../../../wallet/presentation/widgets/widgets.dart';
 import '../view_model/view_models.dart';
 
 /// First Send step: choose an asset and payment rail.
-class SendScreen extends ConsumerStatefulWidget {
+class SendScreen extends ConsumerWidget {
   const SendScreen({super.key});
 
   @override
-  ConsumerState<SendScreen> createState() => _SendScreenState();
-}
-
-class _SendScreenState extends ConsumerState<SendScreen> {
-  late final SendDestinationHandoff _destinationHandoff;
-
-  @override
-  void initState() {
-    super.initState();
-    _destinationHandoff = ref.read(sendDestinationHandoffProvider.notifier);
-  }
-
-  @override
-  void dispose() {
-    _destinationHandoff.clear();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AsterNavigationScope(
-      child: Scaffold(
-        backgroundColor: context.colorScheme.surface,
-        appBar: CustomAppBar(
-          title: 'Send',
-          leadingIcon: true,
-          centerTitle: false,
-        ),
-        body: SafeArea(
-          top: false,
-          minimum: EdgeInsets.only(bottom: context.spacing.lg),
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: context.spacing.screenPadding,
-            ),
-            child: PaymentTargetSelectionView(
-              capabilities: ref.watch(walletPaymentCapabilitiesProvider),
-              onRetry: () => ref.invalidate(walletPaymentCapabilitiesProvider),
-              onSelected: (target) async {
-                await context.pushNamed(
-                  RouteNames.sendAddress,
-                  pathParameters: {
-                    RoutePaths.paymentTargetParameter: target.slug,
-                  },
-                );
-              },
+  Widget build(BuildContext context, WidgetRef ref) {
+    return PopScope<void>(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) {
+          ref.read(sendDestinationHandoffProvider.notifier).clear();
+        }
+      },
+      child: AsterNavigationScope(
+        child: Scaffold(
+          backgroundColor: context.colorScheme.surface,
+          appBar: CustomAppBar(
+            title: 'Send',
+            leadingIcon: true,
+            centerTitle: false,
+          ),
+          body: SafeArea(
+            top: false,
+            minimum: EdgeInsets.only(bottom: context.spacing.lg),
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: context.spacing.screenPadding,
+              ),
+              child: PaymentTargetSelectionView(
+                capabilities: ref.watch(walletPaymentCapabilitiesProvider),
+                onRetry: () =>
+                    ref.invalidate(walletPaymentCapabilitiesProvider),
+                onSelected: (target) async {
+                  await context.pushNamed(
+                    RouteNames.sendAddress,
+                    pathParameters: {
+                      RoutePaths.paymentTargetParameter: target.slug,
+                    },
+                  );
+                },
+              ),
             ),
           ),
         ),

@@ -78,7 +78,72 @@ void main() {
     expect(requestCount, 2);
   });
 
-  test('retryable market failure can recover explicitly', () async {
+  test(
+    'market failure is retained silently and can recover explicitly',
+    () async {
+      var requestCount = 0;
+      final transport = ResilientHttpClient(
+        client: MockClient((request) async {
+          requestCount += 1;
+          if (requestCount <= 2) {
+            return http.Response('temporarily unavailable', 503);
+          }
+          final now = DateTime.now().toUtc();
+          if (request.url.path.endsWith('/range')) {
+            return http.Response(
+              '{"prices":[[${now.millisecondsSinceEpoch},64000]]}',
+              200,
+            );
+          }
+          return http.Response(
+            '{"bitcoin":{"usd":65000,"last_updated_at":'
+            '${now.millisecondsSinceEpoch ~/ 1000}},'
+            '"tether":{"usd":1,"last_updated_at":'
+            '${now.millisecondsSinceEpoch ~/ 1000}}}',
+            200,
+          );
+        }),
+        retryPolicy: RetryPolicy(maxAttempts: 1),
+      );
+      final container = ProviderContainer(
+        retry: (retryCount, error) => null,
+        overrides: [
+          resilientHttpClientProvider.overrideWithValue(transport),
+          selectedMarketQuoteCurrencyProvider.overrideWith(
+            (ref) async => _currency('USD', r'$'),
+          ),
+        ],
+      );
+      final subscription = container.listen(
+        bitcoinMarketViewModelProvider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(() {
+        subscription.close();
+        container.dispose();
+        transport.close();
+      });
+
+      final failed = await container.read(
+        bitcoinMarketViewModelProvider.future,
+      );
+      expect(failed.snapshot, isNull);
+      expect(failed.refreshFailure?.code, 'http_server_unavailable');
+
+      await container.read(bitcoinMarketViewModelProvider.notifier).retry();
+
+      final recovered = container
+          .read(bitcoinMarketViewModelProvider)
+          .requireValue;
+      expect(recovered.snapshot, isNotNull);
+      expect(requestCount, 4);
+    },
+  );
+
+  test('market failure retries automatically after bounded backoff', () async {
+    final retryStarted = Completer<void>();
+    final releaseRetry = Completer<void>();
     var requestCount = 0;
     final transport = ResilientHttpClient(
       client: MockClient((request) async {
@@ -86,17 +151,20 @@ void main() {
         if (requestCount <= 2) {
           return http.Response('temporarily unavailable', 503);
         }
+        if (requestCount == 4 && !retryStarted.isCompleted) {
+          retryStarted.complete();
+        }
+        await releaseRetry.future;
         final now = DateTime.now().toUtc();
         if (request.url.path.endsWith('/range')) {
           return http.Response(
-            '{"prices":[[${now.millisecondsSinceEpoch},64000]]}',
+            '{"prices":[[${now.subtract(const Duration(hours: 24)).millisecondsSinceEpoch},64000],'
+            '[${now.subtract(const Duration(minutes: 1)).millisecondsSinceEpoch},65000]]}',
             200,
           );
         }
         return http.Response(
           '{"bitcoin":{"usd":65000,"last_updated_at":'
-          '${now.millisecondsSinceEpoch ~/ 1000}},'
-          '"tether":{"usd":1,"last_updated_at":'
           '${now.millisecondsSinceEpoch ~/ 1000}}}',
           200,
         );
@@ -107,6 +175,14 @@ void main() {
       retry: (retryCount, error) => null,
       overrides: [
         resilientHttpClientProvider.overrideWithValue(transport),
+        bitcoinMarketBackgroundRetryPolicyProvider.overrideWithValue(
+          RetryPolicy(
+            maxAttempts: 1,
+            baseDelay: Duration.zero,
+            maximumDelay: Duration.zero,
+            jitterFactor: 0,
+          ),
+        ),
         selectedMarketQuoteCurrencyProvider.overrideWith(
           (ref) async => _currency('USD', r'$'),
         ),
@@ -118,24 +194,109 @@ void main() {
       fireImmediately: true,
     );
     addTearDown(() {
+      if (!releaseRetry.isCompleted) releaseRetry.complete();
       subscription.close();
       container.dispose();
       transport.close();
     });
 
-    await expectLater(
-      container.read(bitcoinMarketViewModelProvider.future),
-      throwsA(isA<AppFailureException>()),
-    );
+    final failed = await container.read(bitcoinMarketViewModelProvider.future);
+    expect(failed.snapshot, isNull);
+    expect(failed.refreshFailure?.kind, AppFailureKind.unavailable);
 
-    await container.read(bitcoinMarketViewModelProvider.notifier).retry();
+    await retryStarted.future;
+    final retrying = container
+        .read(bitcoinMarketViewModelProvider)
+        .requireValue;
+    expect(retrying.refreshing, isTrue);
+    expect(retrying.refreshFailure?.kind, AppFailureKind.unavailable);
 
-    expect(
-      container.read(bitcoinMarketViewModelProvider),
-      isA<AsyncData<BitcoinMarketState>>(),
-    );
+    releaseRetry.complete();
+    for (var attempt = 0; attempt < 20; attempt += 1) {
+      await container.pump();
+      if (container.read(bitcoinMarketViewModelProvider).value?.snapshot !=
+          null) {
+        break;
+      }
+    }
+
+    final recovered = container
+        .read(bitcoinMarketViewModelProvider)
+        .requireValue;
+    expect(recovered.snapshot, isNotNull);
+    expect(recovered.refreshFailure, isNull);
     expect(requestCount, 4);
   });
+
+  test(
+    'resuming observation defers retry outside Riverpod callbacks',
+    () async {
+      var requestCount = 0;
+      final transport = ResilientHttpClient(
+        client: MockClient((request) async {
+          requestCount += 1;
+          return http.Response('temporarily unavailable', 503);
+        }),
+        retryPolicy: RetryPolicy(maxAttempts: 1),
+      );
+      final container = ProviderContainer(
+        retry: (retryCount, error) => null,
+        overrides: [
+          resilientHttpClientProvider.overrideWithValue(transport),
+          bitcoinMarketBackgroundRetryPolicyProvider.overrideWithValue(
+            RetryPolicy(
+              maxAttempts: 1,
+              baseDelay: const Duration(minutes: 5),
+              maximumDelay: const Duration(minutes: 5),
+              jitterFactor: 0,
+            ),
+          ),
+          selectedMarketQuoteCurrencyProvider.overrideWith(
+            (ref) async => _currency('USD', r'$'),
+          ),
+        ],
+      );
+      final initialSubscription = container.listen(
+        bitcoinMarketViewModelProvider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      ProviderSubscription<AsyncValue<BitcoinMarketState>>? resumedSubscription;
+      addTearDown(() {
+        resumedSubscription?.close();
+        initialSubscription.close();
+        container.dispose();
+        transport.close();
+      });
+
+      final failed = await container.read(
+        bitcoinMarketViewModelProvider.future,
+      );
+      expect(failed.refreshFailure?.kind, AppFailureKind.unavailable);
+      expect(requestCount, 2);
+
+      initialSubscription.close();
+      expect(
+        () => resumedSubscription = container.listen(
+          bitcoinMarketViewModelProvider,
+          (_, _) {},
+          fireImmediately: true,
+        ),
+        returnsNormally,
+      );
+      await container.pump();
+
+      expect(requestCount, 2);
+      expect(
+        container
+            .read(bitcoinMarketViewModelProvider)
+            .requireValue
+            .refreshFailure
+            ?.kind,
+        AppFailureKind.unavailable,
+      );
+    },
+  );
 
   test('loaded refresh retains confirmed content and typed failure', () async {
     final now = DateTime.utc(2026, 8, 18, 12);
@@ -214,57 +375,63 @@ void main() {
     expect(failed.refreshFailure?.retryable, isTrue);
   });
 
-  test('terminal market failure cannot be retried', () async {
-    var requestCount = 0;
-    final transport = ResilientHttpClient(
-      client: MockClient((request) async {
-        requestCount += 1;
-        return http.Response('unexpected request', 500);
-      }),
-      retryPolicy: RetryPolicy(maxAttempts: 1),
-    );
-    final container = ProviderContainer(
-      retry: (retryCount, error) => null,
-      overrides: [
-        resilientHttpClientProvider.overrideWithValue(transport),
-        marketDataConfigurationProvider.overrideWithValue(
-          MarketDataConfiguration.resolve(
-            configuredBase: '',
-            releaseMode: true,
+  test(
+    'configuration failure stays silent and explicit retry is safe',
+    () async {
+      var requestCount = 0;
+      final transport = ResilientHttpClient(
+        client: MockClient((request) async {
+          requestCount += 1;
+          return http.Response('unexpected request', 500);
+        }),
+        retryPolicy: RetryPolicy(maxAttempts: 1),
+      );
+      final container = ProviderContainer(
+        retry: (retryCount, error) => null,
+        overrides: [
+          resilientHttpClientProvider.overrideWithValue(transport),
+          marketDataConfigurationProvider.overrideWithValue(
+            MarketDataConfiguration.resolve(
+              configuredBase: '',
+              releaseMode: true,
+            ),
           ),
-        ),
-        selectedMarketQuoteCurrencyProvider.overrideWith(
-          (ref) async => _currency('USD', r'$'),
-        ),
-      ],
-    );
-    final transitions = <AsyncValue<BitcoinMarketState>>[];
-    final subscription = container.listen(
-      bitcoinMarketViewModelProvider,
-      (_, next) => transitions.add(next),
-      fireImmediately: true,
-    );
-    addTearDown(() {
-      subscription.close();
-      container.dispose();
-      transport.close();
-    });
+          selectedMarketQuoteCurrencyProvider.overrideWith(
+            (ref) async => _currency('USD', r'$'),
+          ),
+        ],
+      );
+      final transitions = <AsyncValue<BitcoinMarketState>>[];
+      final subscription = container.listen(
+        bitcoinMarketViewModelProvider,
+        (_, next) => transitions.add(next),
+        fireImmediately: true,
+      );
+      addTearDown(() {
+        subscription.close();
+        container.dispose();
+        transport.close();
+      });
 
-    await expectLater(
-      container.read(bitcoinMarketViewModelProvider.future),
-      throwsA(isA<AppFailureException>()),
-    );
-    transitions.clear();
+      final failed = await container.read(
+        bitcoinMarketViewModelProvider.future,
+      );
+      expect(failed.snapshot, isNull);
+      expect(failed.refreshFailure?.kind, AppFailureKind.configuration);
+      transitions.clear();
 
-    await container.read(bitcoinMarketViewModelProvider.notifier).retry();
+      await container.read(bitcoinMarketViewModelProvider.notifier).retry();
 
-    expect(transitions, isEmpty);
-    expect(
-      container.read(bitcoinMarketViewModelProvider),
-      isA<AsyncError<BitcoinMarketState>>(),
-    );
-    expect(requestCount, 0);
-  });
+      expect(transitions, hasLength(2));
+      final retried = container
+          .read(bitcoinMarketViewModelProvider)
+          .requireValue;
+      expect(retried.snapshot, isNull);
+      expect(retried.refreshing, isFalse);
+      expect(retried.refreshFailure?.kind, AppFailureKind.configuration);
+      expect(requestCount, 0);
+    },
+  );
 
   test(
     'rebuilds with the newly selected currency without reusing USD',
@@ -309,13 +476,13 @@ void main() {
       });
 
       final usd = await container.read(bitcoinMarketViewModelProvider.future);
-      expect(usd.snapshot.quoteCurrency.code, 'USD');
+      expect(usd.snapshot!.quoteCurrency.code, 'USD');
 
       selected = _currency('EUR', '€');
       container.invalidate(selectedMarketQuoteCurrencyProvider);
       final eur = await container.read(bitcoinMarketViewModelProvider.future);
 
-      expect(eur.snapshot.quoteCurrency.code, 'EUR');
+      expect(eur.snapshot!.quoteCurrency.code, 'EUR');
       expect(requests, ['usd', 'usd', 'eur', 'eur']);
     },
   );
@@ -379,7 +546,7 @@ void main() {
 
       expect(
         (await container.read(bitcoinMarketViewModelProvider.future))
-            .snapshot
+            .snapshot!
             .quoteCurrency
             .code,
         'USD',
@@ -408,7 +575,7 @@ void main() {
       await container.pump();
       final eur = await container.read(bitcoinMarketViewModelProvider.future);
 
-      expect(eur.snapshot.quoteCurrency.code, 'EUR');
+      expect(eur.snapshot!.quoteCurrency.code, 'EUR');
       expect(requests, ['usd', 'usd', 'eur', 'eur']);
     },
   );
@@ -472,7 +639,7 @@ void main() {
 
     expect(
       (await container.read(bitcoinMarketViewModelProvider.future))
-          .snapshot
+          .snapshot!
           .quoteCurrency
           .code,
       'USD',
@@ -489,12 +656,12 @@ void main() {
     releaseStaleRetry.complete();
     await retry;
 
-    expect(eur.snapshot.quoteCurrency.code, 'EUR');
+    expect(eur.snapshot!.quoteCurrency.code, 'EUR');
     expect(
       container
           .read(bitcoinMarketViewModelProvider)
           .requireValue
-          .snapshot
+          .snapshot!
           .quoteCurrency,
       selected,
     );

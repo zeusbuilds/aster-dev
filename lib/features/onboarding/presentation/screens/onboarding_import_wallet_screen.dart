@@ -207,7 +207,7 @@ class _OnboardingImportWalletScreenState
                         !state.submitting &&
                         !state.requiresReconciliation &&
                         !navigation.inFlight,
-                    canSubmit: state.canSubmit,
+                    canSubmit: state.canContinue,
                     onChanged: _handleWordInput,
                     onSubmitted: (index) =>
                         unawaited(_handleSubmitted(index, state, navigation)),
@@ -272,10 +272,9 @@ class _OnboardingImportWalletScreenState
               CustomButton(
                 text: 'Continue',
                 variant: ButtonVariant.primary,
-                enabled: state.canSubmit && !navigation.inFlight,
-                loading: state.submitting,
+                enabled: state.canContinue && !navigation.inFlight,
                 hapticIntent: null,
-                onTap: () => unawaited(_submit(navigation)),
+                onTap: () => _openName(navigation),
               ),
               OnboardingTextAction(
                 label: 'Back',
@@ -329,9 +328,9 @@ class _OnboardingImportWalletScreenState
       return;
     }
     if (index == ImportWalletState.wordCount - 1) {
-      if (state.canSubmit) {
+      if (state.canContinue) {
         FocusScope.of(context).unfocus();
-        await _submit(navigation);
+        _openName(navigation);
       }
       return;
     }
@@ -360,13 +359,14 @@ class _OnboardingImportWalletScreenState
     );
   }
 
-  Future<void> _submit(AsterNavigationCommandOwner navigation) async {
+  void _openName(AsterNavigationCommandOwner navigation) {
     FocusScope.of(context).unfocus();
-    await navigation.run(
-      command: () => ref.read(importWalletViewModelProvider.notifier).submit(),
-      failureTitle: 'Wallet could not be imported',
-      hapticIntent: null,
-      blocksRoutePop: true,
+    unawaited(
+      navigation.openRoute(
+        command: () =>
+            context.pushNamed<void>(RouteNames.onboardingImportWalletName),
+        failureTitle: 'Wallet name screen could not open',
+      ),
     );
   }
 }

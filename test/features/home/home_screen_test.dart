@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:aster/core/core.dart';
 import 'package:aster/features/home/presentation/screens/screens.dart';
@@ -8,13 +9,14 @@ import 'package:aster/features/home/presentation/widgets/widgets.dart';
 import 'package:aster/features/market/domain/models/models.dart';
 import 'package:aster/features/market/presentation/view_model/view_models.dart';
 import 'package:aster/features/settings/domain/models/models.dart';
-import 'package:aster/features/settings/presentation/models/models.dart';
 import 'package:aster/features/settings/presentation/view_model/view_models.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:aster/features/wallet/presentation/models/models.dart';
 import 'package:aster/features/wallet/presentation/view_model/view_models.dart';
 import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -27,6 +29,14 @@ import '../../support/wallet_fakes.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() async {
+    await (FontLoader(
+      'DM Sans',
+    )..addFont(rootBundle.load('assets/fonts/DMSans-Variable.ttf'))).load();
+    await (FontLoader(
+      'Public Sans',
+    )..addFont(rootBundle.load('assets/fonts/PublicSans-Variable.ttf'))).load();
+  });
 
   testWidgets('hidden balance values align with the asset row trailing edge', (
     tester,
@@ -213,59 +223,22 @@ void main() {
     },
   );
 
-  testWidgets(
-    'Home refresh retries its rendered Settings failure without wallet sync',
-    (tester) async {
-      final now = DateTime.utc(2026, 8, 11, 12);
-      final engine = FakeWalletEngine()..balance = _bitcoinBalance();
-      final httpClient = _marketClient(now);
-      final harness = await PaymentFlowTestHarness.create(
-        engine: engine,
-        clock: () => now,
-        httpClient: httpClient,
-      );
-      final loadedSettings = await harness.container.read(
-        settingsViewModelProvider.future,
-      );
-      const failure = AppFailure(
-        code: 'settings_temporarily_unavailable',
-        kind: AppFailureKind.storage,
-        userMessage: 'Settings are temporarily unavailable.',
-        retryable: true,
-      );
-      final failingSettings = _InitiallyFailingSettingsViewModel(
-        failure: failure,
-        recovered: loadedSettings,
-      );
-      addTearDown(httpClient.close);
-      addTearDown(() => _disposeHarness(tester, harness));
+  testWidgets('Home has no pull-to-refresh affordance', (tester) async {
+    final now = DateTime.utc(2026, 8, 11, 12);
+    final httpClient = _marketClient(now);
+    final harness = await PaymentFlowTestHarness.create(
+      clock: () => now,
+      httpClient: httpClient,
+    );
+    addTearDown(httpClient.close);
+    addTearDown(() => _disposeHarness(tester, harness));
 
-      await _pump(
-        tester,
-        harness,
-        ProviderScope(
-          overrides: [
-            settingsViewModelProvider.overrideWith(() => failingSettings),
-          ],
-          child: const HomeScreen(),
-        ),
-      );
-      await _pumpUntil(
-        tester,
-        () => find.text(failure.userMessage).evaluate().isNotEmpty,
-      );
-      engine.calls.clear();
+    await _pump(tester, harness, const HomeScreen());
+    await _pumpUntil(tester, () => find.text('Assets').evaluate().isNotEmpty);
 
-      await tester
-          .widget<RefreshIndicator>(find.byType(RefreshIndicator))
-          .onRefresh();
-      await tester.pump();
-
-      expect(failingSettings.retryAttempts, 1);
-      expect(engine.calls.where((call) => call == 'sync'), isEmpty);
-      await _pumpUntil(tester, () => find.text('Assets').evaluate().isNotEmpty);
-    },
-  );
+    expect(find.byType(RefreshIndicator), findsNothing);
+    expect(find.byType(CustomScrollView), findsOneWidget);
+  });
 
   testWidgets('Home remains scrollable and accessible at 2x text scale', (
     tester,
@@ -345,6 +318,7 @@ void main() {
       assetId: assetConfiguration.contractId,
       precision: assetConfiguration.precision,
     );
+    var marketRequestCount = 0;
     final engine = FakeWalletEngine()
       ..balances[WalletAsset.bitcoin.id] = _bitcoinBalance()
       ..balances[usdt.id] = _usdtBalance(usdt);
@@ -352,6 +326,7 @@ void main() {
       now: clockNow,
       bitcoinObservedAt: bitcoinObservedAt,
       usdtObservedAt: usdtObservedAt,
+      onRequest: () => marketRequestCount += 1,
     );
     final harness = await PaymentFlowTestHarness.create(
       engine: engine,
@@ -384,7 +359,17 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
     expect(find.text(r'≈ $1.00'), findsNothing);
     expect(find.text('USD estimate unavailable'), findsNWidgets(2));
-    expect(find.text('Market quote expired'), findsOneWidget);
+    expect(find.text('Market quote expired'), findsNothing);
+    expect(
+      tester
+          .widgetList<CandleChart>(find.byType(CandleChart))
+          .single
+          .isSkeleton,
+      isTrue,
+    );
+    await _pumpUntil(tester, () => marketRequestCount == 4);
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(marketRequestCount, 4);
   });
 
   testWidgets('Home owns one cross-control navigation command', (tester) async {
@@ -510,6 +495,41 @@ void main() {
       (widget) => widget is NumericText && widget.text == '1.01%',
     );
     expect(percentage, findsOneWidget);
+    final headline = find.byWidgetPredicate(
+      (widget) => widget is NumericText && widget.text == r'$100,000',
+    );
+    expect(headline, findsOneWidget);
+    expect(tester.widget<NumericText>(headline).textAlign, TextAlign.end);
+    final headlineFittedBox = find.ancestor(
+      of: headline,
+      matching: find.byType(FittedBox),
+    );
+    expect(headlineFittedBox, findsOneWidget);
+    expect(
+      tester.widget<FittedBox>(headlineFittedBox).alignment,
+      Alignment.centerRight,
+    );
+    final priceCardContext = tester.element(find.byType(PriceCard));
+    final headlineParagraph = tester.renderObject<RenderParagraph>(
+      find.descendant(of: headline, matching: find.byType(RichText)),
+    );
+    final headlineBoxes = headlineParagraph.getBoxesForSelection(
+      const TextSelection(baseOffset: 0, extentOffset: 8),
+    );
+    final paintedRight = headlineBoxes
+        .map(
+          (box) =>
+              headlineParagraph.localToGlobal(Offset(box.right, box.bottom)).dx,
+        )
+        .reduce((left, right) => left > right ? left : right);
+    final expectedRight =
+        tester.getRect(find.byType(PriceCard)).right -
+        priceCardContext.spacing.screenPadding;
+    expect(
+      tester.getRect(headline).right,
+      moreOrLessEquals(expectedRight, epsilon: 0.5),
+    );
+    expect(paintedRight, moreOrLessEquals(expectedRight, epsilon: 0.5));
     final richText = tester.widget<Text>(
       find.descendant(of: percentage, matching: find.byType(Text)),
     );
@@ -521,16 +541,20 @@ void main() {
     ]);
   });
 
-  testWidgets('market refresh retains confirmed content through failure', (
+  testWidgets('market refresh is silent and retains confirmed content', (
     tester,
   ) async {
     final now = DateTime.utc(2026, 8, 18, 12);
+    final refreshStarted = Completer<void>();
     final releaseRefresh = Completer<void>();
     var requestCount = 0;
     final httpClient = ResilientHttpClient(
       client: MockClient((request) async {
         requestCount += 1;
         if (requestCount > 2) {
+          if (requestCount == 4 && !refreshStarted.isCompleted) {
+            refreshStarted.complete();
+          }
           await releaseRefresh.future;
           return http.Response('temporarily unavailable', 503);
         }
@@ -558,7 +582,12 @@ void main() {
       httpClient.close();
     });
     addTearDown(() => _disposeHarness(tester, harness));
-    await _pump(tester, harness, const PriceCard());
+    await _pump(
+      tester,
+      harness,
+      const PriceCard(),
+      textScaler: const TextScaler.linear(2),
+    );
     const loadedLabel =
         r'Bitcoin price $100,000.00 USD. up 1.01% over 24 hours.';
     await _pumpUntil(
@@ -569,13 +598,11 @@ void main() {
     final refresh = harness.container
         .read(bitcoinMarketViewModelProvider.notifier)
         .retry();
-    await _pumpUntil(
-      tester,
-      () =>
-          find.bySemanticsLabel('Refreshing market data').evaluate().isNotEmpty,
-    );
+    await refreshStarted.future;
+    await tester.pump();
 
     expect(find.bySemanticsLabel(loadedLabel), findsOneWidget);
+    expect(find.text('Refreshing market data'), findsNothing);
     expect(
       tester
           .widgetList<AppSkeletonizer>(
@@ -595,15 +622,10 @@ void main() {
         .read(bitcoinMarketViewModelProvider)
         .requireValue
         .refreshFailure!;
-    final failureStatus = find.bySemanticsLabel(failure.userMessage);
 
     expect(find.bySemanticsLabel(loadedLabel), findsOneWidget);
-    expect(failureStatus, findsOneWidget);
-    expect(
-      tester.getSemantics(failureStatus).flagsCollection.isLiveRegion,
-      isTrue,
-    );
-    expect(find.byTooltip('Retry market refresh'), findsOneWidget);
+    expect(find.text(failure.userMessage), findsNothing);
+    expect(find.byTooltip('Retry market refresh'), findsNothing);
   });
 
   testWidgets('market header preserves exact basis-point precision', (
@@ -680,7 +702,7 @@ void main() {
     expect(find.bySemanticsLabel(unchangedLabel), findsOneWidget);
   });
 
-  testWidgets('market header announces falling and unavailable prices', (
+  testWidgets('market header announces falling and silently loads on failure', (
     tester,
   ) async {
     final now = DateTime.utc(2026, 8, 11, 12);
@@ -716,22 +738,100 @@ void main() {
     await _pump(tester, unavailableHarness, const HomeScreen());
     await _pumpUntil(
       tester,
-      () => find
-          .bySemanticsLabel('Bitcoin price unavailable.')
-          .evaluate()
-          .isNotEmpty,
+      () =>
+          find.bySemanticsLabel('Bitcoin price loading.').evaluate().isNotEmpty,
     );
-    final market = unavailableHarness.container.read(
-      bitcoinMarketViewModelProvider,
+    final market = unavailableHarness.container
+        .read(bitcoinMarketViewModelProvider)
+        .requireValue;
+    expect(market.snapshot, isNull);
+    expect(market.refreshFailure?.kind, AppFailureKind.unavailable);
+    expect(find.text(market.refreshFailure!.userMessage), findsNothing);
+    expect(find.text("You're offline"), findsNothing);
+    expect(
+      tester
+          .widgetList<CandleChart>(find.byType(CandleChart))
+          .single
+          .isSkeleton,
+      isTrue,
     );
-    final failureMessage = switch (market) {
-      AsyncError(:final error) when error is AppFailureException =>
-        error.failure.userMessage,
-      _ => throw StateError('Expected a typed market failure.'),
-    };
-    final failure = find.bySemanticsLabel(failureMessage);
-    expect(failure, findsOneWidget);
-    expect(tester.getSemantics(failure).flagsCollection.isLiveRegion, isTrue);
+    expect(
+      tester
+          .widgetList<AppSkeletonizer>(
+            find.descendant(
+              of: find.byType(PriceCard),
+              matching: find.byType(AppSkeletonizer),
+            ),
+          )
+          .every((skeleton) => skeleton.enabled),
+      isTrue,
+    );
+    expect(find.byType(GridLoader), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+  });
+
+  testWidgets('offline history replaces only the chart and tap retries', (
+    tester,
+  ) async {
+    final now = DateTime.utc(2026, 8, 11, 12);
+    var offline = true;
+    final httpClient = ResilientHttpClient(
+      client: MockClient((request) async {
+        if (request.url.path.endsWith('/range')) {
+          if (offline) throw const SocketException('offline');
+          return _historyResponse(
+            now: now,
+            firstPrice: 99000,
+            lastPrice: 100000,
+          );
+        }
+        return _currentResponse(
+          observedAt: now.subtract(const Duration(minutes: 1)),
+          bitcoinPrice: 100000,
+        );
+      }),
+      retryPolicy: RetryPolicy(maxAttempts: 1),
+    );
+    final harness = await PaymentFlowTestHarness.create(
+      clock: () => now,
+      httpClient: httpClient,
+    );
+    addTearDown(httpClient.close);
+    addTearDown(() => _disposeHarness(tester, harness));
+
+    await _pump(
+      tester,
+      harness,
+      const PriceCard(),
+      textScaler: const TextScaler.linear(2),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.text("You're offline").evaluate().isNotEmpty,
+    );
+
+    expect(find.text(r'$100,000'), findsOneWidget);
+    expect(find.text("You're offline"), findsOneWidget);
+    expect(find.text('Tap to try again'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel("You're offline. Tap to try again."),
+      findsOneWidget,
+    );
+    expect(find.text('Check your connection and try again.'), findsNothing);
+    expect(tester.takeException(), isNull);
+
+    offline = false;
+    await tester.tap(find.text('Tap to try again'));
+    await _pumpUntil(
+      tester,
+      () =>
+          find.byType(CandleChart).evaluate().isNotEmpty &&
+          tester.widget<CandleChart>(find.byType(CandleChart)).isSkeleton ==
+              false,
+    );
+
+    expect(find.text("You're offline"), findsNothing);
   });
 
   testWidgets('home mesh blurs its own content without a backdrop capture', (
@@ -926,9 +1026,11 @@ ResilientHttpClient _marketClientWithAssetTimestamps({
   required DateTime now,
   required DateTime bitcoinObservedAt,
   required DateTime usdtObservedAt,
+  VoidCallback? onRequest,
 }) {
   return ResilientHttpClient(
     client: MockClient((request) async {
+      onRequest?.call();
       if (request.url.path.endsWith('/range')) {
         return http.Response(
           jsonEncode({
@@ -1084,31 +1186,6 @@ final class _PendingWalletViewModel extends WalletViewModel {
 
   @override
   Future<WalletState> build() => _future;
-}
-
-final class _InitiallyFailingSettingsViewModel extends SettingsViewModel {
-  _InitiallyFailingSettingsViewModel({
-    required this.failure,
-    required this.recovered,
-  });
-
-  final AppFailure failure;
-  final SettingsState recovered;
-  var retryAttempts = 0;
-
-  @override
-  Future<SettingsState> build() {
-    return Future<SettingsState>.error(
-      AppFailureException(failure),
-      StackTrace.current,
-    );
-  }
-
-  @override
-  Future<void> retry() async {
-    retryAttempts += 1;
-    state = AsyncData(recovered);
-  }
 }
 
 final class _BlockingVisibilityPreferencesService extends PreferencesService {

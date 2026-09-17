@@ -7,6 +7,8 @@ class RoutePaths {
   static const String onboardingWelcome = '/onboarding-welcome';
   static const String onboardingCreateWallet = '/onboarding/create-wallet';
   static const String onboardingImportWallet = '/onboarding/import-wallet';
+  static const String confirmRecovery = 'confirm-recovery';
+  static const String nameWallet = 'name-wallet';
 
   // Guarded wallet application.
   static const String home = '/home';
@@ -25,6 +27,7 @@ class RoutePaths {
   static const String settings = '/settings';
   static const String scan = '/scan';
   static const String walletSelection = 'wallet-selection';
+  static const String addWallet = 'add-wallet';
   static const String countrySelection = 'country-selection';
   static const String currencySelection = 'currency-selection';
   static const String bitcoinUnitSelection = 'bitcoin-unit-selection';
@@ -33,6 +36,12 @@ class RoutePaths {
 
   /// Concrete parent location for nested Advanced Settings routes.
   static const String advancedSettingsLocation = '$settings/$advancedSettings';
+
+  /// Concrete location for selecting the active wallet from Settings.
+  static const String walletSelectionLocation = '$settings/$walletSelection';
+
+  /// Concrete location for creating an additional wallet from Settings.
+  static const String addWalletLocation = '$walletSelectionLocation/$addWallet';
 
   /// Concrete Send destination location for a validated payment-target slug.
   static String sendAddressFor(String paymentTarget) {

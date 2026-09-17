@@ -3,41 +3,41 @@ import 'package:flutter/foundation.dart';
 import '../../../../core/errors/errors.dart';
 import '../../domain/models/models.dart';
 
-/// Confirmed market data plus the state of an explicit refresh.
+/// Market presentation state with retained validated data and silent recovery.
 ///
-/// Initial loading and initial failure remain owned by Riverpod's
-/// `AsyncValue`. Once a snapshot exists, refresh progress and failure live in
-/// this state so presentation never discards confirmed content.
+/// A failed read is represented here instead of as an `AsyncError` so the
+/// owner can keep retrying an idempotent market request in the background.
+/// [snapshot] remains available across refresh failures and may be absent only
+/// until the first validated quote arrives.
 @immutable
 final class BitcoinMarketState {
-  BitcoinMarketState({
+  const BitcoinMarketState({
     required this.snapshot,
     this.refreshing = false,
     this.refreshFailure,
-  }) {
-    if (refreshing && refreshFailure != null) {
-      throw ArgumentError(
-        'A market refresh cannot be active and failed at the same time.',
-      );
-    }
-  }
+  });
 
   /// Last successfully validated provider snapshot.
-  final BitcoinMarketSnapshot snapshot;
+  final BitcoinMarketSnapshot? snapshot;
 
-  /// Whether a user-requested refresh is currently active.
+  /// Whether a foreground or scheduled recovery request is active.
   final bool refreshing;
 
-  /// Most recent refresh failure while [snapshot] remains available.
+  /// Most recent complete or partial read failure.
+  ///
+  /// This is retained while a background attempt is active so an offline
+  /// surface does not flicker back to a skeleton between attempts.
   final AppFailure? refreshFailure;
 
   BitcoinMarketState copyWith({
-    BitcoinMarketSnapshot? snapshot,
+    Object? snapshot = _unset,
     bool? refreshing,
     Object? refreshFailure = _unset,
   }) {
     return BitcoinMarketState(
-      snapshot: snapshot ?? this.snapshot,
+      snapshot: identical(snapshot, _unset)
+          ? this.snapshot
+          : snapshot as BitcoinMarketSnapshot?,
       refreshing: refreshing ?? this.refreshing,
       refreshFailure: identical(refreshFailure, _unset)
           ? this.refreshFailure

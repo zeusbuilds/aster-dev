@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:aster/core/bootstrap/app_bootstrap.dart';
 import 'package:aster/core/core.dart';
 import 'package:aster/features/onboarding/data/repository/repository.dart';
+import 'package:aster/features/onboarding/presentation/view_model/view_models.dart';
 import 'package:aster/features/wallet/data/repository/repository.dart';
 import 'package:aster/features/wallet/data/runtime/runtime.dart';
 import 'package:aster/features/wallet/data/storage/storage.dart';
@@ -39,6 +41,7 @@ final class OnboardingTestHarness {
     required this.repository,
     required this.clipboard,
     required this.engine,
+    required this.engines,
     required this.keyGenerator,
     required this.preferences,
     required this.haptics,
@@ -50,6 +53,7 @@ final class OnboardingTestHarness {
   final WalletRepository repository;
   final PlatformSensitiveClipboardService clipboard;
   final FakeWalletEngine engine;
+  final List<FakeWalletEngine> engines;
   final FakeWalletKeyGenerator keyGenerator;
   final SharedPreferences preferences;
   final RecordingHapticFeedbackService haptics;
@@ -67,13 +71,18 @@ final class OnboardingTestHarness {
   }) async {
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
-    final engine = FakeWalletEngine();
+    final engines = List<FakeWalletEngine>.generate(
+      3,
+      (_) => FakeWalletEngine(),
+      growable: false,
+    );
+    final engine = engines.first;
     const services = WalletServiceConfiguration(
       environment: BlockchainEnvironment.regtest,
       sdkNetwork: 'regtest',
     );
     final runtime = WalletRuntime(
-      FakeWalletEngineFactory([engine]),
+      FakeWalletEngineFactory(engines),
       FakeWalletDirectoryManager(),
       WalletSecretStore(MemorySecureStore()),
       services,
@@ -86,7 +95,7 @@ final class OnboardingTestHarness {
       WalletProfileStore(MemoryWalletRegistryDocumentStore()),
       runtime,
       keyGenerator,
-      FakeWalletIdentityGenerator(walletId: '11111111111111111111111111111111'),
+      SecureWalletIdentityGenerator(random: Random(7)),
       services,
     );
     var clipboardText = '';
@@ -106,6 +115,7 @@ final class OnboardingTestHarness {
         bip39WordListRepositoryProvider.overrideWithValue(
           Bip39WordListRepository(rootBundle),
         ),
+        recoveryQuizRandomProvider.overrideWithValue(Random(19)),
         sensitiveClipboardServiceProvider.overrideWithValue(clipboard),
         hapticFeedbackServiceProvider.overrideWithValue(haptics),
         if (httpClient != null)
@@ -117,6 +127,7 @@ final class OnboardingTestHarness {
       repository: repository,
       clipboard: clipboard,
       engine: engine,
+      engines: engines,
       keyGenerator: keyGenerator,
       preferences: preferences,
       haptics: haptics,

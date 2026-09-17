@@ -114,12 +114,27 @@ class ImportWalletViewModel extends _$ImportWalletViewModel {
     await _scheduleChecksum(current.mnemonic, revision);
   }
 
+  /// Updates the user-facing name after the phrase has been checksum-verified.
+  void updateWalletName(String name) {
+    final current = state.value;
+    if (current == null ||
+        current.submitting ||
+        current.requiresReconciliation ||
+        current.walletName == name) {
+      return;
+    }
+    state = AsyncData(current.copyWith(walletName: name, failure: null));
+  }
+
   /// Provisions only after every word and the SDK checksum are valid.
   Future<bool> submit() async {
     final current = state.value;
     if (current == null || !current.canSubmit) return false;
     state = AsyncData(current.copyWith(submitting: true, failure: null));
-    final result = await _createWallet(current.mnemonic);
+    final result = await _createWallet(
+      current.mnemonic,
+      current.normalizedWalletName,
+    );
     if (!ref.mounted) return result is AppSuccess<WalletRegistry>;
     return switch (result) {
       AppSuccess<WalletRegistry>(:final value) => () {
@@ -221,12 +236,15 @@ class ImportWalletViewModel extends _$ImportWalletViewModel {
     }
   }
 
-  Future<AppResult<WalletRegistry>> _createWallet(String mnemonic) async {
+  Future<AppResult<WalletRegistry>> _createWallet(
+    String mnemonic,
+    String name,
+  ) async {
     try {
       final repository = await ref.read(walletRepositoryProvider.future);
       return await repository.createFromMnemonic(
         mnemonic: mnemonic,
-        name: 'Restored Wallet',
+        name: name,
       );
     } catch (error, stackTrace) {
       return AppResult.failure(FailureMapper.from(error, stackTrace));

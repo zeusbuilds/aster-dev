@@ -32,8 +32,8 @@ class _OnboardingContent extends StatelessWidget {
 
     void open(String location, String failureTitle) {
       unawaited(
-        navigation.run(
-          command: () => context.push(location),
+        navigation.openRoute(
+          command: () => context.push<void>(location),
           failureTitle: failureTitle,
         ),
       );

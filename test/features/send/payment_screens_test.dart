@@ -103,6 +103,41 @@ void main() {
     expect(router.canPop(), isTrue);
   });
 
+  testWidgets('leaving Send clears an unconsumed scanned destination', (
+    tester,
+  ) async {
+    final harness = await PaymentFlowTestHarness.create();
+    addTearDown(() => _disposeHarness(tester, harness));
+    harness.container
+        .read(sendDestinationHandoffProvider.notifier)
+        .stage('lightning:unconsumed');
+    final router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) => const Scaffold(body: Text('Home')),
+        ),
+        GoRoute(
+          path: RoutePaths.send,
+          name: RouteNames.send,
+          builder: (context, state) => const SendScreen(),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await _pumpRouter(tester, harness, router);
+
+    unawaited(router.pushNamed(RouteNames.send));
+    await tester.pumpAndSettle();
+    expect(harness.container.read(sendDestinationHandoffProvider), isNotNull);
+
+    router.pop();
+    await tester.pumpAndSettle();
+
+    expect(harness.container.read(sendDestinationHandoffProvider), isNull);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('payment target selection supports compact 2x text accessibly', (
     tester,
   ) async {
@@ -125,7 +160,7 @@ void main() {
     expect(tester, meetsGuideline(textContrastGuideline));
   });
 
-  testWidgets('payment target selection owns one route command at a time', (
+  testWidgets('payment target selection suppresses same-turn route commands', (
     tester,
   ) async {
     final harness = await PaymentFlowTestHarness.create();
@@ -149,15 +184,17 @@ void main() {
     );
 
     final tile = find.byType(PaymentTargetTile);
-    await tester.tap(tile);
-    await tester.tap(tile);
-    await tester.pump();
+    final targetTile = tester.widget<PaymentTargetTile>(tile);
+    targetTile.onSelected!(capability.target);
+    targetTile.onSelected!(capability.target);
 
     expect(selectionCount, 1);
     expect(harness.haptics.intents, [HapticIntent.selection]);
+
+    await tester.pump();
     expect(
       tester.getSemantics(tile).flagsCollection.isEnabled,
-      ui.Tristate.isFalse,
+      ui.Tristate.isTrue,
     );
 
     navigationGate.complete();
@@ -646,10 +683,16 @@ void main() {
       () => find.byType(AsterNumericKeypad).evaluate().isNotEmpty,
     );
     final keypad = find.byType(AsterNumericKeypad);
-    for (final digit in ['0', '.', '0', '0', '0', '0', '0', '1']) {
-      await tester.tap(find.descendant(of: keypad, matching: find.text(digit)));
-      await tester.pump();
-    }
+    await _enterAmount(tester, keypad, [
+      '0',
+      '.',
+      '0',
+      '0',
+      '0',
+      '0',
+      '0',
+      '1',
+    ]);
     await _pumpUntil(
       tester,
       () => find.text('≈ \$0.07 USD').evaluate().isNotEmpty,
@@ -1535,10 +1578,16 @@ void main() {
     );
 
     final keypad = find.byType(AsterNumericKeypad);
-    for (final digit in ['0', '.', '0', '0', '0', '0', '0', '1']) {
-      await tester.tap(find.descendant(of: keypad, matching: find.text(digit)));
-      await tester.pump();
-    }
+    await _enterAmount(tester, keypad, [
+      '0',
+      '.',
+      '0',
+      '0',
+      '0',
+      '0',
+      '0',
+      '1',
+    ]);
     final initialSend = tester.widget<CustomButton>(
       find.widgetWithText(CustomButton, 'Send'),
     );
@@ -1908,6 +1957,20 @@ Future<void> _pumpUntil(WidgetTester tester, bool Function() predicate) async {
 Future<void> _pumpFrames(WidgetTester tester) async {
   for (var frame = 0; frame < 20; frame += 1) {
     await tester.pump(const Duration(milliseconds: 10));
+  }
+}
+
+Future<void> _enterAmount(
+  WidgetTester tester,
+  Finder keypad,
+  List<String> keys,
+) async {
+  for (final key in keys) {
+    final keyFinder = find.descendant(of: keypad, matching: find.text(key));
+    await tester.ensureVisible(keyFinder);
+    await tester.pump();
+    await tester.tap(keyFinder);
+    await tester.pump();
   }
 }
 

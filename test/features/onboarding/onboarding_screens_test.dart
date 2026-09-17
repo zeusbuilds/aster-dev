@@ -14,6 +14,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mesh/mesh.dart';
 
 import '../../support/onboarding_harness.dart';
 import '../../support/presentation_fakes.dart';
@@ -142,7 +143,7 @@ void main() {
           harness.container
               .read(importWalletViewModelProvider)
               .value
-              ?.canSubmit ==
+              ?.canContinue ==
           true,
     );
     await tester.pumpWidget(const SizedBox.shrink());
@@ -154,7 +155,7 @@ void main() {
       expect(field.controller!.text, validTestMnemonicWords[index - 1]);
     }
     expect(
-      harness.container.read(importWalletViewModelProvider).value!.canSubmit,
+      harness.container.read(importWalletViewModelProvider).value!.canContinue,
       isTrue,
     );
   });
@@ -262,22 +263,50 @@ void main() {
     await harness.container.read(walletViewModelProvider.future);
     await _pumpScreen(tester, harness, const OnboardingCreateWalletScreen());
 
-    expect(find.text('Aster'), findsOneWidget);
+    expect(find.text('Aster'), findsNothing);
     expect(
       tester.widget<Scaffold>(find.byType(Scaffold).last).backgroundColor,
       AppTheme.light().colorScheme.surface,
     );
     expect(
-      tester.widget<Text>(find.text('Secure your wallet')).style!.color,
+      tester
+          .widget<Text>(find.text('Your 12-word recovery phrase'))
+          .style!
+          .color,
       AppTheme.light().colorScheme.onSurface,
+    );
+    expect(
+      find.text('Keep this offline and never share it with anyone.'),
+      findsOneWidget,
     );
 
     expect(find.text('1.'), findsOneWidget);
     expect(find.text('6.'), findsOneWidget);
     expect(find.text('7.'), findsOneWidget);
     expect(find.text('12.'), findsOneWidget);
+    expect(find.text('••••••'), findsNWidgets(12));
+    expect(find.text('abandon'), findsNothing);
+    expect(find.text('about'), findsNothing);
+    expect(find.bySemanticsLabel('Recovery word 1, hidden'), findsOneWidget);
+    expect(find.bySemanticsLabel('1. abandon'), findsNothing);
+
+    final reveal = find.widgetWithText(CustomButton, 'Reveal phrase');
+    expect(reveal, findsOneWidget);
+    await tester.ensureVisible(reveal);
+    await tester.tap(reveal);
+    await tester.pump();
+
     expect(find.text('abandon'), findsNWidgets(11));
     expect(find.text('about'), findsOneWidget);
+    expect(find.bySemanticsLabel('1. abandon'), findsOneWidget);
+    expect(find.widgetWithText(CustomButton, 'Hide phrase'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(CustomButton, 'Hide phrase'));
+    await tester.pump();
+    expect(find.text('abandon'), findsNothing);
+    expect(find.bySemanticsLabel('Recovery word 1, hidden'), findsOneWidget);
+    await tester.tap(find.widgetWithText(CustomButton, 'Reveal phrase'));
+    await tester.pump();
 
     final copy = find.text('Copy recovery phrase');
     expect(
@@ -288,11 +317,27 @@ void main() {
       find.widgetWithText(OnboardingTextAction, 'Copy recovery phrase'),
       findsOneWidget,
     );
+    expect(
+      tester
+          .widget<OnboardingTextAction>(
+            find.widgetWithText(OnboardingTextAction, 'Copy recovery phrase'),
+          )
+          .size,
+      OnboardingTextActionSize.compact,
+    );
     await tester.ensureVisible(copy);
     await tester.tap(copy);
     await tester.pump();
     expect(harness.clipboardText, validTestMnemonic);
     expect(harness.toasts.messages.single.title, 'Recovery phrase copied');
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.pump();
+    expect(find.text('abandon'), findsNothing);
+    expect(find.bySemanticsLabel('Recovery word 1, hidden'), findsOneWidget);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+
     await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     await _expectOnboardingContrast(tester);
@@ -402,7 +447,7 @@ void main() {
           harness.container
               .read(importWalletViewModelProvider)
               .value
-              ?.canSubmit ==
+              ?.canContinue ==
           true,
     );
     await tester.pump(const Duration(milliseconds: 1));
@@ -467,7 +512,7 @@ void main() {
           harness.container
               .read(importWalletViewModelProvider)
               .value
-              ?.canSubmit ==
+              ?.canContinue ==
           true,
     );
     await tester.pump();
@@ -486,6 +531,7 @@ void main() {
       importWalletViewModelProvider.notifier,
     );
     notifier.updateWords(0, validTestMnemonicWords);
+    notifier.updateWalletName('Imported wallet');
     await _pumpUntil(
       tester,
       () =>
@@ -495,7 +541,7 @@ void main() {
               ?.canSubmit ==
           true,
     );
-    harness.engine.initializeError = const AppFailureException(
+    harness.engine.provisionError = const AppFailureException(
       AppFailure(
         code: 'wallet_setup_unavailable',
         kind: AppFailureKind.unavailable,
@@ -531,6 +577,7 @@ void main() {
       importWalletViewModelProvider.notifier,
     );
     notifier.updateWords(0, validTestMnemonicWords);
+    notifier.updateWalletName('Imported wallet');
     await _pumpUntil(
       tester,
       () =>
@@ -540,7 +587,7 @@ void main() {
               ?.canSubmit ==
           true,
     );
-    harness.engine.initializeError = const AppFailureException(
+    harness.engine.provisionError = const AppFailureException(
       AppFailure(
         code: 'wallet_setup_outcome_unknown',
         kind: AppFailureKind.timeout,
@@ -592,7 +639,8 @@ void main() {
     final notifier = harness.container.read(
       createWalletViewModelProvider.notifier,
     );
-    harness.engine.initializeError = const AppFailureException(
+    _completeCreateWalletSetup(harness, name: 'Daily wallet');
+    harness.engine.provisionError = const AppFailureException(
       AppFailure(
         code: 'wallet_setup_outcome_unknown',
         kind: AppFailureKind.timeout,
@@ -646,6 +694,7 @@ void main() {
       importWalletViewModelProvider.notifier,
     );
     notifier.updateWords(0, validTestMnemonicWords);
+    notifier.updateWalletName('Imported wallet');
     await _pumpUntil(
       tester,
       () =>
@@ -655,7 +704,7 @@ void main() {
               ?.canSubmit ==
           true,
     );
-    harness.engine.initializeError = const AppFailureException(
+    harness.engine.provisionError = const AppFailureException(
       AppFailure(
         code: 'wallet_setup_reconciliation_required',
         kind: AppFailureKind.storage,
@@ -703,7 +752,8 @@ void main() {
     final notifier = harness.container.read(
       createWalletViewModelProvider.notifier,
     );
-    harness.engine.initializeError = const AppFailureException(
+    _completeCreateWalletSetup(harness, name: 'Daily wallet');
+    harness.engine.provisionError = const AppFailureException(
       AppFailure(
         code: 'wallet_setup_reconciliation_required',
         kind: AppFailureKind.storage,
@@ -743,175 +793,210 @@ void main() {
     );
   });
 
-  testWidgets('import keeps loading on the current screen until commit', (
+  testWidgets('create quiz verifies fixed words and advances only on success', (
     tester,
   ) async {
     final harness = await OnboardingTestHarness.create();
     addTearDown(() => _disposeHarness(tester, harness));
-    await harness.container.read(walletViewModelProvider.future);
-    await _pumpScreen(tester, harness, const OnboardingImportWalletScreen());
-    final notifier = harness.container.read(
-      importWalletViewModelProvider.notifier,
+    await _pumpScreen(tester, harness, const OnboardingCreateWalletScreen());
+    final initial = harness.container
+        .read(createWalletViewModelProvider)
+        .requireValue;
+
+    await _pumpScreen(tester, harness, const CreateWalletQuizScreen());
+    expect(find.text('Aster'), findsNothing);
+    expect(find.text('Check your backup'), findsOneWidget);
+    expect(
+      find.text('Choose each word from the recovery phrase you wrote down.'),
+      findsOneWidget,
     );
-    for (var index = 0; index < validTestMnemonicWords.length; index += 1) {
-      notifier.updateWord(index, validTestMnemonicWords[index]);
+    expect(find.bySemanticsLabel('Back'), findsOneWidget);
+    expect(find.widgetWithText(OnboardingTextAction, 'Back'), findsNothing);
+    expect(find.byType(AsterDivider), findsNothing);
+    expect(find.byType(Squircle), findsNWidgets(4));
+
+    for (var index = 0; index < initial.questions.length; index += 1) {
+      final question = initial.questions[index];
+      expect(
+        find.text(
+          'Word ${question.wordNumber} of ${CreateWalletState.wordCount}',
+        ),
+        findsOneWidget,
+      );
+      if (index == 0) {
+        final incorrect = question.options.firstWhere(
+          (option) => option != question.expectedWord,
+        );
+        await tester.tap(find.text(incorrect));
+        await tester.pump();
+        expect(
+          find.text('That is not word 3. Check your backup and try again.'),
+          findsOneWidget,
+        );
+        expect(
+          harness.container
+              .read(createWalletViewModelProvider)
+              .requireValue
+              .confirmedQuestionCount,
+          0,
+        );
+      }
+      await tester.tap(find.text(question.expectedWord));
+      await tester.pump();
     }
-    await _pumpUntil(
-      tester,
-      () =>
-          harness.container
-              .read(importWalletViewModelProvider)
-              .value
-              ?.canSubmit ==
-          true,
+
+    expect(find.text('Recovery phrase confirmed'), findsOneWidget);
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('Continue'))
+          .flagsCollection
+          .isEnabled,
+      ui.Tristate.isTrue,
     );
-    final nativeGate = Completer<void>();
-    harness.engine.initializeGate = nativeGate;
-    final continueButton = find.bySemanticsLabel('Continue');
-    await tester.ensureVisible(continueButton);
-
-    await tester.tap(continueButton);
-    await tester.pump();
-
-    expect(find.text('Import with recovery phrase'), findsOneWidget);
-    expect(tester.getSemantics(continueButton).value, 'Loading');
-    expect(harness.haptics.intents, isEmpty);
-    await _pumpUntil(tester, () => harness.engine.calls.contains('initialize'));
-
-    nativeGate.complete();
-    await _pumpUntil(
-      tester,
-      () =>
-          harness.container.read(walletViewModelProvider).value?.activeWallet !=
-          null,
+    expect(harness.haptics.intents.first, HapticIntent.error);
+    expect(
+      harness.haptics.intents.where(
+        (intent) => intent == HapticIntent.selection,
+      ),
+      hasLength(CreateWalletState.quizWordNumbers.length),
     );
-    expect(harness.haptics.intents, contains(HapticIntent.success));
   });
 
-  testWidgets('create blocks stale Back and system pop while provisioning', (
-    tester,
-  ) async {
+  testWidgets('wallet naming requires a valid user-owned name', (tester) async {
     final harness = await OnboardingTestHarness.create();
     addTearDown(() => _disposeHarness(tester, harness));
-    await harness.container.read(walletViewModelProvider.future);
-    final nativeGate = Completer<void>();
-    harness.engine.initializeGate = nativeGate;
-    final route = await _pumpOnboardingRoute(
-      tester,
-      harness,
-      path: RoutePaths.onboardingCreateWallet,
-      screen: const OnboardingCreateWalletScreen(),
-    );
-    addTearDown(route.router.dispose);
-    await _pumpUntil(
-      tester,
-      () => find.widgetWithText(CustomButton, 'Continue').evaluate().isNotEmpty,
-    );
-
-    final submit = tester.widget<CustomButton>(
-      find.widgetWithText(CustomButton, 'Continue'),
-    );
-    final back = tester.widget<OnboardingTextAction>(
-      find.widgetWithText(OnboardingTextAction, 'Back'),
-    );
-    final navigation = AsterNavigationScope.of(
-      tester.element(find.widgetWithText(OnboardingTextAction, 'Back')),
-    );
-    expect(route.router.canPop(), isTrue);
-    submit.onTap!();
-    expect(navigation.inFlight, isTrue);
-    expect(route.router.canPop(), isTrue);
-    back.onPressed();
-    expect(route.router.canPop(), isTrue);
-    await tester.binding.handlePopRoute();
-    expect(route.router.canPop(), isTrue);
-    await tester.pump();
-
-    expect(find.text('Secure your wallet'), findsOneWidget);
-    await _pumpUntil(tester, () => harness.engine.calls.contains('initialize'));
-
-    nativeGate.complete();
-    await _pumpUntil(
-      tester,
-      () =>
-          harness.container.read(walletViewModelProvider).value?.activeWallet !=
-          null,
-    );
-    await _pumpUntil(tester, () => !navigation.inFlight);
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
-    await route.completion;
-
-    expect(find.text('Welcome destination'), findsOneWidget);
-  });
-
-  testWidgets('import blocks stale Back and system pop while provisioning', (
-    tester,
-  ) async {
-    final harness = await OnboardingTestHarness.create();
-    addTearDown(() => _disposeHarness(tester, harness));
-    await harness.container.read(walletViewModelProvider.future);
-    final route = await _pumpOnboardingRoute(
-      tester,
-      harness,
-      path: RoutePaths.onboardingImportWallet,
-      screen: const OnboardingImportWalletScreen(),
-    );
-    addTearDown(route.router.dispose);
+    await _pumpScreen(tester, harness, const OnboardingCreateWalletScreen());
     final notifier = harness.container.read(
-      importWalletViewModelProvider.notifier,
+      createWalletViewModelProvider.notifier,
     );
-    notifier.updateWords(0, validTestMnemonicWords);
-    await _pumpUntil(
-      tester,
-      () =>
-          harness.container
-              .read(importWalletViewModelProvider)
-              .value
-              ?.canSubmit ==
-          true,
-    );
-    final nativeGate = Completer<void>();
-    harness.engine.initializeGate = nativeGate;
+    final generated = harness.container
+        .read(createWalletViewModelProvider)
+        .requireValue;
+    for (final question in generated.questions) {
+      expect(notifier.selectQuizOption(question.expectedWord), isTrue);
+    }
 
-    final submit = tester.widget<CustomButton>(
-      find.widgetWithText(CustomButton, 'Continue'),
+    await _pumpScreen(tester, harness, const WalletNameScreen.create());
+    expect(find.text('Aster'), findsNothing);
+    expect(find.text('Name your wallet'), findsOneWidget);
+    expect(
+      find.text('Choose a name that will make this wallet easy to recognize.'),
+      findsOneWidget,
     );
-    final back = tester.widget<OnboardingTextAction>(
-      find.widgetWithText(OnboardingTextAction, 'Back'),
+    expect(find.bySemanticsLabel('Back'), findsOneWidget);
+    expect(find.text('Wallet name'), findsNothing);
+    expect(find.bySemanticsLabel(RegExp('Wallet name')), findsOneWidget);
+    final nameField = tester.widget<TextField>(
+      find.byKey(const ValueKey('wallet-name-field')),
     );
-    final navigation = AsterNavigationScope.of(
-      tester.element(find.widgetWithText(OnboardingTextAction, 'Back')),
+    expect(nameField.decoration?.labelText, isNull);
+    expect(nameField.decoration?.hintText, 'My wallet');
+
+    final submit = find.widgetWithText(CustomButton, 'Create Wallet');
+    expect(
+      tester.getSemantics(submit).flagsCollection.isEnabled,
+      ui.Tristate.isFalse,
     );
-    expect(route.router.canPop(), isTrue);
-    submit.onTap!();
-    expect(navigation.inFlight, isTrue);
-    expect(route.router.canPop(), isTrue);
-    back.onPressed();
-    expect(route.router.canPop(), isTrue);
-    await tester.binding.handlePopRoute();
-    expect(route.router.canPop(), isTrue);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('wallet-name-field')),
+      '   ',
+    );
     await tester.pump();
-
-    expect(find.text('Import with recovery phrase'), findsOneWidget);
-    await _pumpUntil(tester, () => harness.engine.calls.contains('initialize'));
-
-    nativeGate.complete();
-    await _pumpUntil(
-      tester,
-      () =>
-          harness.container.read(walletViewModelProvider).value?.activeWallet !=
-          null,
+    expect(
+      find.text('Use a visible name with up to 64 characters.'),
+      findsOneWidget,
     );
-    await _pumpUntil(tester, () => !navigation.inFlight);
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
-    await route.completion;
+    expect(
+      tester.getSemantics(submit).flagsCollection.isEnabled,
+      ui.Tristate.isFalse,
+    );
 
-    expect(find.text('Welcome destination'), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const ValueKey('wallet-name-field')),
+      'Travel wallet',
+    );
+    await tester.pump();
+    expect(
+      tester.getSemantics(submit).flagsCollection.isEnabled,
+      ui.Tristate.isTrue,
+    );
+    expect(
+      harness.container
+          .read(createWalletViewModelProvider)
+          .requireValue
+          .normalizedWalletName,
+      'Travel wallet',
+    );
   });
 
-  testWidgets('welcome mesh avoids backdrop capture and bounds image decode', (
+  for (final source in _walletNameTestSources) {
+    testWidgets(
+      '${source.label} keeps loading on the name screen and blocks stale navigation',
+      (tester) async {
+        final harness = await OnboardingTestHarness.create();
+        addTearDown(() => _disposeHarness(tester, harness));
+        await harness.container.read(walletViewModelProvider.future);
+        await _prepareWalletNameSource(tester, harness, source);
+        addTearDown(_keepWalletNameSourceAlive(harness, source));
+
+        final nativeGate = Completer<void>();
+        harness.engine.provisionGate = nativeGate;
+        final route = await _pumpOnboardingRoute(
+          tester,
+          harness,
+          path: source.testPath,
+          screen: source.screen,
+        );
+        addTearDown(route.router.dispose);
+
+        final submitFinder = find.widgetWithText(
+          CustomButton,
+          source.submitLabel,
+        );
+        final submit = tester.widget<CustomButton>(submitFinder);
+        final backFinder = find.byType(AsterIconButton);
+        final back = tester.widget<AsterIconButton>(backFinder);
+        final navigation = AsterNavigationScope.of(tester.element(backFinder));
+        final hapticCountBeforeSubmit = harness.haptics.intents.length;
+        expect(route.router.canPop(), isTrue);
+
+        submit.onTap!();
+        expect(navigation.inFlight, isTrue);
+        back.onPressed!();
+        await tester.binding.handlePopRoute();
+        await tester.pump();
+
+        expect(find.text('Name your wallet'), findsOneWidget);
+        expect(tester.getSemantics(submitFinder).value, 'Loading');
+        expect(route.router.canPop(), isTrue);
+        expect(harness.haptics.intents, hasLength(hapticCountBeforeSubmit));
+        await _pumpUntil(
+          tester,
+          () => harness.engine.calls.contains('provision'),
+        );
+
+        nativeGate.complete();
+        await _pumpUntil(
+          tester,
+          () =>
+              harness.container
+                  .read(walletViewModelProvider)
+                  .value
+                  ?.activeWallet
+                  ?.name ==
+              source.walletName,
+        );
+        await _pumpUntil(
+          tester,
+          () => find.text('Home destination').evaluate().isNotEmpty,
+        );
+        expect(harness.haptics.intents.last, HapticIntent.success);
+      },
+    );
+  }
+
+  testWidgets('welcome renders the authored mesh without backdrop capture', (
     tester,
   ) async {
     var compositionReadyCount = 0;
@@ -936,7 +1021,7 @@ void main() {
     final mesh = find.byType(OnboardingWelcomeMeshBackground);
     expect(
       find.descendant(of: mesh, matching: find.byType(ImageFiltered)),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.descendant(of: mesh, matching: find.byType(BackdropFilter)),
@@ -946,6 +1031,13 @@ void main() {
       find.descendant(of: mesh, matching: find.byType(AsterNoiseTexture)),
       findsOneWidget,
     );
+    final gradient = tester.widget<OMeshGradient>(
+      find.descendant(of: mesh, matching: find.byType(OMeshGradient)),
+    );
+    expect(gradient.mesh.width, 4);
+    expect(gradient.mesh.height, 4);
+    expect(gradient.mesh.vertices, hasLength(16));
+    expect(gradient.mesh.colors, hasLength(16));
     final noiseImage = tester.widget<Image>(
       find.descendant(of: mesh, matching: find.byType(Image)),
     );
@@ -1130,6 +1222,112 @@ void main() {
   }
 }
 
+typedef _WalletNameTestSource = ({
+  bool createsWallet,
+  String label,
+  String testPath,
+  Widget screen,
+  String submitLabel,
+  String walletName,
+});
+
+const List<_WalletNameTestSource> _walletNameTestSources = [
+  (
+    createsWallet: true,
+    label: 'create',
+    testPath: '/test-create-wallet-name',
+    screen: WalletNameScreen.create(),
+    submitLabel: 'Create Wallet',
+    walletName: 'Daily wallet',
+  ),
+  (
+    createsWallet: false,
+    label: 'import',
+    testPath: '/test-import-wallet-name',
+    screen: WalletNameScreen.import(),
+    submitLabel: 'Import Wallet',
+    walletName: 'Imported wallet',
+  ),
+];
+
+Future<void> _prepareWalletNameSource(
+  WidgetTester tester,
+  OnboardingTestHarness harness,
+  _WalletNameTestSource source,
+) async {
+  if (source.createsWallet) {
+    await _pumpScreen(tester, harness, const OnboardingCreateWalletScreen());
+    _completeCreateWalletSetup(harness, name: source.walletName);
+    return;
+  }
+
+  await _pumpScreen(tester, harness, const OnboardingImportWalletScreen());
+  final notifier = harness.container.read(
+    importWalletViewModelProvider.notifier,
+  );
+  notifier.updateWords(0, validTestMnemonicWords);
+  await _pumpUntil(
+    tester,
+    () =>
+        harness.container
+            .read(importWalletViewModelProvider)
+            .value
+            ?.canContinue ==
+        true,
+  );
+  notifier.updateWalletName(source.walletName);
+  expect(
+    harness.container
+        .read(importWalletViewModelProvider)
+        .requireValue
+        .canSubmit,
+    isTrue,
+  );
+}
+
+VoidCallback _keepWalletNameSourceAlive(
+  OnboardingTestHarness harness,
+  _WalletNameTestSource source,
+) {
+  if (source.createsWallet) {
+    final subscription = harness.container.listen(
+      createWalletViewModelProvider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    return subscription.close;
+  }
+  final subscription = harness.container.listen(
+    importWalletViewModelProvider,
+    (_, _) {},
+    fireImmediately: true,
+  );
+  return subscription.close;
+}
+
+void _completeCreateWalletSetup(
+  OnboardingTestHarness harness, {
+  required String name,
+}) {
+  final notifier = harness.container.read(
+    createWalletViewModelProvider.notifier,
+  );
+  final state = harness.container
+      .read(createWalletViewModelProvider)
+      .requireValue;
+  for (final question in state.questions) {
+    expect(notifier.selectQuizOption(question.expectedWord), isTrue);
+  }
+  notifier.updateWalletName(name);
+  expect(
+    harness.container
+        .read(createWalletViewModelProvider)
+        .requireValue
+        .canSubmit,
+    isTrue,
+  );
+}
+
 Future<void> _expectOnboardingContrast(WidgetTester tester) async {
   // Recovery routes have an opaque white Scaffold. Measure the actual visible
   // composition, not the welcome mesh retained behind that surface.
@@ -1214,6 +1412,10 @@ Future<({GoRouter router, Future<Object?> completion})> _pumpOnboardingRoute(
       GoRoute(
         path: RoutePaths.onboardingWelcome,
         builder: (context, state) => const Text('Welcome destination'),
+      ),
+      GoRoute(
+        path: RoutePaths.home,
+        builder: (context, state) => const Text('Home destination'),
       ),
       GoRoute(path: path, builder: (context, state) => screen),
     ],

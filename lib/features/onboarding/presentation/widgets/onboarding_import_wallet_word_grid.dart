@@ -5,13 +5,19 @@ import '../../../../shared/shared.dart';
 
 /// Displays a generated 12-word phrase as columns 1-6 and 7-12.
 class OnboardingImportWalletWordGrid extends StatelessWidget {
-  const OnboardingImportWalletWordGrid({super.key, required this.words})
-    : assert(words.length == wordCount);
+  const OnboardingImportWalletWordGrid({
+    super.key,
+    required this.words,
+    this.obscured = false,
+  }) : assert(words.length == wordCount);
 
   static const wordCount = 12;
   static const wordsPerColumn = 6;
 
   final List<String> words;
+
+  /// Prevents phrase words from being painted or exposed to accessibility.
+  final bool obscured;
 
   @override
   Widget build(BuildContext context) {
@@ -26,11 +32,19 @@ class OnboardingImportWalletWordGrid extends StatelessWidget {
           child: Row(
             children: [
               Expanded(
-                child: _RecoveryWordTile(index: left, word: words[left]),
+                child: _RecoveryWordTile(
+                  index: left,
+                  word: words[left],
+                  obscured: obscured,
+                ),
               ),
               SizedBox(width: context.spacing.sm),
               Expanded(
-                child: _RecoveryWordTile(index: right, word: words[right]),
+                child: _RecoveryWordTile(
+                  index: right,
+                  word: words[right],
+                  obscured: obscured,
+                ),
               ),
             ],
           ),
@@ -41,10 +55,15 @@ class OnboardingImportWalletWordGrid extends StatelessWidget {
 }
 
 class _RecoveryWordTile extends StatelessWidget {
-  const _RecoveryWordTile({required this.index, required this.word});
+  const _RecoveryWordTile({
+    required this.index,
+    required this.word,
+    required this.obscured,
+  });
 
   final int index;
   final String word;
+  final bool obscured;
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +71,9 @@ class _RecoveryWordTile extends StatelessWidget {
     return Semantics(
       container: true,
       sortKey: OrdinalSortKey(index.toDouble()),
-      label: '${index + 1}. $word',
+      label: obscured
+          ? 'Recovery word ${index + 1}, hidden'
+          : '${index + 1}. $word',
       excludeSemantics: true,
       child: Squircle(
         padding: EdgeInsets.symmetric(
@@ -70,7 +91,12 @@ class _RecoveryWordTile extends StatelessWidget {
               style: context.type.assetMeta.toNumeric(context),
             ),
             SizedBox(width: context.spacing.sm),
-            Expanded(child: Text(word, style: context.type.rowTitle)),
+            Expanded(
+              child: Text(
+                obscured ? '••••••' : word,
+                style: context.type.rowTitle,
+              ),
+            ),
           ],
         ),
       ),

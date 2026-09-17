@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:remixicon/remixicon.dart';
 
 import '../../../../core/errors/errors.dart';
 import '../../../../shared/shared.dart';
@@ -48,6 +49,9 @@ class WalletSelectionScreen extends ConsumerWidget {
                   switchingWalletId != null || navigation.inFlight;
               return _WalletSelectionScaffold(
                 navigationLocked: navigationLocked,
+                onAddWallet: navigationLocked
+                    ? null
+                    : () => _openAddWallet(context, navigation),
                 child: SafeArea(
                   top: false,
                   minimum: EdgeInsets.only(bottom: spacing.lg),
@@ -86,6 +90,32 @@ class WalletSelectionScreen extends ConsumerWidget {
         },
       ),
     );
+  }
+
+  void _openAddWallet(
+    BuildContext context,
+    AsterNavigationCommandOwner navigation,
+  ) {
+    unawaited(_openAddWalletAndCloseSelector(context, navigation));
+  }
+
+  Future<void> _openAddWalletAndCloseSelector(
+    BuildContext context,
+    AsterNavigationCommandOwner navigation,
+  ) async {
+    final outcome = await navigation
+        .openRouteForResult<WalletCreationRouteResult>(
+          command: () => context.pushNamed<WalletCreationRouteResult>(
+            RouteNames.addWallet,
+          ),
+          failureTitle: 'Wallet setup could not open',
+        );
+    if (!outcome.accepted ||
+        outcome.value != WalletCreationRouteResult.created ||
+        !context.mounted) {
+      return;
+    }
+    context.pop();
   }
 
   Future<void> _switchWallet(
@@ -162,10 +192,12 @@ class _WalletSelectionScaffold extends StatelessWidget {
   const _WalletSelectionScaffold({
     required this.child,
     this.navigationLocked = false,
+    this.onAddWallet,
   });
 
   final Widget child;
   final bool navigationLocked;
+  final VoidCallback? onAddWallet;
 
   @override
   Widget build(BuildContext context) {
@@ -178,6 +210,12 @@ class _WalletSelectionScaffold extends StatelessWidget {
           leadingIcon: true,
           leadingEnabled: !navigationLocked,
           fallbackLocation: RoutePaths.settings,
+          action: AsterIconButton(
+            icon: RemixIcons.add_line,
+            tooltip: 'Add wallet',
+            onPressed: onAddWallet,
+            hapticIntent: null,
+          ),
         ),
         body: child,
       ),

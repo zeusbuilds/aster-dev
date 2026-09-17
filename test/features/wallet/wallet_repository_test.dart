@@ -691,7 +691,7 @@ void main() {
     final profile = committed.activeProfile!;
     expect(profile.name, 'Main Wallet');
     expect(profile.state, WalletProfileState.ready);
-    expect(engine.initializedMnemonic, mnemonic);
+    expect(engine.provisionedMnemonic, mnemonic);
     final registry =
         (await profileStore.read() as AppSuccess<WalletRegistry>).value;
     expect(registry.activeWalletId, walletId);
@@ -1198,7 +1198,8 @@ void main() {
 
     expect(result, isA<AppSuccess<WalletRegistry>>());
     expect(runtime.snapshot.phase, WalletRuntimePhase.active);
-    expect(engine.initializedMnemonic, isNull);
+    expect(engine.provisionedMnemonic, isNull);
+    expect(engine.openedPassword, isNotNull);
   });
 
   test(
@@ -1237,7 +1238,8 @@ void main() {
 
       expect(result, isA<AppSuccess<void>>());
       expect(active.calls, containsAllInOrder(['shutdown', 'destroy']));
-      expect(recovered.initializedMnemonic, isNull);
+      expect(recovered.provisionedMnemonic, isNull);
+      expect(recovered.openedPassword, isNotNull);
       expect(runtime.snapshot.phase, WalletRuntimePhase.active);
       expect(runtime.snapshot.walletId, walletId);
     },
@@ -1251,7 +1253,7 @@ void main() {
       );
       final active = FakeWalletEngine();
       final failedRecovery = FakeWalletEngine()
-        ..initializeError = StateError('injected recovery failure');
+        ..openPersistedError = StateError('injected recovery failure');
       final forbiddenRecovery = FakeWalletEngine();
       final runtime = WalletRuntime(
         FakeWalletEngineFactory([active, failedRecovery, forbiddenRecovery]),
@@ -1274,7 +1276,7 @@ void main() {
         ),
         isA<AppSuccess<WalletRegistry>>(),
       );
-      active.reinitializeError = const AppFailureException(
+      active.openPersistedError = const AppFailureException(
         AppFailure(
           code: 'test_resume_reconciliation_required',
           kind: AppFailureKind.storage,
@@ -1301,11 +1303,11 @@ void main() {
       expect((repeated as AppFailureResult<void>).failure, failure);
       expect(forbiddenRecovery.calls, isEmpty);
       expect(
-        active.calls.where((call) => call == 'reinitialize'),
+        active.calls.where((call) => call == 'openPersisted'),
         hasLength(1),
       );
       expect(
-        failedRecovery.calls.where((call) => call == 'initialize'),
+        failedRecovery.calls.where((call) => call == 'openPersisted'),
         hasLength(1),
       );
     },

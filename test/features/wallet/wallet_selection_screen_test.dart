@@ -66,6 +66,13 @@ void main() {
       expect(switching.flagsCollection.isEnabled, ui.Tristate.isFalse);
       expect(switching.value, 'Switching');
       expect(switching.hasAction(ui.SemanticsAction.tap), isFalse);
+      expect(
+        tester
+            .getSemantics(find.bySemanticsLabel('Add wallet'))
+            .flagsCollection
+            .isEnabled,
+        ui.Tristate.isFalse,
+      );
       final blockedBack = tester
           .getSemantics(find.bySemanticsLabel('Back'))
           .getSemanticsData();
@@ -127,6 +134,32 @@ void main() {
     expect(viewModel.state.value?.activeWallet, _backupWallet);
     expect(harness.haptics.intents, [HapticIntent.selection]);
     expect(harness.toasts.messages, isEmpty);
+  });
+
+  testWidgets('Add wallet action opens the dedicated wallet setup flow', (
+    tester,
+  ) async {
+    await _pumpWalletSelection(
+      tester,
+      _ControlledWalletViewModel(_walletState),
+    );
+
+    final add = find.bySemanticsLabel('Add wallet');
+    expect(add, findsOneWidget);
+    expect(
+      tester.getSemantics(add).flagsCollection.isEnabled,
+      ui.Tristate.isTrue,
+    );
+    final addButton = tester.widget<AsterIconButton>(
+      find.byWidgetPredicate(
+        (widget) => widget is AsterIconButton && widget.tooltip == 'Add wallet',
+      ),
+    );
+    addButton.onPressed!();
+    await tester.pump();
+    await _pumpFrames(tester);
+
+    expect(find.text('Add wallet destination'), findsOneWidget);
   });
 
   testWidgets(
@@ -285,6 +318,14 @@ Future<_WalletSelectionHarness> _pumpWalletSelection(
           GoRoute(
             path: RoutePaths.walletSelection,
             builder: (context, state) => const WalletSelectionScreen(),
+            routes: [
+              GoRoute(
+                path: RoutePaths.addWallet,
+                name: RouteNames.addWallet,
+                builder: (context, state) =>
+                    const Scaffold(body: Text('Add wallet destination')),
+              ),
+            ],
           ),
         ],
       ),

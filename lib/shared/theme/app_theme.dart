@@ -1,5 +1,7 @@
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 
+import 'aster_page_transitions.dart';
 import 'tokens/tokens.dart';
 import 'typography.dart';
 
@@ -49,6 +51,15 @@ class AppTheme {
       scaffoldBackgroundColor: scheme.surface,
       textTheme: textTheme,
       primaryTextTheme: textTheme,
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: <TargetPlatform, PageTransitionsBuilder>{
+          TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
+          TargetPlatform.iOS: AsterCupertinoPageTransitionsBuilder(),
+          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.windows: ZoomPageTransitionsBuilder(),
+          TargetPlatform.linux: ZoomPageTransitionsBuilder(),
+        },
+      ),
       extensions: <ThemeExtension<dynamic>>[
         _colors,
         _spacing,

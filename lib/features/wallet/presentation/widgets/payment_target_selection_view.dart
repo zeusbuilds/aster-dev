@@ -38,7 +38,7 @@ class PaymentTargetSelectionView extends StatelessWidget {
         onSelected: navigation.inFlight
             ? null
             : (target) => unawaited(
-                navigation.run(
+                navigation.openRoute(
                   command: () => onSelected(target),
                   failureTitle: 'Payment option could not be opened',
                   hapticIntent: HapticIntent.selection,

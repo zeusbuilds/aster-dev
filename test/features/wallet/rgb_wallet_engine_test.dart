@@ -156,7 +156,7 @@ void main() {
     verifyNever(() => sdk.wallet(config: any(named: 'config')));
   });
 
-  test('initializes and unlocks through the stable wallet facade', () async {
+  test('provisions and unlocks through the stable wallet facade', () async {
     final wallet = MockUtexoWallet();
     final unlock = UtexoUnlockConfig(
       indexerUrl: 'http://127.0.0.1:50002',
@@ -176,7 +176,7 @@ void main() {
     ).thenAnswer((_) async {});
     final engine = RgbWalletEngine(wallet, services, unlock);
 
-    await engine.initialize(
+    await engine.provision(
       databasePassword: 'database-password',
       mnemonic: 'mnemonic words',
     );
@@ -189,6 +189,33 @@ void main() {
     ).called(1);
     verify(() => wallet.unlock(password: 'database-password', config: unlock))
         .called(1);
+  });
+
+  test('opens a persisted wallet through reinit without init', () async {
+    final wallet = MockUtexoWallet();
+    final unlock = UtexoUnlockConfig(
+      indexerUrl: 'http://127.0.0.1:50002',
+      proxyEndpoint: 'http://127.0.0.1:3001',
+    );
+    when(
+      () => wallet.reinit(
+        password: any(named: 'password'),
+        unlockConfig: any(named: 'unlockConfig'),
+      ),
+    ).thenAnswer((_) async {});
+    final engine = RgbWalletEngine(wallet, services, unlock);
+
+    await engine.openPersisted(databasePassword: 'database-password');
+
+    verify(
+      () => wallet.reinit(password: 'database-password', unlockConfig: unlock),
+    ).called(1);
+    verifyNever(
+      () => wallet.init(
+        password: any(named: 'password'),
+        mnemonic: any(named: 'mnemonic'),
+      ),
+    );
   });
 
   test(
@@ -553,6 +580,24 @@ void main() {
     expect(balance.lightningReceivable.units, 90);
   });
 
+  test('maps a configured but unimported RGB asset to zero', () async {
+    final wallet = MockUtexoWallet();
+    const assetId = 'rgb:not-yet-imported';
+    final asset = WalletAsset.rgbUsdt(assetId: assetId, precision: 6);
+    when(() => wallet.listChannels()).thenAnswer((_) async => const []);
+    when(() => wallet.getAssetBalance(assetId))
+        .thenThrow(const RgbNodeError('Unknown RGB contract ID'));
+    when(() => wallet.listAssets()).thenAnswer((_) async => _assets());
+    final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
+
+    final balance = await engine.getBalance(asset);
+
+    expect(balance.totalAssetUnits, 0);
+    expect(balance.availableAssetUnits, 0);
+    expect(balance.onchainFuture.units, 0);
+    expect(balance.lightningReceivable.units, 0);
+  });
+
   test('preserves a negative pending delta for outgoing Bitcoin', () async {
     final wallet = MockUtexoWallet();
     when(() => wallet.getBtcBalance()).thenAnswer(
@@ -893,6 +938,7 @@ void main() {
     );
     final invoice = 'r' * (WalletProtocolText.maximumQrPayloadCharacters + 1);
     final wallet = MockUtexoWallet();
+    when(() => wallet.listAssets()).thenAnswer((_) async => _assets());
     when(() => wallet.onchainReceive(any())).thenAnswer(
       (_) async =>
           OnchainReceiveResponse(invoice: invoice, batchTransferIdx: 0),
@@ -1044,6 +1090,7 @@ void main() {
     final route = PaymentRoute(asset: asset, rail: PaymentRail.onchain);
     final amount = WalletAmount.onchain(assetId: asset.id, units: 1250000);
     final wallet = MockUtexoWallet();
+    when(() => wallet.listAssets()).thenAnswer((_) async => _assets(assetId));
     when(() => wallet.onchainReceive(any())).thenAnswer(
       (_) async => const OnchainReceiveResponse(
         invoice: 'rgb:invoice',
@@ -1102,6 +1149,76 @@ void main() {
     expect(sent.referenceId, 'rgb-bitcoin-txid');
     expect(sent.batchTransferIndex, 8);
   });
+
+  test(
+    'uses and accepts a generic RGB invoice for the first transfer',
+    () async {
+      const assetId = 'rgb:configured-usdt';
+      const configuredServices = WalletServiceConfiguration(
+        environment: BlockchainEnvironment.regtest,
+        sdkNetwork: 'regtest',
+        usdtAsset: RgbAssetConfiguration(contractId: assetId, precision: 6),
+      );
+      final asset = WalletAsset.rgbUsdt(assetId: assetId, precision: 6);
+      final route = PaymentRoute(asset: asset, rail: PaymentRail.onchain);
+      final amount = WalletAmount.onchain(assetId: asset.id, units: 10000000);
+      final wallet = MockUtexoWallet();
+      when(() => wallet.listAssets()).thenAnswer((_) async => _assets());
+      when(() => wallet.onchainReceive(any())).thenAnswer(
+        (_) async => const OnchainReceiveResponse(
+          invoice: 'rgb:generic',
+          recipientId: 'generic-recipient',
+          expirationTimestamp: 1786446000,
+          batchTransferIdx: 9,
+        ),
+      );
+      when(() => wallet.decodeRgbInvoice('rgb:generic')).thenAnswer(
+        (_) async => CoreInvoiceData(
+          invoice: 'rgb:generic',
+          recipientId: 'generic-recipient',
+          network: 'regtest',
+          assignment: const Assignment(type: 'Fungible'),
+          expirationTimestamp: 1786446000,
+          transportEndpoints: const <String>[],
+        ),
+      );
+      when(() => wallet.onchainSend(any())).thenAnswer(
+        (_) async => const OnchainSendResponse(
+          txid: 'first-transfer-txid',
+          batchTransferIdx: 10,
+        ),
+      );
+      final engine = RgbWalletEngine(
+        wallet,
+        configuredServices,
+        UtexoUnlockConfig(),
+        clock: () => DateTime.utc(2026, 8, 11, 10),
+      );
+
+      final receive = await engine.createReceiveRequest(route);
+      final sent = await engine.sendPayment(
+        WalletSendCommand(
+          route: route,
+          destination: receive.encodedRequest,
+          amount: amount,
+          feeRate: _feeRate(4),
+        ),
+      );
+
+      final receiveRequest =
+          verify(() => wallet.onchainReceive(captureAny())).captured.single
+              as RgbInvoiceRequest;
+      final sendRequest =
+          verify(() => wallet.onchainSend(captureAny())).captured.single
+              as RgbSendRequest;
+      expect(receiveRequest.assetId, isNull);
+      expect(receiveRequest.amount, isNull);
+      expect(receive.amount, isNull);
+      expect(sendRequest.assetId, assetId);
+      expect(sendRequest.amount, 10000000);
+      expect(sent.referenceId, 'first-transfer-txid');
+    },
+  );
 
   test(
     'requires amount and binds configured asset for RGB Lightning',
@@ -1634,6 +1751,26 @@ void main() {
     verifyNever(() => wallet.listPayments());
   });
 }
+
+CoreListAssets _assets([String? assetId]) => CoreListAssets(
+  nia: assetId == null
+      ? const <CoreAssetNia>[]
+      : <CoreAssetNia>[
+          CoreAssetNia(
+            assetId: assetId,
+            ticker: 'USDT',
+            name: 'Test USDT',
+            precision: 6,
+            timestamp: 1,
+            addedAt: 1,
+            balance: const CoreBalance(settled: 0, future: 0, spendable: 0),
+            issuedSupply: 0,
+          ),
+        ],
+  cfa: const <CoreAssetCfa>[],
+  ifa: const <CoreAssetIfa>[],
+  uda: const <CoreAssetUda>[],
+);
 
 WalletFeeRateEstimate _feeRate(int satsPerVbyte) => WalletFeeRateEstimate(
   targetBlocks: 6,

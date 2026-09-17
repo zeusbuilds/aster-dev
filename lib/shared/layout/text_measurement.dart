@@ -9,6 +9,11 @@ double unwrappedTextWidth(BuildContext context, String text, TextStyle style) {
 
 /// Same layout contract as [unwrappedTextWidth], including mixed-font spans.
 double unwrappedSpanWidth(BuildContext context, InlineSpan span) {
+  return unwrappedSpanSize(context, span).width;
+}
+
+/// Measures one unwrapped mixed-font line with the active text environment.
+Size unwrappedSpanSize(BuildContext context, InlineSpan span) {
   final painter = TextPainter(
     text: span,
     textDirection: Directionality.of(context),
@@ -18,7 +23,7 @@ double unwrappedSpanWidth(BuildContext context, InlineSpan span) {
   );
   try {
     painter.layout();
-    return painter.width;
+    return painter.size;
   } finally {
     painter.dispose();
   }

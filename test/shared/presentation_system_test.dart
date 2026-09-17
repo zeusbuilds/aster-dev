@@ -494,6 +494,90 @@ void main() {
     expect(activations, 0);
   });
 
+  testWidgets('button preserves visible press feedback for a quick tap', (
+    tester,
+  ) async {
+    var activations = 0;
+    await tester.pumpWidget(
+      _themedHarness(
+        CustomButton(text: 'Continue', onTap: () => activations += 1),
+      ),
+    );
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(CustomButton)),
+    );
+    await gesture.up();
+    await tester.pump();
+
+    expect(activations, 1);
+    expect(
+      tester.widget<AnimatedScale>(find.byType(AnimatedScale)).scale,
+      const AsterMotion().buttonPressedScale,
+    );
+
+    await tester.pump(const AsterMotion().buttonMinimumPressedDuration);
+    expect(tester.widget<AnimatedScale>(find.byType(AnimatedScale)).scale, 1);
+  });
+
+  testWidgets('button completes quick press feedback after entering loading', (
+    tester,
+  ) async {
+    var loading = false;
+    late StateSetter rebuild;
+    await tester.pumpWidget(
+      _themedHarness(
+        StatefulBuilder(
+          builder: (context, setState) {
+            rebuild = setState;
+            return CustomButton(
+              text: 'Continue',
+              loading: loading,
+              onTap: () => rebuild(() => loading = true),
+            );
+          },
+        ),
+      ),
+    );
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(CustomButton)),
+    );
+    await gesture.up();
+    await tester.pump();
+
+    expect(
+      tester.widget<AnimatedScale>(find.byType(AnimatedScale)).scale,
+      const AsterMotion().buttonPressedScale,
+    );
+    expect(
+      tester.widget<CustomButton>(find.byType(CustomButton)).loading,
+      true,
+    );
+
+    await tester.pump(const AsterMotion().buttonMinimumPressedDuration);
+    expect(tester.widget<AnimatedScale>(find.byType(AnimatedScale)).scale, 1);
+  });
+
+  testWidgets('button adds no press dwell when reduced motion is requested', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _themedHarness(
+        CustomButton(text: 'Continue', onTap: () {}),
+        disableAnimations: true,
+      ),
+    );
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(CustomButton)),
+    );
+    await gesture.up();
+    await tester.pump();
+
+    expect(tester.widget<AnimatedScale>(find.byType(AnimatedScale)).scale, 1);
+  });
+
   testWidgets('icon buttons own enabled and loading semantic actions', (
     tester,
   ) async {
@@ -639,6 +723,62 @@ void main() {
             .isEnabled,
         ui.Tristate.isTrue,
       );
+    },
+  );
+
+  testWidgets(
+    'route ownership releases after installation while observing completion',
+    (tester) async {
+      final gate = Completer<void>();
+      final haptics = _RecordingHaptics();
+      final accepted = <String>[];
+      await tester.pumpWidget(
+        _themedHarness(
+          _RouteNavigationHarness(
+            first: () async {
+              accepted.add('first');
+              await gate.future;
+            },
+            second: () async => accepted.add('second'),
+          ),
+          haptics: haptics,
+        ),
+      );
+
+      tester
+          .widget<CustomButton>(
+            find.widgetWithText(CustomButton, 'First route'),
+          )
+          .onTap!();
+      tester
+          .widget<CustomButton>(
+            find.widgetWithText(CustomButton, 'Second route'),
+          )
+          .onTap!();
+      expect(accepted, ['first']);
+
+      await tester.pump();
+      expect(
+        tester
+            .getSemantics(find.bySemanticsLabel('Second route'))
+            .flagsCollection
+            .isEnabled,
+        ui.Tristate.isTrue,
+      );
+      tester
+          .widget<CustomButton>(
+            find.widgetWithText(CustomButton, 'Second route'),
+          )
+          .onTap!();
+      await tester.pump();
+
+      expect(accepted, ['first', 'second']);
+      expect(haptics.intents, [
+        HapticIntent.lightImpact,
+        HapticIntent.lightImpact,
+      ]);
+      gate.complete();
+      await tester.pump();
     },
   );
 
@@ -1047,6 +1187,55 @@ final class _NavigationHarness extends StatelessWidget {
                   enabled: !navigation.inFlight,
                   hapticIntent: null,
                   onTap: () => run(second),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+final class _RouteNavigationHarness extends StatelessWidget {
+  const _RouteNavigationHarness({required this.first, required this.second});
+
+  final Future<void> Function() first;
+  final Future<void> Function() second;
+
+  @override
+  Widget build(BuildContext context) {
+    return AsterNavigationScope(
+      child: Builder(
+        builder: (context) {
+          final navigation = AsterNavigationScope.of(context);
+
+          void open(Future<void> Function() command) {
+            unawaited(
+              navigation.openRoute(
+                command: command,
+                failureTitle: 'Route could not open',
+              ),
+            );
+          }
+
+          return Row(
+            children: [
+              Expanded(
+                child: CustomButton(
+                  text: 'First route',
+                  enabled: !navigation.inFlight,
+                  hapticIntent: null,
+                  onTap: () => open(first),
+                ),
+              ),
+              SizedBox(width: context.spacing.sm),
+              Expanded(
+                child: CustomButton(
+                  text: 'Second route',
+                  enabled: !navigation.inFlight,
+                  hapticIntent: null,
+                  onTap: () => open(second),
                 ),
               ),
             ],

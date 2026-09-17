@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../../core/errors/app_failure.dart';
+import '../../../wallet/domain/models/models.dart';
 import '../../domain/models/models.dart';
 
 /// Route-scoped state for importing one 12-word BIP39 wallet.
@@ -10,6 +11,7 @@ final class ImportWalletState {
     List<String> words = const [],
     List<MnemonicWordStatus> wordStatuses = const [],
     this.checksumStatus = MnemonicChecksumStatus.incomplete,
+    this.walletName = '',
     this.submitting = false,
     this.failure,
   }) : words = List<String>.unmodifiable(
@@ -33,6 +35,7 @@ final class ImportWalletState {
   final List<String> words;
   final List<MnemonicWordStatus> wordStatuses;
   final MnemonicChecksumStatus checksumStatus;
+  final String walletName;
   final bool submitting;
   final AppFailure? failure;
 
@@ -43,11 +46,18 @@ final class ImportWalletState {
       words.every((word) => word.isNotEmpty) &&
       wordStatuses.every((status) => status == MnemonicWordStatus.valid);
 
-  bool get canSubmit =>
-      !submitting &&
-      allWordsKnown &&
-      checksumStatus == MnemonicChecksumStatus.valid &&
-      (failure == null || failure!.retryable);
+  /// Whether the phrase passed both canonical-word and native checksum checks.
+  bool get phraseValid =>
+      allWordsKnown && checksumStatus == MnemonicChecksumStatus.valid;
+
+  bool get canContinue =>
+      !submitting && phraseValid && (failure == null || failure!.retryable);
+
+  String get normalizedWalletName => walletName.trim();
+
+  bool get walletNameValid => WalletProfile.isValidName(normalizedWalletName);
+
+  bool get canSubmit => canContinue && walletNameValid;
 
   String get mnemonic => words.join(' ');
 
@@ -55,6 +65,7 @@ final class ImportWalletState {
     List<String>? words,
     List<MnemonicWordStatus>? wordStatuses,
     MnemonicChecksumStatus? checksumStatus,
+    String? walletName,
     bool? submitting,
     Object? failure = _unchanged,
   }) {
@@ -62,6 +73,7 @@ final class ImportWalletState {
       words: words ?? this.words,
       wordStatuses: wordStatuses ?? this.wordStatuses,
       checksumStatus: checksumStatus ?? this.checksumStatus,
+      walletName: walletName ?? this.walletName,
       submitting: submitting ?? this.submitting,
       failure: identical(failure, _unchanged)
           ? this.failure
@@ -78,6 +90,7 @@ final class ImportWalletState {
         listEquals(other.words, words) &&
         listEquals(other.wordStatuses, wordStatuses) &&
         other.checksumStatus == checksumStatus &&
+        other.walletName == walletName &&
         other.submitting == submitting &&
         other.failure == failure;
   }
@@ -87,6 +100,7 @@ final class ImportWalletState {
     Object.hashAll(words),
     Object.hashAll(wordStatuses),
     checksumStatus,
+    walletName,
     submitting,
     failure,
   );
