@@ -5,10 +5,6 @@ class RoutePaths {
   // Wallet access and onboarding.
   static const String splash = '/';
   static const String onboardingWelcome = '/onboarding-welcome';
-  static const String onboardingCreateWallet = '/onboarding/create-wallet';
-  static const String onboardingImportWallet = '/onboarding/import-wallet';
-  static const String confirmRecovery = 'confirm-recovery';
-  static const String nameWallet = 'name-wallet';
 
   // Guarded wallet application.
   static const String home = '/home';
@@ -40,7 +36,7 @@ class RoutePaths {
   /// Concrete location for selecting the active wallet from Settings.
   static const String walletSelectionLocation = '$settings/$walletSelection';
 
-  /// Concrete location for creating an additional wallet from Settings.
+  /// Concrete location for creating or importing an additional wallet.
   static const String addWalletLocation = '$walletSelectionLocation/$addWallet';
 
   /// Concrete Send destination location for a validated payment-target slug.

@@ -23,9 +23,7 @@ class ScanWalletHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
-    final effects = context.effects;
     final type = context.type;
-    final metrics = context.metrics;
 
     final failure = failureMessage;
     final hasFailure = failure != null;
@@ -48,24 +46,6 @@ class ScanWalletHeader extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: metrics.walletAvatarSize,
-              height: metrics.walletAvatarSize,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: context.colorScheme.surface.withValues(
-                  alpha: effects.scanAvatarSurfaceOpacity,
-                ),
-              ),
-              child: hasFailure
-                  ? Icon(
-                      RemixIcons.error_warning_line,
-                      size: context.icons.sm,
-                      color: context.colorScheme.surface,
-                    )
-                  : null,
-            ),
-            SizedBox(height: spacing.md),
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [

@@ -12,7 +12,7 @@ import '../models/models.dart';
 
 part 'import_wallet_view_model.g.dart';
 
-/// Owns route-scoped import input, SDK checksum validation, and provisioning.
+/// Owns flow-scoped import input, SDK checksum validation, and provisioning.
 @riverpod
 class ImportWalletViewModel extends _$ImportWalletViewModel {
   static final _nonLetters = RegExp('[^a-z]');
@@ -50,6 +50,7 @@ class ImportWalletViewModel extends _$ImportWalletViewModel {
     final current = state.value;
     if (current == null ||
         current.submitting ||
+        current.completed ||
         current.requiresReconciliation ||
         startIndex < 0 ||
         startIndex >= ImportWalletState.wordCount ||
@@ -105,6 +106,7 @@ class ImportWalletViewModel extends _$ImportWalletViewModel {
     final current = state.value;
     if (current == null ||
         current.submitting ||
+        current.completed ||
         current.checksumStatus != MnemonicChecksumStatus.incomplete ||
         !current.allWordsKnown ||
         current.failure?.retryable != true) {
@@ -114,16 +116,43 @@ class ImportWalletViewModel extends _$ImportWalletViewModel {
     await _scheduleChecksum(current.mnemonic, revision);
   }
 
+  /// Waits for the latest scheduled checksum validation to settle.
+  ///
+  /// This lets the keyboard's Done action preserve a single submit intent
+  /// while native validation is already in flight. It does not start or retry
+  /// validation and therefore cannot duplicate an SDK operation.
+  Future<void> waitForChecksumValidation() async {
+    while (ref.mounted) {
+      final active = _validationDrain;
+      if (active == null) return;
+      await active;
+    }
+  }
+
   /// Updates the user-facing name after the phrase has been checksum-verified.
   void updateWalletName(String name) {
     final current = state.value;
     if (current == null ||
         current.submitting ||
+        current.completed ||
         current.requiresReconciliation ||
         current.walletName == name) {
       return;
     }
     state = AsyncData(current.copyWith(walletName: name, failure: null));
+  }
+
+  /// Abandons the naming-step draft when the user navigates backward.
+  void discardWalletNameDraft() {
+    final current = state.value;
+    if (current == null ||
+        current.submitting ||
+        current.completed ||
+        current.requiresReconciliation ||
+        (current.walletName.isEmpty && current.failure == null)) {
+      return;
+    }
+    state = AsyncData(current.copyWith(walletName: '', failure: null));
   }
 
   /// Provisions only after every word and the SDK checksum are valid.
@@ -161,7 +190,9 @@ class ImportWalletViewModel extends _$ImportWalletViewModel {
 
   Future<void> _scheduleChecksum(String mnemonic, int revision) {
     final current = state.value;
-    if (current == null || current.submitting) return Future.value();
+    if (current == null || current.submitting || current.completed) {
+      return Future.value();
+    }
     state = AsyncData(
       current.copyWith(
         checksumStatus: MnemonicChecksumStatus.checking,

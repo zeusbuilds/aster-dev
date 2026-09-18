@@ -35,17 +35,17 @@ void main() {
     );
     expect(
       RouteGuards.redirect(
-        location: RoutePaths.onboardingImportWallet,
+        location: RoutePaths.onboardingWelcome,
         walletState: empty,
       ),
       isNull,
     );
     expect(
       RouteGuards.redirect(
-        location: RoutePaths.onboardingCreateWallet,
+        location: '/onboarding/legacy-step',
         walletState: empty,
       ),
-      isNull,
+      RoutePaths.onboardingWelcome,
     );
   });
 

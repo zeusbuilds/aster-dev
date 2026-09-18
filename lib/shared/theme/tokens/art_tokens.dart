@@ -19,6 +19,7 @@ class AsterArt extends ThemeExtension<AsterArt> {
     this.onboardingIconGridGap = 6,
     this.onboardingIconTileRadius = 4,
     this.onboardingIndicatorExpansionFactor = 4,
+    this.onboardingWordmarkMarkHeight = 28,
     this.splashLineInitialHeight = 8.5,
     this.splashLineMaximumHeight = 50,
     this.splashLineGapExtent = 1.3,
@@ -40,6 +41,7 @@ class AsterArt extends ThemeExtension<AsterArt> {
   final double onboardingIconGridGap;
   final double onboardingIconTileRadius;
   final double onboardingIndicatorExpansionFactor;
+  final double onboardingWordmarkMarkHeight;
   final double splashLineInitialHeight;
   final double splashLineMaximumHeight;
   final double splashLineGapExtent;
@@ -62,6 +64,7 @@ class AsterArt extends ThemeExtension<AsterArt> {
     double? onboardingIconGridGap,
     double? onboardingIconTileRadius,
     double? onboardingIndicatorExpansionFactor,
+    double? onboardingWordmarkMarkHeight,
     double? splashLineInitialHeight,
     double? splashLineMaximumHeight,
     double? splashLineGapExtent,
@@ -91,6 +94,8 @@ class AsterArt extends ThemeExtension<AsterArt> {
       onboardingIndicatorExpansionFactor:
           onboardingIndicatorExpansionFactor ??
           this.onboardingIndicatorExpansionFactor,
+      onboardingWordmarkMarkHeight:
+          onboardingWordmarkMarkHeight ?? this.onboardingWordmarkMarkHeight,
       splashLineInitialHeight:
           splashLineInitialHeight ?? this.splashLineInitialHeight,
       splashLineMaximumHeight:
@@ -161,6 +166,11 @@ class AsterArt extends ThemeExtension<AsterArt> {
       onboardingIndicatorExpansionFactor: _lerp(
         onboardingIndicatorExpansionFactor,
         other.onboardingIndicatorExpansionFactor,
+        t,
+      ),
+      onboardingWordmarkMarkHeight: _lerp(
+        onboardingWordmarkMarkHeight,
+        other.onboardingWordmarkMarkHeight,
         t,
       ),
       splashLineInitialHeight: _lerp(

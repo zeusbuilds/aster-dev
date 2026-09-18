@@ -1,6 +1,5 @@
 import 'package:go_router/go_router.dart';
 
-import '../../features/onboarding/presentation/models/models.dart';
 import '../../features/onboarding/presentation/screens/screens.dart';
 import '../../features/receive/presentation/screens/screens.dart';
 import '../../features/scan/domain/models/models.dart';
@@ -34,38 +33,6 @@ abstract final class RouteConfig {
             path: RoutePaths.onboardingWelcome,
             name: RouteNames.onboardingWelcome,
             builder: (context, state) => const OnboardingWelcomeScreen(),
-          ),
-          GoRoute(
-            path: RoutePaths.onboardingCreateWallet,
-            name: RouteNames.onboardingCreateWallet,
-            builder: (context, state) => const OnboardingCreateWalletScreen(),
-            routes: [
-              GoRoute(
-                path: RoutePaths.confirmRecovery,
-                name: RouteNames.onboardingCreateWalletQuiz,
-                builder: (context, state) => const CreateWalletQuizScreen(),
-                routes: [
-                  GoRoute(
-                    path: RoutePaths.nameWallet,
-                    name: RouteNames.onboardingCreateWalletName,
-                    builder: (context, state) =>
-                        const WalletNameScreen.create(),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          GoRoute(
-            path: RoutePaths.onboardingImportWallet,
-            name: RouteNames.onboardingImportWallet,
-            builder: (context, state) => const OnboardingImportWalletScreen(),
-            routes: [
-              GoRoute(
-                path: RoutePaths.nameWallet,
-                name: RouteNames.onboardingImportWalletName,
-                builder: (context, state) => const WalletNameScreen.import(),
-              ),
-            ],
           ),
         ],
       ),
@@ -139,43 +106,22 @@ abstract final class RouteConfig {
         ),
       ),
       GoRoute(
+        path: RoutePaths.walletSelectionLocation,
+        name: RouteNames.walletSelection,
+        builder: (context, state) => const WalletSelectionScreen(),
+        routes: [
+          GoRoute(
+            path: RoutePaths.addWallet,
+            name: RouteNames.addWallet,
+            builder: (context, state) => const AddWalletScreen(),
+          ),
+        ],
+      ),
+      GoRoute(
         path: RoutePaths.settings,
         name: RouteNames.settings,
         builder: (context, state) => const SettingsScreen(),
         routes: [
-          GoRoute(
-            path: RoutePaths.walletSelection,
-            name: RouteNames.walletSelection,
-            builder: (context, state) => const WalletSelectionScreen(),
-            routes: [
-              GoRoute(
-                path: RoutePaths.addWallet,
-                name: RouteNames.addWallet,
-                builder: (context, state) => const OnboardingCreateWalletScreen(
-                  origin: WalletCreationOrigin.walletSelector,
-                ),
-                routes: [
-                  GoRoute(
-                    path: RoutePaths.confirmRecovery,
-                    name: RouteNames.addWalletQuiz,
-                    builder: (context, state) => const CreateWalletQuizScreen(
-                      origin: WalletCreationOrigin.walletSelector,
-                    ),
-                    routes: [
-                      GoRoute(
-                        path: RoutePaths.nameWallet,
-                        name: RouteNames.addWalletName,
-                        builder: (context, state) =>
-                            const WalletNameScreen.create(
-                              origin: WalletCreationOrigin.walletSelector,
-                            ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          ),
           GoRoute(
             path: RoutePaths.countrySelection,
             name: RouteNames.countrySelection,

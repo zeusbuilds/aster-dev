@@ -8,25 +8,38 @@ import 'package:ming_cute_icons/ming_cute_icons.dart';
 
 import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
-import '../models/models.dart';
 import '../view_model/view_models.dart';
 import '../widgets/widgets.dart';
 
 enum _WalletNameSource { create, import }
 
-/// Final naming and native-provisioning step for create and import flows.
+/// Final naming and native-provisioning surface for create and import flows.
 class WalletNameScreen extends ConsumerStatefulWidget {
   const WalletNameScreen.create({
     super.key,
-    this.origin = WalletCreationOrigin.onboarding,
+    this.onBack,
+    this.onCompleted,
+    this.onBrandArt = false,
+    this.showNavigationBar = true,
   }) : _source = _WalletNameSource.create;
 
-  const WalletNameScreen.import({super.key})
-    : _source = _WalletNameSource.import,
-      origin = WalletCreationOrigin.onboarding;
+  const WalletNameScreen.import({
+    super.key,
+    this.onBack,
+    this.onCompleted,
+    this.onBrandArt = false,
+    this.showNavigationBar = true,
+  }) : _source = _WalletNameSource.import;
 
   final _WalletNameSource _source;
-  final WalletCreationOrigin origin;
+  final VoidCallback? onBack;
+  final VoidCallback? onCompleted;
+
+  /// Whether this step is presented over the retained onboarding artwork.
+  final bool onBrandArt;
+
+  /// Whether this standalone screen owns its visible back navigation.
+  final bool showNavigationBar;
 
   @override
   ConsumerState<WalletNameScreen> createState() => _WalletNameScreenState();
@@ -94,7 +107,7 @@ class _WalletNameScreenState extends ConsumerState<WalletNameScreen> {
                 previousStepComplete: state.phraseValid,
                 canSubmit: state.canSubmit,
                 submitting: state.submitting,
-                completed: false,
+                completed: state.completed,
                 requiresReconciliation: state.requiresReconciliation,
                 failure: state.failure,
               ),
@@ -112,8 +125,13 @@ class _WalletNameScreenState extends ConsumerState<WalletNameScreen> {
               value?.requiresReconciliation == true;
           return PopScope(
             canPop: !locked,
+            onPopInvokedWithResult: (didPop, result) {
+              if (didPop) _discardNameDraft();
+            },
             child: Scaffold(
-              backgroundColor: context.colorScheme.surface,
+              backgroundColor: widget.onBrandArt
+                  ? context.appColors.transparentSurface
+                  : context.colorScheme.surface,
               resizeToAvoidBottomInset: true,
               body: SafeArea(
                 child: switch (asyncState) {
@@ -122,8 +140,9 @@ class _WalletNameScreenState extends ConsumerState<WalletNameScreen> {
                     _buildForm(value, navigation),
                   AsyncData<_WalletNameViewState>(:final value)
                       when value.completed =>
-                    const OnboardingStatusPanel.loading(
+                    OnboardingStatusPanel.loading(
                       message: 'Finishing wallet setup...',
+                      onBrandArt: widget.onBrandArt,
                     ),
                   AsyncData<_WalletNameViewState>() =>
                     OnboardingStatusPanel.failure(
@@ -131,14 +150,19 @@ class _WalletNameScreenState extends ConsumerState<WalletNameScreen> {
                       message: widget._source == _WalletNameSource.create
                           ? 'Confirm your recovery phrase before naming the wallet.'
                           : 'Enter and validate your recovery phrase before naming the wallet.',
-                      onBack: () => context.pop(),
+                      onBack: widget.showNavigationBar
+                          ? widget.onBack ?? () => context.pop()
+                          : null,
+                      onBrandArt: widget.onBrandArt,
                     ),
                   AsyncError<_WalletNameViewState>(
                     :final error,
                     :final stackTrace,
                   ) =>
                     _buildFailure(error, stackTrace),
-                  _ => const OnboardingStatusPanel.loading(),
+                  _ => OnboardingStatusPanel.loading(
+                    onBrandArt: widget.onBrandArt,
+                  ),
                 },
               ),
             ),
@@ -154,6 +178,7 @@ class _WalletNameScreenState extends ConsumerState<WalletNameScreen> {
   ) {
     final context = this.context;
     final spacing = context.spacing;
+    final colors = context.appColors;
     final invalidVisible = state.name.isNotEmpty && !state.nameValid;
     final canNavigateBack =
         !state.submitting &&
@@ -165,15 +190,21 @@ class _WalletNameScreenState extends ConsumerState<WalletNameScreen> {
         children: [
           SizedBox(
             height: context.metrics.appBarHeight,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: AsterIconButton(
-                icon: MingCuteIcons.mgc_left_line,
-                tooltip: 'Back',
-                onPressed: canNavigateBack ? () => _goBack(navigation) : null,
-                hapticIntent: null,
-              ),
-            ),
+            child: widget.showNavigationBar
+                ? Align(
+                    alignment: Alignment.centerLeft,
+                    child: AsterIconButton(
+                      icon: MingCuteIcons.mgc_left_line,
+                      tooltip: 'Back',
+                      onPressed: canNavigateBack
+                          ? () => _goBack(navigation)
+                          : null,
+                      color: widget.onBrandArt ? colors.onBrandArt : null,
+                      hapticIntent: null,
+                      alignment: Alignment.centerRight,
+                    ),
+                  )
+                : null,
           ),
           Padding(
             padding: EdgeInsets.fromLTRB(
@@ -185,48 +216,114 @@ class _WalletNameScreenState extends ConsumerState<WalletNameScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('Name your wallet', style: context.type.pageTitle),
-                SizedBox(height: spacing.sm),
-                Text(
-                  'Choose a name that will make this wallet easy to recognize.',
-                  style: context.type.rowMeta,
+                OnboardingChoreographyItem(
+                  id: 'wallet-name-copy-motion',
+                  visualIndex: 1,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'Name your wallet',
+                        style: context.type.pageTitle.copyWith(
+                          color: widget.onBrandArt ? colors.onBrandArt : null,
+                        ),
+                      ),
+                      SizedBox(height: spacing.sm),
+                      Text(
+                        'Choose a name that will make this wallet easy to recognize.',
+                        style: context.type.rowMeta.copyWith(
+                          color: widget.onBrandArt
+                              ? colors.onBrandArt.withValues(
+                                  alpha:
+                                      context.effects.brandContentStrongOpacity,
+                                )
+                              : null,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 SizedBox(height: spacing.xxl),
-                Semantics(
-                  label: 'Wallet name',
-                  child: TextField(
-                    key: const ValueKey('wallet-name-field'),
-                    controller: _controller,
-                    autofocus: true,
-                    enabled: !state.submitting && !state.requiresReconciliation,
-                    textCapitalization: TextCapitalization.words,
-                    textInputAction: TextInputAction.done,
-                    inputFormatters: [LengthLimitingTextInputFormatter(64)],
-                    onChanged: _updateName,
-                    onSubmitted: (_) {
-                      if (state.canSubmit && !navigation.inFlight) {
-                        unawaited(_submit(navigation));
-                      }
-                    },
-                    decoration: InputDecoration(
-                      hintText: 'My wallet',
-                      errorText: invalidVisible
-                          ? 'Use a visible name with up to 64 characters.'
-                          : null,
-                      counterText: '',
-                    ),
+                OnboardingChoreographyItem(
+                  id: 'wallet-name-field-motion',
+                  visualIndex: 2,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Semantics(
+                        label: 'Wallet name',
+                        child: TextField(
+                          key: const ValueKey('wallet-name-field'),
+                          controller: _controller,
+                          autofocus: true,
+                          enabled:
+                              !state.submitting &&
+                              !state.requiresReconciliation,
+                          textCapitalization: TextCapitalization.words,
+                          textInputAction: TextInputAction.done,
+                          inputFormatters: [
+                            LengthLimitingTextInputFormatter(64),
+                          ],
+                          style: context.type.rowTitle,
+                          cursorColor: context.colorScheme.primary,
+                          onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                          onChanged: _updateName,
+                          onSubmitted: (_) {
+                            if (state.canSubmit && !navigation.inFlight) {
+                              unawaited(_submit(navigation));
+                            }
+                          },
+                          decoration: InputDecoration(
+                            hintText: 'My wallet',
+                            hintStyle: context.type.rowMeta,
+                            filled: true,
+                            fillColor: widget.onBrandArt
+                                ? context.colorScheme.surface.withValues(
+                                    alpha:
+                                        context.stateLayers.translucentSurface,
+                                  )
+                                : colors.surfaceSubtle,
+                            border: _walletNameBorder(context),
+                            enabledBorder: _walletNameBorder(context),
+                            disabledBorder: _walletNameBorder(context),
+                            focusedBorder: _walletNameBorder(context),
+                            errorBorder: _walletNameBorder(
+                              context,
+                              error: true,
+                            ),
+                            focusedErrorBorder: _walletNameBorder(
+                              context,
+                              error: true,
+                            ),
+                            errorStyle: context.type.errorMessage.copyWith(
+                              color: widget.onBrandArt
+                                  ? colors.onBrandArt
+                                  : context.colorScheme.error,
+                            ),
+                            errorText: invalidVisible
+                                ? 'Use a visible name with up to 64 characters.'
+                                : null,
+                            counterText: '',
+                          ),
+                        ),
+                      ),
+                      if (state.failure case final failure?) ...[
+                        SizedBox(height: spacing.md),
+                        Semantics(
+                          liveRegion: true,
+                          child: Text(
+                            failure.userMessage,
+                            style: context.type.errorMessage.copyWith(
+                              color: widget.onBrandArt
+                                  ? colors.onBrandArt
+                                  : null,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-                if (state.failure case final failure?) ...[
-                  SizedBox(height: spacing.md),
-                  Semantics(
-                    liveRegion: true,
-                    child: Text(
-                      failure.userMessage,
-                      style: context.type.errorMessage,
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
@@ -240,18 +337,25 @@ class _WalletNameScreenState extends ConsumerState<WalletNameScreen> {
             spacing.screenPadding,
             spacing.lg,
           ),
-          child: CustomButton(
-            text: widget._source == _WalletNameSource.create
-                ? 'Create Wallet'
-                : 'Import Wallet',
-            enabled:
-                state.canSubmit &&
-                !state.submitting &&
-                !state.requiresReconciliation &&
-                !navigation.inFlight,
-            loading: state.submitting,
-            hapticIntent: null,
-            onTap: () => unawaited(_submit(navigation)),
+          child: OnboardingChoreographyItem(
+            id: 'wallet-name-actions-motion',
+            visualIndex: 3,
+            child: CustomButton(
+              text: widget._source == _WalletNameSource.create
+                  ? 'Create Wallet'
+                  : 'Import Wallet',
+              variant: widget.onBrandArt
+                  ? ButtonVariant.translucent
+                  : ButtonVariant.primary,
+              enabled:
+                  state.canSubmit &&
+                  !state.submitting &&
+                  !state.requiresReconciliation &&
+                  !navigation.inFlight,
+              loading: state.submitting,
+              hapticIntent: null,
+              onTap: () => unawaited(_submit(navigation)),
+            ),
           ),
         ),
       ],
@@ -263,7 +367,27 @@ class _WalletNameScreenState extends ConsumerState<WalletNameScreen> {
     return OnboardingStatusPanel.failure(
       title: 'Wallet name unavailable',
       message: failure.userMessage,
-      onBack: () => context.pop(),
+      onBack: widget.showNavigationBar
+          ? widget.onBack ?? () => context.pop()
+          : null,
+      onBrandArt: widget.onBrandArt,
+    );
+  }
+
+  InputBorder _walletNameBorder(BuildContext context, {bool error = false}) {
+    final colors = context.appColors;
+    final color = error
+        ? context.colorScheme.error
+        : widget.onBrandArt
+        ? colors.onBrandArt.withValues(
+            alpha: context.effects.brandGlassBorderOpacity,
+          )
+        : colors.borderSubtle;
+    return ShapedInputBorder(
+      borderSide: BorderSide(color: color, width: context.strokes.hairline),
+      shape: RoundedSuperellipseBorder(
+        borderRadius: BorderRadius.circular(context.radii.input),
+      ),
     );
   }
 
@@ -295,21 +419,39 @@ class _WalletNameScreenState extends ConsumerState<WalletNameScreen> {
       blocksRoutePop: true,
     );
     if (!completed || !mounted) return;
-    switch (widget.origin) {
-      case WalletCreationOrigin.onboarding:
-        context.go(RoutePaths.home);
-      case WalletCreationOrigin.walletSelector:
-        context.pop(WalletCreationRouteResult.created);
+    if (widget.onCompleted case final onCompleted?) {
+      onCompleted();
+      return;
     }
+    context.go(RoutePaths.home);
   }
 
   void _goBack(AsterNavigationCommandOwner navigation) {
+    _discardNameDraft();
+    if (widget.onBack case final onBack?) {
+      FocusScope.of(context).unfocus();
+      onBack();
+      return;
+    }
     unawaited(
       navigation.run(
         command: () => context.pop(),
         failureTitle: 'Previous screen could not open',
       ),
     );
+  }
+
+  void _discardNameDraft() {
+    switch (widget._source) {
+      case _WalletNameSource.create:
+        ref
+            .read(createWalletViewModelProvider.notifier)
+            .discardWalletNameDraft();
+      case _WalletNameSource.import:
+        ref
+            .read(importWalletViewModelProvider.notifier)
+            .discardWalletNameDraft();
+    }
   }
 }
 

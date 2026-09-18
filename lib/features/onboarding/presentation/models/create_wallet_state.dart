@@ -21,7 +21,7 @@ final class RecoveryPhraseQuestion {
     }
   }
 
-  static const optionCount = 4;
+  static const optionCount = 3;
 
   /// One-based position in the displayed 12-word recovery phrase.
   final int wordNumber;
@@ -46,21 +46,21 @@ final class RecoveryPhraseQuestion {
       Object.hash(wordNumber, expectedWord, Object.hashAll(options));
 }
 
-/// Route-scoped recovery phrase, confirmation, naming, and provisioning state.
+/// Flow-scoped recovery phrase, confirmation, naming, and provisioning state.
 @immutable
 final class CreateWalletState {
   CreateWalletState({
     required List<String> words,
     required List<RecoveryPhraseQuestion> questions,
-    this.confirmedQuestionCount = 0,
-    this.rejectedQuizOption,
+    Map<int, String> quizSelections = const {},
     this.walletName = '',
     this.copying = false,
     this.submitting = false,
     this.completed = false,
     this.failure,
   }) : words = List<String>.unmodifiable(words),
-       questions = List<RecoveryPhraseQuestion>.unmodifiable(questions) {
+       questions = List<RecoveryPhraseQuestion>.unmodifiable(questions),
+       quizSelections = Map<int, String>.unmodifiable(quizSelections) {
     final validPhrase =
         this.words.length == wordCount &&
         this.words.every((word) => word.isNotEmpty);
@@ -75,31 +75,26 @@ final class CreateWalletState {
               question.expectedWord == this.words[question.wordNumber - 1],
         );
     if ((!completed && (!validPhrase || !validQuestions)) ||
-        (completed && (this.words.isNotEmpty || this.questions.isNotEmpty))) {
+        (completed &&
+            (this.words.isNotEmpty ||
+                this.questions.isNotEmpty ||
+                this.quizSelections.isNotEmpty))) {
       throw ArgumentError(
         'Create state requires a valid phrase and confirmation quiz.',
       );
     }
-    if (confirmedQuestionCount < 0 ||
-        confirmedQuestionCount > this.questions.length) {
+    final questionsByWordNumber = {
+      for (final question in this.questions) question.wordNumber: question,
+    };
+    final validSelections = this.quizSelections.entries.every((entry) {
+      final question = questionsByWordNumber[entry.key];
+      return question != null && question.options.contains(entry.value);
+    });
+    if (!validSelections) {
       throw ArgumentError.value(
-        confirmedQuestionCount,
-        'confirmedQuestionCount',
-      );
-    }
-    final rejectedOptionIsValid =
-        rejectedQuizOption == null ||
-        (confirmedQuestionCount < this.questions.length &&
-            this.questions[confirmedQuestionCount].options.contains(
-              rejectedQuizOption,
-            ) &&
-            rejectedQuizOption !=
-                this.questions[confirmedQuestionCount].expectedWord);
-    if (!rejectedOptionIsValid) {
-      throw ArgumentError.value(
-        rejectedQuizOption,
-        'rejectedQuizOption',
-        'Must be an incorrect option for the current question.',
+        this.quizSelections,
+        'quizSelections',
+        'Selections must identify one of the options for a quiz word.',
       );
     }
     if ((copying && submitting) || (completed && (copying || submitting))) {
@@ -109,29 +104,39 @@ final class CreateWalletState {
 
   static const wordCount = 12;
 
-  /// Fixed one-based positions, verifying one word in every three.
-  static const quizWordNumbers = <int>[3, 6, 9, 12];
+  /// Fixed one-based positions distributed across the recovery phrase.
+  static const quizWordNumbers = <int>[3, 7, 11];
 
   final List<String> words;
   final List<RecoveryPhraseQuestion> questions;
-  final int confirmedQuestionCount;
-  final String? rejectedQuizOption;
+
+  /// Current choice for each prompt, keyed by its one-based word position.
+  final Map<int, String> quizSelections;
   final String walletName;
   final bool copying;
   final bool submitting;
   final bool completed;
   final AppFailure? failure;
 
-  /// Whether the route still owns a phrase that can be copied safely.
+  /// Whether the flow still owns a phrase that can be copied safely.
   bool get canCopy => !copying && !submitting && !completed;
 
   /// Whether retained or uncertain wallet resources require reconciliation.
   bool get requiresReconciliation => failure?.requiresReconciliation ?? false;
 
+  int get confirmedQuestionCount => questions
+      .where(
+        (question) =>
+            quizSelections[question.wordNumber] == question.expectedWord,
+      )
+      .length;
+
   bool get quizComplete => confirmedQuestionCount == questions.length;
 
-  RecoveryPhraseQuestion? get currentQuestion =>
-      quizComplete ? null : questions[confirmedQuestionCount];
+  String? selectedOptionFor(int wordNumber) => quizSelections[wordNumber];
+
+  bool isQuestionConfirmed(RecoveryPhraseQuestion question) =>
+      selectedOptionFor(question.wordNumber) == question.expectedWord;
 
   String get normalizedWalletName => walletName.trim();
 
@@ -149,8 +154,7 @@ final class CreateWalletState {
   String get mnemonic => words.join(' ');
 
   CreateWalletState copyWith({
-    int? confirmedQuestionCount,
-    Object? rejectedQuizOption = _unchanged,
+    Map<int, String>? quizSelections,
     String? walletName,
     bool? copying,
     bool? submitting,
@@ -160,11 +164,7 @@ final class CreateWalletState {
     return CreateWalletState(
       words: words,
       questions: questions,
-      confirmedQuestionCount:
-          confirmedQuestionCount ?? this.confirmedQuestionCount,
-      rejectedQuizOption: identical(rejectedQuizOption, _unchanged)
-          ? this.rejectedQuizOption
-          : rejectedQuizOption as String?,
+      quizSelections: quizSelections ?? this.quizSelections,
       walletName: walletName ?? this.walletName,
       copying: copying ?? this.copying,
       submitting: submitting ?? this.submitting,
@@ -175,7 +175,7 @@ final class CreateWalletState {
     );
   }
 
-  /// Releases every route-owned reference after a confirmed durable commit.
+  /// Releases every flow-owned reference after a confirmed durable commit.
   CreateWalletState cleared() =>
       CreateWalletState(words: const [], questions: const [], completed: true);
 
@@ -184,8 +184,7 @@ final class CreateWalletState {
     return other is CreateWalletState &&
         listEquals(other.words, words) &&
         listEquals(other.questions, questions) &&
-        other.confirmedQuestionCount == confirmedQuestionCount &&
-        other.rejectedQuizOption == rejectedQuizOption &&
+        mapEquals(other.quizSelections, quizSelections) &&
         other.walletName == walletName &&
         other.copying == copying &&
         other.submitting == submitting &&
@@ -197,8 +196,11 @@ final class CreateWalletState {
   int get hashCode => Object.hash(
     Object.hashAll(words),
     Object.hashAll(questions),
-    confirmedQuestionCount,
-    rejectedQuizOption,
+    Object.hashAll(
+      quizWordNumbers.map(
+        (wordNumber) => Object.hash(wordNumber, quizSelections[wordNumber]),
+      ),
+    ),
     walletName,
     copying,
     submitting,

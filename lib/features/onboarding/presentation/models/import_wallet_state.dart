@@ -4,7 +4,7 @@ import '../../../../core/errors/app_failure.dart';
 import '../../../wallet/domain/models/models.dart';
 import '../../domain/models/models.dart';
 
-/// Route-scoped state for importing one 12-word BIP39 wallet.
+/// Flow-scoped state for importing one 12-word BIP39 wallet.
 @immutable
 final class ImportWalletState {
   ImportWalletState({
@@ -13,6 +13,7 @@ final class ImportWalletState {
     this.checksumStatus = MnemonicChecksumStatus.incomplete,
     this.walletName = '',
     this.submitting = false,
+    this.completed = false,
     this.failure,
   }) : words = List<String>.unmodifiable(
          words.isEmpty ? List.filled(wordCount, '') : words,
@@ -37,6 +38,7 @@ final class ImportWalletState {
   final MnemonicChecksumStatus checksumStatus;
   final String walletName;
   final bool submitting;
+  final bool completed;
   final AppFailure? failure;
 
   /// Whether retained or uncertain wallet resources require frozen input.
@@ -51,7 +53,10 @@ final class ImportWalletState {
       allWordsKnown && checksumStatus == MnemonicChecksumStatus.valid;
 
   bool get canContinue =>
-      !submitting && phraseValid && (failure == null || failure!.retryable);
+      !submitting &&
+      !completed &&
+      phraseValid &&
+      (failure == null || failure!.retryable);
 
   String get normalizedWalletName => walletName.trim();
 
@@ -67,6 +72,7 @@ final class ImportWalletState {
     MnemonicChecksumStatus? checksumStatus,
     String? walletName,
     bool? submitting,
+    bool? completed,
     Object? failure = _unchanged,
   }) {
     return ImportWalletState(
@@ -75,14 +81,15 @@ final class ImportWalletState {
       checksumStatus: checksumStatus ?? this.checksumStatus,
       walletName: walletName ?? this.walletName,
       submitting: submitting ?? this.submitting,
+      completed: completed ?? this.completed,
       failure: identical(failure, _unchanged)
           ? this.failure
           : failure as AppFailure?,
     );
   }
 
-  /// Releases route-owned phrase references after a confirmed durable commit.
-  ImportWalletState cleared() => ImportWalletState(submitting: false);
+  /// Releases flow-owned phrase references after a confirmed durable commit.
+  ImportWalletState cleared() => ImportWalletState(completed: true);
 
   @override
   bool operator ==(Object other) {
@@ -92,6 +99,7 @@ final class ImportWalletState {
         other.checksumStatus == checksumStatus &&
         other.walletName == walletName &&
         other.submitting == submitting &&
+        other.completed == completed &&
         other.failure == failure;
   }
 
@@ -102,6 +110,7 @@ final class ImportWalletState {
     checksumStatus,
     walletName,
     submitting,
+    completed,
     failure,
   );
 }

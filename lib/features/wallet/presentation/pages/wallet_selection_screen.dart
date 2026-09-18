@@ -96,26 +96,12 @@ class WalletSelectionScreen extends ConsumerWidget {
     BuildContext context,
     AsterNavigationCommandOwner navigation,
   ) {
-    unawaited(_openAddWalletAndCloseSelector(context, navigation));
-  }
-
-  Future<void> _openAddWalletAndCloseSelector(
-    BuildContext context,
-    AsterNavigationCommandOwner navigation,
-  ) async {
-    final outcome = await navigation
-        .openRouteForResult<WalletCreationRouteResult>(
-          command: () => context.pushNamed<WalletCreationRouteResult>(
-            RouteNames.addWallet,
-          ),
-          failureTitle: 'Wallet setup could not open',
-        );
-    if (!outcome.accepted ||
-        outcome.value != WalletCreationRouteResult.created ||
-        !context.mounted) {
-      return;
-    }
-    context.pop();
+    unawaited(
+      navigation.openRoute(
+        command: () => context.pushNamed<void>(RouteNames.addWallet),
+        failureTitle: 'Wallet setup could not open',
+      ),
+    );
   }
 
   Future<void> _switchWallet(
@@ -125,11 +111,22 @@ class WalletSelectionScreen extends ConsumerWidget {
     String walletId,
   ) async {
     final viewModel = ref.read(walletViewModelProvider.notifier);
+    final confirmationDelay = context.motionPolicy.duration(
+      context.motion.selectionCommitDelay,
+    );
     var switched = false;
     final accepted = await navigation.run(
       command: () async {
         switched = await viewModel.switchWallet(walletId);
-        if (!context.mounted || switched) return;
+        if (!context.mounted) return;
+        if (switched) {
+          unawaited(context.haptics.trigger(HapticIntent.selection));
+          await WidgetsBinding.instance.endOfFrame;
+          if (confirmationDelay > Duration.zero) {
+            await Future<void>.delayed(confirmationDelay);
+          }
+          return;
+        }
         final failure = ref
             .read(walletViewModelProvider)
             .value
@@ -148,7 +145,6 @@ class WalletSelectionScreen extends ConsumerWidget {
       blocksRoutePop: true,
     );
     if (!accepted || !switched || !context.mounted) return;
-    unawaited(context.haptics.trigger(HapticIntent.selection));
     context.pop();
   }
 }
@@ -215,6 +211,7 @@ class _WalletSelectionScaffold extends StatelessWidget {
             tooltip: 'Add wallet',
             onPressed: onAddWallet,
             hapticIntent: null,
+            alignment: Alignment.centerLeft,
           ),
         ),
         body: child,

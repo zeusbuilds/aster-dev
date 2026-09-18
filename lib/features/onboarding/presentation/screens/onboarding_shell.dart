@@ -7,16 +7,16 @@ import 'package:flutter/rendering.dart';
 import '../../../../shared/shared.dart';
 import '../widgets/widgets.dart';
 
-/// Retains the welcome artwork beneath the onboarding navigator.
+/// Retains the welcome artwork beneath the single-route onboarding flow.
 ///
 /// The mesh owns fragment shaders and a full-screen filtered layer. Housing it
-/// above the onboarding navigator prevents route transitions from composing
-/// two copies during transitions. Subsequent routes own opaque white Scaffolds;
-/// only Welcome exposes this background, including when popping back to it.
+/// above the flow prevents step transitions from rebuilding the expensive
+/// composition. Every first-run step keeps a transparent surface so only its
+/// foreground content crossfades above the same retained snapshot.
 class OnboardingShell extends StatefulWidget {
   const OnboardingShell({super.key, required this.child});
 
-  /// Active onboarding route; only Welcome has a transparent surface.
+  /// Active onboarding flow presented above the retained artwork.
   final Widget child;
 
   @override

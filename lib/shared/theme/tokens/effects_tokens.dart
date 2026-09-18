@@ -10,9 +10,9 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
     this.brandGlassBorderOpacity = 0.1,
     this.onboardingIconTileStrongOpacity = 0.3,
     this.onboardingIconTileFaintOpacity = 0.05,
+    this.onboardingStepIndicatorInactiveOpacity = 0.35,
     this.bitcoinIconOpacity = 0.8,
     this.scanControlSurfaceOpacity = 0.4,
-    this.scanAvatarSurfaceOpacity = 0.25,
     this.scanSecondaryContentOpacity = 0.75,
     this.marketShadowOpacity = 0.16,
     this.marketPillSurfaceOpacity = 0.15,
@@ -36,9 +36,9 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
 
   final double onboardingIconTileStrongOpacity;
   final double onboardingIconTileFaintOpacity;
+  final double onboardingStepIndicatorInactiveOpacity;
   final double bitcoinIconOpacity;
   final double scanControlSurfaceOpacity;
-  final double scanAvatarSurfaceOpacity;
   final double scanSecondaryContentOpacity;
   final double marketShadowOpacity;
   final double marketPillSurfaceOpacity;
@@ -62,9 +62,9 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
     double? brandGlassBorderOpacity,
     double? onboardingIconTileStrongOpacity,
     double? onboardingIconTileFaintOpacity,
+    double? onboardingStepIndicatorInactiveOpacity,
     double? bitcoinIconOpacity,
     double? scanControlSurfaceOpacity,
-    double? scanAvatarSurfaceOpacity,
     double? scanSecondaryContentOpacity,
     double? marketShadowOpacity,
     double? marketPillSurfaceOpacity,
@@ -93,11 +93,12 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
           this.onboardingIconTileStrongOpacity,
       onboardingIconTileFaintOpacity:
           onboardingIconTileFaintOpacity ?? this.onboardingIconTileFaintOpacity,
+      onboardingStepIndicatorInactiveOpacity:
+          onboardingStepIndicatorInactiveOpacity ??
+          this.onboardingStepIndicatorInactiveOpacity,
       bitcoinIconOpacity: bitcoinIconOpacity ?? this.bitcoinIconOpacity,
       scanControlSurfaceOpacity:
           scanControlSurfaceOpacity ?? this.scanControlSurfaceOpacity,
-      scanAvatarSurfaceOpacity:
-          scanAvatarSurfaceOpacity ?? this.scanAvatarSurfaceOpacity,
       scanSecondaryContentOpacity:
           scanSecondaryContentOpacity ?? this.scanSecondaryContentOpacity,
       marketShadowOpacity: marketShadowOpacity ?? this.marketShadowOpacity,
@@ -155,6 +156,11 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
         other.onboardingIconTileFaintOpacity,
         t,
       ),
+      onboardingStepIndicatorInactiveOpacity: _lerp(
+        onboardingStepIndicatorInactiveOpacity,
+        other.onboardingStepIndicatorInactiveOpacity,
+        t,
+      ),
       bitcoinIconOpacity: _lerp(
         bitcoinIconOpacity,
         other.bitcoinIconOpacity,
@@ -163,11 +169,6 @@ class AsterEffects extends ThemeExtension<AsterEffects> {
       scanControlSurfaceOpacity: _lerp(
         scanControlSurfaceOpacity,
         other.scanControlSurfaceOpacity,
-        t,
-      ),
-      scanAvatarSurfaceOpacity: _lerp(
-        scanAvatarSurfaceOpacity,
-        other.scanAvatarSurfaceOpacity,
         t,
       ),
       scanSecondaryContentOpacity: _lerp(

@@ -4,7 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:smooth_page_indicator/smooth_page_indicator.dart';
+import 'package:ming_cute_icons/ming_cute_icons.dart';
 
 import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
@@ -15,7 +15,22 @@ import '../widgets/widgets.dart';
 
 /// Imports a wallet through 12 per-word fields and SDK checksum validation.
 class OnboardingImportWalletScreen extends ConsumerStatefulWidget {
-  const OnboardingImportWalletScreen({super.key});
+  const OnboardingImportWalletScreen({
+    super.key,
+    this.onBack,
+    this.onContinue,
+    this.onBrandArt = false,
+    this.showNavigationBar = true,
+  });
+
+  final VoidCallback? onBack;
+  final VoidCallback? onContinue;
+
+  /// Whether this step is presented over the retained onboarding artwork.
+  final bool onBrandArt;
+
+  /// Whether this standalone screen owns its visible back navigation.
+  final bool showNavigationBar;
 
   @override
   ConsumerState<OnboardingImportWalletScreen> createState() =>
@@ -24,15 +39,12 @@ class OnboardingImportWalletScreen extends ConsumerStatefulWidget {
 
 class _OnboardingImportWalletScreenState
     extends ConsumerState<OnboardingImportWalletScreen> {
-  late final PageController _pageController;
   late final List<TextEditingController> _controllers;
   late final List<FocusNode> _focusNodes;
-  var _currentPage = 0;
 
   @override
   void initState() {
     super.initState();
-    _pageController = PageController();
     _controllers = List.generate(
       ImportWalletState.wordCount,
       (_) => TextEditingController(),
@@ -65,7 +77,6 @@ class _OnboardingImportWalletScreenState
     for (final focusNode in _focusNodes) {
       focusNode.dispose();
     }
-    _pageController.dispose();
     super.dispose();
   }
 
@@ -84,7 +95,9 @@ class _OnboardingImportWalletScreenState
           return PopScope(
             canPop: !navigationLocked,
             child: Scaffold(
-              backgroundColor: context.colorScheme.surface,
+              backgroundColor: widget.onBrandArt
+                  ? context.appColors.transparentSurface
+                  : context.colorScheme.surface,
               resizeToAvoidBottomInset: true,
               body: SafeArea(
                 child: switch (asyncState) {
@@ -97,7 +110,9 @@ class _OnboardingImportWalletScreenState
                     :final stackTrace,
                   ) =>
                     _buildFailure(navigation, error, stackTrace),
-                  _ => const OnboardingStatusPanel.loading(),
+                  _ => OnboardingStatusPanel.loading(
+                    onBrandArt: widget.onBrandArt,
+                  ),
                 },
               ),
             ),
@@ -120,7 +135,10 @@ class _OnboardingImportWalletScreenState
       onPrimary: failure.retryable
           ? () => ref.invalidate(importWalletViewModelProvider)
           : null,
-      onBack: () => _navigateToWelcome(context, navigation),
+      onBack: widget.showNavigationBar
+          ? widget.onBack ?? () => _navigateToWelcome(context, navigation)
+          : null,
+      onBrandArt: widget.onBrandArt,
     );
   }
 
@@ -131,161 +149,119 @@ class _OnboardingImportWalletScreenState
     final context = this.context;
     final spacing = context.spacing;
     final colors = context.appColors;
-    final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
-    final wordStyle = context.type.assetValue;
-    final scaledLineHeight =
-        MediaQuery.textScalerOf(context).scale(wordStyle.fontSize!) *
-        (wordStyle.height ?? 1);
-    final wordFieldHeight = math.max(
-      context.metrics.minTouchTarget,
-      scaledLineHeight + spacing.lg,
-    );
+    final canNavigateBack =
+        !state.submitting &&
+        !state.requiresReconciliation &&
+        !navigation.inFlight;
+    final canRetryChecksum =
+        state.allWordsKnown &&
+        state.checksumStatus == MnemonicChecksumStatus.incomplete &&
+        state.failure?.retryable == true;
 
     return AsterFormBody(
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          SizedBox(
+            height: context.metrics.appBarHeight,
+            child: widget.showNavigationBar
+                ? Align(
+                    alignment: Alignment.centerLeft,
+                    child: AsterIconButton(
+                      icon: MingCuteIcons.mgc_left_line,
+                      tooltip: 'Back',
+                      onPressed: canNavigateBack
+                          ? widget.onBack ??
+                                () => _navigateToWelcome(context, navigation)
+                          : null,
+                      color: widget.onBrandArt ? colors.onBrandArt : null,
+                      hapticIntent: null,
+                      alignment: Alignment.centerRight,
+                    ),
+                  )
+                : null,
+          ),
           Padding(
             padding: EdgeInsets.fromLTRB(
-              spacing.xxl,
-              keyboardVisible ? spacing.md : spacing.xxl,
-              spacing.xxl,
+              spacing.screenPadding,
+              spacing.lg,
+              spacing.screenPadding,
               0,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (!keyboardVisible) ...[
-                  const OnboardingWelcomeHeader(),
-                  SizedBox(height: spacing.huge),
-                ],
-                Text(
-                  'Import with recovery phrase',
-                  style: context.type.brandHero.copyWith(
-                    color: context.colorScheme.onSurface,
-                  ),
-                ),
-                if (!keyboardVisible) ...[
-                  SizedBox(height: spacing.md),
+            child: OnboardingChoreographyItem(
+              id: 'import-copy-motion',
+              visualIndex: 1,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    'Enter your 12-word recovery phrase in order.',
-                    style: context.type.brandBody.copyWith(
-                      color: colors.textSecondary,
+                    'Import with recovery phrase',
+                    style: context.type.pageTitle.copyWith(
+                      color: widget.onBrandArt ? colors.onBrandArt : null,
                     ),
                   ),
+                  SizedBox(height: spacing.sm),
+                  Text(
+                    'Enter your 12-word recovery phrase in order. '
+                    'Never share it with anyone.',
+                    style: context.type.rowMeta.copyWith(
+                      color: widget.onBrandArt
+                          ? colors.onBrandArt.withValues(
+                              alpha: context.effects.brandContentStrongOpacity,
+                            )
+                          : null,
+                    ),
+                  ),
+                  SizedBox(height: spacing.xxl),
                 ],
-                SizedBox(height: keyboardVisible ? spacing.lg : spacing.xxxl),
-              ],
+              ),
             ),
           ),
-          SizedBox(
-            height:
-                wordFieldHeight * ImportWalletState.wordsPerPage +
-                spacing.md * (ImportWalletState.wordsPerPage - 1),
-            child: PageView.builder(
-              controller: _pageController,
-              physics:
-                  state.submitting ||
-                      state.requiresReconciliation ||
-                      navigation.inFlight
-                  ? const NeverScrollableScrollPhysics()
-                  : const PageScrollPhysics(),
-              itemCount:
-                  ImportWalletState.wordCount ~/ ImportWalletState.wordsPerPage,
-              onPageChanged: (page) => setState(() => _currentPage = page),
-              itemBuilder: (context, pageIndex) {
-                final start = pageIndex * ImportWalletState.wordsPerPage;
-                final end = start + ImportWalletState.wordsPerPage;
-                return Center(
-                  child: OnboardingImportWalletWordPage(
-                    controllers: _controllers.sublist(start, end),
-                    focusNodes: _focusNodes.sublist(start, end),
-                    statuses: state.wordStatuses.sublist(start, end),
-                    startIndex: start,
-                    fieldHeight: wordFieldHeight,
-                    enabled:
-                        !state.submitting &&
-                        !state.requiresReconciliation &&
-                        !navigation.inFlight,
-                    canSubmit: state.canContinue,
-                    onChanged: _handleWordInput,
-                    onSubmitted: (index) =>
-                        unawaited(_handleSubmitted(index, state, navigation)),
-                  ),
-                );
-              },
-            ),
-          ),
-          SizedBox(height: spacing.xxl),
-          Semantics(
-            container: true,
-            label: 'Recovery phrase page',
-            value:
-                '${_currentPage + 1} of '
-                '${ImportWalletState.wordCount ~/ ImportWalletState.wordsPerPage}',
-            child: ExcludeSemantics(
-              child: Center(
-                child: SmoothPageIndicator(
-                  controller: _pageController,
-                  count:
-                      ImportWalletState.wordCount ~/
-                      ImportWalletState.wordsPerPage,
-                  effect: ExpandingDotsEffect(
-                    activeDotColor: context.colorScheme.primary,
-                    dotColor: colors.borderSubtle,
-                    dotHeight: spacing.sm,
-                    dotWidth: spacing.sm,
-                    expansionFactor:
-                        context.art.onboardingIndicatorExpansionFactor,
-                    spacing: spacing.sm,
-                  ),
-                ),
+          OnboardingChoreographyItem(
+            id: 'import-fields-motion',
+            visualIndex: 2,
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: spacing.screenPadding),
+              child: OnboardingEditableRecoveryPhraseGrid(
+                controllers: _controllers,
+                focusNodes: _focusNodes,
+                statuses: state.wordStatuses,
+                enabled:
+                    !state.submitting &&
+                    !state.requiresReconciliation &&
+                    !navigation.inFlight,
+                onBrandArt: widget.onBrandArt,
+                onChanged: _handleWordInput,
+                onSubmitted: (index) =>
+                    unawaited(_handleSubmitted(index, navigation)),
               ),
             ),
           ),
         ],
       ),
       actions: [
-        _PhraseStatus(
-          state: state,
-          onRetry:
-              state.checksumStatus == MnemonicChecksumStatus.incomplete &&
-                  state.failure?.retryable == true &&
-                  !navigation.inFlight
-              ? () => unawaited(
-                  ref
-                      .read(importWalletViewModelProvider.notifier)
-                      .retryChecksum(),
-                )
-              : null,
-        ),
         Padding(
           padding: EdgeInsets.fromLTRB(
-            spacing.xxl,
+            spacing.screenPadding,
             spacing.sm,
-            spacing.xxl,
+            spacing.screenPadding,
             spacing.lg,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              CustomButton(
-                text: 'Continue',
-                variant: ButtonVariant.primary,
-                enabled: state.canContinue && !navigation.inFlight,
-                hapticIntent: null,
-                onTap: () => _openName(navigation),
-              ),
-              OnboardingTextAction(
-                label: 'Back',
-                enabled:
-                    !state.submitting &&
-                    !state.requiresReconciliation &&
-                    !navigation.inFlight,
-                hapticIntent: null,
-                onPressed: () => _navigateToWelcome(context, navigation),
-              ),
-            ],
+          child: OnboardingChoreographyItem(
+            id: 'import-actions-motion',
+            visualIndex: 3,
+            child: CustomButton(
+              text: 'Continue',
+              variant: widget.onBrandArt
+                  ? ButtonVariant.translucent
+                  : ButtonVariant.primary,
+              enabled:
+                  (state.canContinue || canRetryChecksum) &&
+                  !navigation.inFlight,
+              loading: state.checksumStatus == MnemonicChecksumStatus.checking,
+              hapticIntent: null,
+              onTap: () => unawaited(_continueImport(navigation)),
+            ),
           ),
         ),
       ],
@@ -304,69 +280,86 @@ class _OnboardingImportWalletScreenState
       return;
     }
     notifier.updateWords(index, words);
-    unawaited(_focusAfterPaste(index, words.length));
+    _focusAfterPaste(index, words.length);
   }
 
-  Future<void> _focusAfterPaste(int startIndex, int pastedWordCount) async {
+  void _focusAfterPaste(int startIndex, int pastedWordCount) {
     final lastPasted = math.min(
       ImportWalletState.wordCount - 1,
       startIndex + pastedWordCount - 1,
     );
     final next = math.min(ImportWalletState.wordCount - 1, lastPasted + 1);
-    await _showPage(next ~/ ImportWalletState.wordsPerPage);
     if (mounted) _focusNodes[next].requestFocus();
   }
 
   Future<void> _handleSubmitted(
     int index,
-    ImportWalletState state,
     AsterNavigationCommandOwner navigation,
   ) async {
+    final state = ref.read(importWalletViewModelProvider).value;
+    if (state == null) return;
     if (state.submitting ||
         state.requiresReconciliation ||
         navigation.inFlight) {
       return;
     }
     if (index == ImportWalletState.wordCount - 1) {
-      if (state.canContinue) {
-        FocusScope.of(context).unfocus();
-        _openName(navigation);
+      final firstUnreadyWord = state.wordStatuses.indexWhere(
+        (status) => status != MnemonicWordStatus.valid,
+      );
+      if (firstUnreadyWord >= 0) {
+        _focusNodes[firstUnreadyWord].requestFocus();
+        return;
       }
+      await _continueImport(navigation, waitForActiveValidation: true);
       return;
     }
     final next = index + 1;
-    if (next % ImportWalletState.wordsPerPage == 0) {
-      await _showPage(next ~/ ImportWalletState.wordsPerPage);
-    }
     if (mounted) _focusNodes[next].requestFocus();
   }
 
-  Future<void> _showPage(int page) async {
-    if (!_pageController.hasClients || _pageController.page?.round() == page) {
+  Future<void> _continueImport(
+    AsterNavigationCommandOwner navigation, {
+    bool waitForActiveValidation = false,
+  }) async {
+    if (navigation.inFlight) return;
+    var state = ref.read(importWalletViewModelProvider).value;
+    if (state == null || state.requiresReconciliation || state.submitting) {
       return;
     }
-    final duration = context.motionPolicy.duration(
-      context.motion.selectionTransitionDuration,
-    );
-    if (duration == Duration.zero) {
-      _pageController.jumpToPage(page);
-      return;
+    FocusScope.of(context).unfocus();
+
+    final notifier = ref.read(importWalletViewModelProvider.notifier);
+    if (state.checksumStatus == MnemonicChecksumStatus.checking) {
+      if (!waitForActiveValidation) return;
+      await notifier.waitForChecksumValidation();
+      if (!mounted || navigation.inFlight) return;
+      state = ref.read(importWalletViewModelProvider).value;
+      if (state == null || state.requiresReconciliation || state.submitting) {
+        return;
+      }
     }
-    await _pageController.animateToPage(
-      page,
-      duration: duration,
-      curve: context.motion.choreographyCurve,
-    );
+
+    final shouldRetryChecksum =
+        state.allWordsKnown &&
+        state.checksumStatus == MnemonicChecksumStatus.incomplete &&
+        state.failure?.retryable == true;
+    if (shouldRetryChecksum) {
+      await notifier.retryChecksum();
+      if (!mounted || navigation.inFlight) return;
+      state = ref.read(importWalletViewModelProvider).value;
+    }
+    if (state?.canContinue == true) _openName();
   }
 
-  void _openName(AsterNavigationCommandOwner navigation) {
+  void _openName() {
     FocusScope.of(context).unfocus();
-    unawaited(
-      navigation.openRoute(
-        command: () =>
-            context.pushNamed<void>(RouteNames.onboardingImportWalletName),
-        failureTitle: 'Wallet name screen could not open',
-      ),
+    if (widget.onContinue case final onContinue?) {
+      onContinue();
+      return;
+    }
+    throw StateError(
+      'Initial onboarding must provide an in-place wallet-name callback.',
     );
   }
 }
@@ -388,65 +381,5 @@ void _returnToWelcome(BuildContext context) {
     context.pop();
   } else {
     context.go(RoutePaths.onboardingWelcome);
-  }
-}
-
-class _PhraseStatus extends StatelessWidget {
-  const _PhraseStatus({required this.state, this.onRetry});
-
-  final ImportWalletState state;
-  final VoidCallback? onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final (message, color) = switch (state.checksumStatus) {
-      _ when state.failure != null => (
-        state.failure!.userMessage,
-        context.appColors.statusForeground,
-      ),
-      MnemonicChecksumStatus.checking => (
-        'Checking recovery phrase...',
-        context.appColors.textSecondary,
-      ),
-      MnemonicChecksumStatus.valid => (
-        'Recovery phrase is valid',
-        context.colorScheme.onSurface,
-      ),
-      MnemonicChecksumStatus.invalid => (
-        'The phrase checksum does not match',
-        context.appColors.statusForeground,
-      ),
-      _ => (
-        'Never share your recovery phrase',
-        context.appColors.textSecondary,
-      ),
-    };
-    return Semantics(
-      liveRegion:
-          state.checksumStatus != MnemonicChecksumStatus.incomplete ||
-          state.failure != null,
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          context.spacing.xxl,
-          context.spacing.md,
-          context.spacing.xxl,
-          0,
-        ),
-        child: Column(
-          children: [
-            Text(
-              message,
-              style: context.type.brandBody.copyWith(color: color),
-              textAlign: TextAlign.center,
-            ),
-            if (onRetry case final retry?)
-              OnboardingTextAction(
-                label: 'Retry phrase check',
-                onPressed: retry,
-              ),
-          ],
-        ),
-      ),
-    );
   }
 }

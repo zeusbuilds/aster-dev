@@ -93,7 +93,7 @@ void main() {
       await _pumpFrames(tester);
 
       expect(find.byType(WalletSelectionScreen), findsOneWidget);
-      expect(find.text('Settings root'), findsNothing);
+      expect(find.text('Home root'), findsNothing);
       expect(harness.haptics.intents, [HapticIntent.error]);
       expect(harness.toasts.messages, hasLength(1));
       expect(harness.toasts.messages.single.title, 'Wallet not switched');
@@ -112,29 +112,43 @@ void main() {
     },
   );
 
-  testWidgets('wallet switch navigates only after a confirmed commit', (
-    tester,
-  ) async {
-    final viewModel = _ControlledWalletViewModel(_walletState);
-    final harness = await _pumpWalletSelection(tester, viewModel);
+  testWidgets(
+    'wallet switch paints its committed check before one pop returns Home',
+    (tester) async {
+      final viewModel = _ControlledWalletViewModel(_walletState);
+      final harness = await _pumpWalletSelection(tester, viewModel);
 
-    await tester.tap(find.bySemanticsLabel(_backupLabel));
-    await tester.pump();
-    expect(find.byType(WalletSelectionScreen), findsOneWidget);
-    expect(harness.haptics.intents, isEmpty);
+      await tester.tap(find.bySemanticsLabel(_backupLabel));
+      await tester.pump();
+      expect(find.byType(WalletSelectionScreen), findsOneWidget);
+      expect(harness.haptics.intents, isEmpty);
 
-    viewModel.completeSuccess();
-    await _pumpFrames(tester);
-    await harness.routeCompletion;
-    await tester.pump();
+      viewModel.completeSuccess();
+      await tester.pump();
 
-    expect(_location(harness.router), RoutePaths.settings);
-    expect(find.byType(WalletSelectionScreen), findsNothing);
-    expect(find.text('Settings root'), findsOneWidget);
-    expect(viewModel.state.value?.activeWallet, _backupWallet);
-    expect(harness.haptics.intents, [HapticIntent.selection]);
-    expect(harness.toasts.messages, isEmpty);
-  });
+      final committedRow = tester.widget<WalletSelectOptionRow>(
+        find.byKey(ValueKey('wallet-${_backupWallet.id}')),
+      );
+      expect(committedRow.selected, isTrue);
+      expect(find.byType(GridLoader), findsNothing);
+      expect(find.byType(WalletSelectionScreen), findsOneWidget);
+      expect(harness.haptics.intents, [HapticIntent.selection]);
+
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.byType(WalletSelectionScreen), findsOneWidget);
+
+      await _pumpFrames(tester);
+      await harness.routeCompletion;
+      await tester.pump();
+
+      expect(_location(harness.router), RoutePaths.home);
+      expect(find.byType(WalletSelectionScreen), findsNothing);
+      expect(find.text('Home root'), findsOneWidget);
+      expect(viewModel.state.value?.activeWallet, _backupWallet);
+      expect(harness.haptics.intents, [HapticIntent.selection]);
+      expect(harness.toasts.messages, isEmpty);
+    },
+  );
 
   testWidgets('Add wallet action opens the dedicated wallet setup flow', (
     tester,
@@ -196,8 +210,8 @@ void main() {
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
 
-      expect(_location(harness.router), RoutePaths.settings);
-      expect(find.text('Settings root'), findsOneWidget);
+      expect(_location(harness.router), RoutePaths.home);
+      expect(find.text('Home root'), findsOneWidget);
     },
   );
 
@@ -262,7 +276,7 @@ void main() {
   }
 }
 
-const _walletPath = '${RoutePaths.settings}/${RoutePaths.walletSelection}';
+const _walletPath = RoutePaths.walletSelectionLocation;
 
 final _primaryWallet = WalletProfile(
   id: '11111111111111111111111111111111',
@@ -308,24 +322,21 @@ Future<_WalletSelectionHarness> _pumpWalletSelection(
   final haptics = RecordingHapticFeedbackService();
   final toasts = RecordingToastPresentationService();
   final router = GoRouter(
-    initialLocation: RoutePaths.settings,
+    initialLocation: RoutePaths.home,
     routes: [
       GoRoute(
-        path: RoutePaths.settings,
-        builder: (context, state) =>
-            const Scaffold(body: Text('Settings root')),
+        path: RoutePaths.home,
+        builder: (context, state) => const Scaffold(body: Text('Home root')),
+      ),
+      GoRoute(
+        path: RoutePaths.walletSelectionLocation,
+        builder: (context, state) => const WalletSelectionScreen(),
         routes: [
           GoRoute(
-            path: RoutePaths.walletSelection,
-            builder: (context, state) => const WalletSelectionScreen(),
-            routes: [
-              GoRoute(
-                path: RoutePaths.addWallet,
-                name: RouteNames.addWallet,
-                builder: (context, state) =>
-                    const Scaffold(body: Text('Add wallet destination')),
-              ),
-            ],
+            path: RoutePaths.addWallet,
+            name: RouteNames.addWallet,
+            builder: (context, state) =>
+                const Scaffold(body: Text('Add wallet destination')),
           ),
         ],
       ),

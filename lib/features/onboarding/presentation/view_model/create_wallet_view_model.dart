@@ -48,30 +48,32 @@ class CreateWalletViewModel extends _$CreateWalletViewModel {
     };
   }
 
-  /// Confirms only the current fixed-position prompt and advances on success.
-  bool selectQuizOption(String word) {
+  /// Selects one option for a fixed-position recovery prompt.
+  bool selectQuizOption({required int wordNumber, required String word}) {
     final current = state.value;
-    final question = current?.currentQuestion;
+    final question = current?.questions
+        .where((candidate) => candidate.wordNumber == wordNumber)
+        .firstOrNull;
     if (current == null ||
         question == null ||
         current.submitting ||
         current.requiresReconciliation ||
+        current.isQuestionConfirmed(question) ||
+        current.selectedOptionFor(wordNumber) == word ||
         !question.options.contains(word)) {
       return false;
     }
+    state = AsyncData(
+      current.copyWith(
+        quizSelections: {...current.quizSelections, wordNumber: word},
+      ),
+    );
     if (!question.accepts(word)) {
-      state = AsyncData(current.copyWith(rejectedQuizOption: word));
       unawaited(
         ref.read(hapticFeedbackServiceProvider).trigger(HapticIntent.error),
       );
       return false;
     }
-    state = AsyncData(
-      current.copyWith(
-        confirmedQuestionCount: current.confirmedQuestionCount + 1,
-        rejectedQuizOption: null,
-      ),
-    );
     unawaited(
       ref.read(hapticFeedbackServiceProvider).trigger(HapticIntent.selection),
     );
@@ -89,6 +91,19 @@ class CreateWalletViewModel extends _$CreateWalletViewModel {
       return;
     }
     state = AsyncData(current.copyWith(walletName: name, failure: null));
+  }
+
+  /// Abandons the naming-step draft when the user navigates backward.
+  void discardWalletNameDraft() {
+    final current = state.value;
+    if (current == null ||
+        current.submitting ||
+        current.completed ||
+        current.requiresReconciliation ||
+        (current.walletName.isEmpty && current.failure == null)) {
+      return;
+    }
+    state = AsyncData(current.copyWith(walletName: '', failure: null));
   }
 
   /// Copies the phrase under a bounded matching-content clipboard lease.

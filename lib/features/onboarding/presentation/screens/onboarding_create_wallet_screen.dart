@@ -11,14 +11,27 @@ import '../models/models.dart';
 import '../view_model/view_models.dart';
 import '../widgets/widgets.dart';
 
-/// Generates and displays a route-owned 12-word recovery phrase.
+/// Generates and displays a flow-owned 12-word recovery phrase.
 class OnboardingCreateWalletScreen extends ConsumerWidget {
   const OnboardingCreateWalletScreen({
     super.key,
-    this.origin = WalletCreationOrigin.onboarding,
+    this.onBack,
+    this.onContinue,
+    this.onBrandArt = false,
+    this.showNavigationBar = true,
   });
 
-  final WalletCreationOrigin origin;
+  final VoidCallback? onBack;
+  final VoidCallback? onContinue;
+
+  /// Whether this step is presented over the retained onboarding artwork.
+  final bool onBrandArt;
+
+  /// Whether this standalone screen owns its visible back navigation.
+  ///
+  /// The single-route journey disables this and paints one retained top bar
+  /// above every animated step instead.
+  final bool showNavigationBar;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -35,7 +48,9 @@ class OnboardingCreateWalletScreen extends ConsumerWidget {
           return PopScope(
             canPop: !navigationLocked,
             child: Scaffold(
-              backgroundColor: context.colorScheme.surface,
+              backgroundColor: onBrandArt
+                  ? context.appColors.transparentSurface
+                  : context.colorScheme.surface,
               body: SafeArea(
                 child: switch (asyncState) {
                   AsyncData<CreateWalletState>(:final value)
@@ -43,15 +58,19 @@ class OnboardingCreateWalletScreen extends ConsumerWidget {
                     _CreateWalletContent(
                       state: value,
                       navigation: navigation,
-                      origin: origin,
+                      onBack: onBack,
+                      onContinue: onContinue,
+                      onBrandArt: onBrandArt,
+                      showNavigationBar: showNavigationBar,
                     ),
                   AsyncError<CreateWalletState>(
                     :final error,
                     :final stackTrace,
                   ) =>
                     _buildFailure(context, ref, navigation, error, stackTrace),
-                  _ => const OnboardingStatusPanel.loading(
+                  _ => OnboardingStatusPanel.loading(
                     message: 'Generating your recovery phrase...',
+                    onBrandArt: onBrandArt,
                   ),
                 },
               ),
@@ -77,7 +96,10 @@ class OnboardingCreateWalletScreen extends ConsumerWidget {
       onPrimary: failure.retryable
           ? () => ref.invalidate(createWalletViewModelProvider)
           : null,
-      onBack: () => _navigateBack(context, navigation, origin),
+      onBack: showNavigationBar
+          ? onBack ?? () => _navigateBack(context, navigation)
+          : null,
+      onBrandArt: onBrandArt,
     );
   }
 }
@@ -86,12 +108,18 @@ class _CreateWalletContent extends ConsumerStatefulWidget {
   const _CreateWalletContent({
     required this.state,
     required this.navigation,
-    required this.origin,
+    required this.onBack,
+    required this.onContinue,
+    required this.onBrandArt,
+    required this.showNavigationBar,
   });
 
   final CreateWalletState state;
   final AsterNavigationCommandOwner navigation;
-  final WalletCreationOrigin origin;
+  final VoidCallback? onBack;
+  final VoidCallback? onContinue;
+  final bool onBrandArt;
+  final bool showNavigationBar;
 
   @override
   ConsumerState<_CreateWalletContent> createState() =>
@@ -122,6 +150,7 @@ class _CreateWalletContentState extends ConsumerState<_CreateWalletContent>
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
+    final colors = context.appColors;
     final state = widget.state;
     final navigation = widget.navigation;
     final canNavigateBack =
@@ -134,17 +163,23 @@ class _CreateWalletContentState extends ConsumerState<_CreateWalletContent>
         SliverToBoxAdapter(
           child: SizedBox(
             height: context.metrics.appBarHeight,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: AsterIconButton(
-                icon: MingCuteIcons.mgc_left_line,
-                tooltip: 'Back',
-                onPressed: canNavigateBack
-                    ? () => _navigateBack(context, navigation, widget.origin)
-                    : null,
-                hapticIntent: null,
-              ),
-            ),
+            child: widget.showNavigationBar
+                ? Row(
+                    children: [
+                      AsterIconButton(
+                        icon: MingCuteIcons.mgc_left_line,
+                        tooltip: 'Back',
+                        onPressed: canNavigateBack
+                            ? widget.onBack ??
+                                  () => _navigateBack(context, navigation)
+                            : null,
+                        color: widget.onBrandArt ? colors.onBrandArt : null,
+                        hapticIntent: null,
+                        alignment: Alignment.centerRight,
+                      ),
+                    ],
+                  )
+                : null,
           ),
         ),
         SliverPadding(
@@ -158,45 +193,75 @@ class _CreateWalletContentState extends ConsumerState<_CreateWalletContent>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Your 12-word recovery phrase',
-                  style: context.type.pageTitle,
-                ),
-                SizedBox(height: spacing.sm),
-                Text(
-                  'Keep this offline and never share it with anyone.',
-                  style: context.type.rowMeta,
+                OnboardingChoreographyItem(
+                  id: 'create-recovery-copy-motion',
+                  visualIndex: 1,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Your 12-word recovery phrase',
+                        style: context.type.pageTitle.copyWith(
+                          color: widget.onBrandArt ? colors.onBrandArt : null,
+                        ),
+                      ),
+                      SizedBox(height: spacing.sm),
+                      Text(
+                        'Keep this offline and never share it with anyone.',
+                        style: context.type.rowMeta.copyWith(
+                          color: widget.onBrandArt
+                              ? colors.onBrandArt.withValues(
+                                  alpha:
+                                      context.effects.brandContentStrongOpacity,
+                                )
+                              : null,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 SizedBox(height: spacing.xxl),
-                OnboardingImportWalletWordGrid(
-                  words: state.words,
-                  obscured: !_phraseRevealed,
-                ),
-                SizedBox(height: spacing.xs),
-                Center(
-                  child: OnboardingTextAction(
-                    label: 'Copy recovery phrase',
-                    icon: MingCuteIcons.mgc_copy_2_line,
-                    size: OnboardingTextActionSize.compact,
-                    enabled: state.canCopy && !navigation.inFlight,
-                    loading: state.copying,
-                    hapticIntent: null,
-                    onPressed: () => unawaited(_copy(context, ref)),
-                  ),
-                ),
-                if (state.failure case final failure?) ...[
-                  SizedBox(height: spacing.md),
-                  Semantics(
-                    liveRegion: true,
-                    child: Text(
-                      failure.userMessage,
-                      style: context.type.errorMessage.copyWith(
-                        color: context.appColors.statusForeground,
+                OnboardingChoreographyItem(
+                  id: 'create-recovery-phrase-motion',
+                  visualIndex: 2,
+                  child: Column(
+                    children: [
+                      OnboardingRecoveryPhraseGrid(
+                        words: state.words,
+                        obscured: !_phraseRevealed,
+                        onBrandArt: widget.onBrandArt,
                       ),
-                      textAlign: TextAlign.center,
-                    ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: OnboardingTextAction(
+                          label: _phraseRevealed ? 'Hide' : 'Reveal',
+                          icon: _phraseRevealed
+                              ? MingCuteIcons.mgc_eye_close_line
+                              : MingCuteIcons.mgc_eye_2_line,
+                          enabled: !state.submitting && !navigation.inFlight,
+                          onBrandArt: widget.onBrandArt,
+                          size: OnboardingTextActionSize.compact,
+                          onPressed: _togglePhraseVisibility,
+                        ),
+                      ),
+                      if (state.failure case final failure?) ...[
+                        SizedBox(height: spacing.md),
+                        Semantics(
+                          liveRegion: true,
+                          child: Text(
+                            failure.userMessage,
+                            style: context.type.errorMessage.copyWith(
+                              color: widget.onBrandArt
+                                  ? colors.onBrandArt
+                                  : colors.statusForeground,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                ],
+                ),
               ],
             ),
           ),
@@ -210,31 +275,34 @@ class _CreateWalletContentState extends ConsumerState<_CreateWalletContent>
               spacing.screenPadding,
               spacing.lg,
             ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                CustomButton(
-                  text: 'Continue',
-                  variant: ButtonVariant.primary,
-                  enabled:
-                      state.canCopy &&
-                      !state.requiresReconciliation &&
-                      !navigation.inFlight,
-                  hapticIntent: null,
-                  onTap: () => _openQuiz(context),
-                ),
-                SizedBox(height: spacing.md),
-                CustomButton(
-                  text: _phraseRevealed ? 'Hide phrase' : 'Reveal phrase',
-                  prefixIcon: _phraseRevealed
-                      ? MingCuteIcons.mgc_eye_close_line
-                      : MingCuteIcons.mgc_eye_2_line,
-                  variant: ButtonVariant.secondary,
-                  enabled: !state.submitting && !widget.navigation.inFlight,
-                  onTap: _togglePhraseVisibility,
-                ),
-              ],
+            child: OnboardingChoreographyItem(
+              id: 'create-recovery-actions-motion',
+              visualIndex: 3,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  CustomButton(
+                    text: 'Continue',
+                    variant: ButtonVariant.translucent,
+                    enabled:
+                        state.canCopy &&
+                        !state.requiresReconciliation &&
+                        !navigation.inFlight,
+                    hapticIntent: null,
+                    onTap: _openQuiz,
+                  ),
+                  SizedBox(height: spacing.sm),
+                  OnboardingTextAction(
+                    label: 'Copy recovery phrase',
+                    enabled: state.canCopy && !navigation.inFlight,
+                    loading: state.copying,
+                    onBrandArt: widget.onBrandArt,
+                    hapticIntent: null,
+                    onPressed: () => unawaited(_copy(context, ref)),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -263,29 +331,15 @@ class _CreateWalletContentState extends ConsumerState<_CreateWalletContent>
     }
   }
 
-  void _openQuiz(BuildContext context) {
+  void _openQuiz() {
     _concealPhrase();
-    unawaited(_openQuizAndForwardResult(context));
-  }
-
-  Future<void> _openQuizAndForwardResult(BuildContext context) async {
-    final routeName = switch (widget.origin) {
-      WalletCreationOrigin.onboarding => RouteNames.onboardingCreateWalletQuiz,
-      WalletCreationOrigin.walletSelector => RouteNames.addWalletQuiz,
-    };
-    final outcome = await widget.navigation
-        .openRouteForResult<WalletCreationRouteResult>(
-          command: () =>
-              context.pushNamed<WalletCreationRouteResult>(routeName),
-          failureTitle: 'Recovery check could not open',
-        );
-    if (!outcome.accepted ||
-        outcome.value != WalletCreationRouteResult.created ||
-        widget.origin != WalletCreationOrigin.walletSelector ||
-        !context.mounted) {
+    if (widget.onContinue case final onContinue?) {
+      onContinue();
       return;
     }
-    context.pop(WalletCreationRouteResult.created);
+    throw StateError(
+      'Wallet setup must provide an in-place recovery-check callback.',
+    );
   }
 
   void _togglePhraseVisibility() {
@@ -301,23 +355,11 @@ class _CreateWalletContentState extends ConsumerState<_CreateWalletContent>
 void _navigateBack(
   BuildContext context,
   AsterNavigationCommandOwner navigation,
-  WalletCreationOrigin origin,
 ) {
   unawaited(
     navigation.run(
-      command: () => _returnToPrevious(context, origin),
+      command: () => context.pop(),
       failureTitle: 'Previous screen could not open',
     ),
   );
-}
-
-void _returnToPrevious(BuildContext context, WalletCreationOrigin origin) {
-  if (context.canPop()) {
-    context.pop();
-  } else {
-    context.go(switch (origin) {
-      WalletCreationOrigin.onboarding => RoutePaths.onboardingWelcome,
-      WalletCreationOrigin.walletSelector => RoutePaths.walletSelectionLocation,
-    });
-  }
 }

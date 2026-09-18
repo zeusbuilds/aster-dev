@@ -38,9 +38,12 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
     this.splashLogoWidth = 160,
     this.brandMarkSize = 48,
     this.flagSize = 32,
-    this.walletAvatarSize = 64,
     this.qrLogoSizeFactor = 0.16,
     this.paymentTargetTileMinHeight = 80,
+    this.onboardingStepIndicatorHeight = 4,
+    this.onboardingStepIndicatorActiveWidth = 20,
+    this.onboardingStepIndicatorInactiveWidth = 8,
+    this.onboardingStepIndicatorGap = 4,
   });
 
   final double buttonHeight;
@@ -77,9 +80,14 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
   final double splashLogoWidth;
   final double brandMarkSize;
   final double flagSize;
-  final double walletAvatarSize;
   final double qrLogoSizeFactor;
   final double paymentTargetTileMinHeight;
+
+  /// Compact progress rail shown in the retained onboarding top bar.
+  final double onboardingStepIndicatorHeight;
+  final double onboardingStepIndicatorActiveWidth;
+  final double onboardingStepIndicatorInactiveWidth;
+  final double onboardingStepIndicatorGap;
 
   @override
   AsterComponentMetrics copyWith({
@@ -117,9 +125,12 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
     double? splashLogoWidth,
     double? brandMarkSize,
     double? flagSize,
-    double? walletAvatarSize,
     double? qrLogoSizeFactor,
     double? paymentTargetTileMinHeight,
+    double? onboardingStepIndicatorHeight,
+    double? onboardingStepIndicatorActiveWidth,
+    double? onboardingStepIndicatorInactiveWidth,
+    double? onboardingStepIndicatorGap,
   }) {
     return AsterComponentMetrics(
       buttonHeight: buttonHeight ?? this.buttonHeight,
@@ -162,10 +173,19 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
       splashLogoWidth: splashLogoWidth ?? this.splashLogoWidth,
       brandMarkSize: brandMarkSize ?? this.brandMarkSize,
       flagSize: flagSize ?? this.flagSize,
-      walletAvatarSize: walletAvatarSize ?? this.walletAvatarSize,
       qrLogoSizeFactor: qrLogoSizeFactor ?? this.qrLogoSizeFactor,
       paymentTargetTileMinHeight:
           paymentTargetTileMinHeight ?? this.paymentTargetTileMinHeight,
+      onboardingStepIndicatorHeight:
+          onboardingStepIndicatorHeight ?? this.onboardingStepIndicatorHeight,
+      onboardingStepIndicatorActiveWidth:
+          onboardingStepIndicatorActiveWidth ??
+          this.onboardingStepIndicatorActiveWidth,
+      onboardingStepIndicatorInactiveWidth:
+          onboardingStepIndicatorInactiveWidth ??
+          this.onboardingStepIndicatorInactiveWidth,
+      onboardingStepIndicatorGap:
+          onboardingStepIndicatorGap ?? this.onboardingStepIndicatorGap,
     );
   }
 
@@ -286,11 +306,30 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
       splashLogoWidth: _lerp(splashLogoWidth, other.splashLogoWidth, t),
       brandMarkSize: _lerp(brandMarkSize, other.brandMarkSize, t),
       flagSize: _lerp(flagSize, other.flagSize, t),
-      walletAvatarSize: _lerp(walletAvatarSize, other.walletAvatarSize, t),
       qrLogoSizeFactor: _lerp(qrLogoSizeFactor, other.qrLogoSizeFactor, t),
       paymentTargetTileMinHeight: _lerp(
         paymentTargetTileMinHeight,
         other.paymentTargetTileMinHeight,
+        t,
+      ),
+      onboardingStepIndicatorHeight: _lerp(
+        onboardingStepIndicatorHeight,
+        other.onboardingStepIndicatorHeight,
+        t,
+      ),
+      onboardingStepIndicatorActiveWidth: _lerp(
+        onboardingStepIndicatorActiveWidth,
+        other.onboardingStepIndicatorActiveWidth,
+        t,
+      ),
+      onboardingStepIndicatorInactiveWidth: _lerp(
+        onboardingStepIndicatorInactiveWidth,
+        other.onboardingStepIndicatorInactiveWidth,
+        t,
+      ),
+      onboardingStepIndicatorGap: _lerp(
+        onboardingStepIndicatorGap,
+        other.onboardingStepIndicatorGap,
         t,
       ),
     );

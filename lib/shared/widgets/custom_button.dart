@@ -146,6 +146,10 @@ class _CustomButtonState extends State<CustomButton> {
       ButtonVariant.neutral => context.colorScheme.surface,
       _ => context.colorScheme.onSurface,
     };
+    final loadingColor = switch (widget.variant) {
+      ButtonVariant.translucent => context.colorScheme.primary,
+      _ => foregroundColor,
+    };
     final backgroundColor = switch (widget.variant) {
       ButtonVariant.primary => context.colorScheme.primary,
       ButtonVariant.secondary => context.colorScheme.surface,
@@ -301,7 +305,7 @@ class _CustomButtonState extends State<CustomButton> {
                                   child: Center(
                                     child: GridLoader(
                                       colorStyle: GridLoaderColorStyle.custom,
-                                      color: foregroundColor,
+                                      color: loadingColor,
                                     ),
                                   ),
                                 ),

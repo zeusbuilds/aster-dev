@@ -6,7 +6,18 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
   const AsterMotion({
     this.buttonPressDuration = const Duration(milliseconds: 100),
     this.buttonMinimumPressedDuration = const Duration(milliseconds: 100),
-    this.selectionTransitionDuration = const Duration(milliseconds: 150),
+    this.selectionTransitionDuration = const Duration(milliseconds: 200),
+    this.selectionCommitDelay = const Duration(milliseconds: 250),
+    this.contentTransitionDuration = const Duration(milliseconds: 420),
+    this.onboardingStepTransitionDuration = const Duration(milliseconds: 900),
+    this.onboardingStepIndicatorTransitionDuration = const Duration(
+      milliseconds: 500,
+    ),
+    this.contentTransitionIncomingStart = 0.5,
+    this.contentTransitionOutgoingEnd = 0.5,
+    this.contentTransitionVerticalOffset = 12,
+    this.choreographyItemInterval = 0.2,
+    this.choreographyStaggerInterval = 0.1,
     this.navIndicatorDuration = const Duration(milliseconds: 150),
     this.toastTransitionDuration = const Duration(milliseconds: 300),
     this.toastVisibleDuration = const Duration(seconds: 3),
@@ -27,6 +38,8 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
     this.splashLinesGapStart = 0.576,
     this.splashLinesGapEnd = 0.928,
     this.fastEase = Curves.easeInOut,
+    this.selectionCurve = Curves.easeIn,
+    this.selectionReverseCurve = Curves.easeOut,
     this.navIndicatorCurve = Curves.fastOutSlowIn,
     this.toastCurve = Curves.easeOut,
     this.choreographyCurve = Curves.easeOutCubic,
@@ -35,7 +48,22 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
     this.cupertinoPageIncomingCurve = Curves.fastEaseInToSlowEaseOut,
     this.cupertinoPageCoveredCurve = Curves.linearToEaseOut,
     this.cupertinoPageCoveredReverseCurve = Curves.easeInToLinear,
-  });
+  }) : assert(
+         contentTransitionIncomingStart >= 0 &&
+             contentTransitionIncomingStart <= 1,
+       ),
+       assert(
+         contentTransitionOutgoingEnd >= 0 && contentTransitionOutgoingEnd <= 1,
+       ),
+       assert(
+         contentTransitionOutgoingEnd <= contentTransitionIncomingStart,
+         'Fade-through content must finish exiting before it enters.',
+       ),
+       assert(contentTransitionVerticalOffset >= 0),
+       assert(choreographyItemInterval > 0 && choreographyItemInterval <= 1),
+       assert(
+         choreographyStaggerInterval >= 0 && choreographyStaggerInterval <= 1,
+       );
 
   final Duration buttonPressDuration;
 
@@ -43,6 +71,32 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
   /// complete scale-down transition before the button returns to rest.
   final Duration buttonMinimumPressedDuration;
   final Duration selectionTransitionDuration;
+
+  /// Keeps a committed selection visible before its owning route dismisses.
+  final Duration selectionCommitDelay;
+  final Duration contentTransitionDuration;
+
+  /// Deliberate handoff shared by every step in the onboarding journey.
+  final Duration onboardingStepTransitionDuration;
+
+  /// Rail resize kept close to, but slightly ahead of, the page handoff.
+  final Duration onboardingStepIndicatorTransitionDuration;
+
+  /// Normalized point at which incoming content starts to appear.
+  final double contentTransitionIncomingStart;
+
+  /// Normalized point by which outgoing content is fully hidden.
+  final double contentTransitionOutgoingEnd;
+
+  /// Logical pixels traveled by content while entering or leaving.
+  final double contentTransitionVerticalOffset;
+
+  /// Normalized time allocated to one item in a staggered composition.
+  final double choreographyItemInterval;
+
+  /// Normalized delay between adjacent items in a staggered composition.
+  final double choreographyStaggerInterval;
+
   final Duration navIndicatorDuration;
   final Duration toastTransitionDuration;
   final Duration toastVisibleDuration;
@@ -63,6 +117,8 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
   final double splashLinesGapStart;
   final double splashLinesGapEnd;
   final Curve fastEase;
+  final Curve selectionCurve;
+  final Curve selectionReverseCurve;
   final Curve navIndicatorCurve;
   final Curve toastCurve;
   final Curve choreographyCurve;
@@ -77,6 +133,15 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
     Duration? buttonPressDuration,
     Duration? buttonMinimumPressedDuration,
     Duration? selectionTransitionDuration,
+    Duration? selectionCommitDelay,
+    Duration? contentTransitionDuration,
+    Duration? onboardingStepTransitionDuration,
+    Duration? onboardingStepIndicatorTransitionDuration,
+    double? contentTransitionIncomingStart,
+    double? contentTransitionOutgoingEnd,
+    double? contentTransitionVerticalOffset,
+    double? choreographyItemInterval,
+    double? choreographyStaggerInterval,
     Duration? navIndicatorDuration,
     Duration? toastTransitionDuration,
     Duration? toastVisibleDuration,
@@ -97,6 +162,8 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
     double? splashLinesGapStart,
     double? splashLinesGapEnd,
     Curve? fastEase,
+    Curve? selectionCurve,
+    Curve? selectionReverseCurve,
     Curve? navIndicatorCurve,
     Curve? toastCurve,
     Curve? choreographyCurve,
@@ -112,6 +179,26 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
           buttonMinimumPressedDuration ?? this.buttonMinimumPressedDuration,
       selectionTransitionDuration:
           selectionTransitionDuration ?? this.selectionTransitionDuration,
+      selectionCommitDelay: selectionCommitDelay ?? this.selectionCommitDelay,
+      contentTransitionDuration:
+          contentTransitionDuration ?? this.contentTransitionDuration,
+      onboardingStepTransitionDuration:
+          onboardingStepTransitionDuration ??
+          this.onboardingStepTransitionDuration,
+      onboardingStepIndicatorTransitionDuration:
+          onboardingStepIndicatorTransitionDuration ??
+          this.onboardingStepIndicatorTransitionDuration,
+      contentTransitionIncomingStart:
+          contentTransitionIncomingStart ?? this.contentTransitionIncomingStart,
+      contentTransitionOutgoingEnd:
+          contentTransitionOutgoingEnd ?? this.contentTransitionOutgoingEnd,
+      contentTransitionVerticalOffset:
+          contentTransitionVerticalOffset ??
+          this.contentTransitionVerticalOffset,
+      choreographyItemInterval:
+          choreographyItemInterval ?? this.choreographyItemInterval,
+      choreographyStaggerInterval:
+          choreographyStaggerInterval ?? this.choreographyStaggerInterval,
       navIndicatorDuration: navIndicatorDuration ?? this.navIndicatorDuration,
       toastTransitionDuration:
           toastTransitionDuration ?? this.toastTransitionDuration,
@@ -137,6 +224,9 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
       splashLinesGapStart: splashLinesGapStart ?? this.splashLinesGapStart,
       splashLinesGapEnd: splashLinesGapEnd ?? this.splashLinesGapEnd,
       fastEase: fastEase ?? this.fastEase,
+      selectionCurve: selectionCurve ?? this.selectionCurve,
+      selectionReverseCurve:
+          selectionReverseCurve ?? this.selectionReverseCurve,
       navIndicatorCurve: navIndicatorCurve ?? this.navIndicatorCurve,
       toastCurve: toastCurve ?? this.toastCurve,
       choreographyCurve: choreographyCurve ?? this.choreographyCurve,
@@ -170,6 +260,51 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
       selectionTransitionDuration: _lerpDuration(
         selectionTransitionDuration,
         other.selectionTransitionDuration,
+        t,
+      ),
+      selectionCommitDelay: _lerpDuration(
+        selectionCommitDelay,
+        other.selectionCommitDelay,
+        t,
+      ),
+      contentTransitionDuration: _lerpDuration(
+        contentTransitionDuration,
+        other.contentTransitionDuration,
+        t,
+      ),
+      onboardingStepTransitionDuration: _lerpDuration(
+        onboardingStepTransitionDuration,
+        other.onboardingStepTransitionDuration,
+        t,
+      ),
+      onboardingStepIndicatorTransitionDuration: _lerpDuration(
+        onboardingStepIndicatorTransitionDuration,
+        other.onboardingStepIndicatorTransitionDuration,
+        t,
+      ),
+      contentTransitionIncomingStart: _lerp(
+        contentTransitionIncomingStart,
+        other.contentTransitionIncomingStart,
+        t,
+      ),
+      contentTransitionOutgoingEnd: _lerp(
+        contentTransitionOutgoingEnd,
+        other.contentTransitionOutgoingEnd,
+        t,
+      ),
+      contentTransitionVerticalOffset: _lerp(
+        contentTransitionVerticalOffset,
+        other.contentTransitionVerticalOffset,
+        t,
+      ),
+      choreographyItemInterval: _lerp(
+        choreographyItemInterval,
+        other.choreographyItemInterval,
+        t,
+      ),
+      choreographyStaggerInterval: _lerp(
+        choreographyStaggerInterval,
+        other.choreographyStaggerInterval,
         t,
       ),
       navIndicatorDuration: _lerpDuration(
@@ -260,6 +395,10 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
       ),
       splashLinesGapEnd: _lerp(splashLinesGapEnd, other.splashLinesGapEnd, t),
       fastEase: t < 0.5 ? fastEase : other.fastEase,
+      selectionCurve: t < 0.5 ? selectionCurve : other.selectionCurve,
+      selectionReverseCurve: t < 0.5
+          ? selectionReverseCurve
+          : other.selectionReverseCurve,
       navIndicatorCurve: t < 0.5 ? navIndicatorCurve : other.navIndicatorCurve,
       toastCurve: t < 0.5 ? toastCurve : other.toastCurve,
       choreographyCurve: t < 0.5 ? choreographyCurve : other.choreographyCurve,

@@ -4,7 +4,7 @@ import 'dart:ui' as ui;
 import 'package:aster/features/home/presentation/widgets/asset_row.dart';
 import 'package:aster/features/home/presentation/widgets/home_header.dart';
 import 'package:aster/features/market/presentation/widgets/market_tile.dart';
-import 'package:aster/features/onboarding/presentation/widgets/onboarding_import_wallet_word_grid.dart';
+import 'package:aster/features/onboarding/presentation/widgets/onboarding_recovery_phrase_grid.dart';
 import 'package:aster/features/scan/presentation/widgets/scan_enter_address_button.dart';
 import 'package:aster/features/send/presentation/screens/send_address_screen.dart';
 import 'package:aster/features/send/presentation/view_model/view_models.dart';
@@ -232,7 +232,7 @@ void main() {
     'UXA-003 recovery words traverse 1 through 12 without changing columns',
     (tester) async {
       final words = List.generate(12, (i) => 'word${i + 1}');
-      await _mount(tester, OnboardingImportWalletWordGrid(words: words));
+      await _mount(tester, OnboardingRecoveryPhraseGrid(words: words));
       final labels = <String>[];
       void visit(SemanticsNode node) {
         if (RegExp(r'^\d+\. word\d+$').hasMatch(node.label)) {
@@ -245,7 +245,7 @@ void main() {
         }
       }
 
-      visit(tester.getSemantics(find.byType(OnboardingImportWalletWordGrid)));
+      visit(tester.getSemantics(find.byType(OnboardingRecoveryPhraseGrid)));
       expect(labels, List.generate(12, (i) => '${i + 1}. word${i + 1}'));
       expect(
         tester.getTopLeft(find.text('word1')).dy,

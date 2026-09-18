@@ -74,6 +74,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
         onPressed: leadingEnabled && !navigation.inFlight ? goBack : null,
         hapticIntent: null,
         iconSize: icons.sm,
+        alignment: Alignment.centerRight,
       );
     }
 
@@ -92,9 +93,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
       titleSpacing: leadingIcon
           ? context.spacing.xs
           : context.spacing.screenPadding,
-      actions: action != null
-          ? [action!, SizedBox(width: context.spacing.sm)]
-          : null,
+      actions: action != null ? [action!] : null,
     );
   }
 }

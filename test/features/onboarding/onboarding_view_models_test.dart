@@ -106,6 +106,8 @@ void main() {
           .read(importWalletViewModelProvider)
           .value!;
       expect(importState.words, everyElement(isEmpty));
+      expect(importState.completed, isTrue);
+      expect(importState.canContinue, isFalse);
       final walletState = harness.container
           .read(walletViewModelProvider)
           .value!;
@@ -535,6 +537,12 @@ void main() {
             .canSubmit,
         isTrue,
       );
+      notifier.discardWalletNameDraft();
+      final discarded = harness.container
+          .read(importWalletViewModelProvider)
+          .requireValue;
+      expect(discarded.walletName, isEmpty);
+      expect(discarded.canSubmit, isFalse);
       expect(harness.keyGenerator.validatedMnemonics, hasLength(2));
     },
   );
@@ -589,7 +597,13 @@ void main() {
       final incorrect = first.options.firstWhere(
         (option) => option != first.expectedWord,
       );
-      expect(notifier.selectQuizOption(incorrect), isFalse);
+      expect(
+        notifier.selectQuizOption(
+          wordNumber: first.wordNumber,
+          word: incorrect,
+        ),
+        isFalse,
+      );
       expect(
         harness.container
             .read(createWalletViewModelProvider)
@@ -629,6 +643,12 @@ void main() {
             .canSubmit,
         isTrue,
       );
+      notifier.discardWalletNameDraft();
+      final discarded = harness.container
+          .read(createWalletViewModelProvider)
+          .requireValue;
+      expect(discarded.walletName, isEmpty);
+      expect(discarded.canSubmit, isFalse);
     },
   );
 
@@ -871,7 +891,13 @@ void _completeCreateQuiz(
   CreateWalletState state,
 ) {
   for (final question in state.questions) {
-    expect(notifier.selectQuizOption(question.expectedWord), isTrue);
+    expect(
+      notifier.selectQuizOption(
+        wordNumber: question.wordNumber,
+        word: question.expectedWord,
+      ),
+      isTrue,
+    );
   }
 }
 

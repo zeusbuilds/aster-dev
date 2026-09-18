@@ -14,14 +14,14 @@ class OnboardingWelcomeHeader extends StatelessWidget {
     final foreground = onBrandArt
         ? context.appColors.onBrandArt
         : context.colorScheme.onSurface;
-    final icons = context.icons;
+    final art = context.art;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.start,
       children: [
         SvgPicture.asset(
           'assets/brand/aster-mark.svg',
-          width: icons.lg,
+          height: art.onboardingWordmarkMarkHeight,
           colorFilter: ColorFilter.mode(foreground, BlendMode.srcIn),
         ),
         SizedBox(width: context.spacing.sm),

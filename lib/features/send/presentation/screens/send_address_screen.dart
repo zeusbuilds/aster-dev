@@ -178,6 +178,7 @@ class _SendAddressScreenState extends ConsumerState<SendAddressScreen> {
                   icon: MingCuteIcons.mgc_scan_line,
                   tooltip:
                       'Scan ${widget.target.destinationLabel.toLowerCase()}',
+                  alignment: Alignment.centerLeft,
                 ),
               ),
               body: SafeArea(

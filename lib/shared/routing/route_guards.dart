@@ -26,7 +26,6 @@ abstract final class RouteGuards {
   }
 
   static bool _isOnboarding(String location) {
-    return location == RoutePaths.onboardingWelcome ||
-        location.startsWith('/onboarding/');
+    return location == RoutePaths.onboardingWelcome;
   }
 }

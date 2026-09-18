@@ -373,7 +373,13 @@ void main() {
       tester.getSize(find.byType(AsterSelectionIndicator)),
       const Size.square(16),
     );
-    expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(AsterSelectionIndicator),
+        matching: find.byType(CustomPaint),
+      ),
+      findsOneWidget,
+    );
     expect(
       find.descendant(
         of: find.byType(AsterSelectionIndicator),
@@ -381,6 +387,41 @@ void main() {
       ),
       findsWidgets,
     );
+  });
+
+  testWidgets('selection indicator animates and honors reduced motion', (
+    tester,
+  ) async {
+    late StateSetter setState;
+    var selected = false;
+    Widget indicator({bool disableAnimations = false}) => _themedHarness(
+      StatefulBuilder(
+        builder: (context, update) {
+          setState = update;
+          return AsterSelectionIndicator(selected: selected);
+        },
+      ),
+      disableAnimations: disableAnimations,
+    );
+
+    await tester.pumpWidget(indicator());
+    setState(() => selected = true);
+    await tester.pump();
+    expect(tester.hasRunningAnimations, isTrue);
+    await tester.pump(
+      const AsterMotion().selectionTransitionDuration -
+          const Duration(milliseconds: 1),
+    );
+    expect(tester.hasRunningAnimations, isTrue);
+    await tester.pump(const Duration(milliseconds: 2));
+    await tester.pump();
+    expect(tester.hasRunningAnimations, isFalse);
+
+    selected = false;
+    await tester.pumpWidget(indicator(disableAnimations: true));
+    setState(() => selected = true);
+    await tester.pump();
+    expect(tester.hasRunningAnimations, isFalse);
   });
 
   testWidgets('buttons suppress haptics while disabled or loading', (

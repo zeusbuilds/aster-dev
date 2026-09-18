@@ -174,29 +174,7 @@ void registerVisualCatalog({required VisualCapture capture}) {
       );
       FocusManager.instance.primaryFocus?.unfocus();
       await _settle(tester);
-      // Full-phrase paste focuses word twelve. Deliberately return to page one.
-      for (var page = 3; page > 1; page--) {
-        await tester.drag(find.byType(PageView), const Offset(420, 0));
-        await _settle(tester);
-      }
-      expect(
-        tester
-            .getSemantics(find.bySemanticsLabel('Recovery phrase page'))
-            .value,
-        '1 of 3',
-      );
-      await _shot(tester, capture, '01-onboarding/import-valid-page-1');
-      for (var page = 2; page <= 3; page++) {
-        await tester.drag(find.byType(PageView), const Offset(-420, 0));
-        await _settle(tester);
-        expect(
-          tester
-              .getSemantics(find.bySemanticsLabel('Recovery phrase page'))
-              .value,
-          '$page of 3',
-        );
-        await _shot(tester, capture, '01-onboarding/import-valid-page-$page');
-      }
+      await _shot(tester, capture, '01-onboarding/import-valid');
       await _mount(
         tester,
         harness.container,
@@ -855,7 +833,6 @@ class _CatalogCreate extends CreateWalletViewModel {
               validTestMnemonicWords[wordNumber - 1],
               'ability',
               'above',
-              'absent',
             ],
           ),
       ],
