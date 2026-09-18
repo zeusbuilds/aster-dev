@@ -15,8 +15,8 @@ dependencies:
 
   # State Management
   # Keep the Riverpod runtime and generated annotations on one reviewed set.
-  flutter_riverpod: 3.4.2
-  riverpod_annotation: 4.0.6
+  flutter_riverpod: 3.4.3
+  riverpod_annotation: 4.0.7
 
   # Networking
   http: ^1.6.0
@@ -37,7 +37,7 @@ dependencies:
   url_launcher: ^6.3.2
 
   # Routing
-  go_router: ^17.5.0
+  go_router: ^18.0.1
 
   # Utilities
   # Small, pure-Dart codecs used by the app-owned Bitcoin destination parser.
@@ -56,7 +56,7 @@ dependencies:
 
   # Camera & barcode scanning
   image_picker: ^1.2.3
-  mobile_scanner: ^7.4.0
+  mobile_scanner: ^7.4.2
 
   # Core
   circle_flags: ^5.0.1
@@ -65,7 +65,7 @@ dependencies:
   mesh: ^0.5.0
   ming_cute_icons: ^0.0.8
   pretty_qr_code: ^3.6.0
-  skeletonizer: ^2.1.3
+  skeletonizer: ^3.0.0
 
 dev_dependencies:
   flutter_driver:
@@ -75,13 +75,13 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 
   # Code generation and repository policy tooling.
-  analyzer: 13.3.0
-  archive: 4.1.0
-  build_runner: 2.16.0
+  analyzer: 14.4.0
+  archive: 4.3.0
+  build_runner: 2.16.1
   posix: 6.5.2
-  riverpod_generator: 4.0.8
+  riverpod_generator: 4.0.9
   xml: 7.0.1
-  yaml: 3.1.3
+  yaml: 3.1.4
 
   # Testing
   integration_test:
