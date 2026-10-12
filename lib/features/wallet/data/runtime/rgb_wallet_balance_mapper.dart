@@ -103,18 +103,27 @@ final class RgbWalletBalanceMapper {
     CoreAssetBalance balance,
     List<LightningChannel> channels,
   ) {
-    _validateCoreBalance(balance, 'rgb');
-    _values.requireNonNegative(
+    final settled = _values.exactUnits(balance.settled, 'rgb.settled');
+    final future = _values.exactUnits(balance.future, 'rgb.future');
+    final spendable = _values.exactUnits(balance.spendable, 'rgb.spendable');
+    _validateCoreBalance(
+      CoreBalance(settled: settled, future: future, spendable: spendable),
+      'rgb',
+    );
+    final outbound = _values.exactUnits(
       balance.offchainOutbound,
       'rgb.offchainOutbound',
     );
-    _values.requireNonNegative(balance.offchainInbound, 'rgb.offchainInbound');
+    final inbound = _values.exactUnits(
+      balance.offchainInbound,
+      'rgb.offchainInbound',
+    );
     final assetChannels = channels.where(
       (channel) => channel.assetId == asset.id.value,
     );
     final local = _values.sum(
       assetChannels.map(
-        (channel) => _values.requirePresent(
+        (channel) => _values.requireExactUnits(
           channel.assetLocalAmount,
           'channel.assetLocalAmount',
         ),
@@ -123,34 +132,24 @@ final class RgbWalletBalanceMapper {
     );
     return WalletBalance(
       asset: asset,
-      onchainSettled: WalletAmount.onchain(
-        assetId: asset.id,
-        units: balance.settled,
-      ),
-      onchainFuture: WalletAmount.onchain(
-        assetId: asset.id,
-        units: balance.future,
-      ),
+      onchainSettled: WalletAmount.onchain(assetId: asset.id, units: settled),
+      onchainFuture: WalletAmount.onchain(assetId: asset.id, units: future),
       onchainSpendable: WalletAmount.onchain(
         assetId: asset.id,
-        units: balance.spendable,
+        units: spendable,
       ),
       onchainLocked: WalletAmount.onchain(
         assetId: asset.id,
-        units: _values.checkedSubtract(
-          balance.settled,
-          balance.spendable,
-          'rgb.locked',
-        ),
+        units: _values.checkedSubtract(settled, spendable, 'rgb.locked'),
       ),
       lightningOwned: WalletAmount.lightning(assetId: asset.id, units: local),
       lightningSpendable: WalletAmount.lightning(
         assetId: asset.id,
-        units: balance.offchainOutbound,
+        units: outbound,
       ),
       lightningReceivable: WalletAmount.lightning(
         assetId: asset.id,
-        units: balance.offchainInbound,
+        units: inbound,
       ),
     );
   }

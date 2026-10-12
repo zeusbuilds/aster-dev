@@ -35,7 +35,9 @@ final class WalletAmount {
     }
   }
 
-  /// Largest amount that can cross the SDK's signed 64-bit native boundary.
+  /// Largest amount supported by Aster's integer domain and SDK mutations.
+  /// SDK RGB reads can return larger UInt64 BigInts; adapters reject those
+  /// explicitly instead of clamping them into this signed range.
   static const int maxNativeUnits = 0x7fffffffffffffff;
 
   /// Number of Lightning millisatoshis in one Bitcoin satoshi.

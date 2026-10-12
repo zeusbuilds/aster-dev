@@ -143,6 +143,21 @@ final class RgbWalletNativeValueParser {
     return total.toInt();
   }
 
+  /// Narrows exact SDK values to the app's signed native amount domain.
+  /// Never use BigInt.toInt directly: it clamps out-of-range values.
+  int exactUnits(BigInt value, String field) =>
+      _checkedNativeValue(value, field);
+
+  int requireExactUnits(BigInt? value, String field) {
+    if (value == null) {
+      throw NativeProtocolException(
+        'Native monetary value is missing.',
+        field: field,
+      );
+    }
+    return exactUnits(value, field);
+  }
+
   int checkedAdd(int left, int right, String field) =>
       _checkedNativeValue(BigInt.from(left) + BigInt.from(right), field);
 

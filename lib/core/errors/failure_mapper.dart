@@ -208,6 +208,36 @@ abstract final class FailureMapper {
     if (error is LspError) {
       return _fromLsp(error, stackTrace);
     }
+    if (error is LspQuoteMismatchException ||
+        error is LspAddressQuoteVerificationException ||
+        error is LspBridgeQuoteVerificationException) {
+      return _failure(
+        code: 'lsp_quote_verification_failed',
+        kind: AppFailureKind.protocol,
+        message: 'The payment quote could not be verified safely.',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+    if (error is LspInsufficientAssetLiquidityException ||
+        error is LspNoPayableAssetException) {
+      return _failure(
+        code: 'lsp_payment_unavailable',
+        kind: AppFailureKind.validation,
+        message: 'This payment cannot be made with the available assets and liquidity.',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+    if (error is LnurlCallbackException) {
+      return _failure(
+        code: 'lnurl_invoice_rejected',
+        kind: AppFailureKind.validation,
+        message: 'The payment provider could not issue an invoice.',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
     if (error is NetworkError ||
         error is SocketException ||
         error is HttpException) {

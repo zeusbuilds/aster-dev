@@ -65,6 +65,7 @@ final class ActivityDisplayFormatter {
     WalletActivityStatus.pending => 'Pending',
     WalletActivityStatus.waitingCounterparty => 'Waiting for counterparty',
     WalletActivityStatus.waitingSafeHeight => 'Waiting for safe height',
+    WalletActivityStatus.waitingBroadcast => 'Waiting for broadcast',
     WalletActivityStatus.waitingConfirmations => 'Waiting for confirmations',
     WalletActivityStatus.claimable => 'Claimable',
     WalletActivityStatus.claiming => 'Claiming',

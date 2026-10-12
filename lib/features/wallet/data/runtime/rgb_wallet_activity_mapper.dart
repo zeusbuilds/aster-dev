@@ -135,6 +135,7 @@ final class RgbWalletActivityMapper {
       'CoreTransfer.updatedAt',
     );
     final endpoints = transfer.transportEndpoints;
+    final amountUnits = _transferAmount(transfer);
     final transportTypes =
         endpoints
             .map((endpoint) => endpoint.transportType)
@@ -149,10 +150,9 @@ final class RgbWalletActivityMapper {
       rail: PaymentRail.onchain,
       direction: direction,
       status: _transferStatus(transfer.status),
-      amount: WalletAmount.onchain(
-        assetId: asset.id,
-        units: _transferAmount(transfer.assignments),
-      ),
+      amount: amountUnits == null
+          ? null
+          : WalletAmount.onchain(assetId: asset.id, units: amountUnits),
       occurredAt: createdAt ?? updatedAt,
       updatedAt: updatedAt,
       expiresAt: _values.optionalUnixSeconds(
@@ -189,7 +189,12 @@ final class RgbWalletActivityMapper {
     );
     final amountUnits = asset.kind == WalletAssetKind.bitcoin
         ? payment.amtMsat
-        : payment.assetAmount;
+        : payment.assetAmount == null
+        ? null
+        : _values.exactUnits(
+            payment.assetAmount!,
+            'LightningPayment.assetAmount',
+          );
     if (asset.kind == WalletAssetKind.bitcoin && payment.assetAmount != null) {
       throw const NativeProtocolException(
         'Bitcoin Lightning payment unexpectedly contains an RGB amount.',
@@ -274,20 +279,34 @@ final class RgbWalletActivityMapper {
     return value.toInt();
   }
 
-  int _transferAmount(List<Assignment> assignments) {
+  int? _transferAmount(CoreTransfer transfer) {
+    // A receive request is not an allocation. Empty pending/failed receives
+    // stay amount-unknown even when requestedAssignment names an amount.
+    final assignments = transfer.assignments;
+    if (assignments.isEmpty &&
+        (transfer.kind == 'ReceiveBlind' ||
+            transfer.kind == 'ReceiveWitness') &&
+        transfer.status != CoreTransferStatuses.settled) {
+      return null;
+    }
     var total = BigInt.zero;
     var foundAmount = false;
     for (final assignment in assignments) {
       final amount = assignment.amount;
-      if (amount == null) continue;
+      if (assignment.type != 'Fungible' || amount == null) {
+        throw const NativeProtocolException(
+          'Native fungible transfer has an invalid assignment.',
+          field: 'CoreTransfer.assignments',
+        );
+      }
       foundAmount = true;
-      if (amount < 0) {
+      if (amount.isNegative) {
         throw const NativeProtocolException(
           'Native RGB assignment amount must not be negative.',
           field: 'CoreTransfer.assignments.amount',
         );
       }
-      total += BigInt.from(amount);
+      total += amount;
       if (total > BigInt.from(WalletAmount.maxNativeUnits)) {
         throw const NativeProtocolException(
           'Native RGB transfer amount exceeds supported bounds.',
@@ -308,6 +327,7 @@ final class RgbWalletActivityMapper {
     'Initiated' => WalletActivityStatus.pending,
     'WaitingCounterparty' => WalletActivityStatus.waitingCounterparty,
     'WaitingSafeHeight' => WalletActivityStatus.waitingSafeHeight,
+    'WaitingBroadcast' => WalletActivityStatus.waitingBroadcast,
     'WaitingConfirmations' => WalletActivityStatus.waitingConfirmations,
     'Settled' => WalletActivityStatus.succeeded,
     'Failed' => WalletActivityStatus.failed,

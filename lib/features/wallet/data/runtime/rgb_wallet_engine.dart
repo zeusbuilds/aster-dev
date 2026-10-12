@@ -18,6 +18,8 @@ import 'wallet_engine.dart';
 /// Settings presentation. This prevents the SDK adapter from contacting a
 /// fallback endpoint that the app has neither validated nor disclosed.
 abstract final class RgbWalletServiceConfigurationResolver {
+  // The stable SDK exports indexer/proxy defaults, but not its LSP resolver.
+  // Keep this app deployment policy explicit and visible in Network settings.
   static const _utexoSignetLspBaseUrl = 'https://lsp-signet.utexo.com';
 
   static WalletServiceConfiguration resolve(
@@ -470,6 +472,13 @@ final class RgbWalletEngine implements WalletEngine {
   ) async {
     final decoded = await _wallet.decodeRgbInvoice(invoice);
     _requireNativeEnvironment(decoded.network, 'CoreInvoiceData.network');
+    if (decoded.assignment.type != 'Fungible' &&
+        decoded.assignment.type != 'Any') {
+      throw const WalletValidationException(
+        'This wallet only supports fungible USDT payments.',
+        field: 'CoreInvoiceData.assignment.type',
+      );
+    }
     final encodedAssetId = decoded.assetId;
     if (encodedAssetId != null && encodedAssetId != route.asset.id.value) {
       throw const WalletValidationException(
@@ -487,7 +496,10 @@ final class RgbWalletEngine implements WalletEngine {
         ? null
         : _nativeValues.amount(
             route,
-            decoded.assignment.amount!,
+            _nativeValues.exactUnits(
+              decoded.assignment.amount!,
+              'CoreInvoiceData.assignment.amount',
+            ),
             'CoreInvoiceData.assignment.amount',
           );
     return WalletPaymentPreview(
@@ -514,12 +526,12 @@ final class RgbWalletEngine implements WalletEngine {
           await _isRgbAssetImported(assetId)) {
         rethrow;
       }
-      return const CoreAssetBalance(
-        settled: 0,
-        future: 0,
-        spendable: 0,
-        offchainOutbound: 0,
-        offchainInbound: 0,
+      return CoreAssetBalance(
+        settled: BigInt.zero,
+        future: BigInt.zero,
+        spendable: BigInt.zero,
+        offchainOutbound: BigInt.zero,
+        offchainInbound: BigInt.zero,
       );
     }
   }
@@ -566,7 +578,10 @@ final class RgbWalletEngine implements WalletEngine {
       }
       amount = _nativeValues.amount(
         route,
-        decoded.assetAmount!,
+        _nativeValues.exactUnits(
+          decoded.assetAmount!,
+          'DecodedLightningInvoice.assetAmount',
+        ),
         'DecodedLightningInvoice.assetAmount',
       );
     }

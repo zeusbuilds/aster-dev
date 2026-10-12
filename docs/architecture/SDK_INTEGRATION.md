@@ -8,7 +8,7 @@ architecture boundaries.
 
 The checked-in `pubspec.yaml` and `pubspec.lock` resolve the public UTEXO
 protocol SDK repository to immutable commit
-`3dd82e23d80bb4bb6a2d2526c6c6741ac1ea1236`. Do not replace the commit with a
+`734f5ae6fb175bbf2d8500a9b43f29b5363c1e52`. Do not replace the commit with a
 branch, tag, moving reference, or local path in a committed change.
 
 After changing the SDK pin intentionally, run:
@@ -21,6 +21,44 @@ fvm flutter test
 ```
 
 Both iOS and Android builds are required before accepting a new SDK commit.
+
+The pinned revision targets RN `1.0.0-beta.32` (commit
+`821ae4fd10ca3933445ab926cb0af0230b108913`), core `1.0.0-beta.9`, and RLN
+`0.13.0-beta.3`. The app's Flutter 3.47.0 / Dart 3.13.0, iOS 18.5 minimum,
+Android compile SDK 36 and Java 17 already satisfy its requirements. Native
+artifacts follow the SDK's checked-in baseline and checksum-verifying hooks;
+never reuse binaries from a previous Pub checkout by copying them manually.
+
+## Upgrade Contract And Feature Coverage
+
+| App path | Stable SDK contract | Upgrade handling |
+| --- | --- | --- |
+| Create/import | generateKeys, validateBip39Mnemonic, init, unlock | App owns secrets and commit/rollback; no new-store init on persisted data. |
+| Restore/switch/resume/dispose | reinit, shutdown, destroy | One serialized app owner; native deadlines and quarantines remain authoritative. |
+| Home/balances | getBtcBalance, getAssetBalance, getNodeInfo, listChannels | RGB read values are BigInt. Narrow only after non-negative signed-64 range checks; sum exactly, never via double. |
+| Activity/details | listTransactions, listTransfers(assetId), listPayments | WaitingBroadcast has a dedicated app status. An unallocated pending/failed receive has unknown amount, never its requestedAssignment amount. Settled fungible records still require actual positive allocations. |
+| Send/receive | getAddress, decodeRgbInvoice, decodeLnInvoice, onchainReceive, onchainSend, sendBtc, createLightningInvoice, payLightningInvoice | Identity, network, expiry, amount and mutation-outcome checks are retained. RGB decoded amounts use checked BigInt conversion; non-fungible instructions are rejected. |
+| Fees/settings | estimateFeeRate, getNetworkInfo, getNodeInfo | Fees remain sat/vbyte; network metadata and account xpubs stay behind the adapter. |
+| Network policy | getNetworkDefaults | SDK owns indexer/proxy defaults. The LSP resolver is not exported, so the reviewed UTEXO signet LSP URL remains explicit app deployment policy, validated and shown in Settings. |
+| Errors | Typed SDK exceptions | Quote/proof verification failures and LNURL business rejections are not connectivity failures and are not automatically retryable. Raw reasons, response bodies and credentials never cross to UI. |
+
+Aster intentionally supports the configured USDT contract ID on both rails,
+not arbitrary ticker-based or linked-asset substitution. The upgrade does not
+add Lightning Addresses, APay proofs, LSP relay/bridge/channel provisioning,
+linked/canonical asset selection, inflation, PSBTs or native VSS backup UI.
+These require explicit app models, product flows and funded integration proof;
+the presence of methods in the dependency is not evidence they work in Aster.
+Detailed refresh, UTXO existence and linked-IFA metadata are SDK capabilities,
+not newly exposed app APIs. Existing sync uses syncWallet; fee-aware Send Max
+and Swap remain unavailable rather than approximated or simulated.
+
+The SDK reads the full UInt64 RGB range; Aster's supported amounts and sums
+remain `0..9223372036854775807` smallest units. Values outside that domain fail
+closed. This is an app limitation, not a claim that the SDK cannot represent
+them. Bitcoin Lightning values remain millisatoshis; node.localBalanceMsat is
+derived from whole localBalanceSat, not a new source of sub-satoshi precision.
+Unbound no-asset receive requests cannot appear in an asset-specific feed until
+native identifies their asset; they are never guessed to be USDT.
 
 ## Optional Local Override
 
@@ -45,8 +83,9 @@ candidate evidence.
 
 `WalletRuntime` is the only app-owned native runtime. `RgbWalletEngine` is the
 only adapter that holds a `UtexoWallet`; all SDK DTOs are converted to app-owned
-models at that boundary. The only other stable SDK import is the redacted error
-mapper. UI and ViewModels depend on repositories and app models and never call
+models at that boundary, with private balance, activity and scalar-mapping
+collaborators. The only stable SDK import outside that adapter family is the
+redacted error mapper. UI and ViewModels depend on repositories and app models and never call
 the SDK, native bridge, storage, HTTP, or platform plugins directly.
 
 The runtime serializes all native access with provision, open, sync, suspend,
@@ -73,7 +112,7 @@ reconciliation can be required.
 
 Hot reload is supported. A Flutter hot restart replaces the Dart isolate but
 does not detach the iOS or Android plugin from the still-running Flutter
-engine. The pinned SDK retains its process-owned native RLN node, while the new
+engine. The pinned SDK retains its engine-owned native RLN node, while the new
 isolate has no public API with which to adopt or release that orphaned handle.
 Creating another node for the same storage directory therefore fails closed.
 

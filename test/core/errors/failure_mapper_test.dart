@@ -172,7 +172,11 @@ void main() {
 
   test('preserves distinct LSP timeout and rate-limit semantics', () {
     final timeout = FailureMapper.from(
-      const LspLiquidityTimeoutException(minMsat: 1000, elapsedMs: 5000),
+      const LspLiquidityTimeoutException(
+        minMsat: 1000,
+        elapsedMs: 5000,
+        lastOutboundMsat: 0,
+      ),
       StackTrace.current,
     );
     final rateLimit = FailureMapper.from(
@@ -196,6 +200,25 @@ void main() {
     expect(rateLimit.toString(), isNot(contains('/secret/account')));
     expect(rateLimit.cause.toString(), isNot(contains('bearer token')));
     expect(rateLimit.cause.toString(), isNot(contains('/secret/account')));
+  });
+
+  test('does not retry business rejections or unverified LSP quotes', () {
+    const secret = 'untrusted invoice password bearer secret';
+    for (final error in <RgbSdkException>[
+      const LnurlCallbackException(reason: secret),
+      const LspQuoteMismatchException(reason: secret),
+      const LspAddressQuoteVerificationException(reason: secret),
+      const LspBridgeQuoteVerificationException(reason: secret),
+      const LspNoPayableAssetException(address: secret),
+      LspInsufficientAssetLiquidityException(requiredAmount: 1, candidates: []),
+    ]) {
+      final failure = FailureMapper.from(error, StackTrace.current);
+      expect(failure.retryable, isFalse, reason: error.runtimeType.toString());
+      expect(failure.kind, isNot(AppFailureKind.connectivity));
+      expect(failure.userMessage, isNot(contains(secret)));
+      expect(failure.toString(), isNot(contains(secret)));
+      expect(failure.cause.toString(), isNot(contains(secret)));
+    }
   });
 
   test('never recommends retry after an uncancellable native timeout', () {

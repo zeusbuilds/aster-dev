@@ -536,16 +536,16 @@ void main() {
     final wallet = MockUtexoWallet();
     const assetId = 'rgb:usdt-contract';
     when(() => wallet.getAssetBalance(assetId)).thenAnswer(
-      (_) async => const CoreAssetBalance(
-        settled: 1000,
-        future: 1100,
-        spendable: 700,
-        offchainOutbound: 80,
-        offchainInbound: 90,
+      (_) async => CoreAssetBalance(
+        settled: BigInt.from(1000),
+        future: BigInt.from(1100),
+        spendable: BigInt.from(700),
+        offchainOutbound: BigInt.from(80),
+        offchainInbound: BigInt.from(90),
       ),
     );
     when(() => wallet.listChannels()).thenAnswer(
-      (_) async => const [
+      (_) async => [
         LightningChannel(
           channelId: 'rgb',
           peerPubkey: 'peer',
@@ -553,7 +553,7 @@ void main() {
           ready: true,
           isPublic: false,
           assetId: assetId,
-          assetLocalAmount: 120,
+          assetLocalAmount: BigInt.from(120),
         ),
         LightningChannel(
           channelId: 'other',
@@ -562,7 +562,7 @@ void main() {
           ready: true,
           isPublic: false,
           assetId: 'other-contract',
-          assetLocalAmount: 999,
+          assetLocalAmount: BigInt.from(999),
         ),
       ],
     );
@@ -1105,7 +1105,7 @@ void main() {
         recipientId: 'rgb-recipient',
         assetId: assetId,
         network: 'regtest',
-        assignment: const Assignment(type: 'Fungible', amount: 1250000),
+        assignment: Assignment(type: 'Fungible', amount: BigInt.from(1250000)),
         expirationTimestamp: 1786446000,
         transportEndpoints: const <String>[],
       ),
@@ -1247,7 +1247,7 @@ void main() {
           expirySec: 3600,
           timestamp: createdAt.millisecondsSinceEpoch ~/ 1000,
           assetId: assetId,
-          assetAmount: 2500000,
+          assetAmount: BigInt.from(2500000),
           paymentHash: 'rgb-payment-hash',
           paymentSecret: 'not-retained',
           network: 'regtest',
@@ -1456,7 +1456,7 @@ void main() {
         recipientId: 'rgb-recipient',
         assetId: assetId,
         network: 'regtest',
-        assignment: const Assignment(type: 'Fungible', amount: 1),
+        assignment: Assignment(type: 'Fungible', amount: BigInt.one),
         expirationTimestamp: 1786446000,
         transportEndpoints: const <String>[],
       ),
@@ -1582,8 +1582,8 @@ void main() {
             inbound: true,
             createdAt: 2000,
           ),
-          const LightningPayment(
-            assetAmount: 10,
+          LightningPayment(
+            assetAmount: BigInt.from(10),
             assetId: 'other-rgb-asset',
             paymentHash: 'other-payment-hash',
             status: RlnPaymentStatuses.succeeded,
@@ -1625,9 +1625,9 @@ void main() {
           createdAt: 1000,
           updatedAt: 1100,
           status: 'WaitingConfirmations',
-          assignments: const <Assignment>[
-            Assignment(type: 'Fungible', amount: 4),
-            Assignment(type: 'Fungible', amount: 6),
+          assignments: <Assignment>[
+            Assignment(type: 'Fungible', amount: BigInt.from(4)),
+            Assignment(type: 'Fungible', amount: BigInt.from(6)),
           ],
           kind: 'Send',
           txid: 'rgb-anchor-txid',
@@ -1647,8 +1647,8 @@ void main() {
     );
     when(() => wallet.listPayments()).thenAnswer(
       (_) async => <LightningPayment>[
-        const LightningPayment(
-          assetAmount: 25,
+        LightningPayment(
+          assetAmount: BigInt.from(25),
           assetId: 'rgb-usdt',
           paymentHash: 'usdt-payment-hash',
           status: RlnPaymentStatuses.pending,
@@ -1657,8 +1657,8 @@ void main() {
           invoice: 'lnbcrt1rgbinvoice',
           payeePubkey: _nodePublicKey,
         ),
-        const LightningPayment(
-          assetAmount: 99,
+        LightningPayment(
+          assetAmount: BigInt.from(99),
           assetId: 'another-asset',
           paymentHash: 'another-payment-hash',
           status: RlnPaymentStatuses.succeeded,
@@ -1750,6 +1750,305 @@ void main() {
     );
     verifyNever(() => wallet.listPayments());
   });
+
+  group('SDK 734f5ae exact-value and history contract', () {
+    final asset = WalletAsset.rgbUsdt(assetId: 'rgb-usdt', precision: 6);
+    final maximum = BigInt.from(WalletAmount.maxNativeUnits);
+
+    test('resolves the reviewed SDK baseline and new mainnet indexer', () {
+      expect(RgbSdkFlutter.reactNativeParityVersion, '1.0.0-beta.32');
+      expect(RgbSdkFlutter.rlnVersion, '0.13.0-beta.3');
+      final resolved = RgbWalletServiceConfigurationResolver.resolve(
+        const WalletServiceConfiguration(
+          environment: BlockchainEnvironment.mainnet,
+          sdkNetwork: 'mainnet',
+        ),
+      );
+      expect(resolved.indexerUrl, 'https://esplora-mainnet.utexo.com');
+      expect(
+        resolved.rgbTransportProxy,
+        'rpcs://rgb-proxy-mainnet.utexo.com/json-rpc',
+      );
+      expect(resolved.lspBaseUrl, isNull);
+    });
+
+    test(
+      'RGB invoice boundaries preserve maximum and reject unsigned overflow',
+      () async {
+        final wallet = MockUtexoWallet();
+        const configured = WalletServiceConfiguration(
+          environment: BlockchainEnvironment.regtest,
+          sdkNetwork: 'regtest',
+          usdtAsset: RgbAssetConfiguration(
+            contractId: 'rgb-usdt',
+            precision: 6,
+          ),
+        );
+        final engine = RgbWalletEngine(wallet, configured, UtexoUnlockConfig());
+        for (final value in [maximum, maximum + BigInt.one, -BigInt.one]) {
+          when(() => wallet.decodeRgbInvoice('rgb:invoice')).thenAnswer(
+            (_) async => CoreInvoiceData(
+              invoice: 'rgb:invoice',
+              recipientId: 'recipient',
+              assetId: asset.id.value,
+              network: 'regtest',
+              assignment: Assignment(type: 'Fungible', amount: value),
+              transportEndpoints: [],
+            ),
+          );
+          when(() => wallet.decodeLnInvoice('lnbcrt1invoice')).thenAnswer(
+            (_) async => DecodedLightningInvoice(
+              expirySec: 3600,
+              timestamp: 1000,
+              assetId: asset.id.value,
+              assetAmount: value,
+              paymentHash: 'payment-hash',
+              paymentSecret: 'not-retained',
+              network: 'regtest',
+            ),
+          );
+          for (final rail in PaymentRail.values) {
+            final preview = engine.decodeInvoice(
+              PaymentRoute(asset: asset, rail: rail),
+              rail == PaymentRail.onchain ? 'rgb:invoice' : 'lnbcrt1invoice',
+            );
+            if (value == maximum) {
+              expect(
+                (await preview).amount?.units,
+                WalletAmount.maxNativeUnits,
+              );
+            } else {
+              await expectLater(
+                preview,
+                throwsA(isA<NativeProtocolException>()),
+              );
+            }
+          }
+        }
+      },
+    );
+
+    test(
+      'channel RGB amounts are required, bounded and summed without overflow',
+      () async {
+        final wallet = MockUtexoWallet();
+        when(() => wallet.getAssetBalance(asset.id.value)).thenAnswer(
+          (_) async => CoreAssetBalance(
+            settled: BigInt.zero,
+            future: BigInt.zero,
+            spendable: BigInt.zero,
+            offchainOutbound: BigInt.zero,
+            offchainInbound: BigInt.zero,
+          ),
+        );
+        for (final values in <List<BigInt?>>[
+          [null],
+          [-BigInt.one],
+          [maximum + BigInt.one],
+          [maximum, BigInt.one],
+        ]) {
+          when(() => wallet.listChannels()).thenAnswer(
+            (_) async => [
+              for (var index = 0; index < values.length; index++)
+                LightningChannel(
+                  channelId: 'channel-$index',
+                  peerPubkey: _nodePublicKey,
+                  capacitySat: 1000,
+                  ready: true,
+                  isPublic: false,
+                  assetId: asset.id.value,
+                  assetLocalAmount: values[index],
+                ),
+            ],
+          );
+          final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
+          await expectLater(
+            engine.getBalance(asset),
+            throwsA(isA<NativeProtocolException>()),
+          );
+        }
+      },
+    );
+
+    test('preserves RGB units above JavaScript exact-number range', () async {
+      final wallet = MockUtexoWallet();
+      final exact = BigInt.parse('9007199254740993');
+      when(() => wallet.getAssetBalance(asset.id.value)).thenAnswer(
+        (_) async => CoreAssetBalance(
+          settled: exact,
+          future: exact,
+          spendable: exact,
+          offchainOutbound: BigInt.zero,
+          offchainInbound: BigInt.zero,
+        ),
+      );
+      when(() => wallet.listChannels()).thenAnswer((_) async => []);
+      final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
+      final balance = await engine.getBalance(asset);
+      expect(BigInt.from(balance.onchainSettled.units), exact);
+      expect(BigInt.from(balance.onchainSpendable.units), exact);
+    });
+
+    for (final invalid in [
+      -BigInt.one,
+      maximum + BigInt.one,
+      (BigInt.one << 64) - BigInt.one,
+    ]) {
+      test(
+        'rejects out-of-domain RGB balance $invalid without clamping',
+        () async {
+          final wallet = MockUtexoWallet();
+          when(() => wallet.listChannels()).thenAnswer((_) async => []);
+          for (final field in [
+            'settled',
+            'future',
+            'spendable',
+            'outbound',
+            'inbound',
+          ]) {
+            when(() => wallet.getAssetBalance(asset.id.value)).thenAnswer(
+              (_) async => CoreAssetBalance(
+                settled: field == 'settled' ? invalid : BigInt.one,
+                future: field == 'future' ? invalid : BigInt.one,
+                spendable: field == 'spendable' ? invalid : BigInt.one,
+                offchainOutbound: field == 'outbound' ? invalid : BigInt.zero,
+                offchainInbound: field == 'inbound' ? invalid : BigInt.zero,
+              ),
+            );
+            final engine = RgbWalletEngine(
+              wallet,
+              services,
+              UtexoUnlockConfig(),
+            );
+            await expectLater(
+              engine.getBalance(asset),
+              throwsA(isA<NativeProtocolException>()),
+              reason: field,
+            );
+          }
+        },
+      );
+    }
+
+    for (final status in [
+      CoreTransferStatuses.initiated,
+      CoreTransferStatuses.waitingCounterparty,
+      CoreTransferStatuses.waitingSafeHeight,
+      CoreTransferStatuses.waitingBroadcast,
+      CoreTransferStatuses.waitingConfirmations,
+      CoreTransferStatuses.failed,
+    ]) {
+      test(
+        '$status receive does not confuse requested and allocated amount',
+        () async {
+          final wallet = MockUtexoWallet();
+          when(() => wallet.listTransfers(assetId: asset.id.value)).thenAnswer(
+            (_) async => [
+              CoreTransfer(
+                idx: 1,
+                status: status,
+                kind: 'ReceiveBlind',
+                assignments: [],
+                requestedAssignment: Assignment(
+                  type: 'Fungible',
+                  amount: BigInt.from(10),
+                ),
+                transportEndpoints: [],
+              ),
+            ],
+          );
+          when(() => wallet.listPayments()).thenAnswer((_) async => []);
+          final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
+          final activity = (await engine.listActivity(asset)).single;
+          expect(activity.amount, isNull);
+          if (status == CoreTransferStatuses.waitingBroadcast) {
+            expect(activity.status, WalletActivityStatus.waitingBroadcast);
+          }
+        },
+      );
+    }
+
+    test('actual RGB assignments win over the requested amount', () async {
+      final wallet = MockUtexoWallet();
+      when(() => wallet.listTransfers(assetId: asset.id.value)).thenAnswer(
+        (_) async => [
+          CoreTransfer(
+            idx: 1,
+            status: CoreTransferStatuses.settled,
+            kind: 'ReceiveBlind',
+            assignments: [
+              Assignment(type: 'Fungible', amount: BigInt.from(12)),
+            ],
+            requestedAssignment: Assignment(
+              type: 'Fungible',
+              amount: BigInt.from(10),
+            ),
+            transportEndpoints: [],
+          ),
+        ],
+      );
+      when(() => wallet.listPayments()).thenAnswer((_) async => []);
+      final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
+      expect((await engine.listActivity(asset)).single.amount?.units, 12);
+    });
+
+    test(
+      'rejects aggregate RGB overflow and non-fungible allocations',
+      () async {
+        final wallet = MockUtexoWallet();
+        for (final assignments in <List<Assignment>>[
+          [
+            Assignment(type: 'Fungible', amount: maximum),
+            Assignment(type: 'Fungible', amount: BigInt.one),
+          ],
+          [Assignment(type: 'Fungible', amount: -BigInt.one)],
+          [const Assignment(type: 'NonFungible')],
+          [],
+        ]) {
+          when(() => wallet.listTransfers(assetId: asset.id.value)).thenAnswer(
+            (_) async => [
+              CoreTransfer(
+                idx: 1,
+                status: CoreTransferStatuses.settled,
+                kind: 'ReceiveBlind',
+                assignments: assignments,
+                transportEndpoints: [],
+              ),
+            ],
+          );
+          final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
+          await expectLater(
+            engine.listActivity(asset),
+            throwsA(isA<NativeProtocolException>()),
+          );
+        }
+      },
+    );
+
+    test(
+      'rejects out-of-domain Lightning RGB payment before exposing history',
+      () async {
+        final wallet = MockUtexoWallet();
+        when(() => wallet.listTransfers(assetId: asset.id.value))
+            .thenAnswer((_) async => []);
+        when(() => wallet.listPayments()).thenAnswer(
+          (_) async => [
+            LightningPayment(
+              paymentHash: 'payment-hash',
+              status: RlnPaymentStatuses.succeeded,
+              assetId: asset.id.value,
+              assetAmount: maximum + BigInt.one,
+            ),
+          ],
+        );
+        final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
+        await expectLater(
+          engine.listActivity(asset),
+          throwsA(isA<NativeProtocolException>()),
+        );
+      },
+    );
+  });
 }
 
 CoreListAssets _assets([String? assetId]) => CoreListAssets(
@@ -1763,8 +2062,14 @@ CoreListAssets _assets([String? assetId]) => CoreListAssets(
             precision: 6,
             timestamp: 1,
             addedAt: 1,
-            balance: const CoreBalance(settled: 0, future: 0, spendable: 0),
-            issuedSupply: 0,
+            balance: CoreAssetBalance(
+              settled: BigInt.zero,
+              future: BigInt.zero,
+              spendable: BigInt.zero,
+              offchainOutbound: BigInt.zero,
+              offchainInbound: BigInt.zero,
+            ),
+            issuedSupply: BigInt.zero,
           ),
         ],
   cfa: const <CoreAssetCfa>[],

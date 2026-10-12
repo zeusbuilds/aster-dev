@@ -489,6 +489,7 @@ class _StatusBadge extends StatelessWidget {
       WalletActivityStatus.pending ||
       WalletActivityStatus.waitingCounterparty ||
       WalletActivityStatus.waitingSafeHeight ||
+      WalletActivityStatus.waitingBroadcast ||
       WalletActivityStatus.waitingConfirmations ||
       WalletActivityStatus.claimable ||
       WalletActivityStatus.claiming => (

@@ -18,6 +18,7 @@ enum WalletActivityStatus {
   pending,
   waitingCounterparty,
   waitingSafeHeight,
+  waitingBroadcast,
   waitingConfirmations,
   claimable,
   claiming,
