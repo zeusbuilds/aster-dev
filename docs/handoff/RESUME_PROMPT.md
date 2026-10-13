@@ -1,28 +1,32 @@
 # Resume Aster and RGB SDK Work
 
-Use the block below as the first message in a restored or new Codex task. Change
-the workspace root if the new macOS account has a different home directory.
+Use the block below as the first message in a restored or new Codex task.
+Repositories may be cloned anywhere; identify them by Git remote and revision,
+not their old folder names or assumed sibling layout.
 This file is context, not permission to reset wallets, move funds, publish, or
 mutate another task's environment.
 
 ```text
 We are resuming Aster and rgb_sdk_flutter after a system reset.
 
-Read these files before changing code:
-1. docs/handoff/SYSTEM_CONTEXT.md
-2. docs/handoff/RESET_AND_RESTORE.md
-3. docs/handoff/OPEN_ISSUES_SNAPSHOT.md
-4. docs/handoff/WORKSPACE_SNAPSHOT.json
-5. docs/PRODUCTION_REFACTOR_TRACKER.md
-6. ../rgb-sdk-flutter/doc/RELEASE_READINESS_TRACKER.md
-7. ../rgb-sdk-flutter/doc/API_COMPATIBILITY_AND_DIVERGENCE.md
-8. ../rgb-sdk-flutter/doc/WEBRGB_AND_BURNS.md
+First locate/map the repositories by remote, not by an old absolute path:
+- ASTER_ROOT: https://github.com/zeusbuilds/aster-dev.git (private).
+- SDK_ROOT: https://github.com/zeusbuilds/rgb-sdk-flutter.git (private).
+- SDK public mirror: https://github.com/UTEXO-Protocol/flutter-sdk.git.
+The roots may be unrelated directories. Confirm existing roots with
+git rev-parse --show-toplevel and git remote get-url origin; do not rename or
+move checkouts to match this handoff. Ask for the new locations if unknown.
 
-Original workspace root: /Users/hardik/Projects.
-App: aster-dev. SDK: rgb-sdk-flutter.
-App working origin: private github.com/zeusbuilds/aster-dev.
-SDK working origin: private github.com/zeusbuilds/rgb-sdk-flutter.
-SDK public mirror: github.com/UTEXO-Protocol/flutter-sdk.
+Read these repository-relative files before changing code:
+In Aster: docs/handoff/SYSTEM_CONTEXT.md, docs/handoff/RESET_AND_RESTORE.md,
+docs/handoff/OPEN_ISSUES_SNAPSHOT.md, docs/handoff/WORKSPACE_SNAPSHOT.json,
+and docs/PRODUCTION_REFACTOR_TRACKER.md.
+In the SDK: doc/RELEASE_READINESS_TRACKER.md,
+doc/API_COMPATIBILITY_AND_DIVERGENCE.md and doc/WEBRGB_AND_BURNS.md.
+The SDK baseline files are also available under
+https://github.com/UTEXO-Protocol/flutter-sdk/tree/7c44506fdfe1dae6f3a6fe884f849c7ca2ad028b/doc
+Use Git references for source; restore ignored state only from an explicit
+backup mapping. Snapshot checkout keys and old device IDs are historical.
 Use Zeus project-scoped authentication and repository-local commit identity
 zeusbuilds <zeusbuilds113@gmail.com>. Do not change the global GitHub account,
 global Git identity, origin URLs, repository visibility, or existing history.
@@ -34,8 +38,10 @@ Last implementation baseline:
   1ccbd74f26c2572f168e12e3bf9e8533a3c6eb4a.
 - The handoff itself is a later documentation change. Inspect HEAD and remote
   ancestry; do not reset to an older commit just to match these hashes.
-- RN dev comparison: e38329eba11cce16e3bea75b8a4e7becd52c0036 / beta.37.
-- RLN: 0.16.0-beta.3 / 8777d71d7781b408fcce89c9c965ae29e8ad2300.
+- RN comparison: https://github.com/UTEXO-Protocol/rgb-sdk-rn.git,
+  dev at e38329eba11cce16e3bea75b8a4e7becd52c0036 / beta.37.
+- RLN: https://github.com/UTEXO-Protocol/rgb-lightning-node.git,
+  v0.16.0-beta.3 at 8777d71d7781b408fcce89c9c965ae29e8ad2300.
 
 Aster is the product; UTEXO is the protocol integration. Keep Riverpod MVVM,
 one serialized WalletRuntime, stable public SDK APIs, exact integer money,

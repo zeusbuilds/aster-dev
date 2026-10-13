@@ -79,6 +79,13 @@ native identifies their asset; they are never guessed to be USDT.
 When developing the SDK and app together, create an ignored
 `pubspec_overrides.yaml` in the repository root:
 
+The example below assumes sibling clones only for illustration. Replace `path`
+with your SDK checkout's actual absolute path or a path relative to Aster;
+neither the old machine's directory layout nor sibling clones are required.
+Pub YAML does not expand shell variables such as `$SDK_ROOT`. Normal installs
+continue to use the immutable public Git dependency above, with no local SDK
+checkout required.
+
 ```yaml
 dependency_overrides:
   rgb_sdk_flutter:

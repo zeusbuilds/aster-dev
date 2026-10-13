@@ -3,6 +3,40 @@
 Checkpoint: 13 October 2026. Read [System Context](SYSTEM_CONTEXT.md) for the
 engineering state and [Resume Prompt](RESUME_PROMPT.md) to restart work.
 
+## Location-Independent References
+
+Use the [Git repository map](SYSTEM_CONTEXT.md#repository-authority-and-version-pins)
+to identify source. `owner/repo @ commit : file` always means a file relative
+to that repository, regardless of where it is cloned. Neither the old macOS
+username nor a `Projects` folder is required, and the app and SDK need not be
+siblings. Relative Markdown links within this pack remain portable.
+
+Before running any command, set roots for **your chosen locations**. These are
+examples only; edit each independently, and do not overwrite an existing tree:
+
+```sh
+export ASTER_ROOT="$HOME/Developer/aster"
+export SDK_ROOT="$HOME/Developer/flutter-sdk"
+export RN_ROOT="$HOME/References/rgb-sdk-rn"
+export RLN_ROOT="$HOME/References/rgb-lightning-node"
+export ZEUS_GH_CONFIG="$HOME/.config/aster-zeus-gh"
+```
+
+`ASTER_ROOT` maps to `zeusbuilds/aster-dev`; `SDK_ROOT` maps to
+`zeusbuilds/rgb-sdk-flutter`, not its public mirror. `RN_ROOT` and `RLN_ROOT`
+are optional, separate reference clones. `ZEUS_GH_CONFIG` is a private,
+project-specific credential directory, not the global GitHub CLI profile.
+Set `BRIDGE_RETEST_ROOT`, `EVIDENCE_ROOT`, `SOURCE_ROOT` and `BACKUP_ROOT`
+separately when restoring private state or making a backup; Git cannot supply
+their contents. Never treat a missing variable as a default source directory.
+
+The snapshot's `snapshotCheckoutKey` and `snapshotCommonGitDirectory` are
+relative labels inside the **old backup collection**. They help pair dirty
+overlays/worktrees with `origin` and `head`; they are not paths to recreate.
+File paths in `workingTreeStatus` are relative to their own checkout. A local
+commit may require a Git bundle or preserved object database if no remote ref
+contains it. A recorded Git URL is not proof that every captured ref was pushed.
+
 ## Do Not Erase the Machine Yet
 
 This handoff preserves knowledge, **not the underlying databases or secrets**.
@@ -37,20 +71,22 @@ Neither is a replacement for an encrypted filesystem backup.
 
 ## Backup Inventory
 
-Original home is `/Users/hardik`. Use `$HOME` after restoration; do not rename
-Git authors to match a macOS account name. Check existence before copying.
+The following workspace names are **historical backup labels**, resolved via
+the snapshot's Git origins and the selected roots above. They do not prescribe
+the new directory layout. OS paths using `$HOME` refer to the account on the
+machine being backed up/restored; do not rename Git authors to match that account.
 
 | Path | Preserve or rebuild | Notes |
 | --- | --- | --- |
-| `~/Projects/aster-dev` including `.git` and `.local` | Preserve | App source, local Aster stack, local defines, reports and ignored state |
-| `~/Projects/rgb-sdk-flutter` including `.git` and `tool/regtest/data` | Preserve | SDK source, auth profile metadata, local SDK chain state and reports |
-| `~/Projects/utexo-app` including `.devstack` | Preserve | Dirty Iris source and the newer ignored bridge retest, not just node_modules |
-| `~/Projects/utexo-trial` and `~/Projects/pr-series` | Preserve with their Git parent repos | WDK/IRIS/upstream linked worktrees can point outside their own folder |
-| `~/Projects/rgb-lightning-node-bare`, `rgb-lightning-node-nodejs` | Preserve | Long-lived binding worktrees; newer artifacts may live elsewhere |
-| `~/Projects/utexo-lightweight` entire workspace | Preserve | Native SDK edits, non-Git signer/root docs, local gateway fixtures |
-| `~/Projects/rln-lightning` | Preserve | Upstream mainnet work, local investigations, evidence and repro state |
-| `~/Projects/rgb-lightning-node-perf-lab`, `rgb-ops-perf-lab`, `rgb-protocol-perf-lab` | Owner-coordinated preservation | Protected separate task; do not stop or reset it from Aster |
-| `~/Projects/wdk-rgb-demo` | Preserve if still needed | Older demo, not authoritative current release checkout |
+| Aster checkout: `.git`, `.local`, ignored local config | Preserve | Locate by `zeusbuilds/aster-dev`; committed code is recoverable from Git, local state is not |
+| Flutter SDK checkout: `.git`, `tool/regtest/data`, reports | Preserve | Locate by `zeusbuilds/rgb-sdk-flutter`; retain local-only refs/auth/state separately |
+| Iris backup label `utexo-app`, including `.devstack` | Preserve | Locate source by `UTEXO-Protocol/iriswallet-mobile`; dirty work and ignored retest require backup |
+| Collections `utexo-trial` and `pr-series` | Preserve with their Git parent repos | Match each snapshot origin/commit; linked worktrees can point outside their folder |
+| Node/Bare binding checkouts | Preserve | Locate by `UTEXO-Protocol/rgb-lightning-node-nodejs` and `rgb-lightning-node-bare`; retain distinct retest revisions |
+| Collection `utexo-lightweight` | Preserve | Git supplies Swift/Kotlin SDK baselines only; root notes and shared signer need backup |
+| Collection `rln-lightning` | Preserve | Multiple upstream/fork origins in snapshot; retain local investigations/evidence |
+| Protected performance collections named `rgb-lightning-node-perf-lab`, `rgb-ops-perf-lab`, `rgb-protocol-perf-lab` | Owner-coordinated preservation | Match snapshot origins/commits; do not stop or reset them from Aster |
+| Demo collection `wdk-rgb-demo` | Preserve if still needed | Source `UTEXO-Protocol/utexo-rgb-wdk-demo`; not current release authority |
 | `~/.codex` or custom `$CODEX_HOME` | Preserve encrypted after quitting all Codex clients | Sessions, multiple rollout segments, attachments, DBs, rules, skills, config and secrets |
 | `~/Library/Application Support/Codex` | Preserve encrypted after app exits | Observed app state; not a supported portable export guarantee |
 | `~/Library/Application Support/com.openai.codex` and `~/Library/Preferences/com.openai.codex.plist` | Preserve encrypted | Both paths exist on this machine |
@@ -59,7 +95,7 @@ Git authors to match a macOS account name. Check existence before copying.
 | OS Keychain, signing keys/profiles, password manager and MFA recovery | Approved secure recovery process | File copies and ordinary app backup do not guarantee this-device-only material transfers |
 | Docker bind mounts and named volumes | Coordinated consistent backup/export | Source folders do not contain Docker Desktop-managed named volumes |
 | Desktop visual references and verified output | Preserve selected folders | Only `Aster-iOS-Screenshots-2026-08-25-iPhone-Air` was observed now; old September gallery paths may be gone |
-| `/private/tmp/aster-rgb-upstream-20261013` and upgrade logs | Preserve selected evidence privately | Temporary source/artifacts/logs are not durable; sanitize before publishing |
+| Temporary comparison checkout collection `aster-rgb-upstream-20261013` and logs prefixed `aster-rgb-upgrade-` | Preserve selected evidence privately | Re-clone source from the recorded RN/RLN commits; logs/artifacts require backup or rerun, not Git |
 
 The workspace snapshot identifies additional Git repositories nested inside the
 above folders. Its clean/dirty status is dated; inspect again immediately before
@@ -92,12 +128,14 @@ Illustrative copy commands, **run only after the quiescence and encryption
 steps**, with a real mounted backup destination:
 
 ```sh
-export BACKUP_ROOT="/Volumes/YOUR_ENCRYPTED_DISK/Aster-reset-2026-10-13"
+: "${SOURCE_ROOT:?Set the existing collection root you intend to back up}"
+: "${BACKUP_ROOT:?Set a new directory on a mounted encrypted backup destination}"
 mkdir -p "$BACKUP_ROOT"
 
-# Full Projects is the simplest way to retain linked worktrees and sibling
-# non-Git files when capacity allows. It also includes unrelated/private data.
-ditto "$HOME/Projects" "$BACKUP_ROOT/Projects"
+# Copy the chosen collection, not an assumed home-directory layout. Capture
+# every separate root and linked-worktree common directory in your inventory.
+# BACKUP_ROOT must be outside SOURCE_ROOT; this includes private data.
+ditto "$SOURCE_ROOT" "$BACKUP_ROOT/SourceCollection"
 
 # Run these after quitting Codex, not from an active Codex task.
 ditto "${CODEX_HOME:-$HOME/.codex}" "$BACKUP_ROOT/CodexHome"
@@ -106,6 +144,8 @@ ditto "$HOME/Library/Application Support/com.openai.codex" "$BACKUP_ROOT/CodexBu
 ditto "$HOME/Library/Preferences/com.openai.codex.plist" "$BACKUP_ROOT/com.openai.codex.plist"
 ```
 
+For multiple source collections, use a distinct destination child for each;
+do not merge unrelated roots into the same `SourceCollection` directory.
 These examples do not export Docker volumes, OS Keychain or simulator state.
 Use the approved system/owner-specific backup for those. Do not prune caches
 until you have distinguished rebuildable outputs from ignored sources/state.
@@ -137,12 +177,12 @@ official troubleshooting guide warns that shared logs need secret review.
 
 Observed task identities:
 
-| Exact task title | ID | Working directory |
+| Exact task title | ID | Map to restored repository/collection |
 | --- | --- | --- |
-| Package & App | `019e4624-fd92-7a41-b98b-3790c02da3e1` | `Projects/aster-dev` |
-| Dev | `019efd58-9c10-72d3-9b79-f29b33871537` | `Projects/utexo-app` |
-| Lightweight SDKs | `01a09f2a-0322-7ea3-94e5-a6a64121613b` | `Projects/utexo-lightweight` |
-| Restrict mainnet Lightning APIs | `01a0ccd1-be4a-7ad1-938e-cefcdb239158` | `Projects/rln-lightning` |
+| Package & App | `019e4624-fd92-7a41-b98b-3790c02da3e1` | `zeusbuilds/aster-dev` at `ASTER_ROOT` |
+| Dev | `019efd58-9c10-72d3-9b79-f29b33871537` | Iris source and its separate retest backup, mapped by Git identity |
+| Lightweight SDKs | `01a09f2a-0322-7ea3-94e5-a6a64121613b` | Swift/Kotlin SDK origins plus backup-only workspace notes/signer |
+| Restrict mainnet Lightning APIs | `01a0ccd1-be4a-7ad1-938e-cefcdb239158` | RLN fork/worktrees at the recorded origins/commits plus private notes |
 
 Several tasks have multiple dated rollout segments. Back up the complete
 Codex home rather than naming just one transcript. The current app also has
@@ -153,18 +193,23 @@ Do not hand-edit the databases to relocate a task.
 After reinstalling, sign into the same account. With all Codex clients closed,
 restore the quiescent backup using the platform backup mechanism or cautiously
 restore its directories to an empty target, keeping a copy of the new install's
-state first. Absolute project paths should match where practical; otherwise
-re-add projects at the new paths and use the handoff in a new task.
+state first. Re-add projects at their new locations. Do not recreate the old
+username/path or add symlinks merely to satisfy saved task metadata. Review
+restored project-trust, local environment, MCP and automation path settings
+before enabling them; they may still reference old paths. Do not edit session
+databases by hand.
 
 Try opening **Package & App** in the desktop app. The CLI also supports resuming
 saved sessions; inspect `codex resume --help` on the installed version and use:
 
 ```sh
-cd "$HOME/Projects/aster-dev"
-codex resume 019e4624-fd92-7a41-b98b-3790c02da3e1
+: "${ASTER_ROOT:?Set the new Aster checkout location}"
+codex resume --cd "$ASTER_ROOT" 019e4624-fd92-7a41-b98b-3790c02da3e1
 ```
 
-[Official resume command reference](https://learn.chatgpt.com/docs/developer-commands?surface=cli).
+[Official resume and working-directory reference](https://learn.chatgpt.com/docs/cli/reference).
+An explicit `--cd` selects the new working directory for the CLI; it does not
+rewrite paths in old transcript messages or guarantee desktop task migration.
 The exact desktop task's automatic restoration across OS resets/version/path
 changes has **not** been tested here. Do not promise cloud sync will reconstruct
 everything. The reliable engineering fallback is a new task opened on the
@@ -178,41 +223,85 @@ Project commits use `zeusbuilds <zeusbuilds113@gmail.com>`. The system-wide
 Git/GitHub user must stay unchanged. Git author metadata and push authentication
 are separate settings; verify both.
 
-The old project-scoped GH configuration lives in
-`Projects/rgb-sdk-flutter/.git/gh-zeus`. A fresh clone will not recreate it.
-Reauthenticate rather than printing or embedding its credential contents:
+The historical project-scoped GH configuration was inside the SDK checkout's
+`.git/gh-zeus`, not Git-tracked. A fresh clone cannot recreate it. Use the
+independent `ZEUS_GH_CONFIG` chosen above, which also works before cloning.
+Reauthenticate rather than printing or embedding credentials:
 
 ```sh
-export PROJECTS="$HOME/Projects"
-export ZEUS_GH_CONFIG="$PROJECTS/rgb-sdk-flutter/.git/gh-zeus"
+: "${ZEUS_GH_CONFIG:?Set a project-specific private GH config directory}"
 GH_CONFIG_DIR="$ZEUS_GH_CONFIG" gh auth login --hostname github.com --git-protocol https --web
 GH_CONFIG_DIR="$ZEUS_GH_CONFIG" gh api user --jq .login
-
-git -C "$PROJECTS/aster-dev" config --local user.name zeusbuilds
-git -C "$PROJECTS/aster-dev" config --local user.email zeusbuilds113@gmail.com
-git -C "$PROJECTS/rgb-sdk-flutter" config --local user.name zeusbuilds
-git -C "$PROJECTS/rgb-sdk-flutter" config --local user.email zeusbuilds113@gmail.com
 ```
 
-If both private clones are absent, authenticate first in a dedicated temporary
-**private** `GH_CONFIG_DIR` outside Git, clone the two private repos, then choose
-one permanent project-scoped auth directory and use it consistently. Do not
-switch the global account as a shortcut. Check `gh api user` says `zeusbuilds`
-before any push. Organization SSO/repository permissions may need renewal.
+Check the reported login is `zeusbuilds`. Do not switch the global account as
+a shortcut. Organization SSO/repository permissions may need renewal.
+For **absent** checkouts only, clone with the same scoped credential helper:
+
+```sh
+: "${ASTER_ROOT:?Set the intended Aster clone destination}"
+: "${SDK_ROOT:?Set the intended SDK clone destination}"
+: "${ZEUS_GH_CONFIG:?Set the authenticated project-specific GH directory}"
+GH_CONFIG_DIR="$ZEUS_GH_CONFIG" GIT_TERMINAL_PROMPT=0 \
+  git -c credential.helper= -c 'credential.helper=!gh auth git-credential' \
+  clone https://github.com/zeusbuilds/aster-dev.git "$ASTER_ROOT"
+GH_CONFIG_DIR="$ZEUS_GH_CONFIG" GIT_TERMINAL_PROMPT=0 \
+  git -c credential.helper= -c 'credential.helper=!gh auth git-credential' \
+  clone https://github.com/zeusbuilds/rgb-sdk-flutter.git "$SDK_ROOT"
+```
+
+For existing or restored checkouts, skip cloning and inspect `git status`,
+`git remote get-url origin` and `git log -1` first. Do not reset to the older
+evidence commit or discard local changes. Apply author identity locally:
+
+```sh
+: "${ASTER_ROOT:?Set the verified Aster root}"
+: "${SDK_ROOT:?Set the verified SDK root}"
+git -C "$ASTER_ROOT" config --local user.name zeusbuilds
+git -C "$ASTER_ROOT" config --local user.email zeusbuilds113@gmail.com
+git -C "$SDK_ROOT" config --local user.name zeusbuilds
+git -C "$SDK_ROOT" config --local user.email zeusbuilds113@gmail.com
+```
+
+### Restore References by Git Revision
+
+Use the repository map and snapshot `origin`/`head` to obtain each source
+baseline. Create fresh reference clones at `RN_ROOT` and `RLN_ROOT` rather than
+depending on temporary directories from the old machine. In those **fresh,
+disposable reference clones only**, fetch and select the comparison revisions:
+
+```sh
+: "${RN_ROOT:?Set the fresh RN reference checkout location}"
+: "${RLN_ROOT:?Set the fresh RLN reference checkout location}"
+git -C "$RN_ROOT" fetch origin dev
+git -C "$RN_ROOT" switch --detach e38329eba11cce16e3bea75b8a4e7becd52c0036
+git -C "$RLN_ROOT" fetch origin tag v0.16.0-beta.3
+git -C "$RLN_ROOT" switch --detach 8777d71d7781b408fcce89c9c965ae29e8ad2300
+```
+
+Clone URLs are `https://github.com/UTEXO-Protocol/rgb-sdk-rn.git` and
+`https://github.com/UTEXO-Protocol/rgb-lightning-node.git`. Use an authorized
+scoped identity where private access is required. If an object is unavailable,
+recover its verified bundle/object database; do not substitute latest `dev`
+and report equivalent evidence. Package archives come from SDK manifests and
+their checksums, not an old Pub/npm cache path.
 
 Normal push pattern, only when there is an approved commit to push:
 
 ```sh
+: "${ASTER_ROOT:?Set the verified Aster root}"
+: "${SDK_ROOT:?Set the verified SDK root}"
+: "${ZEUS_GH_CONFIG:?Set the authenticated project-specific GH directory}"
 GH_CONFIG_DIR="$ZEUS_GH_CONFIG" GIT_TERMINAL_PROMPT=0 \
-  git -C "$PROJECTS/aster-dev" -c credential.helper= \
+  git -C "$ASTER_ROOT" -c credential.helper= \
   -c 'credential.helper=!gh auth git-credential' push origin main
 
 GH_CONFIG_DIR="$ZEUS_GH_CONFIG" GIT_TERMINAL_PROMPT=0 \
-  git -C "$PROJECTS/rgb-sdk-flutter" -c credential.helper= \
+  git -C "$SDK_ROOT" -c credential.helper= \
   -c 'credential.helper=!gh auth git-credential' push origin main
 
 GH_CONFIG_DIR="$ZEUS_GH_CONFIG" GIT_TERMINAL_PROMPT=0 \
-  git -C "$PROJECTS/rgb-sdk-flutter" -c credential.helper= \
+  git -C "$SDK_ROOT" -c credential.helper= \
   -c 'credential.helper=!gh auth git-credential' \
   push https://github.com/UTEXO-Protocol/flutter-sdk.git main:main
 ```
@@ -239,6 +328,8 @@ Install tools from their official distribution, validate Xcode/Android licenses
 and available disk, then from Aster:
 
 ```sh
+: "${ASTER_ROOT:?Set the verified Aster checkout location}"
+cd "$ASTER_ROOT"
 make fvm-setup
 make dependencies
 make verify-generated
@@ -257,13 +348,16 @@ SDK commit `7c44506fdfe1dae6f3a6fe884f849c7ca2ad028b` in both manifest and lock.
 SDK host baseline commands (run from SDK root with the pinned Flutter on PATH):
 
 ```sh
+: "${SDK_ROOT:?Set the verified Flutter SDK checkout location}"
+: "${RN_ROOT:?Set the RN checkout at the comparison commit}"
+cd "$SDK_ROOT"
 flutter pub get --enforce-lockfile
 ./tool/generate_pigeon.sh
 dart format --output=none --set-exit-if-changed lib test tool
 flutter analyze --fatal-warnings --fatal-infos
 flutter test --coverage
 dart doc --validate-links
-RGB_SDK_RN_PATH=/path/to/exact-rn-checkout dart run tool/validate_rn_parity.dart
+RGB_SDK_RN_PATH="$RN_ROOT" dart run tool/validate_rn_parity.dart
 ```
 
 Read current README/tool scripts for release-gate inputs before running
@@ -279,11 +373,11 @@ once. Recheck actual listeners and Compose ownership before starting anything.
 
 | Owner/project | Important host ports | Durable state | Authority |
 | --- | --- | --- | --- |
-| Protected `rgb-lightning-node-perf-lab` | 18443 Bitcoin, 50001 Electrum, 3000 proxy | `Projects/rgb-lightning-node-perf-lab/datacore`, `dataindex`, other owner-declared mounts | Its owner only; never its regtest.sh from this task |
-| Aster `aster-app-regtest` | 19443 Bitcoin, 51001 Electrum, 3100 proxy | `aster-dev/.local/aster-regtest/` | `aster-dev/ops/regtest/compose.yaml` |
-| Flutter SDK `rgb-sdk-flutter-regtest` | 18444 Bitcoin, 50002 Electrum, 3013 proxy | `rgb-sdk-flutter/tool/regtest/data/` plus any actual Docker-owned writable state | SDK `tool/regtest/compose.yaml`, `config.sh`, `regtest.sh` |
+| Protected `rgb-lightning-node-perf-lab` | 18443 Bitcoin, 50001 Electrum, 3000 proxy | Owner's restored `datacore`, `dataindex` and other declared mounts | Its owner maps the restored root; never its regtest.sh from this task |
+| Aster `aster-app-regtest` | 19443 Bitcoin, 51001 Electrum, 3100 proxy | `$ASTER_ROOT/.local/aster-regtest/` | Aster Git: `ops/regtest/compose.yaml` |
+| Flutter SDK `rgb-sdk-flutter-regtest` | 18444 Bitcoin, 50002 Electrum, 3013 proxy | `$SDK_ROOT/tool/regtest/data/` plus actual Docker-owned writable state | SDK Git: `tool/regtest/compose.yaml`, `config.sh`, `regtest.sh` |
 | Historical Iris `utexo-wallet-devstack` | Defaults include 18443/50001/3000, 3002 issuer, 9736 peer, 3003 Esplora, 18081 VSS, 8080 LSP | Iris `.devstack/` and declared volumes | Iris `ops/devstack.lock.json`; defaults collide with protected perf-lab |
-| New Iris bridge `iris_bridge_20261013` | Gateway18088, Postgres26432, Anvil18555, RGB forwarder28090; frontend3000 and Mailpit18025 separate | `utexo-app/.devstack/bridge-retest-20261013/stand-data` | Private generated topology plus RETEST.md |
+| New Iris bridge `iris_bridge_20261013` | Gateway18088, Postgres26432, Anvil18555, RGB forwarder28090; frontend3000 and Mailpit18025 separate | `$BRIDGE_RETEST_ROOT/stand-data` | Bridge Git: `deploy/local/README.md`; private topology and RETEST.md from backup |
 
 Aster embedded node listeners are 19735/19736 in its local configuration.
 These are inside the app process, not Docker LSP nodes or funded channels.
@@ -297,13 +391,38 @@ consignment transport bytes matter, have the SDK stack owner preserve the actual
 container writable state or retrieve required wallet proof data before deleting
 containers. `tool/regtest/data` alone is not proof of a complete proxy backup.
 
+### Relocation Checks Before Starting Services
+
+- Map every restored checkout to its captured Git origin/commit and record its
+  new root privately. Keep independent worktrees/dirty overlays separate.
+- Restored linked worktrees may contain stale absolute Git metadata. Preserve
+  the parent common object database and use Git's `worktree repair` workflow
+  for the new locations; verify status and refs afterwards. Do not hand-edit
+  `.git` pointers or discard dirty work to make a fresh clone look clean.
+- Inspect path-valued local configuration without printing credentials. Update
+  Compose bind sources, env-file references, local build contexts, certificates,
+  AVD metadata and source manifests to the chosen roots. Keep credentials,
+  chain generation, asset IDs and operation journals unchanged.
+- Aster's checked-in Compose binds are relative to `ops/regtest/compose.yaml`.
+  They move with `ASTER_ROOT` when its `.local` state is restored there. Verify
+  `ASTER_LOCAL_UID` and file ownership against the new account before launch.
+- Recreate FVM links, generated Flutter/Xcode/Gradle configs and local SDK paths
+  through the repository setup tools. Do not transplant old absolute build paths
+  or assume the Homebrew installation prefix is unchanged.
+- App sandbox/Keychain and native wallet-store relocation need their own
+  verified recovery contract. Do not bulk-replace strings in wallet databases
+  or metadata to suppress a resource mismatch.
+
+These are configuration checks, not authorization to change protected stacks.
+
 ### Aster Restore or Fresh Isolated Setup
 
 For **restored** `.local` state and config, do not rerun the initializer. Check
 paths, permissions, ownership, network/asset generation and free ports, then:
 
 ```sh
-cd "$HOME/Projects/aster-dev"
+: "${ASTER_ROOT:?Set the verified restored Aster checkout location}"
+cd "$ASTER_ROOT"
 docker compose --env-file .local/aster-regtest/compose.env \
   -f ops/regtest/compose.yaml up -d --wait --wait-timeout 180
 docker compose --env-file .local/aster-regtest/compose.env \
@@ -313,6 +432,8 @@ docker compose --env-file .local/aster-regtest/compose.env \
 For a deliberately **new test-only generation** with no state to restore:
 
 ```sh
+: "${ASTER_ROOT:?Set the verified fresh Aster checkout location}"
+cd "$ASTER_ROOT"
 fvm dart run tool/initialize_local_regtest.dart
 ```
 
@@ -338,8 +459,9 @@ Historical Iris `npm run devstack:up` builds/provisions its own locked sources,
 issuer, canonical/linked assets and generated environment. Its reset command
 destroys a generation. Do not run it for the newer bridge retest or Aster.
 
-For the new bridge retest, restore the entire workspace and its private
-`stand-data/config/compose.env`, then inspect the current `deploy/local`
+For the new bridge retest, set `BRIDGE_RETEST_ROOT` to its restored backup
+location. Restore its private `stand-data/config/compose.env`, then inspect the
+bridge Git checkout's `deploy/local`
 bootstrap/status/preflight and Compose wrapper. Preserve chain checkpoints,
 Anvil state, issuer/receiver stores, journals, SQL, certificates, source
 manifest and pending operations together. Do not blindly run a default
@@ -362,9 +484,12 @@ after reset; old UUIDs, AVD paths and Codex run-session IDs may be invalid.
 For configured iOS development after restoring/initializing the Aster stack:
 
 ```sh
+: "${ASTER_ROOT:?Set the verified Aster checkout location}"
+: "${ASTER_SIMULATOR_ID:?Select a newly verified Aster-owned simulator}"
+cd "$ASTER_ROOT"
 make verify-generated ios-dependencies
 BUNDLE_FROZEN=true BUNDLE_PATH="$PWD/.bundle" \
-  bundle exec fvm flutter run --no-pub -d <ASTER_SIMULATOR_ID> \
+  bundle exec fvm flutter run --no-pub -d "$ASTER_SIMULATOR_ID" \
   --dart-define-from-file=config/regtest.ios.local.json
 ```
 
@@ -380,7 +505,10 @@ failure, native ownership left by hot restart, and an actual runtime defect.
 
 ## Evidence to Retain
 
-The October13 app/SDK logs are under `/private/tmp/aster-rgb-upgrade-*`; key files:
+The October13 app/SDK logs were temporary, non-Git files prefixed
+`aster-rgb-upgrade-`. Recover them into a chosen `EVIDENCE_ROOT` from the private
+backup, retaining full original basenames. Do not expect the old temporary
+directory to exist after reset. Important suffixes after that prefix are:
 
 - `app-committed-tests.log`: 975 exact-clean implementation tests.
 - `app-closeout-commit.log`: normal hooks for documentation closeout.
@@ -388,6 +516,13 @@ The October13 app/SDK logs are under `/private/tmp/aster-rgb-upgrade-*`; key fil
 - `app-android-arm64.log`, `app-android-host-tests.log`: compile/host evidence.
 - `sdk-final-coverage.log`, `android-native.log`, `sdk-ios-build.log`.
 - `clean-consumers.log`: incomplete run and failure boundary, not a pass.
+
+Committed summaries remain available without those local paths: Aster
+`docs/PRODUCTION_REFACTOR_TRACKER.md` at the recorded app commit, and Flutter SDK
+`doc/RELEASE_READINESS_TRACKER.md` plus `tool/release_baseline.json` at `7c44506`.
+They are summaries/manifests, not substitutes for missing raw evidence. If raw
+logs or unpublished fixtures were not backed up, report them missing and rerun
+the appropriate checks; do not invent Git links for files that were never pushed.
 
 Preserve SDK `build/test-reports`, coverage evidence, current app coverage,
 native baseline/provenance manifests and any reviewed screenshot sets. Raw logs
@@ -411,6 +546,8 @@ copying another version's generated frameworks or relaxing checksums.
 - [ ] Handoff readable from an off-machine destination; archive integrity checked.
 - [ ] Codex account accessible, local history restored or new task primed.
 - [ ] Aster and Flutter SDK exact baseline commits available; no source edits lost.
+- [ ] New roots mapped by Git URL/commit; no old username, sibling layout or temporary directory required.
+- [ ] Worktree metadata, local path-valued configuration and device IDs verified after relocation.
 - [ ] Every dirty/ignored/non-Git sibling path in the snapshot restored or explicitly retired by its owner.
 - [ ] Git identity/auth verified project-locally; repository privacy unchanged.
 - [ ] Secrets recovered through approved secure process, never pasted into chat.

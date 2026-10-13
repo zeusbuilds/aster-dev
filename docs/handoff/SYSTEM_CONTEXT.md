@@ -18,6 +18,12 @@ uncommitted sibling work, local services, test evidence or Codex history.
 4. Use [the issue snapshot](OPEN_ISSUES_SNAPSHOT.md) as a dated index. The live
    trackers remain authoritative; do not maintain a competing issue tracker here.
 
+Repository identity is **Git URL + commit + repository-relative file**, not a
+folder on the old machine. Clone into any locations you choose; app and SDK do
+not need to be siblings. The runbook defines configurable root variables.
+Snapshot checkout keys describe the old backup layout only, never required
+new-machine paths. Non-Git state must come from a separate verified backup.
+
 No system reset, wallet export, secret backup, chain reset, mining, transfer or
 live service reconfiguration was performed to prepare these documents. A Docker
 metadata query did not return and was terminated without changing any container;
@@ -25,20 +31,20 @@ current running-service health is therefore **not established by this handoff**.
 
 ## Repository Authority and Version Pins
 
-| Component | Authority at this checkpoint | Local location relative to Projects |
+| Component | Git/package authority | Revision or repository-relative entry point |
 | --- | --- | --- |
-| Aster Flutter app | Private `zeusbuilds/aster-dev`, `main`; pre-handoff HEAD `1ccbd74f26c2572f168e12e3bf9e8533a3c6eb4a` | `aster-dev` |
-| Flutter SDK working repository | Private `zeusbuilds/rgb-sdk-flutter`, `main`, `7c44506fdfe1dae6f3a6fe884f849c7ca2ad028b` | `rgb-sdk-flutter` |
-| Flutter SDK public source mirror | `UTEXO-Protocol/flutter-sdk`, `main`, same `7c44506` | App consumes this Git URL |
-| RN parity reference | `UTEXO-Protocol/rgb-sdk-rn`, `dev`, `e38329eba11cce16e3bea75b8a4e7becd52c0036`, `1.0.0-beta.37` | Isolated current comparison under `/private/tmp/aster-rgb-upstream-20261013/rgb-sdk-rn` |
+| Aster Flutter app | Private [zeusbuilds/aster-dev](https://github.com/zeusbuilds/aster-dev), `main` | Pre-handoff evidence at [1ccbd74](https://github.com/zeusbuilds/aster-dev/tree/1ccbd74f26c2572f168e12e3bf9e8533a3c6eb4a); read the current handoff from `main`, not this older evidence commit |
+| Flutter SDK working repository | Private [zeusbuilds/rgb-sdk-flutter](https://github.com/zeusbuilds/rgb-sdk-flutter), `main` | [7c44506](https://github.com/zeusbuilds/rgb-sdk-flutter/tree/7c44506fdfe1dae6f3a6fe884f849c7ca2ad028b); `doc/RELEASE_READINESS_TRACKER.md` |
+| Flutter SDK public source mirror | [UTEXO-Protocol/flutter-sdk](https://github.com/UTEXO-Protocol/flutter-sdk), `main` | App consumes [7c44506](https://github.com/UTEXO-Protocol/flutter-sdk/tree/7c44506fdfe1dae6f3a6fe884f849c7ca2ad028b); do not replace the working origin |
+| RN parity reference | [UTEXO-Protocol/rgb-sdk-rn](https://github.com/UTEXO-Protocol/rgb-sdk-rn), `dev` | [e38329e](https://github.com/UTEXO-Protocol/rgb-sdk-rn/tree/e38329eba11cce16e3bea75b8a4e7becd52c0036), `1.0.0-beta.37`; obtain from Git, not a temporary checkout |
 | Shared TypeScript SDK core | `@utexo/rgb-sdk-core@1.0.0-beta.9` | Exact archive pinned in SDK `tool/release_baseline.json` |
-| Native RLN | `UTEXO-Protocol/rgb-lightning-node`, `v0.16.0-beta.3`, `8777d71d7781b408fcce89c9c965ae29e8ad2300` | Isolated source under `/private/tmp/aster-rgb-upstream-20261013/rln` |
+| Native RLN | [UTEXO-Protocol/rgb-lightning-node](https://github.com/UTEXO-Protocol/rgb-lightning-node), `v0.16.0-beta.3` | [8777d71](https://github.com/UTEXO-Protocol/rgb-lightning-node/tree/8777d71d7781b408fcce89c9c965ae29e8ad2300); `src/sdk/mod.rs`, `src/rgb.rs` |
 | WebRGB and WC companion | `@utexo/webrgb@0.1.2`, `@utexo/webrgb-walletconnect@0.1.2` | SDK peer manifests and isolated source audit |
-| Iris React Native app | Base checkout origin `UTEXO-Protocol/iriswallet-mobile`; newer retest origin `UTEXO-Protocol/utexo-mobile`; these are distinct recorded checkout identities | `utexo-app`, plus linked worktrees and ignored retest checkout |
-| WDK RGB module | `UTEXO-Protocol/wdk-rgb-lightning` | `utexo-trial/wdk-rgb-lightning` and worktrees; exact release state differs by checkout |
-| Node/Bare native bindings | `UTEXO-Protocol/rgb-lightning-node-nodejs` and `rgb-lightning-node-bare` | Same-named Projects folders; separate newer retest sources/artifacts also exist |
-| Lightweight native SDKs | `UTEXO-Protocol/rgb-sdk-swift-light`, `rgb-sdk-kotlin-light` | `utexo-lightweight/` workspace |
-| EVM/RGB bridge | `UTEXO-Protocol/bridge-utexo` plus signer, parser, contract and relay repositories | `utexo-app/.devstack/bridge-retest-20261013/` |
+| Iris React Native app | [iriswallet-mobile](https://github.com/UTEXO-Protocol/iriswallet-mobile) and newer [utexo-mobile](https://github.com/UTEXO-Protocol/utexo-mobile) retest | Distinct recorded origins; exact refs and dirty overlays in snapshot; retest [243fb04](https://github.com/UTEXO-Protocol/utexo-mobile/tree/243fb047011b872cb78d9187a73aa3a933bd26de) |
+| WDK RGB module | [UTEXO-Protocol/wdk-rgb-lightning](https://github.com/UTEXO-Protocol/wdk-rgb-lightning) | Use the snapshot's exact commit/branch for the intended candidate, not a folder-name guess |
+| Node/Bare native bindings | [rgb-lightning-node-nodejs](https://github.com/UTEXO-Protocol/rgb-lightning-node-nodejs), [rgb-lightning-node-bare](https://github.com/UTEXO-Protocol/rgb-lightning-node-bare) | Separate checkout revisions and retest artifact identities in snapshot and bridge section |
+| Lightweight native SDKs | [rgb-sdk-swift-light](https://github.com/UTEXO-Protocol/rgb-sdk-swift-light), [rgb-sdk-kotlin-light](https://github.com/UTEXO-Protocol/rgb-sdk-kotlin-light) | Both have uncommitted overlays; shared signer/root notes are backup-only |
+| EVM/RGB bridge | [UTEXO-Protocol/bridge-utexo](https://github.com/UTEXO-Protocol/bridge-utexo) plus companion repositories listed below | `deploy/local/README.md`; ignored retest orchestration/state is backup-only, not supplied by cloning |
 
 At inspection Aster and the Flutter SDK were clean with tracking branches at
 the same commit. The public SDK `main` was independently checked through GitHub.
@@ -47,7 +53,7 @@ authentication identified `zeusbuilds`. Do not change SDK origin to its public
 mirror. Push SDK commits to both destinations when requested; app work goes to
 its private origin. Old GitLab/Jainakin SDK destinations are retired, not fallbacks.
 
-The long-lived `Projects/rgb-sdk-rn` checkout is older (`821ae4f`, beta.32-era).
+The snapshot's older RN checkout is at `821ae4f` (beta.32-era).
 Do not mistake it for the inspected latest RN reference. Re-fetch `dev` on the
 new machine and explicitly record any drift before upgrading further.
 
@@ -351,7 +357,7 @@ export policy. The issue appendix contains every currently unresolved row.
 These are related workstreams, not dependencies that Aster can start using
 implicitly. Their source and tests must stay separate from Flutter evidence.
 
-Iris base checkout is `Projects/utexo-app`, origin
+Iris base checkout (historical snapshot key `utexo-app`) has origin
 `UTEXO-Protocol/iriswallet-mobile`, `dev` at `21fa0f4`. It has substantial
 uncommitted source, test and documentation changes. Its React Native New
 Architecture uses Expo, TanStack Query, SecureStore and one WDK Bare worklet.
@@ -363,17 +369,38 @@ The retest Iris checkout specifically records origin
 `243fb047011b872cb78d9187a73aa3a933bd26de`. Do not change either existing
 remote automatically or assume their permissions/branches are interchangeable.
 
-Preserve `Projects/pr-series/` as well as its parent repositories: linked
+Preserve the snapshot's `pr-series/` backup collection and its parent
+repositories: linked
 worktree `.git` files point back to parent `.git/worktrees` state. The WDK
-family also has separate worktrees beneath `Projects/utexo-trial/`. Do not
+family also has a historical `utexo-trial/` backup collection. Do not
 assume the first folder or a branch name identifies the latest native version.
 
 ### Newest Local Bridge Evidence Found
 
-Read `utexo-app/.devstack/bridge-retest-20261013/RETEST.md` first, then its
+Read `RETEST.md` in the restored bridge-retest backup first, then its
 `sources.json`, result records and the bridge's `deploy/local/README.md`.
 The ignored retest directory contains source edits, wallets, state, binaries,
 logs, certificates and an Android AVD. **It is not a disposable build cache.**
+
+Use `BRIDGE_RETEST_ROOT` from the runbook for that restored directory. Its old
+snapshot key is `utexo-app/.devstack/bridge-retest-20261013`, not a required
+new location. Git-backed components can instead be located independently:
+
+| Component | Git source at the reported test | Backup still required |
+| --- | --- | --- |
+| Backend | [bridge-utexo at a97d060](https://github.com/UTEXO-Protocol/bridge-utexo/tree/a97d0605d6833ffb6192e4a32ac57e1963158afd) | Local Dockerfile/Compose changes, generated config and state |
+| Frontend | [utexo-bridge-fe at c0edab6](https://github.com/UTEXO-Protocol/utexo-bridge-fe/tree/c0edab6377f22de7faee28750933e7144c01ac31) | Retest runtime configuration and test accounts |
+| Bitcoin relay | [btc-relay at ff93f6d](https://github.com/UTEXO-Protocol/btc-relay/tree/ff93f6da45fea81081d8dfe4006372c1a8ae55d2) | Runtime state |
+| Enclave signer | [enclave-signer at d3f4109](https://github.com/UTEXO-Protocol/enclave-signer/tree/d3f410929b43099bfc7521178906039475f56b5e) | Local Dockerfile change, signer secrets/state |
+| Federated signer | [federated-signer-node at e9f0760](https://github.com/UTEXO-Protocol/federated-signer-node/tree/e9f07604f28518ac8aa05909ebd355b7d790a4b8) | Credentials and state |
+| Signer protocol | [federated-signer-proto at 2b81a2e](https://github.com/UTEXO-Protocol/federated-signer-proto/tree/2b81a2eaadb99daa68c4428ea38f80ae3f40805d) | Retest evidence, not source |
+| Consignment parser | [rgb-consignment-parser at ed35711](https://github.com/UTEXO-Protocol/rgb-consignment-parser/tree/ed35711bc55453d50713c13dd81a7d2a503f69e7) | Wallet proofs/fixtures |
+| Wallet tooling | [rgb-wallet-tools at 8de350d](https://github.com/UTEXO-Protocol/rgb-wallet-tools/tree/8de350d4c776cdd0d105ae9c27aab0325bc1da45) | Dirty lock/source/script overlays, test wallets |
+| EVM contracts | [utexo-smart-contracts at cf390bd](https://github.com/UTEXO-Protocol/utexo-smart-contracts/tree/cf390bd17570e0a6c97998d523c3db421b0ce8e9) | Deployed local chain/contract state |
+
+These URLs identify captured Git objects, not a fresh guarantee of remote access
+or reachability. Local-only refs require the preserved Git object database or a
+verified bundle. A clone cannot restore uncommitted overlays or RETEST.md.
 
 The report records:
 
@@ -420,7 +447,8 @@ current source and qualification before declaring it fixed or still reproduced.
 
 ### Lightweight SDKs and Other Sibling Work
 
-`Projects/utexo-lightweight` is a non-Git workspace containing Swift/Kotlin
+The snapshot's `utexo-lightweight` collection is a non-Git workspace containing
+Swift/Kotlin
 SDK repositories, a shared Rust local signer, gateway PR174 work and many
 workspace-level review documents. Both native SDK repos are dirty; the shared
 signer and root docs are not protected by a top-level Git remote.
@@ -433,7 +461,8 @@ Durable submission/recovery and deployment contracts remain explicit gates.
 
 `rgb-lightning-node-perf-lab`, `rgb-ops-perf-lab` and
 `rgb-protocol-perf-lab` are separate performance/source investigations.
-`Projects/rln-lightning` contains mainnet guard/startup branches, local notes
+The snapshot's `rln-lightning` collection contains mainnet guard/startup branches,
+local notes
 and repro state. Preserve them; their names do not grant this task ownership.
 
 ## Newly Identified Context Corrections
@@ -445,7 +474,7 @@ These are handoff follow-ups, not silently closed release findings:
 | HANDOFF-01: external-signer burn wording | Pinned RLN `8777d71` has `src/rgb.rs::rgb_burn` using burn_begin -> sign/validate PSBT -> burn_end in external mode. RN beta.37 and Flutter signers still gate facade burn capability; Flutter docs say native unsupported. | Correct the native-versus-facade distinction in the SDK tracker/docs, inspect intended RN parity policy, and test before widening capability. Do not flip supportsBurn just to match WDK. |
 | HANDOFF-02: version labels in sibling reports | Bare's October12 report labels source `8777d71` as 0.15, while Flutter's verified published tag/manifest calls it 0.16. | Use exact source/artifact identity and reconcile metadata with that workstream; neither label alone proves artifact contents. |
 | HANDOFF-03: stale current-looking prose | SDK older headings still say dirty/uncommitted despite pushed commits; app DEC-048 says four quiz words despite source `[3, 7, 11]`; REGTEST says refresh Home although pull-to-refresh was removed. | Reconcile these documentation claims during the next owned docs pass. Preserve dated evidence rather than bulk replacing version strings or replaying superseded UX. |
-| HANDOFF-04: recoverability is not a clone | Dirty Iris/lightweight repos, ignored bridge workspace, non-Git root docs and `/tmp` evidence exist. | Complete and test an encrypted off-machine backup before reset. A metadata list or this handoff cannot restore their bytes. |
+| HANDOFF-04: recoverability is not a clone | Dirty Iris/lightweight repos, ignored bridge workspace, non-Git root docs and unpublished temporary evidence exist. | Complete and test an encrypted off-machine backup before reset. A metadata list or this handoff cannot restore their bytes. |
 | HANDOFF-05: current service liveness | Docker metadata query stalled during handoff; no environment was restarted. | Re-establish bounded read-only Docker/port health after restoring. Do not infer down or healthy. |
 
 ## Where to Resume Engineering
@@ -486,6 +515,8 @@ Iris/bridge: latest ignored RETEST/source manifest first, current checkout's
 PRD/release tracker next, then dated WDK upgrade qualification. The October5
 comparison is historical and must not override October12/13 source evidence.
 
-The workspace snapshot records full paths/branches. Original Codex tasks are
+The workspace snapshot records Git origins, commits and branches; old checkout
+layout is labeled backup provenance, not an installation requirement. Original
+Codex tasks are
 listed in the reset runbook. This pack intentionally contains no raw transcripts,
 private keys, tokens, seeds, passwords, database exports or production endpoints.

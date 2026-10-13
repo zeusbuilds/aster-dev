@@ -4,9 +4,15 @@ Captured 2026-10-13T09:54:33.164Z. Private context appendix, not a new authority
 
 Rows below are verbatim from the current trackers, including historical wording that may need reconciliation. Read the latest dated sections and linked audit registers before treating a row as a still-unimplemented defect. No status was promoted by this extraction. Cross-repository documentation contradictions discovered during handoff are listed separately in SYSTEM_CONTEXT.md.
 
+Portable source identity is repository URL + commit + repository-relative file.
+The two Git links below work independently of clone location. Native device
+identifiers and build-report paths quoted in historical rows are evidence
+locators, not requirements for the new machine. Unpublished reports require a
+backup or rerun; they cannot be reconstructed from a Git link.
+
 ## Aster
 
-Source: `docs/PRODUCTION_REFACTOR_TRACKER.md` at pre-handoff app HEAD `1ccbd74f26c2572f168e12e3bf9e8533a3c6eb4a`.
+Source: [Aster tracker at 1ccbd74](https://github.com/zeusbuilds/aster-dev/blob/1ccbd74f26c2572f168e12e3bf9e8533a3c6eb4a/docs/PRODUCTION_REFACTOR_TRACKER.md), repository-relative `docs/PRODUCTION_REFACTOR_TRACKER.md` (private).
 Tracker SHA-256: `e6b6dae26b25239d822868ac368a4636f86799c6434ba235c32678258ba997bd`.
 Finding counts: `{"verified":424,"blocked":34}`. Two accepted constraints are separate from those counts.
 
@@ -65,7 +71,7 @@ These decision rows overlap findings; do not add them to the issue count.
 
 ## Flutter SDK
 
-Source: `rgb-sdk-flutter/doc/RELEASE_READINESS_TRACKER.md` at SDK HEAD `7c44506fdfe1dae6f3a6fe884f849c7ca2ad028b`.
+Source: [Flutter SDK tracker at 7c44506](https://github.com/UTEXO-Protocol/flutter-sdk/blob/7c44506fdfe1dae6f3a6fe884f849c7ca2ad028b/doc/RELEASE_READINESS_TRACKER.md), repository-relative `doc/RELEASE_READINESS_TRACKER.md`; working origin remains private `zeusbuilds/rgb-sdk-flutter`.
 Tracker SHA-256: `afaff6c477134f3141a52a884e2949a07fe9396b498244099d08366479a17a42`.
 Finding counts: `{"In progress":22,"Verified":246,"Blocked upstream":2,"Open":2,"Accepted constraint":7}`. 26 unresolved plus 7 accepted; 246 verified.
 
