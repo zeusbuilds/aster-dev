@@ -1,0 +1,1885 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-10-13T09:54:33.164Z",
+  "purpose": "Private reset handoff metadata; NOT a source, secret, wallet or database backup.",
+  "originalProjectsRoot": "/Users/hardik/Projects",
+  "repositories": [
+    {
+      "path": "aster-dev",
+      "git": true,
+      "origin": "https://github.com/zeusbuilds/aster-dev.git",
+      "head": "1ccbd74f26c2572f168e12e3bf9e8533a3c6eb4a",
+      "branch": "main",
+      "upstream": "origin/main",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/aster-dev/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [
+        {
+          "status": "??",
+          "path": "docs/handoff/"
+        }
+      ],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "pr-series/iris-recovery",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/iriswallet-mobile.git",
+      "head": "2451ef4a50423c0df75b77dd4595ffe079acd2e7",
+      "branch": "hardik/rgb-funding-recovery-ux",
+      "upstream": "fork/hardik/rgb-funding-recovery-ux",
+      "aheadBehindLastFetched": [
+        10,
+        12
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-app/.git",
+      "linkedWorktree": true,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "pr-series/iris-rln-0.13.0-beta.3",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/iriswallet-mobile.git",
+      "head": "af6807d0b38af43729528cea976b42216cd9c7cb",
+      "branch": "release/rln-0.13.0-beta.3",
+      "upstream": "origin/release/rln-0.13.0-beta.3",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-app/.git",
+      "linkedWorktree": true,
+      "workingTreeStatus": [
+        {
+          "status": "??",
+          "path": "docs/engineering/metamask-wdk-reference.md"
+        },
+        {
+          "status": "??",
+          "path": "docs/engineering/wdk-architecture-audit-2026-09-30.md"
+        },
+        {
+          "status": "??",
+          "path": "docs/engineering/wdk-upgrade-blockers-2026-09-30.md"
+        }
+      ],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "pr-series/iris-supervisor",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/iriswallet-mobile.git",
+      "head": "eab2b0b9b579e54f264bc51610209721e332df33",
+      "branch": "hardik/wallet-runtime-supervisor",
+      "upstream": "fork/hardik/wallet-runtime-supervisor",
+      "aheadBehindLastFetched": [
+        13,
+        15
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-app/.git",
+      "linkedWorktree": true,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "pr-series/rgb-lib-electrum-batch-minimal",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/rgb-lib.git",
+      "head": "b0039a786305db3ec94c2c2ca5559cf64c8e03be",
+      "branch": "hardik/electrum-witness-batching-minimal",
+      "upstream": "origin/dev",
+      "aheadBehindLastFetched": [
+        1,
+        22
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/rgb-protocol-perf-lab/.git",
+      "linkedWorktree": true,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "pr-series/rgb-lib-pr79",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/rgb-lib.git",
+      "head": "ee608e0e53da47769493c35c6e69a6d641dd9ff4",
+      "branch": "hardik/rgb-witness-prefetch",
+      "upstream": "fork/hardik/rgb-witness-prefetch",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/rgb-protocol-perf-lab/.git",
+      "linkedWorktree": true,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "pr-series/rgb-lib-prefetch",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/rgb-lib.git",
+      "head": "4f355ee8dfd5b0201ed571356916c86e61444e2d",
+      "branch": "hardik/electrum-witness-batch-integration",
+      "upstream": null,
+      "aheadBehindLastFetched": null,
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/rgb-protocol-perf-lab/.git",
+      "linkedWorktree": true,
+      "workingTreeStatus": [
+        {
+          "status": " M",
+          "path": "Cargo.lock"
+        },
+        {
+          "status": " M",
+          "path": "Cargo.toml"
+        },
+        {
+          "status": " M",
+          "path": "src/lib.rs"
+        },
+        {
+          "status": " M",
+          "path": "src/utils.rs"
+        },
+        {
+          "status": " M",
+          "path": "src/wallet/indexer.rs"
+        }
+      ],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "pr-series/rgb-lib-transaction",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/rgb-lib.git",
+      "head": "dea7b29b47351a4f4f3a9b5e56a4457618d7df68",
+      "branch": "hardik/transactional-rgb-acceptance",
+      "upstream": "fork/hardik/transactional-rgb-acceptance",
+      "aheadBehindLastFetched": [
+        3,
+        26
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/rgb-protocol-perf-lab/.git",
+      "linkedWorktree": true,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "pr-series/rgb-ops-electrum-batch",
+      "git": true,
+      "origin": "https://github.com/rgb-protocol/rgb-ops.git",
+      "head": "6c98f4e2a95b25bfa77b029d2ca37ad6e462815f",
+      "branch": "hardik/electrum-witness-batching",
+      "upstream": "origin/master",
+      "aheadBehindLastFetched": [
+        1,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/rgb-ops-perf-lab/.git",
+      "linkedWorktree": true,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "pr-series/rgb-ops-resolver",
+      "git": true,
+      "origin": "https://github.com/rgb-protocol/rgb-ops.git",
+      "head": "46c7aacb0cfe46e145133393989a38493ecc2f15",
+      "branch": "hardik/esplora-witness-resolution",
+      "upstream": "fork/hardik/esplora-witness-resolution",
+      "aheadBehindLastFetched": [
+        2,
+        1
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/rgb-ops-perf-lab/.git",
+      "linkedWorktree": true,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "pr-series/rgb-ops-stock",
+      "git": true,
+      "origin": "https://github.com/rgb-protocol/rgb-ops.git",
+      "head": "679d3afee01e9079cb601332bff5e50f0d40bcec",
+      "branch": "hardik/rgb-stock-snapshot",
+      "upstream": "fork/hardik/rgb-stock-snapshot",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/rgb-ops-perf-lab/.git",
+      "linkedWorktree": true,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "pr-series/rgbtools-rln-funding-crash-test",
+      "git": true,
+      "origin": "https://github.com/RGB-Tools/rgb-lightning-node.git",
+      "head": "6887cbf95eaa0208a42ff73b41bd4b3959655bf4",
+      "branch": "master",
+      "upstream": "origin/master",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/pr-series/rgbtools-rln-funding-crash-test/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [
+        {
+          "status": " M",
+          "path": "Cargo.toml"
+        },
+        {
+          "status": " M",
+          "path": "rust-lightning"
+        },
+        {
+          "status": " M",
+          "path": "src/test/mod.rs"
+        },
+        {
+          "status": "??",
+          "path": "src/test/funding_crash_recovery.rs"
+        }
+      ],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "pr-series/rln-api",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/rgb-lightning-node.git",
+      "head": "84e661148560227ea0a8b4c9e8ab46fa9d0658de",
+      "branch": "hardik/rln-funding-recovery-api",
+      "upstream": "fork/hardik/rln-funding-recovery-api",
+      "aheadBehindLastFetched": [
+        16,
+        39
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/rgb-lightning-node-perf-lab/.git",
+      "linkedWorktree": true,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "pr-series/rln-durability",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/rgb-lightning-node.git",
+      "head": "dfca1f1e2f170821e1c350c3c703faad966661b9",
+      "branch": "hardik/rln-kv-vss-durability",
+      "upstream": "fork/hardik/rln-kv-vss-durability",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/rgb-lightning-node-perf-lab/.git",
+      "linkedWorktree": true,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "pr-series/rln-funding",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/rgb-lightning-node.git",
+      "head": "3f13cd5f0ad0d634142320cb7757cf0331267e63",
+      "branch": "hardik/rln-rgb-funding-recovery",
+      "upstream": "fork/hardik/rln-rgb-funding-recovery",
+      "aheadBehindLastFetched": [
+        15,
+        37
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/rgb-lightning-node-perf-lab/.git",
+      "linkedWorktree": true,
+      "workingTreeStatus": [
+        {
+          "status": " M",
+          "path": "src/ldk.rs"
+        },
+        {
+          "status": " M",
+          "path": "src/routes.rs"
+        },
+        {
+          "status": " M",
+          "path": "src/sdk/mod.rs"
+        },
+        {
+          "status": " M",
+          "path": "src/synced_kv_store.rs"
+        },
+        {
+          "status": " M",
+          "path": "src/test/mod.rs"
+        },
+        {
+          "status": " M",
+          "path": "src/test/vss.rs"
+        },
+        {
+          "status": "??",
+          "path": "src/test/vss_device_loss_gap.rs"
+        }
+      ],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "pr-series/rln-funding-rebased",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/rgb-lightning-node.git",
+      "head": "6fe3f2561c20bb6b841bd461bcb475e79f8f559c",
+      "branch": "hardik/rln-rgb-funding-recovery-rebased",
+      "upstream": "fork/hardik/rln-rgb-funding-recovery",
+      "aheadBehindLastFetched": [
+        26,
+        36
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/rgb-lightning-node-perf-lab/.git",
+      "linkedWorktree": true,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "pr-series/rln-integration",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/rgb-lightning-node.git",
+      "head": "42343ae9412672e44eb815559d43c7a9ce97522f",
+      "branch": "hardik/rln-publication-integration",
+      "upstream": "origin/dev",
+      "aheadBehindLastFetched": [
+        2,
+        94
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/rgb-lightning-node-perf-lab/.git",
+      "linkedWorktree": true,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "pr-series/rust-lightning-funding",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/rust-lightning.git",
+      "head": "e78e6b611e61301c4893c8c1fb3b951bfc069c89",
+      "branch": "hardik/restart-safe-rgb-funding",
+      "upstream": "fork/hardik/restart-safe-rgb-funding",
+      "aheadBehindLastFetched": [
+        5,
+        2
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/rgb-lightning-node-perf-lab/.git/modules/rust-lightning",
+      "linkedWorktree": true,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "pr-series/rust-lightning-routing",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/rust-lightning.git",
+      "head": "df32f6ea9b83e1329360b0941b21694f26da9025",
+      "branch": "hardik/rgb-payment-routing-correctness",
+      "upstream": "fork/hardik/rgb-payment-routing-correctness",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/rgb-lightning-node-perf-lab/.git/modules/rust-lightning",
+      "linkedWorktree": true,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "rgb-lightning-node-bare",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/rgb-lightning-node-bare.git",
+      "head": "694b992839a1b1f9853a16f27ba46120a6285f5c",
+      "branch": "hardik/mobile-wallet-native-runtime",
+      "upstream": "publication/hardik/mobile-wallet-native-runtime",
+      "aheadBehindLastFetched": [
+        0,
+        7
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/rgb-lightning-node-bare/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "rgb-lightning-node-nodejs",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/rgb-lightning-node-nodejs.git",
+      "head": "86396565ae8c9ab70c8ae1525b90482364f0e72f",
+      "branch": "hardik/mobile-wallet-node-runtime",
+      "upstream": "publication/hardik/mobile-wallet-node-runtime",
+      "aheadBehindLastFetched": [
+        0,
+        7
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/rgb-lightning-node-nodejs/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "rgb-lightning-node-perf-lab",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/rgb-lightning-node.git",
+      "head": "5777b6d8dde24be58a63e73cd1e35ab7e70296c4",
+      "branch": "hardik/rgb-witness-resolution-experiment",
+      "upstream": "origin/hardik/rgb-witness-resolution-experiment",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/rgb-lightning-node-perf-lab/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "rgb-ops-perf-lab",
+      "git": true,
+      "origin": "https://github.com/rgb-protocol/rgb-ops.git",
+      "head": "8010f0ceb1d6bd12546f5f3bab570be43a21bc19",
+      "branch": "hardik/rgb-witness-resolution-experiment",
+      "upstream": "fork/hardik/rgb-witness-resolution-experiment",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/rgb-ops-perf-lab/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "rgb-protocol-perf-lab",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/rgb-lib.git",
+      "head": "d23f3659c0def57c69adce4e5f0640181f9dcbd5",
+      "branch": "hardik/rgb-witness-resolution-experiment",
+      "upstream": "origin/hardik/rgb-witness-resolution-experiment",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/rgb-protocol-perf-lab/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "rgb-sdk-flutter",
+      "git": true,
+      "origin": "https://github.com/zeusbuilds/rgb-sdk-flutter.git",
+      "head": "7c44506fdfe1dae6f3a6fe884f849c7ca2ad028b",
+      "branch": "main",
+      "upstream": "origin/main",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/rgb-sdk-flutter/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "rgb-sdk-rn",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/rgb-sdk-rn.git",
+      "head": "821ae4fd10ca3933445ab926cb0af0230b108913",
+      "branch": "dev",
+      "upstream": "origin/dev",
+      "aheadBehindLastFetched": [
+        0,
+        6
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/rgb-sdk-rn/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "rln-lightning/baseline-mainnet-startup-ee855aa",
+      "git": true,
+      "origin": "https://github.com/Jainakin/rgb-lightning-node.git",
+      "head": "ee855aa81e282ceaf4583cf2a387e1e433e3151c",
+      "branch": "",
+      "upstream": null,
+      "aheadBehindLastFetched": null,
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/rln-lightning/rgb-lightning-node-mainnet-guard/.git",
+      "linkedWorktree": true,
+      "workingTreeStatus": [
+        {
+          "status": " M",
+          "path": "src/test/lib_sdk/helpers.rs"
+        },
+        {
+          "status": " M",
+          "path": "src/test/lib_sdk/vss_manager_lag.rs"
+        }
+      ],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "rln-lightning/baseline-verification",
+      "git": true,
+      "origin": "https://github.com/Jainakin/rgb-lightning-node.git",
+      "head": "ee0ca675fd2731a3490d36431d8f29a59b9d7889",
+      "branch": "",
+      "upstream": null,
+      "aheadBehindLastFetched": null,
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/rln-lightning/rgb-lightning-node-mainnet-guard/.git",
+      "linkedWorktree": true,
+      "workingTreeStatus": null,
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "rln-lightning/rgb-lightning-node-mainnet-ci",
+      "git": true,
+      "origin": "https://github.com/Jainakin/rgb-lightning-node.git",
+      "head": "5123f4361c3d633d4471ce071e365745af85f8f3",
+      "branch": "verify/mainnet-constructor",
+      "upstream": null,
+      "aheadBehindLastFetched": null,
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/rln-lightning/rgb-lightning-node-mainnet-guard/.git",
+      "linkedWorktree": true,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "rln-lightning/rgb-lightning-node-mainnet-guard",
+      "git": true,
+      "origin": "https://github.com/Jainakin/rgb-lightning-node.git",
+      "head": "8645f895b6a61eba27398aaaa3f69f734fbc6fc2",
+      "branch": "fix/mainnet-lightning-api-guard",
+      "upstream": "origin/fix/mainnet-lightning-api-guard",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/rln-lightning/rgb-lightning-node-mainnet-guard/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "rln-lightning/rgb-lightning-node-mainnet-startup",
+      "git": true,
+      "origin": "https://github.com/Jainakin/rgb-lightning-node.git",
+      "head": "7ac80f1f25808eff8ab9753634bb853212ceb9a5",
+      "branch": "fix/mainnet-ldk-startup",
+      "upstream": "upstream/fix/mainnet-ldk-startup",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/rln-lightning/rgb-lightning-node-mainnet-guard/.git",
+      "linkedWorktree": true,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-app",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/iriswallet-mobile.git",
+      "head": "21fa0f47e22d117562893329642bc3dceaa6a549",
+      "branch": "dev",
+      "upstream": "origin/dev",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-app/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [
+        {
+          "status": " M",
+          "path": "docs/engineering/app-release-tracker.md"
+        },
+        {
+          "status": " M",
+          "path": "docs/screens/onboarding/prd.md"
+        },
+        {
+          "status": " M",
+          "path": "docs/screens/onboarding/tracker.md"
+        },
+        {
+          "status": " M",
+          "path": "docs/screens/settings-backup/prd.md"
+        },
+        {
+          "status": " M",
+          "path": "docs/screens/settings-backup/tracker.md"
+        },
+        {
+          "status": " M",
+          "path": "docs/screens/unlock/prd.md"
+        },
+        {
+          "status": " M",
+          "path": "docs/screens/unlock/tracker.md"
+        },
+        {
+          "status": " M",
+          "path": "src/features/settings/domain/authorization-policy.ts"
+        },
+        {
+          "status": " M",
+          "path": "src/features/settings/infrastructure/platform-authentication-adapter.ts"
+        },
+        {
+          "status": " M",
+          "path": "src/features/settings/screens/__tests__/wallet-unlock-screen.test.tsx"
+        },
+        {
+          "status": " M",
+          "path": "src/features/settings/screens/settings-main-screen.tsx"
+        },
+        {
+          "status": " M",
+          "path": "src/features/settings/screens/wallet-unlock-screen.tsx"
+        },
+        {
+          "status": " M",
+          "path": "src/integrations/wdk/application/__tests__/wallet-session-machine.test.ts"
+        },
+        {
+          "status": " M",
+          "path": "src/integrations/wdk/application/wallet-bootstrap.tsx"
+        },
+        {
+          "status": " M",
+          "path": "src/integrations/wdk/application/wallet-session-machine.ts"
+        },
+        {
+          "status": " M",
+          "path": "src/integrations/wdk/config/__tests__/wdk-config.test.ts"
+        },
+        {
+          "status": " M",
+          "path": "src/integrations/wdk/config/wdk-config.ts"
+        },
+        {
+          "status": " M",
+          "path": "src/integrations/wdk/provider/__tests__/wallet-account-binding-provider.test.tsx"
+        },
+        {
+          "status": " M",
+          "path": "src/integrations/wdk/provider/__tests__/wallet-session-controller.test.tsx"
+        },
+        {
+          "status": " M",
+          "path": "src/integrations/wdk/provider/wallet-account-binding-provider.tsx"
+        },
+        {
+          "status": " M",
+          "path": "src/integrations/wdk/provider/wallet-runtime-account-registry.ts"
+        },
+        {
+          "status": " M",
+          "path": "src/integrations/wdk/provider/wallet-session-controller.tsx"
+        },
+        {
+          "status": " M",
+          "path": "src/shared/navigation/__tests__/root-route-policy.test.ts"
+        },
+        {
+          "status": " M",
+          "path": "src/shared/navigation/root-route-policy.ts"
+        },
+        {
+          "status": " M",
+          "path": "src/shared/observability/wallet-event-logger.ts"
+        },
+        {
+          "status": "??",
+          "path": "docs/engineering/iris-vss-pre-upgrade-review.md"
+        },
+        {
+          "status": "??",
+          "path": "docs/engineering/rln-013-custom-patch-audit.md"
+        },
+        {
+          "status": "??",
+          "path": "docs/engineering/rln-upgrade-artifacts/"
+        },
+        {
+          "status": "??",
+          "path": "docs/engineering/wdk-rln-0.13-implementation-tracker.md"
+        },
+        {
+          "status": "??",
+          "path": "docs/engineering/wdk-rln-0.13-production-upgrade-plan.md"
+        },
+        {
+          "status": "??",
+          "path": "docs/engineering/wdk-rln-0.13-upgrade-evidence.md"
+        },
+        {
+          "status": "??",
+          "path": "docs/engineering/wdk-rln-0.15-production-comparison.md"
+        },
+        {
+          "status": "??",
+          "path": "docs/engineering/wdk-rln-0.15-production-release-audit.md"
+        },
+        {
+          "status": "??",
+          "path": "src/integrations/wdk/application/__tests__/vss-ownership-conflict.test.ts"
+        },
+        {
+          "status": "??",
+          "path": "src/integrations/wdk/application/__tests__/wallet-vss-lifecycle-checkpoint.test.ts"
+        },
+        {
+          "status": "??",
+          "path": "src/integrations/wdk/application/vss-ownership-conflict.ts"
+        },
+        {
+          "status": "??",
+          "path": "src/integrations/wdk/application/wallet-vss-lifecycle-checkpoint.ts"
+        }
+      ],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-app/.devstack/bridge-retest-20261013/bare",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/rgb-lightning-node-bare.git",
+      "head": "1a55402a557a42455c8132345c05e99167c34607",
+      "branch": "release/rln-0.15.0-beta.3",
+      "upstream": "origin/release/rln-0.15.0-beta.3",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-app/.devstack/bridge-retest-20261013/bare/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-app/.devstack/bridge-retest-20261013/bridge",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/bridge-utexo.git",
+      "head": "a97d0605d6833ffb6192e4a32ac57e1963158afd",
+      "branch": "dev",
+      "upstream": "origin/dev",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-app/.devstack/bridge-retest-20261013/bridge/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [
+        {
+          "status": " M",
+          "path": "deploy/base-connector.Dockerfile"
+        },
+        {
+          "status": " M",
+          "path": "deploy/base-service.Dockerfile"
+        },
+        {
+          "status": " M",
+          "path": "deploy/local/docker-compose.yml"
+        },
+        {
+          "status": " M",
+          "path": "deploy/rgb-utexo.Dockerfile"
+        },
+        {
+          "status": " M",
+          "path": "tests/integration/docker-compose.stand.yml"
+        },
+        {
+          "status": "??",
+          "path": "tests/integration/android-proxy.conf"
+        }
+      ],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-app/.devstack/bridge-retest-20261013/btc-relay",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/btc-relay.git",
+      "head": "ff93f6da45fea81081d8dfe4006372c1a8ae55d2",
+      "branch": "main",
+      "upstream": "origin/main",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-app/.devstack/bridge-retest-20261013/btc-relay/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-app/.devstack/bridge-retest-20261013/enclave-signer",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/enclave-signer.git",
+      "head": "d3f410929b43099bfc7521178906039475f56b5e",
+      "branch": "dev",
+      "upstream": "origin/dev",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-app/.devstack/bridge-retest-20261013/enclave-signer/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [
+        {
+          "status": " M",
+          "path": "build/Dockerfile.enclave-dev.bfa"
+        }
+      ],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-app/.devstack/bridge-retest-20261013/federated-signer-node",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/federated-signer-node.git",
+      "head": "e9f07604f28518ac8aa05909ebd355b7d790a4b8",
+      "branch": "dev",
+      "upstream": "origin/dev",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-app/.devstack/bridge-retest-20261013/federated-signer-node/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-app/.devstack/bridge-retest-20261013/federated-signer-proto",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/federated-signer-proto.git",
+      "head": "2b81a2eaadb99daa68c4428ea38f80ae3f40805d",
+      "branch": "",
+      "upstream": null,
+      "aheadBehindLastFetched": null,
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-app/.devstack/bridge-retest-20261013/federated-signer-proto/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-app/.devstack/bridge-retest-20261013/frontend",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/utexo-bridge-fe.git",
+      "head": "c0edab6377f22de7faee28750933e7144c01ac31",
+      "branch": "feat/onbording",
+      "upstream": "origin/feat/onbording",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-app/.devstack/bridge-retest-20261013/frontend/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-app/.devstack/bridge-retest-20261013/iris",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/utexo-mobile.git",
+      "head": "243fb047011b872cb78d9187a73aa3a933bd26de",
+      "branch": "release/rln-0.15.0-beta.3",
+      "upstream": "origin/release/rln-0.15.0-beta.3",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-app/.devstack/bridge-retest-20261013/iris/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [
+        {
+          "status": " M",
+          "path": "docs/engineering/bridge-connect-tracker.md"
+        }
+      ],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-app/.devstack/bridge-retest-20261013/rgb-consignment-parser",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/rgb-consignment-parser.git",
+      "head": "ed35711bc55453d50713c13dd81a7d2a503f69e7",
+      "branch": "main",
+      "upstream": "origin/main",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-app/.devstack/bridge-retest-20261013/rgb-consignment-parser/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-app/.devstack/bridge-retest-20261013/rgb-wallet-tools",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/rgb-wallet-tools.git",
+      "head": "8de350d4c776cdd0d105ae9c27aab0325bc1da45",
+      "branch": "main",
+      "upstream": "origin/main",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-app/.devstack/bridge-retest-20261013/rgb-wallet-tools/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [
+        {
+          "status": " M",
+          "path": "Cargo.lock"
+        },
+        {
+          "status": " M",
+          "path": "Cargo.toml"
+        },
+        {
+          "status": " M",
+          "path": "scripts/_rgb_lib_root.sh"
+        },
+        {
+          "status": " M",
+          "path": "scripts/receiver_wallet.sh"
+        },
+        {
+          "status": "??",
+          "path": "src/bin/export_contract.rs"
+        }
+      ],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-app/.devstack/bridge-retest-20261013/utexo-smart-contracts",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/utexo-smart-contracts.git",
+      "head": "cf390bd17570e0a6c97998d523c3db421b0ce8e9",
+      "branch": "dev",
+      "upstream": "origin/dev",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-app/.devstack/bridge-retest-20261013/utexo-smart-contracts/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-lightweight/rgb-lightning-node",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/rgb-lightning-node.git",
+      "head": "7f318a80372ae3bdc7e2f54cd6cd4b7b5d734d9d",
+      "branch": "local/pr-174-gateway-container",
+      "upstream": null,
+      "aheadBehindLastFetched": null,
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-lightweight/rgb-lightning-node/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [
+        {
+          "status": "??",
+          "path": "compose.minimal-gateway.local.yaml"
+        },
+        {
+          "status": "??",
+          "path": "minimal-sdk/.dockerignore"
+        },
+        {
+          "status": "??",
+          "path": "minimal-sdk/Dockerfile.gateway"
+        },
+        {
+          "status": "??",
+          "path": "minimal-sdk/LOCAL_CONTAINER.md"
+        },
+        {
+          "status": "??",
+          "path": "minimal-sdk/local-fixtures/"
+        },
+        {
+          "status": "??",
+          "path": "minimal-sdk/local-stack.mjs"
+        },
+        {
+          "status": "??",
+          "path": "minimal-sdk/local-tests/"
+        }
+      ],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-lightweight/rgb-sdk-kotlin-light",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/rgb-sdk-kotlin-light.git",
+      "head": "4a0a13db8fccb246e7e31941063115a833e7dc99",
+      "branch": "main",
+      "upstream": "origin/main",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-lightweight/rgb-sdk-kotlin-light/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [
+        {
+          "status": " M",
+          "path": "README.md"
+        },
+        {
+          "status": " M",
+          "path": "SECURITY.md"
+        },
+        {
+          "status": " M",
+          "path": "docs/DURABLE_CONSUMER_RECOVERY.md"
+        },
+        {
+          "status": " M",
+          "path": "release-smoke-app/build.gradle.kts"
+        },
+        {
+          "status": " M",
+          "path": "release-smoke-app/proguard-rules.pro"
+        },
+        {
+          "status": " M",
+          "path": "release-smoke-app/src/androidTest/kotlin/com/utexo/rgb/sdk/releasesmoke/PackagedReleaseAarSignerTest.kt"
+        },
+        {
+          "status": " M",
+          "path": "sdk/api/release-api.txt"
+        },
+        {
+          "status": " M",
+          "path": "sdk/src/androidTest/kotlin/com/utexo/rgb/sdk/GatewayNativeProfileTest.kt"
+        },
+        {
+          "status": " M",
+          "path": "sdk/src/main/kotlin/com/utexo/rgb/sdk/Backend.kt"
+        },
+        {
+          "status": " M",
+          "path": "sdk/src/main/kotlin/com/utexo/rgb/sdk/OperationCheckpointCodec.kt"
+        },
+        {
+          "status": " M",
+          "path": "sdk/src/main/kotlin/com/utexo/rgb/sdk/Requests.kt"
+        },
+        {
+          "status": " M",
+          "path": "sdk/src/main/kotlin/com/utexo/rgb/sdk/RgbLightningNodeGatewayBackend.kt"
+        },
+        {
+          "status": " M",
+          "path": "sdk/src/main/kotlin/com/utexo/rgb/sdk/UTEXOWallet.kt"
+        },
+        {
+          "status": " M",
+          "path": "sdk/src/main/kotlin/com/utexo/rgb/sdk/WalletModels.kt"
+        },
+        {
+          "status": " M",
+          "path": "sdk/src/main/kotlin/com/utexo/rgb/sdk/WalletServiceConfiguration.kt"
+        },
+        {
+          "status": " M",
+          "path": "sdk/src/main/kotlin/com/utexo/rgb/sdk/internal/GatewaySigningContext.kt"
+        },
+        {
+          "status": " M",
+          "path": "sdk/src/main/kotlin/com/utexo/rgb/sdk/internal/LocalSigningEngine.kt"
+        },
+        {
+          "status": " M",
+          "path": "sdk/src/main/kotlin/com/utexo/rgb/sdk/internal/OperationCoordinator.kt"
+        },
+        {
+          "status": " M",
+          "path": "sdk/src/main/kotlin/com/utexo/rgb/sdk/internal/UniFfiLocalSigningEngine.kt"
+        },
+        {
+          "status": " M",
+          "path": "sdk/src/test/kotlin/com/utexo/rgb/sdk/GatewaySigningContextTest.kt"
+        },
+        {
+          "status": " M",
+          "path": "sdk/src/test/kotlin/com/utexo/rgb/sdk/OperationCheckpointCodecTest.kt"
+        },
+        {
+          "status": " M",
+          "path": "sdk/src/test/kotlin/com/utexo/rgb/sdk/OperationCoordinatorTest.kt"
+        },
+        {
+          "status": " M",
+          "path": "sdk/src/test/kotlin/com/utexo/rgb/sdk/RgbLightningNodeGatewayBackendTest.kt"
+        },
+        {
+          "status": " M",
+          "path": "sdk/src/test/kotlin/com/utexo/rgb/sdk/WalletModelValidationTest.kt"
+        },
+        {
+          "status": " M",
+          "path": "sdk/src/test/kotlin/com/utexo/rgb/sdk/WalletServiceConfigurationTest.kt"
+        },
+        {
+          "status": "??",
+          "path": "release-smoke-app/src/main/kotlin/com/utexo/rgb/sdk/releasesmoke/ReleaseGatewaySpendingSmoke.kt"
+        },
+        {
+          "status": "??",
+          "path": "sdk/src/main/kotlin/com/utexo/rgb/sdk/internal/GatewayRgbInvoiceDecoder.kt"
+        }
+      ],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-lightweight/rgb-sdk-swift-light",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/rgb-sdk-swift-light.git",
+      "head": "30be0214bba1ccc99bb76c53735ef15c2c062645",
+      "branch": "main",
+      "upstream": "origin/main",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-lightweight/rgb-sdk-swift-light/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [
+        {
+          "status": " M",
+          "path": "API/RGBSDK.macos.json"
+        },
+        {
+          "status": " M",
+          "path": "Artifacts/RGBSDK.xcframework/Info.plist"
+        },
+        {
+          "status": " M",
+          "path": "Artifacts/RGBSDK.xcframework/ios-arm64/RGBSDK.framework/Modules/RGBSDK.swiftmodule/arm64-apple-ios.swiftinterface"
+        },
+        {
+          "status": " M",
+          "path": "Artifacts/RGBSDK.xcframework/ios-arm64/RGBSDK.framework/RGBSDK"
+        },
+        {
+          "status": " M",
+          "path": "Artifacts/RGBSDK.xcframework/ios-arm64_x86_64-simulator/RGBSDK.framework/Modules/RGBSDK.swiftmodule/arm64-apple-ios-simulator.swiftinterface"
+        },
+        {
+          "status": " M",
+          "path": "Artifacts/RGBSDK.xcframework/ios-arm64_x86_64-simulator/RGBSDK.framework/Modules/RGBSDK.swiftmodule/x86_64-apple-ios-simulator.swiftinterface"
+        },
+        {
+          "status": " M",
+          "path": "Artifacts/RGBSDK.xcframework/ios-arm64_x86_64-simulator/RGBSDK.framework/RGBSDK"
+        },
+        {
+          "status": " M",
+          "path": "Artifacts/RGBSDK.xcframework/macos-arm64_x86_64/RGBSDK.framework/Modules/RGBSDK.swiftmodule/arm64-apple-macos.swiftinterface"
+        },
+        {
+          "status": " M",
+          "path": "Artifacts/RGBSDK.xcframework/macos-arm64_x86_64/RGBSDK.framework/Modules/RGBSDK.swiftmodule/x86_64-apple-macos.swiftinterface"
+        },
+        {
+          "status": " M",
+          "path": "Artifacts/RGBSDK.xcframework/macos-arm64_x86_64/RGBSDK.framework/RGBSDK"
+        },
+        {
+          "status": " M",
+          "path": "NativeSource/SHA256SUMS"
+        },
+        {
+          "status": " M",
+          "path": "NativeSource/artifact-manifest.json"
+        },
+        {
+          "status": " M",
+          "path": "NativeSource/facade-build.json"
+        },
+        {
+          "status": " M",
+          "path": "README.md"
+        },
+        {
+          "status": " M",
+          "path": "SECURITY.md"
+        },
+        {
+          "status": " M",
+          "path": "Scripts/verify-apple-consumer.sh"
+        },
+        {
+          "status": " M",
+          "path": "Sources/RGBSDK/Backend.swift"
+        },
+        {
+          "status": " M",
+          "path": "Sources/RGBSDK/Errors.swift"
+        },
+        {
+          "status": " M",
+          "path": "Sources/RGBSDK/GatewayWalletBackend.swift"
+        },
+        {
+          "status": " M",
+          "path": "Sources/RGBSDK/LocalSigningEngine.swift"
+        },
+        {
+          "status": " M",
+          "path": "Sources/RGBSDK/OperationCheckpointCodec.swift"
+        },
+        {
+          "status": " M",
+          "path": "Sources/RGBSDK/OperationCoordinator.swift"
+        },
+        {
+          "status": " M",
+          "path": "Sources/RGBSDK/Requests.swift"
+        },
+        {
+          "status": " M",
+          "path": "Sources/RGBSDK/UTEXOWallet.swift"
+        },
+        {
+          "status": " M",
+          "path": "Sources/RGBSDK/WalletModels.swift"
+        },
+        {
+          "status": " M",
+          "path": "Sources/RGBSDK/WalletServiceConfiguration.swift"
+        },
+        {
+          "status": " M",
+          "path": "Tests/AppleConsumerFixture/PublicGatewayConsumerTests.swift"
+        },
+        {
+          "status": " M",
+          "path": "Tests/ExternalConsumerFixture/Sources/FacadeConsumer/main.swift"
+        },
+        {
+          "status": " M",
+          "path": "Tests/RGBSDKTests/GatewayWalletBackendTests.swift"
+        },
+        {
+          "status": " M",
+          "path": "Tests/RGBSDKTests/OperationCheckpointCodecTests.swift"
+        },
+        {
+          "status": " M",
+          "path": "Tests/RGBSDKTests/OperationRecoveryTests.swift"
+        },
+        {
+          "status": " M",
+          "path": "docs/DURABLE_CONSUMER_RECOVERY.md"
+        },
+        {
+          "status": "??",
+          "path": "Sources/RGBSDK/GatewayReadModels.swift"
+        },
+        {
+          "status": "??",
+          "path": "Tests/RGBSDKTests/GatewayRGBTransportTests.swift"
+        },
+        {
+          "status": "??",
+          "path": "Tests/RGBSDKTests/GatewayReadSupportTests.swift"
+        }
+      ],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-trial/pear-wrk-wdk",
+      "git": true,
+      "origin": "https://github.com/Jainakin/pear-wrk-wdk.git",
+      "head": "c8e94e7aaa3cb1612d5c51b411de45aaa3f4a065",
+      "branch": "rgb-wdk-integration",
+      "upstream": "origin/rgb-wdk-integration",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-trial/pear-wrk-wdk/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [
+        {
+          "status": " M",
+          "path": "package-lock.json"
+        },
+        {
+          "status": " M",
+          "path": "spec/hrpc/hrpc.json"
+        },
+        {
+          "status": " M",
+          "path": "spec/hrpc/index.js"
+        },
+        {
+          "status": " M",
+          "path": "spec/hrpc/messages.js"
+        },
+        {
+          "status": " M",
+          "path": "src/schema/schema.js"
+        },
+        {
+          "status": " M",
+          "path": "src/wdk-core/wdk-manager.js"
+        },
+        {
+          "status": " M",
+          "path": "src/wdk-worklet.js"
+        }
+      ],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-trial/rgb-lib-bare",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/rgb-lib-bare.git",
+      "head": "4b9dcd4e7b35d5bb1c9d70588d76a739e4cf1652",
+      "branch": "main",
+      "upstream": "origin/main",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-trial/rgb-lib-bare/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-trial/rgb-lib-nodejs",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/rgb-lib-nodejs.git",
+      "head": "460c52b547132430ff501802de37ecec2a765194",
+      "branch": "dev",
+      "upstream": "origin/dev",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-trial/rgb-lib-nodejs/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [
+        {
+          "status": " M",
+          "path": "README.md"
+        }
+      ],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-trial/rgb-lightning-node",
+      "git": true,
+      "origin": "https://github.com/Jainakin/rgb-lightning-node.git",
+      "head": "1529c263aa0bbe128bec7c5c300f0ae3330e778f",
+      "branch": "agent/cffi-verify-message",
+      "upstream": "origin/agent/cffi-verify-message",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-trial/rgb-lightning-node/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [
+        {
+          "status": " M",
+          "path": "compose.yaml"
+        },
+        {
+          "status": " M",
+          "path": "regtest.sh"
+        },
+        {
+          "status": " M",
+          "path": "src/ldk.rs"
+        },
+        {
+          "status": "??",
+          "path": "dataissuer-usdt.locked-2026-07-28T09-39-24-317Z/"
+        },
+        {
+          "status": "??",
+          "path": "dataissuer-usdt.reset-2026-07-28T22-30-10-451Z/"
+        },
+        {
+          "status": "??",
+          "path": "dataissuer-usdt.reset-2026-07-29T00-08-32-556Z/"
+        },
+        {
+          "status": "??",
+          "path": "dataissuer-usdt.reset-2026-07-29T01-00-06-890Z/"
+        },
+        {
+          "status": "??",
+          "path": "dataissuer-usdt/"
+        },
+        {
+          "status": "??",
+          "path": "datapeer.bak.1781245058/"
+        },
+        {
+          "status": "??",
+          "path": "datapeer.bak.1781494776/"
+        },
+        {
+          "status": "??",
+          "path": "datapeer.wiped.1781593042/"
+        },
+        {
+          "status": "??",
+          "path": "datapeer.wiped2.1781594395/"
+        },
+        {
+          "status": "??",
+          "path": "datapeer/"
+        },
+        {
+          "status": "??",
+          "path": "logs/"
+        }
+      ],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-trial/rgb-sdk",
+      "git": true,
+      "origin": "https://github.com/Jainakin/rgb-sdk.git",
+      "head": "f560ae4561b03ff300e1f9900a6704d7cb29177a",
+      "branch": "rgb-wdk-integration",
+      "upstream": "origin/rgb-wdk-integration",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-trial/rgb-sdk/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-trial/rgb-sdk-rn",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/rgb-sdk-rn.git",
+      "head": "94e2d65bae9032061cc127c3661a3d7070bde4e2",
+      "branch": "utexo",
+      "upstream": "origin/utexo",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-trial/rgb-sdk-rn/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-trial/utexo-rgb-wdk",
+      "git": true,
+      "origin": "https://github.com/Jainakin/utexo-rgb-wdk.git",
+      "head": "9fcbe4d187e38f7c280b760f99909358519d14fa",
+      "branch": "main",
+      "upstream": "origin/main",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-trial/utexo-rgb-wdk/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-trial/utexo-rgb-wdk-demo",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/utexo-rgb-wdk-demo.git",
+      "head": "1844b5ee838c49e83c037d032284ccedfb4b4ee5",
+      "branch": "node-target/initial-demo",
+      "upstream": "origin/node-target/initial-demo",
+      "aheadBehindLastFetched": [
+        2,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-trial/utexo-rgb-wdk-demo/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [
+        {
+          "status": " M",
+          "path": "node-demo/lsp/compose.yaml"
+        },
+        {
+          "status": " M",
+          "path": "node-demo/package.json"
+        },
+        {
+          "status": " M",
+          "path": "node-demo/test-runner/LnExt.ts"
+        },
+        {
+          "status": " M",
+          "path": "node-demo/test-runner/run.ts"
+        },
+        {
+          "status": " M",
+          "path": "node-demo/test-runner/testCases.ts"
+        },
+        {
+          "status": "??",
+          "path": ".data/"
+        }
+      ],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-trial/utexo-rgb-wdk-sandbox",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/utexo-rgb-wdk-sandbox.git",
+      "head": "604ce6d47ad2abde18d4f246411b9dff69e16a84",
+      "branch": "rln-demo",
+      "upstream": "origin/rln-demo",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-trial/utexo-rgb-wdk-sandbox/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [
+        {
+          "status": " M",
+          "path": "App.tsx"
+        },
+        {
+          "status": "??",
+          "path": "src/DemoModeScreen.tsx"
+        }
+      ],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-trial/wdk-core-react-native",
+      "git": true,
+      "origin": "https://github.com/tetherto/wdk-core-react-native.git",
+      "head": "65f1a2bc98984fcbecbe0f3d220a08423a645491",
+      "branch": "main",
+      "upstream": "origin/main",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-trial/wdk-core-react-native/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-trial/wdk-react-native-provider",
+      "git": true,
+      "origin": "https://github.com/tetherto/wdk-react-native-provider.git",
+      "head": "4711356b8b7b2b85f6ae4e88fc6d5df3e4bbd18f",
+      "branch": "main",
+      "upstream": "origin/main",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-trial/wdk-react-native-provider/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-trial/wdk-rgb-lightning",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/wdk-rgb-lightning.git",
+      "head": "c00fa737c62133226e094c15fcd190ed2da607ef",
+      "branch": "hardik/mobile-wallet-wdk-runtime",
+      "upstream": "publication/hardik/mobile-wallet-wdk-runtime",
+      "aheadBehindLastFetched": [
+        0,
+        4
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-trial/wdk-rgb-lightning/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-trial/wdk-rgb-lightning-release-beta15",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/wdk-rgb-lightning.git",
+      "head": "80302563c0682d73477dd9d1f2552dbd9bae2810",
+      "branch": "agent/fix-release-audit",
+      "upstream": "origin/agent/fix-release-audit",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-trial/wdk-rgb-lightning/.git",
+      "linkedWorktree": true,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-trial/wdk-rgb-lightning-release-hardening",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/wdk-rgb-lightning.git",
+      "head": "53813aef9d63da72b65a04a6e6a5df27bbacd029",
+      "branch": "agent/release-hardening",
+      "upstream": "origin/agent/release-hardening",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-trial/wdk-rgb-lightning/.git",
+      "linkedWorktree": true,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-trial/wdk-rgb-lightning-runtime-alignment",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/wdk-rgb-lightning.git",
+      "head": "d86c63b2f0972ebb8b3dc77a5c4490a2117b875a",
+      "branch": "agent/align-bare-runtime",
+      "upstream": "origin/agent/align-bare-runtime",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-trial/wdk-rgb-lightning/.git",
+      "linkedWorktree": true,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-trial/wdk-rgb-lightning-uma",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/wdk-rgb-lightning.git",
+      "head": "c6202fdc1517c38f7923f036efb6010a69cf4701",
+      "branch": "feat/uma-lightning-address-normalization",
+      "upstream": "origin/feat/uma-lightning-address-normalization",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-trial/wdk-rgb-lightning/.git",
+      "linkedWorktree": true,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-trial/wdk-rgb-lightning-wdk-review-28",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/wdk-rgb-lightning.git",
+      "head": "6e497a2c6784b09b736b0e58651d3567a8af82f7",
+      "branch": "review/package-snapshot-current",
+      "upstream": "origin/review/package-snapshot-current",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-trial/wdk-rgb-lightning/.git",
+      "linkedWorktree": true,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-trial/wdk-starter-react-native",
+      "git": true,
+      "origin": "https://github.com/Jainakin/wdk-starter-react-native.git",
+      "head": "14f8963427091997f0fb397df2a2cab5d1f01d05",
+      "branch": "main",
+      "upstream": "origin/main",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-trial/wdk-starter-react-native/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [
+        {
+          "status": " M",
+          "path": "package-lock.json"
+        },
+        {
+          "status": " M",
+          "path": "package.json"
+        },
+        {
+          "status": " M",
+          "path": "src/config/get-chains-config.ts"
+        },
+        {
+          "status": "??",
+          "path": ".wdk-bundle/"
+        },
+        {
+          "status": "??",
+          "path": ".wdk/"
+        },
+        {
+          "status": "??",
+          "path": "wdk.config.js"
+        }
+      ],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "utexo-trial/wdk-wallet-rgb",
+      "git": true,
+      "origin": "https://github.com/Jainakin/wdk-wallet-rgb.git",
+      "head": "614a67881a85865f6319c146326c2c9f4060e4df",
+      "branch": "chore/wdk-wallet-beta10",
+      "upstream": "origin/chore/wdk-wallet-beta10",
+      "aheadBehindLastFetched": [
+        0,
+        0
+      ],
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/utexo-trial/wdk-wallet-rgb/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [],
+      "ignoredContentNotInventoried": true
+    },
+    {
+      "path": "wdk-rgb-demo/utexo-rgb-wdk-demo",
+      "git": true,
+      "origin": "https://github.com/UTEXO-Protocol/utexo-rgb-wdk-demo.git",
+      "head": "8f234538719bc6a27aad364f391b2623cee19096",
+      "branch": "demo/marketing-recording-screen",
+      "upstream": null,
+      "aheadBehindLastFetched": null,
+      "aheadBehindMeaning": "Local cached tracking refs only; not a fresh remote check.",
+      "commonGitDirectory": "/Users/hardik/Projects/wdk-rgb-demo/utexo-rgb-wdk-demo/.git",
+      "linkedWorktree": false,
+      "workingTreeStatus": [
+        {
+          "status": " M",
+          "path": ".env.example"
+        },
+        {
+          "status": " M",
+          "path": "App.tsx"
+        },
+        {
+          "status": " M",
+          "path": "package-lock.json"
+        },
+        {
+          "status": " M",
+          "path": "package.json"
+        },
+        {
+          "status": " M",
+          "path": "src/RgbScreen.tsx"
+        },
+        {
+          "status": "??",
+          "path": ".codex/"
+        },
+        {
+          "status": "??",
+          "path": "babel.config.js"
+        },
+        {
+          "status": "??",
+          "path": "patches/"
+        },
+        {
+          "status": "??",
+          "path": "scripts/"
+        }
+      ],
+      "ignoredContentNotInventoried": true
+    }
+  ],
+  "nonGitWorkspaceMustPreserve": [
+    "utexo-lightweight (root documentation)",
+    "utexo-lightweight/shared/utexo-local-signer",
+    "utexo-app/.devstack/bridge-retest-20261013 (root scripts, notes, stand-data, secrets, AVD, evidence)",
+    "rln-lightning/local-notes"
+  ],
+  "operationalState": {
+    "docker": "Read-only docker ps stalled; command terminated; live container health not established.",
+    "mutationPerformed": false,
+    "backupPerformed": false
+  }
+}

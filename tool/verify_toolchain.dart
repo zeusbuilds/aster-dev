@@ -2959,7 +2959,12 @@ void _verifyRetiredProductIdentity(String root, List<String> failures) {
       break;
     }
     final appIdentifier = retiredAppIdentifier.firstMatch(source);
-    if (appIdentifier != null) {
+    // Cross-workspace recovery notes must retain real sibling repository paths.
+    // This exception does not permit retired stack vocabulary or app branding.
+    final isWorkspaceHandoff =
+        relativePath.startsWith('docs/handoff/') &&
+        (relativePath.endsWith('.md') || relativePath.endsWith('.json'));
+    if (appIdentifier != null && !isWorkspaceHandoff) {
       failures.add(
         '$relativePath:${_lineNumberAt(source, appIdentifier.start)} uses a '
         'retired app-owned identifier.',

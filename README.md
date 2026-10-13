@@ -110,6 +110,9 @@ onboarding, disclosure, or logging behavior.
 
 ## Documentation
 
+- System reset and cross-project handoff: `docs/handoff/SYSTEM_CONTEXT.md`
+- Backup/restore checklist: `docs/handoff/RESET_AND_RESTORE.md`
+- New Codex task context: `docs/handoff/RESUME_PROMPT.md`
 - Development setup: `docs/DEVELOPMENT.md`
 - Architecture: `docs/architecture/ARCHITECTURE.md`
 - SDK integration: `docs/architecture/SDK_INTEGRATION.md`

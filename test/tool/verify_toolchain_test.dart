@@ -873,6 +873,56 @@ library_count=1
     );
   });
 
+  test(
+    'handoff metadata can identify sibling repos without rebranding app',
+    () {
+      final sibling = String.fromCharCodes(const [117, 116, 101, 120, 111, 45]);
+      _write(repository, 'docs/handoff/CONTEXT.md', 'Sibling: ${sibling}app');
+      _write(
+        repository,
+        'docs/handoff/SNAPSHOT.json',
+        '{"repository":"${sibling}app"}',
+      );
+
+      final result = _verify(
+        repository,
+        flutterVersionMetadata,
+        flutterExtension,
+        flutterGradleUtils,
+      );
+
+      expect(result.failures, isEmpty);
+    },
+  );
+
+  test('handoff exception is limited to metadata and retains stack policy', () {
+    final sibling = String.fromCharCodes(const [117, 116, 101, 120, 111, 45]);
+    final retiredStackName = String.fromCharCodes(const [71, 68, 75]);
+    _write(repository, 'docs/handoff/CONTEXT.md', retiredStackName);
+    _write(repository, 'docs/handoff/run.sh', '# ${sibling}app');
+    _write(repository, 'docs/handoff-lookalike/README.md', '${sibling}app');
+    _write(repository, 'docs/architecture/sibling.md', '${sibling}app');
+    _write(repository, 'lib/core/sibling.dart', '// ${sibling}app');
+
+    final result = _verify(
+      repository,
+      flutterVersionMetadata,
+      flutterExtension,
+      flutterGradleUtils,
+    );
+
+    expect(
+      result.failures,
+      containsAll(<Matcher>[
+        contains('docs/handoff/CONTEXT.md:1 contains retired'),
+        contains('docs/handoff/run.sh:1 uses a retired app-owned identifier'),
+        contains('docs/handoff-lookalike/README.md:1 uses a retired'),
+        contains('docs/architecture/sibling.md:1 uses a retired'),
+        contains('lib/core/sibling.dart:1 uses a retired'),
+      ]),
+    );
+  });
+
   test('rejects omitted NDK and divergent Nix revisions', () {
     _write(
       repository,
