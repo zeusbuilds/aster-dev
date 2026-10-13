@@ -78,6 +78,10 @@ class _NetworkConfigurationContent extends ConsumerWidget {
                 value: _publicEndpoint(configuration.vssUrl),
               ),
               _ConfigurationRow(
+                label: 'Ethereum validation RPC',
+                value: _publicEndpoint(configuration.ethRpcUrl),
+              ),
+              _ConfigurationRow(
                 label: 'Explorer',
                 value: _publicEndpoint(configuration.explorerBaseUrl),
               ),

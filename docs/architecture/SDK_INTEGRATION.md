@@ -8,7 +8,7 @@ architecture boundaries.
 
 The checked-in `pubspec.yaml` and `pubspec.lock` resolve the public UTEXO
 protocol SDK repository to immutable commit
-`734f5ae6fb175bbf2d8500a9b43f29b5363c1e52`. Do not replace the commit with a
+`7c44506fdfe1dae6f3a6fe884f849c7ca2ad028b`. Do not replace the commit with a
 branch, tag, moving reference, or local path in a committed change.
 
 After changing the SDK pin intentionally, run:
@@ -22,9 +22,9 @@ fvm flutter test
 
 Both iOS and Android builds are required before accepting a new SDK commit.
 
-The pinned revision targets RN `1.0.0-beta.32` (commit
-`821ae4fd10ca3933445ab926cb0af0230b108913`), core `1.0.0-beta.9`, and RLN
-`0.13.0-beta.3`. The app's Flutter 3.47.0 / Dart 3.13.0, iOS 18.5 minimum,
+The pinned revision targets RN `1.0.0-beta.37` (commit
+`e38329eba11cce16e3bea75b8a4e7becd52c0036`), core `1.0.0-beta.9`, WebRGB
+`0.1.2`, and RLN `0.16.0-beta.3`. The app's Flutter 3.47.0 / Dart 3.13.0, iOS 18.5 minimum,
 Android compile SDK 36 and Java 17 already satisfy its requirements. Native
 artifacts follow the SDK's checked-in baseline and checksum-verifying hooks;
 never reuse binaries from a previous Pub checkout by copying them manually.
@@ -42,8 +42,15 @@ never reuse binaries from a previous Pub checkout by copying them manually.
 | Network policy | getNetworkDefaults | SDK owns indexer/proxy defaults. The LSP resolver is not exported, so the reviewed UTEXO signet LSP URL remains explicit app deployment policy, validated and shown in Settings. |
 | Errors | Typed SDK exceptions | Quote/proof verification failures and LNURL business rejections are not connectivity failures and are not automatically retryable. Raw reasons, response bodies and credentials never cross to UI. |
 
-Aster intentionally supports the configured USDT contract ID on both rails,
-not arbitrary ticker-based or linked-asset substitution. The upgrade does not
+Aster intentionally supports the configured USDT contract ID, including BFA
+inventory, not arbitrary ticker-based or linked-asset substitution. Lightning
+send/receive choices stay visible but disabled as Coming later on every network.
+Direct repository requests also fail before any native work. Non-mainnet
+existing Lightning balances/history remain visible; mainnet skips those APIs
+because RLN 0.16 has no Lightning runtime there. Other errors are never converted
+into empty balances/history. Outgoing RGB Send/Burn/Inflation uses the SDK's
+exact recipient amount rather than change allocations; absent amounts remain
+unknown. The upgrade does not
 add Lightning Addresses, APay proofs, LSP relay/bridge/channel provisioning,
 linked/canonical asset selection, inflation, PSBTs or native VSS backup UI.
 These require explicit app models, product flows and funded integration proof;
@@ -51,6 +58,13 @@ the presence of methods in the dependency is not evidence they work in Aster.
 Detailed refresh, UTXO existence and linked-IFA metadata are SDK capabilities,
 not newly exposed app APIs. Existing sync uses syncWallet; fee-aware Send Max
 and Swap remain unavailable rather than approximated or simulated.
+
+The optional SDK WebRGB provider supports witness receiving and approved native
+message signing. Its WalletConnect router is not a complete connection flow:
+Aster has no live WalletKit pairing/consent integration or configured Reown
+project ID. These remain explicitly tracked; no Connect or burn success is
+simulated. BFA/Ethereum and VSS service qualification and PKG-006 still prevent
+a mainnet-ready claim.
 
 The SDK reads the full UInt64 RGB range; Aster's supported amounts and sums
 remain `0..9223372036854775807` smallest units. Values outside that domain fail
@@ -138,6 +152,7 @@ manifest documented in `config/README.md` and consumes it through
 | `ASTER_RGB_PROXY_URL` | Optional RGB transport proxy override |
 | `ASTER_LSP_URL` | Optional LSP base URL |
 | `ASTER_VSS_URL` | Optional VSS base URL |
+| `ASTER_ETH_RPC_URL` | Optional credential-free Ethereum validation RPC, not an Ethereum wallet or payout verifier |
 | `ASTER_EXPLORER_URL` | Optional public transaction explorer base |
 
 Credentials and bearer tokens must never be supplied through either individual

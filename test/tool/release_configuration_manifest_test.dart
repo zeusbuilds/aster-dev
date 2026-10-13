@@ -9,6 +9,50 @@ import '../../tool/verify_release_configuration.dart';
 void main() {
   group('ReleaseConfigurationManifest', () {
     test(
+      'onchain release needs no LSP and validates optional Ethereum RPC',
+      () {
+        final values = Map<String, String>.of(_baseValues)
+          ..remove(ReleaseConfigurationKey.lspUrl);
+        expect(
+          ReleaseConfigurationManifest.parse(
+            _manifest(values),
+            audience: ReleaseAudience.internalBeta,
+          ).values,
+          isNot(contains(ReleaseConfigurationKey.lspUrl)),
+        );
+        for (final key in [
+          ReleaseConfigurationKey.ethRpcUrl,
+          ReleaseConfigurationKey.lspUrl,
+        ]) {
+          for (final value in [
+            'http://rpc.aster-wallet.com',
+            'https://token@rpc.aster-wallet.com',
+            'https://rpc.aster-wallet.com?key=secret',
+          ]) {
+            expect(
+              () => ReleaseConfigurationManifest.parse(
+                _manifest({...values, key: value}),
+                audience: ReleaseAudience.internalBeta,
+              ),
+              throwsFormatException,
+            );
+          }
+        }
+        final configured = ReleaseConfigurationManifest.parse(
+          _manifest({
+            ...values,
+            ReleaseConfigurationKey.ethRpcUrl: 'https://rpc.aster-wallet.com',
+          }),
+          audience: ReleaseAudience.internalBeta,
+        );
+        expect(
+          configured.values[ReleaseConfigurationKey.ethRpcUrl],
+          'https://rpc.aster-wallet.com',
+        );
+      },
+    );
+
+    test(
       'optional native listener ports reject malformed and colliding values',
       () {
         ReleaseConfigurationManifest parse(Map<String, String> ports) =>

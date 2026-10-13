@@ -336,7 +336,7 @@ void main() {
   testWidgets(
     'UXA-006 remount and target change hydrate the correct destination',
     (tester) async {
-      final h = await PaymentFlowTestHarness.create();
+      final h = await PaymentFlowTestHarness.create(services: testRgbServices);
       addTearDown(() => _dispose(tester, h));
       const target = WalletPaymentTarget.bitcoinOnchain;
       final provider = sendFlowViewModelProvider(target);
@@ -366,7 +366,7 @@ void main() {
         UncontrolledProviderScope(
           container: h.container,
           child: const SendAddressScreen(
-            target: WalletPaymentTarget.bitcoinLightning,
+            target: WalletPaymentTarget.usdtOnchain,
           ),
         ),
       );

@@ -13,18 +13,21 @@ final class SwapState {
     if (from == to) {
       throw ArgumentError('Swap selections must be different.');
     }
-    final available = this.capabilities
-        .where((item) => item.isAvailable)
-        .map((item) => item.target)
-        .toSet();
-    if (!available.contains(from) || !available.contains(to)) {
-      throw ArgumentError('Swap selections must be available targets.');
+    final targets = this.capabilities.map((item) => item.target).toSet();
+    if (!targets.contains(from) || !targets.contains(to)) {
+      throw ArgumentError('Swap selections must be known targets.');
     }
   }
 
   final List<WalletPaymentCapability> capabilities;
   final WalletPaymentTarget from;
   final WalletPaymentTarget to;
+
+  /// Unconfigured targets may be displayed, but never selected or reversed.
+  /// Swap is a non-executable preview even when both targets are available.
+  bool get canReverse =>
+      capabilities.any((item) => item.target == from && item.isAvailable) &&
+      capabilities.any((item) => item.target == to && item.isAvailable);
 
   SwapState copyWith({WalletPaymentTarget? from, WalletPaymentTarget? to}) {
     return SwapState(

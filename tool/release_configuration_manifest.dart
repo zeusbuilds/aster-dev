@@ -31,6 +31,7 @@ abstract final class ReleaseConfigurationKey {
   static const rgbProxyUrl = 'ASTER_RGB_PROXY_URL';
   static const lspUrl = 'ASTER_LSP_URL';
   static const vssUrl = 'ASTER_VSS_URL';
+  static const ethRpcUrl = 'ASTER_ETH_RPC_URL';
   static const explorerUrl = 'ASTER_EXPLORER_URL';
   static const usdtAssetId = 'ASTER_USDT_ASSET_ID';
   static const usdtPrecision = 'ASTER_USDT_PRECISION';
@@ -44,6 +45,7 @@ abstract final class ReleaseConfigurationKey {
 
   static const all = <String>{
     daemonPort,
+    ethRpcUrl,
     explorerUrl,
     indexerUrl,
     instagramUrl,
@@ -65,7 +67,6 @@ abstract final class ReleaseConfigurationKey {
   static const internalRequired = <String>{
     explorerUrl,
     indexerUrl,
-    lspUrl,
     network,
     rgbProxyUrl,
     usdtAssetId,
@@ -165,7 +166,6 @@ final class ReleaseConfigurationManifest {
       schemes: const {'https', 'rpcs'},
     );
     for (final key in const [
-      ReleaseConfigurationKey.lspUrl,
       ReleaseConfigurationKey.vssUrl,
       ReleaseConfigurationKey.explorerUrl,
     ]) {
@@ -190,6 +190,8 @@ final class ReleaseConfigurationManifest {
       }
     }
     for (final key in const [
+      ReleaseConfigurationKey.ethRpcUrl,
+      ReleaseConfigurationKey.lspUrl,
       ReleaseConfigurationKey.supportUrl,
       ReleaseConfigurationKey.termsUrl,
       ReleaseConfigurationKey.privacyUrl,

@@ -2,6 +2,35 @@ import 'package:aster/core/core.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('Ethereum validation RPC is validated and part of service identity', () {
+    WalletServiceConfiguration configuration(String? rpc) =>
+        WalletServiceConfiguration(
+          environment: BlockchainEnvironment.regtest,
+          sdkNetwork: 'regtest',
+          ethRpcUrl: rpc,
+        );
+    final local = configuration('http://127.0.0.1:8545');
+    expect(local.validate, returnsNormally);
+    expect(local, configuration(local.ethRpcUrl));
+    expect(local.hashCode, configuration(local.ethRpcUrl).hashCode);
+    expect(local, isNot(configuration(null)));
+    expect(
+      () => local.validate(allowInsecureDevelopmentEndpoints: false),
+      throwsA(isA<AppConfigurationException>()),
+    );
+    for (final endpoint in [
+      'https://token@rpc.example.com',
+      'https://rpc.example.com?token=secret',
+      'http://rpc.example.com',
+    ]) {
+      expect(
+        configuration(endpoint).validate,
+        throwsA(isA<AppConfigurationException>()),
+      );
+    }
+    expect(configuration('https://rpc.example.com').validate, returnsNormally);
+  });
+
   test(
     'native listener ports are bounded, distinct configuration identity',
     () {

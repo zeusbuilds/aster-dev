@@ -31,6 +31,13 @@ map, and new plist keys require a source-policy review.
 through `18`. Negative, signed, padded, or out-of-range values fail before any
 release build starts.
 
+`ASTER_ETH_RPC_URL` is optional, credential-free HTTPS configuration for native
+BFA validation. It does not add an Ethereum wallet or establish bridge payout
+proof. `ASTER_LSP_URL` is optional for the onchain-only release and cannot enable
+Lightning payment actions. Both are validated when supplied; `ASTER_VSS_URL`
+remains required by the existing release deployment contract. None of these
+endpoints may contain credentials or API keys.
+
 `ASTER_DAEMON_PORT` and `ASTER_LDK_PEER_PORT` are optional native listener
 ports, defaulting to `9735` and `9736`. They must be distinct canonical decimal
 integers from `1` through `65535`; invalid text never falls back silently.

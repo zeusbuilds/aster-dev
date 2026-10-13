@@ -97,29 +97,34 @@ void main() {
     },
   );
 
-  test('locks an invoice amount and never requests an on-chain fee', () async {
-    const route = PaymentRoute(
-      asset: WalletAsset.bitcoin,
-      rail: PaymentRail.lightning,
-    );
-    final invoiceAmount = WalletAmount.lightning(
-      assetId: WalletAsset.bitcoin.id,
+  test('locks an RGB invoice amount and uses an onchain fee', () async {
+    final now = DateTime.utc(2026, 10, 13);
+    final route = testRgbRoute;
+    final invoiceAmount = WalletAmount.onchain(
+      assetId: route.asset.id,
       units: 1001,
     );
     final engine = FakeWalletEngine()
-      ..balance = _balance(onchainSpendable: 1000, lightningSpendable: 5000)
+      ..balance = testRgbBalance(5000)
+      ..feeEstimate = WalletFeeRateEstimate(
+        targetBlocks: 6,
+        satsPerVbyte: 2,
+        observedAt: now,
+      )
       ..decodedInvoice = WalletPaymentPreview(
         route: route,
-        encodedDestination: 'lnbcrt1invoice',
-        displayDestination: 'lnbcrt1invoice',
+        encodedDestination: 'rgb:invoice',
+        displayDestination: 'rgb:invoice',
         amount: invoiceAmount,
-        expiresAt: DateTime.now().toUtc().add(const Duration(hours: 1)),
+        expiresAt: now.add(const Duration(hours: 1)),
       );
-    final harness = await PaymentFlowTestHarness.create(engine: engine);
-    addTearDown(harness.dispose);
-    final provider = sendFlowViewModelProvider(
-      WalletPaymentTarget.bitcoinLightning,
+    final harness = await PaymentFlowTestHarness.create(
+      engine: engine,
+      services: testRgbServices,
+      clock: () => now,
     );
+    addTearDown(harness.dispose);
+    final provider = sendFlowViewModelProvider(WalletPaymentTarget.usdtOnchain);
     final subscription = harness.container.listen(
       provider,
       (_, _) {},
@@ -129,11 +134,11 @@ void main() {
     await harness.container.read(provider.future);
     final notifier = harness.container.read(provider.notifier);
 
-    notifier.updateDestination('lnbcrt1invoice');
+    notifier.updateDestination('rgb:invoice');
     expect(await notifier.validateDestination(), isTrue);
     final locked = harness.container.read(provider).requireValue;
     expect(locked.amountIsLocked, isTrue);
-    expect(locked.amountText, '0.00000001001');
+    expect(locked.amountText, '0.001001');
     notifier.updateAmount('10');
     expect(
       harness.container.read(provider).requireValue.amountText,
@@ -142,75 +147,21 @@ void main() {
 
     expect(await notifier.submit(), isTrue);
     expect(engine.sentPaymentCommand?.amount, invoiceAmount);
-    expect(engine.sentPaymentCommand?.feeRate, isNull);
-    expect(engine.calls, isNot(contains('estimateFeeRate')));
+    expect(engine.sentPaymentCommand?.feeRate, isNotNull);
+    expect(engine.calls, contains('estimateFeeRate'));
   });
 
-  test(
-    'amountless Bitcoin Lightning rejects fractional sats before mutation',
-    () async {
-      const route = PaymentRoute(
-        asset: WalletAsset.bitcoin,
-        rail: PaymentRail.lightning,
-      );
-      final engine = FakeWalletEngine()
-        ..balance = _balance(onchainSpendable: 0, lightningSpendable: 5000)
-        ..decodedInvoice = WalletPaymentPreview(
-          route: route,
-          encodedDestination: 'lnbcrt1amountless',
-          displayDestination: 'lnbcrt1amountless',
-        );
-      final harness = await PaymentFlowTestHarness.create(engine: engine);
-      addTearDown(harness.dispose);
-      final provider = sendFlowViewModelProvider(
-        WalletPaymentTarget.bitcoinLightning,
-      );
-      final subscription = harness.container.listen(provider, (_, _) {});
-      addTearDown(subscription.close);
-      await harness.container.read(provider.future);
-      final notifier = harness.container.read(provider.notifier);
-
-      notifier.updateDestination('lnbcrt1amountless');
-      expect(await notifier.validateDestination(), isTrue);
-      notifier.updateAmount('0.00000001001');
-      final fractional = harness.container.read(provider).requireValue;
-      expect(fractional.amountInput.units, 1001);
-      expect(fractional.amountUsesSupportedGranularity, isFalse);
-      expect(fractional.canSubmitAt(DateTime.now().toUtc()), isFalse);
-
-      expect(await notifier.submit(), isFalse);
-      expect(
-        harness.container.read(provider).requireValue.failure?.code,
-        'payment_amount_requires_whole_satoshis',
-      );
-      expect(engine.calls, isNot(contains('sendPayment:start')));
-
-      notifier.updateAmount('0.00000002');
-      expect(
-        harness.container
-            .read(provider)
-            .requireValue
-            .amountUsesSupportedGranularity,
-        isTrue,
-      );
-      expect(await notifier.submit(), isTrue);
-      expect(engine.sentPaymentCommand?.amount.units, 2000);
-    },
-  );
-
-  test('suppresses overlapping destination validation', () async {
+  test('Bitcoin Lightning fails closed before any payment work', () async {
     const route = PaymentRoute(
       asset: WalletAsset.bitcoin,
       rail: PaymentRail.lightning,
     );
-    final gate = Completer<void>();
     final engine = FakeWalletEngine()
       ..balance = _balance(onchainSpendable: 0, lightningSpendable: 5000)
-      ..decodeInvoiceGate = gate
       ..decodedInvoice = WalletPaymentPreview(
         route: route,
-        encodedDestination: 'lnbcrt1invoice',
-        displayDestination: 'lnbcrt1invoice',
+        encodedDestination: 'lnbcrt1amountless',
+        displayDestination: 'lnbcrt1amountless',
       );
     final harness = await PaymentFlowTestHarness.create(engine: engine);
     addTearDown(harness.dispose);
@@ -219,9 +170,51 @@ void main() {
     );
     final subscription = harness.container.listen(provider, (_, _) {});
     addTearDown(subscription.close);
+    final callsBefore = List<String>.of(engine.calls);
+    await expectLater(
+      harness.container.read(provider.future),
+      throwsA(
+        isA<AppFailureException>().having(
+          (error) => error.failure.code,
+          'code',
+          'lightning_not_released',
+        ),
+      ),
+    );
+    final notifier = harness.container.read(provider.notifier);
+
+    notifier.updateDestination('lnbcrt1amountless');
+    expect(await notifier.validateDestination(), isFalse);
+    notifier.updateAmount('0.00000001001');
+    expect(await notifier.submit(), isFalse);
+    notifier.updateAmount('0.00000002');
+    expect(await notifier.submit(), isFalse);
+    await notifier.retry();
+    expect(engine.calls, callsBefore);
+  });
+
+  test('suppresses overlapping destination validation', () async {
+    final route = testRgbRoute;
+    final gate = Completer<void>();
+    final engine = FakeWalletEngine()
+      ..balance = testRgbBalance(5000)
+      ..decodeInvoiceGate = gate
+      ..decodedInvoice = WalletPaymentPreview(
+        route: route,
+        encodedDestination: 'rgb:invoice',
+        displayDestination: 'rgb:invoice',
+      );
+    final harness = await PaymentFlowTestHarness.create(
+      engine: engine,
+      services: testRgbServices,
+    );
+    addTearDown(harness.dispose);
+    final provider = sendFlowViewModelProvider(WalletPaymentTarget.usdtOnchain);
+    final subscription = harness.container.listen(provider, (_, _) {});
+    addTearDown(subscription.close);
     await harness.container.read(provider.future);
     final notifier = harness.container.read(provider.notifier);
-    notifier.updateDestination('lnbcrt1invoice');
+    notifier.updateDestination('rgb:invoice');
 
     final first = notifier.validateDestination();
     await Future<void>.delayed(Duration.zero);
@@ -746,7 +739,7 @@ void main() {
       );
       expect(capabilities.map((capability) => capability.isAvailable), [
         true,
-        true,
+        false,
         false,
         false,
       ]);
@@ -786,26 +779,22 @@ void main() {
 
   test('rejects an expired invoice against the injected UTC clock', () async {
     final now = DateTime.utc(2026, 8, 11, 12);
-    const route = PaymentRoute(
-      asset: WalletAsset.bitcoin,
-      rail: PaymentRail.lightning,
-    );
+    final route = testRgbRoute;
     final engine = FakeWalletEngine()
-      ..balance = _balance(onchainSpendable: 0, lightningSpendable: 5000)
+      ..balance = testRgbBalance(5000)
       ..decodedInvoice = WalletPaymentPreview(
         route: route,
-        encodedDestination: 'lnbcrt1expired',
-        displayDestination: 'lnbcrt1expired',
+        encodedDestination: 'rgb:expired',
+        displayDestination: 'rgb:expired',
         expiresAt: now.subtract(const Duration(seconds: 1)),
       );
     final harness = await PaymentFlowTestHarness.create(
       engine: engine,
       clock: () => now,
+      services: testRgbServices,
     );
     addTearDown(harness.dispose);
-    final provider = sendFlowViewModelProvider(
-      WalletPaymentTarget.bitcoinLightning,
-    );
+    final provider = sendFlowViewModelProvider(WalletPaymentTarget.usdtOnchain);
     final subscription = harness.container.listen(
       provider,
       (_, _) {},
@@ -815,7 +804,7 @@ void main() {
     await harness.container.read(provider.future);
     final notifier = harness.container.read(provider.notifier);
 
-    notifier.updateDestination('lnbcrt1expired');
+    notifier.updateDestination('rgb:expired');
 
     expect(await notifier.validateDestination(), isFalse);
     expect(

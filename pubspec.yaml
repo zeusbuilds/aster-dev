@@ -25,7 +25,7 @@ dependencies:
   rgb_sdk_flutter:
     git:
       url: https://github.com/UTEXO-Protocol/flutter-sdk.git
-      ref: 734f5ae6fb175bbf2d8500a9b43f29b5363c1e52
+      ref: 7c44506fdfe1dae6f3a6fe884f849c7ca2ad028b
 
   # Storage
   # 11.0.0 requires Android compile SDK 37, ahead of Flutter 3.47.0's SDK 36.

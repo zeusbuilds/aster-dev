@@ -72,6 +72,7 @@ final class WalletServiceConfiguration {
     this.rgbTransportProxy,
     this.lspBaseUrl,
     this.vssUrl,
+    this.ethRpcUrl,
     this.explorerBaseUrl,
     this.usdtAsset,
     this.daemonListeningPort = 9735,
@@ -112,6 +113,7 @@ final class WalletServiceConfiguration {
       rgbTransportProxy: _optionalEnvironment('ASTER_RGB_PROXY_URL'),
       lspBaseUrl: _optionalEnvironment('ASTER_LSP_URL'),
       vssUrl: _optionalEnvironment('ASTER_VSS_URL'),
+      ethRpcUrl: _optionalEnvironment('ASTER_ETH_RPC_URL'),
       explorerBaseUrl:
           _optionalEnvironment('ASTER_EXPLORER_URL') ??
           switch (environment) {
@@ -146,6 +148,10 @@ final class WalletServiceConfiguration {
   final String? rgbTransportProxy;
   final String? lspBaseUrl;
   final String? vssUrl;
+
+  /// Credential-free Ethereum RPC used by native BFA validation, when enabled.
+  /// This is not an Ethereum wallet or proof of an external bridge payout.
+  final String? ethRpcUrl;
   final String? explorerBaseUrl;
 
   /// RGB USDT identity for this exact blockchain environment.
@@ -165,6 +171,7 @@ final class WalletServiceConfiguration {
       other.rgbTransportProxy == rgbTransportProxy &&
       other.lspBaseUrl == lspBaseUrl &&
       other.vssUrl == vssUrl &&
+      other.ethRpcUrl == ethRpcUrl &&
       other.explorerBaseUrl == explorerBaseUrl &&
       other.usdtAsset == usdtAsset;
 
@@ -178,6 +185,7 @@ final class WalletServiceConfiguration {
     rgbTransportProxy,
     lspBaseUrl,
     vssUrl,
+    ethRpcUrl,
     explorerBaseUrl,
     usdtAsset,
   );
@@ -245,6 +253,12 @@ final class WalletServiceConfiguration {
     _validateEndpoint(
       explorerBaseUrl,
       _EndpointKind.explorer,
+      environment,
+      permitsInsecureDevelopmentEndpoints,
+    );
+    _validateEndpoint(
+      ethRpcUrl,
+      _EndpointKind.webService,
       environment,
       permitsInsecureDevelopmentEndpoints,
     );
@@ -363,6 +377,7 @@ String? _optionalEnvironment(String name) {
     ),
     'ASTER_LSP_URL' => const String.fromEnvironment('ASTER_LSP_URL'),
     'ASTER_VSS_URL' => const String.fromEnvironment('ASTER_VSS_URL'),
+    'ASTER_ETH_RPC_URL' => const String.fromEnvironment('ASTER_ETH_RPC_URL'),
     'ASTER_EXPLORER_URL' => const String.fromEnvironment('ASTER_EXPLORER_URL'),
     _ => '',
   };

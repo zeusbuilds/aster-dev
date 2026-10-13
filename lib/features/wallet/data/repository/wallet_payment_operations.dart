@@ -40,11 +40,8 @@ final class WalletPaymentOperations {
           rail: PaymentRail.onchain,
         ),
       ),
-      WalletPaymentCapability.available(
-        const PaymentRoute(
-          asset: WalletAsset.bitcoin,
-          rail: PaymentRail.lightning,
-        ),
+      const WalletPaymentCapability.unavailable(
+        WalletPaymentTarget.bitcoinLightning,
       ),
       if (usdt == null) ...const [
         WalletPaymentCapability.unavailable(WalletPaymentTarget.usdtOnchain),
@@ -59,14 +56,8 @@ final class WalletPaymentOperations {
             rail: PaymentRail.onchain,
           ),
         ),
-        WalletPaymentCapability.available(
-          PaymentRoute(
-            asset: WalletAsset.rgbUsdt(
-              assetId: usdt.contractId,
-              precision: usdt.precision,
-            ),
-            rail: PaymentRail.lightning,
-          ),
+        const WalletPaymentCapability.unavailable(
+          WalletPaymentTarget.usdtLightning,
         ),
       ],
     ];
@@ -74,6 +65,16 @@ final class WalletPaymentOperations {
   }
 
   AppResult<PaymentRoute> resolveTarget(WalletPaymentTarget target) {
+    if (target.rail == PaymentRail.lightning) {
+      return AppResult.failure(
+        const AppFailure(
+          code: 'lightning_not_released',
+          kind: AppFailureKind.unavailable,
+          userMessage: 'Lightning is not available in this release.',
+          retryable: false,
+        ),
+      );
+    }
     for (final capability in capabilities) {
       if (capability.target != target) continue;
       final route = capability.route;

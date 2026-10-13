@@ -111,7 +111,7 @@ class _AssetTargetItem extends StatelessWidget {
     }
 
     final status = !capability.isAvailable
-        ? 'Not configured'
+        ? capability.unavailableReason!
         : conflictsWithOther
         ? 'Already selected'
         : target.railLabel;

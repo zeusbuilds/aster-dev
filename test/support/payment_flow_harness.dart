@@ -15,6 +15,38 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'presentation_fakes.dart';
 import 'wallet_fakes.dart';
 
+/// Configured RGB route for invoice tests; no production asset identity.
+const testRgbServices = WalletServiceConfiguration(
+  environment: BlockchainEnvironment.regtest,
+  sdkNetwork: 'regtest',
+  usdtAsset: RgbAssetConfiguration(
+    contractId: 'rgb:configured-usdt',
+    precision: 6,
+  ),
+);
+
+PaymentRoute get testRgbRoute => PaymentRoute(
+  asset: WalletAsset.rgbUsdt(assetId: 'rgb:configured-usdt', precision: 6),
+  rail: PaymentRail.onchain,
+);
+
+WalletBalance testRgbBalance(int units) {
+  final asset = testRgbRoute.asset;
+  WalletAmount onchain(int value) =>
+      WalletAmount.onchain(assetId: asset.id, units: value);
+  final noLightning = WalletAmount.lightning(assetId: asset.id, units: 0);
+  return WalletBalance(
+    asset: asset,
+    onchainSettled: onchain(units),
+    onchainFuture: onchain(units),
+    onchainSpendable: onchain(units),
+    onchainLocked: onchain(0),
+    lightningOwned: noLightning,
+    lightningSpendable: noLightning,
+    lightningReceivable: noLightning,
+  );
+}
+
 /// Real repository/runtime composition for payment ViewModel tests.
 final class PaymentFlowTestHarness {
   PaymentFlowTestHarness._({

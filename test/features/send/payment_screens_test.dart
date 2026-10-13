@@ -76,7 +76,8 @@ void main() {
       ),
       '/send/bitcoin-onchain/address',
     );
-    expect(find.textContaining('Not configured'), findsNWidgets(2));
+    expect(find.textContaining('Not configured'), findsOneWidget);
+    expect(find.textContaining('Coming later'), findsNWidgets(2));
     final usdtOnchain = find.byWidgetPredicate(
       (widget) =>
           widget is PaymentTargetTile &&
@@ -151,13 +152,23 @@ void main() {
     );
     await _pumpUntil(
       tester,
-      () => find.byType(PaymentTargetTile).evaluate().length == 4,
+      () => find.byType(PaymentTargetTile).evaluate().isNotEmpty,
     );
 
     expect(tester.takeException(), isNull);
     expect(tester, meetsGuideline(androidTapTargetGuideline));
     expect(tester, meetsGuideline(labeledTapTargetGuideline));
     expect(tester, meetsGuideline(textContrastGuideline));
+    await tester.scrollUntilVisible(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is PaymentTargetTile &&
+            widget.capability.target == WalletPaymentTarget.usdtLightning,
+      ),
+      150,
+    );
+    expect(tester.takeException(), isNull);
+    expect(tester, meetsGuideline(labeledTapTargetGuideline));
   });
 
   testWidgets('payment target selection suppresses same-turn route commands', (
@@ -381,28 +392,27 @@ void main() {
     tester,
   ) async {
     final decodeGate = Completer<void>();
-    const route = PaymentRoute(
-      asset: WalletAsset.bitcoin,
-      rail: PaymentRail.lightning,
-    );
+    final route = testRgbRoute;
     final engine = FakeWalletEngine()
       ..decodeInvoiceGate = decodeGate
       ..decodedInvoice = WalletPaymentPreview(
         route: route,
-        encodedDestination: 'lnbcrt1navigation',
-        displayDestination: 'lnbcrt1navigation',
+        encodedDestination: 'rgb:navigation',
+        displayDestination: 'rgb:navigation',
       );
-    final harness = await PaymentFlowTestHarness.create(engine: engine);
+    final harness = await PaymentFlowTestHarness.create(
+      engine: engine,
+      services: testRgbServices,
+    );
     addTearDown(() => _disposeHarness(tester, harness));
     final router = GoRouter(
-      initialLocation: '/send/bitcoin-lightning/address',
+      initialLocation: '/send/usdt-onchain/address',
       routes: [
         GoRoute(
           path: RoutePaths.sendAddress,
           name: RouteNames.sendAddress,
-          builder: (context, state) => const SendAddressScreen(
-            target: WalletPaymentTarget.bitcoinLightning,
-          ),
+          builder: (context, state) =>
+              const SendAddressScreen(target: WalletPaymentTarget.usdtOnchain),
         ),
         GoRoute(
           path: RoutePaths.sendAmount,
@@ -422,7 +432,7 @@ void main() {
       (widget) => widget is TextField && widget.enabled == true,
     );
     await _pumpUntil(tester, () => destinationField.evaluate().isNotEmpty);
-    await tester.enterText(destinationField, 'lnbcrt1navigation');
+    await tester.enterText(destinationField, 'rgb:navigation');
     await tester.pump();
 
     final continueButton = tester.widget<CustomButton>(
@@ -867,20 +877,14 @@ void main() {
   ) async {
     var clockNow = DateTime.utc(2026, 8, 16, 12);
     final expiresAt = clockNow.add(const Duration(minutes: 1));
-    const route = PaymentRoute(
-      asset: WalletAsset.bitcoin,
-      rail: PaymentRail.lightning,
-    );
+    final route = testRgbRoute;
     final engine = FakeWalletEngine()
-      ..balance = _bitcoinBalance(1000)
+      ..balance = testRgbBalance(5000)
       ..decodedInvoice = WalletPaymentPreview(
         route: route,
-        encodedDestination: 'lnbcrt1review',
-        displayDestination: 'lnbcrt1review',
-        amount: WalletAmount.lightning(
-          assetId: WalletAsset.bitcoin.id,
-          units: 2000,
-        ),
+        encodedDestination: 'rgb:review',
+        displayDestination: 'rgb:review',
+        amount: WalletAmount.onchain(assetId: route.asset.id, units: 2000),
         expiresAt: expiresAt,
         recipientLabel: 'Merchant checkout',
         message: 'Invoice 123',
@@ -895,15 +899,16 @@ void main() {
       engine: engine,
       httpClient: transport,
       clock: () => clockNow,
+      services: testRgbServices,
     );
     addTearDown(() => _disposeHarness(tester, harness));
-    const target = WalletPaymentTarget.bitcoinLightning;
+    const target = WalletPaymentTarget.usdtOnchain;
     final provider = sendFlowViewModelProvider(target);
     final subscription = harness.container.listen(provider, (_, _) {});
     addTearDown(subscription.close);
     await tester.runAsync(() => harness.container.read(provider.future));
     final notifier = harness.container.read(provider.notifier);
-    notifier.updateDestination('lnbcrt1review');
+    notifier.updateDestination('rgb:review');
     expect(await tester.runAsync(notifier.validateDestination), isTrue);
 
     clockNow = expiresAt;
@@ -1113,7 +1118,7 @@ void main() {
     },
   );
 
-  testWidgets('RGB Lightning Receive creates its first request from amount', (
+  testWidgets('RGB onchain Receive applies an exact amount to its request', (
     tester,
   ) async {
     const services = WalletServiceConfiguration(
@@ -1129,18 +1134,15 @@ void main() {
     await _pumpWidget(
       tester,
       harness,
-      const ReceiveRequestScreen(target: WalletPaymentTarget.usdtLightning),
+      const ReceiveRequestScreen(target: WalletPaymentTarget.usdtOnchain),
     );
     await _pumpUntil(
       tester,
-      () => find.text('Amount required').evaluate().isNotEmpty,
+      () => find.byType(PrettyQrView).evaluate().isNotEmpty,
     );
 
-    expect(find.byType(PrettyQrView), findsNothing);
-    expect(find.widgetWithText(CustomButton, 'Copy'), findsNothing);
-    expect(find.text('Generate new request'), findsNothing);
-    expect(find.text('Share'), findsNothing);
-    expect(harness.engine.calls, isNot(contains('createReceiveRequest:start')));
+    expect(find.byType(PrettyQrView), findsOneWidget);
+    expect(harness.engine.createdReceiveAmount, isNull);
 
     await tester.tap(find.text('Set amount'));
     await _pumpUntil(
@@ -1148,8 +1150,7 @@ void main() {
       () => find.byType(AsterNumericKeypad).evaluate().isNotEmpty,
     );
     await _pumpFrames(tester);
-    final createButton = find.widgetWithText(CustomButton, 'Create request');
-    expect(tester.widget<CustomButton>(createButton).enabled, isFalse);
+    expect(find.widgetWithText(CustomButton, 'Clear amount'), findsOneWidget);
     await tester.tap(
       find.descendant(
         of: find.byType(AsterNumericKeypad),
@@ -1157,12 +1158,13 @@ void main() {
       ),
     );
     await tester.pump();
+    final createButton = find.widgetWithText(CustomButton, 'Set amount');
     expect(tester.widget<CustomButton>(createButton).enabled, isTrue);
 
     await tester.tap(createButton);
     await _pumpUntil(
       tester,
-      () => find.byType(PrettyQrView).evaluate().isNotEmpty,
+      () => find.byType(ReceiveAmountSheet).evaluate().isEmpty,
     );
 
     expect(harness.engine.createdReceiveAmount?.units, 1000000);
@@ -1170,7 +1172,7 @@ void main() {
       harness.engine.calls.where(
         (call) => call == 'createReceiveRequest:start',
       ),
-      hasLength(1),
+      hasLength(2),
     );
   });
 
@@ -1230,26 +1232,24 @@ void main() {
   ) async {
     var clockNow = DateTime.utc(2026, 8, 16, 12);
     final expiresAt = clockNow.add(const Duration(milliseconds: 10));
-    const route = PaymentRoute(
-      asset: WalletAsset.bitcoin,
-      rail: PaymentRail.lightning,
-    );
+    final route = testRgbRoute;
     final engine = FakeWalletEngine()
       ..createdReceiveRequest = WalletReceiveRequest(
         route: route,
-        encodedRequest: 'lnbcrt1expiring',
-        displayValue: 'lnbcrt1expiring',
+        encodedRequest: 'rgb:expiring',
+        displayValue: 'rgb:expiring',
         expiresAt: expiresAt,
       );
     final harness = await PaymentFlowTestHarness.create(
       engine: engine,
       clock: () => clockNow,
+      services: testRgbServices,
     );
     addTearDown(() => _disposeHarness(tester, harness));
     await _pumpWidget(
       tester,
       harness,
-      const ReceiveRequestScreen(target: WalletPaymentTarget.bitcoinLightning),
+      const ReceiveRequestScreen(target: WalletPaymentTarget.usdtOnchain),
     );
     await _pumpUntil(
       tester,
@@ -1258,7 +1258,7 @@ void main() {
 
     await tester.pump(const Duration(milliseconds: 20));
     expect(find.text('This payment request has expired.'), findsNothing);
-    expect(find.text('Bitcoin · Lightning'), findsOneWidget);
+    expect(find.text('USDT · RGB on-chain'), findsOneWidget);
     expect(find.textContaining('Expires '), findsOneWidget);
 
     clockNow = expiresAt;
@@ -1267,7 +1267,7 @@ void main() {
     expect(find.text('This payment request has expired.'), findsOneWidget);
     expect(find.byType(PrettyQrView), findsNothing);
     expect(find.textContaining('Expires '), findsNothing);
-    expect(find.text('lnbcrt1expiring'), findsNothing);
+    expect(find.text('rgb:expiring'), findsNothing);
     expect(
       tester
           .getSemantics(
@@ -1292,17 +1292,15 @@ void main() {
     final expiry = now.add(const Duration(hours: 1));
     final engine = FakeWalletEngine()
       ..createdReceiveRequest = WalletReceiveRequest(
-        route: const PaymentRoute(
-          asset: WalletAsset.bitcoin,
-          rail: PaymentRail.lightning,
-        ),
-        encodedRequest: 'lnbcrt1testexpiry',
-        displayValue: 'lnbcrt1testexpiry',
+        route: testRgbRoute,
+        encodedRequest: 'rgb:testexpiry',
+        displayValue: 'rgb:testexpiry',
         expiresAt: expiry,
       );
     final harness = await PaymentFlowTestHarness.create(
       engine: engine,
       clock: () => now,
+      services: testRgbServices,
     );
     addTearDown(() => _disposeHarness(tester, harness));
     addTearDown(
@@ -1313,7 +1311,7 @@ void main() {
     await _pumpWidget(
       tester,
       harness,
-      const ReceiveRequestScreen(target: WalletPaymentTarget.bitcoinLightning),
+      const ReceiveRequestScreen(target: WalletPaymentTarget.usdtOnchain),
     );
     await _pumpUntil(
       tester,

@@ -280,6 +280,22 @@ final class RgbWalletActivityMapper {
   }
 
   int? _transferAmount(CoreTransfer transfer) {
+    // Outgoing allocations can be change. Use the SDK's exact recipient amount,
+    // and preserve an absent request as unknown, never as wallet change.
+    if (transfer.kind == 'Send' ||
+        transfer.kind == 'Burn' ||
+        transfer.kind == 'Inflation') {
+      final amount = transfer.amount;
+      if (amount == null) return null;
+      if (amount.isNegative ||
+          amount > BigInt.from(WalletAmount.maxNativeUnits)) {
+        throw const NativeProtocolException(
+          'Native outgoing RGB amount exceeds supported bounds.',
+          field: 'CoreTransfer.amount',
+        );
+      }
+      return amount.toInt();
+    }
     // A receive request is not an allocation. Empty pending/failed receives
     // stay amount-unknown even when requestedAssignment names an amount.
     final assignments = transfer.assignments;

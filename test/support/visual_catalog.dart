@@ -371,7 +371,9 @@ void registerVisualCatalog({required VisualCapture capture}) {
     }
   });
 
-  testWidgets('visual catalog: all send and receive rails', (tester) async {
+  testWidgets('visual catalog: released and unavailable send and receive rails', (
+    tester,
+  ) async {
     _phone(tester);
     final client = _market();
     final harness = await _harness(
@@ -384,6 +386,30 @@ void registerVisualCatalog({required VisualCapture capture}) {
     addTearDown(client.close);
     try {
       for (final target in WalletPaymentTarget.values) {
+        if (target.rail == PaymentRail.lightning) {
+          for (final sending in [true, false]) {
+            await _mount(
+              tester,
+              harness.container,
+              toasts,
+              router,
+              sending
+                  ? SendAddressScreen(target: target)
+                  : ReceiveRequestScreen(target: target),
+            );
+            await _settle(tester);
+            expect(
+              find.text('Lightning is not available in this release.'),
+              findsOneWidget,
+            );
+            await _shot(
+              tester,
+              capture,
+              '${sending ? '03-send' : '04-receive'}/${target.slug}-unavailable',
+            );
+          }
+          continue;
+        }
         for (final mode in [
           'address-empty',
           'address-ready',
@@ -437,7 +463,7 @@ void registerVisualCatalog({required VisualCapture capture}) {
         await _shot(tester, capture, '04-receive/${target.slug}-amount-sheet');
       }
       for (final mode in ['loading', 'failure', 'invalid', 'expired']) {
-        const target = WalletPaymentTarget.bitcoinLightning;
+        const target = WalletPaymentTarget.usdtOnchain;
         await _mount(
           tester,
           harness.container,
@@ -452,7 +478,7 @@ void registerVisualCatalog({required VisualCapture capture}) {
         await _shot(tester, capture, '03-send/$mode');
       }
       for (final mode in ['loading', 'failure', 'expired', 'generating']) {
-        const target = WalletPaymentTarget.bitcoinLightning;
+        const target = WalletPaymentTarget.usdtOnchain;
         await _mount(
           tester,
           harness.container,
@@ -910,7 +936,7 @@ class _CatalogReceive extends ReceiveFlowViewModel {
           rail: initial.route.rail,
           units: input.units!,
         ),
-        expiresAt: initial.route.rail == PaymentRail.lightning
+        expiresAt: initial.route.asset.kind == WalletAssetKind.usdt
             ? _now.add(Duration(minutes: mode == 'expired' ? -1 : 30))
             : null,
       ),

@@ -54,7 +54,7 @@ void main() {
   );
 
   test(
-    'configured RGB Lightning starts amount-first and forbids clearing',
+    'configured RGB Lightning is blocked before request generation',
     () async {
       const services = WalletServiceConfiguration(
         environment: BlockchainEnvironment.regtest,
@@ -75,14 +75,17 @@ void main() {
         fireImmediately: true,
       );
       addTearDown(subscription.close);
-      final initial = await harness.container.read(provider.future);
+      await expectLater(
+        harness.container.read(provider.future),
+        throwsA(
+          isA<AppFailureException>().having(
+            (error) => error.failure.code,
+            'code',
+            'lightning_not_released',
+          ),
+        ),
+      );
       final notifier = harness.container.read(provider.notifier);
-
-      expect(initial.amountRequired, isTrue);
-      expect(initial.request, isNull);
-      expect(initial.canReadRequest, isFalse);
-      expect(initial.canRegenerate, isFalse);
-      expect(initial.canApplyAmount, isFalse);
       expect(
         harness.engine.calls,
         isNot(contains('createReceiveRequest:start')),
@@ -94,7 +97,7 @@ void main() {
         isA<AppFailureResult<void>>().having(
           (result) => result.failure.code,
           'code',
-          'payment_request_not_ready',
+          'payment_operation_in_progress',
         ),
       );
       expect(
@@ -102,38 +105,21 @@ void main() {
         isA<AppFailureResult<ShareDisposition>>().having(
           (result) => result.failure.code,
           'code',
-          'payment_request_not_ready',
+          'payment_operation_in_progress',
         ),
       );
       expect(harness.clipboard.text, isNull);
       expect(harness.share.sharedText, isNull);
 
       notifier.updateAmount('1.25');
-      expect(
-        harness.container.read(provider).requireValue.canApplyAmount,
-        isTrue,
-      );
-      expect(await notifier.applyAmount(), isTrue);
-      final created = harness.container.read(provider).requireValue;
-      expect(created.request, isNotNull);
-      expect(created.request!.amount?.units, 1250000);
-      expect(harness.engine.createdReceiveAmount?.units, 1250000);
-      expect(
-        harness.engine.calls.where(
-          (call) => call == 'createReceiveRequest:start',
-        ),
-        hasLength(1),
-      );
-
-      notifier.updateAmount('');
-      final cleared = harness.container.read(provider).requireValue;
-      expect(cleared.canApplyAmount, isFalse);
       expect(await notifier.applyAmount(), isFalse);
+      expect(await notifier.regenerate(), isFalse);
+      await notifier.retry();
       expect(
         harness.engine.calls.where(
           (call) => call == 'createReceiveRequest:start',
         ),
-        hasLength(1),
+        isEmpty,
       );
     },
   );
@@ -143,7 +129,7 @@ void main() {
     final harness = await PaymentFlowTestHarness.create(engine: engine);
     addTearDown(harness.dispose);
     final provider = receiveFlowViewModelProvider(
-      WalletPaymentTarget.bitcoinLightning,
+      WalletPaymentTarget.bitcoinOnchain,
     );
     final subscription = harness.container.listen(
       provider,
@@ -208,12 +194,12 @@ void main() {
   });
 
   test(
-    'Bitcoin Lightning invoice amount requires whole satoshis before native',
+    'Bitcoin onchain amount requires whole satoshis before native',
     () async {
       final harness = await PaymentFlowTestHarness.create();
       addTearDown(harness.dispose);
       final provider = receiveFlowViewModelProvider(
-        WalletPaymentTarget.bitcoinLightning,
+        WalletPaymentTarget.bitcoinOnchain,
       );
       final subscription = harness.container.listen(provider, (_, _) {});
       addTearDown(subscription.close);
@@ -223,15 +209,17 @@ void main() {
 
       notifier.updateAmount('0.00000001001');
       final fractional = harness.container.read(provider).requireValue;
-      expect(fractional.amountInput.units, 1001);
-      expect(fractional.amountUsesSupportedGranularity, isFalse);
+      expect(
+        fractional.amountInput.issue,
+        WalletAmountInputIssue.precisionExceeded,
+      );
       expect(fractional.canApplyAmount, isFalse);
       expect(await notifier.applyAmount(), isFalse);
       expect(harness.engine.calls, hasLength(callsBefore));
 
       notifier.updateAmount('0.00000002');
       expect(await notifier.applyAmount(), isTrue);
-      expect(harness.engine.createdReceiveAmount?.units, 2000);
+      expect(harness.engine.createdReceiveAmount?.units, 2);
     },
   );
 
@@ -391,7 +379,7 @@ void main() {
       final harness = await PaymentFlowTestHarness.create(engine: engine);
       addTearDown(harness.dispose);
       final provider = receiveFlowViewModelProvider(
-        WalletPaymentTarget.bitcoinLightning,
+        WalletPaymentTarget.bitcoinOnchain,
       );
       final subscription = harness.container.listen(
         provider,
@@ -402,7 +390,7 @@ void main() {
       await harness.container.read(provider.future);
       final notifier = harness.container.read(provider.notifier);
       engine.createReceiveError = const RlnOperationTimeoutException(
-        operation: 'rlnCreateInvoice',
+        operation: 'rlnGetAddress',
         timeout: Duration(minutes: 2),
       );
 
@@ -440,7 +428,7 @@ void main() {
       final harness = await PaymentFlowTestHarness.create(engine: engine);
       addTearDown(harness.dispose);
       final provider = receiveFlowViewModelProvider(
-        WalletPaymentTarget.bitcoinLightning,
+        WalletPaymentTarget.bitcoinOnchain,
       );
       final subscription = harness.container.listen(
         provider,
@@ -533,24 +521,22 @@ void main() {
 
   test('expired requests never cross copy or share boundaries', () async {
     final now = DateTime.utc(2026, 8, 16, 12);
-    const route = PaymentRoute(
-      asset: WalletAsset.bitcoin,
-      rail: PaymentRail.lightning,
-    );
+    final route = testRgbRoute;
     final engine = FakeWalletEngine()
       ..createdReceiveRequest = WalletReceiveRequest(
         route: route,
-        encodedRequest: 'expired-lightning-request',
-        displayValue: 'expired-lightning-request',
+        encodedRequest: 'rgb:expired-test-request',
+        displayValue: 'rgb:expired-test-request',
         expiresAt: now,
       );
     final harness = await PaymentFlowTestHarness.create(
       engine: engine,
       clock: () => now,
+      services: testRgbServices,
     );
     addTearDown(harness.dispose);
     final provider = receiveFlowViewModelProvider(
-      WalletPaymentTarget.bitcoinLightning,
+      WalletPaymentTarget.usdtOnchain,
     );
     final subscription = harness.container.listen(
       provider,

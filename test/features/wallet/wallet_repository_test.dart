@@ -45,7 +45,7 @@ void main() {
     );
     expect(repository.paymentCapabilities.map((item) => item.isAvailable), [
       true,
-      true,
+      false,
       false,
       false,
     ]);
@@ -84,14 +84,14 @@ void main() {
     );
 
     final result = repository.resolvePaymentTarget(
-      WalletPaymentTarget.usdtLightning,
+      WalletPaymentTarget.usdtOnchain,
     );
 
     expect(result, isA<AppSuccess<PaymentRoute>>());
     final route = (result as AppSuccess<PaymentRoute>).value;
     expect(route.asset.id.value, 'rgb:configured-usdt');
     expect(route.asset.precision, 6);
-    expect(route.rail, PaymentRail.lightning);
+    expect(route.rail, PaymentRail.onchain);
   });
 
   test(
@@ -191,7 +191,7 @@ void main() {
     expect(harness.engine.calls, isNot(contains('activity')));
   });
 
-  test('previews onchain locally and validates invoice input', () async {
+  test('previews onchain locally and rejects unreleased Lightning', () async {
     final harness = await _createActiveRepository();
     addTearDown(harness.runtime.dispose);
 
@@ -212,7 +212,7 @@ void main() {
     expect(malformed, isA<AppFailureResult<WalletPaymentPreview>>());
     expect(
       (malformed as AppFailureResult<WalletPaymentPreview>).failure.code,
-      'bitcoin_lightning_instruction_invalid',
+      'lightning_not_released',
     );
     expect(harness.engine.calls, isNot(contains('decodeInvoice:start')));
   });
@@ -230,7 +230,7 @@ void main() {
     addTearDown(harness.runtime.dispose);
 
     final result = await harness.repository.previewPayment(
-      WalletPaymentTarget.usdtLightning,
+      WalletPaymentTarget.usdtOnchain,
       'rgb:invoice\u202e',
     );
 
@@ -245,7 +245,7 @@ void main() {
     expect(harness.engine.calls, isNot(contains('decodeInvoice:start')));
   });
 
-  test('extracts BIP321 Lightning before native preview validation', () async {
+  test('BIP321 Lightning cannot bypass the release policy', () async {
     final harness = await _createActiveRepository();
     addTearDown(harness.runtime.dispose);
 
@@ -254,13 +254,70 @@ void main() {
       'bitcoin:?lightning=lnbcrt1invoice&label=Merchant&message=Order%20123',
     );
 
-    expect(result, isA<AppSuccess<WalletPaymentPreview>>());
-    final preview = (result as AppSuccess<WalletPaymentPreview>).value;
-    expect(harness.engine.decodedInvoiceValue, 'lnbcrt1invoice');
-    expect(preview.encodedDestination, 'lnbcrt1invoice');
-    expect(preview.recipientLabel, 'Merchant');
-    expect(preview.message, 'Order 123');
+    expect(
+      (result as AppFailureResult<WalletPaymentPreview>).failure.code,
+      'lightning_not_released',
+    );
+    expect(harness.engine.decodedInvoiceValue, isNull);
   });
+
+  for (final network in BlockchainEnvironment.values) {
+    test(
+      'Lightning release gate prevents all runtime effects on ${network.name}',
+      () async {
+        final harness = await _createActiveRepository(
+          services: WalletServiceConfiguration(
+            environment: network,
+            sdkNetwork: network == BlockchainEnvironment.signet
+                ? 'utexo'
+                : network.name,
+            usdtAsset: const RgbAssetConfiguration(
+              contractId: 'rgb:configured-usdt',
+              precision: 6,
+            ),
+          ),
+        );
+        addTearDown(harness.runtime.dispose);
+        final before = List<String>.of(harness.engine.calls);
+        for (final target in [
+          WalletPaymentTarget.bitcoinLightning,
+          WalletPaymentTarget.usdtLightning,
+        ]) {
+          final capability = harness.repository.paymentCapabilities.singleWhere(
+            (item) => item.target == target,
+          );
+          expect(capability.isAvailable, false);
+          expect(capability.unavailableReason, 'Coming later');
+          final preview = await harness.repository.previewPayment(
+            target,
+            'lnbcrt1invoice',
+          );
+          final receive = await harness.repository.createReceiveRequest(
+            target,
+            amountUnits: 10,
+          );
+          final send = await harness.repository.sendPayment(
+            target: target,
+            destination: 'lnbcrt1invoice',
+            amountUnits: 10,
+          );
+          expect(
+            (preview as AppFailureResult<WalletPaymentPreview>).failure.code,
+            'lightning_not_released',
+          );
+          expect(
+            (receive as AppFailureResult<WalletReceiveRequest>).failure.code,
+            'lightning_not_released',
+          );
+          expect(
+            (send as AppFailureResult<WalletSendResult>).failure.code,
+            'lightning_not_released',
+          );
+        }
+        expect(harness.engine.calls, before);
+      },
+    );
+  }
 
   test('passes deployment-owned route and exact units to receive', () async {
     const configured = WalletServiceConfiguration(
@@ -275,14 +332,14 @@ void main() {
     addTearDown(harness.runtime.dispose);
 
     final result = await harness.repository.createReceiveRequest(
-      WalletPaymentTarget.usdtLightning,
+      WalletPaymentTarget.usdtOnchain,
       amountUnits: 1250000,
     );
 
     expect(result, isA<AppSuccess<WalletReceiveRequest>>());
     expect(
       harness.engine.createdReceiveRoute?.target,
-      WalletPaymentTarget.usdtLightning,
+      WalletPaymentTarget.usdtOnchain,
     );
     expect(
       harness.engine.createdReceiveRoute?.asset.id.value,
@@ -295,38 +352,32 @@ void main() {
     );
   });
 
-  test(
-    'rejects amountless RGB Lightning receive before runtime work',
-    () async {
-      const configured = WalletServiceConfiguration(
-        environment: BlockchainEnvironment.regtest,
-        sdkNetwork: 'regtest',
-        usdtAsset: RgbAssetConfiguration(
-          contractId: 'rgb:configured-usdt',
-          precision: 6,
-        ),
-      );
-      final harness = await _createActiveRepository(services: configured);
-      addTearDown(harness.runtime.dispose);
+  test('rejects RGB Lightning receive before runtime work', () async {
+    const configured = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.regtest,
+      sdkNetwork: 'regtest',
+      usdtAsset: RgbAssetConfiguration(
+        contractId: 'rgb:configured-usdt',
+        precision: 6,
+      ),
+    );
+    final harness = await _createActiveRepository(services: configured);
+    addTearDown(harness.runtime.dispose);
 
-      final result = await harness.repository.createReceiveRequest(
-        WalletPaymentTarget.usdtLightning,
-      );
+    final result = await harness.repository.createReceiveRequest(
+      WalletPaymentTarget.usdtLightning,
+    );
 
-      expect(
-        result,
-        isA<AppFailureResult<WalletReceiveRequest>>().having(
-          (failure) => failure.failure.code,
-          'code',
-          'payment_receive_amount_required',
-        ),
-      );
-      expect(
-        harness.engine.calls,
-        isNot(contains('createReceiveRequest:start')),
-      );
-    },
-  );
+    expect(
+      result,
+      isA<AppFailureResult<WalletReceiveRequest>>().having(
+        (failure) => failure.failure.code,
+        'code',
+        'lightning_not_released',
+      ),
+    );
+    expect(harness.engine.calls, isNot(contains('createReceiveRequest:start')));
+  });
 
   test(
     'rejects invalid receive amounts without invoking native code',
@@ -335,7 +386,7 @@ void main() {
       addTearDown(harness.runtime.dispose);
 
       final result = await harness.repository.createReceiveRequest(
-        WalletPaymentTarget.bitcoinLightning,
+        WalletPaymentTarget.bitcoinOnchain,
         amountUnits: 0,
       );
 
@@ -414,25 +465,35 @@ void main() {
 
   test('submits an exact typed command and maps native failures', () async {
     final engine = FakeWalletEngine();
-    final harness = await _createActiveRepository(engine: engine);
+    final harness = await _createActiveRepository(
+      engine: engine,
+      services: const WalletServiceConfiguration(
+        environment: BlockchainEnvironment.regtest,
+        sdkNetwork: 'regtest',
+        usdtAsset: RgbAssetConfiguration(
+          contractId: 'rgb:configured-usdt',
+          precision: 6,
+        ),
+      ),
+    );
     addTearDown(harness.runtime.dispose);
 
     final sent = await harness.repository.sendPayment(
-      target: WalletPaymentTarget.bitcoinLightning,
-      destination: 'bitcoin:?lightning=lnbcrt1invoice',
+      target: WalletPaymentTarget.usdtOnchain,
+      destination: 'rgb:invoice',
       amountUnits: 21000,
     );
 
     expect(sent, isA<AppSuccess<WalletSendResult>>());
     expect(
       engine.sentPaymentCommand?.route.target,
-      WalletPaymentTarget.bitcoinLightning,
+      WalletPaymentTarget.usdtOnchain,
     );
     expect(engine.sentPaymentCommand?.amount.units, 21000);
-    expect(engine.sentPaymentCommand?.destination, 'lnbcrt1invoice');
+    expect(engine.sentPaymentCommand?.destination, 'rgb:invoice');
     expect(
       engine.sentPaymentCommand?.amount.unit,
-      WalletAmountUnit.millisatoshi,
+      WalletAmountUnit.assetAtomic,
     );
 
     engine.decodeInvoiceError = const NativeProtocolException(
@@ -440,8 +501,8 @@ void main() {
       field: 'invoice',
     );
     final decoded = await harness.repository.previewPayment(
-      WalletPaymentTarget.bitcoinLightning,
-      'lnbcrt1malformed',
+      WalletPaymentTarget.usdtOnchain,
+      'rgb:malformed',
     );
     expect(decoded, isA<AppFailureResult<WalletPaymentPreview>>());
     expect(
@@ -503,12 +564,22 @@ void main() {
 
   test('serializes payment operations through the repository owner', () async {
     final engine = FakeWalletEngine()..decodeInvoiceGate = Completer<void>();
-    final harness = await _createActiveRepository(engine: engine);
+    final harness = await _createActiveRepository(
+      engine: engine,
+      services: const WalletServiceConfiguration(
+        environment: BlockchainEnvironment.regtest,
+        sdkNetwork: 'regtest',
+        usdtAsset: RgbAssetConfiguration(
+          contractId: 'rgb:configured-usdt',
+          precision: 6,
+        ),
+      ),
+    );
     addTearDown(harness.runtime.dispose);
 
     final decoding = harness.repository.previewPayment(
-      WalletPaymentTarget.bitcoinLightning,
-      'lnbcrt1invoice',
+      WalletPaymentTarget.usdtOnchain,
+      'rgb:invoice',
     );
     final receiving = harness.repository.createReceiveRequest(
       WalletPaymentTarget.bitcoinOnchain,

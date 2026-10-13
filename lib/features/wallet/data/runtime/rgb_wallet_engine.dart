@@ -47,6 +47,7 @@ abstract final class RgbWalletServiceConfigurationResolver {
           configured.lspBaseUrl ??
           (configured.sdkNetwork == 'utexo' ? _utexoSignetLspBaseUrl : null),
       vssUrl: configured.vssUrl,
+      ethRpcUrl: configured.ethRpcUrl,
       explorerBaseUrl: configured.explorerBaseUrl,
       usdtAsset: configured.usdtAsset,
     );
@@ -105,6 +106,7 @@ final class RgbWalletEngineFactory implements WalletEngineFactory {
       UtexoUnlockConfig(
         indexerUrl: services.indexerUrl,
         proxyEndpoint: services.rgbTransportProxy,
+        ethRpcUrl: services.ethRpcUrl,
       ),
       clock: utcClock,
       bitcoinAddresses: _bitcoinAddresses,
@@ -154,6 +156,11 @@ final class RgbWalletEngine implements WalletEngine {
   final DateTime Function() _clock;
   final BitcoinAddressValidator _bitcoinAddresses;
 
+  // RLN 0.16 has no Lightning runtime on mainnet; querying its Lightning-only
+  // endpoints fails with 403. Never hide a real network error as an empty list.
+  bool get _nativeLightningAvailable =>
+      _services.environment != BlockchainEnvironment.mainnet;
+
   @override
   Future<void> provision({
     required String databasePassword,
@@ -182,7 +189,9 @@ final class RgbWalletEngine implements WalletEngine {
 
   @override
   Future<WalletBalance> getBalance(WalletAsset asset) async {
-    final channels = await _wallet.listChannels();
+    final channels = _nativeLightningAvailable
+        ? await _wallet.listChannels()
+        : const <LightningChannel>[];
     if (asset.id.protocol == WalletAssetProtocol.bitcoin) {
       final (balance, node) = await (
         _wallet.getBtcBalance(),
@@ -218,7 +227,9 @@ final class RgbWalletEngine implements WalletEngine {
           }
         }
       }
-      final payments = await _wallet.listPayments();
+      final payments = _nativeLightningAvailable
+          ? await _wallet.listPayments()
+          : const <LightningPayment>[];
       activities.addAll(
         payments
             .where((item) => _activities.paymentBelongsToAsset(item, asset))

@@ -58,7 +58,7 @@ class SwapCard extends StatelessWidget {
             icon: RemixIcons.arrow_up_down_line,
             tooltip: 'Reverse swap direction',
             hapticIntent: HapticIntent.selection,
-            onPressed: onReverse,
+            onPressed: state.canReverse ? onReverse : null,
           ),
         ),
       ],

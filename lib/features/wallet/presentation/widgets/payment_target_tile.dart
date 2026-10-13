@@ -41,7 +41,7 @@ class PaymentTargetTile extends StatelessWidget {
       button: true,
       enabled: enabled,
       label: target.semanticLabel,
-      value: configured ? null : 'Not configured',
+      value: capability.unavailableReason,
       onTap: enabled ? select : null,
       excludeSemantics: true,
       child: Opacity(
@@ -81,7 +81,7 @@ class PaymentTargetTile extends StatelessWidget {
                           Text(
                             configured
                                 ? target.railLabel
-                                : '${target.railLabel} - Not configured',
+                                : '${target.railLabel} - ${capability.unavailableReason}',
                             style: context.type.rowMeta.copyWith(
                               color: context.appColors.textSecondary,
                             ),

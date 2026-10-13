@@ -50,6 +50,7 @@ void main() {
       indexerUrl: 'http://127.0.0.1:50002',
       rgbTransportProxy: 'http://127.0.0.1:3001',
       vssUrl: 'http://127.0.0.1:3200',
+      ethRpcUrl: 'http://127.0.0.1:8545',
       daemonListeningPort: 19735,
       ldkPeerListeningPort: 19736,
     );
@@ -126,6 +127,7 @@ void main() {
       rgbTransportProxy: 'http://127.0.0.1:3001/json-rpc',
       lspBaseUrl: 'http://127.0.0.1:3100',
       vssUrl: 'http://127.0.0.1:3200',
+      ethRpcUrl: 'http://127.0.0.1:8545',
       daemonListeningPort: 19735,
       ldkPeerListeningPort: 19736,
     );
@@ -136,9 +138,104 @@ void main() {
     expect(resolved.rgbTransportProxy, configured.rgbTransportProxy);
     expect(resolved.lspBaseUrl, configured.lspBaseUrl);
     expect(resolved.vssUrl, configured.vssUrl);
+    expect(resolved.ethRpcUrl, configured.ethRpcUrl);
     expect(resolved.daemonListeningPort, 19735);
     expect(resolved.ldkPeerListeningPort, 19736);
   });
+
+  test('factory forwards Ethereum validation to native unlock', () async {
+    final sdk = MockRgbSdkFlutter();
+    final wallet = MockUtexoWallet();
+    when(() => sdk.wallet(config: any(named: 'config'))).thenReturn(wallet);
+    when(
+      () => wallet.reinit(
+        password: any(named: 'password'),
+        unlockConfig: any(named: 'unlockConfig'),
+      ),
+    ).thenAnswer((_) async {});
+    const configured = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.regtest,
+      sdkNetwork: 'regtest',
+      indexerUrl: 'http://127.0.0.1:50002',
+      rgbTransportProxy: 'http://127.0.0.1:3001',
+      ethRpcUrl: 'http://127.0.0.1:8545',
+    );
+    final engine = RgbWalletEngineFactory.withSdk(sdk).create(
+      const WalletEngineConfiguration(
+        storageDirectory: '/wallet',
+        services: configured,
+      ),
+    );
+    await engine.openPersisted(databasePassword: 'test-password');
+    final unlock =
+        verify(
+              () => wallet.reinit(
+                password: 'test-password',
+                unlockConfig: captureAny(named: 'unlockConfig'),
+              ),
+            ).captured.single
+            as UtexoUnlockConfig;
+    expect(unlock.ethRpcUrl, configured.ethRpcUrl);
+  });
+
+  test(
+    'mainnet reads onchain balances and history without Lightning APIs',
+    () async {
+      final wallet = MockUtexoWallet();
+      const mainnet = WalletServiceConfiguration(
+        environment: BlockchainEnvironment.mainnet,
+        sdkNetwork: 'mainnet',
+      );
+      when(() => wallet.getBtcBalance()).thenAnswer(
+        (_) async => const CoreBtcBalance(
+          vanilla: CoreBalance(settled: 100, future: 100, spendable: 80),
+          colored: CoreBalance(settled: 20, future: 20, spendable: 0),
+        ),
+      );
+      when(() => wallet.getNodeInfo()).thenAnswer((_) async => _nodeInfo);
+      when(() => wallet.listTransactions()).thenAnswer(
+        (_) async => [
+          const CoreTransaction(
+            txid: 'onchain',
+            transactionType: 'Incoming',
+            received: 120,
+            sent: 0,
+            fee: 0,
+          ),
+        ],
+      );
+      const assetId = 'rgb:configured-usdt';
+      when(() => wallet.getAssetBalance(assetId)).thenAnswer(
+        (_) async => CoreAssetBalance(
+          settled: BigInt.from(100),
+          future: BigInt.from(100),
+          spendable: BigInt.from(90),
+          offchainOutbound: BigInt.zero,
+          offchainInbound: BigInt.zero,
+        ),
+      );
+      when(() => wallet.listTransfers(assetId: assetId))
+          .thenAnswer((_) async => []);
+      final engine = RgbWalletEngine(wallet, mainnet, UtexoUnlockConfig());
+      final btc = await engine.getBalance(WalletAsset.bitcoin);
+      expect(btc.onchainSettled.units, 120);
+      expect(btc.lightningOwned.units, 0);
+      expect(btc.lightningSpendable.units, 0);
+      final btcActivity = await engine.listActivity(WalletAsset.bitcoin);
+      expect(btcActivity.single.amount?.units, 120);
+      final usdt = WalletAsset.rgbUsdt(assetId: assetId, precision: 6);
+      expect((await engine.getBalance(usdt)).onchainSpendable.units, 90);
+      expect(await engine.listActivity(usdt), isEmpty);
+      verifyNever(() => wallet.listChannels());
+      verifyNever(() => wallet.listPayments());
+      when(() => wallet.listTransactions())
+          .thenThrow(const WalletException('network error'));
+      await expectLater(
+        engine.listActivity(WalletAsset.bitcoin),
+        throwsA(isA<WalletException>()),
+      );
+    },
+  );
 
   test('factory rejects unresolved endpoint configuration', () {
     final sdk = MockRgbSdkFlutter();
@@ -1629,6 +1726,10 @@ void main() {
             Assignment(type: 'Fungible', amount: BigInt.from(4)),
             Assignment(type: 'Fungible', amount: BigInt.from(6)),
           ],
+          requestedAssignment: Assignment(
+            type: 'Fungible',
+            amount: BigInt.from(10),
+          ),
           kind: 'Send',
           txid: 'rgb-anchor-txid',
           recipientId: 'rgb-recipient',
@@ -1756,8 +1857,8 @@ void main() {
     final maximum = BigInt.from(WalletAmount.maxNativeUnits);
 
     test('resolves the reviewed SDK baseline and new mainnet indexer', () {
-      expect(RgbSdkFlutter.reactNativeParityVersion, '1.0.0-beta.32');
-      expect(RgbSdkFlutter.rlnVersion, '0.13.0-beta.3');
+      expect(RgbSdkFlutter.reactNativeParityVersion, '1.0.0-beta.37');
+      expect(RgbSdkFlutter.rlnVersion, '0.16.0-beta.3');
       final resolved = RgbWalletServiceConfigurationResolver.resolve(
         const WalletServiceConfiguration(
           environment: BlockchainEnvironment.mainnet,
@@ -1991,6 +2092,48 @@ void main() {
       final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
       expect((await engine.listActivity(asset)).single.amount?.units, 12);
     });
+
+    for (final kind in ['Send', 'Burn', 'Inflation']) {
+      test(
+        '$kind history uses recipient amount, never wallet change',
+        () async {
+          final wallet = MockUtexoWallet();
+          when(() => wallet.listTransfers(assetId: asset.id.value)).thenAnswer(
+            (_) async => [
+              CoreTransfer(
+                idx: 1,
+                status: CoreTransferStatuses.settled,
+                kind: kind,
+                assignments: [
+                  Assignment(type: 'Fungible', amount: BigInt.from(900)),
+                ],
+                requestedAssignment: Assignment(
+                  type: 'Fungible',
+                  amount: BigInt.from(100),
+                ),
+                transportEndpoints: [],
+              ),
+              CoreTransfer(
+                idx: 2,
+                status: CoreTransferStatuses.settled,
+                kind: kind,
+                assignments: [
+                  Assignment(type: 'Fungible', amount: BigInt.from(900)),
+                ],
+                transportEndpoints: [],
+              ),
+            ],
+          );
+          when(() => wallet.listPayments()).thenAnswer((_) async => []);
+          final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
+          final records = await engine.listActivity(asset);
+          expect(
+            records.map((item) => item.amount?.units),
+            unorderedEquals([100, null]),
+          );
+        },
+      );
+    }
 
     test(
       'rejects aggregate RGB overflow and non-fungible allocations',

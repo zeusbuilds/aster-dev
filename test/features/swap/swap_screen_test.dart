@@ -70,15 +70,36 @@ void main() {
       false,
     );
     expect(find.text('Bitcoin'), findsNWidgets(2));
-    expect(find.text('USDT'), findsNWidgets(2));
-    await tester.tap(find.text('Lightning').first);
+    // At 2x text the last row is lazy-built only after scrolling.
+    expect(find.text('Coming later'), findsOneWidget);
+    final lightning = tester.getSemantics(
+      find.bySemanticsLabel('Bitcoin, Lightning'),
+    );
+    expect(lightning.flagsCollection.isEnabled, ui.Tristate.isFalse);
+    expect(
+      lightning.getSemanticsData().hasAction(ui.SemanticsAction.tap),
+      isFalse,
+    );
+    await tester.tap(find.text('Coming later').first);
     await tester.pumpAndSettle();
 
-    expect(find.text('Bitcoin · Lightning'), findsOneWidget);
-    expect(harness.haptics.intents, [
-      HapticIntent.lightImpact,
-      HapticIntent.selection,
-    ]);
+    expect(find.byType(AssetSelectorSheet), findsOneWidget);
+    expect(harness.haptics.intents, [HapticIntent.lightImpact]);
+    await tester.scrollUntilVisible(
+      find.bySemanticsLabel('USDT, RGB Lightning'),
+      120,
+      scrollable: find.descendant(
+        of: find.byType(AssetSelectorSheet),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('USDT, RGB Lightning'))
+          .flagsCollection
+          .isEnabled,
+      ui.Tristate.isFalse,
+    );
     expect(tester.takeException(), isNull);
     expect(tester, meetsGuideline(androidTapTargetGuideline));
     expect(tester, meetsGuideline(labeledTapTargetGuideline));

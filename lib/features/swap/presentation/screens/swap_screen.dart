@@ -129,7 +129,7 @@ class _SwapLoading extends StatelessWidget {
               Squircle(
                 padding: EdgeInsets.all(context.spacing.xl),
                 child: Text(
-                  index == 0 ? 'Bitcoin · On-chain' : 'Bitcoin · Lightning',
+                  index == 0 ? 'Bitcoin · On-chain' : 'USDT · On-chain',
                   style: context.type.title,
                 ),
               ),

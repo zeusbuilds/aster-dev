@@ -220,6 +220,13 @@ final class WalletPaymentCapability {
 
   bool get isAvailable => route != null;
 
+  /// Unavailable rails are a release policy, not a missing server setting.
+  String? get unavailableReason => isAvailable
+      ? null
+      : target.rail == PaymentRail.lightning
+      ? 'Coming later'
+      : 'Not configured';
+
   @override
   bool operator ==(Object other) =>
       other is WalletPaymentCapability &&

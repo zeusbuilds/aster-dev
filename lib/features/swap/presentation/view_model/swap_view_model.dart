@@ -40,7 +40,7 @@ class SwapViewModel extends _$SwapViewModel {
 
   bool reverse() {
     final current = state.value;
-    if (current == null) return false;
+    if (current == null || !current.canReverse) return false;
     state = AsyncData(current.copyWith(from: current.to, to: current.from));
     return true;
   }
@@ -52,6 +52,10 @@ class SwapViewModel extends _$SwapViewModel {
         .where((item) => item.target == target)
         .firstOrNull;
     if (capability?.isAvailable != true) return false;
+    if ((updateFrom ? current.to : current.from) == target &&
+        !current.canReverse) {
+      return false;
+    }
     if (updateFrom) {
       if (target == current.from) return false;
       state = AsyncData(
@@ -75,16 +79,14 @@ class SwapViewModel extends _$SwapViewModel {
         .where((item) => item.isAvailable)
         .map((item) => item.target)
         .toList(growable: false);
-    if (available.length < 2) {
-      throw StateError('At least two payment targets are required.');
-    }
-    final preferredTo = available.contains(WalletPaymentTarget.usdtOnchain)
+    final from = available.firstOrNull ?? WalletPaymentTarget.bitcoinOnchain;
+    final alternatives = available.where((target) => target != from);
+    final preferredTo = alternatives.contains(WalletPaymentTarget.usdtOnchain)
         ? WalletPaymentTarget.usdtOnchain
-        : available[1];
-    return SwapState(
-      capabilities: capabilities,
-      from: available.first,
-      to: preferredTo,
-    );
+        : alternatives.firstOrNull ??
+              (from == WalletPaymentTarget.usdtOnchain
+                  ? WalletPaymentTarget.bitcoinOnchain
+                  : WalletPaymentTarget.usdtOnchain);
+    return SwapState(capabilities: capabilities, from: from, to: preferredTo);
   }
 }
