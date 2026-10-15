@@ -20,9 +20,10 @@ eligible for a funds-bearing mainnet release.
   native ELF checks, 16 KiB ZIP alignment and startup on Android 17 with
   compatibility fallback disabled. SDK-004's exact release AAB/split-APK
   qualification and funded-flow qualification remain open.
-- The SDK commit and derived Android AAR are staged locally and not yet
-  published. Public dependency restoration remains unqualified until both are
-  available and a clean remote-only restore passes.
+- SDK [v0.2.0-beta.1](https://github.com/UTEXO-Protocol/flutter-sdk/releases/tag/v0.2.0-beta.1)
+  and its derived Android AAR are published. An empty Git cache restores the
+  exact SDK pin with the lockfile unchanged; an empty Gradle dependency cache
+  downloads and verifies the release AAR over HTTPS.
 - `1.0.0+1` is a provisional app version until release ownership defines the
   public version/build-number and upgrade policy.
 - RGB USDT stays unavailable unless a deployment supplies a validated asset ID

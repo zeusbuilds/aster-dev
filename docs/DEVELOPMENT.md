@@ -226,15 +226,18 @@ number.
 
 Each AAB and split APK must also remain below its reviewed regression budget.
 Verification prints the exact artifact byte count and streamed SHA-256 digest.
-The locally staged SDK `0.2.0-beta.1` candidate includes a derived 16 KiB RLN
+The published SDK `0.2.0-beta.1` beta includes a derived 16 KiB RLN
 0.17 AAR with passing SDK-level ELF, APK ZIP alignment and native signer checks.
 Aster's Debug APK now passes all 25 native ELF checks and 16 KiB ZIP alignment,
 and launches on Android 17 with 16 KiB pages and compatibility fallback disabled.
 A direct load/health check of the RLN library extracted from that same APK also
 passes. SDK-004's exact release AAB/split-APK qualification, funded flows and
-PKG-006 provenance remain open. The SDK commit and derived AAR are
-not yet published, so clean public dependency restoration also remains
-unqualified. A size/digest pass does not satisfy these separate gates.
+PKG-006 provenance remain open. The public SDK pin restores with an empty Git
+cache and an unchanged lockfile; a separate empty Gradle dependency cache
+downloads the published AAR over HTTPS and verifies its pinned size and SHA-256.
+See the [beta release](https://github.com/UTEXO-Protocol/flutter-sdk/releases/tag/v0.2.0-beta.1).
+Dependency restoration and a size/digest pass do not satisfy these separate
+release gates.
 
 ### iOS Release Archives
 

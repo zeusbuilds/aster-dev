@@ -8,13 +8,15 @@ architecture boundaries.
 
 The checked-in `pubspec.yaml` and `pubspec.lock` pin SDK `0.2.0-beta.1` in the
 public UTEXO protocol SDK repository to immutable commit
-`c4e3c2d0b630a5807315710f18240889c7b74b0e`. This is a locally staged candidate
-as of 2026-10-15: the SDK commit and its derived Android AAR have not been
-published. Local staging permits qualification of the pinned bytes; it does
-not prove a clean restore from the public Git repository and release asset.
-Publication and remote restore qualification remain pending. Do not replace
-the commit with a branch, tag, moving reference, or local path in a committed
-change.
+`c4e3c2d0b630a5807315710f18240889c7b74b0e`. The SDK and its derived Android AAR
+were published as [v0.2.0-beta.1](https://github.com/UTEXO-Protocol/flutter-sdk/releases/tag/v0.2.0-beta.1)
+on 2026-10-15. Normal locked Pub resolution from an empty Git cache fetches
+that exact commit over HTTPS with no URL rewrite or dependency override and
+leaves the lockfile unchanged. Separately, an empty Gradle dependency cache
+fetches the release AAR over HTTPS and verifies its size and SHA-256. These
+checks qualify public dependency restoration, not funded or release flows.
+Do not replace the commit with a branch, tag, moving reference, or local path
+in a committed change.
 
 After changing the SDK pin intentionally, clear app build outputs before
 resolving dependencies. Immutable Git pins use different Pub checkout paths;
@@ -127,10 +129,9 @@ When developing the SDK and app together, create an ignored
 The example below assumes sibling clones only for illustration. Replace `path`
 with your SDK checkout's actual absolute path or a path relative to Aster;
 neither the old machine's directory layout nor sibling clones are required.
-Pub YAML does not expand shell variables such as `$SDK_ROOT`. After publication
-and remote restore qualification, normal installs use the immutable public Git
-dependency above with no local SDK checkout required. That remote-only restore
-has not yet been qualified for the locally staged candidate.
+Pub YAML does not expand shell variables such as `$SDK_ROOT`. Normal installs
+use the qualified immutable public Git dependency above with no local SDK
+checkout required.
 
 ```yaml
 dependency_overrides:
