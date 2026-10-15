@@ -352,33 +352,90 @@ void main() {
   testWidgets('payment target selection supports compact 2x text accessibly', (
     tester,
   ) async {
-    final harness = await PaymentFlowTestHarness.create();
-    addTearDown(() => _disposeHarness(tester, harness));
-    await _pumpWidget(
-      tester,
-      harness,
-      const SendScreen(),
-      textScaler: const TextScaler.linear(2),
-    );
-    await _pumpUntil(
-      tester,
-      () => find.byType(PaymentTargetTile).evaluate().isNotEmpty,
-    );
+    final previousHitTestPolicy = WidgetController.hitTestWarningShouldBeFatal;
+    WidgetController.hitTestWarningShouldBeFatal = true;
+    try {
+      final harness = await PaymentFlowTestHarness.create();
+      addTearDown(() => _disposeHarness(tester, harness));
+      final capabilities = Completer<List<WalletPaymentCapability>>();
+      await _pumpWidget(
+        tester,
+        harness,
+        ProviderScope(
+          overrides: [
+            walletPaymentCapabilitiesProvider.overrideWith(
+              (ref) => capabilities.future,
+            ),
+          ],
+          child: const SendScreen(),
+        ),
+        textScaler: const TextScaler.linear(2),
+      );
+      final selection = find.byType(PaymentTargetSelectionView);
+      final activeSkeleton = find.byWidgetPredicate(
+        (widget) => widget is AppSkeletonizer && widget.enabled,
+      );
+      // Loading placeholders already contain tiles. They must not satisfy the
+      // readiness check or receive this test's accessibility/gesture checks.
+      expect(find.byType(PaymentTargetTile), findsWidgets);
+      expect(activeSkeleton, findsOneWidget);
+      expect(
+        tester.widget<PaymentTargetSelectionView>(selection).capabilities,
+        isA<AsyncLoading<List<WalletPaymentCapability>>>(),
+      );
+      capabilities.complete(harness.repository.paymentCapabilities);
+      await _pumpUntil(
+        tester,
+        () =>
+            tester.widget<PaymentTargetSelectionView>(selection).capabilities
+                is AsyncData<List<WalletPaymentCapability>> &&
+            activeSkeleton.evaluate().isEmpty,
+      );
+      await tester.pumpAndSettle();
+      expect(activeSkeleton, findsNothing);
 
-    expect(tester.takeException(), isNull);
-    expect(tester, meetsGuideline(androidTapTargetGuideline));
-    expect(tester, meetsGuideline(labeledTapTargetGuideline));
-    expect(tester, meetsGuideline(textContrastGuideline));
-    await tester.scrollUntilVisible(
-      find.byWidgetPredicate(
+      expect(tester.takeException(), isNull);
+      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(textContrastGuideline));
+      final scrollable = find.descendant(
+        of: selection,
+        matching: find.byType(Scrollable),
+      );
+      expect(scrollable, findsOneWidget);
+      final position = tester.state<ScrollableState>(scrollable).position;
+      final initialOffset = position.pixels;
+      expect(position.maxScrollExtent, greaterThan(0));
+      final lastTarget = find.byWidgetPredicate(
         (widget) =>
             widget is PaymentTargetTile &&
             widget.capability.target == WalletPaymentTarget.usdtLightning,
-      ),
-      150,
-    );
-    expect(tester.takeException(), isNull);
-    expect(tester, meetsGuideline(labeledTapTargetGuideline));
+      );
+      bool lastTargetFullyVisible() {
+        if (lastTarget.evaluate().isEmpty) return false;
+        final viewport = tester.getRect(scrollable);
+        final tile = tester.getRect(lastTarget);
+        return tile.top >= viewport.top && tile.bottom <= viewport.bottom;
+      }
+
+      expect(lastTargetFullyVisible(), isFalse);
+      for (var drag = 0; drag < 5 && !lastTargetFullyVisible(); drag += 1) {
+        final beforeDrag = position.pixels;
+        await tester.drag(scrollable, const Offset(0, -250));
+        await tester.pumpAndSettle();
+        expect(position.pixels, greaterThan(beforeDrag));
+      }
+      expect(position.pixels, greaterThan(initialOffset));
+      expect(lastTarget, findsOneWidget);
+      expect(lastTargetFullyVisible(), isTrue);
+      expect(lastTarget.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(textContrastGuideline));
+    } finally {
+      WidgetController.hitTestWarningShouldBeFatal = previousHitTestPolicy;
+    }
   });
 
   testWidgets('payment target selection suppresses same-turn route commands', (
