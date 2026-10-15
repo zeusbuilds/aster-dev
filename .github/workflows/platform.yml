@@ -42,6 +42,37 @@ jobs:
       - name: Generate sources
         run: dart run build_runner build
 
+      - name: Provision pinned Android NDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          NDK_VERSION=28.2.13676358
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:?Android SDK root is required}}"
+          sdk_manager="${sdk_root}/cmdline-tools/latest/bin/sdkmanager"
+          ndk_root="${sdk_root}/ndk/${NDK_VERSION}"
+          ndk_compiler="${ndk_root}/toolchains/llvm/prebuilt/linux-x86_64/bin/clang"
+          ndk_is_usable() {
+            [[ -f "${ndk_root}/source.properties" && -x "${ndk_compiler}" ]] || return 1
+            local installed
+            installed="$(sed -n 's/^Pkg.Revision[[:space:]]*=[[:space:]]*//p' "${ndk_root}/source.properties" | tr -d '\r')"
+            [[ "${installed}" == "${NDK_VERSION}" ]] || return 1
+            "${ndk_compiler}" --version >/dev/null 2>&1
+          }
+          if ndk_is_usable; then
+            echo "Pinned NDK ${NDK_VERSION} is already usable."
+            exit 0
+          fi
+          [[ -x "${sdk_manager}" ]] || { echo "Installed sdkmanager is unavailable." >&2; exit 1; }
+          for attempt in 1 2 3; do
+            echo "Provision pinned NDK ${NDK_VERSION}, attempt ${attempt}/3."
+            if "${sdk_manager}" --install "ndk;${NDK_VERSION}" --channel=0 && ndk_is_usable; then
+              exit 0
+            fi
+            if [[ "${attempt}" -lt 3 ]]; then sleep "$((attempt * 5))"; fi
+          done
+          echo "Pinned NDK ${NDK_VERSION} could not be provisioned and verified." >&2
+          exit 1
+
       - name: Compile Android host integration
         run: flutter build apk --debug --no-pub
 
