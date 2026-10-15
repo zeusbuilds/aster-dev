@@ -10,7 +10,8 @@ val asterApplicationId = providers.gradleProperty("aster.applicationId").get()
 android {
     // Final package identity is release-owned and remains blocked by DEC-006.
     namespace = asterApplicationId
-    compileSdk = flutter.compileSdkVersion
+    // Android 17 requires API 37; Flutter 3.47 still defaults to API 36.
+    compileSdk = 37
     buildToolsVersion = "36.0.0"
     ndkVersion = flutter.ndkVersion
 
@@ -22,7 +23,7 @@ android {
     defaultConfig {
         applicationId = asterApplicationId
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = 37
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }

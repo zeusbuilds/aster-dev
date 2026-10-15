@@ -90,7 +90,7 @@ aster_capture_quick /bin/sh -c "printf ready"
   });
 
   test('uses an exact pinned absolute FLUTTER_ROOT in CI', () async {
-    final flutterRoot = createFlutterRoot('ci-flutter', version: '3.47.0');
+    final flutterRoot = createFlutterRoot('ci-flutter', version: '3.47.7');
     removeLocalFlutterRuntime();
 
     final result = await runSource(
@@ -155,8 +155,8 @@ aster_capture_quick /bin/sh -c "printf ci-ready"
       'duplicate-metadata',
       metadata:
           '{\n'
-          '  "frameworkVersion": "3.47.0",\n'
-          '  "frameworkVersion": "3.47.0",\n'
+          '  "frameworkVersion": "3.47.7",\n'
+          '  "frameworkVersion": "3.47.7",\n'
           '}\n',
     );
     removeLocalFlutterRuntime();
@@ -172,7 +172,7 @@ aster_capture_quick /bin/sh -c "printf ci-ready"
   });
 
   test('rejects a relative FLUTTER_ROOT', () async {
-    createFlutterRoot('relative-flutter', version: '3.47.0');
+    createFlutterRoot('relative-flutter', version: '3.47.7');
     removeLocalFlutterRuntime();
 
     final result = await runSource(

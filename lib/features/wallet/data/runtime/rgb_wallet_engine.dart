@@ -156,7 +156,7 @@ final class RgbWalletEngine implements WalletEngine {
   final DateTime Function() _clock;
   final BitcoinAddressValidator _bitcoinAddresses;
 
-  // RLN 0.16 has no Lightning runtime on mainnet; querying its Lightning-only
+  // RLN 0.17 has no Lightning runtime on mainnet; querying its Lightning-only
   // endpoints fails with 403. Never hide a real network error as an empty list.
   bool get _nativeLightningAvailable =>
       _services.environment != BlockchainEnvironment.mainnet;

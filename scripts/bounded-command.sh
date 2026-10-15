@@ -24,7 +24,7 @@ readonly ASTER_BOUNDED_ROOT="$(
   cd "${_aster_bounded_source_directory}/.."
   pwd -P
 )"
-readonly ASTER_BOUNDED_FLUTTER_VERSION=3.47.0
+readonly ASTER_BOUNDED_FLUTTER_VERSION=3.47.7
 readonly ASTER_BOUNDED_LOCAL_DART="${ASTER_BOUNDED_ROOT}/.fvm/flutter_sdk/bin/cache/dart-sdk/bin/dart"
 _aster_bounded_dart="${ASTER_BOUNDED_LOCAL_DART}"
 if [[ ! -x "${_aster_bounded_dart}" ]]; then

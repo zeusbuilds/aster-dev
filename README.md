@@ -1,8 +1,9 @@
 # Aster Wallet
 
 Aster is a Flutter wallet for Bitcoin, RGB USDT, and Lightning. It is powered
-by the UTEXO protocol through the public `rgb_sdk_flutter` API, pinned to
-immutable commit `7c44506fdfe1dae6f3a6fe884f849c7ca2ad028b`, and uses Riverpod MVVM.
+by the UTEXO protocol through the public `rgb_sdk_flutter` API, with SDK
+`0.2.0-beta.1` pinned to immutable commit
+`c4e3c2d0b630a5807315710f18240889c7b74b0e`, and uses Riverpod MVVM.
 
 ## Release Status
 
@@ -14,8 +15,14 @@ eligible for a funds-bearing mainnet release.
 - Final application identifiers, signing ownership, authentication for secret
   disclosure, screen-capture policy, and store privacy/export declarations
   remain product, security, or release-owner decisions.
-- The pinned SDK's Android native library is still 4 KiB ELF-aligned. Android
-  16 KiB page-size qualification and a compatible SDK artifact remain blocked.
+- The SDK candidate includes a derived 16 KiB RLN 0.17 artifact with passing
+  native signer checks on both platforms. Aster's Debug APK passes all 25
+  native ELF checks, 16 KiB ZIP alignment and startup on Android 17 with
+  compatibility fallback disabled. SDK-004's exact release AAB/split-APK
+  qualification and funded-flow qualification remain open.
+- The SDK commit and derived Android AAR are staged locally and not yet
+  published. Public dependency restoration remains unqualified until both are
+  available and a clean remote-only restore passes.
 - `1.0.0+1` is a provisional app version until release ownership defines the
   public version/build-number and upgrade policy.
 - RGB USDT stays unavailable unless a deployment supplies a validated asset ID
@@ -77,8 +84,9 @@ make run-ios IOS_SIMULATOR_ID=<simulator-udid>
 # Or: make run-android ANDROID_DEVICE_ID=<emulator-or-device-id>
 ```
 
-Flutter `3.47.0` and Dart `3.13.0` are pinned. Flutter 3.47.0 was the latest
-stable release in Flutter's official archive when verified on 2026-08-13.
+Flutter `3.47.7` and Dart `3.13.5` are pinned. Android builds compile and target
+API 37 (Android 17). iOS builds use the installed Xcode 27 SDK and retain the
+iOS 18.5 deployment minimum.
 
 For complete setup, the reviewed release-manifest workflow, the optional
 uncommitted local SDK override, and protected-regtest isolation, read

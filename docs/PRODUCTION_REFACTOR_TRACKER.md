@@ -43,6 +43,123 @@ TEST-019 and PERF-015 remain blocked.
 
 ## Scope And Status
 
+### October 15 Platform Upgrade (Historical Working-Tree Evidence)
+
+Restored private Aster `main` at `6f26055` and the private SDK at `7c44506`.
+The five handoff files match the supplied backup. This work is limited to
+building and launching on iOS 27 and Android 17. No stack/container operation,
+service connection, wallet restore, create/import, or funded flow is included.
+For that platform-only slice, the SDK source and immutable app dependency
+remained unchanged. The subsequent SDK candidate task below supersedes that
+statement for the current working tree.
+
+The app pins Flutter 3.47.7 / Dart 3.13.5 across FVM, CI, package constraints,
+editor settings and bounded tooling. Android explicitly compiles/targets API 37
+with AGP 9.1.1, retaining reviewed Gradle 9.3.1 and build tools 36.0.0. Cross-file
+policy verifies this deliberate override of Flutter's SDK 36 template. iOS
+uses Xcode 27 / iOS 27 SDK while retaining deployment minimum 18.5 and the locked
+CocoaPods integration. The app explicitly disables SwiftPM for native plugin
+resolution after a fresh hybrid build omitted the storage module. Native Dart
+hooks strip `DEVELOPER_DIR`; a command-scoped ignored `xcrun` wrapper selects
+Xcode without modifying global selection or dependency sources. Existing blocked
+release findings remain blocked.
+
+The macOS presentation golden was visually compared with its old baseline:
+270 pixels (0.08%) differ at text edges after the Flutter patch. Layout, content,
+colors and controls are unchanged; the macOS baseline is refreshed for this
+renderer. The Linux baseline is preserved pending Linux execution. Initial
+host failures from the absent system Java path are rerun with the bundled JDK;
+no production behavior or test policy is bypassed.
+
+Fresh Aster-owned devices and reserved `.invalid` indexer/proxy defines prevent
+use of SDK endpoint defaults. Only the welcome screen is exercised. Local
+verification logs and captures are under ignored `.buildlog/platform-upgrade/`.
+Current working-tree verification: 977 host tests pass with concurrency two
+and an explicit bundled JDK; fatal analysis, toolchain, tracker inventory and
+repository governance pass. The iOS Simulator Debug build passes on Xcode 27
+using `iphonesimulator27.0` and deployment minimum 18.5. The installed app
+`com.example.asterdev.debug` launches on a fresh Aster iPhone 18 Pro simulator
+running iOS 27.0; the welcome screen is visually verified. Runner SHA-256:
+`889a60101efcdf445938d33d8d8fa9a5250a00b4f9c046174039c4052e2bedb9`.
+This is startup/UI evidence with reserved endpoints, not wallet or service
+qualification. The Android platform upgrade adds 107 SHA-256-verified artifacts
+across 48 components, including Linux/macOS aapt2 and the Flutter 3.47.7 Debug
+engine/CI ABI artifacts. Independent byte comparisons with official Google
+Maven and Flutter artifact storage pass. All 2,165 prior checksums and strict
+verification configuration remain intact (2,272 artifacts total). The exact
+NDK 28.2 archive matches Google's published size and checksum.
+
+Android Debug build passes strict verification (460 Gradle tasks), and all
+three `StorageChannelSessionTest` host tests pass with zero failures/errors/skips.
+The installed `com.example.asterdev.debug` APK compiles/targets SDK 37, keeps
+minimum SDK 24, and launches to the visually verified welcome screen on the
+fresh Aster Android 17 / API 37 emulator (540 x 1212 pixels, 240 dpi / 360 dp
+width). Default Impeller OpenGLES rendering is retained. APK SHA-256:
+`b87baca99baa83b869897dbd4f32d7970871e8cd59bf215bfd1d7a024ac596e1`.
+The guest uses 4,096-byte pages; the current packaged RLN libraries still have
+`0x1000` ELF LOAD alignment in all three ABIs. SDK-004's 16 KiB blocker remains
+open; this startup check does not qualify 16 KiB or wallet/service operations.
+Both apps reached welcome with reserved endpoints and no wallet state restored
+or created. The iOS app was relaunched and recaptured successfully, then its
+fresh simulator was shut down to keep the Android guest responsive under host
+memory pressure. Android is left open after a normal unflagged launch; the
+clean welcome capture and final process/renderer proof are retained.
+Captures: `ios27-welcome.png`, `android17-welcome.png` in the
+ignored evidence directory, with Android device/artifact metadata and canonical
+Maven/cache review JSON. Nix, physical devices, release signing and funded
+qualification remain outside this platform smoke check.
+
+### October 15 SDK Candidate Upgrade (Current Task; Local Staging)
+
+The app now pins SDK `0.2.0-beta.1` at immutable local commit
+`c4e3c2d0b630a5807315710f18240889c7b74b0e`. This advances RN to
+`1.0.0-beta.39` at `41ff170f794edff2a1822a672ddab37e29505f14`, retains core
+`1.0.0-beta.9`, and advances WebRGB to `0.1.3` and RLN to `0.17.0-beta.3`.
+The public SDK commit and derived Android release asset are not published yet.
+The committed Git pin and lockfile describe the candidate; local dependency
+and artifact staging do not establish clean remote installation. Publication
+and a fresh remote-only restore remain required qualification steps.
+
+The Android baseline pins the distinct coordinate
+`com.utexo.flutter:rgb-lightning-node-android:0.17.0-beta.3-16k.1` and AAR
+SHA-256 `ca1aa12d44c1e83c0a0f51a38c7bf1486e0ea3ac796dcc02d479acbdf4d832c5`.
+The executed recipe builds exact RLN 0.17 source with 16 KiB linker settings,
+preserves official non-JNI AAR contents, and checks generated Kotlin, FFI
+exports and runtime dependencies before and after stripping. The source-build
+record is local consistency evidence, not a signed builder attestation or an
+independently reproduced build. PKG-006 remains an explicit release constraint.
+
+| Gate | Current evidence | Remaining boundary |
+| --- | --- | --- |
+| SDK Android 17 / 16 KiB | Native Flutter signer test passes 1/1; 30 JVM bridge tests pass; all eight packaged native libraries pass ELF checks and the SDK APK passes ZIP alignment. | Offline signer/bridge evidence; no wallet unlock or funded-flow qualification. |
+| SDK iOS 27 and host gates | Native Flutter signer test passes 1/1; 26 Swift tests pass after correcting one bookkeeping-only test fixture to call public shutdown. Final SDK commit passes 496 host tests and coverage policy (88.3% package). | RGB-assets/VSS success-vector gates remain intentionally red without backend proof; PKG-006 remains. |
+| Aster source gates | Final immutable SDK pin, generation, fatal analysis, 977 tests and complete normal lint pass; documentation has zero warnings/errors. Three Android storage JVM tests pass with zero failures/errors/skips. | These are source and local platform checks, not release eligibility. |
+| Aster Android 17 / 16 KiB | Debug APK passes all 25 native ELF checks across three ABIs and 16 KiB ZIP alignment. Cold welcome launch succeeds on API 37 / 16,384-byte pages with linker mode `fatal` and package compatibility disabled. Extracted APK RLN bytes pass native contract 26, checksum 28125, health check and Rust buffer release. | The underlying SDK ELF/load defect is fixed in this candidate. SDK-004 stays blocked for exact release AAB/split-APK qualification; no funded/backend flow is inferred. |
+| Aster iOS 27 | Xcode 27 Simulator Debug build, install and welcome launch pass with the final Git SDK; no build migrations or checked crash/bootstrap/MissingPlugin markers. | Simulator startup evidence only; physical-device, signing, wallet and service qualification remain separate. |
+| Fresh SDK consumers | Clean `c4e3c2d` path and local Git consumers pass all seven matrix steps: package dry-run with zero warnings, analysis, both Android release APKs with complete four-library arm64 inventory and ELF/ZIP checks, both unsigned iOS release builds and locked pod deployment. | Exact local AAR bytes are staged; public dependency restoration remains separate. |
+| Public dependency restore | Immutable SDK commit and derived AAR bytes are staged locally. | Public commit/asset publication and clean remote-only restore are pending. |
+| WDK/native lifecycle and services | Rechecked open PR45 after its October 15 update: its native core/UniFFI/C-FFI/Node overlay proposes a P01 source/host repair. This derived build consumes the published RLN 0.17 release, which excludes that overlay. | P01 mobile closure/replacement and funded iOS qualification remain pending; P02/P03/P04/P06 stay open. WDK host evidence does not qualify Flutter mobile. No funded or backend qualification is authorized or claimed. |
+
+Mainnet continues to skip Lightning runtime APIs under RLN 0.17; the version
+upgrade does not enable Lightning payment routes or other unqualified app
+features. Historical October 15 platform evidence above and October 13 upgrade
+evidence below retain their original artifact and scope boundaries. Finding
+totals and other blocked release decisions are not promoted by this task.
+
+These app builds use reserved `.invalid` indexer/proxy endpoints and exercise
+only welcome. Logs and captures remain under ignored
+`.buildlog/platform-upgrade/`: `rln17-c4e3-aster-apk-16k.json`,
+`rln17-c4e3-final-apk-native/`, `rln17-c4e3-android17-16k-launch-proof.json`
+and the `rln17-ios/aster-ios27-c4e3-*` files. Android APK SHA-256 is
+`c0f6baa2df63519d005bf0481ff5f21eceebc28362cd3236c614a8e88eb43686`;
+its arm64 RLN payload is
+`d24afa7000f0409993606586040bba98a251a60d68702e8e48d610984c8a7ad9`,
+identical to the SDK APK used for its real Flutter signer test. iOS Runner
+SHA-256 is `0626aac50d0fd28c905eebdfd9c6b0c4003f2a12db5491950122c28510859a0a`.
+The app evidence honestly records the dirty working tree during validation;
+the SDK host coverage binds clean commit `c4e3c2d`. No stack/container was
+created or connected, and no application wallet was created/restored/unlocked.
+
 ### October 13 Reset Handoff
 
 Portability correction (DOC-012): all five handoff files now use Git identity
@@ -158,7 +275,9 @@ source, wallet stores, regtest data and verification logs are retained.
 - Baseline date: 2026-08-08 (Asia/Kolkata)
 - Target product: Aster Bitcoin, RGB USDT, and Lightning wallet powered by the
   UTEXO protocol
-- SDK target: `rgb_sdk_flutter` at `7c44506fdfe1dae6f3a6fe884f849c7ca2ad028b`
+- Current SDK target: local-staged `rgb_sdk_flutter` `0.2.0-beta.1` at
+  `c4e3c2d0b630a5807315710f18240889c7b74b0e`; public publication and remote
+  restore qualification remain pending
 - Current phase: Phase 9 functional work, visual restoration and 15 UI/UX audit
   corrections are implemented; external qualification blockers remain explicit
 - Release status: not eligible for funds-bearing release
@@ -227,7 +346,7 @@ pass upgrades the existing application surface only.
 | DEC-005 | verified | Any app regtest environment must be isolated from `rgb-lightning-node-perf-lab`. | Prevents mutation of the existing shared chain and index state. |
 | DEC-006 | blocked | The visible product name is Aster; final iOS bundle ID, Android application ID, and signing ownership are not yet confirmed. | Every user-visible and app-owned native surface uses Aster. The provisional `com.example.asterdev` identity remains suitable only for development until release ownership supplies final identifiers and signing. |
 | DEC-007 | verified | Use exact compatible releases `flutter_riverpod` 3.4.2, `riverpod_annotation` 4.0.6, `riverpod_generator` 4.0.8, and `build_runner` 2.16.0 on Flutter 3.47.0. | Flutter 3.47.0 advances the SDK-pinned analyzer/test graph enough to resolve the current Riverpod runtime and generator together. Generation, fatal analysis, and all host tests pass on Dart 3.13.0. |
-| DEC-008 | verified | Keep `flutter_secure_storage` at 10.3.1 on this toolchain. | Version 11 still requires Android compile SDK 37 while Flutter 3.47.0 defines compile SDK 36. The pin was re-evaluated rather than inherited from the old toolchain; upgrade only with a coordinated platform contract. |
+| DEC-008 | verified | Keep `flutter_secure_storage` at 10.3.1 for the focused platform migration. | October 15: Aster now compiles against SDK 37, removing the old compile-SDK obstacle to version 11. Retain the reviewed storage release for this OS launch check; a storage migration requires its own compatibility and recovery review. |
 | DEC-009 | verified | Apply AGP built-in Kotlin to the Aster app module while retaining global legacy compatibility only for unmigrated dependency modules. | Flutter 3.47 and AGP 9.1 support module-by-module migration. Aster production and test Kotlin compile through `com.android.built-in-kotlin`; hosted plugins and immutable `rgb_sdk_flutter` still apply KGP, so the global opt-outs remain until PLAT-002 can close. |
 | DEC-010 | verified | Keep iOS plugin integration on CocoaPods for the pinned SDK revision. | The SDK does not currently declare Swift Package Manager support. Flutter's generated package scaffolding remains tool-owned and ignored. |
 | DEC-011 | verified | Store a random 256-bit native database password and the recovery mnemonic as one versioned per-wallet record in platform secure storage. | The product has no PIN/biometric unlock contract yet. iOS uses a non-synchronizing, this-device-only Keychain class; Android uses namespaced AES-GCM storage with destructive reset disabled. Platform round-trip tests pass at `1b3273a`; a later authentication UX may add user-presence controls without changing repository contracts. |
@@ -653,7 +772,7 @@ Baseline screenshots are stored in `docs/release/evidence/baseline/`.
 | BASE-001 | P0 | Toolchain | verified | Flutter 3.38.9 / Dart 3.10.8 could not consume the SDK, which requires Flutter 3.41+ / Dart 3.11+. | `.fvmrc`, `pubspec.yaml`, SDK `pubspec.yaml` | `8e97370` | The compatible foundation advanced again through BASE-002; Flutter 3.47.0 / Dart 3.13.0 host and both platform compile gates pass. |
 | BASE-002 | P0 | Toolchain currency | verified | Flutter 3.47.0 / Dart 3.13.0 became stable after the prior 3.44.9 closeout, leaving project, CI, docs, analyzer, generator, and dependency claims stale. | Official Flutter release manifest on 2026-08-13; complete version-bearing source/configuration sweep | `273d3e6`, `3fc63ba` | Every owned toolchain surface and compatible direct dependency is upgraded together. Exact host gates, 399 tests, warning-free Dartdoc, Android release bundle/slices/runtime, iOS Debug XCTest/build/runtime, and prior unsigned Profile/Release builds pass. |
 | SDK-001 | P0 | Integration | verified | The immutable public `rgb_sdk_flutter` dependency needs one app-owned `UtexoWallet` owner and a DTO-isolating repository adapter. | `pubspec.yaml`; SDK import and ownership audit | `1b3273a` | SDK imports are restricted to `RgbWalletEngine` and typed failure mapping; runtime/repository tests and both platform builds pass. |
-| SDK-004 | P0 | Android native compatibility | blocked | The pinned SDK's prebuilt `librgb_lightning_node.so` uses 4 KiB (`0x1000`) ELF LOAD alignment for arm64-v8a and x86_64. The app targets API 36, but 16 KiB devices require every 64-bit native dependency to use at least `0x4000`; package alignment cannot repair an incompatible ELF. | Reconfirmed 2026-10-13 on RLN 0.16.0-beta.3 AAR SHA-256 c9d68c72...3ee3a72c with NDK 28.2 llvm-readelf: arm64-v8a and x86_64 LOAD alignment 0x1000 | - | An upstream immutable SDK/artifact revision must supply 16 KiB-compatible RLN ELF binaries. Re-run release AAB/APK gates and real 16 KiB runtime proof after advancing the pin. ZIP alignment cannot repair this ELF limitation. |
+| SDK-004 | P0 | Android native compatibility | blocked | The local SDK candidate fixes RLN's 4 KiB ELF/load defect: the final Aster Debug APK passes all 25 native ELF checks, 16 KiB ZIP alignment, native contract/health checks of its exact extracted RLN bytes, and welcome launch on Android 17 / 16 KiB with compatibility fallback disabled. Exact release AAB/split-APK qualification remains outstanding. | Historical 2026-10-13 RLN 0.16 AAR SHA-256 c9d68c72...3ee3a72c had arm64/x86_64 LOAD alignment 0x1000; October 15 final app APK SHA-256 c0f6baa2...b43686 and owned API 37 / 16,384-byte guest proof pass. See the dated current-task section above. | - | Keep blocked until exact release AAB/APK gates and installed release 16 KiB runtime proof pass. Publish the immutable SDK commit and derived asset, then qualify clean remote restoration separately. ZIP alignment alone does not prove ELF compatibility. |
 | SDK-005 | P1 | iOS privacy packaging | blocked | The pinned SDK bundles an empty privacy manifest even though its statically linked Rustix/SQLite archive imports file-metadata and disk-space required-reason APIs. That package metadata is not truthful in isolation. | Reconfirmed empty SDK privacy manifest at 7c44506; prior archive symbol audit establishes required-reason API use | - | App root declarations remain in place; do not infer full new-candidate privacy qualification from a compile. SDK must own applicable declarations and the app must re-audit aggregate privacy against the exact release archive. |
 | DATA-001 | P0 | Product truth | verified | Production UI presented static/mock balances, prices, activity, wallet identifiers, addresses, and delayed loading behavior. | Baseline runtime; independent repository production-truth/no-op sweep | `1b3273a`, `db844ac`, `acd42ab`, `e9d7fab`, `b606ebf`, `89c8d7f` | Market, Send/Receive, Home, Swap, Activity, Scan, and Settings consume real app-owned state or expose an explicit unavailable state. Exact aggregate/platform gates and a repository-wide source sweep find no sample payment data, fake wallet data, fabricated operation delays, or compiled empty actions. |
 | SEND-001 | P0 | Send | verified | Send opened directly on a form prefilled with a sample Bitcoin address and had no asset/rail selection or real submission. | Baseline Send screenshot; route/widget/ViewModel/repository tests | `715e671`, `db844ac`, `814ec5c` | Four full-width target choices route to typed address/invoice and exact amount screens. Validation, balance/fee state, duplicate suppression, current-screen loading, real repository submission, confirmed-success navigation, expiry, and failure/retry paths pass without fixture production behavior. |
@@ -908,7 +1027,7 @@ Baseline screenshots are stored in `docs/release/evidence/baseline/`.
 | PLAT-010 | P1 | iOS linker ownership | verified | Every app configuration carried first-commit native header/library/framework flags, deprecated `ld_classic`, `-all_load`, and `allow_simulator_linking_to_ios`, despite the pinned SDK pod owning its native linkage. | Xcode build settings, git blame, podspec, exact Debug XCTest, and unsigned device-mode builds | `31b5264` | App-owned overrides are absent. Two Debug XCTest cases pass, unsigned generic-device Profile/Release products build, and the Debug simulator app installs and launches against the pod-owned native contract on Flutter 3.47. |
 | PLAT-007 | P1 | Supported orientations | blocked | Both mobile hosts permit phone landscape, while the wallet is qualified only for compact/large phone portrait layouts. The iOS target also previously carried an unreachable iPad orientation override. | Android activity manifest, built iOS `UIDeviceFamily`, target settings, `Info.plist`, widget viewport matrix, and platform runtime evidence | `dd49b7b` | The dead iPad declaration is removed and exact XCTest pins `UIDeviceFamily=[1]` with no iPad override. Product must still decide whether to support and qualify phone landscape on Android and iOS; until then, do not claim landscape is release-qualified or silently restrict it. |
 | TEST-003 | P1 | Native unit tests | verified | `RunnerTests.swift` was an assertion-free Flutter template test and provided no native contract evidence. | Complete iOS target audit and exact `dd49b7b` XCTest | `31b5264`, `5742fc0`, `dd49b7b` | Five deterministic tests compile against Runner and pass, covering storage channel/error redaction, aggregate privacy, narrow ATS, and iPhone-only built metadata. |
-| BUILD-003 | P1 | Nix/toolchain parity | blocked | The development shell is statically aligned to Aster, project-local FVM, Java 21, Android platform/build-tools 36, and Flutter's exact NDK, but no host Nix installation is available for executable evaluation. | `.envrc`, `flake.nix`, `flake.lock`, Android Gradle configuration, pinned-input metadata audit, executable cross-file policy, and failed isolated validator attempt | `270dd51`, `a2530ff`, `3398545` | The static contract and pinned nixpkgs source/metadata pass. A digest-pinned one-off Nix 2.30.2 container mounted the source read-only, but importing the full working tree exhausted Docker Desktop storage before evaluation. App build output was removed to recover 9.3 GiB; Docker then returned EOF. Do not claim `nix flake check` until an owner can run it without restarting or disturbing the protected regtest daemon. |
+| BUILD-003 | P1 | Nix/toolchain parity | blocked | The development shell is statically aligned to Aster, project-local FVM, Java 21, Android platform 37.0/build-tools 36.0.0, and Flutter's exact NDK, but no host Nix installation is available for executable evaluation. | `.envrc`, `flake.nix`, `flake.lock`, Android Gradle configuration, pinned-input metadata audit, executable cross-file policy, and failed isolated validator attempt | `270dd51`, `a2530ff`, `3398545` | The static contract and pinned nixpkgs source/metadata pass. A digest-pinned one-off Nix 2.30.2 container mounted the source read-only, but importing the full working tree exhausted Docker Desktop storage before evaluation. App build output was removed to recover 9.3 GiB; Docker then returned EOF. Do not claim `nix flake check` until an owner can run it without restarting or disturbing the protected regtest daemon. |
 | BUILD-010 | P1 | Nix Android release parity | verified | The advertised pinned development shell included Android platform/build/platform tools but omitted the NDK. The repository's own AAB/APK verification requires `llvm-readelf`, and Flutter 3.47 pins NDK `28.2.13676358`, so `make android-release-bundle` could not complete inside the shell even after Nix became available. | Independent Phase 7 flake-to-Make/script trace; exact Flutter `FlutterExtension.ndkVersion`; pinned nixpkgs `composeAndroidPackages` and `repo.json` source | `3398545` | The composed SDK includes exactly Flutter's NDK revision, developer guidance names it, and one fail-closed gate derives the revision from the executing Flutter SDK and checks Android Gradle, Nix, and docs. Four adversarial vectors, all 667 host tests, and every repository gate pass; BUILD-003 separately retains executable Nix evaluation. |
 | BUILD-011 | P1 | Flutter Android template alignment | verified | The Flutter 3.47 upgrade left the Android wrapper and plugin versions on the prior template generation: Gradle 9.1.0, AGP 9.0.1, and Kotlin 2.3.20, while the executing stable SDK declares Gradle 9.3.1, AGP 9.1.0, and Kotlin 2.4.0. Existing tracker rows still called the old versions current. | Independent Phase 7 comparison against pinned Flutter `gradle_utils.dart`, Android settings/wrapper, and inherited tracker claims | `2de0762` | Gradle 9.3.1, AGP 9.1.0, Kotlin 2.4.0, and NDK `28.2.13676358` are aligned atomically. The executable policy derives every value from the running Flutter SDK, five positive/adversarial vectors pass, all 668 host tests pass at 87.35% line coverage, and exact Android arm64 Release plus iOS Simulator Debug builds pass. PLAT-002 separately retains the future built-in-Kotlin plugin constraint. |
 | BUILD-012 | P1 | Android artifact-verifier toolchain | verified | Release scripts selected the lexicographically newest installed NDK/build-tools executable instead of the repository's configured revision. The AAB verifier also hard-coded protobuf 3.22.3 even though AGP 9.1.0 resolves 3.25.5, so a stale machine cache could silently determine release evidence. | Exact real-cache resolution, symlink containment, focused adversarial matrix, signature policy, AAB/APK rebuilds, and immutable SDK-004 rejection at `430111b` | `430111b` | One typed resolver derives exact AGP libraries, build tools, NDK tools, and platform tools; missing, duplicate, malformed, divergent, stale, or escaping inputs fail closed. BUILD-023 additionally proves inherited process state cannot bypass that resolver. |
@@ -1149,7 +1268,7 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | File | Kind | Status | Finding IDs | Verification | Fix commit |
 | --- | --- | --- | --- | --- | --- |
 | `.envrc` | Project configuration | reviewed-clean | BUILD-003 | Minimal direnv entry delegates to the pinned flake without hidden environment mutation | - |
-| `.fvmrc` | Project configuration | verified | BASE-001, BASE-002 | Flutter 3.47.0 is installed from the official stable release and exact `3fc63ba` host/platform gates pass | `8e97370`, `3fc63ba` |
+| `.fvmrc` | Project configuration | verified | BASE-001, BASE-002 | Flutter 3.47.7 / Dart 3.13.5 is the October 15 platform baseline; prior exact `3fc63ba` evidence remains historical | `8e97370`, `3fc63ba` |
 | `.github/CODEOWNERS` | CI | verified | GIT-002, CI-002 | Active rules match the reviewed effective last-match order with no unreviewed override; focused and aggregate policy pass | - |
 | `.github/dependabot.yml` | CI | verified | GIT-002, CI-002 | Exact ecosystem, directory, schedule, count, and no-private-registry policy passes focused and aggregate faults | - |
 | `.github/pull_request_template.md` | CI | verified | GIT-002 | Review, security, platform, release, and constraint evidence checklist passes governance policy | - |
@@ -1157,7 +1276,7 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `.github/workflows/platform.yml` | CI | verified | CI-001, CI-002, CI-003, BUILD-048 | At `90e5972`, exact Android job `96221514767` passes compile, host tests, cleanup, and cache post-steps in 14m22s; iOS job `96221515069` passes in 4m50s | `5b08097`, `90e5972` |
 | `.gitignore` | Project configuration | verified | BUILD-004, BUILD-008, BUILD-021, BUILD-042, BUILD-043, REG-001 | Local chain data/RPC credentials and app JSON are confirmed ignored; existing reviewed examples and lockfiles remain visible | `270dd51`, `5742fc0`, `60cc8ad` |
 | `.metadata` | Project configuration | verified | BASE-001 | Flutter migration metadata matches framework revision `6b182d2c` and owned platforms | `8e97370` |
-| `.vscode/settings.json` | Project configuration | verified | BASE-001, BASE-002 | Project-local Flutter SDK path points to 3.47.0 and matches the verified FVM/CI/package constraints | `8e97370`, `3fc63ba` |
+| `.vscode/settings.json` | Project configuration | verified | BASE-001, BASE-002 | Project-local Flutter SDK path points to 3.47.7 and matches the FVM/CI/package constraints | `8e97370`, `3fc63ba` |
 | `Gemfile` | Project configuration | verified | BUILD-021 | The repository pins only CocoaPods 1.16.2 from the canonical HTTPS RubyGems source; executable policy rejects added sources or gems and exact iOS runs pass | `60cc8ad` |
 | `Gemfile.lock` | Project configuration | verified | BUILD-021 | The complete CocoaPods/Ruby graph, exact Darwin/generic platforms, one SHA-256 per resolved gem, and Bundler 4.0.10 pass frozen installation and exact iOS execution | `60cc8ad` |
 | `Makefile` | Project configuration | blocked | BUILD-002, BUILD-006, BUILD-007, BUILD-009, BUILD-010, BUILD-015, BUILD-017, BUILD-018, BUILD-019, BUILD-020, BUILD-021, BUILD-022, BUILD-031, BUILD-042, BUILD-043, BUILD-044, BUILD-046, BUILD-048, DOC-006, ARCH-008, ARCH-009, PLAT-016, PLAT-017, STORE-012, TEST-006, TEST-007, TEST-008, PERF-012, TOOL-008, TOOL-011, TOOL-012, TOOL-013, SDK-004 | Owned Android/iOS release targets require one validated manifest, clean regeneration, bounded artifact verification, signed-export policy, and a complete Android Debug APK before native host tests; package release remains independently blocked by SDK-004/PLAT-001. | `9c6dd4e`, `e52a52e`, `c94f8ff`, `60cc8ad`, `59cba0a`, `ff0305b` |
@@ -1189,7 +1308,7 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `android/gradle.properties` | Android platform | blocked | BUILD-018, BUILD-045, PLAT-001, PLAT-002, TOOL-012 | Module-by-module built-in Kotlin is explicit: Aster opts in while global legacy flags remain solely for dependencies; final identity and dependency migration remain external blockers | `8e97370`, `5742fc0`, `9c6dd4e`, `60cc8ad` |
 | `android/gradle/verification-metadata.xml` | Android platform | verified | BUILD-020, BUILD-045, BUILD-048, SDK-006, SDK-012 | Regenerated metadata retains only new RLN 0.16.0-beta.3 AAR/module/POM SHA-256 values; AAR matches SDK baseline, strict Android build passes; October 13 upgrade: changed file reviewed against SDK 7c44506, strict source gates and 975 tests pass; platform compilation and remaining qualification boundaries recorded above | `1a7ca65` |
 | `android/gradle/wrapper/gradle-wrapper.properties` | Android platform | verified | BUILD-001, BUILD-011, BUILD-019 | Gradle 9.3.1 carries the reviewed official distribution SHA-256; isolated fresh-wrapper resolution, adversarial policy, and exact matrix proof pass | `8e97370`, `2de0762`, `60cc8ad` |
-| `android/settings.gradle.kts` | Android platform | blocked | BUILD-001, BUILD-011, BUILD-045, PLAT-002 | AGP 9.1.0 built-in Kotlin and Kotlin 2.4.0 are pinned independently; Aster's module migration passes while hosted/immutable plugin modules remain PLAT-002 | `8e97370`, `5742fc0`, `2de0762` |
+| `android/settings.gradle.kts` | Android platform | blocked | BUILD-001, BUILD-011, BUILD-045, PLAT-002 | AGP 9.1.1 built-in Kotlin and Kotlin 2.4.0 are pinned independently; Aster's module migration passes while hosted/immutable plugin modules remain PLAT-002 | `8e97370`, `5742fc0`, `2de0762` |
 | `assets/README.md` | Asset | verified | ASSET-001, ASSET-002, FIAT-001 | Asset provenance remains unchanged and documentation accurately distinguishes the 94 source rows from the 43 reviewed runtime quote choices; exact docs gates pass | `31b5264`, `3fc63ba`, `d449b5d` |
 | `assets/brand/aster-mark.svg` | Asset | blocked | BRAND-002, ASSET-002 | XML and hash are valid and all product surfaces use this mark, but repository evidence still cannot establish creator/assignment/release clearance | `31b5264` |
 | `assets/data/README.md` | Asset | verified | ONB-003 | Immutable upstream commit, digest, entry count, and SDK checksum-authority boundary recorded | `5f3698f` |
@@ -1211,14 +1330,14 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `config/release.example.json` | Project configuration | verified | BUILD-042 | Sorted deliberately invalid public template fails closed until every release-owned value is supplied | - |
 | `devtools_options.yaml` | Project configuration | reviewed-clean | - | Empty extension enablement is explicit and introduces no hidden runtime/tool dependency | - |
 | `docs/DEVELOPMENT.md` | Documentation | verified | DOC-003, DOC-006, DOC-009, CONFIG-003, CONFIG-007, CONFIG-009, CONFIG-010, CONFIG-011, DEC-039, DEC-043, DEC-045, FIAT-002, BUILD-003, BUILD-004, BUILD-007, BUILD-010, BUILD-011, BUILD-013, BUILD-015, BUILD-016, BUILD-017, BUILD-018, BUILD-019, BUILD-020, BUILD-021, BUILD-022, BUILD-024, BUILD-027, BUILD-028, BUILD-031, BUILD-032, BUILD-035, BUILD-038, BUILD-041, BUILD-042, BUILD-043, BUILD-044, BUILD-045, BUILD-046, BUILD-047, BUILD-048, BASE-002, PLAT-002, PLAT-016, TOOL-011, TOOL-012, ARCH-014, CI-001, CI-002, CI-003, LIFE-009 | Debug workflow distinguishes supported hot reload and process relaunch from the pinned SDK's blocked same-process hot restart, and prohibits destructive or private-bridge workarounds | working tree |
-| `docs/PRODUCTION_REFACTOR_TRACKER.md` | Documentation | verified | TRACK-004, TRACK-005, TRACK-006, TRACK-007, TRACK-008, TRACK-009, CI-001, CI-002, CI-003, CONFIG-010, CONFIG-011, CONFIG-012, CONFIG-013, REG-001, BUILD-046, BUILD-047, BUILD-048, UXA-001, UXA-002, UXA-003, UXA-004, UXA-005, UXA-006, UXA-007, UXA-008, UXA-009, UXA-010, UXA-011, UXA-012, UXA-013, UXA-014, UXA-015, UXA-016, UXA-017, DS-021, LIFE-008, LIFE-009, NAV-009, SDK-006, SDK-007, SDK-008, SDK-009, SDK-010, SDK-012, DOC-011, DOC-012 | 585 owned files and 458 findings reconcile; upgrade evidence and retained packaging/runtime blockers are explicit; October 13 upgrade: changed file reviewed against SDK 7c44506, strict source gates and 975 tests pass; platform compilation and remaining qualification boundaries recorded above; reset handoff: reviewed changes, 38 toolchain-policy tests and normal lint pass; portable Git/relative-path references reviewed, metadata/link/shell checks and normal lint pass | `1a7ca65`; this handoff commit; this portability commit |
+| `docs/PRODUCTION_REFACTOR_TRACKER.md` | Documentation | verified | TRACK-004, TRACK-005, TRACK-006, TRACK-007, TRACK-008, TRACK-009, CI-001, CI-002, CI-003, CONFIG-010, CONFIG-011, CONFIG-012, CONFIG-013, REG-001, BUILD-046, BUILD-047, BUILD-048, UXA-001, UXA-002, UXA-003, UXA-004, UXA-005, UXA-006, UXA-007, UXA-008, UXA-009, UXA-010, UXA-011, UXA-012, UXA-013, UXA-014, UXA-015, UXA-016, UXA-017, DS-021, LIFE-008, LIFE-009, NAV-009, SDK-006, SDK-007, SDK-008, SDK-009, SDK-010, SDK-012, SDK-004, DOC-011, DOC-012 | Historical 585 owned files and 458 findings reconcile; upgrade evidence and retained packaging/runtime blockers are explicit; October 13 upgrade: changed file reviewed against SDK 7c44506, strict source gates and 975 tests pass; platform compilation and remaining qualification boundaries recorded above; reset handoff: reviewed changes, 38 toolchain-policy tests and normal lint pass; portable Git/relative-path references reviewed, metadata/link/shell checks and normal lint pass; October 15 candidate documentation binds local SDK 1cbe601 and derived AAR bytes, preserves historical platform evidence, keeps app/remote qualification open, and passes tracker/governance checks | `1a7ca65`; this handoff commit; this portability commit |
 | `docs/REGTEST.md` | Documentation | verified | CONFIG-003, CONFIG-007, CONFIG-009, CONFIG-013, DOC-005, REG-001 | Actual owned Compose ports/state, private initialization, repeatable startup, health/funding commands, image provenance limits, and unprovisioned rails documented | `9c6dd4e` |
 | `docs/SECURITY.md` | Documentation | verified | DOC-005, DOC-008, SEC-012, SEC-015, SEC-005, SEC-008, SEC-010, SEC-011, FIAT-002, PLAT-011, PLAT-017, PLAT-018, STORE-012, SDK-005, CONFIG-008, CONFIG-009, CONFIG-011, BUILD-019, BUILD-020, BUILD-021, BUILD-024, BUILD-025, BUILD-027, BUILD-028, BUILD-033, BUILD-035, BUILD-037, BUILD-039, BUILD-046, BUILD-047 | Security guidance covers non-secret release inputs, bounded archive extraction, exact packaged privacy/ATS policy, signatures/provisioning, and all prior shell/storage/network boundaries; host gates pass | `de09b2c` |
 | `docs/TESTING.md` | Documentation | verified | DOC-005, DOC-006, TEST-001, TEST-003, TEST-006, TEST-007, TEST-008, TEST-009, TEST-015, TEST-016, TEST-017, PERF-001, PERF-012, PERF-014, TOOL-008, TOOL-013, BUILD-006, BUILD-009, BUILD-015, BUILD-017, BUILD-018, BUILD-019, BUILD-020, BUILD-021, BUILD-024, BUILD-025, BUILD-026, BUILD-027, BUILD-028, BUILD-035, BUILD-040, BUILD-041, BUILD-042, BUILD-043, BUILD-044, BUILD-046, BUILD-047, BUILD-048, SDK-004, PLAT-012, PLAT-016, PLAT-017, STORE-012, CI-001, CI-003 | Android qualification owns full APK/test execution before always-run root cleanup; all local documentation and 868 aggregate tests pass | `fbf3603`, `bbb6d8f` |
 | `docs/architecture/ARCHITECTURE.md` | Documentation | verified | DOC-001, DOC-005, DOC-008, ARCH-001, ARCH-009, SDK-001, LIFE-001, FIAT-001, FIAT-002, NET-004 | Architecture distinguishes SDK native-call timeout quarantine from app durable-state reconciliation and documents exact queue/recovery ownership | `270dd51`, `3fc63ba`, `d449b5d`, `ce03a8f`, `d79fb0d` |
 | `docs/architecture/BARREL_EXPORTS.md` | Documentation | verified | ARCH-008, DOC-006 | Concise boundary-only policy exactly describes the passing executable validator | `270dd51`, `b00b5b2` |
 | `docs/architecture/NETWORK_RELIABILITY.md` | Documentation | verified | DOC-008, NET-001, NET-002, NET-003, NET-004, LIFE-004 | HTTP retry, mutation ownership, and the complete `AppFailure` retry/reconciliation contract match implementation | `1b3273a`, `ce03a8f`, `d79fb0d` |
-| `docs/architecture/SDK_INTEGRATION.md` | Documentation | verified | SDK-001, DOC-003, DOC-008, LIFE-001, LIFE-008, LIFE-009, CONFIG-003, CONFIG-006, CONFIG-007, CONFIG-008, CONFIG-009, CONFIG-012, BUILD-004, BUILD-015, BUILD-031, BUILD-042, FIAT-001, SDK-006, SDK-007, SDK-008, SDK-009, SDK-010, SDK-012, DOC-012 | Method-by-method upgrade audit records BigInt bounds, pending allocation semantics, engine ownership, unexposed features and exact-candidate runtime limits; October 13 upgrade: changed file reviewed against SDK 7c44506, strict source gates and 975 tests pass; platform compilation and remaining qualification boundaries recorded above; portable Git/relative-path references reviewed, metadata/link/shell checks and normal lint pass | `1a7ca65`; this portability commit |
+| `docs/architecture/SDK_INTEGRATION.md` | Documentation | verified | SDK-001, DOC-003, DOC-008, LIFE-001, LIFE-008, LIFE-009, CONFIG-003, CONFIG-006, CONFIG-007, CONFIG-008, CONFIG-009, CONFIG-012, BUILD-004, BUILD-015, BUILD-031, BUILD-042, FIAT-001, SDK-006, SDK-007, SDK-008, SDK-009, SDK-010, SDK-012, SDK-004, DOC-012 | Method-by-method upgrade audit records BigInt bounds, pending allocation semantics, engine ownership, unexposed features and exact-candidate runtime limits; October 13 upgrade: changed file reviewed against SDK 7c44506, strict source gates and 975 tests pass; platform compilation and remaining qualification boundaries recorded above; portable Git/relative-path references reviewed, metadata/link/shell checks and normal lint pass; October 15 candidate documentation records SDK 1cbe601, RN beta.39/core beta.9/WebRGB 0.1.3/RLN 0.17, derived AAR pin and SDK-only proof while app/remote qualification remains open; tracker/governance checks pass | `1a7ca65`; this portability commit |
 | `docs/design/DESIGN_SYSTEM_NORMALIZATION_TRACKER.md` | Documentation | verified | DS-001, DS-002, DS-003, DS-004, DS-015, DS-016, DS-017, TOOL-011, ACCESS-003, DS-021 | State-layer contract now prohibits pressed ink and retains semantic focus/hover; implementation and policy tests match. | `98b7a40`, `3f1215b`, `a649c55`, `9f7c014` |
 | `docs/design/DOCSTRING_PATTERNS.md` | Documentation | verified | DOC-005, DOC-006, DOC-008 | Contract-focused examples distinguish complete reconciliation state from its unknown-outcome subset; isolated Dartdoc passes | `270dd51`, `b00b5b2`, `d79fb0d` |
 | `docs/design/HAPTIC_FEEDBACK.md` | Documentation | verified | UX-001, UX-003 | Semantic intent matrix, no-op rules, ownership, failure isolation, and testing match the implemented service | `98b7a40` |

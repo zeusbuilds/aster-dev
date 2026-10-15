@@ -21,7 +21,7 @@
           cmdLineToolsVersion = "11.0";
           platformToolsVersion = "36.0.0";
           buildToolsVersions = [ "36.0.0" ];
-          platformVersions = [ "36" ];
+          platformVersions = [ "37.0" ];
           includeEmulator = false;
           includeSystemImages = false;
           includeSources = false;

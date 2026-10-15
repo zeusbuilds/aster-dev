@@ -374,7 +374,7 @@ void _requireFile(String path, String description) {
 bool _sameSet(Set<String> left, Set<String> right) =>
     left.length == right.length && left.containsAll(right);
 
-// Mirrors Flutter 3.47.0 FlutterPluginConstants.ABI_VERSION. The toolchain
+// Mirrors Flutter 3.47.7 FlutterPluginConstants.ABI_VERSION. The toolchain
 // gate pins Flutter; artifact tests fail if a later approved SDK changes it.
 const _flutterSplitAbiVersions = <String, int>{
   'armeabi-v7a': 1,

@@ -1857,8 +1857,8 @@ void main() {
     final maximum = BigInt.from(WalletAmount.maxNativeUnits);
 
     test('resolves the reviewed SDK baseline and new mainnet indexer', () {
-      expect(RgbSdkFlutter.reactNativeParityVersion, '1.0.0-beta.37');
-      expect(RgbSdkFlutter.rlnVersion, '0.16.0-beta.3');
+      expect(RgbSdkFlutter.reactNativeParityVersion, '1.0.0-beta.39');
+      expect(RgbSdkFlutter.rlnVersion, '0.17.0-beta.3');
       final resolved = RgbWalletServiceConfigurationResolver.resolve(
         const WalletServiceConfiguration(
           environment: BlockchainEnvironment.mainnet,

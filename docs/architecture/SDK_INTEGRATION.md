@@ -6,14 +6,23 @@ architecture boundaries.
 
 ## Reproducible Dependency
 
-The checked-in `pubspec.yaml` and `pubspec.lock` resolve the public UTEXO
-protocol SDK repository to immutable commit
-`7c44506fdfe1dae6f3a6fe884f849c7ca2ad028b`. Do not replace the commit with a
-branch, tag, moving reference, or local path in a committed change.
+The checked-in `pubspec.yaml` and `pubspec.lock` pin SDK `0.2.0-beta.1` in the
+public UTEXO protocol SDK repository to immutable commit
+`c4e3c2d0b630a5807315710f18240889c7b74b0e`. This is a locally staged candidate
+as of 2026-10-15: the SDK commit and its derived Android AAR have not been
+published. Local staging permits qualification of the pinned bytes; it does
+not prove a clean restore from the public Git repository and release asset.
+Publication and remote restore qualification remain pending. Do not replace
+the commit with a branch, tag, moving reference, or local path in a committed
+change.
 
-After changing the SDK pin intentionally, run:
+After changing the SDK pin intentionally, clear app build outputs before
+resolving dependencies. Immutable Git pins use different Pub checkout paths;
+stale Kotlin incremental outputs can otherwise omit plugin classes even when
+Gradle reports compilation as up to date. Then run:
 
 ```sh
+fvm flutter clean
 fvm flutter pub get
 fvm dart run build_runner build
 fvm flutter analyze --fatal-warnings --fatal-infos
@@ -22,12 +31,48 @@ fvm flutter test
 
 Both iOS and Android builds are required before accepting a new SDK commit.
 
-The pinned revision targets RN `1.0.0-beta.37` (commit
-`e38329eba11cce16e3bea75b8a4e7becd52c0036`), core `1.0.0-beta.9`, WebRGB
-`0.1.2`, and RLN `0.16.0-beta.3`. The app's Flutter 3.47.0 / Dart 3.13.0, iOS 18.5 minimum,
-Android compile SDK 36 and Java 17 already satisfy its requirements. Native
-artifacts follow the SDK's checked-in baseline and checksum-verifying hooks;
-never reuse binaries from a previous Pub checkout by copying them manually.
+The pinned revision targets RN `1.0.0-beta.39` (commit
+`41ff170f794edff2a1822a672ddab37e29505f14`), core `1.0.0-beta.9`, WebRGB
+`0.1.3`, and RLN `0.17.0-beta.3`. The app's Flutter 3.47.7 / Dart 3.13.5,
+iOS 18.5 minimum, Android compile/target SDK 37 and Java 17 compilation already
+satisfy its requirements. Native artifacts follow the SDK's checked-in
+baseline and checksum-verifying hooks; never reuse binaries from a previous
+Pub checkout by copying them manually.
+
+The Android candidate replaces the official RLN AAR's 4 KiB-aligned JNI
+libraries with a derived 16 KiB build of the exact RLN `0.17.0-beta.3` source.
+The SDK baseline pins coordinate
+`com.utexo.flutter:rgb-lightning-node-android:0.17.0-beta.3-16k.1` and AAR
+SHA-256 `ca1aa12d44c1e83c0a0f51a38c7bf1486e0ea3ac796dcc02d479acbdf4d832c5`.
+Its recorded recipe preserves official non-JNI AAR contents and validates
+generated Kotlin bindings, FFI exports and runtime dependencies before and
+after stripping. This build contains no WDK PR45 source overlay. That open PR
+proposes a P01 lifecycle repair across native core, UniFFI, C-FFI and Node, with
+source/host progress but pending mobile closure/replacement and funded iOS
+qualification; P02/P03/P04/P06 remain open. Its overlay is absent from the
+published RLN 0.17 release consumed here. The local build record is not a
+signed provenance or independent reproducibility attestation.
+
+SDK-only evidence includes the Android 17 / 16 KiB native Flutter signer test
+(1/1), 30 JVM bridge tests, all eight packaged native libraries passing ELF
+checks, and APK ZIP alignment. The iOS 27 native signer test (1/1) and 26 Swift
+tests also pass. The final SDK commit passes 496 host tests and coverage policy
+(88.3% package coverage).
+
+Aster passes 977 host tests, fatal analysis, generation, documentation and all
+normal repository policy gates. Its Debug builds launch to visually verified
+welcome screens on iOS 27 and Android 17. All 25 native libraries in the exact
+Android APK pass ELF inspection and 16 KiB ZIP alignment. That APK runs on an
+API 37 guest with 16,384-byte pages and both linker/package compatibility
+fallback disabled; its extracted RLN library separately passes native contract
+and health checks. The underlying SDK ELF/load defect is fixed in this local
+candidate. SDK-004's release AAB/split-APK qualification remains open. No funded,
+backend, wallet restore or payment qualification follows from these checks.
+
+The app explicitly disables Swift Package Manager through
+`flutter.config.enable-swift-package-manager: false`. All native plugins use the
+locked CocoaPods graph while the SDK lacks SwiftPM support. This also avoids
+missing plugin modules in a clean hybrid restore.
 
 ## Upgrade Contract And Feature Coverage
 
@@ -47,7 +92,7 @@ inventory, not arbitrary ticker-based or linked-asset substitution. Lightning
 send/receive choices stay visible but disabled as Coming later on every network.
 Direct repository requests also fail before any native work. Non-mainnet
 existing Lightning balances/history remain visible; mainnet skips those APIs
-because RLN 0.16 has no Lightning runtime there. Other errors are never converted
+because RLN 0.17 has no Lightning runtime there. Other errors are never converted
 into empty balances/history. Outgoing RGB Send/Burn/Inflation uses the SDK's
 exact recipient amount rather than change allocations; absent amounts remain
 unknown. The upgrade does not
@@ -82,9 +127,10 @@ When developing the SDK and app together, create an ignored
 The example below assumes sibling clones only for illustration. Replace `path`
 with your SDK checkout's actual absolute path or a path relative to Aster;
 neither the old machine's directory layout nor sibling clones are required.
-Pub YAML does not expand shell variables such as `$SDK_ROOT`. Normal installs
-continue to use the immutable public Git dependency above, with no local SDK
-checkout required.
+Pub YAML does not expand shell variables such as `$SDK_ROOT`. After publication
+and remote restore qualification, normal installs use the immutable public Git
+dependency above with no local SDK checkout required. That remote-only restore
+has not yet been qualified for the locally staged candidate.
 
 ```yaml
 dependency_overrides:

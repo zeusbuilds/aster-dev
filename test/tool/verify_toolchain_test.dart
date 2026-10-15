@@ -15,7 +15,7 @@ void main() {
     flutterVersionMetadata = _write(
       repository,
       'flutter/bin/cache/flutter.version.json',
-      '{"flutterVersion":"3.47.0","dartSdkVersion":"3.13.0"}',
+      '{"flutterVersion":"3.47.7","dartSdkVersion":"3.13.5"}',
     );
     flutterExtension = _write(
       repository,
@@ -57,13 +57,13 @@ void main() {
           'providers.gradleProperty("aster.applicationId").get()\n'
           'android {\n'
           '  namespace = asterApplicationId\n'
-          '  compileSdk = flutter.compileSdkVersion\n'
+          '  compileSdk = 37\n'
           '  buildToolsVersion = "36.0.0"\n'
           '  ndkVersion = flutter.ndkVersion\n'
           '  defaultConfig {\n'
           '    applicationId = asterApplicationId\n'
           '    minSdk = flutter.minSdkVersion\n'
-          '    targetSdk = flutter.targetSdkVersion\n'
+          '    targetSdk = 37\n'
           '  }\n'
           '}',
     );
@@ -79,8 +79,8 @@ void main() {
       repository,
       'android/settings.gradle.kts',
       'plugins {\n'
-          '  id("com.android.application") version "9.1.0" apply false\n'
-          '  id("com.android.built-in-kotlin") version "9.1.0" apply false\n'
+          '  id("com.android.application") version "9.1.1" apply false\n'
+          '  id("com.android.built-in-kotlin") version "9.1.1" apply false\n'
           '  id("org.jetbrains.kotlin.android") version "2.4.0" apply false\n'
           '}',
     );
@@ -121,19 +121,19 @@ void main() {
           'ndkVersions = [ "28.2.13676358" ];\n'
           'platformToolsVersion = "36.0.0";\n'
           'buildToolsVersions = [ "36.0.0" ];\n'
-          'platformVersions = [ "36" ];\n'
+          'platformVersions = [ "37.0" ];\n'
           'PATH="build-tools/36.0.0";',
     );
-    _write(repository, '.fvmrc', '{"flutter":"3.47.0"}');
+    _write(repository, '.fvmrc', '{"flutter":"3.47.7"}');
     _write(
       repository,
       '.vscode/settings.json',
-      '{"dart.flutterSdkPath":".fvm/versions/3.47.0"}',
+      '{"dart.flutterSdkPath":".fvm/versions/3.47.7"}',
     );
     _write(
       repository,
       '.github/workflows/dart.yml',
-      'flutter-version: "3.47.0"\n'
+      'flutter-version: "3.47.7"\n'
           'run: flutter pub get --enforce-lockfile\n'
           'run: flutter analyze --no-pub --fatal-warnings --fatal-infos\n'
           'run: flutter test --no-pub',
@@ -642,8 +642,8 @@ library_count=1
       'name: aster\n'
           'description: Aster test wallet\n'
           'environment:\n'
-          '  sdk: ">=3.13.0 <4.0.0"\n'
-          '  flutter: ">=3.47.0"\n'
+          '  sdk: ">=3.13.5 <4.0.0"\n'
+          '  flutter: ">=3.47.7"\n'
           'flutter:\n'
           '  assets:\n'
           '    - assets/brand/aster-mark.svg',
@@ -691,10 +691,10 @@ library_count=1
     _write(
       repository,
       'docs/DEVELOPMENT.md',
-      '- Android SDK platform 36, build tools 36.0.0, and platform tools 36.0.0\n'
+      '- Android SDK platform 37.0, build tools 36.0.0, and platform tools 36.0.0\n'
           '- Android NDK 28.2.13676358, matching Flutter\n'
-          '- Gradle 9.3.1, Android Gradle Plugin 9.1.0, and Kotlin 2.4.0\n'
-          '- Flutter 3.47.0 and Dart 3.13.0\n'
+          '- Gradle 9.3.1, Android Gradle Plugin 9.1.1, and Kotlin 2.4.0\n'
+          '- Flutter 3.47.7 and Dart 3.13.5\n'
           '- CocoaPods 1.16.2 through Bundler 4.0.10\n'
           '- Debug `com.example.asterdev.debug`\n'
           '- Profile `com.example.asterdev.profile`\n'
@@ -706,7 +706,7 @@ library_count=1
     repository.deleteSync(recursive: true);
   });
 
-  test('accepts the complete Flutter-owned toolchain contract', () {
+  test('accepts the reviewed Android 17 override of Flutter defaults', () {
     final result = _verify(
       repository,
       flutterVersionMetadata,
@@ -715,8 +715,8 @@ library_count=1
     );
 
     expect(result.passed, isTrue, reason: result.failures.join('\n'));
-    expect(result.flutterVersion, '3.47.0');
-    expect(result.dartVersion, '3.13.0');
+    expect(result.flutterVersion, '3.47.7');
+    expect(result.dartVersion, '3.13.5');
     expect(result.flutterGradleVersion, '9.3.1');
     expect(result.flutterAgpVersion, '9.1.0');
     expect(result.flutterKotlinVersion, '2.4.0');
@@ -745,8 +745,8 @@ library_count=1
         'name: other\n'
             'description: Other wallet\n'
             'environment:\n'
-            '  sdk: ">=3.13.0 <4.0.0"\n'
-            '  flutter: ">=3.47.0"',
+            '  sdk: ">=3.13.5 <4.0.0"\n'
+            '  flutter: ">=3.47.7"',
       );
       _write(
         repository,
@@ -943,7 +943,7 @@ library_count=1
         contains('must include the Android NDK'),
         contains('exactly Flutter NDK 28.2.13676358'),
         contains('exactly Android build tools 36.0.0'),
-        contains('exactly Android SDK platform 36'),
+        contains('exactly Android SDK platform 37.0'),
         contains('Nix Android platform-tools version'),
       ]),
     );
@@ -981,13 +981,13 @@ library_count=1
     expect(
       result.failures,
       containsAll(<Matcher>[
-        contains('must delegate compileSdk to Flutter'),
+        contains('must pin compileSdk to reviewed Android 37'),
         contains('must delegate minSdk to Flutter'),
-        contains('must delegate targetSdk to Flutter'),
+        contains('must pin targetSdk to reviewed Android 37'),
         contains('must delegate ndkVersion to Flutter'),
         contains('must apply AGP built-in Kotlin'),
-        contains('exactly Android Gradle Plugin 9.1.0'),
-        contains('exactly Android built-in Kotlin plugin 9.1.0'),
+        contains('exactly Android Gradle Plugin 9.1.1'),
+        contains('exactly Android built-in Kotlin plugin 9.1.1'),
         contains('exactly Kotlin Gradle Plugin 2.4.0'),
         contains('wrapper must use Flutter Gradle 9.3.1'),
       ]),
@@ -1423,7 +1423,7 @@ esac''');
       result.failures,
       containsAll(<Matcher>[
         contains('must document Android NDK 28.2.13676358'),
-        contains('must document Flutter\'s Android build chain'),
+        contains('must document the reviewed Android build chain'),
         contains('must document the Android SDK/build-tools chain'),
         contains('must document the Flutter/Dart versions'),
       ]),
@@ -1463,53 +1463,58 @@ esac''');
     expect(
       result.failures,
       containsAll(<Matcher>[
-        contains('.fvmrc Flutter version must be exactly 3.47.0'),
+        contains('.fvmrc Flutter version must be exactly 3.47.7'),
         contains('VS Code Flutter SDK path must be exactly'),
-        contains('GitHub Actions Flutter version must be exactly 3.47.0'),
+        contains('GitHub Actions Flutter version must be exactly 3.47.7'),
         contains('must resolve the committed Pub lockfile'),
         contains('analysis must not re-resolve dependencies'),
         contains('tests must not re-resolve dependencies'),
-        contains('must require Dart >=3.13.0 <4.0.0'),
-        contains('must require Flutter >=3.47.0'),
+        contains('must require Dart >=3.13.5 <4.0.0'),
+        contains('must require Flutter >=3.47.7'),
       ]),
     );
   });
 
-  test('rejects build tools from another compile SDK generation', () {
-    _write(
-      repository,
-      'android/app/build.gradle.kts',
-      File('${repository.path}/android/app/build.gradle.kts')
-          .readAsStringSync()
-          .replaceFirst('36.0.0', '35.0.0'),
-    );
-    _write(
-      repository,
-      'flake.nix',
-      File('${repository.path}/flake.nix')
-          .readAsStringSync()
-          .replaceAll('36.0.0', '35.0.0'),
-    );
-    _write(
-      repository,
-      'docs/DEVELOPMENT.md',
-      File('${repository.path}/docs/DEVELOPMENT.md')
-          .readAsStringSync()
-          .replaceFirst('36.0.0', '35.0.0'),
-    );
+  test(
+    'rejects build tools outside the reviewed AGP compatibility contract',
+    () {
+      _write(
+        repository,
+        'android/app/build.gradle.kts',
+        File('${repository.path}/android/app/build.gradle.kts')
+            .readAsStringSync()
+            .replaceFirst('36.0.0', '35.0.0'),
+      );
+      _write(
+        repository,
+        'flake.nix',
+        File('${repository.path}/flake.nix')
+            .readAsStringSync()
+            .replaceAll('36.0.0', '35.0.0'),
+      );
+      _write(
+        repository,
+        'docs/DEVELOPMENT.md',
+        File('${repository.path}/docs/DEVELOPMENT.md')
+            .readAsStringSync()
+            .replaceFirst('36.0.0', '35.0.0'),
+      );
 
-    final result = _verify(
-      repository,
-      flutterVersionMetadata,
-      flutterExtension,
-      flutterGradleUtils,
-    );
+      final result = _verify(
+        repository,
+        flutterVersionMetadata,
+        flutterExtension,
+        flutterGradleUtils,
+      );
 
-    expect(
-      result.failures,
-      contains('Android build tools 35.0.0 must match compile SDK 36.'),
-    );
-  });
+      expect(
+        result.failures,
+        contains(
+          'Android build tools 35.0.0 must use reviewed 36.0.0 for AGP 9.1.1.',
+        ),
+      );
+    },
+  );
 
   test('rejects unpinned Make dependency resolution', () {
     _write(repository, 'Makefile', 'dependencies:\n\tfvm flutter pub get');
@@ -1904,7 +1909,7 @@ esac''');
             '/usr/bin/dart',
           )
           .replaceFirst(
-            'readonly ASTER_BOUNDED_FLUTTER_VERSION=3.47.0',
+            'readonly ASTER_BOUNDED_FLUTTER_VERSION=3.47.7',
             'readonly ASTER_BOUNDED_FLUTTER_VERSION=3.46.0',
           )
           .replaceFirst(
@@ -1995,7 +2000,7 @@ esac''');
         contains('must read canonical CI Flutter metadata'),
         contains('must reject duplicate CI version fields'),
         contains('must reject malformed or mismatched CI Flutter roots'),
-        contains('must pin Flutter 3.47.0'),
+        contains('must pin Flutter 3.47.7'),
         contains('must not discover Dart from ambient PATH'),
         contains('must reject direct helper execution'),
         contains('must discard an inherited mutable guard'),

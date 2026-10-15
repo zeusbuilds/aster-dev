@@ -12,6 +12,14 @@ const _reviewedGradleDistributionSha256 = <String, String>{
   '9.3.1': '17f277867f6914d61b1aa02efab1ba7bb439ad652ca485cd8ca6842fccec6e43',
 };
 
+// Android 17 needs API 37 and AGP 9.1.1 before Flutter's API 36 defaults catch up.
+// AGP 9.1.1 supports SDK build tools 36.0.0; their major need not match the API.
+// https://developer.android.com/build/releases/agp-9-1-0-release-notes
+const _reviewedAndroidSdk = 37;
+const _reviewedAndroidSdkPlatform = '37.0';
+const _reviewedAndroidAgp = '9.1.1';
+const _reviewedAndroidBuildTools = '36.0.0';
+
 /// Result of checking the repository's cross-toolchain version contract.
 final class ToolchainVerification {
   const ToolchainVerification({
@@ -85,7 +93,7 @@ final class ToolchainVerification {
   /// Deterministically ordered missing or divergent toolchain declarations.
   final List<String> failures;
 
-  /// Whether every owned toolchain surface agrees with Flutter.
+  /// Whether every owned toolchain surface agrees with the reviewed contract.
   bool get passed => failures.isEmpty;
 }
 
@@ -117,8 +125,8 @@ void main() {
     'Toolchain policy verified for Flutter ${result.flutterVersion}, '
     'Dart ${result.dartVersion}, Gradle ${result.flutterGradleVersion}, '
     '${result.androidVerifiedArtifacts} verified Android artifacts, '
-    'AGP ${result.flutterAgpVersion}, Kotlin ${result.flutterKotlinVersion}, '
-    'Android SDK ${result.flutterCompileSdk}, build tools '
+    'AGP $_reviewedAndroidAgp, Kotlin ${result.flutterKotlinVersion}, '
+    'Android SDK $_reviewedAndroidSdk, build tools '
     '${result.androidBuildToolsVersion}, platform tools '
     '${result.androidPlatformToolsVersion}, NDK '
     '${result.flutterNdkVersion}, CocoaPods ${result.cocoaPodsVersion}, and '
@@ -126,7 +134,7 @@ void main() {
   );
 }
 
-/// Checks every owned toolchain surface against the executing Flutter SDK.
+/// Checks the reviewed platform contract and executing Flutter SDK together.
 ///
 /// Flutter-owned files are injectable so the fail-closed policy can be tested
 /// without depending on a globally installed Flutter checkout.
@@ -294,8 +302,9 @@ ToolchainVerification verifyToolchain({
     );
     _requireSinglePattern(
       android,
-      RegExp(r'\bcompileSdk\s*=\s*flutter\.compileSdkVersion\b'),
-      'android/app/build.gradle.kts must delegate compileSdk to Flutter.',
+      RegExp('\\bcompileSdk\\s*=\\s*$_reviewedAndroidSdk\\b'),
+      'android/app/build.gradle.kts must pin compileSdk to reviewed '
+      'Android $_reviewedAndroidSdk.',
       failures,
     );
     _requireSinglePattern(
@@ -306,8 +315,9 @@ ToolchainVerification verifyToolchain({
     );
     _requireSinglePattern(
       android,
-      RegExp(r'\btargetSdk\s*=\s*flutter\.targetSdkVersion\b'),
-      'android/app/build.gradle.kts must delegate targetSdk to Flutter.',
+      RegExp('\\btargetSdk\\s*=\\s*$_reviewedAndroidSdk\\b'),
+      'android/app/build.gradle.kts must pin targetSdk to reviewed '
+      'Android $_reviewedAndroidSdk.',
       failures,
     );
     _requireSinglePattern(
@@ -322,12 +332,11 @@ ToolchainVerification verifyToolchain({
       'Android build-tools version',
       failures,
     );
-    if (compileSdk != null &&
-        buildToolsVersion != null &&
-        buildToolsVersion.split('.').first != compileSdk.toString()) {
+    if (buildToolsVersion != null &&
+        buildToolsVersion != _reviewedAndroidBuildTools) {
       failures.add(
-        'Android build tools $buildToolsVersion must match compile SDK '
-        '$compileSdk.',
+        'Android build tools $buildToolsVersion must use reviewed '
+        '$_reviewedAndroidBuildTools for AGP $_reviewedAndroidAgp.',
       );
     }
   }
@@ -358,14 +367,14 @@ ToolchainVerification verifyToolchain({
     _requirePluginVersion(
       settings,
       plugin: 'com.android.application',
-      expected: agpVersion,
+      expected: _reviewedAndroidAgp,
       label: 'Android Gradle Plugin',
       failures: failures,
     );
     _requirePluginVersion(
       settings,
       plugin: 'com.android.built-in-kotlin',
-      expected: agpVersion,
+      expected: _reviewedAndroidAgp,
       label: 'Android built-in Kotlin plugin',
       failures: failures,
     );
@@ -461,7 +470,7 @@ ToolchainVerification verifyToolchain({
     _requireNixVersionList(
       flake,
       property: 'platformVersions',
-      expected: compileSdk?.toString(),
+      expected: _reviewedAndroidSdkPlatform,
       label: 'Android SDK platform',
       failures: failures,
     );
@@ -2048,11 +2057,11 @@ ToolchainVerification verifyToolchain({
       agpVersion != null &&
       kotlinVersion != null &&
       !development.contains(
-        'Gradle $gradleVersion, Android Gradle Plugin $agpVersion, and '
+        'Gradle $gradleVersion, Android Gradle Plugin $_reviewedAndroidAgp, and '
         'Kotlin $kotlinVersion',
       )) {
     failures.add(
-      'docs/DEVELOPMENT.md must document Flutter\'s Android build chain.',
+      'docs/DEVELOPMENT.md must document the reviewed Android build chain.',
     );
   }
   if (development != null &&
@@ -2060,7 +2069,7 @@ ToolchainVerification verifyToolchain({
       buildToolsVersion != null &&
       platformToolsVersion != null &&
       !development.contains(
-        'Android SDK platform $compileSdk, build tools $buildToolsVersion, '
+        'Android SDK platform $_reviewedAndroidSdkPlatform, build tools $buildToolsVersion, '
         'and platform tools $platformToolsVersion',
       )) {
     failures.add(

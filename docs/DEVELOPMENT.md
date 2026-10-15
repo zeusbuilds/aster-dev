@@ -41,6 +41,48 @@ make fvm-setup
 make bootstrap
 ```
 
+## Platform launch without wallet services
+
+For an isolated platform smoke check, use a fresh app-owned iOS 27 simulator or
+Android 17 emulator and launch with reserved endpoints:
+
+```sh
+fvm flutter run -d <device-id> \
+  --dart-define=ASTER_INDEXER_URL=https://indexer.aster.invalid \
+  --dart-define=ASTER_RGB_PROXY_URL=https://proxy.aster.invalid
+```
+
+On macOS, use the locked CocoaPods bundle as described below. The app explicitly
+uses CocoaPods for all native plugins while the RGB SDK lacks SwiftPM support.
+When the active Xcode selection is Command Line Tools, scope
+`DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` to the build command.
+Dart native build hooks can strip that variable. In that case, create this
+ignored command wrapper and prefix the build command's `PATH` with its directory:
+
+```sh
+mkdir -p .dart_tool/xcode-bin
+cat > .dart_tool/xcode-bin/xcrun <<'SH'
+#!/bin/sh
+DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
+export DEVELOPER_DIR
+exec /usr/bin/xcrun "$@"
+SH
+chmod 700 .dart_tool/xcode-bin/xcrun
+PATH="$PWD/.dart_tool/xcode-bin:$PATH" \
+  DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+  BUNDLE_FROZEN=true BUNDLE_PATH="$PWD/.bundle" \
+  bundle exec fvm flutter build ios --simulator --debug --no-pub \
+  --dart-define=ASTER_INDEXER_URL=https://indexer.aster.invalid \
+  --dart-define=ASTER_RGB_PROXY_URL=https://proxy.aster.invalid
+```
+
+Install Bundler into a path without spaces if using a private gem installation;
+its `RUBYOPT` bootstrap path must survive subprocess parsing. This wrapper and
+command environment leave the system Xcode selection unchanged.
+Stay at the welcome screen; wallet creation/import and existing wallet restore
+are separate service qualification. These reserved endpoints prevent a fallback
+to the SDK's default indexer/proxy. No local stack is needed for this check.
+
 ## Development Workflow
 
 1. **Ensure FVM Flutter is installed (first time on a machine):**
@@ -184,8 +226,15 @@ number.
 
 Each AAB and split APK must also remain below its reviewed regression budget.
 Verification prints the exact artifact byte count and streamed SHA-256 digest.
-The current wallet SDK still fails the separate 16 KiB ELF gate under SDK-004;
-a size/digest pass does not override that blocker.
+The locally staged SDK `0.2.0-beta.1` candidate includes a derived 16 KiB RLN
+0.17 AAR with passing SDK-level ELF, APK ZIP alignment and native signer checks.
+Aster's Debug APK now passes all 25 native ELF checks and 16 KiB ZIP alignment,
+and launches on Android 17 with 16 KiB pages and compatibility fallback disabled.
+A direct load/health check of the RLN library extracted from that same APK also
+passes. SDK-004's exact release AAB/split-APK qualification, funded flows and
+PKG-006 provenance remain open. The SDK commit and derived AAR are
+not yet published, so clean public dependency restoration also remains
+unqualified. A size/digest pass does not satisfy these separate gates.
 
 ### iOS Release Archives
 
@@ -238,7 +287,7 @@ pinned Ubuntu 24.04 runner image:
 - `dart run tool/verify_production_tracker.dart`
 
 The separate **Platform compile** workflow uses immutable action commits,
-Java 21, Flutter 3.47.0, Ruby 3.4.10, Bundler 4.0.10, and the locked dependency
+Java 21, Flutter 3.47.7, Ruby 3.4.10, Bundler 4.0.10, and the locked dependency
 graphs to compile Android Debug plus iOS Simulator Debug and run Android host
 tests. It consumes no release configuration, signing secret, or network stack,
 so it proves host integration only. Physical/runtime and signed-candidate gates
@@ -300,9 +349,9 @@ make bootstrap
 This project uses [Nix Flakes](https://nixos.wiki/wiki/Flakes) to pin the native
 development prerequisites. The environment includes:
 
-- Android SDK platform 36, build tools 36.0.0, and platform tools 36.0.0
-- Android NDK 28.2.13676358, matching Flutter 3.47.0
-- Gradle 9.3.1, Android Gradle Plugin 9.1.0, and Kotlin 2.4.0
+- Android SDK platform 37.0, build tools 36.0.0, and platform tools 36.0.0
+- Android NDK 28.2.13676358, matching Flutter 3.47.7
+- Gradle 9.3.1, Android Gradle Plugin 9.1.1, and Kotlin 2.4.0
 - Java JDK 21
 - CocoaPods 1.16.2 through Bundler 4.0.10 (macOS only)
 
@@ -315,12 +364,12 @@ has migrated and the native and platform matrices pass.
 
 The flake deliberately does not install Flutter or Dart. It places the
 project-local `.fvm/flutter_sdk/bin` on `PATH`; FVM remains the sole source of
-truth for Flutter 3.47.0 and Dart 3.13.0. Run `make fvm-setup` before entering
+truth for Flutter 3.47.7 and Dart 3.13.5. Run `make fvm-setup` before entering
 the shell, and do not use a separately installed Dart SDK for app generation,
 analysis, tests, or documentation.
 
 Flutter itself is managed via [FVM](https://fvm.app/) and pinned per project
-using `.fvmrc` (`flutter: 3.47.0`). This keeps the Flutter version
+using `.fvmrc` (`flutter: 3.47.7`). This keeps the Flutter version
 consistent across developers without relying on the Nix store.
 
 ### Locked iOS toolchain

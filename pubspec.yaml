@@ -6,8 +6,8 @@ publish_to: "none"
 version: 1.0.0+1
 
 environment:
-  sdk: ">=3.13.0 <4.0.0"
-  flutter: ">=3.47.0"
+  sdk: ">=3.13.5 <4.0.0"
+  flutter: ">=3.47.7"
 
 dependencies:
   flutter:
@@ -25,10 +25,10 @@ dependencies:
   rgb_sdk_flutter:
     git:
       url: https://github.com/UTEXO-Protocol/flutter-sdk.git
-      ref: 7c44506fdfe1dae6f3a6fe884f849c7ca2ad028b
+      ref: c4e3c2d0b630a5807315710f18240889c7b74b0e
 
   # Storage
-  # 11.0.0 requires Android compile SDK 37, ahead of Flutter 3.47.0's SDK 36.
+  # Keep the reviewed secure-storage release while upgrading the host platforms.
   flutter_secure_storage: 10.3.1
   package_info_plus: ^10.2.1
   path_provider: ^2.1.5
@@ -89,6 +89,9 @@ dev_dependencies:
   mocktail: ^1.0.5
 
 flutter:
+  # Keep native plugins on the locked CocoaPods path until RGB SDK supports SPM.
+  config:
+    enable-swift-package-manager: false
   uses-material-design: true
 
   assets:
