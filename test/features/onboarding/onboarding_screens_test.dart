@@ -392,6 +392,24 @@ void main() {
       OnboardingTextActionSize.compact,
     );
     expect(tester.widget<OnboardingTextAction>(reveal).icon, isNotNull);
+    final actionStyle = tester.widget<Text>(find.text('Reveal')).style!;
+    final actionRole = AppTheme.light()
+        .extension<AsterTypeRoles>()!
+        .compactButtonLabel;
+    expect(actionStyle.fontFamily, actionRole.fontFamily);
+    expect(actionStyle.fontSize, actionRole.fontSize);
+    expect(actionStyle.fontWeight, actionRole.fontWeight);
+    expect(actionStyle.color, AppTheme.light().colorScheme.onSurface);
+    expect(actionStyle.color!.a, 1);
+    // The control uses opaque, approved action ink. Keep the rendered WCAG
+    // guideline below as well: Linux rasterization must not hide a regression.
+    final inkLuminance = actionStyle.color!.computeLuminance();
+    final surfaceLuminance = AppTheme.light().colorScheme.surface
+        .computeLuminance();
+    final inkContrast = surfaceLuminance > inkLuminance
+        ? (surfaceLuminance + 0.05) / (inkLuminance + 0.05)
+        : (inkLuminance + 0.05) / (surfaceLuminance + 0.05);
+    expect(inkContrast, greaterThanOrEqualTo(4.5));
     expect(continueButton, findsOneWidget);
     expect(copyAction, findsNothing);
     expect(
@@ -407,8 +425,13 @@ void main() {
     expect(find.bySemanticsLabel('1. abandon'), findsOneWidget);
     final hide = find.widgetWithText(OnboardingTextAction, 'Hide');
     expect(hide, findsOneWidget);
+    expect(
+      tester.widget<Text>(find.text('Hide')).style!.fontWeight,
+      actionRole.fontWeight,
+    );
     expect(find.text('Hide'), findsOneWidget);
     expect(find.widgetWithText(CustomButton, 'Hide'), findsNothing);
+    await _expectOnboardingContrast(tester);
 
     await tester.tap(hide);
     await tester.pump();

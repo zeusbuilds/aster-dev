@@ -64,7 +64,7 @@ class _OnboardingTextActionState extends State<OnboardingTextAction> {
         : foreground.withValues(alpha: context.stateLayers.disabled);
     final compact = widget.size == OnboardingTextActionSize.compact;
     final textStyle = compact
-        ? context.type.statusMessage
+        ? context.type.compactButtonLabel
         : context.type.brandAction;
 
     return Semantics(
