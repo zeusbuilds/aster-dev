@@ -219,6 +219,75 @@ void main() {
       );
     });
   });
+
+  group('Android Gradle cache capacity policy', () {
+    const cacheFailure =
+        'must not configure setup-java cache inputs or alternate cache actions';
+    const nextStep = '      - name: Setup Flutter\n';
+    final mutations = <String, String Function(String)>{
+      'setup-java whole Gradle cache': (source) => source.replaceFirst(
+        '          java-version: "21"\n',
+        '          java-version: "21"\n          cache: gradle\n',
+      ),
+      'setup-java dynamic Gradle cache input': (source) => source.replaceFirst(
+        '          java-version: "21"\n',
+        '          java-version: "21"\n'
+            "          cache: \${{ 'gradle' }}\n",
+      ),
+      'separate cache action with an indirect path': (source) =>
+          source.replaceFirst(
+            nextStep,
+            '      - uses: actions/cache@${'a' * 40}\n'
+            '        with:\n'
+            '          path: \${{ env.GRADLE_USER_HOME }}\n'
+            '          key: fixture\n\n$nextStep',
+          ),
+      'Gradle setup action default cache': (source) => source.replaceFirst(
+        nextStep,
+        '      - uses: gradle/gradle-build-action@${'a' * 40}\n\n$nextStep',
+      ),
+    };
+    for (final entry in mutations.entries) {
+      test('rejects ${entry.key} while retaining compile/test policy', () {
+        final repository = Directory.systemTemp.createTempSync(
+          'aster-governance-cache-',
+        );
+        addTearDown(() => repository.deleteSync(recursive: true));
+        _copyGovernanceFiles(repository);
+        final platform = File(
+          '${repository.path}/.github/workflows/platform.yml',
+        );
+        final original = platform.readAsStringSync();
+        final mutated = entry.value(original);
+        expect(mutated, isNot(original));
+        platform.writeAsStringSync(mutated);
+
+        // Only the cache policy fails: Java 21, full APK compilation, native
+        // tests and cleanup remain present in the otherwise valid workflow.
+        expect(verifyRepositoryGovernance(repository), [
+          contains(cacheFailure),
+        ]);
+      });
+    }
+
+    test('allows a comment about Gradle caches without enabling a cache', () {
+      final repository = Directory.systemTemp.createTempSync(
+        'aster-governance-cache-',
+      );
+      addTearDown(() => repository.deleteSync(recursive: true));
+      _copyGovernanceFiles(repository);
+      final platform = File(
+        '${repository.path}/.github/workflows/platform.yml',
+      );
+      platform.writeAsStringSync(
+        platform.readAsStringSync().replaceFirst(
+          '          java-version: "21"\n',
+          '          java-version: "21"\n          # cache: gradle\n',
+        ),
+      );
+      expect(verifyRepositoryGovernance(repository), isEmpty);
+    });
+  });
 }
 
 void _expectInvalidAndroidCleanup(

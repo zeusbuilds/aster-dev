@@ -241,6 +241,12 @@ void _verifyWorkflow(File file, List<String> failures) {
     if (!_jobUsesJava21(android)) {
       failures.add('Android platform CI must configure Java 21.');
     }
+    if (_jobUsesUnreviewedAndroidCache(android)) {
+      failures.add(
+        'Android platform CI must not configure setup-java cache inputs or '
+        'alternate cache actions; keep Gradle state within this job.',
+      );
+    }
     if (!_jobHasPostTestAndroidCleanup(android)) {
       failures.add(
         'Android platform CI must always clean transient build outputs after '
@@ -339,6 +345,33 @@ bool _jobUsesJava21(Object? job) {
         action.startsWith('actions/setup-java@') &&
         options is YamlMap &&
         options['java-version'] == '21') {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool _jobUsesUnreviewedAndroidCache(Object? job) {
+  if (job is! YamlMap) return false;
+  final steps = job['steps'];
+  if (steps is! YamlList) return false;
+  for (final step in steps.whereType<YamlMap>()) {
+    final uses = step['uses'];
+    if (uses is! String) continue;
+    final action = uses.split('@').first.toLowerCase();
+    final options = step['with'];
+    if (action == 'actions/setup-java' &&
+        options is YamlMap &&
+        options.containsKey('cache')) {
+      return true;
+    }
+    // The pinned Flutter action retains its scoped Flutter/Pub caches. An
+    // alternate cache action in this Android job needs explicit policy review;
+    // an arbitrary path expression cannot prove it excludes Gradle state.
+    if (action == 'actions/cache' ||
+        action.startsWith('actions/cache/') ||
+        action == 'gradle/actions/setup-gradle' ||
+        action == 'gradle/gradle-build-action') {
       return true;
     }
   }
