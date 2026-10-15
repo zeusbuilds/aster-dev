@@ -16,17 +16,13 @@ part 'create_wallet_view_model.g.dart';
 @riverpod
 Random recoveryQuizRandom(Ref ref) => Random.secure();
 
-/// Owns generated phrase display, bounded clipboard access, and provisioning.
+/// Owns generated phrase display, offline confirmation, and provisioning.
 @riverpod
 class CreateWalletViewModel extends _$CreateWalletViewModel {
-  late SensitiveClipboardService _clipboard;
-
   @override
   Future<CreateWalletState> build() async {
-    _clipboard = ref.watch(sensitiveClipboardServiceProvider);
     final wordListRepository = ref.watch(bip39WordListRepositoryProvider);
     final quizRandom = ref.watch(recoveryQuizRandomProvider);
-    ref.onDispose(() => unawaited(_clipboard.clearSensitive()));
     final wordListResult = await wordListRepository.load();
     final wordList = switch (wordListResult) {
       AppSuccess<Bip39WordList>(:final value) => value,
@@ -106,29 +102,9 @@ class CreateWalletViewModel extends _$CreateWalletViewModel {
     state = AsyncData(current.copyWith(walletName: '', failure: null));
   }
 
-  /// Copies the phrase under a bounded matching-content clipboard lease.
-  Future<AppResult<void>> copyMnemonic() async {
-    final current = state.value;
-    if (current == null || !current.canCopy) {
-      return AppResult.failure(
-        const AppFailure(
-          code: 'clipboard_action_unavailable',
-          kind: AppFailureKind.conflict,
-          userMessage: 'The recovery phrase is not available to copy.',
-          retryable: false,
-        ),
-      );
-    }
-    state = AsyncData(current.copyWith(copying: true));
-    final result = await _clipboard.copySensitive(current.mnemonic);
-    if (!ref.mounted) return result;
-    state = AsyncData(current.copyWith(copying: false));
-    final intent = result is AppSuccess<void>
-        ? HapticIntent.lightImpact
-        : HapticIntent.error;
-    unawaited(ref.read(hapticFeedbackServiceProvider).trigger(intent));
-    return result;
-  }
+  /// Secret copying is deliberately unavailable, including direct callers.
+  Future<AppResult<void>> copyMnemonic() =>
+      const PlatformSensitiveClipboardService().copySensitive('');
 
   /// Provisions the displayed phrase and publishes only its committed registry.
   Future<bool> submit() async {
@@ -161,9 +137,6 @@ class CreateWalletViewModel extends _$CreateWalletViewModel {
     CreateWalletState current,
     WalletRegistry registry,
   ) async {
-    // The durable wallet commit must not retain the clipboard lease. A failed
-    // clear remains leased and is retried by the clipboard service.
-    await _clipboard.clearSensitive();
     if (!ref.mounted) return true;
     state = AsyncData(current.cleared());
     unawaited(

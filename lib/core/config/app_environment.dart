@@ -73,6 +73,7 @@ final class WalletServiceConfiguration {
     this.lspBaseUrl,
     this.vssUrl,
     this.ethRpcUrl,
+    this.ethChainId,
     this.explorerBaseUrl,
     this.usdtAsset,
     this.daemonListeningPort = 9735,
@@ -114,6 +115,7 @@ final class WalletServiceConfiguration {
       lspBaseUrl: _optionalEnvironment('ASTER_LSP_URL'),
       vssUrl: _optionalEnvironment('ASTER_VSS_URL'),
       ethRpcUrl: _optionalEnvironment('ASTER_ETH_RPC_URL'),
+      ethChainId: _optionalEnvironment('ASTER_ETH_CHAIN_ID'),
       explorerBaseUrl:
           _optionalEnvironment('ASTER_EXPLORER_URL') ??
           switch (environment) {
@@ -152,6 +154,12 @@ final class WalletServiceConfiguration {
   /// Credential-free Ethereum RPC used by native BFA validation, when enabled.
   /// This is not an Ethereum wallet or proof of an external bridge payout.
   final String? ethRpcUrl;
+
+  /// Deployment-approved EVM chain identity as a canonical decimal uint256.
+  ///
+  /// Bitcoin's network name does not identify the BFA backing chain. No chain
+  /// is inferred from mainnet, an RPC URL, or an asset's display ticker.
+  final String? ethChainId;
   final String? explorerBaseUrl;
 
   /// RGB USDT identity for this exact blockchain environment.
@@ -172,6 +180,7 @@ final class WalletServiceConfiguration {
       other.lspBaseUrl == lspBaseUrl &&
       other.vssUrl == vssUrl &&
       other.ethRpcUrl == ethRpcUrl &&
+      other.ethChainId == ethChainId &&
       other.explorerBaseUrl == explorerBaseUrl &&
       other.usdtAsset == usdtAsset;
 
@@ -186,6 +195,7 @@ final class WalletServiceConfiguration {
     lspBaseUrl,
     vssUrl,
     ethRpcUrl,
+    ethChainId,
     explorerBaseUrl,
     usdtAsset,
   );
@@ -263,6 +273,19 @@ final class WalletServiceConfiguration {
       permitsInsecureDevelopmentEndpoints,
     );
     usdtAsset?.validate();
+    final expectedChain = ethChainId;
+    if (expectedChain != null &&
+        (!isCanonicalEvmChainId(expectedChain) || ethRpcUrl == null)) {
+      throw const AppConfigurationException();
+    }
+    // Native RLN enables BFA schemas only with an EVM RPC. A mainnet USDT
+    // route must never be advertised while this validation is disabled or
+    // while the backing chain's expected identity has not been supplied.
+    if (environment == BlockchainEnvironment.mainnet &&
+        usdtAsset != null &&
+        (ethRpcUrl == null || expectedChain == null)) {
+      throw const AppConfigurationException();
+    }
   }
 
   static int _listenerPort(String value) {
@@ -378,6 +401,7 @@ String? _optionalEnvironment(String name) {
     'ASTER_LSP_URL' => const String.fromEnvironment('ASTER_LSP_URL'),
     'ASTER_VSS_URL' => const String.fromEnvironment('ASTER_VSS_URL'),
     'ASTER_ETH_RPC_URL' => const String.fromEnvironment('ASTER_ETH_RPC_URL'),
+    'ASTER_ETH_CHAIN_ID' => const String.fromEnvironment('ASTER_ETH_CHAIN_ID'),
     'ASTER_EXPLORER_URL' => const String.fromEnvironment('ASTER_EXPLORER_URL'),
     _ => '',
   };
@@ -385,6 +409,15 @@ String? _optionalEnvironment(String name) {
 }
 
 final _transactionId = RegExp(r'^[0-9a-fA-F]{64}$');
+
+/// EIP-155 chain identities are positive integers with at most 256 bits.
+bool isCanonicalEvmChainId(String value) {
+  if (value.length > 78 || !RegExp(r'^[1-9][0-9]*$').hasMatch(value)) {
+    return false;
+  }
+  final parsed = BigInt.tryParse(value);
+  return parsed != null && parsed.bitLength <= 256;
+}
 
 RgbAssetConfiguration? _rgbAssetEnvironment({
   required String contractId,

@@ -218,13 +218,13 @@ void main() {
     () async {
       await expectLater(
         engine.sendPayment(command(null)),
-        throwsA(isA<WalletValidationException>()),
+        throwsA(isA<WalletPaymentRejectedBeforeDispatchException>()),
       );
       final reviewed = command(RgbRecipientType.witness);
       kind = 'Blind';
       await expectLater(
         engine.sendPayment(reviewed),
-        throwsA(isA<WalletValidationException>()),
+        throwsA(isA<WalletPaymentRejectedBeforeDispatchException>()),
       );
       verifyNever(() => wallet.onchainSend(any()));
     },

@@ -8,7 +8,12 @@ import 'package:analyzer/dart/ast/visitor.dart';
 const _infrastructureOwners = <String, Set<String>>{
   'flutter_secure_storage': {'lib/core/storage/secure_storage_service.dart'},
   'haptic_feedback': {'lib/shared/feedback/haptic_feedback_service.dart'},
-  'http': {'lib/core/network/resilient_http_client.dart'},
+  // The EVM adapter performs one non-retrying, bounded eth_chainId POST;
+  // ResilientHttpClient owns the separate GET-with-retry policy.
+  'http': {
+    'lib/core/network/http_evm_chain_validator.dart',
+    'lib/core/network/resilient_http_client.dart',
+  },
   'image_picker': {'lib/features/scan/data/services/mobile_scan_adapters.dart'},
   'mobile_scanner': {
     'lib/features/scan/data/services/mobile_scan_adapters.dart',

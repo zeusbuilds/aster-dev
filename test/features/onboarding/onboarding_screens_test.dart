@@ -325,7 +325,7 @@ void main() {
     expect(taps, 4);
   });
 
-  testWidgets('create shows 1-6 and 7-12 and uses the secure copy service', (
+  testWidgets('create shows 1-6 and 7-12 while keeping the phrase offline', (
     tester,
   ) async {
     final harness = await OnboardingTestHarness.create();
@@ -393,14 +393,10 @@ void main() {
     );
     expect(tester.widget<OnboardingTextAction>(reveal).icon, isNotNull);
     expect(continueButton, findsOneWidget);
-    expect(copyAction, findsOneWidget);
+    expect(copyAction, findsNothing);
     expect(
       tester.getTopLeft(reveal).dy,
       lessThan(tester.getTopLeft(continueButton).dy),
-    );
-    expect(
-      tester.getTopLeft(copyAction).dy,
-      greaterThan(tester.getTopLeft(continueButton).dy),
     );
     await tester.ensureVisible(reveal);
     await tester.tap(reveal);
@@ -421,22 +417,8 @@ void main() {
     await tester.tap(reveal);
     await tester.pump();
 
-    final copy = find.text('Copy recovery phrase');
-    expect(
-      find.widgetWithText(CustomButton, 'Copy recovery phrase'),
-      findsNothing,
-    );
-    expect(copyAction, findsOneWidget);
-    expect(
-      tester.widget<OnboardingTextAction>(copyAction).size,
-      OnboardingTextActionSize.standard,
-    );
-    expect(tester.widget<OnboardingTextAction>(copyAction).icon, isNull);
-    await tester.ensureVisible(copy);
-    await tester.tap(copy);
-    await tester.pump();
-    expect(harness.clipboardText, validTestMnemonic);
-    expect(harness.toasts.messages.single.title, 'Recovery phrase copied');
+    expect(find.text('Copy recovery phrase'), findsNothing);
+    expect(harness.clipboardText, isEmpty);
 
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     await tester.pump();
@@ -759,59 +741,54 @@ void main() {
     );
   });
 
-  testWidgets('create keeps Copy but disables unknown-outcome provisioning', (
-    tester,
-  ) async {
-    final harness = await OnboardingTestHarness.create();
-    addTearDown(() => _disposeHarness(tester, harness));
-    await _pumpScreen(tester, harness, const OnboardingCreateWalletScreen());
-    final notifier = harness.container.read(
-      createWalletViewModelProvider.notifier,
-    );
-    _completeCreateWalletSetup(harness, name: 'Daily wallet');
-    harness.engine.provisionError = const AppFailureException(
-      AppFailure(
-        code: 'wallet_setup_outcome_unknown',
-        kind: AppFailureKind.timeout,
-        userMessage: 'Restart before continuing wallet setup.',
-        retryable: false,
-        outcomeUnknown: true,
-      ),
-    );
+  testWidgets(
+    'create keeps phrase offline and disables unknown-outcome provisioning',
+    (tester) async {
+      final harness = await OnboardingTestHarness.create();
+      addTearDown(() => _disposeHarness(tester, harness));
+      await _pumpScreen(tester, harness, const OnboardingCreateWalletScreen());
+      final notifier = harness.container.read(
+        createWalletViewModelProvider.notifier,
+      );
+      _completeCreateWalletSetup(harness, name: 'Daily wallet');
+      harness.engine.provisionError = const AppFailureException(
+        AppFailure(
+          code: 'wallet_setup_outcome_unknown',
+          kind: AppFailureKind.timeout,
+          userMessage: 'Restart before continuing wallet setup.',
+          retryable: false,
+          outcomeUnknown: true,
+        ),
+      );
 
-    expect(await notifier.submit(), isFalse);
-    await tester.pump();
+      expect(await notifier.submit(), isFalse);
+      await tester.pump();
 
-    expect(
-      find.text('Restart before continuing wallet setup.'),
-      findsOneWidget,
-    );
-    expect(
-      tester
-          .getSemantics(find.bySemanticsLabel('Continue'))
-          .flagsCollection
-          .isEnabled,
-      ui.Tristate.isFalse,
-    );
-    expect(
-      tester
-          .getSemantics(find.bySemanticsLabel('Copy recovery phrase'))
-          .flagsCollection
-          .isEnabled,
-      ui.Tristate.isTrue,
-    );
-    expect(
-      tester
-          .getSemantics(find.bySemanticsLabel('Back'))
-          .flagsCollection
-          .isEnabled,
-      ui.Tristate.isFalse,
-    );
-    expect(
-      tester.widget<PopScope<dynamic>>(find.byType(PopScope)).canPop,
-      isFalse,
-    );
-  });
+      expect(
+        find.text('Restart before continuing wallet setup.'),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .getSemantics(find.bySemanticsLabel('Continue'))
+            .flagsCollection
+            .isEnabled,
+        ui.Tristate.isFalse,
+      );
+      expect(find.bySemanticsLabel('Copy recovery phrase'), findsNothing);
+      expect(
+        tester
+            .getSemantics(find.bySemanticsLabel('Back'))
+            .flagsCollection
+            .isEnabled,
+        ui.Tristate.isFalse,
+      );
+      expect(
+        tester.widget<PopScope<dynamic>>(find.byType(PopScope)).canPop,
+        isFalse,
+      );
+    },
+  );
 
   testWidgets('import freezes navigation after known retained resources', (
     tester,
@@ -872,55 +849,50 @@ void main() {
     );
   });
 
-  testWidgets('create preserves copy but freezes known retained navigation', (
-    tester,
-  ) async {
-    final harness = await OnboardingTestHarness.create();
-    addTearDown(() => _disposeHarness(tester, harness));
-    await _pumpScreen(tester, harness, const OnboardingCreateWalletScreen());
-    final notifier = harness.container.read(
-      createWalletViewModelProvider.notifier,
-    );
-    _completeCreateWalletSetup(harness, name: 'Daily wallet');
-    harness.engine.provisionError = const AppFailureException(
-      AppFailure(
-        code: 'wallet_setup_reconciliation_required',
-        kind: AppFailureKind.storage,
-        userMessage: 'Restart before continuing wallet setup.',
-        retryable: false,
-        requiresReconciliation: true,
-      ),
-    );
+  testWidgets(
+    'create keeps phrase offline and freezes known retained navigation',
+    (tester) async {
+      final harness = await OnboardingTestHarness.create();
+      addTearDown(() => _disposeHarness(tester, harness));
+      await _pumpScreen(tester, harness, const OnboardingCreateWalletScreen());
+      final notifier = harness.container.read(
+        createWalletViewModelProvider.notifier,
+      );
+      _completeCreateWalletSetup(harness, name: 'Daily wallet');
+      harness.engine.provisionError = const AppFailureException(
+        AppFailure(
+          code: 'wallet_setup_reconciliation_required',
+          kind: AppFailureKind.storage,
+          userMessage: 'Restart before continuing wallet setup.',
+          retryable: false,
+          requiresReconciliation: true,
+        ),
+      );
 
-    expect(await notifier.submit(), isFalse);
-    await tester.pump();
+      expect(await notifier.submit(), isFalse);
+      await tester.pump();
 
-    expect(
-      tester
-          .getSemantics(find.bySemanticsLabel('Continue'))
-          .flagsCollection
-          .isEnabled,
-      ui.Tristate.isFalse,
-    );
-    expect(
-      tester
-          .getSemantics(find.bySemanticsLabel('Copy recovery phrase'))
-          .flagsCollection
-          .isEnabled,
-      ui.Tristate.isTrue,
-    );
-    expect(
-      tester
-          .getSemantics(find.bySemanticsLabel('Back'))
-          .flagsCollection
-          .isEnabled,
-      ui.Tristate.isFalse,
-    );
-    expect(
-      tester.widget<PopScope<dynamic>>(find.byType(PopScope)).canPop,
-      isFalse,
-    );
-  });
+      expect(
+        tester
+            .getSemantics(find.bySemanticsLabel('Continue'))
+            .flagsCollection
+            .isEnabled,
+        ui.Tristate.isFalse,
+      );
+      expect(find.bySemanticsLabel('Copy recovery phrase'), findsNothing);
+      expect(
+        tester
+            .getSemantics(find.bySemanticsLabel('Back'))
+            .flagsCollection
+            .isEnabled,
+        ui.Tristate.isFalse,
+      );
+      expect(
+        tester.widget<PopScope<dynamic>>(find.byType(PopScope)).canPop,
+        isFalse,
+      );
+    },
+  );
 
   testWidgets('create quiz verifies words 3, 7, and 11 in equal option rows', (
     tester,
@@ -1847,7 +1819,7 @@ void main() {
     expect(_welcomeItemOpacity(tester, 'welcome-actions-motion'), 1);
   });
 
-  testWidgets('leaving recovery clears its sensitive clipboard lease', (
+  testWidgets('recovery never exposes a clipboard action or writes a phrase', (
     tester,
   ) async {
     final harness = await OnboardingTestHarness.create();
@@ -1860,9 +1832,8 @@ void main() {
       tester,
       () => find.text('Your 12-word recovery phrase').evaluate().isNotEmpty,
     );
-    await tester.tap(find.text('Copy recovery phrase'));
-    await _pumpUntil(tester, () => harness.clipboardText.isNotEmpty);
-    expect(harness.clipboardText, validTestMnemonic);
+    expect(find.text('Copy recovery phrase'), findsNothing);
+    expect(harness.clipboardText, isEmpty);
 
     await tester.tap(find.bySemanticsLabel('Back'));
     await _pumpOnboardingTransition(tester);

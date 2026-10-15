@@ -11,7 +11,9 @@ make verify-release-configuration \
   RELEASE_AUDIENCE=internal-beta
 ```
 
-Use `public-distribution` only after release ownership has supplied the market
+Public distribution requires `ASTER_NETWORK=mainnet`; non-mainnet service
+qualification remains an `internal-beta` activity. Use `public-distribution`
+only after release ownership has supplied the market
 proxy, support, terms, and privacy destinations. The validator accepts no
 unknown keys and no credentials, tokens, API keys, mnemonics, passwords, or
 other secrets. Compile-time values are recoverable from a mobile binary.
@@ -31,9 +33,16 @@ map, and new plist keys require a source-policy review.
 through `18`. Negative, signed, padded, or out-of-range values fail before any
 release build starts.
 
-`ASTER_ETH_RPC_URL` is optional, credential-free HTTPS configuration for native
-BFA validation. It does not add an Ethereum wallet or establish bridge payout
-proof. `ASTER_LSP_URL` is optional for the onchain-only release and cannot enable
+`ASTER_ETH_RPC_URL` is required, credential-free HTTPS configuration for native
+BFA validation. `ASTER_ETH_CHAIN_ID` is the deployment-approved EVM backing
+chain ID, expressed as a positive canonical decimal uint256. The wallet checks
+`eth_chainId` against this identity before native initialization or unlock,
+rejecting unavailable, malformed, redirected, or wrong-chain responses. There
+is no chain default: the release owner must verify it alongside the canonical
+mainnet RGB asset ID, precision, BFA contract identities, and backing policy.
+This check does not authenticate contracts or establish bridge payout proof.
+The mainnet USDT route fails configuration validation if either EVM setting is
+missing. `ASTER_LSP_URL` is optional for the onchain-only release and cannot enable
 Lightning payment actions. Both are validated when supplied; `ASTER_VSS_URL`
 remains required by the existing release deployment contract. None of these
 endpoints may contain credentials or API keys.

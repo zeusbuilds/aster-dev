@@ -133,6 +133,7 @@ final class PaymentFlowTestHarness {
       FakeWalletIdentityGenerator(walletId: walletId),
       services,
       clock: effectiveClock,
+      paymentJournalStore: MemoryWalletPaymentJournalStore(),
     );
     final settings = SettingsRepository(
       preferenceService,

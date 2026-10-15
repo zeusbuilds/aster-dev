@@ -209,7 +209,8 @@ manifest documented in `config/README.md` and consumes it through
 | `ASTER_RGB_PROXY_URL` | Optional RGB transport proxy override |
 | `ASTER_LSP_URL` | Optional LSP base URL |
 | `ASTER_VSS_URL` | Optional VSS base URL |
-| `ASTER_ETH_RPC_URL` | Optional credential-free Ethereum validation RPC, not an Ethereum wallet or payout verifier |
+| `ASTER_ETH_RPC_URL` | Required credential-free HTTPS BFA validation RPC for release manifests and mainnet USDT; not an Ethereum wallet or payout verifier |
+| `ASTER_ETH_CHAIN_ID` | Required deployment-approved decimal EVM chain identity for release manifests and mainnet USDT; checked through bounded `eth_chainId` before native initialization/unlock |
 | `ASTER_EXPLORER_URL` | Optional public transaction explorer base |
 
 Credentials and bearer tokens must never be supplied through either individual

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:aster/core/core.dart';
+import 'package:aster/features/transaction/presentation/view_model/activity_view_model.dart';
 import 'package:aster/features/wallet/data/repository/repository.dart';
 import 'package:aster/features/wallet/data/runtime/runtime.dart';
 import 'package:aster/features/wallet/data/storage/storage.dart';
@@ -10,9 +11,48 @@ import 'package:aster/features/wallet/presentation/view_model/wallet_view_model.
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/payment_flow_harness.dart';
 import '../../support/wallet_fakes.dart';
 
 void main() {
+  test('pending payment switch denial preserves the active wallet and Activity access', () async {
+    final now = DateTime.now().toUtc();
+    final engine = FakeWalletEngine()
+      ..feeEstimate = WalletFeeRateEstimate(
+        targetBlocks: 6,
+        satsPerVbyte: 2,
+        observedAt: now,
+      )
+      ..sendPaymentError = StateError('Lost payment response');
+    final h = await PaymentFlowTestHarness.create(engine: engine);
+    addTearDown(h.dispose);
+    final before = await h.container.read(walletViewModelProvider.future);
+    final result = await h.repository.sendPayment(
+      target: WalletPaymentTarget.bitcoinOnchain,
+      destination: 'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn',
+      amountUnits: 1,
+      reviewedFeeRate: engine.feeEstimate,
+    );
+    expect(result, isA<AppFailureResult<WalletSendResult>>());
+    final vm = h.container.read(walletViewModelProvider.notifier);
+    expect(await vm.switchWallet(_secondWalletId), isFalse);
+    final after = await h.container.read(walletViewModelProvider.future);
+    expect(after.activeWallet, before.activeWallet);
+    expect(after.wallets, before.wallets);
+    expect(
+      after.operationFailure?.code,
+      walletPaymentSubmissionPendingFailure.code,
+    );
+    final activity = await h.container.read(
+      activityViewModelProvider(WalletAssetKind.bitcoin).future,
+    );
+    expect(activity.feed.paymentSubmission?.requiresReconciliation, isTrue);
+    expect(
+      engine.calls.where((call) => call == 'sendPayment:start'),
+      hasLength(1),
+    );
+  });
+
   test('ignores reload while the initial wallet read is active', () async {
     final harness = await _createHarness(delayRepository: true);
     final subscription = harness.container.listen(

@@ -284,9 +284,13 @@ void main() {
           satsPerVbyte: 2,
           observedAt: DateTime.now().toUtc(),
         )
-        ..sendPaymentError = const WalletValidationException(
-          'Injected send failure.',
-          field: 'amount',
+        ..sendPaymentError = const WalletPaymentRejectedBeforeDispatchException(
+          AppFailure(
+            code: 'wallet_validation',
+            kind: AppFailureKind.validation,
+            userMessage: 'Check the entered information and try again.',
+            retryable: false,
+          ),
         );
       final harness = await PaymentFlowTestHarness.create(engine: engine);
       addTearDown(harness.dispose);
@@ -442,9 +446,13 @@ void main() {
           satsPerVbyte: 2,
           observedAt: DateTime.now().toUtc(),
         )
-        ..sendPaymentError = const WalletValidationException(
-          'Rejected amount.',
-          field: 'amount',
+        ..sendPaymentError = const WalletPaymentRejectedBeforeDispatchException(
+          AppFailure(
+            code: 'wallet_validation',
+            kind: AppFailureKind.validation,
+            userMessage: 'Check the entered information and try again.',
+            retryable: false,
+          ),
         );
       final harness = await PaymentFlowTestHarness.create(engine: engine);
       addTearDown(harness.dispose);
@@ -485,53 +493,50 @@ void main() {
     },
   );
 
-  test(
-    'known retryable submit failure permits only explicit submit retry',
-    () async {
-      final engine = FakeWalletEngine()
-        ..balance = _balance(onchainSpendable: 1000, lightningSpendable: 0)
-        ..feeEstimate = WalletFeeRateEstimate(
-          targetBlocks: 6,
-          satsPerVbyte: 2,
-          observedAt: DateTime.now().toUtc(),
-        )
-        ..sendPaymentError = const AppFailureException(
-          AppFailure(
-            code: 'payment_route_temporarily_unavailable',
-            kind: AppFailureKind.unavailable,
-            userMessage:
-                'The selected payment route is temporarily unavailable.',
-            retryable: true,
-          ),
-        );
-      final harness = await PaymentFlowTestHarness.create(engine: engine);
-      addTearDown(harness.dispose);
-      final provider = sendFlowViewModelProvider(
-        WalletPaymentTarget.bitcoinOnchain,
+  test('a retryable engine error without proof of rejection cannot replay dispatch', () async {
+    final engine = FakeWalletEngine()
+      ..balance = _balance(onchainSpendable: 1000, lightningSpendable: 0)
+      ..feeEstimate = WalletFeeRateEstimate(
+        targetBlocks: 6,
+        satsPerVbyte: 2,
+        observedAt: DateTime.now().toUtc(),
+      )
+      ..sendPaymentError = const AppFailureException(
+        AppFailure(
+          code: 'payment_route_temporarily_unavailable',
+          kind: AppFailureKind.unavailable,
+          userMessage: 'The selected payment route is temporarily unavailable.',
+          retryable: true,
+        ),
       );
-      final subscription = harness.container.listen(provider, (_, _) {});
-      addTearDown(subscription.close);
-      await harness.container.read(provider.future);
-      final notifier = harness.container.read(provider.notifier);
-      notifier.updateDestination('mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn');
-      expect(await notifier.validateDestination(), isTrue);
-      notifier.updateAmount('0.000001');
+    final harness = await PaymentFlowTestHarness.create(engine: engine);
+    addTearDown(harness.dispose);
+    final provider = sendFlowViewModelProvider(
+      WalletPaymentTarget.bitcoinOnchain,
+    );
+    final subscription = harness.container.listen(provider, (_, _) {});
+    addTearDown(subscription.close);
+    await harness.container.read(provider.future);
+    final notifier = harness.container.read(provider.notifier);
+    notifier.updateDestination('mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn');
+    expect(await notifier.validateDestination(), isTrue);
+    notifier.updateAmount('0.000001');
 
-      expect(await notifier.submit(), isFalse);
-      final failed = harness.container.read(provider).requireValue;
-      expect(failed.failure?.retryable, isTrue);
-      expect(failed.canStart(SendFlowOperation.submitting), isTrue);
-      expect(failed.canStart(SendFlowOperation.refreshingBalance), isFalse);
-      engine.sendPaymentError = null;
+    expect(await notifier.submit(), isFalse);
+    final failed = harness.container.read(provider).requireValue;
+    expect(failed.failure?.retryable, isFalse);
+    expect(failed.failure?.outcomeUnknown, isTrue);
+    expect(failed.canStart(SendFlowOperation.submitting), isFalse);
+    expect(failed.canStart(SendFlowOperation.refreshingBalance), isFalse);
+    engine.sendPaymentError = null;
 
-      expect(await notifier.refreshBalance(), isFalse);
-      expect(await notifier.submit(), isTrue);
-      expect(
-        engine.calls.where((call) => call == 'sendPayment:start'),
-        hasLength(2),
-      );
-    },
-  );
+    expect(await notifier.refreshBalance(), isFalse);
+    expect(await notifier.submit(), isFalse);
+    expect(
+      engine.calls.where((call) => call == 'sendPayment:start'),
+      hasLength(1),
+    );
+  });
 
   test(
     'balance refresh failure is recoverable only by the same operation',

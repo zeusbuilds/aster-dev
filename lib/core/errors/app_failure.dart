@@ -150,6 +150,18 @@ final class WalletMutationOutcomeUnknownException implements Exception {
   String toString() => 'WalletMutationOutcomeUnknownException';
 }
 
+/// Proof from the app's native adapter that dispatch never started. Journal
+/// owners may persist rejection and permit a fresh user-reviewed submission.
+/// Generic errors or retryable transport failures are never this proof.
+final class WalletPaymentRejectedBeforeDispatchException implements Exception {
+  const WalletPaymentRejectedBeforeDispatchException(this.failure);
+
+  final AppFailure failure;
+
+  @override
+  String toString() => 'WalletPaymentRejectedBeforeDispatchException';
+}
+
 /// Non-secret marker for invalid compile-time or runtime service settings.
 final class AppConfigurationException implements Exception {
   const AppConfigurationException();

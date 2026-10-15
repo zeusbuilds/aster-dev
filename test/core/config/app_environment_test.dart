@@ -2,6 +2,57 @@ import 'package:aster/core/core.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('mainnet USDT requires explicit BFA RPC and chain binding', () {
+    WalletServiceConfiguration configuration({String? rpc, String? chain}) =>
+        WalletServiceConfiguration(
+          environment: BlockchainEnvironment.mainnet,
+          sdkNetwork: 'mainnet',
+          usdtAsset: const RgbAssetConfiguration(
+            contractId: 'rgb:deployment-owned-contract',
+            precision: 6,
+          ),
+          ethRpcUrl: rpc,
+          ethChainId: chain,
+        );
+    for (final configuration in [
+      configuration(),
+      configuration(rpc: 'https://rpc.aster-wallet.com'),
+      configuration(chain: '42161'),
+    ]) {
+      expect(configuration.validate, throwsA(isA<AppConfigurationException>()));
+    }
+    final valid = configuration(
+      rpc: 'https://rpc.aster-wallet.com',
+      chain: '42161',
+    );
+    expect(valid.validate, returnsNormally);
+    expect(valid, isNot(configuration(rpc: valid.ethRpcUrl, chain: '1')));
+    for (final chain in [
+      '',
+      '0',
+      '-1',
+      '+1',
+      '01',
+      '0xa4b1',
+      '1.0',
+      ' 1',
+      '1 ',
+      (BigInt.one << 256).toString(),
+    ]) {
+      expect(
+        configuration(rpc: valid.ethRpcUrl, chain: chain).validate,
+        throwsA(isA<AppConfigurationException>()),
+        reason: chain,
+      );
+    }
+    expect(
+      configuration(
+        rpc: valid.ethRpcUrl,
+        chain: ((BigInt.one << 256) - BigInt.one).toString(),
+      ).validate,
+      returnsNormally,
+    );
+  });
   test('Ethereum validation RPC is validated and part of service identity', () {
     WalletServiceConfiguration configuration(String? rpc) =>
         WalletServiceConfiguration(

@@ -8,6 +8,7 @@ import '../storage/storage.dart';
 import '../validation/validation.dart';
 import 'wallet_lifecycle_repository.dart';
 import 'wallet_payment_operations.dart';
+import 'wallet_payment_submissions.dart';
 import 'wallet_rgb_setup_operations.dart';
 
 /// Coordinates wallet metadata transactions and the single native runtime.
@@ -25,6 +26,7 @@ final class WalletRepository implements WalletLifecycleRepository {
     this._bitcoinInstructions = const BitcoinPaymentInstructionParser(),
     DateTime Function()? clock,
     this.rgbSetupStore,
+    this.paymentJournalStore,
   }) : _clock = clock ?? _utcNow {
     _services.validate();
   }
@@ -37,6 +39,13 @@ final class WalletRepository implements WalletLifecycleRepository {
   final BitcoinPaymentInstructionDecoder _bitcoinInstructions;
   final DateTime Function() _clock;
   final RgbWalletSetupStore? rgbSetupStore;
+  final WalletPaymentJournalStore? paymentJournalStore;
+  late final WalletPaymentSubmissions _submissions = WalletPaymentSubmissions(
+    _runtime,
+    paymentJournalStore,
+    newId: _identityGenerator.newStorageToken,
+    clock: _clock,
+  );
   late final WalletRgbSetupOperations _rgbSetup = WalletRgbSetupOperations(
     _runtime,
     _profiles,
@@ -51,7 +60,8 @@ final class WalletRepository implements WalletLifecycleRepository {
     _services,
     _bitcoinInstructions,
     _enqueueOperation,
-    beforeOnchainMutation: _rgbSetup.assertResolved,
+    beforeOnchainMutation: _assertOnchainMutationResolved,
+    submissions: _submissions,
     clock: _clock,
   );
 
@@ -62,12 +72,24 @@ final class WalletRepository implements WalletLifecycleRepository {
   Future<AppResult<WalletRegistry>> load() => _enqueueOperation(_profiles.read);
 
   Future<AppResult<RgbWalletSetupReview>> prepareRgbWalletSetup() =>
-      _enqueueOperation(_rgbSetup.prepare);
+      _enqueueOperation(() async {
+        final gate = await _submissions.assertResolved();
+        if (gate case AppFailureResult<void>(:final failure)) {
+          return AppResult.failure(failure);
+        }
+        return _rgbSetup.prepare();
+      });
   Future<AppResult<void>> cancelRgbWalletSetup(RgbWalletSetupReview review) =>
       _enqueueOperation(() => _rgbSetup.cancel(review));
   Future<AppResult<RgbWalletSetupStatus>> confirmRgbWalletSetup(
     RgbWalletSetupReview review,
-  ) => _enqueueOperation(() => _rgbSetup.confirm(review));
+  ) => _enqueueOperation(() async {
+    final gate = await _submissions.assertResolved();
+    if (gate case AppFailureResult<void>(:final failure)) {
+      return AppResult.failure(failure);
+    }
+    return _rgbSetup.confirm(review);
+  });
   Future<AppResult<RgbWalletSetupStatus>> rgbWalletSetupStatus() =>
       _enqueueOperation(_rgbSetup.status);
 
@@ -129,6 +151,7 @@ final class WalletRepository implements WalletLifecycleRepository {
       }
       registry = (removal as AppSuccess<WalletRegistry>).value;
     }
+    await _submissions.validateProfiles(registry.readyProfiles);
     final storageAudit = await _runtime.verifyStorage(registry.readyProfiles);
     if (storageAudit case AppFailureResult<void>(:final failure)) {
       return AppResult.failure(failure);
@@ -136,6 +159,7 @@ final class WalletRepository implements WalletLifecycleRepository {
     final active = registry.activeProfile;
     if (active == null) return AppResult.success(registry);
     final restore = await _runtime.restore(active);
+    if (restore is AppSuccess<void>) await _submissions.restoreFence();
     return switch (restore) {
       AppSuccess<void>() => AppResult.success(registry),
       AppFailureResult<void>(:final failure) => AppResult.failure(failure),
@@ -215,6 +239,10 @@ final class WalletRepository implements WalletLifecycleRepository {
     required String mnemonic,
     required String name,
   }) async {
+    final gate = await _submissions.assertResolved();
+    if (gate case AppFailureResult<void>(:final failure)) {
+      return AppResult.failure(failure);
+    }
     final normalizedMnemonic = _normalizeMnemonic(mnemonic);
     final normalizedName = name.trim();
     if (!WalletProfile.isValidName(normalizedName)) {
@@ -378,6 +406,10 @@ final class WalletRepository implements WalletLifecycleRepository {
   }
 
   Future<AppResult<WalletRegistry>> _switchWalletUnsafe(String walletId) async {
+    final gate = await _submissions.assertResolved();
+    if (gate case AppFailureResult<void>(:final failure)) {
+      return AppResult.failure(failure);
+    }
     final registryResult = await _profiles.read();
     if (registryResult case AppFailureResult<WalletRegistry>()) {
       return registryResult;
@@ -408,7 +440,10 @@ final class WalletRepository implements WalletLifecycleRepository {
       return AppResult.failure(failure);
     }
     final persisted = await _profiles.setActive(walletId);
-    if (persisted is AppSuccess<WalletRegistry>) return persisted;
+    if (persisted is AppSuccess<WalletRegistry>) {
+      await _submissions.restoreFence();
+      return persisted;
+    }
 
     final persistenceFailure =
         (persisted as AppFailureResult<WalletRegistry>).failure;
@@ -511,7 +546,18 @@ final class WalletRepository implements WalletLifecycleRepository {
     reviewedFeeRate: reviewedFeeRate,
   );
 
-  Future<AppResult<void>> sync() => _enqueueOperation(_runtime.sync);
+  /// Durable submission evidence never grants permission to repeat dispatch.
+  Future<AppResult<WalletPaymentSubmission?>> paymentSubmissionStatus() =>
+      _enqueueOperation(_submissions.status);
+
+  /// Matches a durably recorded native transaction identity, never a guessed
+  /// payment by amount/date or an empty history. This operation never sends.
+  Future<AppResult<void>> reconcilePaymentSubmission() =>
+      _enqueueOperation(_submissions.reconcile);
+
+  Future<AppResult<void>> sync() => _enqueueOperation(
+    () => _runtime.readPaymentState((engine) => engine.sync()),
+  );
 
   /// Suspends the native owner after all in-flight wallet metadata mutations.
   @override
@@ -546,14 +592,32 @@ final class WalletRepository implements WalletLifecycleRepository {
   Future<AppResult<void>> dispose() => _enqueueOperation(_runtime.dispose);
 
   Future<AppResult<WalletNetworkStatus>> networkStatus() => _enqueueOperation(
-    () => _runtime.run((engine) => engine.getNetworkStatus()),
+    () => _runtime.readPaymentState((engine) => engine.getNetworkStatus()),
   );
 
   Future<AppResult<WalletPublicKeys>> publicKeys() =>
-      _enqueueOperation(() => _runtime.run((engine) => engine.getPublicKeys()));
+      _enqueueOperation(() async {
+        final gate = await _submissions.assertResolved();
+        if (gate case AppFailureResult<void>(:final failure)) {
+          return AppResult.failure(failure);
+        }
+        return _runtime.run((engine) => engine.getPublicKeys());
+      });
 
   Future<AppResult<String>> recoveryMnemonic(String walletId) =>
-      _enqueueOperation(() => _runtime.recoveryMnemonic(walletId));
+      _enqueueOperation(() async {
+        final gate = await _submissions.assertResolved();
+        if (gate case AppFailureResult<void>(:final failure)) {
+          return AppResult.failure(failure);
+        }
+        return _runtime.recoveryMnemonic(walletId);
+      });
+
+  Future<AppResult<void>> _assertOnchainMutationResolved() async {
+    final payment = await _submissions.assertResolved();
+    if (payment is AppFailureResult<void>) return payment;
+    return _rgbSetup.assertResolved();
+  }
 
   Future<AppResult<T>> _enqueueOperation<T>(
     Future<AppResult<T>> Function() operation,

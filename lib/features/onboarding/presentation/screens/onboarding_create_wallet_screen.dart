@@ -286,20 +286,11 @@ class _CreateWalletContentState extends ConsumerState<_CreateWalletContent>
                     text: 'Continue',
                     variant: ButtonVariant.translucent,
                     enabled:
-                        state.canCopy &&
+                        state.canContinue &&
                         !state.requiresReconciliation &&
                         !navigation.inFlight,
                     hapticIntent: null,
                     onTap: _openQuiz,
-                  ),
-                  SizedBox(height: spacing.sm),
-                  OnboardingTextAction(
-                    label: 'Copy recovery phrase',
-                    enabled: state.canCopy && !navigation.inFlight,
-                    loading: state.copying,
-                    onBrandArt: widget.onBrandArt,
-                    hapticIntent: null,
-                    onPressed: () => unawaited(_copy(context, ref)),
                   ),
                 ],
               ),
@@ -308,27 +299,6 @@ class _CreateWalletContentState extends ConsumerState<_CreateWalletContent>
         ),
       ],
     );
-  }
-
-  Future<void> _copy(BuildContext context, WidgetRef ref) async {
-    final result = await ref
-        .read(createWalletViewModelProvider.notifier)
-        .copyMnemonic();
-    if (!context.mounted) return;
-    switch (result) {
-      case AppSuccess<void>():
-        context.toasts.show(
-          title: 'Recovery phrase copied',
-          message: 'It will be cleared from the clipboard after one minute.',
-          variant: ToastVariant.success,
-        );
-      case AppFailureResult<void>(:final failure):
-        context.toasts.show(
-          title: 'Could not copy recovery phrase',
-          message: failure.userMessage,
-          variant: ToastVariant.failure,
-        );
-    }
   }
 
   void _openQuiz() {

@@ -256,6 +256,12 @@ Future<WalletRepository> walletRepository(Ref ref) async {
     services,
     bitcoinInstructions: bitcoinInstructions,
     clock: clock,
+    paymentJournalStore: setupDocuments is IoWalletRegistryDocumentStore
+        ? IoWalletPaymentJournalStore(
+            '${setupDocuments.rootPath}/payment_submissions',
+            security,
+          )
+        : null,
     rgbSetupStore: setupDocuments is IoWalletRegistryDocumentStore
         ? IoRgbWalletSetupStore(
             '${setupDocuments.rootPath}/rgb_setup',

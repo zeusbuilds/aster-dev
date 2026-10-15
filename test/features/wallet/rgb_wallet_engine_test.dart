@@ -16,6 +16,8 @@ final class MockRgbSdkFlutter extends Mock implements RgbSdkFlutter {}
 
 final class MockLocalNetworkAccess extends Mock implements LocalNetworkAccess {}
 
+final class MockEvmChainValidator extends Mock implements EvmChainValidator {}
+
 const _nodePublicKey =
     '020000000000000000000000000000000000000000000000000000000000000000';
 
@@ -184,6 +186,60 @@ void main() {
             as UtexoUnlockConfig;
     expect(unlock.ethRpcUrl, configured.ethRpcUrl);
   });
+
+  test(
+    'wrong BFA chain cannot dispatch native initialization or unlock',
+    () async {
+      const configured = WalletServiceConfiguration(
+        environment: BlockchainEnvironment.mainnet,
+        sdkNetwork: 'mainnet',
+        indexerUrl: 'https://indexer.aster-wallet.com',
+        rgbTransportProxy: 'rpcs://rgb.aster-wallet.com',
+        ethRpcUrl: 'https://rpc.aster-wallet.com',
+        ethChainId: '42161',
+        usdtAsset: RgbAssetConfiguration(
+          contractId: 'rgb:deployment-owned-contract',
+          precision: 6,
+        ),
+      );
+      final sdk = MockRgbSdkFlutter();
+      final wallet = MockUtexoWallet();
+      final chain = MockEvmChainValidator();
+      final access = MockLocalNetworkAccess();
+      when(() => sdk.wallet(config: any(named: 'config'))).thenReturn(wallet);
+      when(() => access.ensureFor(configured)).thenAnswer((_) async {});
+      when(() => chain.verify(configured))
+          .thenThrow(const AppConfigurationException());
+      final engine =
+          RgbWalletEngineFactory.withSdk(
+            sdk,
+            localNetworkAccess: access,
+            evmChainValidator: chain,
+          ).create(
+            const WalletEngineConfiguration(
+              storageDirectory: '/wallet',
+              services: configured,
+            ),
+          );
+      await expectLater(
+        engine.provision(
+          databasePassword: 'test-password',
+          mnemonic: 'test-only phrase',
+        ),
+        throwsA(isA<AppConfigurationException>()),
+      );
+      await expectLater(
+        engine.openPersisted(databasePassword: 'test-password'),
+        throwsA(isA<AppConfigurationException>()),
+      );
+      verify(() => chain.verify(configured)).called(2);
+      verifyZeroInteractions(wallet);
+      final resolved = RgbWalletServiceConfigurationResolver.resolve(
+        configured,
+      );
+      expect(resolved.ethChainId, configured.ethChainId);
+    },
+  );
 
   test(
     'mainnet reads onchain balances and history without Lightning APIs',
@@ -1181,7 +1237,13 @@ void main() {
           feeRate: _feeRate(1),
         ),
       ),
-      throwsA(isA<WalletValidationException>()),
+      throwsA(
+        isA<WalletPaymentRejectedBeforeDispatchException>().having(
+          (error) => error.failure.kind,
+          'normalized failure',
+          AppFailureKind.validation,
+        ),
+      ),
     );
     verifyNever(
       () => wallet.sendBtc(
@@ -1238,7 +1300,13 @@ void main() {
           services,
           UtexoUnlockConfig(),
         ).sendPayment(command),
-        throwsA(isA<WalletValidationException>()),
+        throwsA(
+          isA<WalletPaymentRejectedBeforeDispatchException>().having(
+            (error) => error.failure.kind,
+            'normalized failure',
+            AppFailureKind.validation,
+          ),
+        ),
       );
       await expectLater(
         RgbWalletEngine(
@@ -1795,7 +1863,7 @@ void main() {
             amount: amount,
           ),
         ),
-        throwsA(isA<WalletValidationException>()),
+        throwsA(isA<WalletPaymentRejectedBeforeDispatchException>()),
       );
       await expectLater(
         engine.decodeInvoice(bitcoinRoute, 'lntb1wrongnetwork'),

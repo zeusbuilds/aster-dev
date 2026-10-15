@@ -653,7 +653,7 @@ void main() {
   );
 
   test(
-    'create copies, provisions, clears, and adopts the exact wallet',
+    'create keeps phrase offline, provisions, and adopts the exact wallet',
     () async {
       final harness = await OnboardingTestHarness.create();
       addTearDown(harness.dispose);
@@ -674,8 +674,8 @@ void main() {
       );
       _completeCreateQuiz(notifier, generated);
       notifier.updateWalletName('Daily wallet');
-      expect(await notifier.copyMnemonic(), isA<AppSuccess<void>>());
-      expect(harness.clipboardText, validTestMnemonic);
+      expect(await notifier.copyMnemonic(), isA<AppFailureResult<void>>());
+      expect(harness.clipboardText, isEmpty);
       expect(await notifier.submit(), isTrue);
       await _waitFor(() => harness.clipboardText.isEmpty);
 
@@ -692,10 +692,7 @@ void main() {
             ?.name,
         'Daily wallet',
       );
-      expect(
-        harness.haptics.intents,
-        containsAll([HapticIntent.lightImpact, HapticIntent.success]),
-      );
+      expect(harness.haptics.intents, contains(HapticIntent.success));
       for (final key in harness.preferences.getKeys()) {
         expect(
           harness.preferences.get(key).toString(),
@@ -706,12 +703,9 @@ void main() {
   );
 
   test(
-    'create serializes copy and disables provisioning until it settles',
+    'direct recovery-copy calls stay disabled without blocking provisioning',
     () async {
-      final clipboardGate = Completer<void>();
-      final harness = await OnboardingTestHarness.create(
-        clipboardWriteGate: clipboardGate,
-      );
+      final harness = await OnboardingTestHarness.create();
       addTearDown(harness.dispose);
       final subscription = harness.container.listen(
         createWalletViewModelProvider,
@@ -728,21 +722,18 @@ void main() {
       );
       _completeCreateQuiz(notifier, generated);
       notifier.updateWalletName('Daily wallet');
-
-      final copy = notifier.copyMnemonic();
+      final result = await notifier.copyMnemonic();
+      expect(result, isA<AppFailureResult<void>>());
       expect(
-        harness.container.read(createWalletViewModelProvider).value?.copying,
-        isTrue,
+        (result as AppFailureResult<void>).failure.code,
+        'sensitive_clipboard_disabled',
       );
-      expect(await notifier.submit(), isFalse);
-      expect(await notifier.copyMnemonic(), isA<AppFailureResult<void>>());
-
-      clipboardGate.complete();
-      expect(await copy, isA<AppSuccess<void>>());
+      expect(harness.clipboardText, isEmpty);
       expect(
         harness.container.read(createWalletViewModelProvider).value?.copying,
         isFalse,
       );
+      expect(await notifier.submit(), isTrue);
     },
   );
 
@@ -789,7 +780,7 @@ void main() {
   });
 
   test(
-    'create blocks outcome-unknown replay but keeps phrase copy available',
+    'create blocks outcome-unknown replay and keeps phrase offline',
     () async {
       final harness = await OnboardingTestHarness.create();
       addTearDown(harness.dispose);
@@ -822,14 +813,14 @@ void main() {
           .read(createWalletViewModelProvider)
           .requireValue;
       expect(failed.canSubmit, isFalse);
-      expect(failed.canCopy, isTrue);
+      expect(failed.canContinue, isTrue);
       expect(failed.words, validTestMnemonicWords);
       final callsAfterFailure = List<String>.of(harness.engine.calls);
 
-      expect(await notifier.copyMnemonic(), isA<AppSuccess<void>>());
+      expect(await notifier.copyMnemonic(), isA<AppFailureResult<void>>());
       expect(await notifier.submit(), isFalse);
 
-      expect(harness.clipboardText, validTestMnemonic);
+      expect(harness.clipboardText, isEmpty);
       expect(harness.engine.calls, callsAfterFailure);
       expect(
         harness.engine.calls.where((call) => call == 'provision'),
@@ -839,7 +830,7 @@ void main() {
   );
 
   test(
-    'create blocks known retained-resource replay but keeps phrase copy',
+    'create blocks retained-resource replay and keeps phrase offline',
     () async {
       final harness = await OnboardingTestHarness.create();
       addTearDown(harness.dispose);
@@ -874,13 +865,13 @@ void main() {
       expect(failed.failure?.requiresReconciliation, isTrue);
       expect(failed.failure?.outcomeUnknown, isFalse);
       expect(failed.canSubmit, isFalse);
-      expect(failed.canCopy, isTrue);
+      expect(failed.canContinue, isTrue);
       final callsAfterFailure = List<String>.of(harness.engine.calls);
 
-      expect(await notifier.copyMnemonic(), isA<AppSuccess<void>>());
+      expect(await notifier.copyMnemonic(), isA<AppFailureResult<void>>());
       expect(await notifier.submit(), isFalse);
 
-      expect(harness.clipboardText, validTestMnemonic);
+      expect(harness.clipboardText, isEmpty);
       expect(harness.engine.calls, callsAfterFailure);
     },
   );

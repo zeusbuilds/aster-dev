@@ -32,6 +32,7 @@ abstract final class ReleaseConfigurationKey {
   static const lspUrl = 'ASTER_LSP_URL';
   static const vssUrl = 'ASTER_VSS_URL';
   static const ethRpcUrl = 'ASTER_ETH_RPC_URL';
+  static const ethChainId = 'ASTER_ETH_CHAIN_ID';
   static const explorerUrl = 'ASTER_EXPLORER_URL';
   static const usdtAssetId = 'ASTER_USDT_ASSET_ID';
   static const usdtPrecision = 'ASTER_USDT_PRECISION';
@@ -45,6 +46,7 @@ abstract final class ReleaseConfigurationKey {
 
   static const all = <String>{
     daemonPort,
+    ethChainId,
     ethRpcUrl,
     explorerUrl,
     indexerUrl,
@@ -65,6 +67,8 @@ abstract final class ReleaseConfigurationKey {
   };
 
   static const internalRequired = <String>{
+    ethChainId,
+    ethRpcUrl,
     explorerUrl,
     indexerUrl,
     network,
@@ -145,6 +149,12 @@ final class ReleaseConfigurationManifest {
     }
 
     _validateNetwork(values[ReleaseConfigurationKey.network]!);
+    if (audience == ReleaseAudience.publicDistribution &&
+        values[ReleaseConfigurationKey.network] != 'mainnet') {
+      throw const FormatException(
+        'Public distribution requires ASTER_NETWORK=mainnet.',
+      );
+    }
     final daemonPort = _validateListenerPort(
       values[ReleaseConfigurationKey.daemonPort] ?? '9735',
     );
@@ -175,6 +185,14 @@ final class ReleaseConfigurationManifest {
       values[ReleaseConfigurationKey.usdtAssetId]!,
       values[ReleaseConfigurationKey.usdtPrecision]!,
     );
+    final expectedEvmChain = values[ReleaseConfigurationKey.ethChainId]!;
+    if (expectedEvmChain.length > 78 ||
+        !RegExp(r'^[1-9][0-9]*$').hasMatch(expectedEvmChain) ||
+        BigInt.parse(expectedEvmChain).bitLength > 256) {
+      throw const FormatException(
+        'ASTER_ETH_CHAIN_ID must be a canonical positive decimal uint256.',
+      );
+    }
 
     final market = values[ReleaseConfigurationKey.marketApiBaseUrl];
     if (market != null) {

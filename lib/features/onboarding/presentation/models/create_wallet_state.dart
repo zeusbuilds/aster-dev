@@ -118,8 +118,8 @@ final class CreateWalletState {
   final bool completed;
   final AppFailure? failure;
 
-  /// Whether the flow still owns a phrase that can be copied safely.
-  bool get canCopy => !copying && !submitting && !completed;
+  /// Whether phrase confirmation may proceed while no operation is pending.
+  bool get canContinue => !copying && !submitting && !completed;
 
   /// Whether retained or uncertain wallet resources require reconciliation.
   bool get requiresReconciliation => failure?.requiresReconciliation ?? false;

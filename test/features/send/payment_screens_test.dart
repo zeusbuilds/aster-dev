@@ -1644,13 +1644,13 @@ void main() {
           outcomeUnknown: true,
         ),
       );
-      expect(
-        await tester.runAsync(
-          harness.container.read(provider.notifier).regenerate,
-        ),
-        isFalse,
-      );
+      final regeneration = harness.container
+          .read(provider.notifier)
+          .regenerate();
+      // Keep the action in the widget zone and flush the complete repository
+      // queue, including durable-intent gates, before awaiting its result.
       await tester.pump();
+      expect(await regeneration, isFalse);
 
       final copy = tester.widget<CustomButton>(
         find.widgetWithText(CustomButton, 'Copy'),
@@ -1933,18 +1933,14 @@ void main() {
     expect(retryQuote, findsOneWidget);
     expect(tester.widget<CustomButton>(retryQuote).enabled, isFalse);
     expect(
-      find.text(
-        'The wallet did not confirm the operation in time. Check its status '
-        'before trying again.',
-      ),
+      find.text(walletPaymentSubmissionPendingFailure.userMessage),
       findsOneWidget,
     );
     expect(
       tester
           .getSemantics(
             find.bySemanticsLabel(
-              'The wallet did not confirm the operation in time. Check its '
-              'status before trying again.',
+              walletPaymentSubmissionPendingFailure.userMessage,
             ),
           )
           .flagsCollection

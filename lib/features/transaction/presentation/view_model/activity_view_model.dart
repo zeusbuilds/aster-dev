@@ -112,6 +112,13 @@ class ActivityViewModel extends _$ActivityViewModel {
       if (sync case AppFailureResult<void>(:final failure)) {
         return AppResult.failure(failure);
       }
+      // This explicit read-only check can resolve only an exact durable native
+      // receipt. An unidentified submission remains visible and fenced.
+      final reconciliation = await repository.reconcilePaymentSubmission();
+      if (reconciliation case AppFailureResult<void>(:final failure)
+          when failure.code != walletPaymentSubmissionPendingFailure.code) {
+        return AppResult.failure(failure);
+      }
       return await repository.activityFeed(kind);
     } catch (error, stackTrace) {
       return AppResult.failure(FailureMapper.from(error, stackTrace));

@@ -56,6 +56,28 @@ void main() {
     expect(result.exportCount, 0);
   });
 
+  test('EVM HTTP access is confined to the dedicated network adapter', () {
+    _write(
+      repository,
+      'lib/core/network/http_evm_chain_validator.dart',
+      "import 'package:http/http.dart';",
+    );
+    expect(verifyArchitecture(repository).passed, isTrue);
+    _write(
+      repository,
+      'lib/core/config/evm_chain_validator.dart',
+      "import 'package:http/http.dart';",
+    );
+    final result = verifyArchitecture(repository);
+    expect(result.passed, isFalse);
+    expect(result.failures, hasLength(1));
+    expect(
+      result.failures.single,
+      contains('lib/core/config/evm_chain_validator.dart'),
+    );
+    expect(result.failures.single, contains('package:http is infrastructure'));
+  });
+
   test('applies ownership and layer policy to every export URI', () {
     _write(
       repository,

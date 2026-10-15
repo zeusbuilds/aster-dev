@@ -7,6 +7,7 @@ import 'wallet_amount.dart';
 import 'wallet_asset.dart';
 import 'wallet_balance.dart';
 import 'wallet_network.dart';
+import 'wallet_payment_submission.dart';
 
 /// Read-only history refreshes may observe independently advancing native tips.
 const walletActivityConsistencyFailure = AppFailure(
@@ -337,6 +338,7 @@ final class WalletActivityFeed {
     required this.balance,
     required this.networkStatus,
     required List<WalletActivity> activities,
+    this.paymentSubmission,
   }) : activities = List<WalletActivity>.unmodifiable(activities) {
     final ids = <String>{};
     for (var index = 0; index < this.activities.length; index += 1) {
@@ -367,6 +369,9 @@ final class WalletActivityFeed {
   final WalletBalance balance;
   final WalletNetworkStatus networkStatus;
   final List<WalletActivity> activities;
+
+  /// Durable wallet-wide send uncertainty, even when viewing another asset.
+  final WalletPaymentSubmission? paymentSubmission;
 
   /// Orders dated records newest-first and undated records last, then uses the
   /// opaque ID as a deterministic tie-breaker.
@@ -399,11 +404,16 @@ final class WalletActivityFeed {
       other is WalletActivityFeed &&
       other.balance == balance &&
       other.networkStatus == networkStatus &&
+      other.paymentSubmission == paymentSubmission &&
       listEquals(other.activities, activities);
 
   @override
-  int get hashCode =>
-      Object.hash(balance, networkStatus, Object.hashAll(activities));
+  int get hashCode => Object.hash(
+    balance,
+    networkStatus,
+    paymentSubmission,
+    Object.hashAll(activities),
+  );
 }
 
 final _activityId = RegExp(r'^activity-[0-9a-f]{64}$');

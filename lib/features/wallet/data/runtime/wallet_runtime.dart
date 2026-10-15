@@ -16,7 +16,15 @@ enum WalletRuntimePhase {
   disposed,
 }
 
-enum _ReconciliationAccess { blocked, audit, rollback, disposal }
+enum _ReconciliationAccess {
+  blocked,
+  audit,
+  paymentAudit,
+  paymentLifecycle,
+  paymentResolution,
+  rollback,
+  disposal,
+}
 
 sealed class _WalletActivation {
   const _WalletActivation();
@@ -90,8 +98,10 @@ final class WalletRuntime {
   bool _disposing = false;
   Future<AppResult<void>>? _disposeInFlight;
   String? _reconciliationRollbackWalletId;
+  bool _paymentAuditSuspended = false;
 
   WalletRuntimeSnapshot get snapshot => _snapshot;
+  WalletProfile? get activeProfile => _activeProfile;
   Stream<WalletRuntimeSnapshot> get states => _states.stream;
 
   Future<AppResult<void>> restore(WalletProfile profile) {
@@ -312,6 +322,58 @@ final class WalletRuntime {
     });
   }
 
+  bool get _hasPaymentQuarantine =>
+      _snapshot.phase == WalletRuntimePhase.failed &&
+      _snapshot.failure?.code == walletPaymentSubmissionPendingFailure.code;
+
+  /// Installs the durable send fence without discarding the native reader.
+  /// This is used only after a wallet-scoped submitting record is verified.
+  Future<AppResult<void>> retainUnresolvedPayment() => _enqueue(
+    () async => const AppResult.failure(walletPaymentSubmissionPendingFailure),
+  );
+
+  /// Narrow audit path for balance, fees, network status, and Activity. Callers
+  /// must not dispatch wallet mutations in this lease. Other reconciliation
+  /// failures retain the existing complete runtime quarantine.
+  Future<AppResult<T>> readPaymentState<T>(
+    Future<T> Function(WalletEngine engine) operation,
+  ) => _enqueue(() async {
+    final engine = _engine;
+    if (engine == null ||
+        _paymentAuditSuspended ||
+        (_snapshot.phase != WalletRuntimePhase.active &&
+            !_hasPaymentQuarantine)) {
+      return AppResult.failure(
+        const AppFailure(
+          code: 'wallet_not_ready',
+          kind: AppFailureKind.authentication,
+          userMessage: 'Open a wallet before continuing.',
+          retryable: false,
+        ),
+      );
+    }
+    try {
+      return AppResult.success(await operation(engine));
+    } catch (error, stackTrace) {
+      return AppResult.failure(FailureMapper.from(error, stackTrace));
+    }
+  }, reconciliationAccess: _ReconciliationAccess.paymentAudit);
+
+  /// Reopens mutations only after the owned journal and exact native history
+  /// agree. The callback is supplied by WalletPaymentSubmissions, not by UI.
+  Future<AppResult<void>> reconcilePaymentSubmission(
+    Future<bool> Function(WalletEngine engine) verifyExactAcceptance,
+  ) => _enqueue(() async {
+    if (!_hasPaymentQuarantine) return const AppResult.success(null);
+    final engine = _engine;
+    if (engine == null ||
+        _paymentAuditSuspended ||
+        !await verifyExactAcceptance(engine)) {
+      return const AppResult.failure(walletPaymentSubmissionPendingFailure);
+    }
+    return const AppResult.success(null);
+  }, reconciliationAccess: _ReconciliationAccess.paymentResolution);
+
   Future<AppResult<void>> sync() => run((engine) => engine.sync());
 
   Future<AppResult<void>> suspend() {
@@ -319,6 +381,14 @@ final class WalletRuntime {
       final engine = _engine;
       if (_snapshot.phase == WalletRuntimePhase.suspended ||
           _snapshot.phase == WalletRuntimePhase.inactive) {
+        return const AppResult.success(null);
+      }
+      if (_hasPaymentQuarantine && engine != null) {
+        if (!_paymentAuditSuspended) {
+          // Even a lost shutdown response revokes read leases until reopen.
+          _paymentAuditSuspended = true;
+          await engine.shutdown();
+        }
         return const AppResult.success(null);
       }
       if (_snapshot.phase == WalletRuntimePhase.failed) {
@@ -354,11 +424,28 @@ final class WalletRuntime {
       } catch (error, stackTrace) {
         return _runtimeFailure(error, stackTrace, walletId: _activeProfile?.id);
       }
-    });
+    }, reconciliationAccess: _ReconciliationAccess.paymentLifecycle);
   }
 
   Future<AppResult<void>> resume() {
     return _enqueue(() async {
+      if (_hasPaymentQuarantine && _engine != null && _activeProfile != null) {
+        if (!_paymentAuditSuspended) return const AppResult.success(null);
+        final profile = _activeProfile!;
+        final secret = await _secrets.read(
+          profile.id,
+          expectedStorageToken: profile.storageToken,
+        );
+        if (secret case AppFailureResult<WalletSecret>(:final failure)) {
+          return AppResult.failure(failure);
+        }
+        await _engine!.openPersisted(
+          databasePassword:
+              (secret as AppSuccess<WalletSecret>).value.databasePassword,
+        );
+        _paymentAuditSuspended = false;
+        return const AppResult.success(null);
+      }
       if (_snapshot case WalletRuntimeSnapshot(
         phase: WalletRuntimePhase.failed,
         failure: final failure?,
@@ -474,7 +561,7 @@ final class WalletRuntime {
         );
         return AppResult.failure(combined);
       }
-    });
+    }, reconciliationAccess: _ReconciliationAccess.paymentLifecycle);
   }
 
   Future<AppResult<String>> recoveryMnemonic(String walletId) {
@@ -973,6 +1060,9 @@ final class WalletRuntime {
         final canRun = switch (reconciliationAccess) {
           _ReconciliationAccess.blocked => false,
           _ReconciliationAccess.audit || _ReconciliationAccess.disposal => true,
+          _ReconciliationAccess.paymentAudit ||
+          _ReconciliationAccess.paymentLifecycle ||
+          _ReconciliationAccess.paymentResolution => _hasPaymentQuarantine,
           _ReconciliationAccess.rollback =>
             _reconciliationRollbackWalletId != null &&
                 _reconciliationRollbackWalletId ==
@@ -1019,11 +1109,49 @@ final class WalletRuntime {
     required String? reconciliationRollbackWalletId,
   }) {
     if (retainedSnapshot != null) {
+      if (retainedSnapshot.failure?.code ==
+              walletPaymentSubmissionPendingFailure.code &&
+          result is AppFailureResult<T> &&
+          ((result.failure.requiresReconciliation &&
+                  result.failure.code !=
+                      walletPaymentSubmissionPendingFailure.code) ||
+              access == _ReconciliationAccess.paymentLifecycle ||
+              access == _ReconciliationAccess.disposal)) {
+        // A read-only payment fence assumes the native owner is intact. Lost
+        // shutdown/reopen/disposal outcomes or a stronger native failure revoke
+        // that assumption; exact transaction history cannot repair its owner.
+        _paymentAuditSuspended = true;
+        final failure = result.failure.requiresReconciliation
+            ? result.failure
+            : AppFailure(
+                code: 'wallet_payment_owner_recovery_required',
+                kind: AppFailureKind.storage,
+                userMessage:
+                    'The wallet could not be opened or closed safely. '
+                    'Wallet access needs recovery before continuing.',
+                retryable: false,
+                requiresReconciliation: true,
+                outcomeUnknown:
+                    retainedSnapshot.failure!.outcomeUnknown ||
+                    result.failure.outcomeUnknown,
+                cause: result.failure,
+              );
+        _emit(
+          WalletRuntimeSnapshot(
+            phase: WalletRuntimePhase.failed,
+            walletId: retainedSnapshot.walletId,
+            failure: failure,
+          ),
+        );
+        return;
+      }
       if (result is AppSuccess<T> &&
           (access == _ReconciliationAccess.rollback ||
-              access == _ReconciliationAccess.disposal)) {
+              access == _ReconciliationAccess.disposal ||
+              access == _ReconciliationAccess.paymentResolution)) {
         _reconciliationRollbackWalletId = null;
-        if (access == _ReconciliationAccess.rollback) {
+        if (access == _ReconciliationAccess.rollback ||
+            access == _ReconciliationAccess.paymentResolution) {
           _emit(
             _engine != null && _activeProfile != null
                 ? WalletRuntimeSnapshot(

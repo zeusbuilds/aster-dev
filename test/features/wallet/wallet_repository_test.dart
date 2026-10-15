@@ -403,6 +403,8 @@ void main() {
             sdkNetwork: network == BlockchainEnvironment.signet
                 ? 'utexo'
                 : network.name,
+            ethRpcUrl: 'https://rpc.aster-wallet.com',
+            ethChainId: '42161',
             usdtAsset: const RgbAssetConfiguration(
               contractId: 'rgb:configured-usdt',
               precision: 6,
@@ -1794,6 +1796,7 @@ Future<_ActiveRepositoryHarness> _createActiveRepository({
       FakeWalletIdentityGenerator(walletId: walletId),
       services,
       clock: clock ?? () => fixtureTime,
+      paymentJournalStore: MemoryWalletPaymentJournalStore(),
     ),
     runtime: runtime,
     engine: selectedEngine,

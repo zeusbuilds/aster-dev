@@ -8,8 +8,44 @@ import '../../tool/verify_release_configuration.dart';
 
 void main() {
   group('ReleaseConfigurationManifest', () {
+    test('BFA release fails without RPC or an explicit canonical chain ID', () {
+      for (final key in [
+        ReleaseConfigurationKey.ethRpcUrl,
+        ReleaseConfigurationKey.ethChainId,
+      ]) {
+        final values = Map<String, String>.of(_baseValues)..remove(key);
+        expect(
+          () => ReleaseConfigurationManifest.parse(
+            _manifest(values),
+            audience: ReleaseAudience.internalBeta,
+          ),
+          throwsFormatException,
+        );
+      }
+      for (final chain in [
+        '0',
+        '-1',
+        '+1',
+        '01',
+        '0xa4b1',
+        '1.0',
+        (BigInt.one << 256).toString(),
+      ]) {
+        expect(
+          () => ReleaseConfigurationManifest.parse(
+            _manifest({
+              ..._baseValues,
+              ReleaseConfigurationKey.ethChainId: chain,
+            }),
+            audience: ReleaseAudience.internalBeta,
+          ),
+          throwsFormatException,
+          reason: chain,
+        );
+      }
+    });
     test(
-      'onchain release needs no LSP and validates optional Ethereum RPC',
+      'onchain release needs no LSP and validates required Ethereum RPC',
       () {
         final values = Map<String, String>.of(_baseValues)
           ..remove(ReleaseConfigurationKey.lspUrl);
@@ -117,6 +153,7 @@ void main() {
 
       final values = <String, String>{
         ..._baseValues,
+        ReleaseConfigurationKey.network: 'mainnet',
         ReleaseConfigurationKey.marketApiBaseUrl:
             'https://market.aster-wallet.com/api/v3/',
         ReleaseConfigurationKey.privacyUrl: 'https://aster-wallet.com/privacy',
@@ -130,6 +167,15 @@ void main() {
         ).values,
         hasLength(values.length),
       );
+      for (final network in ['signet', 'regtest']) {
+        expect(
+          () => ReleaseConfigurationManifest.parse(
+            _manifest({...values, ReleaseConfigurationKey.network: network}),
+            audience: ReleaseAudience.publicDistribution,
+          ),
+          throwsFormatException,
+        );
+      }
     });
 
     test('rejects unknown keys, non-string values, and unstable ordering', () {
@@ -289,6 +335,8 @@ String _manifest([Map<String, Object?> values = _baseValues]) {
 }
 
 const _baseValues = <String, String>{
+  ReleaseConfigurationKey.ethChainId: '42161',
+  ReleaseConfigurationKey.ethRpcUrl: 'https://rpc.aster-wallet.com',
   ReleaseConfigurationKey.explorerUrl: 'https://explorer.aster-wallet.com',
   ReleaseConfigurationKey.indexerUrl: 'ssl://indexer.aster-wallet.com:50002',
   ReleaseConfigurationKey.lspUrl: 'https://lsp.aster-wallet.com',

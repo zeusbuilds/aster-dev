@@ -11,6 +11,40 @@ import '../../support/payment_flow_harness.dart';
 import '../../support/wallet_fakes.dart';
 
 void main() {
+  test(
+    'unknown submission remains visible after explicit Activity status checks',
+    () async {
+      final engine = _engine()
+        ..feeEstimate = WalletFeeRateEstimate(
+          targetBlocks: 6,
+          satsPerVbyte: 2,
+          observedAt: DateTime.now().toUtc(),
+        )
+        ..sendPaymentError = StateError('Lost native response');
+      final h = await PaymentFlowTestHarness.create(engine: engine);
+      addTearDown(h.dispose);
+      await h.repository.sendPayment(
+        target: WalletPaymentTarget.bitcoinOnchain,
+        destination: 'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn',
+        amountUnits: 1,
+        reviewedFeeRate: engine.feeEstimate,
+      );
+      final provider = activityViewModelProvider(WalletAssetKind.bitcoin);
+      final subscription = h.container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final initial = await h.container.read(provider.future);
+      expect(initial.feed.paymentSubmission?.requiresReconciliation, isTrue);
+      expect(await h.container.read(provider.notifier).refresh(), isTrue);
+      final refreshed = h.container.read(provider).requireValue;
+      expect(refreshed.feed.paymentSubmission, initial.feed.paymentSubmission);
+      expect(refreshed.feed.paymentSubmission?.requiresReconciliation, isTrue);
+      expect(
+        engine.calls.where((call) => call == 'sendPayment:start'),
+        hasLength(1),
+      );
+    },
+  );
+
   test('loads real balance, network, and normalized activity', () async {
     final engine = _engine();
     final harness = await PaymentFlowTestHarness.create(engine: engine);

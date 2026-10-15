@@ -1,182 +1,45 @@
-import 'dart:async';
-import 'dart:convert';
-
-import 'package:crypto/crypto.dart';
-import 'package:flutter/services.dart';
-
 import '../errors/errors.dart';
 
-typedef ClipboardTextReader = Future<String?> Function();
-typedef ClipboardTextWriter = Future<void> Function(String text);
-
-/// Clipboard boundary for short-lived secret material.
+/// A fail-closed boundary for secret material, retained for existing callers.
+///
+/// Recovery phrases must be recorded offline. A process-owned expiry timer
+/// cannot guarantee removal from clipboard history or after app termination.
 abstract interface class SensitiveClipboardService {
-  /// Copies [text] and schedules a matching-content clear after [clearAfter].
   Future<AppResult<void>> copySensitive(
     String text, {
     Duration clearAfter = PlatformSensitiveClipboardService.defaultLifetime,
   });
-
-  /// Clears clipboard content only when it still matches this service's lease.
   Future<AppResult<void>> clearSensitive();
-
-  /// Releases timers and attempts a final matching-content clear.
   Future<void> dispose();
 }
 
-/// System clipboard adapter that retains only a SHA-256 digest of copied text.
+/// Secret copying is unavailable on every supported release platform.
+///
+/// No clipboard platform channel is invoked and no supplied text is retained.
+/// Enabling this later requires a separately reviewed native security policy.
 final class PlatformSensitiveClipboardService
     implements SensitiveClipboardService {
-  PlatformSensitiveClipboardService({
-    ClipboardTextReader? reader,
-    ClipboardTextWriter? writer,
-  }) : _reader = reader ?? _readSystemClipboard,
-       _writer = writer ?? _writeSystemClipboard;
+  const PlatformSensitiveClipboardService();
 
   static const defaultLifetime = Duration(minutes: 1);
-  static const clearRetryDelay = Duration(seconds: 5);
-  static const maximumSecretCharacters = 512;
-
-  final ClipboardTextReader _reader;
-  final ClipboardTextWriter _writer;
-  Timer? _clearTimer;
-  List<int>? _leasedDigest;
-  Future<void> _operationTail = Future<void>.value();
-  var _pendingOperations = 0;
-  bool _disposed = false;
 
   @override
   Future<AppResult<void>> copySensitive(
     String text, {
     Duration clearAfter = defaultLifetime,
-  }) {
-    return _enqueue(() => _copyUnsafe(text, clearAfter: clearAfter));
-  }
-
-  Future<AppResult<void>> _copyUnsafe(
-    String text, {
-    required Duration clearAfter,
-  }) async {
-    if (_disposed || text.isEmpty || text.length > maximumSecretCharacters) {
-      return AppResult.failure(_invalidRequestFailure());
-    }
-    if (clearAfter <= Duration.zero) {
-      return AppResult.failure(_invalidRequestFailure());
-    }
-    final previousClear = await _clearUnsafe();
-    if (previousClear is AppFailureResult<void>) return previousClear;
-    try {
-      await _writer(text);
-      _leasedDigest = _digest(text);
-      _clearTimer?.cancel();
-      _clearTimer = Timer(clearAfter, () => unawaited(clearSensitive()));
-      return const AppResult<void>.success(null);
-    } catch (error, stackTrace) {
-      _leasedDigest = null;
-      _clearTimer?.cancel();
-      _clearTimer = null;
-      return _failure('clipboard_write_failed', error, stackTrace);
-    }
-  }
-
-  @override
-  Future<AppResult<void>> clearSensitive() => _enqueue(_clearUnsafe);
-
-  Future<AppResult<void>> _clearUnsafe() async {
-    _clearTimer?.cancel();
-    _clearTimer = null;
-    final expected = _leasedDigest;
-    if (expected == null) return const AppResult<void>.success(null);
-    try {
-      final current = await _reader();
-      if (current != null &&
-          current.length <= maximumSecretCharacters &&
-          _constantTimeEquals(_digest(current), expected)) {
-        await _writer('');
-      }
-      if (identical(_leasedDigest, expected)) _leasedDigest = null;
-      return const AppResult<void>.success(null);
-    } catch (error, stackTrace) {
-      if (!_disposed && identical(_leasedDigest, expected)) {
-        _clearTimer = Timer(clearRetryDelay, () => unawaited(clearSensitive()));
-      }
-      return _failure('clipboard_clear_failed', error, stackTrace);
-    }
-  }
-
-  @override
-  Future<void> dispose() async {
-    if (_disposed) return;
-    _disposed = true;
-    if (_pendingOperations == 0) {
-      await _clearUnsafe();
-      return;
-    }
-    await _enqueue(_clearUnsafe);
-  }
-
-  Future<AppResult<void>> _enqueue(
-    Future<AppResult<void>> Function() operation,
-  ) {
-    final completer = Completer<AppResult<void>>();
-    _pendingOperations += 1;
-    _operationTail = _operationTail.then((_) async {
-      try {
-        completer.complete(await operation());
-      } catch (error, stackTrace) {
-        completer.complete(
-          _failure('clipboard_operation_failed', error, stackTrace),
-        );
-      } finally {
-        _pendingOperations -= 1;
-      }
-    });
-    return completer.future;
-  }
-
-  static AppFailure _invalidRequestFailure() {
-    return const AppFailure(
-      code: 'clipboard_request_invalid',
-      kind: AppFailureKind.validation,
-      userMessage: 'The recovery phrase could not be copied safely.',
+  }) async => const AppResult<void>.failure(
+    AppFailure(
+      code: 'sensitive_clipboard_disabled',
+      kind: AppFailureKind.unsupported,
+      userMessage: 'Write your recovery phrase down and keep it offline.',
       retryable: false,
-    );
-  }
+    ),
+  );
 
-  static AppResult<void> _failure(
-    String code,
-    Object error,
-    StackTrace stackTrace,
-  ) {
-    return AppResult.failure(
-      AppFailure(
-        code: code,
-        kind: AppFailureKind.unavailable,
-        userMessage: 'The recovery phrase could not be copied safely.',
-        retryable: true,
-        cause: FailureMapper.diagnosticCause(error),
-        stackTrace: stackTrace,
-      ),
-    );
-  }
+  @override
+  Future<AppResult<void>> clearSensitive() async =>
+      const AppResult<void>.success(null);
 
-  static List<int> _digest(String text) =>
-      sha256.convert(utf8.encode(text)).bytes;
-
-  static bool _constantTimeEquals(List<int> left, List<int> right) {
-    if (left.length != right.length) return false;
-    var difference = 0;
-    for (var index = 0; index < left.length; index += 1) {
-      difference |= left[index] ^ right[index];
-    }
-    return difference == 0;
-  }
-
-  static Future<String?> _readSystemClipboard() async {
-    return (await Clipboard.getData(Clipboard.kTextPlain))?.text;
-  }
-
-  static Future<void> _writeSystemClipboard(String text) {
-    return Clipboard.setData(ClipboardData(text: text));
-  }
+  @override
+  Future<void> dispose() async {}
 }

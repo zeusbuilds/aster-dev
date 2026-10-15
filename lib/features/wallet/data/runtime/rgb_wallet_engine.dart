@@ -5,8 +5,10 @@ import 'package:flutter/foundation.dart';
 import 'package:rgb_sdk_flutter/rgb_sdk_flutter.dart';
 
 import '../../../../core/config/app_environment.dart';
+import '../../../../core/config/evm_chain_validator.dart';
 import '../../../../core/errors/app_failure.dart';
 import '../../../../core/errors/failure_mapper.dart';
+import '../../../../core/network/http_evm_chain_validator.dart';
 import '../../../../core/platform/local_network_access.dart';
 import '../../domain/models/models.dart';
 import '../../domain/validation/validation.dart';
@@ -53,6 +55,7 @@ abstract final class RgbWalletServiceConfigurationResolver {
           (configured.sdkNetwork == 'utexo' ? _utexoSignetLspBaseUrl : null),
       vssUrl: configured.vssUrl,
       ethRpcUrl: configured.ethRpcUrl,
+      ethChainId: configured.ethChainId,
       explorerBaseUrl: configured.explorerBaseUrl,
       usdtAsset: configured.usdtAsset,
     );
@@ -69,6 +72,7 @@ final class RgbWalletEngineFactory implements WalletEngineFactory {
     : _sdk = const RgbSdkFlutter(),
       _bitcoinAddresses = const BitcoinPaymentInstructionParser(),
       _localNetworkAccess = null,
+      _evmChainValidator = const HttpEvmChainValidator(),
       utcClock = null;
 
   /// Production constructor for sharing the app-owned validation boundary.
@@ -76,6 +80,7 @@ final class RgbWalletEngineFactory implements WalletEngineFactory {
     this._bitcoinAddresses, {
     this.utcClock,
     this._localNetworkAccess,
+    this._evmChainValidator = const HttpEvmChainValidator(),
   }) : _sdk = const RgbSdkFlutter();
 
   /// Test seam for proving stable-SDK forwarding without global state.
@@ -83,11 +88,13 @@ final class RgbWalletEngineFactory implements WalletEngineFactory {
     this._sdk, {
     this._bitcoinAddresses = const BitcoinPaymentInstructionParser(),
     this._localNetworkAccess,
+    this._evmChainValidator = const HttpEvmChainValidator(),
   }) : utcClock = null;
 
   final RgbSdkFlutter _sdk;
   final BitcoinAddressValidator _bitcoinAddresses;
   final LocalNetworkAccess? _localNetworkAccess;
+  final EvmChainValidator _evmChainValidator;
 
   /// UTC time source forwarded to each created adapter.
   final DateTime Function()? utcClock;
@@ -120,6 +127,7 @@ final class RgbWalletEngineFactory implements WalletEngineFactory {
       clock: utcClock,
       bitcoinAddresses: _bitcoinAddresses,
       localNetworkAccess: _localNetworkAccess,
+      evmChainValidator: _evmChainValidator,
     );
   }
 }
@@ -154,6 +162,7 @@ final class RgbWalletEngine implements WalletEngine, RgbSetupWalletEngine {
     DateTime Function()? clock,
     this._bitcoinAddresses = const BitcoinPaymentInstructionParser(),
     LocalNetworkAccess? localNetworkAccess,
+    this._evmChainValidator = const HttpEvmChainValidator(),
   }) : _clock = clock ?? _utcNow,
        _localNetworkAccess = localNetworkAccess ?? PlatformLocalNetworkAccess();
 
@@ -168,6 +177,7 @@ final class RgbWalletEngine implements WalletEngine, RgbSetupWalletEngine {
   final DateTime Function() _clock;
   final BitcoinAddressValidator _bitcoinAddresses;
   final LocalNetworkAccess _localNetworkAccess;
+  final EvmChainValidator _evmChainValidator;
 
   // RLN 0.17 has no Lightning runtime on mainnet; querying its Lightning-only
   // endpoints fails with 403. Never hide a real network error as an empty list.
@@ -180,6 +190,7 @@ final class RgbWalletEngine implements WalletEngine, RgbSetupWalletEngine {
     required String mnemonic,
   }) async {
     await _localNetworkAccess.ensureFor(_services);
+    await _evmChainValidator.verify(_services);
     await _wallet.init(password: databasePassword, mnemonic: mnemonic);
     await _wallet.unlock(password: databasePassword, config: _unlockConfig);
   }
@@ -187,6 +198,7 @@ final class RgbWalletEngine implements WalletEngine, RgbSetupWalletEngine {
   @override
   Future<void> openPersisted({required String databasePassword}) async {
     await _localNetworkAccess.ensureFor(_services);
+    await _evmChainValidator.verify(_services);
     await _wallet.reinit(
       password: databasePassword,
       unlockConfig: _unlockConfig,
@@ -473,14 +485,26 @@ final class RgbWalletEngine implements WalletEngine, RgbSetupWalletEngine {
 
   @override
   Future<WalletSendResult> sendPayment(WalletSendCommand command) async {
-    final route = command.route;
-    _requireConfiguredRoute(route);
-    return switch (route.target) {
-      WalletPaymentTarget.bitcoinOnchain => _sendBitcoin(command),
-      WalletPaymentTarget.usdtOnchain => _sendRgb(command),
-      WalletPaymentTarget.bitcoinLightning ||
-      WalletPaymentTarget.usdtLightning => _sendLightning(command),
-    };
+    try {
+      final route = command.route;
+      _requireConfiguredRoute(route);
+      return await (switch (route.target) {
+        WalletPaymentTarget.bitcoinOnchain => _sendBitcoin(command),
+        WalletPaymentTarget.usdtOnchain => _sendRgb(command),
+        WalletPaymentTarget.bitcoinLightning ||
+        WalletPaymentTarget.usdtLightning => _sendLightning(command),
+      });
+    } catch (error, stackTrace) {
+      if (_isConfirmedPaymentRejection(error)) {
+        Error.throwWithStackTrace(
+          WalletPaymentRejectedBeforeDispatchException(
+            FailureMapper.from(error, stackTrace),
+          ),
+          stackTrace,
+        );
+      }
+      rethrow;
+    }
   }
 
   Future<WalletReceiveRequest> _createBitcoinReceive(

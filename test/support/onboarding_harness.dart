@@ -66,7 +66,6 @@ final class OnboardingTestHarness {
   static Future<OnboardingTestHarness> create({
     Object? generationError,
     Object? validationError,
-    Completer<void>? clipboardWriteGate,
     ResilientHttpClient? httpClient,
   }) async {
     SharedPreferences.setMockInitialValues({});
@@ -98,14 +97,7 @@ final class OnboardingTestHarness {
       SecureWalletIdentityGenerator(random: Random(7)),
       services,
     );
-    var clipboardText = '';
-    final clipboard = PlatformSensitiveClipboardService(
-      reader: () async => clipboardText,
-      writer: (text) async {
-        await clipboardWriteGate?.future;
-        clipboardText = text;
-      },
-    );
+    const clipboard = PlatformSensitiveClipboardService();
     final haptics = RecordingHapticFeedbackService();
     final toasts = RecordingToastPresentationService();
     final container = ProviderContainer(
@@ -132,7 +124,7 @@ final class OnboardingTestHarness {
       preferences: preferences,
       haptics: haptics,
       toasts: toasts,
-      readClipboard: () => clipboardText,
+      readClipboard: () => '',
     );
   }
 

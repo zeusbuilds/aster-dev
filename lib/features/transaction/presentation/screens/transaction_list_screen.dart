@@ -147,6 +147,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
                   now: _now,
                   formatter: TransactionListScreen._formatter,
                   onOpenDetails: navigation.inFlight ? null : openDetails,
+                  onCheckPaymentStatus: () => unawaited(refresh()),
                 ),
               ),
             ),
@@ -165,6 +166,7 @@ class _ActivityBody extends StatelessWidget {
     required this.now,
     required this.formatter,
     required this.onOpenDetails,
+    required this.onCheckPaymentStatus,
   });
 
   final AsyncValue<ActivityState> activity;
@@ -173,6 +175,7 @@ class _ActivityBody extends StatelessWidget {
   final DateTime now;
   final ActivityDisplayFormatter formatter;
   final ValueChanged<String>? onOpenDetails;
+  final VoidCallback onCheckPaymentStatus;
 
   @override
   Widget build(BuildContext context) {
@@ -195,6 +198,16 @@ class _ActivityBody extends StatelessWidget {
     final state = activity.requireValue;
     final preferences = settings.requireValue.snapshot.preferences;
     final records = state.feed.activities;
+    final submission = state.feed.paymentSubmission;
+    final acceptedReceipt =
+        submission?.phase == WalletPaymentSubmissionPhase.accepted &&
+            submission?.requiresReconciliation == false &&
+            submission?.command.route.asset == state.feed.balance.asset &&
+            !records.any(
+              (record) => record.txid == submission?.result?.referenceId,
+            )
+        ? submission?.result
+        : null;
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
@@ -214,6 +227,73 @@ class _ActivityBody extends StatelessWidget {
             ),
           ),
         ),
+        if (state.feed.paymentSubmission?.requiresReconciliation == true)
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(
+              context.spacing.screenPadding,
+              context.spacing.lg,
+              context.spacing.screenPadding,
+              context.spacing.none,
+            ),
+            sliver: SliverToBoxAdapter(
+              child: Semantics(
+                liveRegion: true,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Payment status needs checking',
+                      style: context.type.rowTitle,
+                    ),
+                    SizedBox(height: context.spacing.sm),
+                    Text(
+                      'Your previous send may have completed. Sending and wallet '
+                      'changes stay blocked until its status is confirmed. '
+                      'Checking status never sends another payment. If the status '
+                      'stays unknown, contact support; restarting will not resolve it.',
+                      style: context.type.rowMeta,
+                    ),
+                    SizedBox(height: context.spacing.md),
+                    CustomButton(
+                      text: 'Check payment status',
+                      onTap: onCheckPaymentStatus,
+                      variant: ButtonVariant.secondary,
+                      loading: state.refreshing,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        if (acceptedReceipt != null)
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(
+              context.spacing.screenPadding,
+              context.spacing.lg,
+              context.spacing.screenPadding,
+              context.spacing.none,
+            ),
+            sliver: SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Previous send submitted', style: context.type.rowTitle),
+                  SizedBox(height: context.spacing.sm),
+                  Text(
+                    'Your wallet accepted this send and saved its transaction '
+                    'receipt. Activity may take a moment to show the transfer. '
+                    'Check this transaction before sending again.',
+                    style: context.type.rowMeta,
+                  ),
+                  SizedBox(height: context.spacing.sm),
+                  SelectableText(
+                    acceptedReceipt.referenceId,
+                    style: context.type.rowMeta,
+                  ),
+                ],
+              ),
+            ),
+          ),
         SliverPadding(
           padding: EdgeInsets.fromLTRB(
             context.spacing.screenPadding,

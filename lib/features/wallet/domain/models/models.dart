@@ -8,6 +8,7 @@ export 'wallet_balance.dart';
 export 'wallet_fee.dart';
 export 'wallet_network.dart';
 export 'wallet_payment.dart';
+export 'wallet_payment_submission.dart';
 export 'wallet_portfolio.dart';
 export 'wallet_profile.dart';
 export 'wallet_registry.dart';

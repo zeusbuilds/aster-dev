@@ -22,6 +22,89 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets(
+    'Activity retains an accepted receipt before native history catches up',
+    (tester) async {
+      final now = DateTime.now().toUtc();
+      final engine = FakeWalletEngine()
+        ..feeEstimate = WalletFeeRateEstimate(
+          targetBlocks: 6,
+          satsPerVbyte: 2,
+          observedAt: now,
+        );
+      final harness = await _harness(engine: engine, clock: () => now);
+      addTearDown(() => _disposeHarness(tester, harness));
+      final result = await harness.repository.sendPayment(
+        target: WalletPaymentTarget.bitcoinOnchain,
+        destination: 'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn',
+        amountUnits: 1,
+        reviewedFeeRate: engine.feeEstimate,
+      );
+      expect(result, isA<AppSuccess<WalletSendResult>>());
+      await _pump(
+        tester,
+        harness,
+        const TransactionListScreen(assetKind: WalletAssetKind.bitcoin),
+        textScaler: const TextScaler.linear(2),
+      );
+      await _pumpUntil(
+        tester,
+        () => find.text('Previous send submitted').evaluate().isNotEmpty,
+      );
+      expect(find.text('b' * 64), findsOneWidget);
+      expect(find.text('Check payment status'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Activity exposes unknown submission and checks status without sending',
+    (tester) async {
+      final now = DateTime.now().toUtc();
+      final engine = FakeWalletEngine()
+        ..feeEstimate = WalletFeeRateEstimate(
+          targetBlocks: 6,
+          satsPerVbyte: 2,
+          observedAt: now,
+        )
+        ..sendPaymentError = StateError('Lost native response');
+      final harness = await _harness(engine: engine, clock: () => now);
+      addTearDown(() => _disposeHarness(tester, harness));
+      await harness.repository.sendPayment(
+        target: WalletPaymentTarget.bitcoinOnchain,
+        destination: 'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn',
+        amountUnits: 1,
+        reviewedFeeRate: engine.feeEstimate,
+      );
+      await _pump(
+        tester,
+        harness,
+        const TransactionListScreen(assetKind: WalletAssetKind.bitcoin),
+      );
+      await _pumpUntil(
+        tester,
+        () => find.text('Payment status needs checking').evaluate().isNotEmpty,
+      );
+      expect(find.text('Check payment status'), findsOneWidget);
+      await tester.ensureVisible(find.text('Check payment status'));
+      await tester.tap(find.text('Check payment status'));
+      await tester.pump();
+      await _pumpUntil(
+        tester,
+        () => !harness.container
+            .read(activityViewModelProvider(WalletAssetKind.bitcoin))
+            .requireValue
+            .refreshing,
+      );
+      expect(find.text('Payment status needs checking'), findsOneWidget);
+      expect(
+        engine.calls.where((call) => call == 'sendPayment:start'),
+        hasLength(1),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'UXA-013 details retain content through refresh, failure and recovery',
     (tester) async {
       final pending = WalletActivity(

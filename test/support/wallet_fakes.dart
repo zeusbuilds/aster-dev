@@ -74,6 +74,35 @@ final class MemoryWalletRegistryDocumentStore
   }
 }
 
+final class MemoryWalletPaymentJournalStore
+    implements WalletPaymentJournalStore {
+  final documents = <String, String>{};
+  final writes = <String>[];
+  Object? readError;
+  int? failWriteNumber;
+  bool commitBeforeError = false;
+  void Function(String walletId, String document)? onWrite;
+
+  @override
+  Future<String?> read(String walletId) async {
+    if (readError case final Object error) throw error;
+    return documents[walletId];
+  }
+
+  @override
+  Future<void> write(String walletId, String document) async {
+    writes.add(document);
+    if (writes.length == failWriteNumber) {
+      if (commitBeforeError) documents[walletId] = document;
+      throw DurableStorageCommitException([
+        StateError('Injected write failure'),
+      ]);
+    }
+    documents[walletId] = document;
+    onWrite?.call(walletId, document);
+  }
+}
+
 final class MemoryWalletStorageSecurity implements WalletStorageSecurity {
   final preparedRoots = <String>[];
   final createdDirectories = <String>[];
@@ -343,7 +372,10 @@ final class FakeWalletEngine implements WalletEngine {
         WalletSendResult(
           route: command.route,
           amount: command.amount,
-          referenceId: 'payment-reference',
+          referenceId: 'b' * 64,
+          batchTransferIndex: command.route.asset.kind == WalletAssetKind.usdt
+              ? 1
+              : null,
           status: WalletPaymentStatus.pending,
         );
   }
@@ -462,12 +494,19 @@ final class FakeWalletIdentityGenerator implements WalletIdentityGenerator {
   final String walletId;
   final String password;
   final String storageToken;
+  int _storageTokenSequence = 0;
 
   @override
   String newDatabasePassword() => password;
 
   @override
-  String newStorageToken() => storageToken;
+  String newStorageToken() {
+    final index = _storageTokenSequence++;
+    if (index == 0) return storageToken;
+    return (BigInt.parse(storageToken, radix: 16) + BigInt.from(index))
+        .toRadixString(16)
+        .padLeft(32, '0');
+  }
 
   @override
   String newWalletId() => walletId;

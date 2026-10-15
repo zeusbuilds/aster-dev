@@ -4,6 +4,7 @@ import '../../domain/models/models.dart';
 import '../../domain/validation/validation.dart';
 import '../runtime/runtime.dart';
 import '../validation/validation.dart';
+import 'wallet_payment_submissions.dart';
 
 /// Generic queue callback supplied only by the owning wallet repository.
 typedef WalletSerializedOperationRunner = Future<AppResult<T>> Function<T>(
@@ -24,6 +25,7 @@ final class WalletPaymentOperations {
     this._runSerialized, {
     this.beforeOnchainMutation,
     required this._clock,
+    required this._submissions,
   });
 
   final WalletRuntime _runtime;
@@ -32,6 +34,7 @@ final class WalletPaymentOperations {
   final WalletSerializedOperationRunner _runSerialized;
   final Future<AppResult<void>> Function()? beforeOnchainMutation;
   final DateTime Function() _clock;
+  final WalletPaymentSubmissions _submissions;
 
   static const standardFeeTargetBlocks = 6;
   static const _activityTipRevalidationAttempts = 3;
@@ -115,7 +118,8 @@ final class WalletPaymentOperations {
     }
     final route = (routeResult as AppSuccess<PaymentRoute>).value;
     return _runSerialized(
-      () => _runtime.run((engine) => engine.getBalance(route.asset)),
+      () =>
+          _runtime.readPaymentState((engine) => engine.getBalance(route.asset)),
     );
   }
 
@@ -127,14 +131,16 @@ final class WalletPaymentOperations {
       return Future.value(AppResult.failure(_invalidFeeTargetFailure()));
     }
     return _runSerialized(
-      () => _runtime.run((engine) => engine.estimateFeeRate(targetBlocks)),
+      () => _runtime.readPaymentState(
+        (engine) => engine.estimateFeeRate(targetBlocks),
+      ),
     );
   }
 
   Future<AppResult<WalletPortfolio>> portfolio() {
     final usdtRoute = resolveTarget(WalletPaymentTarget.usdtOnchain);
     return _runSerialized(
-      () => _runtime.run((engine) async {
+      () => _runtime.readPaymentState((engine) async {
         final bitcoin = await engine.getBalance(WalletAsset.bitcoin);
         final WalletBalance? usdt;
         if (usdtRoute case AppSuccess<PaymentRoute>(:final value)) {
@@ -158,7 +164,7 @@ final class WalletPaymentOperations {
     }
     final asset = (routeResult as AppSuccess<PaymentRoute>).value.asset;
     return _runSerialized(
-      () => _runtime.run((engine) async {
+      () => _runtime.readPaymentState((engine) async {
         // History reads sync the on-chain wallet. Its new confirmations can
         // precede the independent Lightning tip, so sample that tip last.
         final activities = await engine.listActivity(asset);
@@ -184,7 +190,15 @@ final class WalletPaymentOperations {
             throw const AppFailureException(walletActivityConsistencyFailure);
           }
         }
+        final submission = await _submissions.status();
+        if (submission case AppFailureResult<WalletPaymentSubmission?>(
+          :final failure,
+        )) {
+          throw AppFailureException(failure);
+        }
         return WalletActivityFeed(
+          paymentSubmission:
+              (submission as AppSuccess<WalletPaymentSubmission?>).value,
           balance: balance,
           networkStatus: networkStatus,
           activities: activities,
@@ -232,7 +246,7 @@ final class WalletPaymentOperations {
       final instruction =
           (parsed as AppSuccess<BitcoinLightningInstruction>).value;
       return _runSerialized(() async {
-        final decoded = await _runtime.run(
+        final decoded = await _runtime.readPaymentState(
           (engine) => engine.decodeInvoice(route, instruction.invoice),
         );
         return switch (decoded) {
@@ -251,7 +265,9 @@ final class WalletPaymentOperations {
       return Future.value(AppResult.failure(_invalidDestinationFailure()));
     }
     return _runSerialized(
-      () => _runtime.run((engine) => engine.decodeInvoice(route, destination)),
+      () => _runtime.readPaymentState(
+        (engine) => engine.decodeInvoice(route, destination),
+      ),
     );
   }
 
@@ -274,7 +290,7 @@ final class WalletPaymentOperations {
     }
     final amount = (amountResult as AppSuccess<WalletAmount?>).value;
     return _runSerialized(() async {
-      if (target == WalletPaymentTarget.usdtOnchain) {
+      if (route.rail == PaymentRail.onchain) {
         final gate = await beforeOnchainMutation?.call();
         if (gate case AppFailureResult<void>(:final failure)) {
           return AppResult.failure(failure);
@@ -377,7 +393,8 @@ final class WalletPaymentOperations {
               fresh.targetBlocks != reviewed.targetBlocks) {
             throw const AppFailureException(walletFeeReviewChangedFailure);
           }
-          return engine.sendPayment(
+          return _submissions.dispatch(
+            engine,
             WalletSendCommand(
               route: route,
               destination: submissionDestination,

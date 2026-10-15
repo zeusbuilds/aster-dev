@@ -10,6 +10,12 @@ import 'app_failure.dart';
 abstract final class FailureMapper {
   /// Reduces an exception to bounded metadata that cannot retain payload text.
   static FailureDiagnostic diagnosticCause(Object error) {
+    if (error is WalletPaymentRejectedBeforeDispatchException) {
+      return FailureDiagnostic(
+        sourceType: 'WalletPaymentRejectedBeforeDispatchException',
+        sourceCode: _safeToken(error.failure.code),
+      );
+    }
     if (error is WalletMutationOutcomeUnknownException) {
       return error.diagnostic;
     }
@@ -52,6 +58,9 @@ abstract final class FailureMapper {
     StackTrace stackTrace, {
     String fallbackCode = 'unexpected_error',
   }) {
+    if (error is WalletPaymentRejectedBeforeDispatchException) {
+      return error.failure;
+    }
     if (error is AppFailureException) return error.failure;
     if (error is LocalNetworkAccessException) {
       final denied = error.reason == LocalNetworkAccessFailure.denied;

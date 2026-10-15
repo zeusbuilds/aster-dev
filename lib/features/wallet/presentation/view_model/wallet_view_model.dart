@@ -66,7 +66,8 @@ class WalletViewModel extends _$WalletViewModel {
         return true;
       }(),
       AppFailureResult<WalletRegistry>(:final failure) => () {
-        if (failure.requiresReconciliation) {
+        if (failure.requiresReconciliation &&
+            failure.code != walletPaymentSubmissionPendingFailure.code) {
           state = AsyncError(
             AppFailureException(failure),
             failure.stackTrace ?? StackTrace.current,
