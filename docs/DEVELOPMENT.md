@@ -41,6 +41,25 @@ make fvm-setup
 make bootstrap
 ```
 
+## Process supervisor prerequisite
+
+macOS and Linux development require `python3` 3.9 or newer. The Nix shell
+provides Python; without Nix, install it through the host's normal package
+manager. `make dependencies` and all CI jobs verify the runtime explicitly:
+
+```sh
+python3 -I -S -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 69)'
+```
+
+The shared process owner launches only Python's standard library with `-I -S`,
+ignoring Python environment variables, startup code and local module shadows.
+It uses a new POSIX session and a private READY/GO gate before starting the
+requested command. Cancellation, output failures and successful completion
+clean the owned group; parent control-pipe loss also cleans the worker and its
+command. Child tools must not detach into independent sessions. Process-tree
+ownership fails closed on unsupported hosts or missing/old Python; it never
+falls back to an unowned command.
+
 ## Platform launch without wallet services
 
 For an isolated platform smoke check, use a fresh app-owned iOS 27 simulator or

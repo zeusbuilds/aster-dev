@@ -31,6 +31,17 @@ UTF-8, overflow, launch, child-status, and cleanup assertions must remain real
 process tests rather than mocks. A timed-out mutation is never retried or
 reported as successful merely because the test harness reclaimed its process.
 
+The sole process owner uses isolated Python 3.9+ (`python3 -I -S`) and POSIX
+sessions, with an independently verified READY/GO boundary, close-on-exec
+control/status descriptors and a bounded status protocol. Actual-source
+barrier tests force cancellation before registration and during normal and
+interrupted cleanup; they require exit 143, termination of the exact owned
+group and EOF on both streams. Additional live vectors cover unexpected
+supervisor death, malformed status records, startup/cleanup faults, default
+command signal behavior and Python runtime/isolation failures. The existing
+CLI overflow and deadline limits are unchanged; a successful later run does
+not erase an earlier retained failure.
+
 Repository shell wrappers prefer the checkout's `.fvm/flutter_sdk` runtime.
 Source-only CI accepts the absolute `FLUTTER_ROOT` exported by the pinned
 Flutter setup action only when canonical Flutter metadata contains exactly one

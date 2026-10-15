@@ -51,6 +51,7 @@ shell:
 
 # Resolve only the dependency graph committed by the repository.
 dependencies:
+	python3 -I -S -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 69)'
 	fvm flutter pub get --enforce-lockfile
 
 # Keep CocoaPods and its Ruby graph local to this checkout and Gemfile.lock.

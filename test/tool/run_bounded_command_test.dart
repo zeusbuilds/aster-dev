@@ -96,6 +96,19 @@ void main() {
     expect(result.stderr, isNot(contains('123456789')));
   });
 
+  test('maps a stderr overflow to the same bounded redacted status', () async {
+    final result = await run(<String>[
+      '/bin/sh',
+      '-c',
+      "printf '123456789' >&2",
+    ], maxStderrBytes: 8);
+
+    expect(result.exitCode, 125);
+    expect(result.stdout, isEmpty);
+    expect(result.stderr, contains('stderr byte ceiling'));
+    expect(result.stderr, isNot(contains('123456789')));
+  });
+
   test('rejects malformed UTF-8 without replaying bytes', () async {
     final directory = Directory.systemTemp.createTempSync(
       'aster_bounded_command_utf8_',

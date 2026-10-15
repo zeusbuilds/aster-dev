@@ -37,6 +37,7 @@
         commonBuildInputs = with pkgs; [
           jdk
           androidSdk
+          python3
           git
           curl
           unzip

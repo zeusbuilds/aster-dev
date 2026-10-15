@@ -2,13 +2,15 @@
 
 Aster is a Flutter wallet for Bitcoin, RGB USDT, and Lightning. It is powered
 by the UTEXO protocol through the public `rgb_sdk_flutter` API, with SDK
-`0.2.0-beta.2` pinned to immutable public Git commit
-`992b86ee528d0811bd17cedca901de08561c1982`, and uses Riverpod MVVM.
+`0.2.0-beta.3` pinned to immutable public Git commit
+`518a056dbe4a525762322686ac90bed080b03e78`, and uses Riverpod MVVM.
 
 ## Release Status
 
 This repository is undergoing release-candidate hardening. It is not currently
-eligible for a funds-bearing mainnet release.
+eligible for a funds-bearing mainnet release. The initial release scope is
+password signing with mainnet Bitcoin and RGB on-chain operations. Lightning
+and mainnet external signing are disabled at their release boundaries.
 
 - The SDK's accepted PKG-006 native-artifact provenance constraint permits
   development and internal beta, not a mainnet production claim.
@@ -22,7 +24,7 @@ eligible for a funds-bearing mainnet release.
   qualification remains open. Local funded wallet evidence is tracked in
   `docs/SHARED_WALLET_QUALIFICATION.md`.
 - SDK [v0.2.0-beta.1](https://github.com/UTEXO-Protocol/flutter-sdk/releases/tag/v0.2.0-beta.1)
-  and its derived Android AAR are published. The current beta.2 Git pin reuses
+  and its derived Android AAR are published. The current beta.3 Git pin retains
   those native bytes. Historical empty-Git-cache evidence restores beta.1;
   an empty Gradle dependency cache
   downloads and verifies the release AAR over HTTPS.
@@ -40,7 +42,9 @@ The complete, evidence-backed status is maintained in
 
 ## Product Model
 
-The wallet models asset, payment rail, and chain environment separately:
+The library and application domain model asset, payment rail, and chain
+environment separately. The model includes the following rails; only on-chain
+rails are in the initial mainnet release scope:
 
 - Bitcoin on-chain
 - Bitcoin Lightning
@@ -75,6 +79,7 @@ See `docs/architecture/ARCHITECTURE.md` and
 Prerequisites:
 
 - FVM
+- Python 3.9 or newer (`python3`) for bounded POSIX process supervision
 - Xcode plus Bundler 4.0.10 for the locked CocoaPods 1.16.2 toolchain
 - Android SDK and Java 21 for Android
 - Nix and direnv are optional development-shell helpers

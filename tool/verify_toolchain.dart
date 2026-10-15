@@ -488,6 +488,15 @@ ToolchainVerification verifyToolchain({
     }
   }
 
+  if (flake != null) {
+    _requireSinglePattern(
+      flake,
+      RegExp(r'commonBuildInputs[\s\S]*?\bpython3\b'),
+      'Nix development shells must provide Python 3 for process ownership.',
+      failures,
+    );
+  }
+
   final fvm = _readJsonObject(File('$root/.fvmrc'), '.fvmrc', failures);
   _requireJsonValue(
     fvm,
@@ -525,6 +534,16 @@ ToolchainVerification verifyToolchain({
     );
   }
   if (workflow != null) {
+    _requireSinglePattern(
+      workflow,
+      RegExp(
+        RegExp.escape(
+          "python3 -I -S -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 69)'",
+        ),
+      ),
+      'Quality CI must verify the isolated Python 3.9 process supervisor runtime.',
+      failures,
+    );
     _requireSinglePattern(
       workflow,
       RegExp(
@@ -977,6 +996,16 @@ ToolchainVerification verifyToolchain({
     );
   }
   if (makefile != null) {
+    _requireSinglePattern(
+      makefile,
+      RegExp(
+        RegExp.escape(
+          "python3 -I -S -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 69)'",
+        ),
+      ),
+      'Makefile setup must verify the isolated Python 3.9 process supervisor runtime.',
+      failures,
+    );
     if (bundlerVersion != null) {
       _requireSinglePattern(
         makefile,
@@ -1744,46 +1773,91 @@ ToolchainVerification verifyToolchain({
             'Process-tree supervision must fail closed on unsupported hosts.',
       ),
       (
-        pattern: RegExp(r"killProcessTree \? '/bin/bash' : executable"),
+        pattern: RegExp(r"killProcessTree \? 'python3' : executable"),
         failure:
             'Descendant-owning commands must use the fixed POSIX supervisor.',
       ),
       (
         pattern: RegExp(
-          r"'--noprofile',\s*'--norc',\s*'-p',\s*'-c',\s*"
-          r'_posixProcessTreeSupervisor,\s*'
-          r"'aster-bounded-process',\s*executable,\s*\.\.\.arguments,",
+          r"'-I',\s*'-S',\s*'-c',\s*_posixProcessTreeSupervisor,\s*executable,\s*\.\.\.arguments,",
         ),
-        failure: 'The POSIX subprocess supervisor must ignore shell startup code and forward positional arguments.',
+        failure: 'The POSIX subprocess supervisor must isolate Python and forward positional arguments.',
       ),
       (
-        pattern: RegExp(r'set -m'),
-        failure: 'The POSIX subprocess supervisor must create an owned process group.',
-      ),
-      (
-        pattern: RegExp(r'"\$@" >&3 2>&4'),
-        failure: 'The POSIX subprocess supervisor must forward arguments without interpolation.',
+        pattern: RegExp(r'if sys.version_info < \(3, 9\):'),
+        failure: 'The POSIX subprocess supervisor must reject unsupported Python runtimes.',
       ),
       (
         pattern: RegExp(
-          r'set \+m\s*"\$@" >&3 2>&4\s*owned_status=\$\?\s*'
-          r'while :; do /bin/sleep 3600; done &',
+          r'start_new_session=True,\s*close_fds=True,\s*pass_fds=\(status_write, gate_read\),',
         ),
-        failure: 'The POSIX subprocess supervisor must reserve the owned group until status capture.',
-      ),
-      (
-        pattern: RegExp(r'kill -TERM -- "-\$owned_pid"'),
-        failure: 'The POSIX subprocess supervisor must terminate the complete group.',
-      ),
-      (
-        pattern: RegExp(r'kill -KILL -- "-\$owned_pid"'),
-        failure: 'The POSIX subprocess supervisor must force-stop the complete group.',
+        failure: 'The POSIX subprocess supervisor must create an owned session with private descriptors.',
       ),
       (
         pattern: RegExp(
-          r'trap - HUP INT TERM\s*stop_owned_groups\s*exit "\$status"',
+          r'os.getpid\(\) != os.getpgrp\(\) or os.getpid\(\) != os.getsid\(0\)',
+        ),
+        failure: 'The POSIX subprocess worker must verify its native group and session.',
+      ),
+      (
+        pattern: RegExp(
+          r"os.getpgid\(worker.pid\) != worker.pid or os.getsid\(worker.pid\) != worker.pid:[\s\S]*?owned_group = True\s*if read_bytes\(1\) != b'R':",
+        ),
+        failure: 'The POSIX subprocess supervisor must verify native identity and READY before activation.',
+      ),
+      (
+        pattern: RegExp(
+          r'termination_pending = False\s*def request_termination\(signum, frame\):\s*global termination_pending\s*termination_pending = True\s*for name',
+        ),
+        failure: 'The POSIX subprocess supervisor must latch cancellation without destructive signal handlers.',
+      ),
+      (
+        pattern: RegExp(
+          r"activation_attempted = True\s*if os.write\(gate_write, b'G'\) != 1:",
+        ),
+        failure: 'The POSIX subprocess supervisor must mark activation before its gate write.',
+      ),
+      (
+        pattern: RegExp(
+          r'if termination_pending:\s*raise Cancelled\(\)[\s\S]*?select.select\(\[status_read\], \[\], \[\], 0.05\)',
+        ),
+        failure: 'The POSIX subprocess supervisor must poll cancellation with a finite protocol wait.',
+      ),
+      (
+        pattern: RegExp(
+          r"received_bytes > 5[\s\S]*?struct.unpack\('!i', read_bytes\(4\)\)\[0\][\s\S]*?0 <= result <= 255[\s\S]*?read_bytes\(1, eof=True\)",
+        ),
+        failure: 'The POSIX subprocess supervisor must validate its bounded status record and EOF.',
+      ),
+      (
+        pattern: RegExp(
+          r'os.set_inheritable\(status_fd, False\)\s*os.set_inheritable\(gate_fd, False\)',
+        ),
+        failure: 'The POSIX subprocess worker must close private descriptors on command exec.',
+      ),
+      (
+        pattern: RegExp(
+          r'command = subprocess.Popen\(sys.argv\[3:\], close_fds=True\)',
+        ),
+        failure: 'The POSIX subprocess worker must forward arguments directly with default exec signals.',
+      ),
+      (
+        pattern: RegExp(
+          r'select.select\(\[gate_fd\], \[\], \[\], timeout\)[\s\S]*?os.read\(gate_fd, 1\)\s*os.killpg\(os.getpid\(\), signal.SIGKILL\)',
+        ),
+        failure: 'The POSIX subprocess worker must self-clean on parent control-pipe loss.',
+      ),
+      (
+        pattern: RegExp(
+          r'if owned_group and activation_attempted:[\s\S]*?os.killpg\(worker.pid, signal.SIGTERM\)[\s\S]*?time.sleep\(0.25\)[\s\S]*?finally:[\s\S]*?os.killpg\(worker.pid, signal.SIGKILL\)',
         ),
         failure: 'The POSIX subprocess supervisor must clean descendants after normal completion.',
+      ),
+      (
+        pattern: RegExp(
+          r'finally:[\s\S]*?for descriptor in \(status_read, status_write, gate_read, gate_write\):[\s\S]*?os.close\(descriptor\)[\s\S]*?worker.wait\(\)',
+        ),
+        failure: 'The POSIX subprocess supervisor must close liveness descriptors before reaping its anchor.',
       ),
       (
         pattern: RegExp(r'await ensureTerminated\(\);'),

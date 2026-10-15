@@ -23,6 +23,52 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Reclaim unused hosted Android NDKs
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "${RUNNER_ENVIRONMENT:-}" == github-hosted && "${RUNNER_OS:-}" == Linux ]] || {
+            echo "NDK reclamation requires the reviewed hosted Linux runner." >&2; exit 1;
+          }
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          [[ "${sdk_root}" == /usr/local/lib/android/sdk ]] || {
+            echo "Android SDK root differs from the reviewed runner image." >&2; exit 1;
+          }
+          [[ "$(realpath -e -- "${sdk_root}")" == "${sdk_root}" ]] || {
+            echo "Android SDK root must be a canonical, existing directory." >&2; exit 1;
+          }
+          [[ "$(stat -c %F -- "${sdk_root}")" == directory ]] || {
+            echo "Android SDK root must be a directory." >&2; exit 1;
+          }
+          # Installed revisions verified in actions/runner-images image:
+          # ubuntu24/20261012.334/images/ubuntu/Ubuntu2404-Readme.md.
+          # Preserve default 27.3 and the Flutter-pinned 28.2 NDK.
+          unused_ndks=(
+            /usr/local/lib/android/sdk/ndk/29.0.14206865
+            /usr/local/lib/android/sdk/ndk/30.0.16248370
+          )
+          active_ndks=()
+          for active in "${ANDROID_NDK:-}" "${ANDROID_NDK_HOME:-}" "${ANDROID_NDK_ROOT:-}"; do
+            if [[ -n "${active}" ]]; then active_ndks+=("$(realpath -m -- "${active}")"); fi
+          done
+          for ndk in "${unused_ndks[@]}"; do
+            [[ "$(realpath -m -- "${ndk}")" == "${ndk}" ]] || {
+              echo "An allowlisted NDK path contains a symlink." >&2; exit 1;
+            }
+            for active in "${active_ndks[@]}"; do
+              [[ "${active}" != "${ndk}" ]] || {
+                echo "An allowlisted NDK is now the active default; review the image." >&2; exit 1;
+              }
+            done
+          done
+          echo "Disk capacity before allowlisted NDK reclamation:"
+          df -Pk -- "${GITHUB_WORKSPACE:?Workspace is required}"
+          cleanup_status=0
+          sudo rm -rf -- "${unused_ndks[@]}" || cleanup_status=$?
+          echo "Disk capacity after allowlisted NDK reclamation:"
+          df -Pk -- "${GITHUB_WORKSPACE}"
+          exit "${cleanup_status}"
+
       - name: Setup Java
         uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
         with:
@@ -38,6 +84,9 @@ jobs:
 
       - name: Resolve locked dependencies
         run: flutter pub get --enforce-lockfile
+
+      - name: Verify process supervisor runtime
+        run: python3 -I -S -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 69)'
 
       - name: Generate sources
         run: dart run build_runner build
@@ -73,6 +122,26 @@ jobs:
           echo "Pinned NDK ${NDK_VERSION} could not be provisioned and verified." >&2
           exit 1
 
+      - name: Verify Android compile disk headroom
+        shell: bash
+        run: |
+          set -euo pipefail
+          capacity="$(df -Pk -- "${GITHUB_WORKSPACE:?Workspace is required}")"
+          printf '%s\n' "${capacity}"
+          available_kib="$(awk 'NR == 2 { print $4 } END { if (NR != 2) exit 1 }' <<< "${capacity}")"
+          [[ "${available_kib}" =~ ^[0-9]{1,12}$ ]] || {
+            echo "Workspace free capacity could not be verified." >&2; exit 1;
+          }
+          # Existing three-ABI Debug app outputs occupy about 3 GiB locally.
+          # Require 4x that output footprint for transforms, merge, strip and APK
+          # packaging; exact CI still proves whether this budget is sufficient.
+          minimum_kib=12582912
+          echo "Workspace available bytes: $((10#${available_kib} * 1024)); minimum bytes: $((minimum_kib * 1024))."
+          if (( 10#${available_kib} < minimum_kib )); then
+            echo "At least 12 GiB must remain before Android compilation; no further cleanup or retry is authorized." >&2
+            exit 1
+          fi
+
       - name: Compile Android host integration
         run: flutter build apk --debug --no-pub
 
@@ -106,6 +175,9 @@ jobs:
 
       - name: Resolve locked dependencies
         run: flutter pub get --enforce-lockfile
+
+      - name: Verify process supervisor runtime
+        run: python3 -I -S -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 69)'
 
       - name: Generate sources
         run: dart run build_runner build

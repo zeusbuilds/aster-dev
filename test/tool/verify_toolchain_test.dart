@@ -115,7 +115,8 @@ void main() {
     _write(
       repository,
       'flake.nix',
-      'ruby = pkgs.ruby;\n'
+      'commonBuildInputs = [ python3 ];\n'
+          'ruby = pkgs.ruby;\n'
           'bundler = pkgs.bundler;\n'
           'includeNDK = true;\n'
           'ndkVersions = [ "28.2.13676358" ];\n'
@@ -632,6 +633,8 @@ library_count=1
       'scripts/verify-android-release-bundle.sh',
       'tool/bounded_process.dart',
       'tool/run_bounded_command.dart',
+      '.github/workflows/dart.yml',
+      'Makefile',
     ]) {
       final source = File('${Directory.current.path}/$relativePath');
       _write(repository, relativePath, source.readAsStringSync());
@@ -2028,8 +2031,8 @@ esac''');
         contains('must enforce one deadline'),
         contains('must force child termination'),
         contains('must request graceful termination'),
-        contains('must ignore shell startup code'),
-        contains('must reserve the owned group until status capture'),
+        contains('must isolate Python'),
+        contains('must create an owned session'),
         contains('must clean descendants after normal completion'),
         contains('launch failures must redact arguments'),
         contains('must not use buffered Process.run'),
@@ -2037,6 +2040,113 @@ esac''');
       ]),
     );
   });
+
+  for (final (path, runtime, failure) in [
+    ('flake.nix', 'python3', 'Nix development shells must provide Python 3'),
+    (
+      'Makefile',
+      "python3 -I -S -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 69)'",
+      'Makefile setup must verify the isolated Python 3.9',
+    ),
+    (
+      '.github/workflows/dart.yml',
+      "python3 -I -S -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 69)'",
+      'Quality CI must verify the isolated Python 3.9',
+    ),
+  ]) {
+    test('rejects missing process supervisor runtime in $path', () {
+      final file = File('${repository.path}/$path');
+      final source = file.readAsStringSync();
+      expect(runtime.allMatches(source), hasLength(1));
+      file.writeAsStringSync(source.replaceFirst(runtime, ''));
+      expect(
+        _verify(
+          repository,
+          flutterVersionMetadata,
+          flutterExtension,
+          flutterGradleUtils,
+        ).failures,
+        contains(contains(failure)),
+      );
+    });
+  }
+
+  for (final (name, original, unsafe, failure) in [
+    (
+      r'''nonisolated interpreter''',
+      r'''              '-I',
+''',
+      r'''''',
+      r'''must isolate Python''',
+    ),
+    (
+      r'''unsafe signal handler''',
+      r'''    termination_pending = True
+''',
+      r'''    raise SystemExit(143)
+''',
+      r'''must latch cancellation''',
+    ),
+    (
+      r'''activation bookkeeping after dispatch''',
+      r'''    activation_attempted = True
+''',
+      r'''''',
+      r'''must mark activation''',
+    ),
+    (
+      r'''unverified worker session''',
+      r'''start_new_session=True,''',
+      r'''start_new_session=False,''',
+      r'''must create an owned session''',
+    ),
+    (
+      r'''inherited private control descriptor''',
+      r'''os.set_inheritable(gate_fd, False)''',
+      r'''os.set_inheritable(gate_fd, True)''',
+      r'''must close private descriptors''',
+    ),
+    (
+      r'''unbounded cancellation wait''',
+      r'''select.select([status_read], [], [], 0.05)''',
+      r'''select.select([status_read], [], [], None)''',
+      r'''must poll cancellation''',
+    ),
+    (
+      r'''lost parent liveness''',
+      r'''os.read(gate_fd, 1)
+        os.killpg(os.getpid(), signal.SIGKILL)''',
+      r'''os.read(gate_fd, 1)
+        pass''',
+      r'''must self-clean''',
+    ),
+    (
+      r'''missing group KILL''',
+      r'''os.killpg(worker.pid, signal.SIGKILL)''',
+      r'''pass''',
+      r'''must clean descendants''',
+    ),
+    (
+      r'''missing status EOF''',
+      r'''    read_bytes(1, eof=True)''',
+      r'''    pass''',
+      r'''must validate its bounded status''',
+    ),
+  ]) {
+    test('rejects supervisor $name', () {
+      final owner = File('${repository.path}/tool/bounded_process.dart');
+      final source = owner.readAsStringSync();
+      expect(original.allMatches(source), hasLength(1));
+      owner.writeAsStringSync(source.replaceFirst(original, unsafe));
+      final result = _verify(
+        repository,
+        flutterVersionMetadata,
+        flutterExtension,
+        flutterGradleUtils,
+      );
+      expect(result.failures, contains(contains(failure)));
+    });
+  }
 
   test('rejects shell-boundary and process-owner bypasses', () {
     final boundary = File('${repository.path}/scripts/bounded-command.sh');
