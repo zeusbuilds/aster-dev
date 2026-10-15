@@ -326,7 +326,9 @@ final class _AmountBody extends StatelessWidget {
               children: [
                 DetailRow(
                   title: state.route.rail == PaymentRail.onchain
-                      ? 'Network fee rate'
+                      ? fee?.source == WalletFeeRateSource.localRegtestPolicy
+                            ? 'Local test fee rate'
+                            : 'Network fee rate'
                       : 'Payment rail',
                   value: state.route.rail == PaymentRail.onchain
                       ? fee == null
@@ -334,11 +336,24 @@ final class _AmountBody extends StatelessWidget {
                             : '${fee.satsPerVbyte} sats/vbyte'
                       : 'Lightning',
                 ),
+                if (preview.witnessBitcoinAmountSats != null) ...[
+                  SizedBox(height: context.spacing.sm),
+                  const DetailRow(
+                    title: 'Recipient Bitcoin output',
+                    value: '1,000 sats',
+                  ),
+                  const AsterStatusMessage(
+                    'Sends 1,000 sats to recipient in addition to network fee. The final network fee is determined during construction.',
+                    tone: AsterStatusTone.warning,
+                  ),
+                ],
                 if (feeStale || state.feeFailure != null) ...[
                   SizedBox(height: context.spacing.sm),
                   AsterStatusMessage(
                     state.feeFailure?.userMessage ??
-                        'Refresh the network fee before sending.',
+                        (fee?.source == WalletFeeRateSource.localRegtestPolicy
+                            ? 'Refresh the local test fee rate before sending.'
+                            : 'Refresh the network fee before sending.'),
                     tone: AsterStatusTone.warning,
                     announce: true,
                   ),

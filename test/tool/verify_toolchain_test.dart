@@ -923,6 +923,149 @@ library_count=1
     );
   });
 
+  const infrastructureDocs = <String>[
+    'docs/PRODUCTION_REFACTOR_TRACKER.md',
+    'docs/REGTEST.md',
+    'docs/SHARED_WALLET_QUALIFICATION.md',
+  ];
+  final infrastructurePrefix = String.fromCharCodes(const [
+    117,
+    116,
+    101,
+    120,
+    111,
+  ]);
+  final sharedProject = '${infrastructurePrefix}_local';
+  final sharedFolder = '$infrastructurePrefix-local-stack';
+  final retiredAppPrefix = String.fromCharCodes(const [85, 84, 69, 88, 79]);
+
+  test('operational docs retain the exact external shared-stack identities', () {
+    for (final path in infrastructureDocs) {
+      _write(
+        repository,
+        path,
+        'External project: `$sharedProject`.\nFolder: `/Users/developer/Projects/$sharedFolder`.',
+      );
+    }
+    expect(
+      _verify(
+        repository,
+        flutterVersionMetadata,
+        flutterExtension,
+        flutterGradleUtils,
+      ).failures,
+      isEmpty,
+    );
+  });
+
+  for (final path in infrastructureDocs) {
+    for (final allowed in [sharedProject, sharedFolder]) {
+      test(
+        '$path still rejects a second retired app identifier after allowed infrastructure',
+        () {
+          _write(
+            repository,
+            path,
+            'External: `$allowed`.\nApp: ${retiredAppPrefix}_WALLET',
+          );
+          expect(
+            _verify(
+              repository,
+              flutterVersionMetadata,
+              flutterExtension,
+              flutterGradleUtils,
+            ).failures,
+            contains('$path:2 uses a retired app-owned identifier.'),
+          );
+        },
+      );
+    }
+  }
+
+  for (final altered in [
+    '${sharedProject}_wallet',
+    '$sharedProject-app',
+    '$sharedFolder-app',
+    'prefix-$sharedProject',
+    '${sharedProject}2',
+    '$infrastructurePrefix-local',
+    '${retiredAppPrefix}_LOCAL',
+    '\u00e9$sharedProject',
+    '$sharedProject\u00e9',
+  ]) {
+    test(
+      'external infrastructure exception rejects altered or embedded identity $altered',
+      () {
+        _write(repository, 'docs/REGTEST.md', 'Identifier: $altered');
+        expect(
+          _verify(
+            repository,
+            flutterVersionMetadata,
+            flutterExtension,
+            flutterGradleUtils,
+          ).failures,
+          contains('docs/REGTEST.md:1 uses a retired app-owned identifier.'),
+        );
+      },
+    );
+  }
+
+  test(
+    'shared-stack exception is limited to three exact operational doc paths',
+    () {
+      for (final path in [
+        'docs/architecture/infra.md',
+        'docs/copy/REGTEST.md',
+        'docs/REGTEST_COPY.md',
+        'lib/core/infra.dart',
+      ]) {
+        _write(
+          repository,
+          path,
+          'External project: $sharedProject, folder: $sharedFolder',
+        );
+      }
+      final failures = _verify(
+        repository,
+        flutterVersionMetadata,
+        flutterExtension,
+        flutterGradleUtils,
+      ).failures;
+      for (final path in [
+        'docs/architecture/infra.md',
+        'docs/copy/REGTEST.md',
+        'docs/REGTEST_COPY.md',
+        'lib/core/infra.dart',
+      ]) {
+        expect(
+          failures,
+          contains('$path:1 uses a retired app-owned identifier.'),
+        );
+      }
+    },
+  );
+
+  test(
+    'approved operational docs retain the retired wallet-stack prohibition',
+    () {
+      final retiredStackName = String.fromCharCodes(const [71, 68, 75]);
+      _write(
+        repository,
+        'docs/REGTEST.md',
+        'External: $sharedProject\n$retiredStackName',
+      );
+      expect(
+        _verify(
+          repository,
+          flutterVersionMetadata,
+          flutterExtension,
+          flutterGradleUtils,
+        ).failures,
+        contains('docs/REGTEST.md:2 contains retired wallet-stack vocabulary.'),
+      );
+    },
+  );
+
   test('rejects omitted NDK and divergent Nix revisions', () {
     _write(
       repository,

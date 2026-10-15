@@ -31,6 +31,138 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
   Timer? _expiryTimer;
   late DateTime _now;
   late ProviderSubscription<AsyncValue<ReceiveFlowState>> _requestSubscription;
+  bool _setupCommandActive = false;
+
+  Future<void> _changeRgbMode(RgbReceiveMode mode) async {
+    if (_setupCommandActive) return;
+    setState(() => _setupCommandActive = true);
+    try {
+      if (mode == RgbReceiveMode.blind) {
+        var decisionMade = false;
+        final approved = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Text('Use blind receive?'),
+            content: const Text(
+              'A blind request uses prepared wallet-owned Bitcoin outputs. If none are available, you can prepare them separately and pay a Bitcoin network fee. Witness receive remains available without preparation.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  if (decisionMade) return;
+                  decisionMade = true;
+                  Navigator.pop(context, false);
+                },
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () {
+                  if (decisionMade) return;
+                  decisionMade = true;
+                  Navigator.pop(context, true);
+                },
+                child: const Text('Use blind receive'),
+              ),
+            ],
+          ),
+        );
+        if (approved != true || !mounted) return;
+      }
+      if (!mounted) return;
+      await ref
+          .read(receiveFlowViewModelProvider(widget.target).notifier)
+          .setRgbReceiveMode(mode);
+    } finally {
+      if (mounted) setState(() => _setupCommandActive = false);
+    }
+  }
+
+  Future<void> _prepareRgbSetup() async {
+    if (_setupCommandActive) return;
+    setState(() => _setupCommandActive = true);
+    final notifier = ref.read(
+      receiveFlowViewModelProvider(widget.target).notifier,
+    );
+    RgbWalletSetupReview? review;
+    var submitted = false;
+    try {
+      final result = await notifier.prepareRgbSetup();
+      if (result case AppSuccess<RgbWalletSetupReview>(:final value)) {
+        review = value;
+      }
+      if (review == null || !mounted) return;
+      final current = review;
+      var decisionMade = false;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: const Text('Prepare RGB wallet?'),
+          content: SingleChildScrollView(
+            child: Text(
+              'Create up to ${RgbWalletSetupReview.outputCount} wallet-owned outputs of '
+              '${RgbWalletSetupReview.outputValueSats} sat each at '
+              '${current.feeRateSatPerVbyte} sat/vB.\n'
+              '${current.feeSource == WalletFeeRateSource.localRegtestPolicy ? 'Local test fee rate' : 'Network fee rate'}\n\n'
+              'The native wallet may create fewer outputs after allowing for the network fee. The outputs remain in your wallet. Only the Bitcoin network fee is spent. '
+              'The final fee is unknown until construction; no total fee cap applies. '
+              'Receiving USDT starts only after confirmation.\n\n'
+              'This review expires in two minutes.',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                if (decisionMade) return;
+                decisionMade = true;
+                Navigator.pop(context, false);
+              },
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                if (decisionMade) return;
+                decisionMade = true;
+                Navigator.pop(context, true);
+              },
+              child: const Text('Confirm setup'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+      submitted = true;
+      await notifier.confirmRgbSetup(current);
+    } finally {
+      if (!submitted && review != null) await notifier.cancelRgbSetup(review);
+      if (mounted) setState(() => _setupCommandActive = false);
+    }
+  }
+
+  Future<void> _retryRgbReceive() async {
+    if (_setupCommandActive) return;
+    setState(() => _setupCommandActive = true);
+    try {
+      await ref
+          .read(receiveFlowViewModelProvider(widget.target).notifier)
+          .retryRgbReceive();
+    } finally {
+      if (mounted) setState(() => _setupCommandActive = false);
+    }
+  }
+
+  Future<void> _checkRgbSetup() async {
+    if (_setupCommandActive) return;
+    setState(() => _setupCommandActive = true);
+    try {
+      await ref
+          .read(receiveFlowViewModelProvider(widget.target).notifier)
+          .checkRgbSetup();
+    } finally {
+      if (mounted) setState(() => _setupCommandActive = false);
+    }
+  }
 
   @override
   void initState() {
@@ -184,7 +316,8 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
   Widget build(BuildContext context) {
     final provider = receiveFlowViewModelProvider(widget.target);
     final flow = ref.watch(provider);
-    final durableGenerationOwnsRoute = flow.value?.isGenerating ?? false;
+    final durableGenerationOwnsRoute =
+        (flow.value?.isGenerating ?? false) || _setupCommandActive;
     return AsterNavigationScope(
       child: Builder(
         builder: (context) {
@@ -209,25 +342,78 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
                   padding: EdgeInsets.symmetric(
                     horizontal: context.spacing.screenPadding,
                   ),
-                  child: flow.when(
-                    skipLoadingOnRefresh: false,
-                    data: (state) => _RequestBody(
-                      state: state,
-                      now: _now,
-                      commandsEnabled: !navigation.inFlight,
-                      onCopy: () => unawaited(_copy()),
-                      onShare: () => unawaited(_share()),
-                      onRegenerate: () => unawaited(_regenerate(navigation)),
-                      onSetAmount: () =>
-                          unawaited(_showAmountSheet(context, navigation)),
-                    ),
-                    loading: () => const _RequestLoading(),
-                    error: (error, stackTrace) => _RequestFailure(
-                      failure: error is AppFailureException
-                          ? error.failure
-                          : FailureMapper.from(error, stackTrace),
-                      onRetry: ref.read(provider.notifier).retry,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (widget.target == WalletPaymentTarget.usdtOnchain)
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                ref.read(provider.notifier).rgbReceiveMode ==
+                                        RgbReceiveMode.witness
+                                    ? 'Witness receive'
+                                    : 'Blind receive',
+                              ),
+                            ),
+                            TextButton(
+                              onPressed:
+                                  generationOwnsRoute ||
+                                      flow.isLoading ||
+                                      (flow.value?.isBusy ?? false)
+                                  ? null
+                                  : () => unawaited(
+                                      _changeRgbMode(
+                                        ref
+                                                    .read(provider.notifier)
+                                                    .rgbReceiveMode ==
+                                                RgbReceiveMode.witness
+                                            ? RgbReceiveMode.blind
+                                            : RgbReceiveMode.witness,
+                                      ),
+                                    ),
+                              child: Text(
+                                ref.read(provider.notifier).rgbReceiveMode ==
+                                        RgbReceiveMode.witness
+                                    ? 'Use blind receive'
+                                    : 'Use witness receive',
+                              ),
+                            ),
+                          ],
+                        ),
+                      Expanded(
+                        child: flow.when(
+                          skipLoadingOnRefresh: false,
+                          data: (state) => _RequestBody(
+                            state: state,
+                            now: _now,
+                            commandsEnabled: !navigation.inFlight,
+                            onCopy: () => unawaited(_copy()),
+                            onShare: () => unawaited(_share()),
+                            onRegenerate: () =>
+                                unawaited(_regenerate(navigation)),
+                            onSetAmount: () => unawaited(
+                              _showAmountSheet(context, navigation),
+                            ),
+                            onSetup: () => unawaited(_prepareRgbSetup()),
+                            onCheckSetup: () => unawaited(_checkRgbSetup()),
+                            onRetryReceive: () => unawaited(_retryRgbReceive()),
+                            setupBusy: _setupCommandActive,
+                          ),
+                          loading: () => const _RequestLoading(),
+                          error: (error, stackTrace) => _RequestFailure(
+                            failure: error is AppFailureException
+                                ? error.failure
+                                : FailureMapper.from(error, stackTrace),
+                            onRetry: ref.read(provider.notifier).retry,
+                            onSetup: () => unawaited(_prepareRgbSetup()),
+                            onCheckSetup: () => unawaited(_checkRgbSetup()),
+                            onRetryReceive: () => unawaited(_retryRgbReceive()),
+                            setupBusy: _setupCommandActive,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -248,6 +434,10 @@ final class _RequestBody extends StatelessWidget {
     required this.onShare,
     required this.onRegenerate,
     required this.onSetAmount,
+    required this.onSetup,
+    required this.onCheckSetup,
+    required this.onRetryReceive,
+    required this.setupBusy,
   });
 
   final ReceiveFlowState state;
@@ -257,6 +447,10 @@ final class _RequestBody extends StatelessWidget {
   final VoidCallback onShare;
   final VoidCallback onRegenerate;
   final VoidCallback onSetAmount;
+  final VoidCallback onSetup;
+  final VoidCallback onCheckSetup;
+  final VoidCallback onRetryReceive;
+  final bool setupBusy;
   final WalletAmountDisplayFormatter _formatter =
       WalletAmountDisplayFormatter();
 
@@ -401,6 +595,27 @@ final class _RequestBody extends StatelessWidget {
         if (state.failure case final failure?) ...[
           SizedBox(height: context.spacing.md),
           AsterStatusMessage(failure.userMessage, tone: AsterStatusTone.danger),
+          if (failure.code == 'rgb_wallet_setup_required')
+            CustomButton.compact(
+              text: 'Try receive again',
+              enabled: !setupBusy,
+              onTap: onRetryReceive,
+              variant: ButtonVariant.tonal,
+            ),
+          if (failure.code == 'rgb_wallet_setup_required')
+            CustomButton(
+              text: 'Prepare wallet',
+              loading: setupBusy,
+              enabled: !setupBusy,
+              onTap: onSetup,
+            ),
+          if (failure.code == 'rgb_wallet_setup_pending')
+            CustomButton(
+              text: 'Check preparation',
+              loading: setupBusy,
+              enabled: !setupBusy,
+              onTap: onCheckSetup,
+            ),
         ],
       ],
     );
@@ -469,10 +684,21 @@ final class _RequestLoading extends StatelessWidget {
 }
 
 final class _RequestFailure extends StatelessWidget {
-  const _RequestFailure({required this.failure, required this.onRetry});
+  const _RequestFailure({
+    required this.failure,
+    required this.onRetry,
+    required this.onSetup,
+    required this.onCheckSetup,
+    required this.onRetryReceive,
+    required this.setupBusy,
+  });
 
   final AppFailure failure;
   final VoidCallback onRetry;
+  final VoidCallback onSetup;
+  final VoidCallback onCheckSetup;
+  final VoidCallback onRetryReceive;
+  final bool setupBusy;
 
   @override
   Widget build(BuildContext context) {
@@ -488,7 +714,30 @@ final class _RequestFailure extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
           ),
-          if (failure.retryable) ...[
+          if (failure.code == 'rgb_wallet_setup_required') ...[
+            SizedBox(height: context.spacing.lg),
+            CustomButton.compact(
+              text: 'Try receive again',
+              enabled: !setupBusy,
+              onTap: onRetryReceive,
+              variant: ButtonVariant.tonal,
+            ),
+            SizedBox(height: context.spacing.sm),
+            CustomButton(
+              text: 'Prepare wallet',
+              loading: setupBusy,
+              enabled: !setupBusy,
+              onTap: onSetup,
+            ),
+          ] else if (failure.code == 'rgb_wallet_setup_pending') ...[
+            SizedBox(height: context.spacing.lg),
+            CustomButton(
+              text: 'Check preparation',
+              loading: setupBusy,
+              enabled: !setupBusy,
+              onTap: onCheckSetup,
+            ),
+          ] else if (failure.retryable) ...[
             SizedBox(height: context.spacing.lg),
             CustomButton(text: 'Retry', onTap: onRetry),
           ],

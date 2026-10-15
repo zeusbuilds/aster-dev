@@ -5,6 +5,41 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rgb_sdk_flutter/rgb_sdk_flutter.dart';
 
 void main() {
+  test('local network denial is actionable before any wallet mutation', () {
+    final failure = FailureMapper.from(
+      const LocalNetworkAccessException(LocalNetworkAccessFailure.denied),
+      StackTrace.current,
+    );
+    expect(failure.code, 'local_network_access_denied');
+    expect(failure.kind, AppFailureKind.authentication);
+    expect(failure.retryable, isTrue);
+    expect(failure.requiresReconciliation, isFalse);
+    expect(failure.outcomeUnknown, isFalse);
+    expect(failure.userMessage, contains('Allow local network access'));
+  });
+
+  test('preserves only a bounded native operation diagnostic', () {
+    final failure = FailureMapper.from(
+      const ConflictError(
+        'private native response',
+        cause: _OperationCause('rlnUnlockNode'),
+      ),
+      StackTrace.current,
+    );
+    final diagnostic = failure.cause! as FailureDiagnostic;
+    expect(diagnostic.context, 'rlnUnlockNode');
+    expect(diagnostic.sourceCode, 'CONFLICT');
+    expect(failure.toString(), isNot(contains('private native response')));
+
+    final rejected = FailureMapper.diagnosticCause(
+      const ConflictError(
+        'private native response',
+        cause: _OperationCause('rlnUnlockNode /private/wallet'),
+      ),
+    );
+    expect(rejected.context, isNull);
+  });
+
   test('retains redacted SDK metadata without retaining its message', () {
     const secret = 'seed invoice token must not leak';
     final failure = FailureMapper.from(
@@ -285,4 +320,10 @@ void main() {
     expect(node.code, 'rgb_node_failed');
     expect(node.userMessage, isNot(contains('native details')));
   });
+}
+
+final class _OperationCause implements NativeOperationCause {
+  const _OperationCause(this.operation);
+  @override
+  final String operation;
 }

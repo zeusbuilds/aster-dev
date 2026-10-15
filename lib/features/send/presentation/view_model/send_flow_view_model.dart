@@ -194,7 +194,7 @@ class SendFlowViewModel extends _$SendFlowViewModel {
     };
   }
 
-  /// Refreshes the display quote. The repository still owns the send-time fee.
+  /// Refreshes the displayed quote without submitting or retrying a payment.
   Future<bool> refreshFee() async {
     final current = state.value;
     if (current == null || !current.canRefreshFee) {
@@ -287,6 +287,9 @@ class SendFlowViewModel extends _$SendFlowViewModel {
         target: _target,
         destination: preview.encodedDestination,
         amountUnits: units,
+        rgbRecipientType: preview.rgbRecipientType,
+        witnessBitcoinAmountSats: preview.witnessBitcoinAmountSats,
+        reviewedFeeRate: current.feeEstimate,
       ),
     );
     if (!ref.mounted) return result is AppSuccess<WalletSendResult>;
@@ -304,6 +307,20 @@ class SendFlowViewModel extends _$SendFlowViewModel {
         );
         return true;
       }(),
+      AppFailureResult<WalletSendResult>(:final failure)
+          when failure.code == walletFeeReviewRequiredFailure.code ||
+              failure.code == walletFeeReviewChangedFailure.code =>
+        () {
+          state = AsyncData(
+            current.copyWith(
+              operation: null,
+              feeEstimate: null,
+              feeFailure: failure,
+              retainedFailure: null,
+            ),
+          );
+          return false;
+        }(),
       AppFailureResult<WalletSendResult>(:final failure) => _fail(
         current,
         failure,
@@ -473,10 +490,13 @@ class SendFlowViewModel extends _$SendFlowViewModel {
       );
     }
     if (state.route.rail == PaymentRail.onchain) {
-      return const AppFailure(
+      return AppFailure(
         code: 'payment_fee_refresh_required',
         kind: AppFailureKind.unavailable,
-        userMessage: 'Refresh the network fee before sending.',
+        userMessage:
+            state.feeEstimate?.source == WalletFeeRateSource.localRegtestPolicy
+            ? 'Refresh the local test fee rate before sending.'
+            : 'Refresh the network fee before sending.',
         retryable: true,
       );
     }

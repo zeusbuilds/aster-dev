@@ -1,11 +1,21 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../../core/errors/app_failure.dart';
 import '../../../../core/validation/validation.dart';
 import '../validation/validation.dart';
 import 'wallet_amount.dart';
 import 'wallet_asset.dart';
 import 'wallet_balance.dart';
 import 'wallet_network.dart';
+
+/// Read-only history refreshes may observe independently advancing native tips.
+const walletActivityConsistencyFailure = AppFailure(
+  code: 'wallet_activity_snapshot_inconsistent',
+  kind: AppFailureKind.conflict,
+  userMessage:
+      'Wallet history could not be read consistently. Refresh to try again.',
+  retryable: true,
+);
 
 /// Native activity family after SDK DTOs have been isolated by the adapter.
 enum WalletActivitySource { bitcoinTransaction, rgbTransfer, lightningPayment }

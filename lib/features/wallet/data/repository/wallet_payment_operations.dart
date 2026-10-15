@@ -21,15 +21,21 @@ final class WalletPaymentOperations {
     this._runtime,
     this._services,
     this._bitcoinInstructions,
-    this._runSerialized,
-  );
+    this._runSerialized, {
+    this.beforeOnchainMutation,
+    required this._clock,
+  });
 
   final WalletRuntime _runtime;
   final WalletServiceConfiguration _services;
   final BitcoinPaymentInstructionDecoder _bitcoinInstructions;
   final WalletSerializedOperationRunner _runSerialized;
+  final Future<AppResult<void>> Function()? beforeOnchainMutation;
+  final DateTime Function() _clock;
 
   static const standardFeeTargetBlocks = 6;
+  static const _activityTipRevalidationAttempts = 3;
+  static const _activityTipRevalidationDelay = Duration(seconds: 1);
 
   List<WalletPaymentCapability> get capabilities {
     final usdt = _services.usdtAsset;
@@ -153,9 +159,31 @@ final class WalletPaymentOperations {
     final asset = (routeResult as AppSuccess<PaymentRoute>).value.asset;
     return _runSerialized(
       () => _runtime.run((engine) async {
-        final networkStatus = await engine.getNetworkStatus();
-        final balance = await engine.getBalance(asset);
+        // History reads sync the on-chain wallet. Its new confirmations can
+        // precede the independent Lightning tip, so sample that tip last.
         final activities = await engine.listActivity(asset);
+        final balance = await engine.getBalance(asset);
+        var networkStatus = await engine.getNetworkStatus();
+        final originalStatus = networkStatus;
+        var revalidations = 0;
+        while (activities.any(
+          (activity) =>
+              activity.confirmationHeight != null &&
+              activity.confirmationHeight! > networkStatus.blockHeight,
+        )) {
+          if (revalidations == _activityTipRevalidationAttempts) {
+            throw const AppFailureException(walletActivityConsistencyFailure);
+          }
+          revalidations += 1;
+          // Keep the same runtime lease. Only re-read the observed tip; never
+          // retry a payment or manufacture a height from its confirmations.
+          await Future<void>.delayed(_activityTipRevalidationDelay);
+          networkStatus = await engine.getNetworkStatus();
+          if (networkStatus.environment != originalStatus.environment ||
+              networkStatus.nodePublicKey != originalStatus.nodePublicKey) {
+            throw const AppFailureException(walletActivityConsistencyFailure);
+          }
+        }
         return WalletActivityFeed(
           balance: balance,
           networkStatus: networkStatus,
@@ -230,6 +258,7 @@ final class WalletPaymentOperations {
   Future<AppResult<WalletReceiveRequest>> createReceiveRequest(
     WalletPaymentTarget target, {
     int? amountUnits,
+    RgbReceiveMode rgbReceiveMode = RgbReceiveMode.witness,
   }) {
     final routeResult = resolveTarget(target);
     if (routeResult case AppFailureResult<PaymentRoute>(:final failure)) {
@@ -244,17 +273,43 @@ final class WalletPaymentOperations {
       return Future.value(AppResult.failure(failure));
     }
     final amount = (amountResult as AppSuccess<WalletAmount?>).value;
-    return _runSerialized(
-      () => _runtime.run(
-        (engine) => engine.createReceiveRequest(route, amount: amount),
-      ),
-    );
+    return _runSerialized(() async {
+      if (target == WalletPaymentTarget.usdtOnchain) {
+        final gate = await beforeOnchainMutation?.call();
+        if (gate case AppFailureResult<void>(:final failure)) {
+          return AppResult.failure(failure);
+        }
+      }
+      return _runtime.run((engine) {
+        if (rgbReceiveMode == RgbReceiveMode.blind) {
+          if (target != WalletPaymentTarget.usdtOnchain ||
+              engine is! RgbSetupWalletEngine) {
+            throw const AppFailureException(
+              AppFailure(
+                code: 'rgb_blind_receive_unavailable',
+                kind: AppFailureKind.unavailable,
+                userMessage: 'Blind RGB receipt is unavailable.',
+                retryable: false,
+              ),
+            );
+          }
+          return (engine as RgbSetupWalletEngine).createBlindRgbReceive(
+            route,
+            amount: amount,
+          );
+        }
+        return engine.createReceiveRequest(route, amount: amount);
+      });
+    });
   }
 
   Future<AppResult<WalletSendResult>> send({
     required WalletPaymentTarget target,
     required String destination,
     required int amountUnits,
+    RgbRecipientType? rgbRecipientType,
+    int? witnessBitcoinAmountSats,
+    WalletFeeRateEstimate? reviewedFeeRate,
   }) {
     final routeResult = resolveTarget(target);
     if (routeResult case AppFailureResult<PaymentRoute>(:final failure)) {
@@ -302,21 +357,37 @@ final class WalletPaymentOperations {
     }
     if (route.rail == PaymentRail.onchain) {
       return _runSerialized(() async {
-        final feeResult = await _runtime.run(
-          (engine) => engine.estimateFeeRate(standardFeeTargetBlocks),
-        );
-        if (feeResult case AppFailureResult<WalletFeeRateEstimate>(
-          :final failure,
-        )) {
+        final gate = await beforeOnchainMutation?.call();
+        if (gate case AppFailureResult<void>(:final failure)) {
           return AppResult.failure(failure);
         }
-        final command = WalletSendCommand(
-          route: route,
-          destination: submissionDestination,
-          amount: amount,
-          feeRate: (feeResult as AppSuccess<WalletFeeRateEstimate>).value,
-        );
-        return _runtime.run((engine) => engine.sendPayment(command));
+        return _runtime.run((engine) async {
+          if (!_isValidReview(reviewedFeeRate)) {
+            throw const AppFailureException(walletFeeReviewRequiredFailure);
+          }
+          final reviewed = reviewedFeeRate!;
+          final fresh = await engine.estimateFeeRate(reviewed.targetBlocks);
+          // One native lease covers revalidation and dispatch. The quote the
+          // user reviewed is never silently replaced, even by a lower rate.
+          if (!_isValidReview(reviewed) || !_isValidReview(fresh)) {
+            throw const AppFailureException(walletFeeReviewRequiredFailure);
+          }
+          if (fresh.satsPerVbyte != reviewed.satsPerVbyte ||
+              fresh.source != reviewed.source ||
+              fresh.targetBlocks != reviewed.targetBlocks) {
+            throw const AppFailureException(walletFeeReviewChangedFailure);
+          }
+          return engine.sendPayment(
+            WalletSendCommand(
+              route: route,
+              destination: submissionDestination,
+              amount: amount,
+              feeRate: reviewed,
+              rgbRecipientType: rgbRecipientType,
+              witnessBitcoinAmountSats: witnessBitcoinAmountSats,
+            ),
+          );
+        });
       });
     }
     final command = WalletSendCommand(
@@ -328,6 +399,12 @@ final class WalletPaymentOperations {
       () => _runtime.run((engine) => engine.sendPayment(command)),
     );
   }
+
+  bool _isValidReview(WalletFeeRateEstimate? review) =>
+      review != null &&
+      !review.isStaleAt(_clock()) &&
+      (review.source != WalletFeeRateSource.localRegtestPolicy ||
+          _services.environment == BlockchainEnvironment.regtest);
 
   static AppResult<WalletAmount?> _amountForRoute(
     PaymentRoute route,

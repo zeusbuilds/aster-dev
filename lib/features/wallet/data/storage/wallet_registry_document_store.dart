@@ -19,7 +19,15 @@ abstract interface class WalletRegistryDocumentStore {
 /// truncation and accidental corruption before registry JSON is decoded.
 final class IoWalletRegistryDocumentStore
     implements WalletRegistryDocumentStore {
-  const IoWalletRegistryDocumentStore(this.rootPath, this._security);
+  const IoWalletRegistryDocumentStore(
+    this.rootPath,
+    this._security, {
+    this.rejectCorruptSlots = false,
+  });
+
+  /// Financial-operation markers cannot fall back to an older unsubmitted
+  /// document: a present corrupt slot makes the entire journal unreadable.
+  final bool rejectCorruptSlots;
 
   static const _schemaVersion = 1;
   static const _maximumDocumentBytes = 512 * 1024;
@@ -105,7 +113,11 @@ final class IoWalletRegistryDocumentStore
       present += 1;
       await _security.verifyFile(file.path);
       final slot = await _readSlot(file);
-      if (slot != null) valid.add(slot);
+      if (slot != null) {
+        valid.add(slot);
+      } else if (rejectCorruptSlots) {
+        throw const StoredDataCorruptionException();
+      }
     }
     if (present > 0 && valid.isEmpty) {
       throw const StoredDataCorruptionException();

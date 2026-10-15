@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:rgb_sdk_flutter/rgb_sdk_flutter.dart';
 
+import '../platform/local_network_access.dart';
 import 'app_failure.dart';
 
 /// Converts infrastructure and SDK errors into stable, redacted app failures.
@@ -25,7 +26,7 @@ abstract final class FailureMapper {
         WalletValidationException(:final field) => field,
         UnsupportedWalletFeatureException(:final feature) => feature,
         ExperimentalCryptoException(:final primitive) => primitive,
-        _ => null,
+        _ => error.operation,
       };
       return FailureDiagnostic(
         sourceType:
@@ -52,6 +53,24 @@ abstract final class FailureMapper {
     String fallbackCode = 'unexpected_error',
   }) {
     if (error is AppFailureException) return error.failure;
+    if (error is LocalNetworkAccessException) {
+      final denied = error.reason == LocalNetworkAccessFailure.denied;
+      return _failure(
+        code: denied
+            ? 'local_network_access_denied'
+            : 'local_network_access_unavailable',
+        kind: denied
+            ? AppFailureKind.authentication
+            : AppFailureKind.unavailable,
+        message: denied
+            ? 'Allow local network access in Android settings to connect to '
+                  'your configured wallet services.'
+            : 'Local network access could not be checked. Try again.',
+        retryable: true,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
     if (error is AppConfigurationException) {
       return _failure(
         code: 'app_configuration_invalid',

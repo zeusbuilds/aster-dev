@@ -995,11 +995,11 @@ packages:
     dependency: "direct main"
     description:
       path: "."
-      ref: c4e3c2d0b630a5807315710f18240889c7b74b0e
-      resolved-ref: c4e3c2d0b630a5807315710f18240889c7b74b0e
+      ref: "992b86ee528d0811bd17cedca901de08561c1982"
+      resolved-ref: "992b86ee528d0811bd17cedca901de08561c1982"
       url: "https://github.com/UTEXO-Protocol/flutter-sdk.git"
     source: git
-    version: "0.2.0-beta.1"
+    version: "0.2.0-beta.2"
   riverpod:
     dependency: transitive
     description:

@@ -5,6 +5,8 @@ import android.system.Os
 import android.system.OsConstants
 import android.os.Handler
 import android.os.Looper
+import android.os.Build
+import android.content.pm.PackageManager
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.plugin.common.MethodCall
@@ -22,6 +24,9 @@ class MainActivity : FlutterActivity() {
     private var walletStorageExecutor: ExecutorService? = null
     private var walletStorageSession: StorageChannelSession? = null
     private var walletStorageGeneration = 0L
+    private var localNetworkChannel: MethodChannel? = null
+    private var localNetworkRequest: LocalNetworkPermissionRequest? = null
+    private var localNetworkTimeout: Runnable? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -78,11 +83,86 @@ class MainActivity : FlutterActivity() {
         }
         walletStorageChannel = channel
         walletStorageSession = session
+        configureLocalNetworkChannel(flutterEngine)
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        detachLocalNetworkChannel()
         detachWalletStorageChannel()
         super.cleanUpFlutterEngine(flutterEngine)
+    }
+
+    private fun configureLocalNetworkChannel(flutterEngine: FlutterEngine) {
+        detachLocalNetworkChannel()
+        val channel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.aster.wallet/local_network",
+        )
+        channel.setMethodCallHandler { call, result ->
+            if (call.method != "ensureAccess") {
+                result.notImplemented()
+                return@setMethodCallHandler
+            }
+            if (Build.VERSION.SDK_INT < 37 ||
+                checkSelfPermission(localNetworkPermission) == PackageManager.PERMISSION_GRANTED
+            ) {
+                result.success(true)
+                return@setMethodCallHandler
+            }
+            if (isFinishing || isDestroyed || localNetworkRequest != null) {
+                localNetworkUnavailable(result)
+                return@setMethodCallHandler
+            }
+            val pending = LocalNetworkPermissionRequest { granted ->
+                if (granted == null) localNetworkUnavailable(result) else result.success(granted)
+            }
+            localNetworkRequest = pending
+            val timeout = Runnable {
+                // Keep the in-flight marker until Android answers; a timed-out
+                // dialog must not allow a second overlapping permission request.
+                pending.complete(null)
+            }
+            localNetworkTimeout = timeout
+            mainHandler.postDelayed(timeout, localNetworkTimeoutMillis)
+            try {
+                requestPermissions(arrayOf(localNetworkPermission), localNetworkRequestCode)
+            } catch (_: RuntimeException) {
+                mainHandler.removeCallbacks(timeout)
+                localNetworkTimeout = null
+                localNetworkRequest = null
+                pending.complete(null)
+            }
+        }
+        localNetworkChannel = channel
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != localNetworkRequestCode) return
+        localNetworkTimeout?.let(mainHandler::removeCallbacks)
+        localNetworkTimeout = null
+        val pending = localNetworkRequest
+        localNetworkRequest = null
+        pending?.complete(
+            checkSelfPermission(localNetworkPermission) == PackageManager.PERMISSION_GRANTED,
+        )
+    }
+
+    private fun detachLocalNetworkChannel() {
+        localNetworkChannel?.setMethodCallHandler(null)
+        localNetworkChannel = null
+        localNetworkTimeout?.let(mainHandler::removeCallbacks)
+        localNetworkTimeout = null
+        localNetworkRequest?.complete(null)
+        localNetworkRequest = null
+    }
+
+    private fun localNetworkUnavailable(result: MethodChannel.Result) {
+        result.error("local_network_unavailable", "Local network permission is unavailable.", null)
     }
 
     private fun detachWalletStorageChannel() {
@@ -108,6 +188,25 @@ class MainActivity : FlutterActivity() {
                 null,
             )
         }
+    }
+
+    companion object {
+        private const val localNetworkPermission = "android.permission.ACCESS_LOCAL_NETWORK"
+        private const val localNetworkRequestCode = 7357
+        private const val localNetworkTimeoutMillis = 90_000L
+    }
+}
+
+/** Completes each permission result once, including timeout and engine cleanup races. */
+internal class LocalNetworkPermissionRequest(respond: (Boolean?) -> Unit) {
+    private val pending = AtomicBoolean(true)
+    private var responder: ((Boolean?) -> Unit)? = respond
+
+    fun complete(granted: Boolean?) {
+        if (!pending.compareAndSet(true, false)) return
+        val response = responder
+        responder = null
+        response?.invoke(granted)
     }
 }
 

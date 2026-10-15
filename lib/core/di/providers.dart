@@ -50,8 +50,9 @@ Future<PreferencesService> preferencesService(Ref ref) async {
 
 @riverpod
 Future<SettingsRepository> settingsRepository(Ref ref) async {
-  final preferences = await ref.watch(preferencesServiceProvider.future);
-  return SettingsRepository(preferences, ref.watch(appAssetBundleProvider));
+  final preferences = ref.watch(preferencesServiceProvider.future);
+  final assets = ref.watch(appAssetBundleProvider);
+  return SettingsRepository(await preferences, assets);
 }
 
 @riverpod
@@ -238,14 +239,29 @@ Future<WalletRepository> walletRepository(Ref ref) async {
   final keyGenerator = ref.watch(walletKeyGeneratorProvider);
   final identityGenerator = ref.watch(walletIdentityGeneratorProvider);
   final services = ref.watch(walletServiceConfigurationProvider);
+  final setupDocumentsFuture = ref.watch(
+    walletRegistryDocumentStoreProvider.future,
+  );
+  final bitcoinInstructions = ref.watch(
+    bitcoinPaymentInstructionDecoderProvider,
+  );
+  final clock = ref.watch(utcClockProvider);
+  final security = ref.watch(walletStorageSecurityProvider);
+  final setupDocuments = await setupDocumentsFuture;
   return WalletRepository(
     await profiles,
     await runtime,
     keyGenerator,
     identityGenerator,
     services,
-    bitcoinInstructions: ref.watch(bitcoinPaymentInstructionDecoderProvider),
-    clock: ref.watch(utcClockProvider),
+    bitcoinInstructions: bitcoinInstructions,
+    clock: clock,
+    rgbSetupStore: setupDocuments is IoWalletRegistryDocumentStore
+        ? IoRgbWalletSetupStore(
+            '${setupDocuments.rootPath}/rgb_setup',
+            security,
+          )
+        : null,
   );
 }
 

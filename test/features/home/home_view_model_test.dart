@@ -220,7 +220,7 @@ WalletBalance _bitcoinBalance() {
     onchainSettled: onchain(2000),
     onchainFuture: onchain(2100),
     onchainSpendable: onchain(1500),
-    onchainLocked: onchain(500),
+    onchainLocked: onchain(600),
     lightningOwned: lightning(1500),
     lightningSpendable: lightning(1000),
     lightningReceivable: lightning(2500),

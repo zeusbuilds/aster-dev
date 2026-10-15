@@ -14,14 +14,22 @@ final class RgbWalletBalanceMapper {
 
   final RgbWalletNativeValueParser _values;
 
+  /// BTC spendability includes pending outputs; RGB allocations do not.
+  ///
+  /// Pinned rgb-lib `get_btc_balance_for_keychain` reports BDK confirmed as
+  /// settled, total as future, and total minus immature/reserved as spendable.
+  void validateBitcoin(CoreBtcBalance balance) {
+    _validateCoreBalance(balance.vanilla, 'bitcoin.vanilla', bitcoin: true);
+    _validateCoreBalance(balance.colored, 'bitcoin.colored', bitcoin: true);
+  }
+
   WalletBalance bitcoin(
     WalletAsset asset,
     CoreBtcBalance balance,
     WalletNodeInfo node,
     List<LightningChannel> channels,
   ) {
-    _validateCoreBalance(balance.vanilla, 'bitcoin.vanilla');
-    _validateCoreBalance(balance.colored, 'bitcoin.colored');
+    validateBitcoin(balance);
     _values.requireNonNegative(node.localBalanceSat, 'node.localBalanceSat');
     final outboundMsat = _values.sum(
       channels
@@ -71,9 +79,9 @@ final class RgbWalletBalanceMapper {
         assetId: asset.id,
         units: _values.checkedSubtract(
           _values.checkedAdd(
-            balance.vanilla.settled,
-            balance.colored.settled,
-            'bitcoin.settled',
+            balance.vanilla.future,
+            balance.colored.future,
+            'bitcoin.future',
           ),
           balance.vanilla.spendable,
           'bitcoin.locked',
@@ -154,13 +162,23 @@ final class RgbWalletBalanceMapper {
     );
   }
 
-  void _validateCoreBalance(CoreBalance balance, String field) {
+  void _validateCoreBalance(
+    CoreBalance balance,
+    String field, {
+    bool bitcoin = false,
+  }) {
     _values.requireNonNegative(balance.settled, '$field.settled');
     _values.requireNonNegative(balance.future, '$field.future');
     _values.requireNonNegative(balance.spendable, '$field.spendable');
-    if (balance.spendable > balance.settled) {
+    if (bitcoin && balance.settled > balance.future) {
       throw NativeProtocolException(
-        'Spendable balance exceeds settled balance.',
+        'Confirmed Bitcoin balance exceeds total balance.',
+        field: '$field.future',
+      );
+    }
+    if (balance.spendable > (bitcoin ? balance.future : balance.settled)) {
+      throw NativeProtocolException(
+        'Spendable balance exceeds its available accounting domain.',
         field: '$field.spendable',
       );
     }

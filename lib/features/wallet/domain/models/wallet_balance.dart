@@ -43,9 +43,12 @@ final class WalletBalance {
     ].any((amount) => amount.rail != PaymentRail.lightning)) {
       throw const FormatException('Lightning balance has the wrong rail.');
     }
-    if (BigInt.from(onchainSpendable.units) +
-            BigInt.from(onchainLocked.units) !=
-        BigInt.from(onchainSettled.units)) {
+    final bitcoin = asset.id.protocol == WalletAssetProtocol.bitcoin;
+    final accountingTotal = bitcoin ? onchainFuture : onchainSettled;
+    if ((bitcoin && onchainSettled.units > onchainFuture.units) ||
+        BigInt.from(onchainSpendable.units) +
+                BigInt.from(onchainLocked.units) !=
+            BigInt.from(accountingTotal.units)) {
       throw const FormatException('On-chain balance invariants are invalid.');
     }
     if (lightningSpendable.units > lightningOwned.units) {
@@ -74,12 +77,14 @@ final class WalletBalance {
   final WalletAsset asset;
   final WalletAmount onchainSettled;
 
-  /// Projected balance after pending incoming and outgoing transfers settle.
+  /// Bitcoin UTXO total, including pending and immature outputs. For RGB,
+  /// projected balance after pending incoming and outgoing transfers settle.
   final WalletAmount onchainFuture;
   final WalletAmount onchainSpendable;
 
-  /// Settled value that is not currently spendable, such as Bitcoin held in
-  /// colored UTXOs or funds reserved by an in-flight operation.
+  /// Bitcoin future value unavailable to ordinary BTC sends: all colored
+  /// outputs plus vanilla immature or reserved funds. Includes pending outputs.
+  /// For RGB, settled allocations unavailable to spend during pending operations.
   final WalletAmount onchainLocked;
 
   /// Locally owned value committed to Lightning channels.

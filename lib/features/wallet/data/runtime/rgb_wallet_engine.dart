@@ -1,12 +1,17 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:rgb_sdk_flutter/rgb_sdk_flutter.dart';
 
 import '../../../../core/config/app_environment.dart';
 import '../../../../core/errors/app_failure.dart';
 import '../../../../core/errors/failure_mapper.dart';
+import '../../../../core/platform/local_network_access.dart';
 import '../../domain/models/models.dart';
 import '../../domain/validation/validation.dart';
 import '../validation/validation.dart';
+import 'rgb_setup_wallet_engine.dart';
 import 'rgb_wallet_activity_mapper.dart';
 import 'rgb_wallet_balance_mapper.dart';
 import 'rgb_wallet_native_value_parser.dart';
@@ -63,22 +68,26 @@ final class RgbWalletEngineFactory implements WalletEngineFactory {
   const RgbWalletEngineFactory()
     : _sdk = const RgbSdkFlutter(),
       _bitcoinAddresses = const BitcoinPaymentInstructionParser(),
+      _localNetworkAccess = null,
       utcClock = null;
 
   /// Production constructor for sharing the app-owned validation boundary.
   const RgbWalletEngineFactory.withAddresses(
     this._bitcoinAddresses, {
     this.utcClock,
+    this._localNetworkAccess,
   }) : _sdk = const RgbSdkFlutter();
 
   /// Test seam for proving stable-SDK forwarding without global state.
   const RgbWalletEngineFactory.withSdk(
-    this._sdk, [
+    this._sdk, {
     this._bitcoinAddresses = const BitcoinPaymentInstructionParser(),
-  ]) : utcClock = null;
+    this._localNetworkAccess,
+  }) : utcClock = null;
 
   final RgbSdkFlutter _sdk;
   final BitcoinAddressValidator _bitcoinAddresses;
+  final LocalNetworkAccess? _localNetworkAccess;
 
   /// UTC time source forwarded to each created adapter.
   final DateTime Function()? utcClock;
@@ -110,6 +119,7 @@ final class RgbWalletEngineFactory implements WalletEngineFactory {
       ),
       clock: utcClock,
       bitcoinAddresses: _bitcoinAddresses,
+      localNetworkAccess: _localNetworkAccess,
     );
   }
 }
@@ -136,14 +146,16 @@ final class RgbWalletKeyGenerator implements WalletKeyGenerator {
 }
 
 /// Converts SDK models to app-owned domain models at the repository boundary.
-final class RgbWalletEngine implements WalletEngine {
+final class RgbWalletEngine implements WalletEngine, RgbSetupWalletEngine {
   RgbWalletEngine(
     this._wallet,
     this._services,
     this._unlockConfig, {
     DateTime Function()? clock,
     this._bitcoinAddresses = const BitcoinPaymentInstructionParser(),
-  }) : _clock = clock ?? _utcNow;
+    LocalNetworkAccess? localNetworkAccess,
+  }) : _clock = clock ?? _utcNow,
+       _localNetworkAccess = localNetworkAccess ?? PlatformLocalNetworkAccess();
 
   static const _receiveLifetime = Duration(hours: 1);
   static const _activities = RgbWalletActivityMapper();
@@ -155,6 +167,7 @@ final class RgbWalletEngine implements WalletEngine {
   final UtexoUnlockConfig _unlockConfig;
   final DateTime Function() _clock;
   final BitcoinAddressValidator _bitcoinAddresses;
+  final LocalNetworkAccess _localNetworkAccess;
 
   // RLN 0.17 has no Lightning runtime on mainnet; querying its Lightning-only
   // endpoints fails with 403. Never hide a real network error as an empty list.
@@ -166,26 +179,138 @@ final class RgbWalletEngine implements WalletEngine {
     required String databasePassword,
     required String mnemonic,
   }) async {
+    await _localNetworkAccess.ensureFor(_services);
     await _wallet.init(password: databasePassword, mnemonic: mnemonic);
     await _wallet.unlock(password: databasePassword, config: _unlockConfig);
   }
 
   @override
-  Future<void> openPersisted({required String databasePassword}) {
-    return _wallet.reinit(
+  Future<void> openPersisted({required String databasePassword}) async {
+    await _localNetworkAccess.ensureFor(_services);
+    await _wallet.reinit(
       password: databasePassword,
       unlockConfig: _unlockConfig,
     );
   }
 
   @override
-  Future<void> sync() => _wallet.syncWallet();
+  Future<void> sync() async {
+    await _wallet.syncWallet();
+    // RGB consignments and acknowledgements have their own state machine.
+    // A chain sync alone cannot advance an incoming asset transfer.
+    await _wallet.refreshWallet();
+  }
 
   @override
   Future<void> shutdown() => _wallet.shutdown();
 
   @override
   Future<void> destroy() => _wallet.destroy();
+
+  Future<int> _freeRgbAllocationCount() async {
+    final List<CoreUnspent> unspents;
+    try {
+      unspents = await _wallet.listUnspents();
+    } on FormatException catch (error, stack) {
+      Error.throwWithStackTrace(
+        NativeProtocolException(
+          'Malformed native wallet output response.',
+          field: 'listUnspents',
+          cause: FailureMapper.diagnosticCause(error),
+        ),
+        stack,
+      );
+    } on TypeError catch (error, stack) {
+      Error.throwWithStackTrace(
+        NativeProtocolException(
+          'Malformed native wallet output response.',
+          field: 'listUnspents',
+          cause: FailureMapper.diagnosticCause(error),
+        ),
+        stack,
+      );
+    }
+    if (unspents.length > 10000) {
+      throw const NativeProtocolException(
+        'Too many wallet outputs.',
+        field: 'unspents',
+      );
+    }
+    final outpoints = <String>{};
+    var available = 0;
+    for (final item in unspents) {
+      final outpoint = item.utxo.outpoint;
+      if (!RegExp(r'^[a-f0-9]{64}$').hasMatch(outpoint.txid) ||
+          outpoint.vout < 0 ||
+          outpoint.vout > 0xffffffff ||
+          !outpoints.add('${outpoint.txid}:${outpoint.vout}') ||
+          item.pendingBlinded < 0 ||
+          item.utxo.btcAmount < 0) {
+        throw const NativeProtocolException(
+          'Malformed wallet output inventory.',
+          field: 'unspents',
+        );
+      }
+      if (item.utxo.exists &&
+          item.utxo.colorable &&
+          item.rgbAllocations.isEmpty &&
+          item.pendingBlinded == 0) {
+        available += 1;
+      }
+    }
+    return available;
+  }
+
+  @override
+  Future<RgbWalletSetupInventory> rgbSetupInventory() async {
+    final available = await _freeRgbAllocationCount();
+    final bitcoin = await _wallet.getBtcBalance();
+    _balances.validateBitcoin(bitcoin);
+    final node = await _wallet.getNodeInfo();
+    final artifact = await const RgbSdkFlutter().nativeArtifactInfo();
+    final fingerprint = sha256
+        .convert(
+          utf8.encode(
+            jsonEncode({
+              'artifact': artifact.toMap(),
+              'policy': 'aster-rgb-setup-v1',
+            }),
+          ),
+        )
+        .toString();
+    return RgbWalletSetupInventory(
+      freeAllocationCount: available,
+      vanillaSpendableSats: bitcoin.vanilla.spendable,
+      runtimeFingerprint: fingerprint,
+      nodePublicKey: node.pubkey,
+    );
+  }
+
+  @override
+  Future<List<RgbWalletSetupTransaction>> rgbSetupTransactions() async =>
+      (await _wallet.listTransactions())
+          .where((tx) => tx.transactionType == 'CreateUtxos')
+          .map(
+            (tx) => RgbWalletSetupTransaction(
+              txid: tx.txid,
+              confirmed: tx.confirmationTime != null,
+            ),
+          )
+          .toList(growable: false);
+
+  @override
+  Future<void> createRgbSetupOutputs(int feeRateSatPerVbyte) async {
+    if (feeRateSatPerVbyte <= 0 ||
+        feeRateSatPerVbyte > WalletFeeRateEstimate.maximumSatsPerVbyte) {
+      throw ArgumentError('Invalid reviewed fee rate.');
+    }
+    await _wallet.createUtxos(
+      upTo: false,
+      num: RgbWalletSetupReview.outputCount,
+      size: RgbWalletSetupReview.outputValueSats,
+      feeRate: feeRateSatPerVbyte.toDouble(),
+    );
+  }
 
   @override
   Future<WalletBalance> getBalance(WalletAsset asset) async {
@@ -267,6 +392,16 @@ final class RgbWalletEngine implements WalletEngine {
       throw const WalletValidationException(
         'Confirmation target is outside the supported range.',
         field: 'targetBlocks',
+      );
+    }
+    // A local regtest chain has no fee market and Esplora may return no fee
+    // estimates. This is an explicit test-chain policy, never an error fallback.
+    if (_services.environment == BlockchainEnvironment.regtest) {
+      return WalletFeeRateEstimate(
+        targetBlocks: targetBlocks,
+        satsPerVbyte: 1,
+        observedAt: _clock().toUtc(),
+        source: WalletFeeRateSource.localRegtestPolicy,
       );
     }
     final response = await _wallet.estimateFeeRate(targetBlocks);
@@ -424,16 +559,28 @@ final class RgbWalletEngine implements WalletEngine {
 
   Future<WalletReceiveRequest> _createRgbReceive(
     PaymentRoute route,
-    WalletAmount? amount,
-  ) async {
+    WalletAmount? amount, {
+    RgbReceiveMode mode = RgbReceiveMode.witness,
+  }) async {
     final assetImported = await _isRgbAssetImported(route.asset.id.value);
-    final response = await _wallet.onchainReceive(
-      RgbInvoiceRequest(
-        assetId: assetImported ? route.asset.id.value : null,
-        amount: assetImported ? amount?.units : null,
-        durationSeconds: _receiveLifetime.inSeconds,
-      ),
-    );
+    final OnchainReceiveResponse response;
+    try {
+      response = await _wallet.onchainReceive(
+        RgbInvoiceRequest(
+          assetId: assetImported ? route.asset.id.value : null,
+          amount: assetImported ? amount?.units : null,
+          durationSeconds: _receiveLifetime.inSeconds,
+          witness: mode == RgbReceiveMode.witness,
+        ),
+      );
+    } on RgbSdkException catch (error) {
+      if (mode == RgbReceiveMode.blind &&
+          (error.nativeCode == 'NoAvailableUtxos' ||
+              error.nativeCode == 'InsufficientAllocationSlots')) {
+        throw const AppFailureException(rgbWalletSetupRequiredFailure);
+      }
+      rethrow;
+    }
     final invoice = _nativeQrPaymentValue(
       response.invoice,
       'OnchainReceiveResponse.invoice',
@@ -447,7 +594,11 @@ final class RgbWalletEngine implements WalletEngine {
       'OnchainReceiveResponse.batchTransferIdx',
     );
     final preview = await _decodeRgbInvoice(route, invoice);
-    if ((assetImported ? preview.amount != amount : preview.amount != null) ||
+    if (preview.rgbRecipientType !=
+            (mode == RgbReceiveMode.witness
+                ? RgbRecipientType.witness
+                : RgbRecipientType.blind) ||
+        (assetImported ? preview.amount != amount : preview.amount != null) ||
         (nativeRecipient != null && preview.referenceId != nativeRecipient)) {
       throw const NativeProtocolException(
         'Created RGB invoice does not match the request.',
@@ -477,11 +628,32 @@ final class RgbWalletEngine implements WalletEngine {
     );
   }
 
+  @override
+  Future<WalletReceiveRequest> createBlindRgbReceive(
+    PaymentRoute route, {
+    WalletAmount? amount,
+  }) {
+    _requireConfiguredRoute(route);
+    _requireOptionalAmount(route, amount);
+    if (route.target != WalletPaymentTarget.usdtOnchain) {
+      throw const AppConfigurationException();
+    }
+    return _createRgbReceive(route, amount, mode: RgbReceiveMode.blind);
+  }
+
   Future<WalletPaymentPreview> _decodeRgbInvoice(
     PaymentRoute route,
     String invoice,
   ) async {
     final decoded = await _wallet.decodeRgbInvoice(invoice);
+    final recipientType = switch (decoded.recipientType) {
+      'Blind' => RgbRecipientType.blind,
+      'Witness' => RgbRecipientType.witness,
+      _ => throw const NativeProtocolException(
+        'Unknown RGB recipient type.',
+        field: 'CoreInvoiceData.recipientType',
+      ),
+    };
     _requireNativeEnvironment(decoded.network, 'CoreInvoiceData.network');
     if (decoded.assignment.type != 'Fungible' &&
         decoded.assignment.type != 'Any') {
@@ -517,6 +689,7 @@ final class RgbWalletEngine implements WalletEngine {
       route: route,
       encodedDestination: invoice,
       displayDestination: invoice,
+      rgbRecipientType: recipientType,
       amount: amount,
       expiresAt: _nativeValues.optionalUnixSeconds(
         decoded.expirationTimestamp,
@@ -629,6 +802,7 @@ final class RgbWalletEngine implements WalletEngine {
         field: 'destination',
       );
     }
+    _requireReviewedOnchainFee(command);
     return _runPaymentMutation(() async {
       final txid = await _wallet.sendBtc(
         amount: command.amount.units,
@@ -664,10 +838,28 @@ final class RgbWalletEngine implements WalletEngine {
         error is AppConfigurationException;
   }
 
+  void _requireReviewedOnchainFee(WalletSendCommand command) {
+    final fee = command.feeRate;
+    if (fee == null ||
+        fee.isStaleAt(_clock()) ||
+        (fee.source == WalletFeeRateSource.localRegtestPolicy &&
+            _services.environment != BlockchainEnvironment.regtest)) {
+      throw const AppFailureException(walletFeeReviewRequiredFailure);
+    }
+  }
+
   Future<WalletSendResult> _sendRgb(WalletSendCommand command) async {
     final preview = await _decodeRgbInvoice(command.route, command.destination);
     _requireMatchingAmount(preview, command.amount);
     _requireNotExpired(preview);
+    if (command.rgbRecipientType != preview.rgbRecipientType ||
+        command.witnessBitcoinAmountSats != preview.witnessBitcoinAmountSats) {
+      throw const WalletValidationException(
+        'The RGB recipient or reviewed Bitcoin output changed. Review the payment again.',
+        field: 'recipientType',
+      );
+    }
+    _requireReviewedOnchainFee(command);
     return _runPaymentMutation(() async {
       final response = await _wallet.onchainSend(
         RgbSendRequest(
@@ -675,6 +867,7 @@ final class RgbWalletEngine implements WalletEngine {
           assetId: command.route.asset.id.value,
           amount: command.amount.units,
           feeRate: command.feeRate!.satsPerVbyte.toDouble(),
+          witnessAmountSat: command.witnessBitcoinAmountSats,
         ),
       );
       return WalletSendResult(

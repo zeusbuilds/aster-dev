@@ -1,116 +1,220 @@
-# Aster Local Regtest
+# Aster shared local regtest
 
-## Ownership
+Aster consumes the existing `utexo_local` development stack. Wallet storage is
+app-owned and separate from every infrastructure wallet and from SDK examples.
+Do not initialize another stack, run SDK `regtest.sh`, reset chains, remove
+containers, or clear existing wallet data to run these tests.
 
-Aster owns the Compose project `aster-app-regtest`, network
-`aster-app-regtest-network`, and state under `.local/aster-regtest/` in this
-checkout. These resources carry the `com.aster.owner=aster-dev` label. This is
-a development chain with valueless test coins, not a release deployment.
+Before configuring a consumer, read the shared folder's `AGENTS.md`,
+`docs/CONSUMERS.md`, `artifacts/consumer-config.json`, `README.md`,
+`docs/RUNBOOK.md`, `manifests/sources.json`, and `docs/VALIDATION.md`.
+Use its exported public RGB contract only after checking the recorded SHA-256.
+The contract identity belongs to this preserved local chain and must not be
+copied into a public-network configuration or replaced with invented metadata.
 
-Never stop, reset, recreate, inspect secrets from, or reuse the external
-`rgb-lightning-node-perf-lab`, Iris-owned wallet stack, or SDK regtest
-projects. Do not run their `regtest.sh` scripts. Their containers, wallets,
-networks, and data are not Aster dependencies.
+## Existing services
 
-| Service | Host endpoint | Persistent state |
+| Service | Host / iOS Simulator | Android emulator |
 | --- | --- | --- |
-| Bitcoin Core 30.0 | `127.0.0.1:19443` RPC | `.local/aster-regtest/bitcoind/` |
-| Electrs 0.10.10 | `127.0.0.1:51001` Electrum TCP | `.local/aster-regtest/electrs/` |
-| RGB proxy 0.3.0 | `rpc://127.0.0.1:3100/json-rpc` | `.local/aster-regtest/proxy/` |
-| Miner / faucet | No published port | `aster-faucet` wallet inside Bitcoin state |
+| Esplora | `http://127.0.0.1:18094` | `http://10.0.2.2:18094` |
+| Electrum | `127.0.0.1:18001` | `10.0.2.2:18001` |
+| RGB proxy | `rpc://127.0.0.1:28090/json-rpc` | `rpc://10.0.2.2:28090/json-rpc` |
+| Local EVM | `http://127.0.0.1:18555` | `http://10.0.2.2:18555` |
+| Gateway | `http://127.0.0.1:18088` | `http://10.0.2.2:18088` |
+| Explorer | `http://127.0.0.1:18095` | `http://10.0.2.2:18095` |
 
-The app's embedded native node uses ports `19735` (daemon) and `19736`
-(Lightning peers) in the generated local configuration. The normal SDK
-defaults `9735`/`9736` can collide with other simulator wallets on the host.
-These are app-process listeners, not Docker services or provisioned channels.
+EVM chain ID `42161` is a local fixture, not public Arbitrum. The main profile
+does not supply an LSP, VSS backup service, or funded Lightning channels. Keep
+those app capabilities unavailable; do not treat a healthy indexer as proof of
+Lightning or backup operation.
 
-## Initialize And Run
+The already existing `wdk-rln-017-qualification` stack is reserved for destructive
+regression testing (RLN API `29301`, Esplora `29302`, proxy `29300`). The separate
+qualification Anvil uses RPC `29545`, chain `31337`. Never perform reorgs or
+interrupted-transaction experiments on `utexo_local`, or substitute these chains
+for one another during a bridge operation.
 
-From the app root, initialize once:
+## App configuration
 
-```sh
-fvm dart run tool/initialize_local_regtest.dart
-docker compose --env-file .local/aster-regtest/compose.env -f ops/regtest/compose.yaml up -d --wait --wait-timeout 180
-docker compose --env-file .local/aster-regtest/compose.env -f ops/regtest/compose.yaml ps
-```
+Use ignored `config/shared-stack.ios.local.json` and
+`config/shared-stack.android.local.json`. Set `ASTER_NETWORK` to `regtest`,
+`ASTER_INDEXER_URL` and `ASTER_RGB_PROXY_URL` to the appropriate endpoints above,
+and `ASTER_ETH_RPC_URL` to the local EVM. Take `ASTER_USDT_ASSET_ID` and
+`ASTER_USDT_PRECISION` from the shared consumer manifest. Leave LSP/VSS unset.
+Reserve free app-process listener ports with `ASTER_DAEMON_PORT` and
+`ASTER_LDK_PEER_PORT`; this qualification uses `19745` and `19746`. These are
+embedded wallet listeners, not stack services. Do not stop another process to
+make a port available.
 
-The initializer refuses existing state/configuration and symlinked local or
-configuration roots. It generates independent random RPC credentials inside
-a mode-700 directory; credential files are mode 600. It writes only public,
-non-secret defines to ignored `config/regtest.ios.local.json`. Never commit
-these files, print interpolated Compose configuration, or treat `.local` as a
-build cache. An interrupted initialization preserves partial state for manual
-inspection, not automatic deletion or password rotation.
-
-Run `up` again to restart existing services; do not rerun initialization.
-Before starting, check that `19443`, `51001`, `3100`, `19735`, and `19736` are
-free or already owned by this exact Aster setup. A collision is a reason to
-choose new Aster ports and update its local config, never stop another app.
-
-Build and run on an explicitly selected Aster-only iOS simulator:
+Build the normal app with the explicitly selected Aster-owned device:
 
 ```sh
-make verify-generated ios-dependencies
-BUNDLE_FROZEN=true BUNDLE_PATH="$PWD/.bundle" bundle exec fvm flutter run --no-pub -d <ASTER_SIMULATOR_ID> --dart-define-from-file=config/regtest.ios.local.json
+fvm flutter run --no-pub -d <ASTER_DEVICE_ID> \
+  --dart-define-from-file=config/shared-stack.ios.local.json
 ```
 
-For Android, create a separate ignored local JSON config using `10.0.2.2`
-instead of `127.0.0.1` for the indexer and proxy hosts; keep the Aster ports.
-Then pass that file to `fvm flutter run --no-pub -d <ASTER_DEVICE_ID>` with
-`--dart-define-from-file`. The Android runtime has not been qualified against
-this new stack. Never target an Iris emulator.
+Use the Android file on Android. On Android 17 / target API 37, Aster requests
+local network access before native wallet initialization. Allow it in the OS
+dialog. Denial leaves wallet initialization unstarted and gives a typed,
+actionable failure; allow the permission in system settings before retrying.
+Public endpoint profiles do not request this local permission. See Android's
+[local network permission documentation](https://developer.android.com/privacy-and-security/local-network-permission).
 
-## Health, Mining, And Funding
+Local HTTP transport is Debug/Profile only. These defines do not satisfy the
+TLS or deployment ownership requirements of a Release artifact.
 
-The miner creates or loads only `aster-faucet`, bootstraps a new chain to at
-least 101 blocks, and mines one block every ten seconds. It never resets an
-existing chain. Stop/start only the miner service to control confirmations:
+## Funding and RGB preparation
+
+Create only disposable local test wallets. Obtain an actual new `bcrt1...`
+receive address from the app, then use the shared stack's locked funding tool:
 
 ```sh
-docker compose --env-file .local/aster-regtest/compose.env -f ops/regtest/compose.yaml stop miner
-docker compose --env-file .local/aster-regtest/compose.env -f ops/regtest/compose.yaml start miner
-docker exec aster-app-regtest-bitcoind-1 bitcoin-cli -regtest -datadir=/srv/app/.bitcoin getblockchaininfo
+cd "$SHARED_STACK"
+./stack fund <NEW_APP_ADDRESS> 2000000
 ```
 
-Create a **test-only** wallet in Aster, select Receive > Bitcoin onchain, then
-fund its actual `bcrt1...` address from the isolated faucet:
+Amounts are integer satoshis. The shared stack owns mining and mutation locking.
+Keep financial intent, transaction IDs and receipts; inspect the existing
+journal before acting on a lost response. Never repeat an uncertain mint or
+burn. Never expose a mnemonic, native password, RPC credential or private key
+in a command, log or screenshot.
+
+Witness receive remains the default and does not require output preparation.
+Its sender separately reviews a 1,000-sat Bitcoin output to the recipient plus
+network fees. The optional **Use blind receive** action explains its different
+requirements before changing mode.
+
+A fresh RGB blind receive may need wallet-owned allocation outputs. Aster's
+Receive flow provides an explicit preparation review and confirmation. The
+review requests up to four outputs of 20,000 satoshis each and discloses the
+fee rate; native RLN does not supply an exact total fee or a guaranteed created
+count. Funds stay wallet-owned except transaction fees. Cancelling the review
+does not call `createUtxos`. Confirm dispatches once after a durable marker;
+pending or uncertain outcomes block another onchain mutation until reconciled.
+The app observes confirmed history and free allocation outputs before declaring
+the wallet ready. It never silently spends BTC to create a receive request.
+
+The first receive invoice can be unbound to an asset and amount until the
+first valid consignment imports the contract. The sender must review and enter
+the intended exact amount. After receipt, verify canonical asset identity,
+precision, balance and history; do not manufacture a USDT balance or label a
+first unbound invoice as an amount-bound request.
+
+## Device qualification
+
+`integration_test/full_wallet_flow_test.dart` uses production Aster bootstrap,
+native SDK, cryptography, repository and real platform storage with a separate
+`aster_full_wallet_qa/<run-id>` directory and secure-storage namespace. A unique
+run ID is mandatory. Existing runs and financial requests must never be
+overwritten or automatically replayed.
+
+`tool/run_shared_wallet_qualification.py` launches one run against the already
+operated loopback evidence/controller service on `127.0.0.1:29671`. That
+controller must follow the shared consumer contract, mutation lock and durable
+mint/burn journals. The runner neither starts it nor provisions infrastructure.
+Android requires `adb -s <ASTER_SERIAL> reverse tcp:29671 tcp:29671`.
 
 ```sh
-docker exec aster-app-regtest-bitcoind-1 bitcoin-cli -regtest -datadir=/srv/app/.bitcoin -rpcwallet=aster-faucet sendtoaddress <ASTER_REGTEST_ADDRESS> 0.01
+FLUTTER_BIN="$(command -v flutter)" python3 tool/run_shared_wallet_qualification.py \
+  --device <ASTER_DEVICE_ID> --run-id <NEW_UNIQUE_RUN_ID> --stage full
 ```
 
-After mining/indexing, refresh Home to synchronize. An unfunded wallet starts
-with zero; the app does not invent a balance. Never import a real-funds seed
-into this simulator. Do not post mnemonics or RPC credentials in diagnostics.
+Use the pinned Flutter, scoped JDK, Bundler and Xcode environment described in
+`DEVELOPMENT.md`. The runner records source hashes, consumer/configuration
+hashes, events, test output and a private closed-fixture copy under ignored
+`.buildlog/full-wallet-20261015/<run-id>/`. A native disposal and verified
+host-copy acknowledgement are required for a passing report. Failed runs and
+uncertain journals remain intact.
 
-Bitcoin RPC, proxy JSON-RPC, and miner heartbeat have bounded health checks.
-Electrs' container health checks its listener; verify actual indexing with
-the Electrum `blockchain.headers.subscribe` method when collecting evidence.
-Bitcoin P2P listening is explicitly enabled for electrs inside the isolated
-Docker network even with outbound peers disabled by `-connect=0`. P2P is not
-published to the host. Startup failure or unhealthy status is not a readiness
-pass. Logs are size-bounded but may still be sensitive; inspect them locally.
+The harness captures the exact wallet-selector `ModalRoute` and requires it to
+be inactive, the selector absent and the target wallet committed before another
+navigation command. A GoRouter refresh can leave the original push Future
+unresolved after actual removal, so its completion is not navigation proof;
+Future errors are still observed. Its binding retains a framework-error
+latch after an exception has been consumed, while preserving normal Flutter
+and driver failure reporting. A late asynchronous failure stops further UI and
+financial work. Preparation confirmation is submitted once; the helper waits
+for a delayed, enabled Check preparation action without repeating Confirm.
+A failed scheduling run remains failed even when earlier financial steps
+completed. Preserve its closed fixture and receipts; do not rerun its financial
+requests to repair the report. A fresh full qualification uses a new run ID.
 
-## Capabilities And Limits
+A process-start failure before test entry must not be reported as native
+disposal or a closed-wallet backup. The narrowly reviewed Android I/J admissions
+requires the immutable failed report with zero events, no test/SDK entry,
+unchanged source/SDK/configuration, a stopped process and an absent QA root
+before, after and at quiescence. Its separate preservation supplement binds
+the full app credential-encrypted/device-encrypted snapshot and exact prior
+fixture files. This admits only a fresh isolated run; it never replays a
+financial request or turns the failed report into a pass. All other failed
+checkpoints retain their ordinary refusal and preservation requirements.
 
-This stack supplies Bitcoin regtest, an Electrum indexer, and RGB consignment
-transport. It does **not** provision an RGB USDT contract, LSP, peer/channel
-liquidity, VSS backup, or explorer. USDT stays unavailable without a real
-configured contract ID/precision; Lightning payments require real channels
-and liquidity. Healthy containers do not prove funded wallet flows or all
-four payment options. Full exact-candidate qualification remains TEST-019.
+The reviewed K launch names both prior pre-entry failures explicitly:
 
-Images are pinned to immutable digests in `ops/regtest/compose.yaml`, using
-the locally available Hashbeam Bitcoin/electrs packaging and RGB-Tools proxy.
-The proxy's OCI metadata identifies source revision
-`f466a580b1108580a922b098dc6952b4bde219cb` and MIT licensing. The Hashbeam
-wrappers do not provide complete source/license attestations in their inspected
-OCI labels. Digests establish identity, not independently verified provenance,
-licensing completeness, signatures, or reproducible builds. These images are
-local development dependencies, not an approved production supply chain.
+```sh
+python3 tool/run_shared_wallet_qualification.py \
+  --device emulator-5582 --run-id aster-full-android17-20261015-k --stage full \
+  --admit-pretest-failure aster-full-android17-20261015-i \
+  --admit-pretest-failure aster-full-android17-20261015-j
+```
 
-App endpoint policy rejects protected ports `18443`, `50001`, and `3000` on
-loopback and Android emulator host aliases. Noncanonical numeric aliases such
-as `127.1` fail before native use. Insecure local transport is Debug/Profile
-only; this config intentionally cannot qualify a Release artifact, which
-requires explicit TLS-protected endpoints and the release manifest gate.
+Its cold restore uses `--stage restore`,
+`--restore-from aster-full-android17-20261015-k`, a new control run ID
+`aster-restore-android17-20261015-k`, and the same two explicit admission flags.
+These flags admit only the pinned I/J reports and preservation evidence on the
+same owned device; they are not a general failed-run bypass. The runner checks
+read-only Android framework readiness before creating invocation evidence or
+launching Flutter: boot completion and both package/activity services are
+required. A zero-exit service query saying the service is absent still fails.
+The reviewed data-preserving reboot changes no AVD, wallet files or stack.
+After reboot, verify API 37, 16 KiB/fatal compatibility, app UID/data and prior
+fixture hashes; restore only controller reverse port 29671. Standard drive
+uses `--no-start-paused` with `--keep-app-running`.
+
+The private copy is a local test snapshot, not a portable recovery backup.
+iOS credentials remain in the same simulator's Keychain account. Android
+credentials remain in the original app's Keystore and encrypted preferences;
+do not uninstall or clear that app. Flutter iOS integration can uninstall at
+run boundaries, so preserve closed files before teardown and restore only
+into a verified empty owned fixture while keeping the same Keychain identity.
+Cold-process restore must follow verified process termination and retain the
+same two wallet identities, all BTC/BFA balance dimensions and active selection,
+with unchanged source/SDK/configuration and original-backup hash. A normal app
+launch is separate evidence and must not replace that isolated restore check.
+The final iOS J and Android K full/cold-restore reports meet these local
+onchain criteria. Earlier failed reports, including zero-event I/J OS failures,
+remain immutable; the same AVD recovery preserved the full app archive and
+prior fixture files. Both normal main entry points also launch independently;
+the matching normal Android APK installs without erase and renders Welcome on
+API 37 / 16 KiB with compatibility fallback disabled. That public-screen proof
+uses the fresh direct-ADB capture, not the retained stale tool frame. The final infrastructure audit confirms every accepted
+app Send from its full Esplora transaction body and rechecks exact financial,
+acknowledgement and event evidence after health. It never replays a financial
+request or uses `/status` alone as proof of transaction existence. Exact
+reports, hashes and qualification limits are in
+`SHARED_WALLET_QUALIFICATION.md`.
+
+Device reports distinguish actual UI interaction from repository-level native
+payment checks. Simulator/emulator success does not qualify physical camera,
+VoiceOver/TalkBack, hardware performance, release signing, mainnet funds,
+unimplemented Lightning routes, or upstream reorg and recovery fixes. See
+`SHARED_WALLET_QUALIFICATION.md` for the current evidence and remaining limits.
+
+## Historical isolated-stack tooling
+
+`ops/regtest/compose.yaml` and `tool/initialize_local_regtest.dart` remain from
+the earlier Aster-owned infrastructure experiment. They are not prerequisites
+for this shared-stack workflow and must not be invoked for this qualification.
+Their old endpoints (`19443`, `51001`, `3100`) do not identify `utexo_local`.
+
+## Already accepted mint after a harness failure
+
+`--stage reconcile-mint --restore-from <FAILED_FULL_RUN>` is a narrow,
+read-only recovery path for the recorded `qa_private_field_rejected` test
+failure after an accepted mint acknowledgement. It requires the same owned
+device, unchanged consumer/configuration identities, one matching canonical
+mint, and a hash-verified closed fixture. It opens the original storage and
+secure namespace, syncs the already-issued consignment, validates exact BTC
+and BFA state, and closes with another private snapshot. It never funds,
+mints, burns, sends or prepares outputs. Other failed checkpoints are refused;
+inspect their journals explicitly instead of replaying a financial request.

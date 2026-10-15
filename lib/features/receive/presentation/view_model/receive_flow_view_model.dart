@@ -1,15 +1,41 @@
 import 'dart:async';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/core.dart';
 import '../../../../shared/feedback/feedback.dart';
+import '../../../settings/data/repository/repository.dart';
 import '../../../settings/domain/models/models.dart';
 import '../../../wallet/data/repository/repository.dart';
 import '../../../wallet/domain/models/models.dart';
+import '../../../wallet/presentation/models/models.dart';
+import '../../../wallet/presentation/view_model/wallet_view_model.dart';
 import '../models/models.dart';
 
 part 'receive_flow_view_model.g.dart';
+
+final class _ReceiveGeneration {
+  _ReceiveGeneration(
+    this.target,
+    this.repository,
+    this.settings,
+    this.clock,
+    this.wallet,
+    this.walletId,
+  );
+  final WalletPaymentTarget target;
+  final Future<WalletRepository> repository;
+  final Future<SettingsRepository> settings;
+  final DateTime Function() clock;
+  final Future<WalletState> wallet;
+  final String? walletId;
+  bool active = true;
+}
+
+final class _ReceiveGenerationChanged implements Exception {
+  const _ReceiveGenerationChanged();
+}
 
 /// Owns one route-scoped Receive request and its optional exact amount.
 @riverpod
@@ -17,15 +43,193 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
   static const _amountCodec = WalletAmountInputCodec();
 
   late WalletPaymentTarget _target;
+  _ReceiveGeneration? _generation;
+  bool _isCurrent(_ReceiveGeneration? value) =>
+      value != null && value.active && identical(value, _generation);
+  void _requireCurrent(_ReceiveGeneration value) {
+    if (!_isCurrent(value)) throw const _ReceiveGenerationChanged();
+  }
+
+  ReceiveFlowState? get _readyState {
+    if (!_isCurrent(_generation) || state.isLoading || state.hasError) {
+      return null;
+    }
+    return state.value;
+  }
+
+  static ({String? walletId, bool changing}) _walletContext(
+    AsyncValue<WalletState> wallet,
+  ) => (
+    walletId: wallet.value?.activeWallet?.id,
+    changing:
+        wallet.isLoading ||
+        wallet.hasError ||
+        wallet.value?.switchingWalletId != null,
+  );
+
+  Future<void> _requireWalletContext(_ReceiveGeneration generation) async {
+    final wallet = await generation.wallet;
+    _requireCurrent(generation);
+    if (generation.walletId == null ||
+        wallet.activeWallet?.id != generation.walletId ||
+        wallet.switchingWalletId != null) {
+      throw AppFailureException(_operationUnavailableFailure());
+    }
+  }
+
+  bool _setupCommandInFlight = false;
+  RgbReceiveMode _rgbReceiveMode = RgbReceiveMode.witness;
+  RgbReceiveMode get rgbReceiveMode => _rgbReceiveMode;
+
+  Future<void> setRgbReceiveMode(RgbReceiveMode mode) async {
+    final generation = _generation;
+    if (!_isCurrent(generation)) return;
+    if (_target != WalletPaymentTarget.usdtOnchain ||
+        _setupCommandInFlight ||
+        state.isLoading ||
+        (state.value?.isBusy ?? false) ||
+        mode == _rgbReceiveMode) {
+      return;
+    }
+    _rgbReceiveMode = mode;
+    state = const AsyncLoading();
+    final next = await AsyncValue.guard(() => _load(generation!, mode));
+    if (_isCurrent(generation)) state = next;
+  }
+
+  Future<AppResult<RgbWalletSetupReview>> prepareRgbSetup() async {
+    final generation = _generation;
+    if (!_isCurrent(generation)) {
+      return AppResult.failure(_operationUnavailableFailure());
+    }
+    if (_setupCommandInFlight ||
+        _target != WalletPaymentTarget.usdtOnchain ||
+        _rgbReceiveMode != RgbReceiveMode.blind) {
+      return AppResult.failure(_operationUnavailableFailure());
+    }
+    _setupCommandInFlight = true;
+    try {
+      final result = await _walletOperation(
+        (repository) => repository.prepareRgbWalletSetup(),
+      );
+      if (result case AppFailureResult<RgbWalletSetupReview>(:final failure)) {
+        _setupFailure(failure, generation);
+      }
+      return result;
+    } finally {
+      _setupCommandInFlight = false;
+    }
+  }
+
+  Future<void> cancelRgbSetup(RgbWalletSetupReview review) async {
+    final generation = _generation;
+    final result = await _walletOperation(
+      (repository) => repository.cancelRgbWalletSetup(review),
+    );
+    if (result case AppFailureResult<void>(:final failure)) {
+      _setupFailure(failure, generation);
+    }
+  }
+
+  Future<void> confirmRgbSetup(RgbWalletSetupReview review) async {
+    final generation = _generation;
+    if (!_isCurrent(generation)) return;
+    if (_setupCommandInFlight) return;
+    _setupCommandInFlight = true;
+    try {
+      final result = await _walletOperation(
+        (repository) => repository.confirmRgbWalletSetup(review),
+      );
+      if (!_isCurrent(generation)) return;
+      switch (result) {
+        case AppSuccess<RgbWalletSetupStatus>(:final value):
+          await _adoptRgbSetupStatus(value, generation!);
+        case AppFailureResult<RgbWalletSetupStatus>(:final failure):
+          _setupFailure(failure, generation);
+      }
+    } finally {
+      _setupCommandInFlight = false;
+    }
+  }
+
+  Future<void> checkRgbSetup() async {
+    final generation = _generation;
+    if (!_isCurrent(generation)) return;
+    if (_setupCommandInFlight) return;
+    _setupCommandInFlight = true;
+    try {
+      final result = await _walletOperation(
+        (repository) => repository.rgbWalletSetupStatus(),
+      );
+      if (!_isCurrent(generation)) return;
+      switch (result) {
+        case AppSuccess<RgbWalletSetupStatus>(:final value):
+          await _adoptRgbSetupStatus(value, generation!);
+        case AppFailureResult<RgbWalletSetupStatus>(:final failure):
+          _setupFailure(failure, generation);
+      }
+    } finally {
+      _setupCommandInFlight = false;
+    }
+  }
+
+  Future<void> _adoptRgbSetupStatus(
+    RgbWalletSetupStatus status,
+    _ReceiveGeneration generation,
+  ) async {
+    if (!_isCurrent(generation)) return;
+    if (status.phase == RgbWalletSetupPhase.ready ||
+        status.phase == RgbWalletSetupPhase.required) {
+      state = const AsyncLoading();
+      final next = await AsyncValue.guard(
+        () => _load(generation, _rgbReceiveMode),
+      );
+      if (_isCurrent(generation)) state = next;
+    } else {
+      _setupFailure(
+        status.phase == RgbWalletSetupPhase.required
+            ? rgbWalletSetupRequiredFailure
+            : rgbWalletSetupPendingFailure,
+        generation,
+      );
+    }
+  }
+
+  void _setupFailure(AppFailure failure, _ReceiveGeneration? generation) {
+    if (_isCurrent(generation)) {
+      state = AsyncError(AppFailureException(failure), StackTrace.current);
+    }
+  }
 
   @override
   Future<ReceiveFlowState> build(WalletPaymentTarget target) {
     _target = target;
-    return _load();
+    final walletContext = ref.watch(
+      walletViewModelProvider.select(_walletContext),
+    );
+    final generation = _ReceiveGeneration(
+      target,
+      ref.watch(walletRepositoryProvider.future),
+      ref.watch(settingsRepositoryProvider.future),
+      ref.watch(utcClockProvider),
+      ref.read(walletViewModelProvider.future),
+      walletContext.walletId,
+    );
+    _generation = generation;
+    // Invalidate immediately on a selection transition, including the gap
+    // before Riverpod rebuilds this provider. A late old-wallet request must
+    // never become the next visible or copyable request.
+    ref.listen(walletViewModelProvider, (_, next) {
+      if (_walletContext(next) != walletContext) generation.active = false;
+    });
+    ref.onDispose(() => generation.active = false);
+    return _load(generation, _rgbReceiveMode);
   }
 
   /// Retries initial route resolution and request generation.
   Future<void> retry() async {
+    final generation = _generation;
+    if (!_isCurrent(generation)) return;
     final failure = switch (state) {
       AsyncError(:final error, :final stackTrace) => FailureMapper.from(
         error,
@@ -35,13 +239,33 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
     };
     if (failure == null || !failure.retryable) return;
     state = const AsyncLoading();
-    final next = await AsyncValue.guard(_load);
-    if (ref.mounted) state = next;
+    final next = await AsyncValue.guard(
+      () => _load(generation!, _rgbReceiveMode),
+    );
+    if (_isCurrent(generation)) state = next;
+  }
+
+  /// A user-requested genuine receive attempt after native capacity changed.
+  /// This never prepares outputs, spends Bitcoin, or cancels a probe invoice.
+  Future<void> retryRgbReceive() async {
+    final generation = _generation;
+    if (!_isCurrent(generation) ||
+        _rgbReceiveMode != RgbReceiveMode.blind ||
+        _setupCommandInFlight ||
+        state.isLoading ||
+        (state.value?.isBusy ?? false)) {
+      return;
+    }
+    state = const AsyncLoading();
+    final next = await AsyncValue.guard(
+      () => _load(generation!, RgbReceiveMode.blind),
+    );
+    if (_isCurrent(generation)) state = next;
   }
 
   /// Updates pending amount-sheet input without regenerating on every key.
   void updateAmount(String value) {
-    final current = state.value;
+    final current = _readyState;
     if (current == null || !current.canEditAmount) return;
     if (value == current.amountText) return;
     state = AsyncData(
@@ -55,7 +279,7 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
 
   /// Applies the pending amount and replaces the QR only after native success.
   Future<bool> applyAmount() async {
-    final current = state.value;
+    final current = _readyState;
     if (current == null || !current.canApplyAmount) return false;
     final units = current.amountText.isEmpty ? null : current.amountInput.units;
     return _generate(current, amountUnits: units, emitSuccessHaptic: true);
@@ -63,7 +287,7 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
 
   /// Generates a new address or invoice while preserving the applied amount.
   Future<bool> regenerate() async {
-    final current = state.value;
+    final current = _readyState;
     if (current == null || !current.canRegenerate) return false;
     return _generate(
       current,
@@ -74,10 +298,16 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
 
   /// Copies the currently encoded request through the app platform boundary.
   Future<AppResult<void>> copyRequest() async {
-    final current = state.value;
+    final generation = _generation;
+    if (!_isCurrent(generation)) {
+      return AppResult.failure(_operationUnavailableFailure());
+    }
+    final current = _readyState;
     if (current == null) {
       return AppResult.failure(_operationUnavailableFailure());
     }
+    final clipboard = ref.read(clipboardServiceProvider);
+    final haptics = ref.read(hapticFeedbackServiceProvider);
     if (_requestReadFailure(current) case final failure?) {
       return AppResult.failure(failure);
     }
@@ -85,19 +315,15 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
       current.copyWith(operation: ReceiveFlowOperation.copyingRequest),
     );
     final request = current.request!;
-    final result = await ref
-        .read(clipboardServiceProvider)
-        .writeText(request.encodedRequest);
-    if (!ref.mounted) return result;
+    final result = await clipboard.writeText(request.encodedRequest);
+    if (!_isCurrent(generation)) return result;
     state = AsyncData(current.copyWith(operation: null));
     unawaited(
-      ref
-          .read(hapticFeedbackServiceProvider)
-          .trigger(
-            result is AppSuccess<void>
-                ? HapticIntent.lightImpact
-                : HapticIntent.error,
-          ),
+      haptics.trigger(
+        result is AppSuccess<void>
+            ? HapticIntent.lightImpact
+            : HapticIntent.error,
+      ),
     );
     return result;
   }
@@ -106,10 +332,16 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
   Future<AppResult<ShareDisposition>> shareRequest({
     ShareOrigin? origin,
   }) async {
-    final current = state.value;
+    final generation = _generation;
+    if (!_isCurrent(generation)) {
+      return AppResult.failure(_operationUnavailableFailure());
+    }
+    final current = _readyState;
     if (current == null) {
       return AppResult.failure(_operationUnavailableFailure());
     }
+    final share = ref.read(shareServiceProvider);
+    final haptics = ref.read(hapticFeedbackServiceProvider);
     if (_requestReadFailure(current) case final failure?) {
       return AppResult.failure(failure);
     }
@@ -117,40 +349,48 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
       current.copyWith(operation: ReceiveFlowOperation.sharingRequest),
     );
     final request = current.request!;
-    final result = await ref
-        .read(shareServiceProvider)
-        .shareText(
-          request.encodedRequest,
-          subject: '${current.route.asset.displayName} payment request',
-          origin: origin,
-        );
-    if (!ref.mounted) return result;
+    final result = await share.shareText(
+      request.encodedRequest,
+      subject: '${current.route.asset.displayName} payment request',
+      origin: origin,
+    );
+    if (!_isCurrent(generation)) return result;
     state = AsyncData(current.copyWith(operation: null));
     if (result case AppFailureResult<ShareDisposition>()) {
-      unawaited(
-        ref.read(hapticFeedbackServiceProvider).trigger(HapticIntent.error),
-      );
+      unawaited(haptics.trigger(HapticIntent.error));
     }
     return result;
   }
 
-  Future<ReceiveFlowState> _load() async {
+  Future<ReceiveFlowState> _load(
+    _ReceiveGeneration generation,
+    RgbReceiveMode mode,
+  ) async {
     try {
-      return await _loadUnsafe();
+      return await _loadUnsafe(generation, mode);
+    } on _ReceiveGenerationChanged {
+      rethrow;
     } catch (error, stackTrace) {
       throw AppFailureException(FailureMapper.from(error, stackTrace));
     }
   }
 
-  Future<ReceiveFlowState> _loadUnsafe() async {
-    final repository = await ref.read(walletRepositoryProvider.future);
-    final settings = await ref.read(settingsRepositoryProvider.future);
-    final routeResult = repository.resolvePaymentTarget(_target);
+  Future<ReceiveFlowState> _loadUnsafe(
+    _ReceiveGeneration generation,
+    RgbReceiveMode mode,
+  ) async {
+    await _requireWalletContext(generation);
+    final repository = await generation.repository;
+    _requireCurrent(generation);
+    final settings = await generation.settings;
+    _requireCurrent(generation);
+    final routeResult = repository.resolvePaymentTarget(generation.target);
     if (routeResult case AppFailureResult<PaymentRoute>(:final failure)) {
       throw AppFailureException(failure);
     }
     final route = (routeResult as AppSuccess<PaymentRoute>).value;
     final settingsResult = await settings.load();
+    _requireCurrent(generation);
     if (settingsResult case AppFailureResult<SettingsSnapshot>(
       :final failure,
     )) {
@@ -160,10 +400,14 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
         (settingsResult as AppSuccess<SettingsSnapshot>).value;
     final bitcoinUnit = settingsSnapshot.preferences.bitcoinUnit;
     final WalletReceiveRequest? request;
-    if (_target.requiresReceiveAmount) {
+    if (generation.target.requiresReceiveAmount) {
       request = null;
     } else {
-      final requestResult = await repository.createReceiveRequest(_target);
+      final requestResult = await repository.createReceiveRequest(
+        generation.target,
+        rgbReceiveMode: mode,
+      );
+      _requireCurrent(generation);
       if (requestResult case AppFailureResult<WalletReceiveRequest>(
         :final failure,
       )) {
@@ -189,6 +433,10 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
     required int? amountUnits,
     required bool emitSuccessHaptic,
   }) async {
+    final generation = _generation;
+    if (!_isCurrent(generation)) return false;
+    final haptics = ref.read(hapticFeedbackServiceProvider);
+    final mode = _rgbReceiveMode;
     state = AsyncData(
       previous.copyWith(
         operation: ReceiveFlowOperation.generatingRequest,
@@ -196,10 +444,15 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
       ),
     );
     final result = await _walletOperation(
-      (repository) =>
-          repository.createReceiveRequest(_target, amountUnits: amountUnits),
+      (repository) => repository.createReceiveRequest(
+        generation!.target,
+        amountUnits: amountUnits,
+        rgbReceiveMode: mode,
+      ),
     );
-    if (!ref.mounted) return result is AppSuccess<WalletReceiveRequest>;
+    if (!_isCurrent(generation)) {
+      return result is AppSuccess<WalletReceiveRequest>;
+    }
     return switch (result) {
       AppSuccess<WalletReceiveRequest>(:final value) => () {
         final amount = value.amount;
@@ -220,11 +473,7 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
           ),
         );
         if (emitSuccessHaptic) {
-          unawaited(
-            ref
-                .read(hapticFeedbackServiceProvider)
-                .trigger(HapticIntent.success),
-          );
+          unawaited(haptics.trigger(HapticIntent.success));
         }
         return true;
       }(),
@@ -238,9 +487,7 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
             ),
           ),
         );
-        unawaited(
-          ref.read(hapticFeedbackServiceProvider).trigger(HapticIntent.error),
-        );
+        unawaited(haptics.trigger(HapticIntent.error));
         return false;
       }(),
     };
@@ -257,8 +504,16 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
   Future<AppResult<T>> _walletOperation<T>(
     Future<AppResult<T>> Function(WalletRepository repository) operation,
   ) async {
+    final generation = _generation;
+    if (!_isCurrent(generation)) {
+      return AppResult.failure(_operationUnavailableFailure());
+    }
     try {
-      final repository = await ref.read(walletRepositoryProvider.future);
+      await _requireWalletContext(generation!);
+      final repository = await generation.repository;
+      if (!_isCurrent(generation)) {
+        return AppResult.failure(_operationUnavailableFailure());
+      }
       return await operation(repository);
     } catch (error, stackTrace) {
       return AppResult.failure(FailureMapper.from(error, stackTrace));
@@ -270,7 +525,7 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
       return _operationUnavailableFailure();
     }
     if (current.request == null) return _requestNotReadyFailure;
-    if (current.isExpiredAt(ref.read(utcClockProvider)())) {
+    if (current.isExpiredAt(_generation!.clock())) {
       return _requestExpiredFailure;
     }
     return null;

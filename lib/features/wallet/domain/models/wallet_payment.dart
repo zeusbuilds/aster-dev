@@ -7,6 +7,13 @@ import 'wallet_asset.dart';
 import 'wallet_fee.dart';
 
 /// App-owned lifecycle state for a payment or transfer.
+enum RgbRecipientType { blind, witness }
+
+enum RgbReceiveMode { witness, blind }
+
+/// Explicit app policy for the additional Bitcoin output of a witness send.
+const rgbWitnessRecipientSats = 1000;
+
 enum WalletPaymentStatus { pending, succeeded, failed, cancelled, expired }
 
 /// Validated destination preview returned before a send is submitted.
@@ -24,7 +31,12 @@ final class WalletPaymentPreview {
     this.referenceId,
     this.recipientLabel,
     this.message,
+    this.rgbRecipientType,
   }) {
+    if (rgbRecipientType != null &&
+        route.target != WalletPaymentTarget.usdtOnchain) {
+      throw ArgumentError('RGB recipient policy belongs only to on-chain RGB.');
+    }
     _requireEncoded(encodedDestination, 'encodedDestination');
     _requireEncoded(displayDestination, 'displayDestination');
     final value = amount;
@@ -52,6 +64,13 @@ final class WalletPaymentPreview {
   /// Optional recipient-authored payment-purpose text.
   final String? message;
 
+  /// Authoritative native-decoded recipient kind; never inferred from text.
+  final RgbRecipientType? rgbRecipientType;
+  int? get witnessBitcoinAmountSats =>
+      rgbRecipientType == RgbRecipientType.witness
+      ? rgbWitnessRecipientSats
+      : null;
+
   bool get requiresAmount => amount == null;
 
   bool isExpiredAt(DateTime now) {
@@ -73,6 +92,7 @@ final class WalletPaymentPreview {
       referenceId: referenceId,
       recipientLabel: recipientLabel ?? this.recipientLabel,
       message: message ?? this.message,
+      rgbRecipientType: rgbRecipientType,
     );
   }
 
@@ -89,7 +109,8 @@ final class WalletPaymentPreview {
       other.expiresAt == expiresAt &&
       other.referenceId == referenceId &&
       other.recipientLabel == recipientLabel &&
-      other.message == message;
+      other.message == message &&
+      other.rgbRecipientType == rgbRecipientType;
 
   @override
   int get hashCode => Object.hash(
@@ -101,6 +122,7 @@ final class WalletPaymentPreview {
     referenceId,
     recipientLabel,
     message,
+    rgbRecipientType,
   );
 }
 
@@ -179,7 +201,18 @@ final class WalletSendCommand {
     required this.destination,
     required this.amount,
     this.feeRate,
+    this.rgbRecipientType,
+    this.witnessBitcoinAmountSats,
   }) {
+    if (rgbRecipientType != null &&
+        route.target != WalletPaymentTarget.usdtOnchain) {
+      throw ArgumentError('RGB recipient policy belongs only to on-chain RGB.');
+    }
+    if (rgbRecipientType == RgbRecipientType.witness
+        ? witnessBitcoinAmountSats != rgbWitnessRecipientSats
+        : witnessBitcoinAmountSats != null) {
+      throw ArgumentError('The reviewed witness Bitcoin output is invalid.');
+    }
     _requireEncoded(destination, 'destination');
     _requireRouteAmount(route, amount);
     if (amount.isZero) throw ArgumentError.value(amount.units, 'amount');
@@ -197,6 +230,8 @@ final class WalletSendCommand {
 
   /// Fresh fee rate used only for on-chain sends.
   final WalletFeeRateEstimate? feeRate;
+  final RgbRecipientType? rgbRecipientType;
+  final int? witnessBitcoinAmountSats;
 
   @override
   String toString() => 'WalletSendCommand(${route.target.slug})';
@@ -207,10 +242,19 @@ final class WalletSendCommand {
       other.route == route &&
       other.destination == destination &&
       other.amount == amount &&
-      other.feeRate == feeRate;
+      other.feeRate == feeRate &&
+      other.rgbRecipientType == rgbRecipientType &&
+      other.witnessBitcoinAmountSats == witnessBitcoinAmountSats;
 
   @override
-  int get hashCode => Object.hash(route, destination, amount, feeRate);
+  int get hashCode => Object.hash(
+    route,
+    destination,
+    amount,
+    feeRate,
+    rgbRecipientType,
+    witnessBitcoinAmountSats,
+  );
 }
 
 /// Confirmed native acceptance of a send mutation.

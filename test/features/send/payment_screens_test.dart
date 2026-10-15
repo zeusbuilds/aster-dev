@@ -30,6 +30,216 @@ import '../../support/wallet_fakes.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  testWidgets(
+    'a changed fee requires Refresh fee and a second deliberate Send',
+    (tester) async {
+      final now = DateTime.utc(2026, 10, 15);
+      WalletFeeRateEstimate rate(int value) => WalletFeeRateEstimate(
+        targetBlocks: 6,
+        satsPerVbyte: value,
+        observedAt: now,
+      );
+      final engine = FakeWalletEngine()..feeEstimate = rate(3);
+      final transport = ResilientHttpClient(
+        client: MockClient((request) async => http.Response('{}', 503)),
+        retryPolicy: RetryPolicy(maxAttempts: 1),
+      );
+      addTearDown(transport.close);
+      final harness = await PaymentFlowTestHarness.create(
+        engine: engine,
+        clock: () => now,
+        httpClient: transport,
+      );
+      addTearDown(() => _disposeHarness(tester, harness));
+      final provider = sendFlowViewModelProvider(
+        WalletPaymentTarget.bitcoinOnchain,
+      );
+      await _pumpWidget(
+        tester,
+        harness,
+        const SendAmountScreen(target: WalletPaymentTarget.bitcoinOnchain),
+      );
+      await _pumpUntil(tester, () => harness.container.read(provider).hasValue);
+      final notifier = harness.container.read(provider.notifier);
+      notifier.updateDestination('mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn');
+      final validation = notifier.validateDestination();
+      await _pumpFrames(tester);
+      expect(await validation, isTrue);
+      notifier.updateAmount('0.00000001');
+      await _pumpFrames(tester);
+      engine.feeEstimate = rate(4);
+      await tester.ensureVisible(find.widgetWithText(CustomButton, 'Send'));
+      await _pumpFrames(tester);
+      await tester.tap(find.widgetWithText(CustomButton, 'Send'));
+      await _pumpUntil(
+        tester,
+        () => harness.container.read(provider).value?.feeFailure != null,
+      );
+      expect(
+        find.text(walletFeeReviewChangedFailure.userMessage),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<CustomButton>(find.widgetWithText(CustomButton, 'Send'))
+            .enabled,
+        isFalse,
+      );
+      expect(
+        tester
+            .widget<CustomButton>(
+              find.widgetWithText(CustomButton, 'Refresh fee'),
+            )
+            .enabled,
+        isTrue,
+      );
+      expect(engine.calls, isNot(contains('sendPayment:start')));
+      await tester.ensureVisible(find.text('Refresh fee'));
+      await tester.tap(find.widgetWithText(CustomButton, 'Refresh fee'));
+      await _pumpUntil(
+        tester,
+        () =>
+            harness.container.read(provider).value?.feeEstimate?.satsPerVbyte ==
+            4,
+      );
+      expect(engine.calls, isNot(contains('sendPayment:start')));
+      expect(
+        tester
+            .widget<CustomButton>(find.widgetWithText(CustomButton, 'Send'))
+            .enabled,
+        isTrue,
+      );
+      final accepted = notifier.submit();
+      await _pumpFrames(tester);
+      expect(await accepted, isTrue);
+      expect(
+        engine.calls.where((call) => call == 'sendPayment:start'),
+        hasLength(1),
+      );
+      expect(engine.sentPaymentCommand!.feeRate!.satsPerVbyte, 4);
+    },
+  );
+
+  testWidgets(
+    'witness send discloses and binds the additional recipient Bitcoin output',
+    (tester) async {
+      final now = DateTime.utc(2026, 10, 15);
+      final engine = FakeWalletEngine()
+        ..balances[testRgbRoute.asset.id] = testRgbBalance(2000000)
+        ..decodedInvoice = WalletPaymentPreview(
+          route: testRgbRoute,
+          encodedDestination: 'rgb:witness',
+          displayDestination: 'rgb:witness',
+          rgbRecipientType: RgbRecipientType.witness,
+        )
+        ..feeEstimate = WalletFeeRateEstimate(
+          targetBlocks: 6,
+          satsPerVbyte: 1,
+          observedAt: now,
+          source: WalletFeeRateSource.localRegtestPolicy,
+        );
+      final transport = ResilientHttpClient(
+        client: MockClient((request) async => http.Response('{}', 503)),
+        retryPolicy: RetryPolicy(maxAttempts: 1),
+      );
+      addTearDown(transport.close);
+      final harness = await PaymentFlowTestHarness.create(
+        engine: engine,
+        services: testRgbServices,
+        clock: () => now,
+        httpClient: transport,
+      );
+      addTearDown(() => _disposeHarness(tester, harness));
+      final provider = sendFlowViewModelProvider(
+        WalletPaymentTarget.usdtOnchain,
+      );
+      await _pumpWidget(
+        tester,
+        harness,
+        const SendAmountScreen(target: WalletPaymentTarget.usdtOnchain),
+      );
+      await _pumpUntil(tester, () => harness.container.read(provider).hasValue);
+      final notifier = harness.container.read(provider.notifier);
+      notifier.updateDestination('rgb:witness');
+      final validation = notifier.validateDestination();
+      await _pumpFrames(tester);
+      expect(await validation, isTrue);
+      notifier.updateAmount('1');
+      await _pumpWidget(
+        tester,
+        harness,
+        const SendAmountScreen(target: WalletPaymentTarget.usdtOnchain),
+      );
+      await _pumpUntil(
+        tester,
+        () => find.text('Recipient Bitcoin output').evaluate().isNotEmpty,
+      );
+      expect(find.text('1,000 sats'), findsOneWidget);
+      expect(
+        find.textContaining(
+          'Sends 1,000 sats to recipient in addition to network fee',
+        ),
+        findsOneWidget,
+      );
+      expect(engine.sentPaymentCommand, isNull);
+      final submission = notifier.submit();
+      await _pumpFrames(tester);
+      expect(await submission, isTrue);
+      expect(
+        engine.sentPaymentCommand?.rgbRecipientType,
+        RgbRecipientType.witness,
+      );
+      expect(engine.sentPaymentCommand?.witnessBitcoinAmountSats, 1000);
+      expect(
+        engine.calls.where((call) => call == 'sendPayment:start'),
+        hasLength(1),
+      );
+    },
+  );
+
+  testWidgets('Send displays the local regtest fee policy honestly', (
+    tester,
+  ) async {
+    final now = DateTime.utc(2026, 10, 15);
+    final engine = FakeWalletEngine()
+      ..feeEstimate = WalletFeeRateEstimate(
+        targetBlocks: 6,
+        satsPerVbyte: 1,
+        observedAt: now,
+        source: WalletFeeRateSource.localRegtestPolicy,
+      );
+    final harness = await PaymentFlowTestHarness.create(
+      engine: engine,
+      clock: () => now,
+    );
+    addTearDown(() => _disposeHarness(tester, harness));
+    final provider = sendFlowViewModelProvider(
+      WalletPaymentTarget.bitcoinOnchain,
+    );
+    final subscription = harness.container.listen(
+      provider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    await tester.runAsync(() => harness.container.read(provider.future));
+    final notifier = harness.container.read(provider.notifier);
+    notifier.updateDestination('mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn');
+    expect(await tester.runAsync(notifier.validateDestination), isTrue);
+    await _pumpWidget(
+      tester,
+      harness,
+      const SendAmountScreen(target: WalletPaymentTarget.bitcoinOnchain),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.text('Local test fee rate').evaluate().isNotEmpty,
+    );
+    expect(find.text('Network fee rate'), findsNothing);
+    expect(find.text('1 sats/vbyte'), findsOneWidget);
+    await _pumpFrames(tester);
+  });
+
   testWidgets('Send selector exposes four targets and routes by stable slug', (
     tester,
   ) async {
@@ -1699,8 +1909,9 @@ void main() {
       tester,
       () => find.byType(AsterNumericKeypad).evaluate().isNotEmpty,
     );
-    expect(await tester.runAsync(notifier.submit), isFalse);
+    final submission = notifier.submit();
     await _pumpFrames(tester);
+    expect(await submission, isFalse);
 
     final sendButton = find.byWidgetPredicate(
       (widget) => widget is CustomButton && widget.text == 'Send',

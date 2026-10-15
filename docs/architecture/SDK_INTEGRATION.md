@@ -6,13 +6,16 @@ architecture boundaries.
 
 ## Reproducible Dependency
 
-The checked-in `pubspec.yaml` and `pubspec.lock` pin SDK `0.2.0-beta.1` in the
+The checked-in `pubspec.yaml` and `pubspec.lock` pin SDK `0.2.0-beta.2` in the
 public UTEXO protocol SDK repository to immutable commit
-`c4e3c2d0b630a5807315710f18240889c7b74b0e`. The SDK and its derived Android AAR
-were published as [v0.2.0-beta.1](https://github.com/UTEXO-Protocol/flutter-sdk/releases/tag/v0.2.0-beta.1)
-on 2026-10-15. Normal locked Pub resolution from an empty Git cache fetches
-that exact commit over HTTPS with no URL rewrite or dependency override and
-leaves the lockfile unchanged. Separately, an empty Gradle dependency cache
+`992b86ee528d0811bd17cedca901de08561c1982`. Normal Pub resolution fetches
+that public commit without a path override. It adds typed public-contract
+import, safe native diagnostics, authoritative RGB invoice recipient type and
+cleanup quarantine. The native artifacts are unchanged. The derived Android
+AAR was published in [v0.2.0-beta.1](https://github.com/UTEXO-Protocol/flutter-sdk/releases/tag/v0.2.0-beta.1)
+and beta.2 continues to use its immutable URL/checksum. Historical empty-Git-cache
+restore evidence binds beta.1 commit `c4e3c2d`; it is not relabelled as a beta.2
+restore. Separately, an empty Gradle dependency cache
 fetches the release AAR over HTTPS and verifies its size and SHA-256. These
 checks qualify public dependency restoration, not funded or release flows.
 Do not replace the commit with a branch, tag, moving reference, or local path

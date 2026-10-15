@@ -177,8 +177,140 @@ void main() {
         (call) =>
             call == 'networkStatus' || call == 'balance' || call == 'activity',
       ),
-      ['networkStatus', 'balance', 'activity'],
+      ['activity', 'balance', 'networkStatus'],
     );
+  });
+
+  test('samples the tip after history advances the onchain wallet', () async {
+    final engine = FakeWalletEngine()
+      ..activities = [_confirmedBitcoinActivity(101)]
+      ..networkStatus = _networkAt(100)
+      ..activityGate = Completer<void>();
+    final harness = await _createActiveRepository(engine: engine);
+    addTearDown(harness.runtime.dispose);
+
+    final reading = harness.repository.activityFeed(WalletAssetKind.bitcoin);
+    await Future<void>.delayed(Duration.zero);
+    expect(engine.calls, contains('activity'));
+    expect(engine.calls, isNot(contains('networkStatus')));
+
+    engine.networkStatus = _networkAt(101);
+    engine.activityGate!.complete();
+    final result = await reading;
+
+    expect(result, isA<AppSuccess<WalletActivityFeed>>());
+    final feed = (result as AppSuccess<WalletActivityFeed>).value;
+    expect(feed.networkStatus.blockHeight, 101);
+    expect(feed.confirmationsFor(feed.activities.single), 1);
+    expect(engine.calls, ['provision', 'activity', 'balance', 'networkStatus']);
+  });
+
+  test('revalidates a lagging tip under the original runtime lease', () async {
+    final firstTipRead = Completer<void>();
+    var tipReads = 0;
+    final engine = FakeWalletEngine()
+      ..activities = [_confirmedBitcoinActivity(101)]
+      ..networkStatusReader = () async {
+        tipReads += 1;
+        if (tipReads == 1) {
+          firstTipRead.complete();
+          return _networkAt(100);
+        }
+        return _networkAt(101);
+      };
+    final harness = await _createActiveRepository(engine: engine);
+    addTearDown(harness.runtime.dispose);
+
+    final reading = harness.repository.activityFeed(WalletAssetKind.bitcoin);
+    await firstTipRead.future;
+    final suspending = harness.runtime.suspend();
+    await Future<void>.delayed(Duration.zero);
+    expect(engine.calls, isNot(contains('shutdown')));
+
+    final result = await reading;
+    expect(result, isA<AppSuccess<WalletActivityFeed>>());
+    final feed = (result as AppSuccess<WalletActivityFeed>).value;
+    expect(feed.networkStatus.blockHeight, 101);
+    expect(feed.confirmationsFor(feed.activities.single), 1);
+    expect(await suspending, isA<AppSuccess<void>>());
+    // No sync or financial operation is repeated while the tip catches up.
+    expect(engine.calls, [
+      'provision',
+      'activity',
+      'balance',
+      'networkStatus',
+      'networkStatus',
+      'shutdown',
+    ]);
+  });
+
+  test(
+    'bounds inconsistent future heights without manufacturing a tip',
+    () async {
+      final activity = _confirmedBitcoinActivity(1000);
+      final engine = FakeWalletEngine()
+        ..activities = [activity]
+        ..networkStatus = _networkAt(100);
+      final harness = await _createActiveRepository(engine: engine);
+      addTearDown(harness.runtime.dispose);
+
+      final result = await harness.repository.activityFeed(
+        WalletAssetKind.bitcoin,
+      );
+
+      expect(result, isA<AppFailureResult<WalletActivityFeed>>());
+      final failure = (result as AppFailureResult<WalletActivityFeed>).failure;
+      expect(failure, walletActivityConsistencyFailure);
+      expect(failure.retryable, isTrue);
+      expect(failure.requiresReconciliation, isFalse);
+      expect(failure.outcomeUnknown, isFalse);
+      expect(engine.networkStatus!.blockHeight, 100);
+      expect(activity.confirmationHeight, 1000);
+      expect(engine.calls, [
+        'provision',
+        'activity',
+        'balance',
+        'networkStatus',
+        'networkStatus',
+        'networkStatus',
+        'networkStatus',
+      ]);
+      final balance = await engine.getBalance(WalletAsset.bitcoin);
+      expect(
+        () => WalletActivityFeed(
+          balance: balance,
+          networkStatus: _networkAt(100),
+          activities: [activity],
+        ),
+        throwsArgumentError,
+      );
+    },
+  );
+
+  test('rejects a different wallet identity during tip revalidation', () async {
+    var tipReads = 0;
+    final engine = FakeWalletEngine()
+      ..activities = [_confirmedBitcoinActivity(101)]
+      ..networkStatusReader = () async => ++tipReads == 1
+          ? _networkAt(100)
+          : _networkAt(101, publicKey: '03${'1' * 64}');
+    final harness = await _createActiveRepository(engine: engine);
+    addTearDown(harness.runtime.dispose);
+
+    final result = await harness.repository.activityFeed(
+      WalletAssetKind.bitcoin,
+    );
+
+    expect(result, isA<AppFailureResult<WalletActivityFeed>>());
+    expect(
+      (result as AppFailureResult<WalletActivityFeed>).failure,
+      walletActivityConsistencyFailure,
+    );
+    expect(tipReads, 2);
+    expect(engine.calls.where((call) => call == 'activity'), hasLength(1));
+    expect(engine.calls.where((call) => call == 'balance'), hasLength(1));
+    expect(engine.calls, isNot(contains('sendPayment:start')));
+    expect(engine.calls, isNot(contains('sync')));
   });
 
   test('fails before native activity when USDT is not configured', () async {
@@ -402,7 +534,7 @@ void main() {
     },
   );
 
-  test('refreshes a displayed fee inside every onchain send', () async {
+  test('rejects a changed fee until a new rate has been reviewed', () async {
     final observedAt = DateTime.now().toUtc();
     final engine = FakeWalletEngine()
       ..feeEstimate = WalletFeeRateEstimate(
@@ -429,6 +561,23 @@ void main() {
       target: WalletPaymentTarget.bitcoinOnchain,
       destination: 'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn',
       amountUnits: 1,
+      reviewedFeeRate: estimate,
+    );
+    expect(sent, isA<AppFailureResult<WalletSendResult>>());
+    expect(
+      (sent as AppFailureResult<WalletSendResult>).failure.code,
+      walletFeeReviewChangedFailure.code,
+    );
+    expect(engine.calls, isNot(contains('sendPayment:start')));
+    final refreshed =
+        (await harness.repository.estimateFeeRate()
+                as AppSuccess<WalletFeeRateEstimate>)
+            .value;
+    final accepted = await harness.repository.sendPayment(
+      target: WalletPaymentTarget.bitcoinOnchain,
+      destination: 'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn',
+      amountUnits: 1,
+      reviewedFeeRate: refreshed,
     );
     engine.feeEstimateError = const RlnOperationTimeoutException(
       operation: 'estimateFeeRate',
@@ -438,12 +587,14 @@ void main() {
       target: WalletPaymentTarget.bitcoinOnchain,
       destination: 'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn',
       amountUnits: 1,
+      reviewedFeeRate: refreshed,
     );
     final invalidTarget = await harness.repository.estimateFeeRate(
       targetBlocks: 0,
     );
 
-    expect(sent, isA<AppSuccess<WalletSendResult>>());
+    expect(accepted, isA<AppSuccess<WalletSendResult>>());
+    expect(engine.sentPaymentCommand?.feeRate, same(refreshed));
     expect(engine.sentPaymentCommand?.feeRate?.satsPerVbyte, 4);
     expect(
       (failedRefresh as AppFailureResult<WalletSendResult>).failure.code,
@@ -459,7 +610,7 @@ void main() {
     );
     expect(
       engine.calls.where((call) => call == 'estimateFeeRate'),
-      hasLength(3),
+      hasLength(5),
     );
   });
 
@@ -482,6 +633,10 @@ void main() {
       target: WalletPaymentTarget.usdtOnchain,
       destination: 'rgb:invoice',
       amountUnits: 21000,
+      reviewedFeeRate:
+          (await harness.repository.estimateFeeRate()
+                  as AppSuccess<WalletFeeRateEstimate>)
+              .value,
     );
 
     expect(sent, isA<AppSuccess<WalletSendResult>>());
@@ -520,6 +675,10 @@ void main() {
       target: WalletPaymentTarget.bitcoinOnchain,
       destination: 'bitcoin:$address?amount=0.00000100&label=Merchant',
       amountUnits: 100,
+      reviewedFeeRate:
+          (await harness.repository.estimateFeeRate()
+                  as AppSuccess<WalletFeeRateEstimate>)
+              .value,
     );
     final mismatch = await harness.repository.sendPayment(
       target: WalletPaymentTarget.bitcoinOnchain,
@@ -1554,6 +1713,32 @@ void main() {
   });
 }
 
+WalletActivity _confirmedBitcoinActivity(int height) => WalletActivity(
+  id: 'activity-${'a' * 64}',
+  source: WalletActivitySource.bitcoinTransaction,
+  operation: WalletActivityOperation.bitcoinSend,
+  asset: WalletAsset.bitcoin,
+  rail: PaymentRail.onchain,
+  direction: WalletActivityDirection.sent,
+  status: WalletActivityStatus.succeeded,
+  amount: WalletAmount.onchain(assetId: WalletAsset.bitcoin.id, units: 20000),
+  confirmationHeight: height,
+  txid: 'confirmed-btc-send',
+);
+
+WalletNetworkStatus _networkAt(
+  int height, {
+  String publicKey =
+      '020000000000000000000000000000000000000000000000000000000000000000',
+}) => WalletNetworkStatus(
+  environment: BlockchainEnvironment.regtest,
+  blockHeight: height,
+  nodePublicKey: publicKey,
+  channelCount: 0,
+  usableChannelCount: 0,
+  peerCount: 0,
+);
+
 final class _ActiveRepositoryHarness {
   const _ActiveRepositoryHarness({
     required this.repository,
@@ -1572,10 +1757,13 @@ Future<_ActiveRepositoryHarness> _createActiveRepository({
     sdkNetwork: 'regtest',
   ),
   FakeWalletEngine? engine,
+  DateTime Function()? clock,
 }) async {
   const walletId = '11111111111111111111111111111111';
   const storageToken = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
   final selectedEngine = engine ?? FakeWalletEngine();
+  final fixtureTime =
+      selectedEngine.feeEstimate?.observedAt ?? DateTime.utc(2026, 8, 11);
   final runtime = WalletRuntime(
     FakeWalletEngineFactory([selectedEngine]),
     FakeWalletDirectoryManager(),
@@ -1605,6 +1793,7 @@ Future<_ActiveRepositoryHarness> _createActiveRepository({
       FakeWalletKeyGenerator(),
       FakeWalletIdentityGenerator(walletId: walletId),
       services,
+      clock: clock ?? () => fixtureTime,
     ),
     runtime: runtime,
     engine: selectedEngine,

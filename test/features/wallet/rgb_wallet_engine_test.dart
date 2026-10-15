@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:aster/core/core.dart';
@@ -12,6 +13,8 @@ import 'package:rgb_sdk_flutter/rgb_sdk_flutter.dart';
 final class MockUtexoWallet extends Mock implements UtexoWallet {}
 
 final class MockRgbSdkFlutter extends Mock implements RgbSdkFlutter {}
+
+final class MockLocalNetworkAccess extends Mock implements LocalNetworkAccess {}
 
 const _nodePublicKey =
     '020000000000000000000000000000000000000000000000000000000000000000';
@@ -160,13 +163,17 @@ void main() {
       rgbTransportProxy: 'http://127.0.0.1:3001',
       ethRpcUrl: 'http://127.0.0.1:8545',
     );
-    final engine = RgbWalletEngineFactory.withSdk(sdk).create(
-      const WalletEngineConfiguration(
-        storageDirectory: '/wallet',
-        services: configured,
-      ),
-    );
+    final access = MockLocalNetworkAccess();
+    when(() => access.ensureFor(configured)).thenAnswer((_) async {});
+    final engine =
+        RgbWalletEngineFactory.withSdk(sdk, localNetworkAccess: access).create(
+          const WalletEngineConfiguration(
+            storageDirectory: '/wallet',
+            services: configured,
+          ),
+        );
     await engine.openPersisted(databasePassword: 'test-password');
+    verify(() => access.ensureFor(configured)).called(1);
     final unlock =
         verify(
               () => wallet.reinit(
@@ -288,6 +295,84 @@ void main() {
         .called(1);
   });
 
+  test(
+    'obtains local network consent before native wallet initialization',
+    () async {
+      final wallet = MockUtexoWallet();
+      final access = MockLocalNetworkAccess();
+      final gate = Completer<void>();
+      when(() => access.ensureFor(services)).thenAnswer((_) => gate.future);
+      when(
+        () => wallet.init(
+          password: any(named: 'password'),
+          mnemonic: any(named: 'mnemonic'),
+        ),
+      ).thenAnswer((_) async {});
+      when(
+        () => wallet.unlock(
+          password: any(named: 'password'),
+          config: any(named: 'config'),
+        ),
+      ).thenAnswer((_) async {});
+      final unlock = UtexoUnlockConfig();
+      final engine = RgbWalletEngine(
+        wallet,
+        services,
+        unlock,
+        localNetworkAccess: access,
+      );
+
+      final provision = engine.provision(
+        databasePassword: 'database-password',
+        mnemonic: 'mnemonic words',
+      );
+      verifyNever(
+        () => wallet.init(
+          password: any(named: 'password'),
+          mnemonic: any(named: 'mnemonic'),
+        ),
+      );
+      gate.complete();
+      await provision;
+      verifyInOrder([
+        () => access.ensureFor(services),
+        () => wallet.init(
+          password: 'database-password',
+          mnemonic: 'mnemonic words',
+        ),
+        () => wallet.unlock(password: 'database-password', config: unlock),
+      ]);
+    },
+  );
+
+  test(
+    'permission denial prevents native mutation for create and reopen',
+    () async {
+      final wallet = MockUtexoWallet();
+      final access = MockLocalNetworkAccess();
+      const denied = LocalNetworkAccessException(
+        LocalNetworkAccessFailure.denied,
+      );
+      when(() => access.ensureFor(services)).thenThrow(denied);
+      final engine = RgbWalletEngine(
+        wallet,
+        services,
+        UtexoUnlockConfig(),
+        localNetworkAccess: access,
+      );
+
+      await expectLater(
+        engine.provision(databasePassword: 'password', mnemonic: 'mnemonic'),
+        throwsA(same(denied)),
+      );
+      await expectLater(
+        engine.openPersisted(databasePassword: 'password'),
+        throwsA(same(denied)),
+      );
+      verifyZeroInteractions(wallet);
+    },
+  );
+
   test('opens a persisted wallet through reinit without init', () async {
     final wallet = MockUtexoWallet();
     final unlock = UtexoUnlockConfig(
@@ -324,7 +409,10 @@ void main() {
           .thenAnswer((_) async => const FeeEstimationResponse(feeRate: 1.25));
       final engine = RgbWalletEngine(
         wallet,
-        services,
+        const WalletServiceConfiguration(
+          environment: BlockchainEnvironment.signet,
+          sdkNetwork: 'utexo',
+        ),
         UtexoUnlockConfig(),
         clock: () => observedAt,
       );
@@ -341,7 +429,10 @@ void main() {
     final invalidTargetWallet = MockUtexoWallet();
     final invalidTargetEngine = RgbWalletEngine(
       invalidTargetWallet,
-      services,
+      const WalletServiceConfiguration(
+        environment: BlockchainEnvironment.signet,
+        sdkNetwork: 'utexo',
+      ),
       UtexoUnlockConfig(),
     );
 
@@ -360,7 +451,14 @@ void main() {
       final wallet = MockUtexoWallet();
       when(() => wallet.estimateFeeRate(6))
           .thenAnswer((_) async => FeeEstimationResponse(feeRate: value));
-      final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
+      final engine = RgbWalletEngine(
+        wallet,
+        const WalletServiceConfiguration(
+          environment: BlockchainEnvironment.signet,
+          sdkNetwork: 'utexo',
+        ),
+        UtexoUnlockConfig(),
+      );
 
       await expectLater(
         engine.estimateFeeRate(6),
@@ -618,7 +716,7 @@ void main() {
       expect(balance.onchainFuture.units, 155);
       expect(balance.onchainPendingDeltaUnits, 35);
       expect(balance.onchainSpendable.units, 80);
-      expect(balance.onchainLocked.units, 40);
+      expect(balance.onchainLocked.units, 75);
       expect(balance.lightningOwned.units, 4000);
       expect(balance.lightningSpendable.units, 1200);
       expect(balance.lightningReceivable.units, 300);
@@ -695,7 +793,7 @@ void main() {
     expect(balance.lightningReceivable.units, 0);
   });
 
-  test('preserves a negative pending delta for outgoing Bitcoin', () async {
+  test('rejects Bitcoin confirmed balance exceeding its UTXO total', () async {
     final wallet = MockUtexoWallet();
     when(() => wallet.getBtcBalance()).thenAnswer(
       (_) async => const CoreBtcBalance(
@@ -715,12 +813,147 @@ void main() {
     when(() => wallet.listChannels()).thenAnswer((_) async => const []);
     final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
 
-    final balance = await engine.getBalance(WalletAsset.bitcoin);
-
-    expect(balance.onchainSettled.units, 120);
-    expect(balance.onchainFuture.units, 90);
-    expect(balance.onchainPendingDeltaUnits, -30);
+    await expectLater(
+      engine.getBalance(WalletAsset.bitcoin),
+      throwsA(
+        isA<NativeProtocolException>().having(
+          (error) => error.field,
+          'field',
+          'bitcoin.vanilla.future',
+        ),
+      ),
+    );
   });
+
+  for (final sample
+      in <
+        ({String name, CoreBalance vanilla, CoreBalance colored, int locked})
+      >[
+        (
+          name: 'unconfirmed RGB setup change',
+          vanilla: const CoreBalance(
+            settled: 0,
+            future: 1895000,
+            spendable: 1895000,
+          ),
+          colored: const CoreBalance(
+            settled: 0,
+            future: 80000,
+            spendable: 80000,
+          ),
+          locked: 80000,
+        ),
+        (
+          name:
+              'pending and confirmed colored outputs plus vanilla reservations',
+          vanilla: const CoreBalance(
+            settled: 1000000,
+            future: 1200000,
+            spendable: 1100000,
+          ),
+          colored: const CoreBalance(
+            settled: 40000,
+            future: 80000,
+            spendable: 80000,
+          ),
+          locked: 180000,
+        ),
+        (
+          name: 'immature vanilla outputs',
+          vanilla: const CoreBalance(settled: 0, future: 50000, spendable: 0),
+          colored: const CoreBalance(
+            settled: 20000,
+            future: 20000,
+            spendable: 20000,
+          ),
+          locked: 70000,
+        ),
+      ]) {
+    test('preserves native BTC accounting for ${sample.name}', () async {
+      final wallet = MockUtexoWallet();
+      when(wallet.getBtcBalance).thenAnswer(
+        (_) async =>
+            CoreBtcBalance(vanilla: sample.vanilla, colored: sample.colored),
+      );
+      when(wallet.getNodeInfo).thenAnswer((_) async => _nodeInfo);
+      when(wallet.listChannels).thenAnswer((_) async => const []);
+      final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
+
+      final balance = await engine.getBalance(WalletAsset.bitcoin);
+
+      expect(
+        balance.onchainSettled.units,
+        sample.vanilla.settled + sample.colored.settled,
+      );
+      expect(
+        balance.onchainFuture.units,
+        sample.vanilla.future + sample.colored.future,
+      );
+      expect(balance.onchainSpendable.units, sample.vanilla.spendable);
+      expect(balance.onchainLocked.units, sample.locked);
+      expect(
+        balance.onchainSpendable.units + balance.onchainLocked.units,
+        balance.onchainFuture.units,
+      );
+      expect(
+        balance.onchainLocked.units,
+        greaterThanOrEqualTo(sample.colored.future),
+      );
+    });
+  }
+
+  test(
+    'RGB outgoing pending value does not relax settled allocation spendability',
+    () async {
+      final wallet = MockUtexoWallet();
+      const assetId = 'rgb:usdt-contract';
+      final asset = WalletAsset.rgbUsdt(assetId: assetId, precision: 6);
+      var spendable = 70;
+      when(() => wallet.getAssetBalance(assetId)).thenAnswer(
+        (_) async => CoreAssetBalance(
+          settled: BigInt.from(100),
+          future: BigInt.from(75),
+          spendable: BigInt.from(spendable),
+          offchainOutbound: BigInt.zero,
+          offchainInbound: BigInt.zero,
+        ),
+      );
+      when(wallet.listChannels).thenAnswer((_) async => const []);
+      final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
+      final balance = await engine.getBalance(asset);
+      expect(balance.onchainPendingDeltaUnits, -25);
+      expect(balance.onchainLocked.units, 30);
+      spendable = 101;
+      await expectLater(
+        engine.getBalance(asset),
+        throwsA(isA<NativeProtocolException>()),
+      );
+    },
+  );
+
+  for (final colored in [false, true]) {
+    test(
+      'rejects ${colored ? 'colored' : 'vanilla'} spendability above native BTC total',
+      () async {
+        final wallet = MockUtexoWallet();
+        const invalid = CoreBalance(settled: 0, future: 100, spendable: 101);
+        const zero = CoreBalance(settled: 0, future: 0, spendable: 0);
+        when(wallet.getBtcBalance).thenAnswer(
+          (_) async => CoreBtcBalance(
+            vanilla: colored ? zero : invalid,
+            colored: colored ? invalid : zero,
+          ),
+        );
+        when(wallet.getNodeInfo).thenAnswer((_) async => _nodeInfo);
+        when(wallet.listChannels).thenAnswer((_) async => const []);
+        final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
+        await expectLater(
+          engine.getBalance(WalletAsset.bitcoin),
+          throwsA(isA<NativeProtocolException>()),
+        );
+      },
+    );
+  }
 
   test('rejects negative native monetary values instead of clamping', () async {
     final wallet = MockUtexoWallet();
@@ -836,6 +1069,97 @@ void main() {
     expect(sent.referenceId, 'bitcoin-txid');
     expect(sent.status, WalletPaymentStatus.pending);
   });
+
+  test(
+    'Bitcoin native dispatch rejects stale or future-dated fee consent',
+    () async {
+      final wallet = MockUtexoWallet();
+      final now = DateTime.utc(2026, 10, 15);
+      final engine = RgbWalletEngine(
+        wallet,
+        services,
+        UtexoUnlockConfig(),
+        clock: () => now,
+      );
+      for (final observed in [
+        now.subtract(
+          WalletFeeRateEstimate.maximumAge + const Duration(seconds: 1),
+        ),
+        now.add(const Duration(seconds: 1)),
+      ]) {
+        await expectLater(
+          engine.sendPayment(
+            WalletSendCommand(
+              route: const PaymentRoute(
+                asset: WalletAsset.bitcoin,
+                rail: PaymentRail.onchain,
+              ),
+              destination: _regtestAddress(),
+              amount: WalletAmount.onchain(
+                assetId: WalletAsset.bitcoin.id,
+                units: 1000,
+              ),
+              feeRate: _feeRate(1, observedAt: observed),
+            ),
+          ),
+          throwsA(
+            isA<AppFailureException>().having(
+              (error) => error.failure,
+              'failure',
+              walletFeeReviewRequiredFailure,
+            ),
+          ),
+        );
+      }
+      verifyZeroInteractions(wallet);
+    },
+  );
+
+  test(
+    'local regtest fee policy cannot authorize a mainnet native send',
+    () async {
+      final wallet = MockUtexoWallet();
+      final now = DateTime.utc(2026, 10, 15);
+      final engine = RgbWalletEngine(
+        wallet,
+        const WalletServiceConfiguration(
+          environment: BlockchainEnvironment.mainnet,
+          sdkNetwork: 'mainnet',
+        ),
+        UtexoUnlockConfig(),
+        clock: () => now,
+      );
+      await expectLater(
+        engine.sendPayment(
+          WalletSendCommand(
+            route: const PaymentRoute(
+              asset: WalletAsset.bitcoin,
+              rail: PaymentRail.onchain,
+            ),
+            destination: '1BoatSLRHtKNngkdXEeobR76b53LETtpyT',
+            amount: WalletAmount.onchain(
+              assetId: WalletAsset.bitcoin.id,
+              units: 1000,
+            ),
+            feeRate: WalletFeeRateEstimate(
+              targetBlocks: 6,
+              satsPerVbyte: 1,
+              observedAt: now,
+              source: WalletFeeRateSource.localRegtestPolicy,
+            ),
+          ),
+        ),
+        throwsA(
+          isA<AppFailureException>().having(
+            (error) => error.failure,
+            'failure',
+            walletFeeReviewRequiredFailure,
+          ),
+        ),
+      );
+      verifyZeroInteractions(wallet);
+    },
+  );
 
   test('rejects invalid Bitcoin destinations before native mutation', () async {
     final wallet = MockUtexoWallet();
@@ -1198,6 +1522,7 @@ void main() {
     );
     when(() => wallet.decodeRgbInvoice('rgb:invoice')).thenAnswer(
       (_) async => CoreInvoiceData(
+        recipientType: 'Witness',
         invoice: 'rgb:invoice',
         recipientId: 'rgb-recipient',
         assetId: assetId,
@@ -1205,6 +1530,16 @@ void main() {
         assignment: Assignment(type: 'Fungible', amount: BigInt.from(1250000)),
         expirationTimestamp: 1786446000,
         transportEndpoints: const <String>[],
+      ),
+    );
+    when(wallet.getBtcBalance).thenAnswer(
+      (_) async => const CoreBtcBalance(
+        vanilla: CoreBalance(
+          settled: 2000000,
+          future: 2000000,
+          spendable: 2000000,
+        ),
+        colored: CoreBalance(settled: 0, future: 0, spendable: 0),
       ),
     );
     when(() => wallet.onchainSend(any())).thenAnswer(
@@ -1226,7 +1561,9 @@ void main() {
         route: route,
         destination: receive.encodedRequest,
         amount: amount,
-        feeRate: _feeRate(4),
+        rgbRecipientType: RgbRecipientType.witness,
+        witnessBitcoinAmountSats: rgbWitnessRecipientSats,
+        feeRate: _feeRate(4, observedAt: DateTime.utc(2026, 8, 11, 10)),
       ),
     );
 
@@ -1271,12 +1608,23 @@ void main() {
       );
       when(() => wallet.decodeRgbInvoice('rgb:generic')).thenAnswer(
         (_) async => CoreInvoiceData(
+          recipientType: 'Witness',
           invoice: 'rgb:generic',
           recipientId: 'generic-recipient',
           network: 'regtest',
           assignment: const Assignment(type: 'Fungible'),
           expirationTimestamp: 1786446000,
           transportEndpoints: const <String>[],
+        ),
+      );
+      when(wallet.getBtcBalance).thenAnswer(
+        (_) async => const CoreBtcBalance(
+          vanilla: CoreBalance(
+            settled: 2000000,
+            future: 2000000,
+            spendable: 2000000,
+          ),
+          colored: CoreBalance(settled: 0, future: 0, spendable: 0),
         ),
       );
       when(() => wallet.onchainSend(any())).thenAnswer(
@@ -1298,7 +1646,9 @@ void main() {
           route: route,
           destination: receive.encodedRequest,
           amount: amount,
-          feeRate: _feeRate(4),
+          rgbRecipientType: RgbRecipientType.witness,
+          witnessBitcoinAmountSats: rgbWitnessRecipientSats,
+          feeRate: _feeRate(4, observedAt: DateTime.utc(2026, 8, 11, 10)),
         ),
       );
 
@@ -1549,6 +1899,7 @@ void main() {
     final rgbWallet = MockUtexoWallet();
     when(() => rgbWallet.decodeRgbInvoice('rgb:send')).thenAnswer(
       (_) async => CoreInvoiceData(
+        recipientType: 'Blind',
         invoice: 'rgb:send',
         recipientId: 'rgb-recipient',
         assetId: assetId,
@@ -1601,9 +1952,10 @@ void main() {
       rgbEngine.sendPayment(
         WalletSendCommand(
           route: rgbRoute,
+          rgbRecipientType: RgbRecipientType.blind,
           destination: 'rgb:send',
           amount: rgbAmount,
-          feeRate: _feeRate(1),
+          feeRate: _feeRate(1, observedAt: DateTime.utc(2026, 8, 11, 10)),
         ),
       ),
       throwsA(
@@ -1889,6 +2241,7 @@ void main() {
         for (final value in [maximum, maximum + BigInt.one, -BigInt.one]) {
           when(() => wallet.decodeRgbInvoice('rgb:invoice')).thenAnswer(
             (_) async => CoreInvoiceData(
+              recipientType: 'Blind',
               invoice: 'rgb:invoice',
               recipientId: 'recipient',
               assetId: asset.id.value,
@@ -2220,11 +2573,12 @@ CoreListAssets _assets([String? assetId]) => CoreListAssets(
   uda: const <CoreAssetUda>[],
 );
 
-WalletFeeRateEstimate _feeRate(int satsPerVbyte) => WalletFeeRateEstimate(
-  targetBlocks: 6,
-  satsPerVbyte: satsPerVbyte,
-  observedAt: DateTime.utc(2026, 8, 11),
-);
+WalletFeeRateEstimate _feeRate(int satsPerVbyte, {DateTime? observedAt}) =>
+    WalletFeeRateEstimate(
+      targetBlocks: 6,
+      satsPerVbyte: satsPerVbyte,
+      observedAt: observedAt ?? DateTime.now().toUtc(),
+    );
 
 String _regtestAddress() {
   final program = Uint8List.fromList(List<int>.generate(20, (index) => index));

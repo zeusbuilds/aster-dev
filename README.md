@@ -2,8 +2,8 @@
 
 Aster is a Flutter wallet for Bitcoin, RGB USDT, and Lightning. It is powered
 by the UTEXO protocol through the public `rgb_sdk_flutter` API, with SDK
-`0.2.0-beta.1` pinned to immutable commit
-`c4e3c2d0b630a5807315710f18240889c7b74b0e`, and uses Riverpod MVVM.
+`0.2.0-beta.2` pinned to immutable public Git commit
+`992b86ee528d0811bd17cedca901de08561c1982`, and uses Riverpod MVVM.
 
 ## Release Status
 
@@ -19,10 +19,12 @@ eligible for a funds-bearing mainnet release.
   native signer checks on both platforms. Aster's Debug APK passes all 25
   native ELF checks, 16 KiB ZIP alignment and startup on Android 17 with
   compatibility fallback disabled. SDK-004's exact release AAB/split-APK
-  qualification and funded-flow qualification remain open.
+  qualification remains open. Local funded wallet evidence is tracked in
+  `docs/SHARED_WALLET_QUALIFICATION.md`.
 - SDK [v0.2.0-beta.1](https://github.com/UTEXO-Protocol/flutter-sdk/releases/tag/v0.2.0-beta.1)
-  and its derived Android AAR are published. An empty Git cache restores the
-  exact SDK pin with the lockfile unchanged; an empty Gradle dependency cache
+  and its derived Android AAR are published. The current beta.2 Git pin reuses
+  those native bytes. Historical empty-Git-cache evidence restores beta.1;
+  an empty Gradle dependency cache
   downloads and verifies the release AAR over HTTPS.
 - `1.0.0+1` is a provisional app version until release ownership defines the
   public version/build-number and upgrade policy.

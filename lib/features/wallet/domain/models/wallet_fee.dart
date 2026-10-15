@@ -1,12 +1,33 @@
 import 'package:flutter/foundation.dart';
 
-/// Fresh app-owned on-chain fee-rate estimate.
+import '../../../../core/errors/app_failure.dart';
+
+/// Provenance of the selected rate; local test policy is never a network quote.
+enum WalletFeeRateSource { networkEstimate, localRegtestPolicy }
+
+/// Known pre-dispatch failures: refreshing a quote never submits a payment.
+const walletFeeReviewRequiredFailure = AppFailure(
+  code: 'payment_fee_review_required',
+  kind: AppFailureKind.conflict,
+  userMessage: 'Refresh the fee and review the payment before sending.',
+  retryable: true,
+);
+
+const walletFeeReviewChangedFailure = AppFailure(
+  code: 'payment_fee_review_changed',
+  kind: AppFailureKind.conflict,
+  userMessage: 'The fee rate or policy changed. Refresh the fee and review the payment before sending.',
+  retryable: true,
+);
+
+/// App-owned on-chain fee rate with a bounded review lifetime.
 @immutable
 final class WalletFeeRateEstimate {
   WalletFeeRateEstimate({
     required this.targetBlocks,
     required this.satsPerVbyte,
     required this.observedAt,
+    this.source = WalletFeeRateSource.networkEstimate,
   }) {
     if (targetBlocks < minimumTargetBlocks ||
         targetBlocks > maximumTargetBlocks) {
@@ -14,6 +35,13 @@ final class WalletFeeRateEstimate {
     }
     if (satsPerVbyte <= 0 || satsPerVbyte > maximumSatsPerVbyte) {
       throw ArgumentError.value(satsPerVbyte, 'satsPerVbyte');
+    }
+    if (source == WalletFeeRateSource.localRegtestPolicy && satsPerVbyte != 1) {
+      throw ArgumentError.value(
+        satsPerVbyte,
+        'satsPerVbyte',
+        'Local regtest policy is one sat/vbyte.',
+      );
     }
     if (!observedAt.isUtc) {
       throw ArgumentError.value(observedAt, 'observedAt', 'Must use UTC.');
@@ -28,6 +56,7 @@ final class WalletFeeRateEstimate {
   final int targetBlocks;
   final int satsPerVbyte;
   final DateTime observedAt;
+  final WalletFeeRateSource source;
 
   bool isStaleAt(DateTime now) {
     final age = now.toUtc().difference(observedAt);
@@ -39,8 +68,10 @@ final class WalletFeeRateEstimate {
       other is WalletFeeRateEstimate &&
       other.targetBlocks == targetBlocks &&
       other.satsPerVbyte == satsPerVbyte &&
-      other.observedAt == observedAt;
+      other.observedAt == observedAt &&
+      other.source == source;
 
   @override
-  int get hashCode => Object.hash(targetBlocks, satsPerVbyte, observedAt);
+  int get hashCode =>
+      Object.hash(targetBlocks, satsPerVbyte, observedAt, source);
 }

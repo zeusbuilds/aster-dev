@@ -43,6 +43,37 @@ void main() {
     expect(display.fiatContext, r'$1.00 USD estimated');
   });
 
+  test(
+    'pending Bitcoin spendability does not alter or clamp the confirmed total',
+    () {
+      WalletAmount onchain(int units) =>
+          WalletAmount.onchain(assetId: WalletAsset.bitcoin.id, units: units);
+      final lightning = WalletAmount.lightning(
+        assetId: WalletAsset.bitcoin.id,
+        units: 0,
+      );
+      final display = HomeAssetDisplayFormatter().format(
+        balance: WalletBalance(
+          asset: WalletAsset.bitcoin,
+          onchainSettled: onchain(0),
+          onchainFuture: onchain(100000),
+          onchainSpendable: onchain(80000),
+          onchainLocked: onchain(20000),
+          lightningOwned: lightning,
+          lightningSpendable: lightning,
+          lightningReceivable: lightning,
+        ),
+        bitcoinUnit: BitcoinUnit.sats,
+        currencyCode: 'USD',
+        now: now,
+        bitcoinMarket: usdMarket,
+      );
+      expect(display.total.text, '0 sats');
+      expect(display.available.text, '80,000 sats');
+      expect(display.fiatContext, r'$0.00 USD estimated');
+    },
+  );
+
   test('formats a selected non-USD quote without relabeling it', () {
     final formatter = HomeAssetDisplayFormatter();
     expect(

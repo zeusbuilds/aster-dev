@@ -25,7 +25,7 @@ void main() {
     expect(state.feed.networkStatus.blockHeight, 100);
     expect(
       engine.calls,
-      containsAllInOrder(['networkStatus', 'balance', 'activity']),
+      containsAllInOrder(['activity', 'balance', 'networkStatus']),
     );
   });
 
@@ -77,6 +77,44 @@ void main() {
         isNotEmpty,
       );
       expect(engine.calls.where((call) => call == 'activity'), hasLength(2));
+    },
+  );
+
+  test(
+    'inconsistent activity can be explicitly retried without a payment',
+    () async {
+      final engine = _engine()
+        ..activityError = const AppFailureException(
+          walletActivityConsistencyFailure,
+        );
+      final harness = await PaymentFlowTestHarness.create(engine: engine);
+      addTearDown(harness.dispose);
+      final provider = activityViewModelProvider(WalletAssetKind.bitcoin);
+      final subscription = harness.container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+
+      await expectLater(
+        harness.container.read(provider.future),
+        throwsA(
+          isA<AppFailureException>().having(
+            (error) => error.failure,
+            'failure',
+            walletActivityConsistencyFailure,
+          ),
+        ),
+      );
+      expect(engine.calls.where((call) => call == 'activity'), hasLength(1));
+      engine.activityError = null;
+
+      await harness.container.read(provider.notifier).retry();
+
+      expect(
+        harness.container.read(provider).requireValue.feed.activities,
+        isNotEmpty,
+      );
+      expect(engine.calls.where((call) => call == 'activity'), hasLength(2));
+      expect(engine.calls, isNot(contains('sendPayment:start')));
+      expect(engine.calls, isNot(contains('sync')));
     },
   );
 

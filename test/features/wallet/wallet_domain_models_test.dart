@@ -7,6 +7,88 @@ const _nodePublicKey =
     '020000000000000000000000000000000000000000000000000000000000000000';
 
 void main() {
+  WalletBalance accountingBalance(
+    WalletAsset asset, {
+    required int settled,
+    required int future,
+    required int spendable,
+    required int locked,
+  }) {
+    WalletAmount onchain(int value) =>
+        WalletAmount.onchain(assetId: asset.id, units: value);
+    final lightning = WalletAmount.lightning(assetId: asset.id, units: 0);
+    return WalletBalance(
+      asset: asset,
+      onchainSettled: onchain(settled),
+      onchainFuture: onchain(future),
+      onchainSpendable: onchain(spendable),
+      onchainLocked: onchain(locked),
+      lightningOwned: lightning,
+      lightningSpendable: lightning,
+      lightningReceivable: lightning,
+    );
+  }
+
+  test('Bitcoin unavailable value accounts for pending UTXOs without altering confirmed total', () {
+    final balance = accountingBalance(
+      WalletAsset.bitcoin,
+      settled: 0,
+      future: 1975000,
+      spendable: 1895000,
+      locked: 80000,
+    );
+    expect(balance.onchainSettled.units, 0);
+    expect(balance.onchainPendingDeltaUnits, 1975000);
+    expect(balance.totalAssetUnits, 0);
+    expect(balance.availableAssetUnits, 1895000);
+    expect(balance.onchainLocked.units, 80000);
+  });
+
+  test('Bitcoin rejects confirmed value above total and unavailable value using the wrong domain', () {
+    expect(
+      () => accountingBalance(
+        WalletAsset.bitcoin,
+        settled: 101,
+        future: 100,
+        spendable: 80,
+        locked: 20,
+      ),
+      throwsFormatException,
+    );
+    expect(
+      () => accountingBalance(
+        WalletAsset.bitcoin,
+        settled: 100,
+        future: 130,
+        spendable: 80,
+        locked: 20,
+      ),
+      throwsFormatException,
+    );
+  });
+
+  test('RGB retains settled allocation accounting and signed outgoing pending delta', () {
+    final asset = WalletAsset.rgbUsdt(assetId: 'rgb:contract', precision: 6);
+    final balance = accountingBalance(
+      asset,
+      settled: 100,
+      future: 75,
+      spendable: 70,
+      locked: 30,
+    );
+    expect(balance.onchainPendingDeltaUnits, -25);
+    expect(
+      () => accountingBalance(
+        asset,
+        settled: 100,
+        future: 130,
+        spendable: 110,
+        locked: 20,
+      ),
+      throwsFormatException,
+    );
+  });
+
   test('wallet domain objects compare by validated value', () {
     final asset = WalletAsset.rgbUsdt(assetId: 'rgb:contract', precision: 6);
     final sameAsset = WalletAsset.rgbUsdt(

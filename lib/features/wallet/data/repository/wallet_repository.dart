@@ -8,6 +8,7 @@ import '../storage/storage.dart';
 import '../validation/validation.dart';
 import 'wallet_lifecycle_repository.dart';
 import 'wallet_payment_operations.dart';
+import 'wallet_rgb_setup_operations.dart';
 
 /// Coordinates wallet metadata transactions and the single native runtime.
 ///
@@ -23,6 +24,7 @@ final class WalletRepository implements WalletLifecycleRepository {
     this._services, {
     this._bitcoinInstructions = const BitcoinPaymentInstructionParser(),
     DateTime Function()? clock,
+    this.rgbSetupStore,
   }) : _clock = clock ?? _utcNow {
     _services.validate();
   }
@@ -34,12 +36,23 @@ final class WalletRepository implements WalletLifecycleRepository {
   final WalletServiceConfiguration _services;
   final BitcoinPaymentInstructionDecoder _bitcoinInstructions;
   final DateTime Function() _clock;
+  final RgbWalletSetupStore? rgbSetupStore;
+  late final WalletRgbSetupOperations _rgbSetup = WalletRgbSetupOperations(
+    _runtime,
+    _profiles,
+    _services,
+    rgbSetupStore,
+    newId: _identityGenerator.newStorageToken,
+    clock: _clock,
+  );
   Future<void> _operationTail = Future<void>.value();
   late final WalletPaymentOperations _payments = WalletPaymentOperations(
     _runtime,
     _services,
     _bitcoinInstructions,
     _enqueueOperation,
+    beforeOnchainMutation: _rgbSetup.assertResolved,
+    clock: _clock,
   );
 
   /// Balanced confirmation target used until product fee selection exists.
@@ -47,6 +60,16 @@ final class WalletRepository implements WalletLifecycleRepository {
       WalletPaymentOperations.standardFeeTargetBlocks;
 
   Future<AppResult<WalletRegistry>> load() => _enqueueOperation(_profiles.read);
+
+  Future<AppResult<RgbWalletSetupReview>> prepareRgbWalletSetup() =>
+      _enqueueOperation(_rgbSetup.prepare);
+  Future<AppResult<void>> cancelRgbWalletSetup(RgbWalletSetupReview review) =>
+      _enqueueOperation(() => _rgbSetup.cancel(review));
+  Future<AppResult<RgbWalletSetupStatus>> confirmRgbWalletSetup(
+    RgbWalletSetupReview review,
+  ) => _enqueueOperation(() => _rgbSetup.confirm(review));
+  Future<AppResult<RgbWalletSetupStatus>> rgbWalletSetupStatus() =>
+      _enqueueOperation(_rgbSetup.status);
 
   /// Product payment targets and whether this deployment can execute them.
   ///
@@ -462,17 +485,30 @@ final class WalletRepository implements WalletLifecycleRepository {
   Future<AppResult<WalletReceiveRequest>> createReceiveRequest(
     WalletPaymentTarget target, {
     int? amountUnits,
-  }) => _payments.createReceiveRequest(target, amountUnits: amountUnits);
+    RgbReceiveMode rgbReceiveMode = RgbReceiveMode.witness,
+  }) => _payments.createReceiveRequest(
+    target,
+    amountUnits: amountUnits,
+    rgbReceiveMode: rgbReceiveMode,
+  );
 
   /// Submits one non-retryable payment mutation through the serialized owner.
+  /// On-chain sends require [reviewedFeeRate]; changed or expired quotes must
+  /// be refreshed and reviewed before another explicit submission.
   Future<AppResult<WalletSendResult>> sendPayment({
     required WalletPaymentTarget target,
     required String destination,
     required int amountUnits,
+    RgbRecipientType? rgbRecipientType,
+    int? witnessBitcoinAmountSats,
+    WalletFeeRateEstimate? reviewedFeeRate,
   }) => _payments.send(
     target: target,
     destination: destination,
     amountUnits: amountUnits,
+    rgbRecipientType: rgbRecipientType,
+    witnessBitcoinAmountSats: witnessBitcoinAmountSats,
+    reviewedFeeRate: reviewedFeeRate,
   );
 
   Future<AppResult<void>> sync() => _enqueueOperation(_runtime.sync);

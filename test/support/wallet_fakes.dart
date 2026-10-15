@@ -219,6 +219,8 @@ final class FakeWalletEngine implements WalletEngine {
   Completer<void>? decodeInvoiceGate;
   Completer<void>? createReceiveGate;
   Completer<void>? sendPaymentGate;
+  Completer<void>? feeEstimateGate;
+  Completer<void>? feeEstimateStarted;
   Completer<void>? balanceGate;
   Completer<void>? activityGate;
   Completer<void>? networkStatusGate;
@@ -242,6 +244,7 @@ final class FakeWalletEngine implements WalletEngine {
   WalletAsset? requestedBalanceAsset;
   WalletAsset? requestedActivityAsset;
   WalletNetworkStatus? networkStatus;
+  Future<WalletNetworkStatus> Function()? networkStatusReader;
 
   @override
   Future<void> provision({
@@ -387,6 +390,10 @@ final class FakeWalletEngine implements WalletEngine {
   Future<WalletFeeRateEstimate> estimateFeeRate(int targetBlocks) async {
     calls.add('estimateFeeRate');
     feeTargetBlocks = targetBlocks;
+    if (feeEstimateStarted?.isCompleted == false) {
+      feeEstimateStarted!.complete();
+    }
+    await feeEstimateGate?.future;
     if (feeEstimateError case final Object error) throw error;
     return feeEstimate ??
         WalletFeeRateEstimate(
@@ -402,6 +409,7 @@ final class FakeWalletEngine implements WalletEngine {
     final gate = networkStatusGate;
     await gate?.future;
     if (networkStatusError case final Object error) throw error;
+    if (networkStatusReader case final reader?) return reader();
     return networkStatus ??
         WalletNetworkStatus(
           environment: BlockchainEnvironment.regtest,
