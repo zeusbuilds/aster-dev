@@ -995,8 +995,8 @@ packages:
     dependency: "direct main"
     description:
       path: "."
-      ref: "518a056dbe4a525762322686ac90bed080b03e78"
-      resolved-ref: "518a056dbe4a525762322686ac90bed080b03e78"
+      ref: a8b053766c4ebfdc52f94716caad1c09060eba90
+      resolved-ref: a8b053766c4ebfdc52f94716caad1c09060eba90
       url: "https://github.com/UTEXO-Protocol/flutter-sdk.git"
     source: git
     version: "0.2.0-beta.3"

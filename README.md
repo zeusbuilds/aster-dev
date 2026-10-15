@@ -3,7 +3,7 @@
 Aster is a Flutter wallet for Bitcoin, RGB USDT, and Lightning. It is powered
 by the UTEXO protocol through the public `rgb_sdk_flutter` API, with SDK
 `0.2.0-beta.3` pinned to immutable public Git commit
-`518a056dbe4a525762322686ac90bed080b03e78`, and uses Riverpod MVVM.
+`a8b053766c4ebfdc52f94716caad1c09060eba90`, and uses Riverpod MVVM.
 
 ## Release Status
 

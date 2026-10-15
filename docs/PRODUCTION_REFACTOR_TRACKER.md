@@ -117,10 +117,12 @@ expected/actual/diff images show only 182 changed pixels in that indicator;
 the actual matches the existing approved macOS design. The Linux baseline is
 updated from that exact CI-rendered image (SHA-256
 `5d850ab8701aefaca6c9f6f6b5c043265afa0a405554051e96cc52deddcba37f`).
-The exact pixel comparator is unchanged; final Linux CI must verify the update.
+The exact pixel comparator is unchanged. Quality run `38807341171` at
+`bac5879` passes the rendered guidelines and the exact Linux golden; final
+candidate evidence remains separately attributable.
 
 The app now pins SDK `0.2.0-beta.3` at immutable public Git commit
-`dc33e47a69b666523d9c0106c034f92393d21f6c`. This remains an internal beta;
+`a8b053766c4ebfdc52f94716caad1c09060eba90`. This remains an internal beta;
 mainnet funds are not approved. See `docs/architecture/SEND_SUBMISSION_RECOVERY.md`
 for the durable Send protocol and its native request-correlation limitation.
 Every onchain Send flushes its reviewed intent before native dispatch and its
@@ -131,12 +133,19 @@ cannot authorize retry. Stronger native cleanup failures fence all access.
 
 Independent reviews caught and corrected wallet-switch presentation loss,
 malformed native acceptance, and cleanup escalation regressions. The consolidated
-283-test focused suite passes. The full 1,155-test host suite passes with
-88.29% line coverage (15,832 / 17,931), and final lint passes. Platform and
-exact-candidate results are recorded separately in ignored release-fix evidence. Clipboard and EVM
+283-test focused suite passes. Earlier verification of the core changes passed
+the full 1,155-test host suite with 88.29% line coverage (15,832 / 17,931) and
+its matching lint. Platform and exact-candidate results are recorded separately
+in ignored release-fix evidence. Clipboard and EVM
 configuration checks below describe the app-owned fixes. SDK source safety,
 provenance, native privacy review, fresh-device backup recovery, signed artifacts,
 physical devices, and deployment-owner inputs remain explicit release gates.
+
+The final SDK pin also enforces the unresolved iOS native DiskSpace privacy
+review as a production failure tied to the exact native source/archive pair;
+unknown pairs fail closed. Its mainnet aggregate stops before builds or supplied
+evidence, and its production supply-chain check independently records the
+blocker. The native bytes and runtime API are unchanged by this tooling fix.
 
 ### October 16 Mainnet Onchain Clipboard And BFA Configuration Corrections
 
@@ -1507,7 +1516,7 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `Gemfile` | Project configuration | verified | BUILD-021 | The repository pins only CocoaPods 1.16.2 from the canonical HTTPS RubyGems source; executable policy rejects added sources or gems and exact iOS runs pass | `60cc8ad` |
 | `Gemfile.lock` | Project configuration | verified | BUILD-021 | The complete CocoaPods/Ruby graph, exact Darwin/generic platforms, one SHA-256 per resolved gem, and Bundler 4.0.10 pass frozen installation and exact iOS execution | `60cc8ad` |
 | `Makefile` | Project configuration | blocked | BUILD-002, BUILD-006, BUILD-007, BUILD-009, BUILD-010, BUILD-015, BUILD-017, BUILD-018, BUILD-019, BUILD-020, BUILD-021, BUILD-022, BUILD-031, BUILD-042, BUILD-043, BUILD-044, BUILD-046, BUILD-048, DOC-006, ARCH-008, ARCH-009, PLAT-016, PLAT-017, STORE-012, TEST-006, TEST-007, TEST-008, PERF-012, TOOL-008, TOOL-011, TOOL-012, TOOL-013, SDK-004, BUILD-049 | Dependency setup verifies isolated Python 3.9+ before resolving the exact Pub lockfile. Owned release targets retain manifest, artifact, signing and packaging gates; SDK-004/PLAT-001 remain independent | `9c6dd4e`, `e52a52e`, `c94f8ff`, `60cc8ad`, `59cba0a`, `ff0305b`, working tree |
-| `README.md` | Project configuration | verified | DOC-001, DOC-005, DOC-007, BRAND-001, BASE-002, FIAT-002, SDK-004, PLAT-015, SEC-015, BUILD-021, BUILD-022, BUILD-042, CI-001, SDK-006, SDK-012, DOC-011, BUILD-049 | Documents immutable SDK beta.3 at 518a056, its unchanged published native artifact boundary, Python 3.9+ prerequisite and initial password-only mainnet on-chain scope; native provenance, signing, recovery and exact Release qualification limits remain explicit | `1a7ca65`; this handoff commit, working tree |
+| `README.md` | Project configuration | verified | DOC-001, DOC-005, DOC-007, BRAND-001, BASE-002, FIAT-002, SDK-004, PLAT-015, SEC-015, BUILD-021, BUILD-022, BUILD-042, CI-001, SDK-006, SDK-012, DOC-011, BUILD-049 | Documents immutable SDK beta.3 at a8b0537, its unchanged published native artifact boundary, Python 3.9+ prerequisite and initial password-only mainnet on-chain scope; native provenance, signing, recovery and exact Release qualification limits remain explicit | `1a7ca65`; this handoff commit, working tree |
 | `analysis_options.yaml` | Project configuration | verified | BUILD-002, ARCH-001, CODE-001, BASE-002 | Dart 3.13 removes the deprecated inverse await lint; strict analysis catches unsafe future returns from try blocks and exact `3fc63ba` analysis reports zero diagnostics | `8e97370`, `3fc63ba` |
 | `android/.gitignore` | Android platform | reviewed-clean | BUILD-001 | Flutter-owned wrapper outputs, local SDK state, captures, native intermediates, and signing material are excluded without hiding repository source | - |
 | `android/app/build.gradle.kts` | Android platform | blocked | BUILD-001, BUILD-012, BUILD-013, BUILD-018, BUILD-045, PLAT-001, PLAT-002, PLAT-012, PLAT-016, PLAT-017, STORE-012 | Aster production/test Kotlin now compiles through AGP built-in Kotlin and source policy rejects legacy KGP in the app module; final public identity/signing and dependency-module migration remain external blockers | `8e97370`, `5742fc0`, `dd49b7b`, `430111b`, `9c6dd4e`, `e52a52e` |
