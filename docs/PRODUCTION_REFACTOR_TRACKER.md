@@ -46,7 +46,7 @@ TEST-019 and PERF-015 remain blocked.
 ### October 16 Durable Send And SDK Release Hardening
 
 The app now pins SDK `0.2.0-beta.3` at immutable public Git commit
-`c6ef6612d6b90cd1dec3f7e9067f45024eef9654`. This remains an internal beta;
+`dc33e47a69b666523d9c0106c034f92393d21f6c`. This remains an internal beta;
 mainnet funds are not approved. See `docs/architecture/SEND_SUBMISSION_RECOVERY.md`
 for the durable Send protocol and its native request-correlation limitation.
 Every onchain Send flushes its reviewed intent before native dispatch and its
