@@ -25,7 +25,7 @@ dependencies:
   rgb_sdk_flutter:
     git:
       url: https://github.com/UTEXO-Protocol/flutter-sdk.git
-      ref: dc33e47a69b666523d9c0106c034f92393d21f6c
+      ref: 518a056dbe4a525762322686ac90bed080b03e78
 
   # Storage
   # Keep the reviewed secure-storage release while upgrading the host platforms.
