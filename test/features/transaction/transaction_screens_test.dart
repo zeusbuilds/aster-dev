@@ -21,6 +21,88 @@ import '../../support/wallet_fakes.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  for (final (unit, amount, fee) in [
+    ('btc', '0.05 BTC', '0.00000155 BTC'),
+    ('sats', '5,000,000 sats', '155 sats'),
+  ]) {
+    testWidgets(
+      'self transfer uses exact reviewed $unit amount on Activity and details',
+      (tester) async {
+        final native = WalletActivity(
+          id: 'activity-${'f' * 64}',
+          source: WalletActivitySource.bitcoinTransaction,
+          operation: WalletActivityOperation.bitcoinSelfTransfer,
+          asset: WalletAsset.bitcoin,
+          rail: PaymentRail.onchain,
+          direction: WalletActivityDirection.internal,
+          status: WalletActivityStatus.succeeded,
+          fee: WalletAmount.onchain(
+            assetId: WalletAsset.bitcoin.id,
+            units: 155,
+          ),
+          occurredAt: DateTime.utc(2026, 8, 11, 10),
+          confirmedAt: DateTime.utc(2026, 8, 11, 10),
+          confirmationHeight: 100,
+          txid: 'f' * 64,
+        );
+        final record = native.withReviewedAmount(
+          WalletAmount.onchain(assetId: WalletAsset.bitcoin.id, units: 5000000),
+        );
+        final engine = FakeWalletEngine()..activities = [record];
+        final harness = await _harness(
+          engine: engine,
+          preferenceValues: {'aster.settings.v1.bitcoin_unit': unit},
+        );
+        addTearDown(() => _disposeHarness(tester, harness));
+        await _pump(
+          tester,
+          harness,
+          const TransactionListScreen(assetKind: WalletAssetKind.bitcoin),
+        );
+        await _pumpUntil(
+          tester,
+          () => find.text('Transfer to self').evaluate().isNotEmpty,
+        );
+        expect(find.widgetWithText(AmountText, amount), findsOneWidget);
+        expect(find.text('Amount unavailable'), findsNothing);
+        expect(
+          find.bySemanticsLabel(
+            RegExp(
+              'Transfer to self, on-chain, ${RegExp.escape(amount)}, Completed',
+            ),
+          ),
+          findsOneWidget,
+        );
+        expect(find.text('Sent'), findsNothing);
+
+        await _pump(
+          tester,
+          harness,
+          TransactionDetailsScreen(
+            assetKind: WalletAssetKind.bitcoin,
+            activityId: record.id,
+          ),
+        );
+        await _pumpUntil(
+          tester,
+          () => find.text('Network fee').evaluate().isNotEmpty,
+        );
+        expect(find.text('Transfer to self'), findsWidgets);
+        expect(find.widgetWithText(AmountText, amount), findsWidgets);
+        expect(find.widgetWithText(AmountText, fee), findsOneWidget);
+        expect(
+          find.bySemanticsLabel(
+            'Bitcoin, Transfer to self, $amount, Completed',
+          ),
+          findsOneWidget,
+        );
+        expect(find.text('Amount unavailable'), findsNothing);
+        expect(find.text('-$amount'), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets(
     'Activity retains an accepted receipt before native history catches up',
     (tester) async {
@@ -140,7 +222,11 @@ void main() {
         () => find.text('Pending').evaluate().isNotEmpty,
       );
       expect(find.byType(RefreshIndicator), findsOneWidget);
-      await tester.tap(find.byTooltip('Refresh transaction'));
+      expect(find.byTooltip('Refresh transaction'), findsNothing);
+      final refresh = tester
+          .widget<RefreshIndicator>(find.byType(RefreshIndicator))
+          .onRefresh;
+      final refreshing = refresh();
       await tester.pump();
       expect(find.byType(LinearProgressIndicator), findsOneWidget);
       expect(find.text('Received'), findsOneWidget);
@@ -152,6 +238,7 @@ void main() {
       );
       engine.syncError = AppFailureException(failure);
       gate.complete();
+      await refreshing;
       await _pumpUntil(
         tester,
         () => find.text(failure.userMessage).evaluate().isNotEmpty,
@@ -167,7 +254,7 @@ void main() {
       );
       engine.syncError = null;
       engine.activities = [_onchainActivity()];
-      await tester.tap(find.byTooltip('Refresh transaction'));
+      await refresh();
       await _pumpUntil(
         tester,
         () => find.text('Completed').evaluate().isNotEmpty,
@@ -287,6 +374,72 @@ void main() {
 
     expect(find.text('Today'), findsNothing);
     expect(find.text('Yesterday'), findsOneWidget);
+  });
+
+  testWidgets('Activity and details scroll beneath the bottom system inset', (
+    tester,
+  ) async {
+    tester.view.padding = const FakeViewPadding(bottom: 34);
+    tester.view.viewPadding = const FakeViewPadding(bottom: 34);
+    addTearDown(tester.view.resetPadding);
+    addTearDown(tester.view.resetViewPadding);
+    final harness = await _harness();
+    addTearDown(() => _disposeHarness(tester, harness));
+    await _pump(
+      tester,
+      harness,
+      const TransactionListScreen(assetKind: WalletAssetKind.bitcoin),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byType(TransactionItem).evaluate().length == 2,
+    );
+    final activityScroll = find.byType(CustomScrollView);
+    expect(tester.getRect(activityScroll).bottom, 844);
+    final activityPosition = tester
+        .state<ScrollableState>(
+          find
+              .descendant(of: activityScroll, matching: find.byType(Scrollable))
+              .first,
+        )
+        .position;
+    activityPosition.jumpTo(activityPosition.maxScrollExtent);
+    await tester.pump();
+    final bottomPadding = tester
+        .widgetList<SizedBox>(
+          find.descendant(of: activityScroll, matching: find.byType(SizedBox)),
+        )
+        .where(
+          (box) =>
+              box.height == 34 + tester.element(activityScroll).spacing.xxl,
+        );
+    expect(bottomPadding, isNotEmpty);
+
+    await _pump(
+      tester,
+      harness,
+      TransactionDetailsScreen(
+        assetKind: WalletAssetKind.bitcoin,
+        activityId: _onchainActivity().id,
+      ),
+    );
+    await _pumpUntil(tester, () => find.text('Received').evaluate().isNotEmpty);
+    final detailsScroll = find.byType(CustomScrollView);
+    expect(tester.getRect(detailsScroll).bottom, 844);
+    final padding = tester
+        .widget<SliverPadding>(
+          find
+              .descendant(
+                of: detailsScroll,
+                matching: find.byType(SliverPadding),
+              )
+              .first,
+        )
+        .padding
+        .resolve(TextDirection.ltr);
+    expect(padding.bottom, 34 + tester.element(detailsScroll).spacing.xxl);
+    expect(find.byTooltip('Refresh transaction'), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Details exposes available data, copy, and explorer actions', (

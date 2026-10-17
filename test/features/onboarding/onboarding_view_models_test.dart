@@ -8,6 +8,7 @@ import 'package:aster/features/onboarding/presentation/view_model/view_models.da
 import 'package:aster/features/wallet/presentation/view_model/wallet_view_model.dart';
 import 'package:aster/shared/feedback/feedback.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rgb_sdk_flutter/rgb_sdk_flutter.dart';
 
 import '../../support/onboarding_harness.dart';
 
@@ -780,6 +781,64 @@ void main() {
   });
 
   test(
+    'native unlock conflict retains the reviewed onboarding draft',
+    () async {
+      final harness = await OnboardingTestHarness.create();
+      addTearDown(harness.dispose);
+      final subscription = harness.container.listen(
+        createWalletViewModelProvider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      await harness.container.read(walletViewModelProvider.future);
+      final generated = await harness.container.read(
+        createWalletViewModelProvider.future,
+      );
+      final notifier = harness.container.read(
+        createWalletViewModelProvider.notifier,
+      );
+      _completeCreateQuiz(notifier, generated);
+      notifier.updateWalletName('Daily wallet');
+      harness.engine.provisionError = const ConflictError(
+        'private native rejection',
+        cause: _NativeUnlockCause(),
+      );
+
+      expect(await notifier.submit(), isFalse);
+
+      final state = harness.container
+          .read(createWalletViewModelProvider)
+          .requireValue;
+      expect(state.words, validTestMnemonicWords);
+      expect(state.walletName, 'Daily wallet');
+      expect(state.failure?.code, 'wallet_unlock_conflict');
+      expect(
+        state.failure?.userMessage,
+        'The wallet could not start. Check the wallet services and try again.',
+      );
+      expect(state.failure?.requiresReconciliation, isFalse);
+      expect(state.failure?.outcomeUnknown, isFalse);
+      expect(state.canSubmit, isTrue);
+      expect(
+        harness.container
+            .read(walletViewModelProvider)
+            .requireValue
+            .activeWallet,
+        isNull,
+      );
+      expect(
+        harness.engine.calls,
+        containsAllInOrder(['provision', 'destroy']),
+      );
+      expect(
+        harness.engine.calls.where((call) => call == 'provision'),
+        hasLength(1),
+      );
+    },
+  );
+
+  test(
     'create blocks outcome-unknown replay and keeps phrase offline',
     () async {
       final harness = await OnboardingTestHarness.create();
@@ -898,4 +957,11 @@ Future<void> _waitFor(bool Function() predicate) async {
     await Future<void>.delayed(Duration.zero);
   }
   fail('Timed out waiting for asynchronous state.');
+}
+
+final class _NativeUnlockCause implements NativeOperationCause {
+  const _NativeUnlockCause();
+
+  @override
+  String get operation => 'rlnUnlockNode';
 }

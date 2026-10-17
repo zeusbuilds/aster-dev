@@ -168,21 +168,10 @@ class SettingsScreen extends ConsumerWidget {
                         padding: EdgeInsets.symmetric(vertical: spacing.xs),
                         child: Column(
                           children: [
-                            AsterOptionRow(
+                            const AsterOptionRow(
                               title: 'Currency',
-                              details:
-                                  settingsSnapshot?.selectedCurrency.code ??
-                                  (settings.hasError
-                                      ? 'Unavailable'
-                                      : 'Loading'),
+                              details: 'USD',
                               prefixIcon: MingCuteIcons.mgc_cash_line,
-                              hapticIntent: null,
-                              onTap: settingsEnabled && !navigation.inFlight
-                                  ? openNamed(
-                                      RouteNames.currencySelection,
-                                      'Currency selector could not open',
-                                    )
-                                  : null,
                             ),
                             const AsterDivider.inset(),
                             AsterOptionRow(
@@ -209,29 +198,6 @@ class SettingsScreen extends ConsumerWidget {
                               title: 'Language',
                               details: 'English',
                               prefixIcon: MingCuteIcons.mgc_translate_2_line,
-                            ),
-                            const AsterDivider.inset(),
-                            AsterOptionRow(
-                              title: 'Region',
-                              details:
-                                  settingsSnapshot?.selectedRegion.name ??
-                                  (settings.hasError
-                                      ? 'Unavailable'
-                                      : 'Loading'),
-                              prefixIcon: MingCuteIcons.mgc_world_2_line,
-                              hapticIntent: null,
-                              onTap: settingsEnabled && !navigation.inFlight
-                                  ? openNamed(
-                                      RouteNames.countrySelection,
-                                      'Region selector could not open',
-                                    )
-                                  : null,
-                            ),
-                            const AsterDivider.inset(),
-                            const AsterOptionRow(
-                              title: 'Notifications',
-                              details: 'Unavailable',
-                              prefixIcon: MingCuteIcons.mgc_bell_ringing_line,
                             ),
                           ],
                         ),

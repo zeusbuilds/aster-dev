@@ -42,6 +42,7 @@ enum WalletActivityStatus {
 /// Stable semantic operation independent from native enum spelling.
 enum WalletActivityOperation {
   bitcoinSend,
+  bitcoinSelfTransfer,
   bitcoinReceive,
   bitcoinDrain,
   bitcoinUtxoCreation,
@@ -234,12 +235,59 @@ final class WalletActivity {
     }
   }
 
+  /// Adds an exact accepted-send amount without changing native history truth.
+  ///
+  /// The repository must first match the wallet-scoped receipt to the native
+  /// transaction identity. Native status, ownership direction and fees remain
+  /// authoritative; a conflicting amount is never replaced.
+  WalletActivity withReviewedAmount(WalletAmount reviewed) {
+    if ((operation != WalletActivityOperation.bitcoinSend &&
+            operation != WalletActivityOperation.bitcoinSelfTransfer &&
+            operation != WalletActivityOperation.rgbSend) ||
+        reviewed.assetId != asset.id ||
+        reviewed.rail != rail ||
+        reviewed.isZero ||
+        (amount != null && amount != reviewed)) {
+      throw ArgumentError('Reviewed payment amount is inconsistent.');
+    }
+    if (amount == reviewed) return this;
+    return WalletActivity(
+      id: id,
+      source: source,
+      operation: operation,
+      asset: asset,
+      rail: rail,
+      direction: direction,
+      status: status,
+      amount: reviewed,
+      fee: fee,
+      occurredAt: occurredAt,
+      updatedAt: updatedAt,
+      confirmedAt: confirmedAt,
+      expiresAt: expiresAt,
+      confirmationHeight: confirmationHeight,
+      txid: txid,
+      paymentHash: paymentHash,
+      invoice: invoice,
+      recipientId: recipientId,
+      payeePublicKey: payeePublicKey,
+      transferIndex: transferIndex,
+      batchTransferIndex: batchTransferIndex,
+      receiveOutpoint: receiveOutpoint,
+      changeOutpoint: changeOutpoint,
+      transportEndpointCount: transportEndpointCount,
+      usedTransportEndpointCount: usedTransportEndpointCount,
+      transportTypes: transportTypes,
+    );
+  }
+
   bool _validBitcoinOperationDirection() => switch (operation) {
     WalletActivityOperation.bitcoinSend ||
     WalletActivityOperation.bitcoinDrain =>
       direction == WalletActivityDirection.sent,
     WalletActivityOperation.bitcoinReceive =>
       direction == WalletActivityDirection.received,
+    WalletActivityOperation.bitcoinSelfTransfer ||
     WalletActivityOperation.bitcoinUtxoCreation ||
     WalletActivityOperation.rgbAnchor =>
       direction == WalletActivityDirection.internal,
@@ -259,6 +307,7 @@ final class WalletActivity {
     WalletActivityOperation.rgbInflation =>
       direction == WalletActivityDirection.received,
     WalletActivityOperation.bitcoinSend ||
+    WalletActivityOperation.bitcoinSelfTransfer ||
     WalletActivityOperation.bitcoinReceive ||
     WalletActivityOperation.bitcoinDrain ||
     WalletActivityOperation.bitcoinUtxoCreation ||

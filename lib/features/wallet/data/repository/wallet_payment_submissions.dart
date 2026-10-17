@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
+
 import '../../../../core/config/app_environment.dart';
 import '../../../../core/errors/errors.dart';
 import '../../domain/models/models.dart';
@@ -12,12 +14,14 @@ final class WalletPaymentSubmissions {
   WalletPaymentSubmissions(
     this.runtime,
     this.store, {
+    required this.receipts,
     required this.newId,
     required this.clock,
   });
 
   final WalletRuntime runtime;
   final WalletPaymentJournalStore? store;
+  final WalletPaymentReceiptStore? receipts;
   final String Function() newId;
   final DateTime Function() clock;
   WalletPaymentSubmission? _unconfirmedAttempt;
@@ -26,6 +30,7 @@ final class WalletPaymentSubmissions {
     if (store == null) return;
     for (final profile in profiles) {
       await _read(profile);
+      await _archived(profile);
     }
   }
 
@@ -104,34 +109,62 @@ final class WalletPaymentSubmissions {
         record?.id != _unconfirmedAttempt?.id) {
       return false;
     }
+    // Match unmodified native history, never the archive-enriched feed. A
+    // native self-transfer establishes wallet ownership but cannot report the
+    // user-selected gross amount: both recipient and change remain ours.
     final matches = (await engine.listActivity(result.route.asset)).where(
       (activity) =>
-          activity.asset == result.route.asset &&
-          activity.rail == PaymentRail.onchain &&
-          activity.direction == WalletActivityDirection.sent &&
-          activity.amount == result.amount &&
-          activity.txid == result.referenceId &&
-          (result.route.asset.kind == WalletAssetKind.bitcoin
-              ? activity.source == WalletActivitySource.bitcoinTransaction &&
-                    activity.operation == WalletActivityOperation.bitcoinSend &&
-                    result.batchTransferIndex == null
-              : activity.source == WalletActivitySource.rgbTransfer &&
-                    activity.operation == WalletActivityOperation.rgbSend &&
-                    result.batchTransferIndex != null &&
-                    activity.batchTransferIndex == result.batchTransferIndex) &&
-          activity.status != WalletActivityStatus.failed &&
-          activity.status != WalletActivityStatus.cancelled &&
-          activity.status != WalletActivityStatus.expired,
+          _matchesIdentity(activity, result) &&
+          (activity.operation == WalletActivityOperation.bitcoinSelfTransfer
+              ? activity.amount == null
+              : activity.amount == result.amount),
     );
     return matches.length == 1;
   });
+
+  /// Adds reviewed amounts only to independently observed native transactions.
+  /// Native status, direction, identity, fees and wallet balances stay intact.
+  Future<List<WalletActivity>> reviewedHistory(
+    List<WalletActivity> activities,
+  ) async {
+    final profile = runtime.activeProfile;
+    if (profile == null || store == null) return activities;
+    await _read(profile); // Backfill the existing v1 accepted journal first.
+    final archive = await _archived(profile);
+    final byIdentity = {
+      for (final receipt in archive)
+        _receiptKey(profile, receipt.result!): receipt.result!,
+    };
+    final matched = <String>{};
+    return List.unmodifiable(
+      activities.map((activity) {
+        final txid = activity.txid;
+        if (txid == null) return activity;
+        final result =
+            byIdentity[_identityKey(
+              profile,
+              activity.asset,
+              txid,
+              activity.batchTransferIndex,
+            )];
+        if (result != null && _matchesIdentity(activity, result)) {
+          if (!matched.add(_receiptKey(profile, result)) ||
+              (activity.amount != null && activity.amount != result.amount)) {
+            throw const AppFailureException(walletActivityConsistencyFailure);
+          }
+          return activity.withReviewedAmount(result.amount);
+        }
+        return activity;
+      }),
+    );
+  }
 
   Future<WalletSendResult> dispatch(
     WalletEngine engine,
     WalletSendCommand command,
   ) async {
     final profile = runtime.activeProfile;
-    if (store == null || profile == null) {
+    if (store == null || receipts == null || profile == null) {
       throw const AppFailureException(
         AppFailure(
           code: 'payment_journal_unavailable',
@@ -145,6 +178,7 @@ final class WalletPaymentSubmissions {
     if (previous?.requiresReconciliation == true) {
       throw const AppFailureException(walletPaymentSubmissionPendingFailure);
     }
+    await _archived(profile);
     String? id;
     for (var attempt = 0; attempt < 8; attempt += 1) {
       final candidate = newId();
@@ -223,6 +257,12 @@ final class WalletPaymentSubmissions {
         WalletPaymentSubmissionPhase.accepted,
         result: result,
       );
+      // The accepted journal remains the recovery source if the immutable
+      // archive commit loses its acknowledgement. Never return success first.
+      final accepted = await _read(profile);
+      if (accepted?.id != intent.id || accepted?.result != result) {
+        throw const StoredDataCorruptionException();
+      }
     } catch (error, stack) {
       _unresolved(error, stack);
     }
@@ -232,7 +272,102 @@ final class WalletPaymentSubmissions {
 
   Future<WalletPaymentSubmission?> _read(WalletProfile profile) async {
     final encoded = await store!.read(profile.id);
-    return encoded == null ? null : _decode(encoded, profile);
+    if (encoded == null) return null;
+    final value = _decode(encoded, profile);
+    if (value.phase == WalletPaymentSubmissionPhase.accepted) {
+      await _archive(value, profile);
+    }
+    return value;
+  }
+
+  Future<void> _archive(
+    WalletPaymentSubmission receipt,
+    WalletProfile profile,
+  ) async {
+    if (receipts == null) {
+      throw const AppFailureException(
+        AppFailure(
+          code: 'payment_receipt_storage_unavailable',
+          kind: AppFailureKind.configuration,
+          userMessage: 'Payment receipt storage is unavailable.',
+          retryable: false,
+        ),
+      );
+    }
+    await receipts!.writeReceipt(
+      profile.id,
+      _receiptKey(profile, receipt.result!),
+      _encode(receipt, profile),
+    );
+  }
+
+  Future<List<WalletPaymentSubmission>> _archived(WalletProfile profile) async {
+    if (receipts == null) return const [];
+    final documents = await receipts!.readAll(profile.id);
+    return documents.entries
+        .map((entry) {
+          final receipt = _decode(entry.value, profile);
+          if (receipt.phase != WalletPaymentSubmissionPhase.accepted ||
+              _receiptKey(profile, receipt.result!) != entry.key) {
+            throw const StoredDataCorruptionException();
+          }
+          return receipt;
+        })
+        .toList(growable: false);
+  }
+
+  static String _receiptKey(WalletProfile profile, WalletSendResult result) =>
+      _identityKey(
+        profile,
+        result.route.asset,
+        result.referenceId,
+        result.batchTransferIndex,
+      );
+
+  static String _identityKey(
+    WalletProfile profile,
+    WalletAsset asset,
+    String txid,
+    int? batchTransferIndex,
+  ) => sha256
+      .convert(
+        utf8.encode(
+          jsonEncode([
+            profile.storageToken,
+            profile.environment.name,
+            asset.id.value,
+            asset.precision,
+            txid,
+            batchTransferIndex,
+          ]),
+        ),
+      )
+      .toString();
+
+  static bool _matchesIdentity(
+    WalletActivity activity,
+    WalletSendResult result,
+  ) {
+    if (activity.asset != result.route.asset ||
+        activity.rail != PaymentRail.onchain ||
+        activity.txid != result.referenceId ||
+        activity.status == WalletActivityStatus.failed ||
+        activity.status == WalletActivityStatus.cancelled ||
+        activity.status == WalletActivityStatus.expired) {
+      return false;
+    }
+    return result.route.asset.kind == WalletAssetKind.bitcoin
+        ? activity.source == WalletActivitySource.bitcoinTransaction &&
+              (activity.operation == WalletActivityOperation.bitcoinSend ||
+                  activity.operation ==
+                      WalletActivityOperation.bitcoinSelfTransfer) &&
+              result.batchTransferIndex == null &&
+              (activity.status == WalletActivityStatus.pending ||
+                  activity.status == WalletActivityStatus.succeeded)
+        : activity.source == WalletActivitySource.rgbTransfer &&
+              activity.operation == WalletActivityOperation.rgbSend &&
+              result.batchTransferIndex != null &&
+              activity.batchTransferIndex == result.batchTransferIndex;
   }
 
   Future<void> _write(

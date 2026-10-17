@@ -41,6 +41,8 @@ void main() {
     expect(display.total.text, '1,001.5 sats');
     expect(display.available.text, '901.25 sats');
     expect(display.fiatContext, r'$1.00 USD estimated');
+    expect(display.hasFiatEstimate, isTrue);
+    expect(display.fiatLabel, r'≈ $1.00');
   });
 
   test(
@@ -92,30 +94,65 @@ void main() {
 
   test('rejects mismatched and stale selected-currency quotes', () {
     final formatter = HomeAssetDisplayFormatter();
-    expect(
-      formatter
-          .format(
-            balance: _bitcoinBalance(),
-            bitcoinUnit: BitcoinUnit.bitcoin,
-            currencyCode: 'EUR',
-            now: now,
-            bitcoinMarket: usdMarket,
-          )
-          .fiatContext,
-      'EUR estimate unavailable',
+    final mismatched = formatter.format(
+      balance: _bitcoinBalance(),
+      bitcoinUnit: BitcoinUnit.bitcoin,
+      currencyCode: 'EUR',
+      now: now,
+      bitcoinMarket: usdMarket,
     );
-    expect(
-      formatter
-          .format(
-            balance: _bitcoinBalance(),
-            bitcoinUnit: BitcoinUnit.bitcoin,
-            currencyCode: 'USD',
-            now: usdMarket.expiresAt,
-            bitcoinMarket: usdMarket,
-          )
-          .fiatContext,
-      'USD estimate unavailable',
+    expect(mismatched.fiatContext, 'EUR estimate unavailable');
+    expect(mismatched.fiatLabel, isNull);
+    expect(mismatched.hasFiatEstimate, isFalse);
+
+    final expired = formatter.format(
+      balance: _bitcoinBalance(),
+      bitcoinUnit: BitcoinUnit.bitcoin,
+      currencyCode: 'USD',
+      now: usdMarket.expiresAt,
+      bitcoinMarket: usdMarket,
     );
+    expect(expired.fiatContext, 'USD estimate unavailable');
+    expect(expired.fiatLabel, isNull);
+    expect(expired.hasFiatEstimate, isFalse);
+  });
+
+  test('marks absent quotes unavailable independently for each asset', () {
+    final formatter = HomeAssetDisplayFormatter();
+    final noUsdtQuote = BitcoinMarketSnapshot(
+      quoteCurrency: usdMarket.quoteCurrency,
+      currentBitcoinPrice: usdMarket.currentBitcoinPrice,
+      currentSource: usdMarket.currentSource,
+      history: usdMarket.history,
+    );
+    final bitcoin = formatter.format(
+      balance: _bitcoinBalance(),
+      bitcoinUnit: BitcoinUnit.bitcoin,
+      currencyCode: 'USD',
+      now: now,
+      bitcoinMarket: noUsdtQuote,
+    );
+    final usdt = formatter.format(
+      balance: _usdtBalance(),
+      bitcoinUnit: BitcoinUnit.bitcoin,
+      currencyCode: 'USD',
+      now: now,
+      bitcoinMarket: noUsdtQuote,
+    );
+    final noSnapshot = formatter.format(
+      balance: _bitcoinBalance(),
+      bitcoinUnit: BitcoinUnit.bitcoin,
+      currencyCode: 'USD',
+      now: now,
+    );
+
+    expect(bitcoin.hasFiatEstimate, isTrue);
+    expect(usdt.hasFiatEstimate, isFalse);
+    expect(usdt.fiatLabel, isNull);
+    expect(usdt.total.text, '125 USDT');
+    expect(noSnapshot.hasFiatEstimate, isFalse);
+    expect(noSnapshot.fiatLabel, isNull);
+    expect(noSnapshot.total.text, '0.000010015 BTC');
   });
 
   test('formats configured USDT from its independent live fiat quote', () {
@@ -130,6 +167,7 @@ void main() {
     expect(display.total.text, '125 USDT');
     expect(display.available.text, '110 USDT');
     expect(display.fiatContext, r'$125.00 USD estimated');
+    expect(display.hasFiatEstimate, isTrue);
   });
 }
 

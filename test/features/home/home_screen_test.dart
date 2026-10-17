@@ -148,7 +148,12 @@ void main() {
     expect(find.text(r'≈ $1.00'), findsOneWidget);
     expect(find.text('Powered by CoinGecko'), findsNothing);
     expect(find.bySemanticsLabel(RegExp('CoinGecko')), findsNothing);
-    expect(find.text('Unavailable on this network'), findsOneWidget);
+    expect(find.text('Unavailable on this network'), findsNothing);
+    expect(find.text('Not configured'), findsNothing);
+    expect(
+      tester.widgetList<AssetRow>(find.byType(AssetRow)).map((row) => row.kind),
+      [WalletAssetKind.bitcoin],
+    );
 
     await tester.tap(find.byTooltip('Hide balances'));
     await _pumpUntil(
@@ -285,6 +290,7 @@ void main() {
     );
 
     expect(find.text('1,001 sats'), findsOneWidget);
+    expect(find.text('USD estimate unavailable'), findsNothing);
     expect(
       tester
           .widgetList<AppSkeletonizer>(find.byType(AppSkeletonizer))
@@ -300,10 +306,172 @@ void main() {
     );
   });
 
+  testWidgets('unavailable fiat stays hidden when balances are hidden', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: const Scaffold(
+          body: AssetRow(
+            kind: WalletAssetKind.bitcoin,
+            title: 'Bitcoin',
+            totalText: '1,001 sats',
+            availableText: '900 sats',
+            fiatContext: 'USD estimate unavailable',
+            balancesVisible: false,
+            fiatLoading: true,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.bySemanticsLabel('Bitcoin balance hidden'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('fiat estimate')), findsNothing);
+    expect(find.text('1,001 sats'), findsNothing);
+    expect(find.text('USD estimate unavailable'), findsNothing);
+    expect(
+      tester
+          .widgetList<AppSkeletonizer>(find.byType(AppSkeletonizer))
+          .any((widget) => widget.enabled),
+      isFalse,
+    );
+  });
+
+  testWidgets('a configured zero-balance asset remains in Home', (
+    tester,
+  ) async {
+    final now = DateTime.utc(2026, 8, 11, 12);
+    final engine = FakeWalletEngine()
+      ..balances[testRgbRoute.asset.id] = testRgbBalance(0);
+    final httpClient = _marketClient(now);
+    final harness = await PaymentFlowTestHarness.create(
+      engine: engine,
+      clock: () => now,
+      httpClient: httpClient,
+      services: testRgbServices,
+    );
+    addTearDown(httpClient.close);
+    addTearDown(() => _disposeHarness(tester, harness));
+
+    await _pump(tester, harness, const HomeScreen());
+    await _pumpUntil(
+      tester,
+      () => _assetRow(WalletAssetKind.usdt).evaluate().isNotEmpty,
+    );
+
+    final row = tester.widget<AssetRow>(_assetRow(WalletAssetKind.usdt));
+    expect(row.totalText, '0 USDT');
+    expect(row.onTap, isNotNull);
+    expect(find.text('Not configured'), findsNothing);
+  });
+
+  testWidgets(
+    'missing asset fiat shimmers independently, recovers, and retains good quotes',
+    (tester) async {
+      final now = DateTime.utc(2026, 8, 11, 12);
+      const configuration = RgbAssetConfiguration(
+        contractId: 'contract-id',
+        precision: 2,
+      );
+      final usdt = WalletAsset.rgbUsdt(
+        assetId: configuration.contractId,
+        precision: configuration.precision,
+      );
+      final engine = FakeWalletEngine()
+        ..balances[WalletAsset.bitcoin.id] = _bitcoinBalance()
+        ..balances[usdt.id] = _usdtBalance(usdt);
+      var includeUsdt = false;
+      var failRequests = false;
+      final httpClient = ResilientHttpClient(
+        client: MockClient((request) async {
+          if (failRequests) return http.Response('unavailable', 503);
+          if (request.url.path.endsWith('/range')) {
+            return _historyResponse(
+              now: now,
+              firstPrice: 99000,
+              lastPrice: 100000,
+            );
+          }
+          return _currentResponse(
+            observedAt: now.subtract(const Duration(minutes: 1)),
+            bitcoinPrice: 100000,
+            usdtPrice: includeUsdt ? 1 : null,
+          );
+        }),
+        retryPolicy: RetryPolicy(maxAttempts: 1),
+      );
+      final harness = await PaymentFlowTestHarness.create(
+        engine: engine,
+        clock: () => now,
+        httpClient: httpClient,
+        services: const WalletServiceConfiguration(
+          environment: BlockchainEnvironment.regtest,
+          sdkNetwork: 'regtest',
+          usdtAsset: configuration,
+        ),
+      );
+      addTearDown(httpClient.close);
+      addTearDown(() => _disposeHarness(tester, harness));
+      await _pump(tester, harness, const HomeScreen());
+      await _pumpUntil(
+        tester,
+        () => find.text(r'≈ $1.00').evaluate().isNotEmpty,
+      );
+
+      _expectFiatLoading(tester, WalletAssetKind.bitcoin, false);
+      _expectFiatLoading(tester, WalletAssetKind.usdt, true);
+      expect(find.text('125 USDT'), findsOneWidget);
+      expect(find.text('USD estimate unavailable'), findsNothing);
+      expect(find.text('Retry fiat quote'), findsNothing);
+
+      includeUsdt = true;
+      final recovery = harness.container
+          .read(bitcoinMarketViewModelProvider.notifier)
+          .retry();
+      await tester.runAsync(() => recovery);
+      await tester.pump();
+
+      expect(find.text(r'≈ $125.00'), findsOneWidget);
+      _expectFiatLoading(tester, WalletAssetKind.usdt, false);
+
+      failRequests = true;
+      final failedRefresh = harness.container
+          .read(bitcoinMarketViewModelProvider.notifier)
+          .retry();
+      await tester.runAsync(() => failedRefresh);
+      await tester.pump();
+
+      expect(
+        harness.container
+            .read(bitcoinMarketViewModelProvider)
+            .requireValue
+            .refreshFailure,
+        isNotNull,
+      );
+      expect(find.text(r'≈ $1.00'), findsOneWidget);
+      expect(find.text(r'≈ $125.00'), findsOneWidget);
+      _expectFiatLoading(tester, WalletAssetKind.bitcoin, false);
+      _expectFiatLoading(tester, WalletAssetKind.usdt, false);
+      expect(find.text('Retry fiat quote'), findsNothing);
+      expect(harness.toasts.messages, isEmpty);
+    },
+  );
+
   testWidgets('Home advances through independent asset quote expiries', (
     tester,
   ) async {
     var clockNow = DateTime.utc(2026, 8, 11, 12);
+    Future<void> advanceTwoSeconds() async {
+      // Keep the injected wall clock aligned with timer callbacks. A single
+      // large pump would make a callback at 1s observe 2s and could fire its
+      // newly scheduled timer inside that same pump while the clock stays 2s.
+      for (var quarter = 0; quarter < 8; quarter += 1) {
+        clockNow = clockNow.add(const Duration(milliseconds: 250));
+        await tester.pump(const Duration(milliseconds: 250));
+      }
+    }
+
     final bitcoinObservedAt = clockNow.subtract(
       BitcoinMarketSnapshot.maximumCurrentAge - const Duration(seconds: 3),
     );
@@ -347,18 +515,27 @@ void main() {
       () => find.text(r'≈ $125.00').evaluate().isNotEmpty,
     );
     expect(find.text(r'≈ $1.00'), findsOneWidget);
+    _expectFiatLoading(tester, WalletAssetKind.bitcoin, false);
+    _expectFiatLoading(tester, WalletAssetKind.usdt, false);
     expect(find.text('Retry fiat quote'), findsNothing);
 
-    clockNow = clockNow.add(const Duration(seconds: 2));
-    await tester.pump(const Duration(seconds: 2));
+    await advanceTwoSeconds();
     expect(find.text(r'≈ $1.00'), findsOneWidget);
-    expect(find.text('USD estimate unavailable'), findsOneWidget);
-    expect(find.text('Retry fiat quote'), findsOneWidget);
-
-    clockNow = clockNow.add(const Duration(seconds: 2));
-    await tester.pump(const Duration(seconds: 2));
+    _expectFiatLoading(tester, WalletAssetKind.bitcoin, false);
+    _expectFiatLoading(tester, WalletAssetKind.usdt, true);
+    expect(find.text('USD estimate unavailable'), findsNothing);
+    expect(find.text('Retry fiat quote'), findsNothing);
+    await advanceTwoSeconds();
+    await _pumpUntil(
+      tester,
+      () =>
+          find.bySemanticsLabel('Bitcoin price loading.').evaluate().isNotEmpty,
+    );
     expect(find.text(r'≈ $1.00'), findsNothing);
-    expect(find.text('USD estimate unavailable'), findsNWidgets(2));
+    _expectFiatLoading(tester, WalletAssetKind.bitcoin, true);
+    _expectFiatLoading(tester, WalletAssetKind.usdt, true);
+    expect(find.text('USD estimate unavailable'), findsNothing);
+    expect(find.text('Retry fiat quote'), findsNothing);
     expect(find.text('Market quote expired'), findsNothing);
     expect(
       tester
@@ -367,9 +544,7 @@ void main() {
           .isSkeleton,
       isTrue,
     );
-    await _pumpUntil(tester, () => marketRequestCount == 4);
-    await tester.pump(const Duration(milliseconds: 100));
-    expect(marketRequestCount, 4);
+    await _pumpUntil(tester, () => marketRequestCount > 2);
   });
 
   testWidgets('Home owns one cross-control navigation command', (tester) async {
@@ -1010,6 +1185,7 @@ http.Response _historyResponse({
 http.Response _currentResponse({
   required DateTime observedAt,
   required int bitcoinPrice,
+  int? usdtPrice,
 }) {
   return http.Response(
     jsonEncode({
@@ -1017,9 +1193,35 @@ http.Response _currentResponse({
         'usd': bitcoinPrice,
         'last_updated_at': observedAt.millisecondsSinceEpoch ~/ 1000,
       },
+      if (usdtPrice != null)
+        'tether': {
+          'usd': usdtPrice,
+          'last_updated_at': observedAt.millisecondsSinceEpoch ~/ 1000,
+        },
     }),
     200,
   );
+}
+
+Finder _assetRow(WalletAssetKind kind) => find.byWidgetPredicate(
+  (widget) => widget is AssetRow && widget.kind == kind && !widget.loading,
+);
+
+void _expectFiatLoading(
+  WidgetTester tester,
+  WalletAssetKind kind,
+  bool expected,
+) {
+  final skeletons = tester.widgetList<AppSkeletonizer>(
+    find.descendant(
+      of: _assetRow(kind),
+      matching: find.byType(AppSkeletonizer),
+    ),
+  );
+  expect(skeletons.map((widget) => widget.enabled), [
+    expected,
+    false,
+  ], reason: 'Only the fiat value should shimmer for $kind.');
 }
 
 ResilientHttpClient _marketClientWithAssetTimestamps({

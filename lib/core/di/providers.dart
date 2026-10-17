@@ -262,6 +262,12 @@ Future<WalletRepository> walletRepository(Ref ref) async {
             security,
           )
         : null,
+    paymentReceiptStore: setupDocuments is IoWalletRegistryDocumentStore
+        ? IoWalletPaymentReceiptStore(
+            '${setupDocuments.rootPath}/payment_receipts',
+            security,
+          )
+        : null,
     rgbSetupStore: setupDocuments is IoWalletRegistryDocumentStore
         ? IoRgbWalletSetupStore(
             '${setupDocuments.rootPath}/rgb_setup',

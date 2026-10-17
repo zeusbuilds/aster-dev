@@ -14,7 +14,7 @@ void main() {
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  test('loads documented defaults and persists all selections', () async {
+  test('loads documented defaults and persists available selections', () async {
     final preferences = PreferencesService(
       await SharedPreferences.getInstance(),
     );
@@ -27,7 +27,7 @@ void main() {
     expect(initialSnapshot.currencies.map((item) => item.code), ['EUR', 'USD']);
 
     expect(
-      await repository.selectCurrency('EUR'),
+      await repository.selectCurrency('USD'),
       isA<AppSuccess<SettingsSnapshot>>(),
     );
     expect(
@@ -45,7 +45,7 @@ void main() {
 
     final restarted = SettingsRepository(preferences, _validCatalog());
     final restored = await restarted.load() as AppSuccess<SettingsSnapshot>;
-    expect(restored.value.preferences.currencyCode, 'EUR');
+    expect(restored.value.preferences.currencyCode, 'USD');
     expect(restored.value.preferences.regionCode, 'DE');
     expect(restored.value.preferences.bitcoinUnit, BitcoinUnit.sats);
     expect(restored.value.preferences.balancesVisible, isFalse);
@@ -162,27 +162,51 @@ void main() {
     );
   });
 
-  test('repairs a stored currency removed by the quote policy', () async {
-    SharedPreferences.setMockInitialValues({
-      'aster.settings.v1.currency': 'ALL',
-      'aster.settings.v1.region': 'US',
-      'aster.settings.v1.bitcoin_unit': 'btc',
-      'aster.settings.v1.balances_visible': true,
+  for (final storedCurrency in ['ALL', 'EUR']) {
+    test('repairs stored $storedCurrency to the fixed USD currency', () async {
+      SharedPreferences.setMockInitialValues({
+        'aster.settings.v1.currency': storedCurrency,
+        'aster.settings.v1.region': 'DE',
+        'aster.settings.v1.bitcoin_unit': 'sats',
+        'aster.settings.v1.balances_visible': false,
+      });
+      final shared = await SharedPreferences.getInstance();
+      final repository = SettingsRepository(
+        PreferencesService(shared),
+        _validCatalog(),
+      );
+
+      final result = await repository.load();
+
+      expect(result, isA<AppSuccess<SettingsSnapshot>>());
+      expect(
+        (result as AppSuccess<SettingsSnapshot>).value.preferences.currencyCode,
+        'USD',
+      );
+      expect(result.value.preferences.regionCode, 'DE');
+      expect(result.value.preferences.bitcoinUnit, BitcoinUnit.sats);
+      expect(result.value.preferences.balancesVisible, isFalse);
+      expect(shared.getString('aster.settings.v1.currency'), 'USD');
     });
+  }
+
+  test('rejects another supported currency without changing USD', () async {
     final shared = await SharedPreferences.getInstance();
     final repository = SettingsRepository(
       PreferencesService(shared),
       _validCatalog(),
     );
+    await repository.load();
 
-    final result = await repository.load();
+    final result = await repository.selectCurrency('EUR');
 
-    expect(result, isA<AppSuccess<SettingsSnapshot>>());
-    expect(
-      (result as AppSuccess<SettingsSnapshot>).value.preferences.currencyCode,
-      'USD',
-    );
+    expect(result, isA<AppFailureResult<SettingsSnapshot>>());
+    final failure = (result as AppFailureResult<SettingsSnapshot>).failure;
+    expect(failure.code, 'settings_currency_unavailable');
+    expect(failure.retryable, isFalse);
     expect(shared.getString('aster.settings.v1.currency'), 'USD');
+    final reloaded = await repository.load() as AppSuccess<SettingsSnapshot>;
+    expect(reloaded.value.selectedCurrency.code, 'USD');
   });
 
   test('serializes concurrent preference writes', () async {
@@ -195,7 +219,7 @@ void main() {
     final repository = SettingsRepository(preferences, _validCatalog());
     await repository.load();
 
-    final first = repository.selectCurrency('EUR');
+    final first = repository.selectBitcoinUnit(BitcoinUnit.sats);
     await preferences.firstWriteStarted.future;
     final second = repository.selectRegion('DE');
     preferences.releaseWrites.complete();

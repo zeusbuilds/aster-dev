@@ -26,6 +26,215 @@ final _now = DateTime.utc(2026, 10, 16);
 final _txid = 'b' * 64;
 
 void main() {
+  test('an archive commit with a lost acknowledgement never allows another payment', () async {
+    final h = await _Harness.create();
+    addTearDown(h.dispose);
+    h.store
+      ..receiptCommitBeforeError = true
+      ..receiptWriteError = StateError('Lost archive commit acknowledgement');
+    _expectPending(await h.send());
+    expect(h.store.receiptDocuments[_id], hasLength(1));
+    _expectPending(await h.send());
+    expect(h.engine.calls.where((c) => c == 'sendPayment:start'), hasLength(1));
+    h.store.receiptWriteError = null;
+    h.engine.activities = [_bitcoinActivity(txid: _txid, selfTransfer: true)];
+    expect(
+      await h.repository.reconcilePaymentSubmission(),
+      isA<AppSuccess<void>>(),
+    );
+    expect(h.store.receiptDocuments[_id], hasLength(1));
+    expect(h.engine.calls.where((c) => c == 'sendPayment:start'), hasLength(1));
+  });
+
+  test('one reviewed receipt never enriches duplicate native transaction identities', () async {
+    final h = await _Harness.create();
+    addTearDown(h.dispose);
+    expect(await h.send(), isA<AppSuccess<WalletSendResult>>());
+    h.engine.activities = [
+      _bitcoinActivity(txid: _txid, selfTransfer: true),
+      _bitcoinActivity(txid: _txid, index: 2, selfTransfer: true),
+    ];
+    final feed = await h.repository.activityFeed(WalletAssetKind.bitcoin);
+    expect(
+      (feed as AppFailureResult<WalletActivityFeed>).failure,
+      walletActivityConsistencyFailure,
+    );
+    expect(h.engine.activities.every((a) => a.amount == null), isTrue);
+  });
+
+  test(
+    'two accepted self-transfer amounts survive a newer send and restart',
+    () async {
+      final h = await _Harness.create();
+      addTearDown(h.dispose);
+      expect(await h.send(), isA<AppSuccess<WalletSendResult>>());
+      final secondTx = 'c' * 64;
+      h.engine.sentPayment = WalletSendResult(
+        route: const PaymentRoute(
+          asset: WalletAsset.bitcoin,
+          rail: PaymentRail.onchain,
+        ),
+        amount: WalletAmount.onchain(
+          assetId: WalletAsset.bitcoin.id,
+          units: 30000,
+        ),
+        referenceId: secondTx,
+        status: WalletPaymentStatus.pending,
+      );
+      expect(
+        await h.send(amountUnits: 30000),
+        isA<AppSuccess<WalletSendResult>>(),
+      );
+      expect(h.store.receiptDocuments[_id], hasLength(2));
+      await h.restart();
+      h.engine.activities = [
+        _bitcoinActivity(txid: _txid, selfTransfer: true),
+        _bitcoinActivity(txid: secondTx, index: 2, selfTransfer: true),
+      ];
+      final feed = (await h.repository.activityFeed(
+        WalletAssetKind.bitcoin,
+      ) as AppSuccess<WalletActivityFeed>).value;
+      expect(feed.activities.map((a) => a.amount?.units), [20000, 30000]);
+      expect(
+        feed.activities.every(
+          (a) => a.direction == WalletActivityDirection.internal,
+        ),
+        isTrue,
+      );
+      expect(
+        feed.activities.every((a) => a.status == WalletActivityStatus.pending),
+        isTrue,
+      );
+      expect(h.engine.activities.every((a) => a.amount == null), isTrue);
+      expect(h.engine.calls, isNot(contains('sendPayment:start')));
+    },
+  );
+
+  test(
+    'legacy v1 accepted journal backfills before a newer receipt replaces it',
+    () async {
+      final h = await _Harness.create();
+      addTearDown(h.dispose);
+      expect(await h.send(), isA<AppSuccess<WalletSendResult>>());
+      final legacy = h.store.documents[_id]!;
+      expect((jsonDecode(legacy) as Map)['version'], 1);
+      h.store.receiptDocuments.clear();
+      await h.restart();
+      expect(h.store.receiptDocuments[_id], hasLength(1));
+      expect(h.store.documents[_id], legacy);
+      final originalArchive = Map<String, String>.from(
+        h.store.receiptDocuments[_id]!,
+      );
+      await h.repository.paymentSubmissionStatus();
+      await h.repository.paymentSubmissionStatus();
+      expect(h.store.receiptDocuments[_id], originalArchive);
+      h.engine.sentPayment = WalletSendResult(
+        route: const PaymentRoute(
+          asset: WalletAsset.bitcoin,
+          rail: PaymentRail.onchain,
+        ),
+        amount: WalletAmount.onchain(
+          assetId: WalletAsset.bitcoin.id,
+          units: 20000,
+        ),
+        referenceId: 'c' * 64,
+        status: WalletPaymentStatus.pending,
+      );
+      expect(await h.send(), isA<AppSuccess<WalletSendResult>>());
+      expect(h.store.receiptDocuments[_id], hasLength(2));
+      for (final entry in originalArchive.entries) {
+        expect(h.store.receiptDocuments[_id]![entry.key], entry.value);
+      }
+    },
+  );
+
+  test('archive failure after native acceptance fences replay and recovers from accepted journal', () async {
+    final h = await _Harness.create();
+    addTearDown(h.dispose);
+    h.store.receiptWriteError = DurableStorageCommitException([
+      StateError('Lost archive acknowledgement'),
+    ]);
+    _expectPending(await h.send());
+    expect((jsonDecode(h.store.documents[_id]!) as Map)['phase'], 'accepted');
+    expect(h.store.writes, hasLength(2));
+    _expectPending(await h.send());
+    expect(h.engine.calls.where((c) => c == 'sendPayment:start'), hasLength(1));
+    h.store.receiptWriteError = null;
+    h.engine.activities = [_bitcoinActivity(txid: _txid, selfTransfer: true)];
+    expect(
+      await h.repository.reconcilePaymentSubmission(),
+      isA<AppSuccess<void>>(),
+    );
+    expect(h.store.receiptDocuments[_id], hasLength(1));
+    expect(h.runtime.snapshot.phase, WalletRuntimePhase.active);
+    expect(h.engine.activities.single.amount, isNull);
+    expect(h.engine.calls.where((c) => c == 'sendPayment:start'), hasLength(1));
+  });
+
+  test('accepted archive failure cannot overwrite legacy journal or enter native again', () async {
+    final h = await _Harness.create();
+    addTearDown(h.dispose);
+    expect(await h.send(), isA<AppSuccess<WalletSendResult>>());
+    final accepted = h.store.documents[_id];
+    h.store.receiptDocuments.clear();
+    h.store.receiptWriteError = StateError('Archive unavailable');
+    expect(await h.send(), isA<AppFailureResult<WalletSendResult>>());
+    expect(h.store.documents[_id], accepted);
+    expect(h.store.writes, hasLength(2));
+    expect(h.engine.calls.where((c) => c == 'sendPayment:start'), hasLength(1));
+  });
+
+  test(
+    'reviewed history never replaces a conflicting native external amount',
+    () async {
+      final h = await _Harness.create();
+      addTearDown(h.dispose);
+      expect(await h.send(), isA<AppSuccess<WalletSendResult>>());
+      h.engine.activities = [_bitcoinActivity(txid: _txid, amount: 19999)];
+      final feed = await h.repository.activityFeed(WalletAssetKind.bitcoin);
+      expect(
+        (feed as AppFailureResult<WalletActivityFeed>).failure,
+        walletActivityConsistencyFailure,
+      );
+      expect(h.engine.activities.single.amount?.units, 19999);
+    },
+  );
+
+  test('an unknown self-transfer cannot recover a requested amount from outputs or balance', () async {
+    final h = await _Harness.create();
+    addTearDown(h.dispose);
+    h.engine.activities = [_bitcoinActivity(txid: _txid, selfTransfer: true)];
+    final feed = (await h.repository.activityFeed(
+      WalletAssetKind.bitcoin,
+    ) as AppSuccess<WalletActivityFeed>).value;
+    expect(feed.activities.single.amount, isNull);
+    expect(h.store.receiptDocuments, isEmpty);
+  });
+
+  test('receipt key and wallet/network binding corruption fail bootstrap before native opens', () async {
+    for (final corruptKey in [false, true]) {
+      final h = await _Harness.create();
+      addTearDown(h.dispose);
+      expect(await h.send(), isA<AppSuccess<WalletSendResult>>());
+      final receipt = h.store.receiptDocuments[_id]!.entries.single;
+      if (corruptKey) {
+        h.store.receiptDocuments[_id] = {'f' * 64: receipt.value};
+      } else {
+        final decoded = jsonDecode(receipt.value) as Map<String, Object?>;
+        decoded['network'] = 'mainnet';
+        h.store.receiptDocuments[_id]![receipt.key] = jsonEncode(decoded);
+      }
+      // The old journal is absent to ensure archive validation is independent.
+      h.store.documents.clear();
+      final boot = await h.restart(expectSuccess: false);
+      expect(
+        (boot as AppFailureResult<WalletRegistry>).failure.code,
+        'stored_data_invalid',
+      );
+      expect(h.engine.calls, isNot(contains('openPersisted')));
+    }
+  });
+
   test('an earlier accepted receipt cannot resolve a different failed marker commit', () async {
     final h = await _Harness.create();
     addTearDown(h.dispose);
@@ -591,15 +800,22 @@ WalletActivity _bitcoinActivity({
   required String txid,
   int amount = 20000,
   int index = 1,
+  bool selfTransfer = false,
 }) => WalletActivity(
   id: 'activity-${index.toRadixString(16).padLeft(64, '0')}',
   source: WalletActivitySource.bitcoinTransaction,
-  operation: WalletActivityOperation.bitcoinSend,
+  operation: selfTransfer
+      ? WalletActivityOperation.bitcoinSelfTransfer
+      : WalletActivityOperation.bitcoinSend,
   asset: WalletAsset.bitcoin,
   rail: PaymentRail.onchain,
-  direction: WalletActivityDirection.sent,
+  direction: selfTransfer
+      ? WalletActivityDirection.internal
+      : WalletActivityDirection.sent,
   status: WalletActivityStatus.pending,
-  amount: WalletAmount.onchain(assetId: WalletAsset.bitcoin.id, units: amount),
+  amount: selfTransfer
+      ? null
+      : WalletAmount.onchain(assetId: WalletAsset.bitcoin.id, units: amount),
   txid: txid,
 );
 
@@ -711,12 +927,13 @@ final class _Harness {
     return result;
   }
 
-  Future<AppResult<WalletSendResult>> send() => repository.sendPayment(
-    target: WalletPaymentTarget.bitcoinOnchain,
-    destination: _destination,
-    amountUnits: 20000,
-    reviewedFeeRate: fee,
-  );
+  Future<AppResult<WalletSendResult>> send({int amountUnits = 20000}) =>
+      repository.sendPayment(
+        target: WalletPaymentTarget.bitcoinOnchain,
+        destination: _destination,
+        amountUnits: amountUnits,
+        reviewedFeeRate: fee,
+      );
 
   Future<void> dispose() async => runtime.dispose();
 }

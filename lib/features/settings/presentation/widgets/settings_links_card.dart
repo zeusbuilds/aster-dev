@@ -13,11 +13,6 @@ typedef _LinkDescriptor = ({
 
 const _links = <_LinkDescriptor>[
   (
-    link: SettingsExternalLink.contactSupport,
-    title: 'Contact Support',
-    icon: MingCuteIcons.mgc_lifebuoy_line,
-  ),
-  (
     link: SettingsExternalLink.termsOfService,
     title: 'Terms of Service',
     icon: MingCuteIcons.mgc_document_2_line,
@@ -26,21 +21,6 @@ const _links = <_LinkDescriptor>[
     link: SettingsExternalLink.privacyPolicy,
     title: 'Privacy Policy',
     icon: MingCuteIcons.mgc_file_check_line,
-  ),
-  (
-    link: SettingsExternalLink.twitter,
-    title: 'Twitter',
-    icon: MingCuteIcons.mgc_twitter_line,
-  ),
-  (
-    link: SettingsExternalLink.telegram,
-    title: 'Telegram',
-    icon: MingCuteIcons.mgc_telegram_line,
-  ),
-  (
-    link: SettingsExternalLink.instagram,
-    title: 'Instagram',
-    icon: MingCuteIcons.mgc_instagram_line,
   ),
 ];
 

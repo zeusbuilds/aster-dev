@@ -57,6 +57,7 @@ class HomeViewModel extends _$HomeViewModel {
   /// Synchronizes the wallet and atomically replaces the displayed portfolio.
   /// Existing content remains visible while refresh is active or fails.
   Future<bool> refresh() async {
+    if (state.isLoading) return false;
     final current = state.value;
     if (current == null || current.refreshing) return false;
     final generation = _stateGeneration;

@@ -26,10 +26,13 @@ class AdvancedSettingsScreen extends StatelessWidget {
             ),
             body: SafeArea(
               top: false,
+              bottom: false,
               child: ListView(
-                padding: EdgeInsets.symmetric(
-                  horizontal: spacing.screenPadding,
-                  vertical: spacing.lg,
+                padding: EdgeInsets.fromLTRB(
+                  spacing.screenPadding,
+                  spacing.lg,
+                  spacing.screenPadding,
+                  spacing.lg + context.windowInsets.bottomSafe,
                 ),
                 children: [
                   Squircle(

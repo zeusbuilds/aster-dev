@@ -23,9 +23,15 @@ class WalletUnavailableScreen extends StatelessWidget {
     final canRetry = failure.retryable && onRetry != null;
     return Scaffold(
       body: SafeArea(
+        bottom: false,
         child: Center(
           child: SingleChildScrollView(
-            padding: EdgeInsets.all(context.spacing.screenPadding),
+            padding: EdgeInsets.fromLTRB(
+              context.spacing.screenPadding,
+              context.spacing.screenPadding,
+              context.spacing.screenPadding,
+              context.spacing.screenPadding + context.windowInsets.bottomSafe,
+            ),
             child: Semantics(
               container: true,
               liveRegion: true,

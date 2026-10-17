@@ -67,8 +67,11 @@ class _RegionList extends ConsumerWidget {
       children: [
         SafeArea(
           top: false,
-          minimum: EdgeInsets.only(bottom: context.spacing.lg),
+          bottom: false,
           child: ListView.separated(
+            padding: EdgeInsets.only(
+              bottom: context.windowInsets.bottomSafe + context.spacing.lg,
+            ),
             itemCount: state.snapshot.regions.length,
             separatorBuilder: (context, index) => const AsterDivider.inset(),
             itemBuilder: (context, index) {
@@ -139,6 +142,9 @@ class _RegionLoading extends StatelessWidget {
       child: AppSkeletonizer(
         enabled: true,
         child: ListView.separated(
+          padding: EdgeInsets.only(
+            bottom: context.windowInsets.bottomSafe + context.spacing.lg,
+          ),
           itemCount: 8,
           separatorBuilder: (context, index) => const AsterDivider.inset(),
           itemBuilder: (context, index) => CountrySelectOptionRow(

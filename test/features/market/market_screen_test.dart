@@ -1,5 +1,3 @@
-import 'dart:ui' as ui;
-
 import 'package:aster/features/market/presentation/screens/market_screen.dart';
 import 'package:aster/features/market/presentation/widgets/widgets.dart';
 import 'package:aster/shared/shared.dart';
@@ -22,7 +20,7 @@ void main() {
         _app(router, _RecordingHaptics(), textScaler: TextScaler.linear(scale)),
       );
       await tester.pumpAndSettle();
-      final tile = find.widgetWithText(MarketTile, 'Buy');
+      final tile = find.widgetWithText(MarketTile, 'Send');
       final chip = find.descendant(of: tile, matching: find.byType(AsterPill));
       expect(chip, findsOneWidget);
       expect(
@@ -33,7 +31,7 @@ void main() {
     });
   }
 
-  testWidgets('unsupported market actions are disabled without claims', (
+  testWidgets('Market has three supported routes without unsupported claims', (
     tester,
   ) async {
     final haptics = _RecordingHaptics();
@@ -56,21 +54,34 @@ void main() {
       expect(resized.height, resized.width);
     }
 
-    for (final label in ['Buy', 'Sell', 'Lend']) {
-      final tile = find.widgetWithText(MarketTile, label);
-      await tester.scrollUntilVisible(tile, 250);
-      expect(
-        tester.getSemantics(tile).flagsCollection.isEnabled,
-        ui.Tristate.isFalse,
-        reason: label,
+    final tiles = tester.widgetList<MarketTile>(find.byType(MarketTile));
+    expect(tiles.map((tile) => tile.label), ['Send', 'Receive', 'Swap']);
+    final gradients = tester.element(find.byType(MarketScreen)).gradients;
+    expect(tiles.map((tile) => tile.gradient), [
+      gradients.marketBuy,
+      gradients.marketSell,
+      gradients.marketSwap,
+    ]);
+    final white = tester
+        .element(find.byType(MarketScreen))
+        .appColors
+        .onMarketTile;
+    for (final tile in tiles) {
+      expect(tile.contentTone, MarketContentTone.light);
+      final texts = tester.widgetList<Text>(
+        find.descendant(
+          of: find.widgetWithText(MarketTile, tile.label),
+          matching: find.byType(Text),
+        ),
       );
+      expect(texts, isNotEmpty);
+      expect(texts.every((text) => text.style?.color == white), isTrue);
     }
-
-    final buy = find.widgetWithText(MarketTile, 'Buy');
-    await tester.scrollUntilVisible(buy, -250);
-    await tester.tap(buy);
-    await tester.pumpAndSettle();
-    expect(find.text('Market'), findsOneWidget);
+    for (final label in ['Buy', 'Sell', 'Lend']) {
+      expect(find.text(label), findsNothing);
+    }
+    expect(find.text('On-chain or Lightning'), findsNothing);
+    expect(find.text('Coming soon'), findsOneWidget);
     expect(haptics.intents, isEmpty);
   });
 
@@ -147,9 +158,9 @@ void main() {
     await tester.scrollUntilVisible(receive, 200);
     expect(tester.takeException(), isNull);
     expect(receive, findsOneWidget);
-    expect(tester, meetsGuideline(androidTapTargetGuideline));
-    expect(tester, meetsGuideline(labeledTapTargetGuideline));
-    expect(tester, meetsGuideline(textContrastGuideline));
+    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(textContrastGuideline));
   });
 }
 

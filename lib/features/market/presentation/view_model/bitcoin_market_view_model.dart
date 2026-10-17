@@ -48,7 +48,7 @@ Future<MarketQuoteCurrency> selectedMarketQuoteCurrency(Ref ref) async {
 @riverpod
 class BitcoinMarketViewModel extends _$BitcoinMarketViewModel {
   NetworkCancellationToken? _activeRequest;
-  Timer? _backgroundRetryTimer;
+  Timer? _backgroundRefreshTimer;
   late RetryPolicy? _backgroundRetryPolicy;
   var _backgroundRetryAttempts = 0;
   var _stateGeneration = 0;
@@ -59,7 +59,7 @@ class BitcoinMarketViewModel extends _$BitcoinMarketViewModel {
   Future<BitcoinMarketState> build() async {
     final generation = ++_stateGeneration;
     _activeRequest?.cancel();
-    _backgroundRetryTimer?.cancel();
+    _cancelBackgroundRefresh();
     _backgroundRetryAttempts = 0;
     _backgroundRetryPolicy = ref.watch(
       bitcoinMarketBackgroundRetryPolicyProvider,
@@ -68,7 +68,7 @@ class BitcoinMarketViewModel extends _$BitcoinMarketViewModel {
     ref.onResume(_handleObservationResumed);
     ref.onDispose(() {
       _activeRequest?.cancel();
-      _cancelBackgroundRetry();
+      _cancelBackgroundRefresh();
     });
     final currency = await ref.watch(
       selectedMarketQuoteCurrencyProvider.future,
@@ -79,11 +79,15 @@ class BitcoinMarketViewModel extends _$BitcoinMarketViewModel {
         snapshot: load.snapshot,
         refreshFailure: load.degradedFailure,
       );
-      _finishAttempt(failure: load.degradedFailure, generation: generation);
+      _finishAttempt(
+        snapshot: load.snapshot,
+        failure: load.degradedFailure,
+        generation: generation,
+      );
       return next;
     } catch (error, stackTrace) {
       final failure = FailureMapper.from(error, stackTrace);
-      _finishAttempt(failure: failure, generation: generation);
+      _finishAttempt(snapshot: null, failure: failure, generation: generation);
       return BitcoinMarketState(snapshot: null, refreshFailure: failure);
     }
   }
@@ -103,7 +107,7 @@ class BitcoinMarketViewModel extends _$BitcoinMarketViewModel {
     final current = state.value;
     if (current == null || current.refreshing) return;
 
-    _backgroundRetryTimer?.cancel();
+    _cancelBackgroundRefresh();
     final generation = ++_stateGeneration;
     state = AsyncData(current.copyWith(refreshing: true));
     try {
@@ -118,7 +122,11 @@ class BitcoinMarketViewModel extends _$BitcoinMarketViewModel {
           refreshFailure: load.degradedFailure,
         ),
       );
-      _finishAttempt(failure: load.degradedFailure, generation: generation);
+      _finishAttempt(
+        snapshot: load.snapshot,
+        failure: load.degradedFailure,
+        generation: generation,
+      );
       return;
     } catch (error, stackTrace) {
       if (!ref.mounted || generation != _stateGeneration) return;
@@ -126,22 +134,58 @@ class BitcoinMarketViewModel extends _$BitcoinMarketViewModel {
       state = AsyncData(
         current.copyWith(refreshing: false, refreshFailure: failure),
       );
-      _finishAttempt(failure: failure, generation: generation);
+      _finishAttempt(
+        snapshot: current.snapshot,
+        failure: failure,
+        generation: generation,
+      );
     }
   }
 
-  void _finishAttempt({required AppFailure? failure, required int generation}) {
-    if (failure == null) {
-      _backgroundRetryAttempts = 0;
-      _cancelBackgroundRetry();
+  void _finishAttempt({
+    required BitcoinMarketSnapshot? snapshot,
+    required AppFailure? failure,
+    required int generation,
+  }) {
+    if (!ref.mounted || !_observed || generation != _stateGeneration) return;
+    if (failure != null) {
+      _scheduleBackgroundRetry(failure, generation);
       return;
     }
-    _scheduleBackgroundRetry(failure, generation);
+    final now = ref.read(utcClockProvider)().toUtc();
+    // Tether is optional at the repository boundary so an invalid observation
+    // cannot discard valid Bitcoin data. It still needs silent recovery here.
+    if (snapshot == null ||
+        !snapshot.currentBitcoinPrice.isCurrentAt(now) ||
+        snapshot.currentUsdtPrice?.isCurrentAt(now) != true) {
+      _scheduleBackgroundRetry(_incompleteFiatQuote, generation);
+      return;
+    }
+    _backgroundRetryAttempts = 0;
+    _scheduleQuoteRefresh(snapshot, generation, now);
+  }
+
+  void _scheduleQuoteRefresh(
+    BitcoinMarketSnapshot snapshot,
+    int generation,
+    DateTime now,
+  ) {
+    _cancelBackgroundRefresh();
+    if (!ref.mounted || !_observed || generation != _stateGeneration) return;
+    final bitcoinExpiry = snapshot.currentBitcoinPrice.expiresAt;
+    final usdtExpiry = snapshot.currentUsdtPrice!.expiresAt;
+    final earliestExpiry = bitcoinExpiry.isBefore(usdtExpiry)
+        ? bitcoinExpiry
+        : usdtExpiry;
+    _scheduleBackgroundRefresh(
+      earliestExpiry.difference(now) + const Duration(milliseconds: 1),
+      generation,
+    );
   }
 
   void _scheduleBackgroundRetry(AppFailure failure, int generation) {
-    _cancelBackgroundRetry();
-    if (!ref.mounted || generation != _stateGeneration) return;
+    _cancelBackgroundRefresh();
+    if (!ref.mounted || !_observed || generation != _stateGeneration) return;
     final policy = _backgroundRetryPolicy;
     if (policy == null) return;
 
@@ -150,22 +194,26 @@ class BitcoinMarketViewModel extends _$BitcoinMarketViewModel {
     if (failure.retryAfter case final retryAfter? when retryAfter > delay) {
       delay = retryAfter;
     }
-    _backgroundRetryTimer = Timer(delay, () {
-      _backgroundRetryTimer = null;
-      if (!ref.mounted || generation != _stateGeneration) return;
+    _scheduleBackgroundRefresh(delay, generation);
+  }
+
+  void _scheduleBackgroundRefresh(Duration delay, int generation) {
+    _backgroundRefreshTimer = Timer(delay, () {
+      _backgroundRefreshTimer = null;
+      if (!ref.mounted || !_observed || generation != _stateGeneration) return;
       unawaited(_refresh());
     });
   }
 
-  void _cancelBackgroundRetry() {
-    _backgroundRetryTimer?.cancel();
-    _backgroundRetryTimer = null;
+  void _cancelBackgroundRefresh() {
+    _backgroundRefreshTimer?.cancel();
+    _backgroundRefreshTimer = null;
   }
 
   void _handleObservationCancelled() {
     _observed = false;
     _observationGeneration += 1;
-    _cancelBackgroundRetry();
+    _cancelBackgroundRefresh();
   }
 
   void _handleObservationResumed() {
@@ -175,16 +223,21 @@ class BitcoinMarketViewModel extends _$BitcoinMarketViewModel {
       if (!_observed || observationGeneration != _observationGeneration) {
         return;
       }
-      _resumeBackgroundRetry();
+      _resumeBackgroundRefresh();
     });
   }
 
-  void _resumeBackgroundRetry() {
-    if (!ref.mounted || _backgroundRetryTimer != null) return;
+  void _resumeBackgroundRefresh() {
+    if (!ref.mounted || _backgroundRefreshTimer != null || state.isLoading) {
+      return;
+    }
     final current = state.value;
-    final failure = current?.refreshFailure;
-    if (failure == null || current!.refreshing) return;
-    _scheduleBackgroundRetry(failure, _stateGeneration);
+    if (current == null || current.refreshing) return;
+    _finishAttempt(
+      snapshot: current.snapshot,
+      failure: current.refreshFailure,
+      generation: _stateGeneration,
+    );
   }
 
   Future<BitcoinMarketLoad> _fetch(
@@ -211,3 +264,10 @@ class BitcoinMarketViewModel extends _$BitcoinMarketViewModel {
     }
   }
 }
+
+const _incompleteFiatQuote = AppFailure(
+  code: 'market_fiat_quote_incomplete',
+  kind: AppFailureKind.unavailable,
+  userMessage: 'Fiat quote is unavailable.',
+  retryable: true,
+);

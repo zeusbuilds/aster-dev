@@ -33,8 +33,15 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
   late ProviderSubscription<AsyncValue<ReceiveFlowState>> _requestSubscription;
   bool _setupCommandActive = false;
 
+  bool get _requestActionInProgress {
+    final flow = ref.read(receiveFlowViewModelProvider(widget.target));
+    return _setupCommandActive ||
+        flow.isLoading ||
+        (flow.value?.isBusy ?? false);
+  }
+
   Future<void> _changeRgbMode(RgbReceiveMode mode) async {
-    if (_setupCommandActive) return;
+    if (_requestActionInProgress) return;
     setState(() => _setupCommandActive = true);
     try {
       if (mode == RgbReceiveMode.blind) {
@@ -79,7 +86,7 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
   }
 
   Future<void> _prepareRgbSetup() async {
-    if (_setupCommandActive) return;
+    if (_requestActionInProgress) return;
     setState(() => _setupCommandActive = true);
     final notifier = ref.read(
       receiveFlowViewModelProvider(widget.target).notifier,
@@ -141,7 +148,7 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
   }
 
   Future<void> _retryRgbReceive() async {
-    if (_setupCommandActive) return;
+    if (_requestActionInProgress) return;
     setState(() => _setupCommandActive = true);
     try {
       await ref
@@ -153,7 +160,7 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
   }
 
   Future<void> _checkRgbSetup() async {
-    if (_setupCommandActive) return;
+    if (_requestActionInProgress) return;
     setState(() => _setupCommandActive = true);
     try {
       await ref
@@ -224,6 +231,7 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
   }
 
   Future<void> _copy() async {
+    if (_requestActionInProgress) return;
     final result = await ref
         .read(receiveFlowViewModelProvider(widget.target).notifier)
         .copyRequest();
@@ -244,6 +252,7 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
   }
 
   Future<void> _share() async {
+    if (_requestActionInProgress) return;
     final renderBox = context.findRenderObject();
     final origin = renderBox is RenderBox && renderBox.hasSize
         ? () {
@@ -270,6 +279,7 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
   }
 
   Future<void> _regenerate(AsterNavigationCommandOwner navigation) async {
+    if (_requestActionInProgress) return;
     await navigation.run(
       command: () async {
         final regenerated = await ref
@@ -305,6 +315,7 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
     BuildContext context,
     AsterNavigationCommandOwner navigation,
   ) async {
+    if (_requestActionInProgress) return;
     await navigation.openRoute(
       command: () => ReceiveAmountSheet.show(context, target: widget.target),
       failureTitle: 'Amount editor could not open',
@@ -316,6 +327,8 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
   Widget build(BuildContext context) {
     final provider = receiveFlowViewModelProvider(widget.target);
     final flow = ref.watch(provider);
+    final sharing =
+        flow.value?.operation == ReceiveFlowOperation.sharingRequest;
     final durableGenerationOwnsRoute =
         (flow.value?.isGenerating ?? false) || _setupCommandActive;
     return AsterNavigationScope(
@@ -335,85 +348,96 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
                 centerTitle: false,
                 fallbackLocation: RoutePaths.receive,
               ),
-              body: SafeArea(
-                top: false,
-                minimum: EdgeInsets.only(bottom: context.spacing.lg),
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: context.spacing.screenPadding,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (widget.target == WalletPaymentTarget.usdtOnchain)
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                ref.read(provider.notifier).rgbReceiveMode ==
-                                        RgbReceiveMode.witness
-                                    ? 'Witness receive'
-                                    : 'Blind receive',
+              body: IgnorePointer(
+                ignoring: sharing,
+                child: SafeArea(
+                  top: false,
+                  bottom: false,
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: context.spacing.screenPadding,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (widget.target == WalletPaymentTarget.usdtOnchain)
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  ref.read(provider.notifier).rgbReceiveMode ==
+                                          RgbReceiveMode.witness
+                                      ? 'Witness receive'
+                                      : 'Blind receive',
+                                ),
                               ),
-                            ),
-                            TextButton(
-                              onPressed:
-                                  generationOwnsRoute ||
-                                      flow.isLoading ||
-                                      (flow.value?.isBusy ?? false)
-                                  ? null
-                                  : () => unawaited(
-                                      _changeRgbMode(
-                                        ref
-                                                    .read(provider.notifier)
-                                                    .rgbReceiveMode ==
-                                                RgbReceiveMode.witness
-                                            ? RgbReceiveMode.blind
-                                            : RgbReceiveMode.witness,
+                              TextButton(
+                                onPressed:
+                                    generationOwnsRoute ||
+                                        flow.isLoading ||
+                                        ((flow.value?.isBusy ?? false) &&
+                                            !sharing)
+                                    ? null
+                                    : () => unawaited(
+                                        _changeRgbMode(
+                                          ref
+                                                      .read(provider.notifier)
+                                                      .rgbReceiveMode ==
+                                                  RgbReceiveMode.witness
+                                              ? RgbReceiveMode.blind
+                                              : RgbReceiveMode.witness,
+                                        ),
                                       ),
-                                    ),
-                              child: Text(
-                                ref.read(provider.notifier).rgbReceiveMode ==
-                                        RgbReceiveMode.witness
-                                    ? 'Use blind receive'
-                                    : 'Use witness receive',
+                                child: Text(
+                                  ref.read(provider.notifier).rgbReceiveMode ==
+                                          RgbReceiveMode.witness
+                                      ? 'Use blind receive'
+                                      : 'Use witness receive',
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                      Expanded(
-                        child: flow.when(
-                          skipLoadingOnRefresh: false,
-                          data: (state) => _RequestBody(
-                            state: state,
-                            now: _now,
-                            commandsEnabled: !navigation.inFlight,
-                            onCopy: () => unawaited(_copy()),
-                            onShare: () => unawaited(_share()),
-                            onRegenerate: () =>
-                                unawaited(_regenerate(navigation)),
-                            onSetAmount: () => unawaited(
-                              _showAmountSheet(context, navigation),
-                            ),
-                            onSetup: () => unawaited(_prepareRgbSetup()),
-                            onCheckSetup: () => unawaited(_checkRgbSetup()),
-                            onRetryReceive: () => unawaited(_retryRgbReceive()),
-                            setupBusy: _setupCommandActive,
+                            ],
                           ),
-                          loading: () => const _RequestLoading(),
-                          error: (error, stackTrace) => _RequestFailure(
-                            failure: error is AppFailureException
-                                ? error.failure
-                                : FailureMapper.from(error, stackTrace),
-                            onRetry: ref.read(provider.notifier).retry,
-                            onSetup: () => unawaited(_prepareRgbSetup()),
-                            onCheckSetup: () => unawaited(_checkRgbSetup()),
-                            onRetryReceive: () => unawaited(_retryRgbReceive()),
-                            setupBusy: _setupCommandActive,
+                        Expanded(
+                          child: flow.when(
+                            skipLoadingOnRefresh: false,
+                            data: (state) => _RequestBody(
+                              // The platform sheet owns input while opening.
+                              // Keep the request surface visually unchanged;
+                              // the real state and command guards remain busy.
+                              state: sharing
+                                  ? state.copyWith(operation: null)
+                                  : state,
+                              now: _now,
+                              commandsEnabled: !navigation.inFlight,
+                              onCopy: () => unawaited(_copy()),
+                              onShare: () => unawaited(_share()),
+                              onRegenerate: () =>
+                                  unawaited(_regenerate(navigation)),
+                              onSetAmount: () => unawaited(
+                                _showAmountSheet(context, navigation),
+                              ),
+                              onSetup: () => unawaited(_prepareRgbSetup()),
+                              onCheckSetup: () => unawaited(_checkRgbSetup()),
+                              onRetryReceive: () =>
+                                  unawaited(_retryRgbReceive()),
+                              setupBusy: _setupCommandActive,
+                            ),
+                            loading: () => const _RequestLoading(),
+                            error: (error, stackTrace) => _RequestFailure(
+                              failure: error is AppFailureException
+                                  ? error.failure
+                                  : FailureMapper.from(error, stackTrace),
+                              onRetry: ref.read(provider.notifier).retry,
+                              onSetup: () => unawaited(_prepareRgbSetup()),
+                              onCheckSetup: () => unawaited(_checkRgbSetup()),
+                              onRetryReceive: () =>
+                                  unawaited(_retryRgbReceive()),
+                              setupBusy: _setupCommandActive,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -467,15 +491,10 @@ final class _RequestBody extends StatelessWidget {
             bitcoinUnit: state.bitcoinUnit,
           );
     return ListView(
+      padding: EdgeInsets.only(
+        bottom: context.windowInsets.bottomSafe + context.spacing.lg,
+      ),
       children: [
-        Padding(
-          padding: EdgeInsets.only(bottom: context.spacing.lg),
-          child: Text(
-            '${state.route.target.assetLabel} · ${state.route.target.railLabel}',
-            style: context.type.sectionLabel,
-            textAlign: TextAlign.center,
-          ),
-        ),
         if (request == null)
           _AmountRequiredCard(target: state.route.target)
         else
@@ -578,10 +597,6 @@ final class _RequestBody extends StatelessWidget {
                 const AsterDivider.inset(),
                 AsterOptionRow(
                   title: 'Share',
-                  details:
-                      state.operation == ReceiveFlowOperation.sharingRequest
-                      ? 'Opening'
-                      : null,
                   prefixIcon: MingCuteIcons.mgc_share_forward_line,
                   hapticIntent: null,
                   onTap: commandsEnabled && state.canReadRequest && !expired

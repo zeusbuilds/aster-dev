@@ -21,9 +21,15 @@ final class SettingsLoadFailure extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       top: false,
+      bottom: false,
       child: Center(
         child: SingleChildScrollView(
-          padding: EdgeInsets.all(context.spacing.screenPadding),
+          padding: EdgeInsets.fromLTRB(
+            context.spacing.screenPadding,
+            context.spacing.screenPadding,
+            context.spacing.screenPadding,
+            context.spacing.screenPadding + context.windowInsets.bottomSafe,
+          ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [

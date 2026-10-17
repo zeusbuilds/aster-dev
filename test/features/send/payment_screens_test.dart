@@ -30,8 +30,76 @@ import '../../support/wallet_fakes.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  for (final (name, screen) in [
+    ('Send', const SendScreen()),
+    ('Receive', const ReceiveScreen()),
+  ]) {
+    testWidgets(
+      '$name lists on-chain assets first and scrolls to bottom edge',
+      (tester) async {
+        tester.view.padding = const FakeViewPadding(bottom: 34);
+        tester.view.viewPadding = const FakeViewPadding(bottom: 34);
+        addTearDown(tester.view.resetPadding);
+        addTearDown(tester.view.resetViewPadding);
+        final harness = await PaymentFlowTestHarness.create(
+          services: testRgbServices,
+        );
+        addTearDown(() => _disposeHarness(tester, harness));
+        await _pumpWidget(tester, harness, screen);
+        await _pumpUntil(
+          tester,
+          () => tester
+              .widget<PaymentTargetSelectionView>(
+                find.byType(PaymentTargetSelectionView),
+              )
+              .capabilities
+              .hasValue,
+        );
+        await tester.pumpAndSettle();
+
+        final tiles = tester.widgetList<PaymentTargetTile>(
+          find.byType(PaymentTargetTile),
+        );
+        expect(tiles.map((tile) => tile.capability.target), [
+          WalletPaymentTarget.bitcoinOnchain,
+          WalletPaymentTarget.usdtOnchain,
+          WalletPaymentTarget.bitcoinLightning,
+          WalletPaymentTarget.usdtLightning,
+        ]);
+        for (final target in [
+          WalletPaymentTarget.bitcoinLightning,
+          WalletPaymentTarget.usdtLightning,
+        ]) {
+          final tile = find.byWidgetPredicate(
+            (widget) =>
+                widget is PaymentTargetTile &&
+                widget.capability.target == target,
+          );
+          final semantics = tester.getSemantics(tile);
+          expect(semantics.flagsCollection.isEnabled, ui.Tristate.isFalse);
+          expect(
+            semantics.getSemanticsData().hasAction(ui.SemanticsAction.tap),
+            isFalse,
+          );
+          await tester.tap(tile);
+        }
+        expect(harness.haptics.intents, isEmpty);
+        final list = find.byType(ListView);
+        expect(tester.getRect(list).bottom, 844);
+        expect(
+          tester
+              .widget<ListView>(list)
+              .padding!
+              .resolve(TextDirection.ltr)
+              .bottom,
+          greaterThan(34),
+        );
+      },
+    );
+  }
+
   testWidgets(
-    'a changed fee requires Refresh fee and a second deliberate Send',
+    'a changed fee refreshes silently and requires a second deliberate Send',
     (tester) async {
       final now = DateTime.utc(2026, 10, 15);
       WalletFeeRateEstimate rate(int value) => WalletFeeRateEstimate(
@@ -39,7 +107,9 @@ void main() {
         satsPerVbyte: value,
         observedAt: now,
       );
-      final engine = FakeWalletEngine()..feeEstimate = rate(3);
+      final engine = FakeWalletEngine()
+        ..balance = _bitcoinBalance(1000)
+        ..feeEstimate = rate(3);
       final transport = ResilientHttpClient(
         client: MockClient((request) async => http.Response('{}', 503)),
         retryPolicy: RetryPolicy(maxAttempts: 1),
@@ -76,26 +146,27 @@ void main() {
         () => harness.container.read(provider).value?.feeFailure != null,
       );
       expect(
-        find.text(walletFeeReviewChangedFailure.userMessage),
-        findsOneWidget,
+        find.text(
+          'The fee changed. Review the updated rate before sending again.',
+        ),
+        findsNothing,
       );
+      expect(harness.toasts.messages, hasLength(1));
+      expect(harness.toasts.messages.single.variant, ToastVariant.warning);
+      expect(harness.toasts.messages.single.message, contains('fee'));
       expect(
         tester
             .widget<CustomButton>(find.widgetWithText(CustomButton, 'Send'))
             .enabled,
         isFalse,
       );
-      expect(
-        tester
-            .widget<CustomButton>(
-              find.widgetWithText(CustomButton, 'Refresh fee'),
-            )
-            .enabled,
-        isTrue,
-      );
+      expect(find.text('Refresh fee'), findsNothing);
+      expect(find.text('Refresh balance'), findsNothing);
       expect(engine.calls, isNot(contains('sendPayment:start')));
-      await tester.ensureVisible(find.text('Refresh fee'));
-      await tester.tap(find.widgetWithText(CustomButton, 'Refresh fee'));
+      final feedbackBeforeRecovery = List<HapticIntent>.of(
+        harness.haptics.intents,
+      );
+      await tester.pump(const Duration(seconds: 2));
       await _pumpUntil(
         tester,
         () =>
@@ -103,6 +174,8 @@ void main() {
             4,
       );
       expect(engine.calls, isNot(contains('sendPayment:start')));
+      expect(harness.haptics.intents, feedbackBeforeRecovery);
+      expect(find.text('4 sats/vbyte'), findsOneWidget);
       expect(
         tester
             .widget<CustomButton>(find.widgetWithText(CustomButton, 'Send'))
@@ -117,6 +190,128 @@ void main() {
         hasLength(1),
       );
       expect(engine.sentPaymentCommand!.feeRate!.satsPerVbyte, 4);
+    },
+  );
+
+  testWidgets(
+    'automatic fee reads are bounded and wait for route and native foreground',
+    (tester) async {
+      var now = DateTime.utc(2026, 10, 16);
+      final engine = FakeWalletEngine()
+        ..balance = _bitcoinBalance(1000)
+        ..feeEstimate = WalletFeeRateEstimate(
+          targetBlocks: 6,
+          satsPerVbyte: 2,
+          observedAt: now,
+        );
+      final transport = ResilientHttpClient(
+        client: MockClient((request) async => http.Response('{}', 503)),
+        retryPolicy: RetryPolicy(maxAttempts: 1),
+      );
+      addTearDown(transport.close);
+      final harness = await PaymentFlowTestHarness.create(
+        engine: engine,
+        clock: () => now,
+        httpClient: transport,
+      );
+      addTearDown(() => _disposeHarness(tester, harness));
+      addTearDown(
+        () => tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        ),
+      );
+      const target = WalletPaymentTarget.bitcoinOnchain;
+      final provider = sendFlowViewModelProvider(target);
+      final subscription = harness.container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      await tester.runAsync(() => harness.container.read(provider.future));
+      final notifier = harness.container.read(provider.notifier);
+      notifier.updateDestination('mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn');
+      expect(await tester.runAsync(notifier.validateDestination), isTrue);
+      notifier.updateAmount('0.00000001');
+      final router = GoRouter(
+        initialLocation: '/send/bitcoin-onchain/amount',
+        routes: [
+          GoRoute(
+            path: RoutePaths.sendAmount,
+            builder: (_, _) => const SendAmountScreen(target: target),
+          ),
+          GoRoute(
+            path: '/covered',
+            builder: (_, _) => const Scaffold(body: Text('Covered')),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      await _pumpRouter(tester, harness, router);
+      await _pumpUntil(
+        tester,
+        () => find.byType(SendCard).evaluate().isNotEmpty,
+      );
+      await _pumpFrames(tester);
+      final readsBefore = engine.calls
+          .where((call) => call == 'estimateFeeRate')
+          .length;
+      engine.feeEstimateError = TimeoutException('temporary fee outage');
+      unawaited(router.push<void>('/covered'));
+      await tester.pumpAndSettle();
+      now = now.add(
+        WalletFeeRateEstimate.maximumAge + const Duration(seconds: 1),
+      );
+      await tester.pump(
+        WalletFeeRateEstimate.maximumAge + const Duration(seconds: 3),
+      );
+      expect(
+        engine.calls.where((call) => call == 'estimateFeeRate'),
+        hasLength(readsBefore),
+      );
+      router.pop();
+      await tester.pumpAndSettle();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pump(const Duration(seconds: 10));
+      expect(
+        engine.calls.where((call) => call == 'estimateFeeRate'),
+        hasLength(readsBefore),
+      );
+      final lifecycle = harness.container.read(
+        walletLifecycleViewModelProvider.notifier,
+      );
+      await lifecycle.handle(AppLifecycleState.paused);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump(const Duration(seconds: 10));
+      expect(
+        engine.calls.where((call) => call == 'estimateFeeRate'),
+        hasLength(readsBefore),
+      );
+      await lifecycle.handle(AppLifecycleState.resumed);
+      final feedbackBefore = List<HapticIntent>.of(harness.haptics.intents);
+      for (var attempt = 1; attempt <= 3; attempt += 1) {
+        await tester.pump(const Duration(seconds: 2));
+        await _pumpUntil(
+          tester,
+          () =>
+              engine.calls.where((call) => call == 'estimateFeeRate').length ==
+              readsBefore + attempt,
+        );
+        await _pumpFrames(tester);
+      }
+      await tester.pump(const Duration(minutes: 5));
+      expect(
+        engine.calls.where((call) => call == 'estimateFeeRate'),
+        hasLength(readsBefore + 3),
+      );
+      expect(harness.haptics.intents, feedbackBefore);
+      expect(harness.toasts.messages, hasLength(1));
+      expect(harness.toasts.messages.single.variant, ToastVariant.warning);
+      expect(engine.calls, isNot(contains('sendPayment:start')));
+      expect(
+        tester
+            .widget<CustomButton>(find.widgetWithText(CustomButton, 'Send'))
+            .enabled,
+        isFalse,
+      );
+      expect(find.text('Refresh fee'), findsNothing);
+      expect(tester.takeException(), isNull);
     },
   );
 
@@ -179,7 +374,7 @@ void main() {
         find.textContaining(
           'Sends 1,000 sats to recipient in addition to network fee',
         ),
-        findsOneWidget,
+        findsNothing,
       );
       expect(engine.sentPaymentCommand, isNull);
       final submission = notifier.submit();
@@ -239,6 +434,124 @@ void main() {
     expect(find.text('1 sats/vbyte'), findsOneWidget);
     await _pumpFrames(tester);
   });
+
+  testWidgets(
+    'Max fills available BTC and Send warns to leave its network fee',
+    (tester) async {
+      final now = DateTime.utc(2026, 10, 16);
+      final engine = FakeWalletEngine()
+        ..balance = _bitcoinBalance(1000)
+        ..feeEstimate = WalletFeeRateEstimate(
+          targetBlocks: 6,
+          satsPerVbyte: 2,
+          observedAt: now,
+        );
+      final transport = ResilientHttpClient(
+        client: MockClient((request) async => http.Response('{}', 503)),
+        retryPolicy: RetryPolicy(maxAttempts: 1),
+      );
+      addTearDown(transport.close);
+      final harness = await PaymentFlowTestHarness.create(
+        engine: engine,
+        clock: () => now,
+        httpClient: transport,
+      );
+      addTearDown(() => _disposeHarness(tester, harness));
+      const target = WalletPaymentTarget.bitcoinOnchain;
+      final provider = sendFlowViewModelProvider(target);
+      final subscription = harness.container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      await tester.runAsync(() => harness.container.read(provider.future));
+      final notifier = harness.container.read(provider.notifier);
+      notifier.updateDestination('mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn');
+      expect(await tester.runAsync(notifier.validateDestination), isTrue);
+      await _pumpWidget(
+        tester,
+        harness,
+        const SendAmountScreen(target: target),
+      );
+      await _pumpUntil(
+        tester,
+        () => find.byType(AsterNumericKeypad).evaluate().isNotEmpty,
+      );
+      final readsBeforeMax = engine.calls.length;
+      await tester.tap(find.widgetWithText(CustomButton, 'Max'));
+      await _pumpFrames(tester);
+
+      expect(
+        harness.container.read(provider).requireValue.amountInput.units,
+        1000,
+      );
+      expect(
+        tester.widget<WalletAmountEntry>(find.byType(WalletAmountEntry)).value,
+        '0.00001',
+      );
+      expect(engine.calls, hasLength(readsBeforeMax));
+      expect(harness.toasts.messages, isEmpty);
+      final card = find.byType(SendCard);
+      expect(
+        find.descendant(of: card, matching: find.text('On-chain')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: card, matching: find.text('Address')),
+        findsNothing,
+      );
+      final details = tester
+          .widgetList<DetailRow>(find.byType(DetailRow))
+          .toList();
+      expect(details.map((row) => row.title), ['Network fee rate']);
+      expect(
+        find.bySemanticsLabel('Address, mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn'),
+        findsOneWidget,
+      );
+      expect(find.byType(AsterStatusMessage), findsNothing);
+      expect(find.textContaining('quote unavailable'), findsNothing);
+      await tester.ensureVisible(find.widgetWithText(CustomButton, 'Send'));
+      await tester.tap(find.widgetWithText(CustomButton, 'Send'));
+      await _pumpFrames(tester);
+
+      expect(engine.calls, isNot(contains('sendPayment:start')));
+      expect(engine.sentPaymentCommand, isNull);
+      expect(harness.toasts.messages, hasLength(1));
+      final feedback = harness.toasts.messages.single;
+      expect(feedback.title, 'Check amount');
+      expect(feedback.variant, ToastVariant.warning);
+      expect(
+        feedback.message,
+        'Leave some BTC for the network fee. Lower the amount and try again.',
+      );
+      expect(find.text(feedback.message!), findsNothing);
+      expect(find.byType(AsterStatusMessage), findsNothing);
+      expect(harness.haptics.intents, isNot(contains(HapticIntent.error)));
+      expect(harness.haptics.intents, contains(HapticIntent.warning));
+
+      // A deliberate attempt after editing must explain the same fee
+      // requirement again. Automatic rebuilds must remain deduplicated.
+      notifier.updateAmount('0.000009');
+      await _pumpFrames(tester);
+      await tester.ensureVisible(find.widgetWithText(CustomButton, 'Max'));
+      await tester.tap(find.widgetWithText(CustomButton, 'Max'));
+      await _pumpFrames(tester);
+      expect(
+        harness.container.read(provider).requireValue.amountInput.units,
+        1000,
+      );
+      await tester.ensureVisible(find.widgetWithText(CustomButton, 'Send'));
+      await tester.tap(find.widgetWithText(CustomButton, 'Send'));
+      await _pumpFrames(tester);
+      expect(harness.toasts.messages, hasLength(2));
+      expect(harness.toasts.messages.last.title, feedback.title);
+      expect(harness.toasts.messages.last.message, feedback.message);
+      expect(harness.toasts.messages.last.variant, ToastVariant.warning);
+      expect(engine.calls, isNot(contains('sendPayment:start')));
+      expect(engine.sentPaymentCommand, isNull);
+      expect(find.byType(AsterStatusMessage), findsNothing);
+      await tester.pump(const Duration(seconds: 5));
+      expect(harness.toasts.messages, hasLength(2));
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('Send selector exposes four targets and routes by stable slug', (
     tester,
@@ -978,7 +1291,8 @@ void main() {
     clockNow = clockNow.add(const Duration(seconds: 2));
     await tester.pump(const Duration(seconds: 2));
 
-    expect(find.text('USD quote unavailable'), findsOneWidget);
+    expect(find.text('USD quote unavailable'), findsNothing);
+    expect(find.widgetWithText(AmountText, '—'), findsOneWidget);
   });
 
   testWidgets('late Send state renders an already-stale fee immediately', (
@@ -1040,18 +1354,12 @@ void main() {
     );
 
     expect(
-      find.text('Refresh the network fee before sending.'),
-      findsOneWidget,
+      find.text(
+        'A current network fee is required before sending. Go back and reopen this step if it remains unavailable.',
+      ),
+      findsNothing,
     );
-    expect(
-      tester
-          .getSemantics(
-            find.bySemanticsLabel('Refresh the network fee before sending.'),
-          )
-          .flagsCollection
-          .isLiveRegion,
-      isTrue,
-    );
+    expect(harness.toasts.messages, isEmpty);
     final sendButton = find.byWidgetPredicate(
       (widget) => widget is CustomButton && widget.text == 'Send',
     );
@@ -1131,17 +1439,24 @@ void main() {
     );
     await _pumpUntil(
       tester,
-      () => find.text('USD quote unavailable').evaluate().isNotEmpty,
+      () => find.widgetWithText(AmountText, '—').evaluate().isNotEmpty,
     );
 
-    expect(find.text('USD quote unavailable'), findsOneWidget);
+    expect(find.text('USD quote unavailable'), findsNothing);
+    expect(find.widgetWithText(AmountText, '—'), findsOneWidget);
     expect(find.text(r'$0.00 USD'), findsNothing);
-    expect(find.text('Retry fiat quote'), findsOneWidget);
+    expect(find.text('Retry fiat quote'), findsNothing);
+    expect(harness.toasts.messages, isEmpty);
+    await _pumpFrames(tester);
   });
 
-  testWidgets('Send review explains expiry and preserves payment metadata', (
+  testWidgets('Send review keeps details clean and warns once for expiry', (
     tester,
   ) async {
+    tester.view.padding = const FakeViewPadding(bottom: 34);
+    tester.view.viewPadding = const FakeViewPadding(bottom: 34);
+    addTearDown(tester.view.resetPadding);
+    addTearDown(tester.view.resetViewPadding);
     var clockNow = DateTime.utc(2026, 8, 16, 12);
     final expiresAt = clockNow.add(const Duration(minutes: 1));
     final route = testRgbRoute;
@@ -1185,20 +1500,60 @@ void main() {
       () => find.byType(AsterNumericKeypad).evaluate().isNotEmpty,
     );
 
-    expect(find.text('Payment label'), findsOneWidget);
-    expect(find.text('Merchant checkout'), findsOneWidget);
-    expect(find.text('Message'), findsOneWidget);
-    expect(find.text('Invoice 123'), findsOneWidget);
-    expect(find.text('This payment request has expired.'), findsOneWidget);
+    expect(tester.getRect(find.byType(CustomScrollView)).bottom, 844);
+    expect(
+      tester.widget<AsterFormBody>(find.byType(AsterFormBody)).bottomPadding,
+      greaterThan(34),
+    );
+    final card = find.byType(SendCard);
+    expect(
+      find.descendant(of: card, matching: find.text('Recipient')),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: card, matching: find.text('rgb:review')),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: card, matching: find.text('RGB on-chain')),
+      findsNothing,
+    );
+    expect(find.text('Send USDT'), findsOneWidget);
+    expect(find.text('Recipient'), findsNothing);
+    expect(find.bySemanticsLabel('Address, rgb:review'), findsOneWidget);
+    expect(
+      find.descendant(of: card, matching: find.text('On-chain')),
+      findsOneWidget,
+    );
+    expect(find.text('Max'), findsOneWidget);
     expect(
       tester
-          .getSemantics(
-            find.bySemanticsLabel('This payment request has expired.'),
-          )
-          .flagsCollection
-          .isLiveRegion,
-      isTrue,
+          .widget<CustomButton>(find.widgetWithText(CustomButton, 'Max'))
+          .enabled,
+      isFalse,
     );
+    await tester.tap(find.widgetWithText(CustomButton, 'Max'));
+    expect(
+      harness.container.read(provider).requireValue.amountInput.units,
+      2000,
+    );
+    expect(find.textContaining('Max unavailable'), findsNothing);
+    expect(find.text('Refresh balance'), findsNothing);
+    expect(find.text('Refresh fee'), findsNothing);
+    expect(find.text('Payment label'), findsNothing);
+    expect(find.text('Merchant checkout'), findsNothing);
+    expect(find.text('Message'), findsNothing);
+    expect(find.text('Invoice 123'), findsNothing);
+    expect(find.text('This payment request has expired.'), findsNothing);
+    await _pumpFrames(tester);
+    expect(harness.toasts.messages, hasLength(1));
+    expect(harness.toasts.messages.single.variant, ToastVariant.warning);
+    expect(
+      harness.toasts.messages.single.message,
+      'This payment request has expired.',
+    );
+    await tester.pump(const Duration(seconds: 5));
+    expect(harness.toasts.messages, hasLength(1));
     expect(
       tester
           .widget<CustomButton>(find.widgetWithText(CustomButton, 'Send'))
@@ -1213,6 +1568,10 @@ void main() {
   testWidgets('Receive renders real request, copies it, and applies amount', (
     tester,
   ) async {
+    tester.view.padding = const FakeViewPadding(bottom: 34);
+    tester.view.viewPadding = const FakeViewPadding(bottom: 34);
+    addTearDown(tester.view.resetPadding);
+    addTearDown(tester.view.resetViewPadding);
     final harness = await PaymentFlowTestHarness.create();
     addTearDown(() => _disposeHarness(tester, harness));
     await _pumpWidget(
@@ -1223,6 +1582,15 @@ void main() {
     await _pumpUntil(
       tester,
       () => find.byType(PrettyQrView).evaluate().isNotEmpty,
+    );
+
+    expect(find.text('Receive Bitcoin'), findsOneWidget);
+    expect(find.text('Bitcoin · On-chain'), findsNothing);
+    final list = find.byType(ListView);
+    expect(tester.getRect(list).bottom, 844);
+    expect(
+      tester.widget<ListView>(list).padding!.resolve(TextDirection.ltr).bottom,
+      greaterThan(34),
     );
 
     await tester.tap(find.widgetWithText(CustomButton, 'Copy'));
@@ -1525,7 +1893,8 @@ void main() {
 
     await tester.pump(const Duration(milliseconds: 20));
     expect(find.text('This payment request has expired.'), findsNothing);
-    expect(find.text('USDT · RGB on-chain'), findsOneWidget);
+    expect(find.text('Receive USDT'), findsOneWidget);
+    expect(find.text('USDT · RGB on-chain'), findsNothing);
     expect(find.textContaining('Expires '), findsOneWidget);
 
     clockNow = expiresAt;
@@ -1898,17 +2267,40 @@ void main() {
     );
 
     engine.sendPaymentGate!.complete();
+    await tester.pump(const Duration(seconds: 2));
     await _pumpUntil(
       tester,
-      () => find.text('Wallet home').evaluate().isNotEmpty,
+      () => find.text('Payment sent').evaluate().isNotEmpty,
     );
 
+    expect(find.text('Wallet home'), findsNothing);
+    expect(find.byType(AsterNumericKeypad), findsNothing);
+    expect(find.byType(SendCard), findsNothing);
+    expect(find.bySemanticsLabel('Back'), findsNothing);
+    expect(find.widgetWithText(AmountText, '0.000001 BTC'), findsOneWidget);
+    expect(harness.toasts.messages, isEmpty);
     expect(engine.sentPaymentCommand?.amount.units, 100);
     expect(
       engine.calls.where((call) => call == 'sendPayment:start'),
       hasLength(1),
     );
-    expect(harness.toasts.messages.last.title, 'Payment submitted');
+    await tester.binding.handlePopRoute();
+    await _pumpFrames(tester);
+    expect(find.text('Payment sent'), findsOneWidget);
+    final continueAction = tester
+        .widget<CustomButton>(find.widgetWithText(CustomButton, 'Continue'))
+        .onTap!;
+    continueAction();
+    continueAction();
+    await _pumpUntil(
+      tester,
+      () => find.text('Wallet home').evaluate().isNotEmpty,
+    );
+    expect(
+      engine.calls.where((call) => call == 'sendPayment:start'),
+      hasLength(1),
+    );
+    expect(harness.toasts.messages, isEmpty);
   });
 
   testWidgets('unknown payment outcome disables every Send route control', (
@@ -1983,26 +2375,21 @@ void main() {
     final refreshBalance = find.byWidgetPredicate(
       (widget) => widget is CustomButton && widget.text == 'Refresh balance',
     );
-    expect(tester.widget<CustomButton>(refreshBalance).enabled, isFalse);
+    expect(refreshBalance, findsNothing);
     final retryQuote = find.byWidgetPredicate(
       (widget) => widget is CustomButton && widget.text == 'Retry fiat quote',
     );
-    expect(retryQuote, findsOneWidget);
-    expect(tester.widget<CustomButton>(retryQuote).enabled, isFalse);
+    expect(retryQuote, findsNothing);
     expect(
       find.text(walletPaymentSubmissionPendingFailure.userMessage),
-      findsOneWidget,
+      findsNothing,
     );
+    expect(harness.toasts.messages, hasLength(1));
+    expect(harness.toasts.messages.single.title, 'Check payment status');
+    expect(harness.toasts.messages.single.variant, ToastVariant.warning);
     expect(
-      tester
-          .getSemantics(
-            find.bySemanticsLabel(
-              walletPaymentSubmissionPendingFailure.userMessage,
-            ),
-          )
-          .flagsCollection
-          .isLiveRegion,
-      isTrue,
+      harness.toasts.messages.single.message,
+      walletPaymentSubmissionPendingFailure.userMessage,
     );
 
     await _pumpWidget(
@@ -2064,14 +2451,9 @@ void main() {
     );
     await _pumpFrames(tester);
 
-    expect(find.text(failureMessage), findsOneWidget);
-    expect(
-      tester
-          .getSemantics(find.bySemanticsLabel(failureMessage))
-          .flagsCollection
-          .isLiveRegion,
-      isTrue,
-    );
+    expect(find.text(failureMessage), findsNothing);
+    expect(harness.toasts.messages, hasLength(1));
+    expect(harness.toasts.messages.single.message, failureMessage);
     expect(find.text('Refresh fee'), findsNothing);
     final sendButton = find.byWidgetPredicate(
       (widget) => widget is CustomButton && widget.text == 'Send',
@@ -2079,7 +2461,69 @@ void main() {
     expect(tester.widget<CustomButton>(sendButton).enabled, isFalse);
   });
 
-  testWidgets('balance failure renders beside its own retry control', (
+  testWidgets('a deferred fee warning is discarded after leaving Send', (
+    tester,
+  ) async {
+    final now = DateTime.utc(2026, 10, 16);
+    final engine = FakeWalletEngine()
+      ..balance = _bitcoinBalance(1000)
+      ..feeEstimate = WalletFeeRateEstimate(
+        targetBlocks: 6,
+        satsPerVbyte: 2,
+        observedAt: now,
+      );
+    final transport = ResilientHttpClient(
+      client: MockClient((request) async => http.Response('{}', 503)),
+      retryPolicy: RetryPolicy(maxAttempts: 1),
+    );
+    addTearDown(transport.close);
+    final harness = await PaymentFlowTestHarness.create(
+      engine: engine,
+      clock: () => now,
+      httpClient: transport,
+    );
+    addTearDown(() => _disposeHarness(tester, harness));
+    const target = WalletPaymentTarget.bitcoinOnchain;
+    final provider = sendFlowViewModelProvider(target);
+    final subscription = harness.container.listen(provider, (_, _) {});
+    addTearDown(subscription.close);
+    await tester.runAsync(() => harness.container.read(provider.future));
+    final notifier = harness.container.read(provider.notifier);
+    notifier.updateDestination('mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn');
+    expect(await tester.runAsync(notifier.validateDestination), isTrue);
+    notifier.updateAmount('0.000001');
+    final router = GoRouter(
+      initialLocation: RoutePaths.home,
+      routes: [
+        GoRoute(
+          path: RoutePaths.home,
+          builder: (_, _) => const Scaffold(body: Text('Wallet home')),
+        ),
+        GoRoute(
+          path: RoutePaths.sendAmount,
+          builder: (_, _) => const SendAmountScreen(target: target),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await _pumpRouter(tester, harness, router);
+    unawaited(router.push<void>('/send/${target.slug}/amount'));
+    await tester.pumpAndSettle();
+    expect(harness.toasts.messages, isEmpty);
+
+    // A retained read failure schedules presentation for the next frame.
+    // Pop first: no feedback from this route may leak onto Home.
+    engine.feeEstimateError = StateError('terminal fee state');
+    expect(await tester.runAsync(notifier.refreshFee), isFalse);
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(find.text('Wallet home'), findsOneWidget);
+    expect(harness.toasts.messages, isEmpty);
+    expect(engine.calls, isNot(contains('sendPayment:start')));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('balance failure recovers silently without refresh controls', (
     tester,
   ) async {
     final engine = FakeWalletEngine()
@@ -2089,26 +2533,19 @@ void main() {
         satsPerVbyte: 2,
         observedAt: DateTime.now().toUtc(),
       );
-    final harness = await PaymentFlowTestHarness.create(engine: engine);
+    final transport = ResilientHttpClient(
+      client: MockClient((request) async => http.Response('{}', 503)),
+      retryPolicy: RetryPolicy(maxAttempts: 1),
+    );
+    addTearDown(transport.close);
+    final harness = await PaymentFlowTestHarness.create(
+      engine: engine,
+      httpClient: transport,
+    );
     addTearDown(() => _disposeHarness(tester, harness));
     final provider = sendFlowViewModelProvider(
       WalletPaymentTarget.bitcoinOnchain,
     );
-    final subscription = harness.container.listen(provider, (_, _) {});
-    addTearDown(subscription.close);
-    await tester.runAsync(() => harness.container.read(provider.future));
-    final notifier = harness.container.read(provider.notifier);
-    notifier.updateDestination('mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn');
-    expect(await tester.runAsync(notifier.validateDestination), isTrue);
-    notifier.updateAmount('0.000001');
-    engine.balanceError = TimeoutException('temporary balance timeout');
-    expect(await tester.runAsync(notifier.refreshBalance), isFalse);
-    final failureMessage = harness.container
-        .read(provider)
-        .requireValue
-        .failure!
-        .userMessage;
-
     await _pumpWidget(
       tester,
       harness,
@@ -2116,26 +2553,44 @@ void main() {
     );
     await _pumpUntil(
       tester,
-      () => find.byType(AsterNumericKeypad).evaluate().isNotEmpty,
+      () =>
+          harness.container.read(provider).hasValue &&
+          harness.container.read(walletViewModelProvider).hasValue,
     );
+    final notifier = harness.container.read(provider.notifier);
+    notifier.updateDestination('mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn');
+    final validation = notifier.validateDestination();
     await _pumpFrames(tester);
+    expect(await validation, isTrue);
+    notifier.updateAmount('0.000001');
+    engine.balanceError = TimeoutException('temporary balance timeout');
+    final refresh = notifier.refreshBalance();
+    await _pumpFrames(tester);
+    expect(await refresh, isFalse);
+    final failureMessage = harness.container
+        .read(provider)
+        .requireValue
+        .failure!
+        .userMessage;
 
-    expect(
-      tester.widget<SendCard>(find.byType(SendCard)).validationMessage,
-      isNull,
+    expect(find.byType(AsterStatusMessage), findsNothing);
+    expect(find.text(failureMessage), findsNothing);
+    expect(harness.toasts.messages, isEmpty);
+    expect(find.text('Refresh balance'), findsNothing);
+    expect(find.text('Refresh fee'), findsNothing);
+    engine.balanceError = null;
+    final feedbackBeforeRecovery = List<HapticIntent>.of(
+      harness.haptics.intents,
     );
-    expect(find.text(failureMessage), findsOneWidget);
-    expect(
-      tester
-          .getSemantics(find.bySemanticsLabel(failureMessage))
-          .flagsCollection
-          .isLiveRegion,
-      isTrue,
+    await tester.pump(const Duration(seconds: 2));
+    await _pumpUntil(
+      tester,
+      () => harness.container.read(provider).value?.failure == null,
     );
-    final refreshBalance = find.byWidgetPredicate(
-      (widget) => widget is CustomButton && widget.text == 'Refresh balance',
-    );
-    expect(tester.widget<CustomButton>(refreshBalance).enabled, isTrue);
+    expect(find.text(failureMessage), findsNothing);
+    expect(harness.toasts.messages, isEmpty);
+    expect(harness.haptics.intents, feedbackBeforeRecovery);
+    expect(engine.calls, isNot(contains('sendPayment:start')));
   });
 }
 

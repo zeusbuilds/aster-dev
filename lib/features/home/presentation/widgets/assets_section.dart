@@ -114,8 +114,7 @@ class _AssetsSectionState extends ConsumerState<AssetsSection> {
           SizedBox(height: context.spacing.screenPadding),
           Row(
             children: [
-              Text('Assets', style: context.type.sectionTitle),
-              const Spacer(),
+              Expanded(child: Text('Assets', style: context.type.sectionTitle)),
               AsterIconButton(
                 icon: balancesVisible == false
                     ? MingCuteIcons.mgc_eye_close_line
@@ -181,14 +180,6 @@ class _AssetsBody extends ConsumerWidget {
     final preferences = settingsState.snapshot.preferences;
     final marketState = market.value;
     final marketSnapshot = marketState?.snapshot;
-    final marketMatchesCurrency =
-        marketSnapshot?.quoteCurrency.code == preferences.currencyCode;
-    final marketRetryable = _marketRetryable(
-      market: market,
-      currencyCode: preferences.currencyCode,
-      hasUsdt: homeState.portfolio.usdt != null,
-      now: now,
-    );
     final displays = <HomeAssetDisplay>[
       _formatter.format(
         balance: homeState.portfolio.bitcoin,
@@ -212,7 +203,6 @@ class _AssetsBody extends ConsumerWidget {
           AssetRow.loaded(
             display: displays[index],
             balancesVisible: preferences.balancesVisible,
-            fiatLoading: market.isLoading && !marketMatchesCurrency,
             onTap: navigation.inFlight
                 ? null
                 : () {
@@ -232,44 +222,8 @@ class _AssetsBody extends ConsumerWidget {
           ),
           if (index < displays.length - 1) SizedBox(height: context.spacing.lg),
         ],
-        if (homeState.portfolio.usdt == null) ...[
-          if (displays.isNotEmpty) SizedBox(height: context.spacing.lg),
-          const _UnconfiguredUsdtRow(),
-        ],
-        if (marketRetryable) ...[
-          SizedBox(height: context.spacing.lg),
-          CustomButton.compact(
-            text: 'Retry fiat quote',
-            hapticIntent: null,
-            onTap: () =>
-                ref.read(bitcoinMarketViewModelProvider.notifier).retry(),
-          ),
-        ],
       ],
     );
-  }
-
-  static bool _marketRetryable({
-    required AsyncValue<BitcoinMarketState> market,
-    required String currencyCode,
-    required bool hasUsdt,
-    required DateTime now,
-  }) {
-    final presentation = market.value;
-    if (presentation?.refreshing ?? false) return false;
-    if (presentation?.refreshFailure case final failure?) {
-      return failure.retryable;
-    }
-    if (market.isLoading) return false;
-    if (market case AsyncError(:final error, :final stackTrace)) {
-      return _failure(error, stackTrace).retryable;
-    }
-    final snapshot = presentation?.snapshot;
-    if (snapshot == null || snapshot.quoteCurrency.code != currencyCode) {
-      return true;
-    }
-    if (!snapshot.currentBitcoinPrice.isCurrentAt(now)) return true;
-    return hasUsdt && !(snapshot.currentUsdtPrice?.isCurrentAt(now) ?? false);
   }
 
   static AppFailure _failure(Object error, StackTrace stackTrace) =>
@@ -294,29 +248,6 @@ class _AssetLoadingList extends StatelessWidget {
           SizedBox(height: context.spacing.lg),
           AssetRow.loading(kind: WalletAssetKind.usdt, title: 'USDT'),
         ],
-      ),
-    );
-  }
-}
-
-class _UnconfiguredUsdtRow extends StatelessWidget {
-  const _UnconfiguredUsdtRow();
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      label: 'USDT is not configured for this network',
-      excludeSemantics: true,
-      child: Opacity(
-        opacity: context.stateLayers.disabled,
-        child: AssetRow(
-          kind: WalletAssetKind.usdt,
-          title: 'USDT',
-          totalText: 'Not configured',
-          availableText: 'Not configured',
-          fiatContext: 'Unavailable on this network',
-          balancesVisible: true,
-        ),
       ),
     );
   }

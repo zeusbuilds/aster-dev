@@ -29,7 +29,7 @@ final class SettingsRepository {
   /// documented defaults. Failures are typed and contain no asset payloads.
   Future<AppResult<SettingsSnapshot>> load() => _enqueue(_loadUnsafe);
 
-  /// Persists a selected ISO 4217 [code] after catalog validation.
+  /// Keeps [code] at USD while currency selection is unavailable.
   Future<AppResult<SettingsSnapshot>> selectCurrency(String code) {
     return _enqueue(() async {
       final current = await _requireSnapshot();
@@ -41,6 +41,16 @@ final class SettingsRepository {
             code: 'settings_currency_invalid',
             kind: AppFailureKind.validation,
             userMessage: 'That currency is not available.',
+            retryable: false,
+          ),
+        );
+      }
+      if (code != AppPreferences.defaults.currencyCode) {
+        return const AppResult.failure(
+          AppFailure(
+            code: 'settings_currency_unavailable',
+            kind: AppFailureKind.validation,
+            userMessage: 'Only USD is available for now.',
             retryable: false,
           ),
         );
@@ -117,10 +127,10 @@ final class SettingsRepository {
       final storedUnit = await _preferences.getString(_bitcoinUnitKey);
       final storedVisibility = await _preferences.getBool(_balancesVisibleKey);
 
-      final currency =
-          catalog.currencies.any((item) => item.code == storedCurrency)
-          ? storedCurrency!
-          : AppPreferences.defaults.currencyCode;
+      // Currency selection is temporarily unavailable. Resolve and repair old
+      // selections here so quotes, balances, and Send all use the visible USD
+      // preference, including when a previously selected currency is valid.
+      final currency = AppPreferences.defaults.currencyCode;
       final region = catalog.regions.any((item) => item.code == storedRegion)
           ? storedRegion!
           : AppPreferences.defaults.regionCode;

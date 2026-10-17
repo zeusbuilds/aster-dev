@@ -349,6 +349,22 @@ void main() {
     expect(missingActivation.failure.retryable, isTrue);
     expect(missingActivation.failure.cause, isNull);
     expect(missingActivation.failure.userMessage, isNot(contains(secondId)));
+    for (final result in [duplicate, missingCommit, missingActivation]) {
+      final original = result.failure;
+      final mapped = FailureMapper.from(
+        AppFailureException(original),
+        StackTrace.current,
+      );
+      expect(mapped, same(original));
+      expect(mapped.kind, AppFailureKind.conflict);
+      expect(
+        mapped.userMessage,
+        'The wallet changed while this action was running. Try again.',
+      );
+      expect(mapped.retryable, isTrue);
+      expect(mapped.requiresReconciliation, isFalse);
+      expect(mapped.outcomeUnknown, isFalse);
+    }
   });
 
   test('profile rollback removal is idempotent', () async {

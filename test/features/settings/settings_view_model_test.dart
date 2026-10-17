@@ -9,6 +9,7 @@ import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:aster/features/wallet/presentation/models/models.dart';
 import 'package:aster/features/wallet/presentation/view_model/view_models.dart';
 import 'package:aster/shared/feedback/feedback.dart';
+import 'package:aster/shared/formatting/bitcoin_unit.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -47,7 +48,7 @@ void main() {
     await container.read(settingsViewModelProvider.future);
 
     final notifier = container.read(settingsViewModelProvider.notifier);
-    final first = notifier.selectCurrency('EUR');
+    final first = notifier.selectBitcoinUnit(BitcoinUnit.sats);
     await preferences.writeStarted.future;
     final overlapping = await notifier.selectRegion('DE');
 
@@ -55,7 +56,8 @@ void main() {
     preferences.releaseWrite.complete();
     expect(await first, isTrue);
     final state = container.read(settingsViewModelProvider).requireValue;
-    expect(state.snapshot.preferences.currencyCode, 'EUR');
+    expect(state.snapshot.preferences.currencyCode, 'USD');
+    expect(state.snapshot.preferences.bitcoinUnit, BitcoinUnit.sats);
     expect(state.snapshot.preferences.regionCode, 'US');
     expect(state.operation, isNull);
   });
@@ -88,7 +90,7 @@ void main() {
     await container.read(settingsViewModelProvider.future);
     final staleMutation = container
         .read(settingsViewModelProvider.notifier)
-        .selectCurrency('EUR');
+        .selectBitcoinUnit(BitcoinUnit.sats);
     await preferences.writeStarted.future;
 
     repository = SettingsRepository(
@@ -98,6 +100,7 @@ void main() {
     container.invalidate(settingsRepositoryProvider);
     final rebuilt = await container.read(settingsViewModelProvider.future);
     expect(rebuilt.snapshot.preferences.currencyCode, 'USD');
+    expect(rebuilt.snapshot.preferences.bitcoinUnit, BitcoinUnit.bitcoin);
 
     preferences.releaseWrite.complete();
     expect(await staleMutation, isFalse);
@@ -107,9 +110,146 @@ void main() {
           .requireValue
           .snapshot
           .preferences
-          .currencyCode,
-      'USD',
+          .bitcoinUnit,
+      BitcoinUnit.bitcoin,
     );
+  });
+
+  test(
+    'failed health refresh clears stale metrics once and recovers on retry',
+    () async {
+      final harness = await PaymentFlowTestHarness.create();
+      addTearDown(harness.dispose);
+      final container = harness.container;
+      final subscription = container.listen(
+        networkConfigurationViewModelProvider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      final initial = await container.read(
+        networkConfigurationViewModelProvider.future,
+      );
+      expect(initial.status, isNotNull);
+      expect(container.read(toastControllerProvider).current, isNull);
+      expect(harness.haptics.intents, isEmpty);
+
+      const failure = AppFailure(
+        code: 'node_temporarily_unavailable',
+        kind: AppFailureKind.unavailable,
+        userMessage: 'Node health is temporarily unavailable.',
+        retryable: true,
+      );
+      harness.engine.networkStatusError = const AppFailureException(failure);
+      final gate = Completer<void>();
+      harness.engine.networkStatusGate = gate;
+      final notifier = container.read(
+        networkConfigurationViewModelProvider.notifier,
+      );
+      final refresh = notifier.refreshHealth();
+      await _waitFor(
+        () =>
+            harness.engine.calls
+                .where((call) => call == 'networkStatus')
+                .length ==
+            2,
+      );
+      expect(
+        container
+            .read(networkConfigurationViewModelProvider)
+            .requireValue
+            .refreshing,
+        isTrue,
+      );
+      expect(await notifier.refreshHealth(), isFalse);
+      expect(container.read(toastControllerProvider).current, isNull);
+      expect(harness.haptics.intents, isEmpty);
+
+      gate.complete();
+      expect(await refresh, isFalse);
+      final failed = container
+          .read(networkConfigurationViewModelProvider)
+          .requireValue;
+      expect(failed.status, isNull);
+      expect(failed.healthFailure, failure);
+      expect(failed.refreshing, isFalse);
+      final feedback = container.read(toastControllerProvider);
+      expect(feedback.current?.title, 'Health check failed');
+      expect(feedback.current?.message, isNull);
+      expect(feedback.current?.variant, ToastVariant.failure);
+      expect(feedback.pending, isEmpty);
+      expect(harness.haptics.intents, [HapticIntent.error]);
+      expect(
+        harness.engine.calls.where((call) => call == 'networkStatus'),
+        hasLength(2),
+      );
+
+      container.read(toastControllerProvider.notifier).dismissCurrent();
+      harness.engine.networkStatusGate = null;
+      harness.engine.networkStatusError = null;
+      final recoveredStatus = WalletNetworkStatus(
+        environment: BlockchainEnvironment.regtest,
+        blockHeight: 102,
+        nodePublicKey: initial.status!.nodePublicKey,
+        channelCount: 2,
+        usableChannelCount: 1,
+        peerCount: 3,
+      );
+      harness.engine.networkStatus = recoveredStatus;
+      expect(await notifier.refreshHealth(), isTrue);
+      final recovered = container
+          .read(networkConfigurationViewModelProvider)
+          .requireValue;
+      expect(recovered.status, recoveredStatus);
+      expect(recovered.healthFailure, isNull);
+      expect(recovered.refreshing, isFalse);
+      expect(container.read(toastControllerProvider).current, isNull);
+      expect(harness.haptics.intents, [
+        HapticIntent.error,
+        HapticIntent.success,
+      ]);
+    },
+  );
+
+  test('disposed health refresh emits no feedback after completion', () async {
+    final harness = await PaymentFlowTestHarness.create();
+    addTearDown(harness.dispose);
+    final container = harness.container;
+    final subscription = container.listen(
+      networkConfigurationViewModelProvider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    await container.read(networkConfigurationViewModelProvider.future);
+    final gate = Completer<void>();
+    harness.engine.networkStatusGate = gate;
+    harness.engine.networkStatusError = const AppFailureException(
+      AppFailure(
+        code: 'node_temporarily_unavailable',
+        kind: AppFailureKind.unavailable,
+        userMessage: 'Node health is temporarily unavailable.',
+        retryable: true,
+      ),
+    );
+    final refresh = container
+        .read(networkConfigurationViewModelProvider.notifier)
+        .refreshHealth();
+    await _waitFor(
+      () =>
+          harness.engine.calls
+              .where((call) => call == 'networkStatus')
+              .length ==
+          2,
+    );
+
+    subscription.close();
+    container.invalidate(networkConfigurationViewModelProvider);
+    await container.pump();
+    gate.complete();
+
+    expect(await refresh, isFalse);
+    expect(container.read(toastControllerProvider).current, isNull);
+    expect(harness.haptics.intents, isEmpty);
   });
 
   test('stale health retry cannot overwrite a rebuilt configuration', () async {
@@ -146,9 +286,7 @@ void main() {
     final container = ProviderContainer(
       retry: applicationProviderRetryPolicy,
       overrides: [
-        hapticFeedbackServiceProvider.overrideWithValue(
-          const NoopHapticFeedbackService(),
-        ),
+        hapticFeedbackServiceProvider.overrideWithValue(firstHarness.haptics),
         walletRepositoryProvider.overrideWith((ref) async => repository),
         walletServiceConfigurationProvider.overrideWithValue(services),
       ],
@@ -171,6 +309,8 @@ void main() {
           ?.retryable,
       isTrue,
     );
+    expect(container.read(toastControllerProvider).current, isNull);
+    expect(firstHarness.haptics.intents, isEmpty);
     firstHarness.engine.networkStatusError = null;
     final gate = Completer<void>();
     firstHarness.engine.networkStatusGate = gate;
@@ -194,7 +334,7 @@ void main() {
 
     firstHarness.engine.networkStatusError = StateError('stale native failure');
     gate.complete();
-    await staleRetry;
+    expect(await staleRetry, isFalse);
     expect(
       container
           .read(networkConfigurationViewModelProvider)
@@ -203,6 +343,8 @@ void main() {
           ?.blockHeight,
       101,
     );
+    expect(container.read(toastControllerProvider).current, isNull);
+    expect(firstHarness.haptics.intents, isEmpty);
   });
 
   test('terminal settings load failure rejects explicit retry', () async {
@@ -327,7 +469,7 @@ void main() {
     );
   });
 
-  test('confirmed foreground resume reloads healthy network status', () async {
+  test('foreground health reload stays quiet on success and failure', () async {
     const services = WalletServiceConfiguration(
       environment: BlockchainEnvironment.regtest,
       sdkNetwork: 'regtest',
@@ -347,6 +489,7 @@ void main() {
     final container = ProviderContainer(
       retry: applicationProviderRetryPolicy,
       overrides: [
+        hapticFeedbackServiceProvider.overrideWithValue(harness.haptics),
         walletLifecycleViewModelProvider.overrideWith(() => lifecycle),
         walletRepositoryProvider.overrideWith(
           (ref) async => harness.repository,
@@ -389,6 +532,24 @@ void main() {
       harness.engine.calls.where((call) => call == 'networkStatus'),
       hasLength(2),
     );
+    harness.engine.networkStatusError = const AppFailureException(
+      AppFailure(
+        code: 'node_temporarily_unavailable',
+        kind: AppFailureKind.unavailable,
+        userMessage: 'Node health is temporarily unavailable.',
+        retryable: true,
+      ),
+    );
+    lifecycle.publishForeground(2);
+    await container.pump();
+    final failed = await container.read(
+      networkConfigurationViewModelProvider.future,
+    );
+
+    expect(failed.status, isNull);
+    expect(failed.healthFailure?.retryable, isTrue);
+    expect(container.read(toastControllerProvider).current, isNull);
+    expect(harness.haptics.intents, isEmpty);
   });
 }
 

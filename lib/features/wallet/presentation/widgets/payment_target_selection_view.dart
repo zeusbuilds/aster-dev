@@ -8,6 +8,13 @@ import '../../../../shared/shared.dart';
 import '../../domain/models/models.dart';
 import 'payment_target_tile.dart';
 
+const _paymentTargetOrder = [
+  WalletPaymentTarget.bitcoinOnchain,
+  WalletPaymentTarget.usdtOnchain,
+  WalletPaymentTarget.bitcoinLightning,
+  WalletPaymentTarget.usdtLightning,
+];
+
 /// Shared loading, failure, and four-target list for payment entry screens.
 class PaymentTargetSelectionView extends StatelessWidget {
   const PaymentTargetSelectionView({
@@ -64,15 +71,22 @@ final class _PaymentTargetList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final items = [...capabilities]
+      ..sort(
+        (first, second) => _paymentTargetOrder
+            .indexOf(first.target)
+            .compareTo(_paymentTargetOrder.indexOf(second.target)),
+      );
     return ListView.separated(
-      padding: EdgeInsets.only(top: context.spacing.md),
-      itemCount: capabilities.length,
+      padding: EdgeInsets.only(
+        top: context.spacing.md,
+        bottom: context.windowInsets.bottomSafe + context.spacing.lg,
+      ),
+      itemCount: items.length,
       separatorBuilder: (context, index) =>
           SizedBox(height: context.spacing.md),
-      itemBuilder: (context, index) => PaymentTargetTile(
-        capability: capabilities[index],
-        onSelected: onSelected,
-      ),
+      itemBuilder: (context, index) =>
+          PaymentTargetTile(capability: items[index], onSelected: onSelected),
     );
   }
 }

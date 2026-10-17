@@ -28,6 +28,9 @@ final class HomeAssetDisplay {
   /// Compact estimate for the two-line portfolio row. Accessibility retains
   /// the currency code and explicit estimate wording in [fiatContext].
   final String? fiatLabel;
+
+  /// Only current quotes in the selected currency produce a visible estimate.
+  bool get hasFiatEstimate => fiatLabel != null;
 }
 
 /// Formats cross-rail portfolio totals without floating-point money math.
@@ -81,7 +84,7 @@ final class HomeAssetDisplayFormatter {
     );
   }
 
-  static ({String label, String semantics}) _fiatContext({
+  static ({String? label, String semantics}) _fiatContext({
     required PaymentRoute route,
     required int totalUnits,
     required String currencyCode,
@@ -89,7 +92,7 @@ final class HomeAssetDisplayFormatter {
     required BitcoinMarketSnapshot? market,
   }) {
     final unavailable = (
-      label: '$currencyCode estimate unavailable',
+      label: null,
       semantics: '$currencyCode estimate unavailable',
     );
     if (market == null || market.quoteCurrency.code != currencyCode) {

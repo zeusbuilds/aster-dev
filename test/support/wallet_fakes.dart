@@ -75,7 +75,33 @@ final class MemoryWalletRegistryDocumentStore
 }
 
 final class MemoryWalletPaymentJournalStore
-    implements WalletPaymentJournalStore {
+    implements WalletPaymentJournalStore, WalletPaymentReceiptStore {
+  final receiptDocuments = <String, Map<String, String>>{};
+  Object? receiptWriteError;
+  bool receiptCommitBeforeError = false;
+
+  @override
+  Future<Map<String, String>> readAll(String walletId) async =>
+      Map.unmodifiable(receiptDocuments[walletId] ?? const {});
+
+  @override
+  Future<void> writeReceipt(
+    String walletId,
+    String receiptKey,
+    String document,
+  ) async {
+    if (receiptWriteError case final error? when !receiptCommitBeforeError) {
+      throw error;
+    }
+    final wallet = receiptDocuments.putIfAbsent(walletId, () => {});
+    final existing = wallet[receiptKey];
+    if (existing != null && existing != document) {
+      throw const StoredDataCorruptionException();
+    }
+    wallet[receiptKey] = document;
+    if (receiptWriteError case final error?) throw error;
+  }
+
   final documents = <String, String>{};
   final writes = <String>[];
   Object? readError;

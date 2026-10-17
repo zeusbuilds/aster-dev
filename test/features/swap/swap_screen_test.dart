@@ -17,9 +17,13 @@ import '../../support/presentation_fakes.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('Swap exposes four typed targets and no fabricated execution', (
+  testWidgets('Swap exposes on-chain assets and no fabricated execution', (
     tester,
   ) async {
+    tester.view.padding = const FakeViewPadding(bottom: 34);
+    tester.view.viewPadding = const FakeViewPadding(bottom: 34);
+    addTearDown(tester.view.resetPadding);
+    addTearDown(tester.view.resetViewPadding);
     final harness = await PaymentFlowTestHarness.create(
       services: const WalletServiceConfiguration(
         environment: BlockchainEnvironment.regtest,
@@ -69,36 +73,35 @@ void main() {
       selected.getSemanticsData().hasAction(ui.SemanticsAction.tap),
       false,
     );
-    expect(find.text('Bitcoin'), findsNWidgets(2));
-    // At 2x text the last row is lazy-built only after scrolling.
-    expect(find.text('Coming later'), findsOneWidget);
-    final lightning = tester.getSemantics(
-      find.bySemanticsLabel('Bitcoin, Lightning'),
+    expect(find.text('Bitcoin'), findsOneWidget);
+    expect(find.text('USDT'), findsOneWidget);
+    expect(find.text('Coming later'), findsNothing);
+    expect(find.bySemanticsLabel('Bitcoin, Lightning'), findsNothing);
+    expect(find.bySemanticsLabel('USDT, RGB Lightning'), findsNothing);
+    final otherAsset = tester.getSemantics(
+      find.bySemanticsLabel('USDT, RGB on-chain'),
     );
-    expect(lightning.flagsCollection.isEnabled, ui.Tristate.isFalse);
+    expect(otherAsset.flagsCollection.isEnabled, ui.Tristate.isFalse);
     expect(
-      lightning.getSemanticsData().hasAction(ui.SemanticsAction.tap),
+      otherAsset.getSemanticsData().hasAction(ui.SemanticsAction.tap),
       isFalse,
     );
-    await tester.tap(find.text('Coming later').first);
+    await tester.tap(find.text('Already selected'));
     await tester.pumpAndSettle();
-
     expect(find.byType(AssetSelectorSheet), findsOneWidget);
     expect(harness.haptics.intents, [HapticIntent.lightImpact]);
-    await tester.scrollUntilVisible(
-      find.bySemanticsLabel('USDT, RGB Lightning'),
-      120,
-      scrollable: find.descendant(
-        of: find.byType(AssetSelectorSheet),
-        matching: find.byType(Scrollable),
-      ),
+    final sheetList = find.descendant(
+      of: find.byType(AssetSelectorSheet),
+      matching: find.byType(ListView),
     );
+    expect(tester.getRect(sheetList).bottom, 844);
     expect(
       tester
-          .getSemantics(find.bySemanticsLabel('USDT, RGB Lightning'))
-          .flagsCollection
-          .isEnabled,
-      ui.Tristate.isFalse,
+          .widget<ListView>(sheetList)
+          .padding!
+          .resolve(TextDirection.ltr)
+          .bottom,
+      greaterThan(34),
     );
     expect(tester.takeException(), isNull);
     expect(tester, meetsGuideline(androidTapTargetGuideline));

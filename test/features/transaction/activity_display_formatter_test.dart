@@ -7,6 +7,31 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   final formatter = ActivityDisplayFormatter(locale: 'en_US');
 
+  test('self transfer shows reviewed amount neutrally and fee separately', () {
+    final native = WalletActivity(
+      id: 'activity-${'d' * 64}',
+      source: WalletActivitySource.bitcoinTransaction,
+      operation: WalletActivityOperation.bitcoinSelfTransfer,
+      asset: WalletAsset.bitcoin,
+      rail: PaymentRail.onchain,
+      direction: WalletActivityDirection.internal,
+      status: WalletActivityStatus.succeeded,
+      fee: WalletAmount.onchain(assetId: WalletAsset.bitcoin.id, units: 155),
+      txid: 'd' * 64,
+    );
+    expect(formatter.activityTitle(native), 'Transfer to self');
+    expect(formatter.operationLabel(native.operation), 'Transfer to self');
+    expect(formatter.amountText(native, BitcoinUnit.bitcoin), isNull);
+    final reviewed = native.withReviewedAmount(
+      WalletAmount.onchain(assetId: WalletAsset.bitcoin.id, units: 5000000),
+    );
+    expect(formatter.amountText(reviewed, BitcoinUnit.bitcoin), '0.05 BTC');
+    expect(formatter.amountText(reviewed, BitcoinUnit.sats), '5,000,000 sats');
+    expect(formatter.feeText(reviewed, BitcoinUnit.bitcoin), '0.00000155 BTC');
+    expect(formatter.feeText(reviewed, BitcoinUnit.sats), '155 sats');
+    expect(formatter.statusLabel(reviewed.status), 'Completed');
+  });
+
   test('formats exact onchain and Lightning units with truthful signs', () {
     final received = _activity(
       idCharacter: 'a',

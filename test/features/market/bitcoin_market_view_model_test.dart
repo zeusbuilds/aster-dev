@@ -298,6 +298,217 @@ void main() {
     },
   );
 
+  testWidgets('refreshes when USDT expires before the Bitcoin quote', (
+    tester,
+  ) async {
+    var now = DateTime.utc(2026, 10, 17, 12);
+    var requestCount = 0;
+    final transport = ResilientHttpClient(
+      client: MockClient((request) async {
+        requestCount += 1;
+        return _marketResponse(
+          request,
+          now,
+          usdtObservedAt: requestCount <= 2
+              ? now.subtract(const Duration(minutes: 29, seconds: 58))
+              : now,
+        );
+      }),
+      retryPolicy: RetryPolicy(maxAttempts: 1),
+      clock: () => now,
+    );
+    final container = _marketContainer(transport, () => now);
+    final subscription = container.listen(
+      bitcoinMarketViewModelProvider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(() {
+      subscription.close();
+      container.dispose();
+      transport.close();
+    });
+
+    await tester.pump();
+    final initial = container.read(bitcoinMarketViewModelProvider).requireValue;
+    expect(initial.refreshFailure, isNull);
+    expect(initial.snapshot!.currentBitcoinPrice.isCurrentAt(now), isTrue);
+    expect(initial.snapshot!.currentUsdtPrice!.isCurrentAt(now), isTrue);
+    expect(requestCount, 2);
+
+    now = now.add(const Duration(seconds: 1));
+    await tester.pump(const Duration(seconds: 1));
+    expect(requestCount, 2);
+
+    now = now.add(const Duration(seconds: 1, milliseconds: 1));
+    await tester.pump(const Duration(seconds: 1, milliseconds: 1));
+    final refreshed = container
+        .read(bitcoinMarketViewModelProvider)
+        .requireValue;
+    expect(requestCount, 4);
+    expect(refreshed.snapshot!.currentUsdtPrice!.isCurrentAt(now), isTrue);
+    expect(refreshed.refreshFailure, isNull);
+    container.dispose();
+  });
+
+  testWidgets('missing USDT recovers silently with increasing backoff', (
+    tester,
+  ) async {
+    var now = DateTime.utc(2026, 10, 17, 12);
+    var requestCount = 0;
+    final transport = ResilientHttpClient(
+      client: MockClient((request) async {
+        requestCount += 1;
+        return _marketResponse(request, now, includeUsdt: requestCount > 4);
+      }),
+      retryPolicy: RetryPolicy(maxAttempts: 1),
+      clock: () => now,
+    );
+    final container = _marketContainer(transport, () => now);
+    final subscription = container.listen(
+      bitcoinMarketViewModelProvider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(() {
+      subscription.close();
+      container.dispose();
+      transport.close();
+    });
+
+    await tester.pump();
+    var current = container.read(bitcoinMarketViewModelProvider).requireValue;
+    expect(current.snapshot!.currentUsdtPrice, isNull);
+    expect(current.refreshFailure, isNull);
+    expect(requestCount, 2);
+
+    now = now.add(const Duration(seconds: 1));
+    await tester.pump(const Duration(seconds: 1));
+    expect(requestCount, 4);
+    expect(
+      container
+          .read(bitcoinMarketViewModelProvider)
+          .requireValue
+          .snapshot!
+          .currentUsdtPrice,
+      isNull,
+    );
+
+    now = now.add(const Duration(seconds: 1));
+    await tester.pump(const Duration(seconds: 1));
+    expect(requestCount, 4);
+
+    now = now.add(const Duration(seconds: 1));
+    await tester.pump(const Duration(seconds: 1));
+    current = container.read(bitcoinMarketViewModelProvider).requireValue;
+    expect(requestCount, 6);
+    expect(current.snapshot!.currentUsdtPrice!.isCurrentAt(now), isTrue);
+    expect(current.refreshFailure, isNull);
+
+    now = now.add(const Duration(seconds: 8));
+    await tester.pump(const Duration(seconds: 8));
+    expect(requestCount, 6);
+    container.dispose();
+  });
+
+  testWidgets('persistent failures honor Retry-After until recovery', (
+    tester,
+  ) async {
+    var now = DateTime.utc(2026, 10, 17, 12);
+    var requestCount = 0;
+    final transport = ResilientHttpClient(
+      client: MockClient((request) async {
+        requestCount += 1;
+        if (requestCount <= 4) {
+          return http.Response(
+            'temporarily unavailable',
+            503,
+            headers: {'retry-after': '3'},
+          );
+        }
+        return _marketResponse(request, now);
+      }),
+      retryPolicy: RetryPolicy(maxAttempts: 1),
+      clock: () => now,
+    );
+    final container = _marketContainer(transport, () => now);
+    final subscription = container.listen(
+      bitcoinMarketViewModelProvider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(() {
+      subscription.close();
+      container.dispose();
+      transport.close();
+    });
+
+    await tester.pump();
+    expect(requestCount, 2);
+    expect(
+      container
+          .read(bitcoinMarketViewModelProvider)
+          .requireValue
+          .refreshFailure
+          ?.retryAfter,
+      const Duration(seconds: 3),
+    );
+
+    for (var attempt = 0; attempt < 2; attempt += 1) {
+      now = now.add(const Duration(seconds: 2));
+      await tester.pump(const Duration(seconds: 2));
+      expect(requestCount, 2 + attempt * 2);
+      now = now.add(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+      expect(requestCount, 4 + attempt * 2);
+    }
+
+    final recovered = container
+        .read(bitcoinMarketViewModelProvider)
+        .requireValue;
+    expect(recovered.snapshot, isNotNull);
+    expect(recovered.refreshFailure, isNull);
+    container.dispose();
+  });
+
+  testWidgets('scheduled quote refresh stops without observers', (
+    tester,
+  ) async {
+    var now = DateTime.utc(2026, 10, 17, 12);
+    var requestCount = 0;
+    final transport = ResilientHttpClient(
+      client: MockClient((request) async {
+        requestCount += 1;
+        return _marketResponse(
+          request,
+          now,
+          usdtObservedAt: now.subtract(
+            const Duration(minutes: 29, seconds: 59),
+          ),
+        );
+      }),
+      retryPolicy: RetryPolicy(maxAttempts: 1),
+      clock: () => now,
+    );
+    final container = _marketContainer(transport, () => now);
+    final subscription = container.listen(
+      bitcoinMarketViewModelProvider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(() {
+      container.dispose();
+      transport.close();
+    });
+
+    await tester.pump();
+    expect(requestCount, 2);
+    subscription.close();
+    now = now.add(const Duration(hours: 1));
+    await tester.pump(const Duration(hours: 1));
+    expect(requestCount, 2);
+  });
+
   test('loaded refresh retains confirmed content and typed failure', () async {
     final now = DateTime.utc(2026, 8, 18, 12);
     final refreshStarted = Completer<void>();
@@ -666,6 +877,49 @@ void main() {
       selected,
     );
   });
+}
+
+ProviderContainer _marketContainer(
+  ResilientHttpClient transport,
+  DateTime Function() clock,
+) => ProviderContainer(
+  retry: (retryCount, error) => null,
+  overrides: [
+    utcClockProvider.overrideWithValue(clock),
+    resilientHttpClientProvider.overrideWithValue(transport),
+    selectedMarketQuoteCurrencyProvider.overrideWith(
+      (ref) async => _currency('USD', r'$'),
+    ),
+    bitcoinMarketBackgroundRetryPolicyProvider.overrideWithValue(
+      RetryPolicy(
+        maxAttempts: 1,
+        baseDelay: const Duration(seconds: 1),
+        maximumDelay: const Duration(seconds: 8),
+        jitterFactor: 0,
+      ),
+    ),
+  ],
+);
+
+http.Response _marketResponse(
+  http.Request request,
+  DateTime now, {
+  DateTime? usdtObservedAt,
+  bool includeUsdt = true,
+}) {
+  if (request.url.path.endsWith('/range')) {
+    return http.Response(
+      '{"prices":[[${now.subtract(const Duration(hours: 24)).millisecondsSinceEpoch},64000],'
+      '[${now.subtract(const Duration(minutes: 1)).millisecondsSinceEpoch},65000]]}',
+      200,
+    );
+  }
+  return http.Response(
+    '{"bitcoin":{"usd":65000,"last_updated_at":'
+    '${now.millisecondsSinceEpoch ~/ 1000}}'
+    '${includeUsdt ? ',"tether":{"usd":1,"last_updated_at":${(usdtObservedAt ?? now).millisecondsSinceEpoch ~/ 1000}}' : ''}}',
+    200,
+  );
 }
 
 MarketQuoteCurrency _currency(String code, String symbol) =>

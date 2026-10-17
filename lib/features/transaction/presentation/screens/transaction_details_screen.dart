@@ -40,6 +40,7 @@ class TransactionDetailsScreen extends ConsumerWidget {
       ),
       body: SafeArea(
         top: false,
+        bottom: false,
         child: _DetailsBody(
           activity: activity,
           settings: settings,
@@ -132,7 +133,7 @@ class _DetailsBody extends ConsumerWidget {
               context.spacing.screenPadding,
               context.spacing.xl,
               context.spacing.screenPadding,
-              context.spacing.xxl,
+              context.spacing.xxl + context.windowInsets.bottomSafe,
             ),
             sliver: SliverList.list(
               children: [
@@ -144,17 +145,6 @@ class _DetailsBody extends ConsumerWidget {
                   ),
                   SizedBox(height: context.spacing.md),
                 ],
-                Align(
-                  alignment: AlignmentDirectional.centerEnd,
-                  child: AsterIconButton(
-                    tooltip: state.refreshing
-                        ? 'Refreshing transaction'
-                        : 'Refresh transaction',
-                    icon: RemixIcons.refresh_line,
-                    onPressed: state.refreshing ? null : refresh,
-                    hapticIntent: null,
-                  ),
-                ),
                 if (state.refreshing) ...[
                   const LinearProgressIndicator(
                     semanticsLabel: 'Refreshing transaction',
@@ -524,38 +514,48 @@ class _DetailsFailure extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.all(context.spacing.screenPadding),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              RemixIcons.error_warning_line,
-              size: context.icons.lg,
-              color: context.appColors.danger,
+    return CustomScrollView(
+      slivers: [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              context.spacing.screenPadding,
+              context.spacing.screenPadding,
+              context.spacing.screenPadding,
+              context.spacing.screenPadding + context.windowInsets.bottomSafe,
             ),
-            SizedBox(height: context.spacing.lg),
-            Semantics(
-              liveRegion: true,
-              child: Text(
-                failure.userMessage,
-                style: context.type.statusMessage,
-                textAlign: TextAlign.center,
-              ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  RemixIcons.error_warning_line,
+                  size: context.icons.lg,
+                  color: context.appColors.danger,
+                ),
+                SizedBox(height: context.spacing.lg),
+                Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    failure.userMessage,
+                    style: context.type.statusMessage,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                if (failure.retryable) ...[
+                  SizedBox(height: context.spacing.lg),
+                  CustomButton.compact(
+                    text: 'Retry',
+                    loading: loading,
+                    hapticIntent: null,
+                    onTap: onRetry,
+                  ),
+                ],
+              ],
             ),
-            if (failure.retryable) ...[
-              SizedBox(height: context.spacing.lg),
-              CustomButton.compact(
-                text: 'Retry',
-                loading: loading,
-                hapticIntent: null,
-                onTap: onRetry,
-              ),
-            ],
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -577,7 +577,7 @@ class _DetailsLoadingView extends StatelessWidget {
             context.spacing.screenPadding,
             context.spacing.xl,
             context.spacing.screenPadding,
-            context.spacing.xxl,
+            context.spacing.xxl + context.windowInsets.bottomSafe,
           ),
           child: Column(
             children: [

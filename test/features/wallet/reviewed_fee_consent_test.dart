@@ -218,8 +218,11 @@ void main() {
   });
 
   test(
-    'fee change requires explicit refresh followed by another Send command',
+    'fee change requires a read-only refresh followed by another Send command',
     () async {
+      // Leave BTC for fees so this case reaches the fee-review guard rather
+      // than the separate guard against sending the full available balance.
+      engine.balance = _bitcoinBalance(1000);
       final provider = sendFlowViewModelProvider(
         WalletPaymentTarget.bitcoinOnchain,
       );
@@ -234,6 +237,10 @@ void main() {
       notifier.updateDestination(address);
       expect(await notifier.validateDestination(), isTrue);
       notifier.updateAmount('0.00000001');
+      expect(
+        harness.container.read(provider).requireValue.canSubmitAt(now),
+        isTrue,
+      );
       engine.feeEstimate = quote(rate: 4);
       expect(await notifier.submit(), isFalse);
       final blocked = harness.container.read(provider).requireValue;
@@ -244,17 +251,35 @@ void main() {
       expect(blocked.canSubmitAt(now), isFalse);
       expectNoSend();
       expect(await notifier.submit(), isFalse);
-      expect(await notifier.refreshFee(), isTrue);
+      expect(await notifier.refreshFee(silent: true), isTrue);
       expectNoSend();
       expect(
         harness.container.read(provider).requireValue.feeEstimate!.satsPerVbyte,
         4,
       );
       expect(await notifier.submit(), isTrue);
+      expect(await notifier.submit(), isFalse);
       expect(
         engine.calls.where((call) => call == 'sendPayment:start'),
         hasLength(1),
       );
     },
+  );
+}
+
+WalletBalance _bitcoinBalance(int units) {
+  const asset = WalletAsset.bitcoin;
+  WalletAmount onchain(int value) =>
+      WalletAmount.onchain(assetId: asset.id, units: value);
+  final noLightning = WalletAmount.lightning(assetId: asset.id, units: 0);
+  return WalletBalance(
+    asset: asset,
+    onchainSettled: onchain(units),
+    onchainFuture: onchain(units),
+    onchainSpendable: onchain(units),
+    onchainLocked: onchain(0),
+    lightningOwned: noLightning,
+    lightningSpendable: noLightning,
+    lightningReceivable: noLightning,
   );
 }

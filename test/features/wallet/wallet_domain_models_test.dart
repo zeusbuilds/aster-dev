@@ -7,6 +7,171 @@ const _nodePublicKey =
     '020000000000000000000000000000000000000000000000000000000000000000';
 
 void main() {
+  test('reviewed self transfer amount preserves authoritative native identity and state', () {
+    final native = _selfTransferActivity();
+    final amount = WalletAmount.onchain(
+      assetId: WalletAsset.bitcoin.id,
+      units: 5000000,
+    );
+    final reviewed = native.withReviewedAmount(amount);
+
+    expect(native.amount, isNull);
+    expect(reviewed.amount, amount);
+    expect(reviewed.id, native.id);
+    expect(reviewed.source, native.source);
+    expect(reviewed.operation, WalletActivityOperation.bitcoinSelfTransfer);
+    expect(reviewed.asset, native.asset);
+    expect(reviewed.rail, native.rail);
+    expect(reviewed.direction, WalletActivityDirection.internal);
+    expect(reviewed.status, native.status);
+    expect(reviewed.fee, native.fee);
+    expect(reviewed.txid, native.txid);
+    expect(reviewed.occurredAt, native.occurredAt);
+    expect(reviewed.updatedAt, native.updatedAt);
+    expect(reviewed.confirmedAt, native.confirmedAt);
+    expect(reviewed.confirmationHeight, native.confirmationHeight);
+    expect(identical(reviewed.withReviewedAmount(amount), reviewed), isTrue);
+    expect(
+      () => reviewed.withReviewedAmount(
+        WalletAmount.onchain(assetId: WalletAsset.bitcoin.id, units: 4999999),
+      ),
+      throwsArgumentError,
+    );
+  });
+
+  test(
+    'reviewed activity amount rejects zero and mismatched asset or rail',
+    () {
+      final activity = _selfTransferActivity();
+      final rgb = WalletAsset.rgbUsdt(assetId: 'rgb:fixture', precision: 6);
+      for (final amount in [
+        WalletAmount.onchain(assetId: WalletAsset.bitcoin.id, units: 0),
+        WalletAmount.onchain(assetId: rgb.id, units: 5000000),
+        WalletAmount.lightning(assetId: WalletAsset.bitcoin.id, units: 5000000),
+      ]) {
+        expect(() => activity.withReviewedAmount(amount), throwsArgumentError);
+      }
+    },
+  );
+
+  test(
+    'reviewed external payment cannot replace an authoritative native amount',
+    () {
+      final native = WalletActivity(
+        id: 'activity-${'c' * 64}',
+        source: WalletActivitySource.bitcoinTransaction,
+        operation: WalletActivityOperation.bitcoinSend,
+        asset: WalletAsset.bitcoin,
+        rail: PaymentRail.onchain,
+        direction: WalletActivityDirection.sent,
+        status: WalletActivityStatus.pending,
+        amount: WalletAmount.onchain(
+          assetId: WalletAsset.bitcoin.id,
+          units: 5000000,
+        ),
+        txid: 'c' * 64,
+      );
+      expect(
+        identical(native.withReviewedAmount(native.amount!), native),
+        isTrue,
+      );
+      expect(
+        () => native.withReviewedAmount(
+          WalletAmount.onchain(assetId: WalletAsset.bitcoin.id, units: 155),
+        ),
+        throwsArgumentError,
+      );
+    },
+  );
+
+  test(
+    'a reviewed send cannot enrich an incoming or unrelated internal movement',
+    () {
+      for (final (operation, direction) in [
+        (
+          WalletActivityOperation.bitcoinReceive,
+          WalletActivityDirection.received,
+        ),
+        (
+          WalletActivityOperation.bitcoinUtxoCreation,
+          WalletActivityDirection.internal,
+        ),
+        (WalletActivityOperation.rgbAnchor, WalletActivityDirection.internal),
+      ]) {
+        final activity = WalletActivity(
+          id: 'activity-${'d' * 64}',
+          source: WalletActivitySource.bitcoinTransaction,
+          operation: operation,
+          asset: WalletAsset.bitcoin,
+          rail: PaymentRail.onchain,
+          direction: direction,
+          status: WalletActivityStatus.pending,
+          txid: 'd' * 64,
+        );
+        expect(
+          () => activity.withReviewedAmount(
+            WalletAmount.onchain(
+              assetId: WalletAsset.bitcoin.id,
+              units: 5000000,
+            ),
+          ),
+          throwsArgumentError,
+        );
+      }
+    },
+  );
+
+  test('RGB reviewed amount retains transfer and transport metadata', () {
+    final asset = WalletAsset.rgbUsdt(
+      assetId: 'rgb:reviewed-fixture',
+      precision: 6,
+    );
+    final native = WalletActivity(
+      id: 'activity-${'e' * 64}',
+      source: WalletActivitySource.rgbTransfer,
+      operation: WalletActivityOperation.rgbSend,
+      asset: asset,
+      rail: PaymentRail.onchain,
+      direction: WalletActivityDirection.sent,
+      status: WalletActivityStatus.waitingConfirmations,
+      occurredAt: DateTime.utc(2026, 10, 16, 10),
+      updatedAt: DateTime.utc(2026, 10, 16, 11),
+      expiresAt: DateTime.utc(2026, 10, 17),
+      txid: 'e' * 64,
+      recipientId: 'rgb:synthetic-recipient',
+      transferIndex: 7,
+      batchTransferIndex: 8,
+      receiveOutpoint: 'receive-fixture:0',
+      changeOutpoint: 'change-fixture:1',
+      transportEndpointCount: 2,
+      usedTransportEndpointCount: 1,
+      transportTypes: const ['JsonRpc'],
+    );
+    final reviewed = native.withReviewedAmount(
+      WalletAmount.onchain(assetId: asset.id, units: 1000001),
+    );
+    expect(reviewed.amount?.units, 1000001);
+    expect(reviewed.id, native.id);
+    expect(reviewed.operation, native.operation);
+    expect(reviewed.direction, native.direction);
+    expect(reviewed.status, native.status);
+    expect(reviewed.occurredAt, native.occurredAt);
+    expect(reviewed.updatedAt, native.updatedAt);
+    expect(reviewed.expiresAt, native.expiresAt);
+    expect(reviewed.txid, native.txid);
+    expect(reviewed.recipientId, native.recipientId);
+    expect(reviewed.transferIndex, native.transferIndex);
+    expect(reviewed.batchTransferIndex, native.batchTransferIndex);
+    expect(reviewed.receiveOutpoint, native.receiveOutpoint);
+    expect(reviewed.changeOutpoint, native.changeOutpoint);
+    expect(reviewed.transportEndpointCount, native.transportEndpointCount);
+    expect(
+      reviewed.usedTransportEndpointCount,
+      native.usedTransportEndpointCount,
+    );
+    expect(reviewed.transportTypes, native.transportTypes);
+  });
+
   WalletBalance accountingBalance(
     WalletAsset asset, {
     required int settled,
@@ -672,6 +837,22 @@ void main() {
     );
   });
 }
+
+WalletActivity _selfTransferActivity() => WalletActivity(
+  id: 'activity-${'f' * 64}',
+  source: WalletActivitySource.bitcoinTransaction,
+  operation: WalletActivityOperation.bitcoinSelfTransfer,
+  asset: WalletAsset.bitcoin,
+  rail: PaymentRail.onchain,
+  direction: WalletActivityDirection.internal,
+  status: WalletActivityStatus.succeeded,
+  fee: WalletAmount.onchain(assetId: WalletAsset.bitcoin.id, units: 155),
+  occurredAt: DateTime.utc(2026, 10, 16, 10),
+  updatedAt: DateTime.utc(2026, 10, 16, 11),
+  confirmedAt: DateTime.utc(2026, 10, 16, 10),
+  confirmationHeight: 100,
+  txid: 'f' * 64,
+);
 
 WalletNetworkStatus _networkStatus() => WalletNetworkStatus(
   environment: BlockchainEnvironment.regtest,

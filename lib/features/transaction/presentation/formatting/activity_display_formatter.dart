@@ -27,6 +27,7 @@ final class ActivityDisplayFormatter {
     WalletActivityDirection.sent => 'Sent',
     WalletActivityDirection.received => 'Received',
     WalletActivityDirection.internal => switch (activity.operation) {
+      WalletActivityOperation.bitcoinSelfTransfer => 'Transfer to self',
       WalletActivityOperation.bitcoinUtxoCreation => 'UTXO preparation',
       WalletActivityOperation.rgbAnchor => 'RGB anchor',
       _ => 'Wallet operation',
@@ -37,6 +38,7 @@ final class ActivityDisplayFormatter {
   String operationLabel(WalletActivityOperation operation) =>
       switch (operation) {
         WalletActivityOperation.bitcoinSend => 'Bitcoin send',
+        WalletActivityOperation.bitcoinSelfTransfer => 'Transfer to self',
         WalletActivityOperation.bitcoinReceive => 'Bitcoin receive',
         WalletActivityOperation.bitcoinDrain => 'Wallet drain',
         WalletActivityOperation.bitcoinUtxoCreation => 'UTXO preparation',

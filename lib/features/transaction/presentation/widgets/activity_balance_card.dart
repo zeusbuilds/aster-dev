@@ -5,7 +5,7 @@ import '../../../wallet/domain/models/models.dart';
 import '../../../wallet/presentation/widgets/widgets.dart';
 import '../formatting/formatting.dart';
 
-/// Real total and available balance for the selected Activity asset.
+/// Real total balance for the selected Activity asset.
 class ActivityBalanceCard extends StatelessWidget {
   const ActivityBalanceCard({
     super.key,
@@ -23,12 +23,9 @@ class ActivityBalanceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final total = formatter.totalBalanceText(balance, bitcoinUnit);
-    final available = formatter.availableBalanceText(balance, bitcoinUnit);
     final title = formatter.assetTitle(balance.asset.kind);
     return Semantics(
-      label: valuesVisible
-          ? '$title total $total, available $available'
-          : '$title balance hidden',
+      label: valuesVisible ? '$title total $total' : '$title balance hidden',
       excludeSemantics: true,
       child: Squircle(
         color: context.appColors.surfaceRaised,
@@ -44,13 +41,6 @@ class ActivityBalanceCard extends StatelessWidget {
                   AmountText(
                     valuesVisible ? total : '••••',
                     style: context.type.amountInline,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  SizedBox(height: context.spacing.xs),
-                  AmountText(
-                    valuesVisible ? 'Available $available' : 'Balance hidden',
-                    style: context.type.rowMeta,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),

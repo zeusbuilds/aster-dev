@@ -18,9 +18,14 @@ class SendFlowViewModel extends _$SendFlowViewModel {
   static const _amountCodec = WalletAmountInputCodec();
 
   late WalletPaymentTarget _target;
+  // Riverpod can rebuild a retained notifier while a read is still pending.
+  // Only reads from the current build may publish back into the form.
+  var _generation = 0;
 
   @override
   Future<SendFlowState> build(WalletPaymentTarget target) {
+    _generation += 1;
+    ref.onDispose(() => _generation += 1);
     _target = target;
     return _load();
   }
@@ -152,10 +157,34 @@ class SendFlowViewModel extends _$SendFlowViewModel {
     );
   }
 
-  /// Refreshes the selected rail's available balance.
-  Future<bool> refreshBalance() async {
+  /// Fills the available asset amount exactly, without estimating a fee.
+  /// Bitcoin on-chain fees still require BTC in addition to this amount.
+  void useMaxAmount() {
     final current = state.value;
-    if (current == null ||
+    if (current == null || !current.canChangeAmount || current.amountIsLocked) {
+      return;
+    }
+    var units = current.availableUnits;
+    if (current.route.target == WalletPaymentTarget.bitcoinLightning) {
+      units -= units % WalletAmount.millisatoshisPerSatoshi;
+    }
+    updateAmount(
+      _amountCodec.formatUnits(
+        units: units,
+        route: current.route,
+        bitcoinUnit: current.bitcoinUnit,
+      ),
+    );
+  }
+
+  /// Refreshes the selected rail's available balance.
+  /// [silent] suppresses feedback for screen-owned read recovery.
+  Future<bool> refreshBalance({bool silent = false}) async {
+    final generation = _generation;
+    final current = state.value;
+    if (state.isLoading ||
+        state.hasError ||
+        current == null ||
         !current.canStart(SendFlowOperation.refreshingBalance)) {
       return false;
     }
@@ -168,7 +197,7 @@ class SendFlowViewModel extends _$SendFlowViewModel {
     final result = await _walletOperation(
       (repository) => repository.balance(current.route.asset.kind),
     );
-    if (!ref.mounted) return result is AppSuccess<WalletBalance>;
+    if (!ref.mounted || generation != _generation) return false;
     return switch (result) {
       AppSuccess<WalletBalance>(:final value) => () {
         state = AsyncData(
@@ -178,26 +207,33 @@ class SendFlowViewModel extends _$SendFlowViewModel {
             retainedFailure: null,
           ),
         );
-        unawaited(
-          ref
-              .read(hapticFeedbackServiceProvider)
-              .trigger(HapticIntent.lightImpact),
-        );
+        if (!silent) {
+          unawaited(
+            ref
+                .read(hapticFeedbackServiceProvider)
+                .trigger(HapticIntent.lightImpact),
+          );
+        }
         return true;
       }(),
       AppFailureResult<WalletBalance>(:final failure) => _fail(
         current,
         failure,
         failedOperation: SendFlowOperation.refreshingBalance,
-        emitErrorHaptic: true,
+        emitErrorHaptic: !silent,
       ),
     };
   }
 
   /// Refreshes the displayed quote without submitting or retrying a payment.
-  Future<bool> refreshFee() async {
+  /// [silent] suppresses feedback for screen-owned read recovery.
+  Future<bool> refreshFee({bool silent = false}) async {
+    final generation = _generation;
     final current = state.value;
-    if (current == null || !current.canRefreshFee) {
+    if (state.isLoading ||
+        state.hasError ||
+        current == null ||
+        !current.canRefreshFee) {
       return false;
     }
     state = AsyncData(
@@ -210,7 +246,7 @@ class SendFlowViewModel extends _$SendFlowViewModel {
     final result = await _walletOperation(
       (repository) => repository.estimateFeeRate(),
     );
-    if (!ref.mounted) return result is AppSuccess<WalletFeeRateEstimate>;
+    if (!ref.mounted || generation != _generation) return false;
     return switch (result) {
       AppSuccess<WalletFeeRateEstimate>(:final value) => () {
         state = AsyncData(
@@ -221,11 +257,13 @@ class SendFlowViewModel extends _$SendFlowViewModel {
             retainedFailure: null,
           ),
         );
-        unawaited(
-          ref
-              .read(hapticFeedbackServiceProvider)
-              .trigger(HapticIntent.lightImpact),
-        );
+        if (!silent) {
+          unawaited(
+            ref
+                .read(hapticFeedbackServiceProvider)
+                .trigger(HapticIntent.lightImpact),
+          );
+        }
         return true;
       }(),
       AppFailureResult<WalletFeeRateEstimate>(:final failure) => () {
@@ -236,9 +274,11 @@ class SendFlowViewModel extends _$SendFlowViewModel {
             operation: null,
           ),
         );
-        unawaited(
-          ref.read(hapticFeedbackServiceProvider).trigger(HapticIntent.error),
-        );
+        if (!silent) {
+          unawaited(
+            ref.read(hapticFeedbackServiceProvider).trigger(HapticIntent.error),
+          );
+        }
         return false;
       }(),
     };
@@ -251,6 +291,29 @@ class SendFlowViewModel extends _$SendFlowViewModel {
       return false;
     }
     final now = ref.read(utcClockProvider)();
+    // A normal BTC send pays its network fee in addition to the recipient
+    // amount. Reject the full available balance before creating any durable
+    // dispatch marker; RGB token balances do not pay this fee themselves.
+    if (current.hasValidatedDestination &&
+        !current.isExpiredAt(now) &&
+        current.route.target == WalletPaymentTarget.bitcoinOnchain &&
+        current.amountInput.isValid &&
+        current.amountInput.units == current.availableUnits) {
+      final rejected = _fail(
+        current,
+        const AppFailure(
+          code: 'payment_amount_leaves_no_fee',
+          kind: AppFailureKind.validation,
+          userMessage: 'Leave some BTC for the network fee. Lower the amount and try again.',
+          retryable: false,
+        ),
+        failedOperation: SendFlowOperation.submitting,
+      );
+      unawaited(
+        ref.read(hapticFeedbackServiceProvider).trigger(HapticIntent.warning),
+      );
+      return rejected;
+    }
     if (!current.canSubmitAt(now)) {
       if (current.feeFailure != null) return false;
       final failure = _submissionFailure(current, now);

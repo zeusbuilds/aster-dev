@@ -21,6 +21,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../support/payment_flow_harness.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -153,6 +155,45 @@ void main() {
     expect(tester.getSemantics(loading).flagsCollection.isLiveRegion, isTrue);
     expect(find.bySemanticsLabel(RegExp('Currency,')), findsNothing);
   });
+
+  for (final screen in const [
+    CountrySelectionScreen(),
+    CurrencySelectionScreen(),
+    BitcoinUnitSelectionScreen(),
+  ]) {
+    testWidgets('${screen.runtimeType} scrolls through the bottom safe area', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(420, 932);
+      tester.view.padding = const FakeViewPadding(bottom: 34);
+      tester.view.viewPadding = const FakeViewPadding(bottom: 34);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetPadding);
+      addTearDown(tester.view.resetViewPadding);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            settingsViewModelProvider.overrideWith(
+              () => _StaticSettingsViewModel(_selectionState),
+            ),
+          ],
+          child: MaterialApp(theme: AppTheme.light(), home: screen),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final list = find.byType(ListView);
+      expect(tester.getBottomLeft(list).dy, 932);
+      final padding = tester
+          .widget<ListView>(list)
+          .padding!
+          .resolve(TextDirection.ltr);
+      expect(padding.bottom, 34 + tester.element(list).spacing.lg);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   for (final retryable in [true, false]) {
     for (final scenario in const [
@@ -450,7 +491,9 @@ void main() {
     );
   });
 
-  testWidgets('network refresh remains explicitly announced', (tester) async {
+  testWidgets('network refresh announces checking without failure prose', (
+    tester,
+  ) async {
     const configuration = WalletServiceConfiguration(
       environment: BlockchainEnvironment.regtest,
       sdkNetwork: 'regtest',
@@ -499,13 +542,13 @@ void main() {
     expect(retry.flagsCollection.isEnabled, ui.Tristate.isFalse);
     expect(
       tester
-          .getSemantics(
-            find.bySemanticsLabel('Node health is temporarily unavailable.'),
-          )
+          .getSemantics(find.bySemanticsLabel('Status, Checking'))
           .flagsCollection
           .isLiveRegion,
       isTrue,
     );
+    expect(find.text('Node health is temporarily unavailable.'), findsNothing);
+    expect(find.text('Details'), findsNothing);
     expect(find.text('Status'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.text('https://explorer.example.com/regtest'),
@@ -604,30 +647,84 @@ void main() {
     });
   }
 
-  testWidgets('terminal network health failure has no retry action', (
-    tester,
-  ) async {
-    const configuration = WalletServiceConfiguration(
-      environment: BlockchainEnvironment.regtest,
-      sdkNetwork: 'regtest',
-    );
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          networkConfigurationViewModelProvider.overrideWith(
-            () => _StaticNetworkConfigurationViewModel(
-              const NetworkConfigurationState(
-                configuration: configuration,
-                healthFailure: AppFailure(
-                  code: 'network_configuration_invalid',
-                  kind: AppFailureKind.configuration,
-                  userMessage: 'Network configuration is invalid.',
-                  retryable: false,
+  for (final retryable in [true, false]) {
+    testWidgets(
+      '${retryable ? 'retryable' : 'terminal'} health failure shows only unavailable status quietly',
+      (tester) async {
+        const configuration = WalletServiceConfiguration(
+          environment: BlockchainEnvironment.regtest,
+          sdkNetwork: 'regtest',
+        );
+        final failure = AppFailure(
+          code: retryable
+              ? 'node_temporarily_unavailable'
+              : 'network_configuration_invalid',
+          kind: retryable
+              ? AppFailureKind.unavailable
+              : AppFailureKind.configuration,
+          userMessage: retryable
+              ? 'Node health is temporarily unavailable.'
+              : 'Network configuration is invalid.',
+          retryable: retryable,
+        );
+        final toasts = _RecordingToasts();
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              networkConfigurationViewModelProvider.overrideWith(
+                () => _StaticNetworkConfigurationViewModel(
+                  NetworkConfigurationState(
+                    configuration: configuration,
+                    healthFailure: failure,
+                  ),
                 ),
+              ),
+            ],
+            child: MaterialApp(
+              theme: AppTheme.light(),
+              home: AsterFeedbackScope(
+                haptics: _RecordingHaptics(),
+                toasts: toasts,
+                child: const NetworkConfigurationScreen(),
               ),
             ),
           ),
-        ],
+        );
+        await tester.pumpAndSettle();
+        await tester.scrollUntilVisible(find.text('Unavailable'), 300);
+        await tester.pump();
+
+        expect(find.text('Unavailable'), findsOneWidget);
+        expect(find.text(failure.userMessage), findsNothing);
+        expect(find.text('Details'), findsNothing);
+        expect(find.text('Health check details'), findsNothing);
+        expect(find.byType(AlertDialog), findsNothing);
+        expect(
+          find.text('Retry health check'),
+          retryable ? findsOneWidget : findsNothing,
+        );
+        expect(toasts.messages, isEmpty);
+      },
+    );
+  }
+
+  testWidgets('failed explicit health check clears metrics and recovers', (
+    tester,
+  ) async {
+    final harness = await PaymentFlowTestHarness.create();
+    final gate = Completer<void>();
+    addTearDown(() async {
+      if (!gate.isCompleted) gate.complete();
+      await tester.pumpWidget(const SizedBox.shrink());
+      final disposal = harness.dispose();
+      for (var frame = 0; frame < 3; frame += 1) {
+        await tester.pump();
+      }
+      await disposal;
+    });
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: harness.container,
         child: MaterialApp(
           theme: AppTheme.light(),
           home: const NetworkConfigurationScreen(),
@@ -635,13 +732,123 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Refresh health'), 300);
+    expect(find.text('Responding'), findsOneWidget);
+    expect(find.text('Block height'), findsOneWidget);
+    expect(harness.container.read(toastControllerProvider).current, isNull);
 
-    final failure = find.text('Network configuration is invalid.');
-    await tester.scrollUntilVisible(failure, 300);
+    const failure = AppFailure(
+      code: 'node_temporarily_unavailable',
+      kind: AppFailureKind.unavailable,
+      userMessage: 'Node health is temporarily unavailable.',
+      retryable: true,
+    );
+    harness.engine.networkStatusError = const AppFailureException(failure);
+    harness.engine.networkStatusGate = gate;
+    await tester.tap(find.text('Refresh health'));
     await tester.pump();
-    expect(failure, findsOneWidget);
-    expect(find.text('Retry health check'), findsNothing);
+    await tester.pump();
+    expect(find.text('Checking'), findsOneWidget);
+    expect(find.text('Responding'), findsNothing);
+    expect(find.text('Block height'), findsNothing);
+    gate.complete();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Unavailable'), findsOneWidget);
+    expect(find.text('Responding'), findsNothing);
+    expect(find.text('Block height'), findsNothing);
+    expect(find.text('Channels'), findsNothing);
+    expect(find.text('Peers'), findsNothing);
+    expect(find.text(failure.userMessage), findsNothing);
+    final feedback = harness.container.read(toastControllerProvider);
+    expect(feedback.current?.title, 'Health check failed');
+    expect(feedback.current?.message, isNull);
+    expect(feedback.pending, isEmpty);
+
+    expect(find.text('Details'), findsNothing);
+    expect(find.text('Health check details'), findsNothing);
+    expect(find.byType(AlertDialog), findsNothing);
+
+    harness.engine.networkStatusError = null;
+    harness.engine.networkStatusGate = null;
+    await tester.tap(find.text('Retry health check'));
+    await tester.pumpAndSettle();
+    expect(find.text('Responding'), findsOneWidget);
+    expect(find.text('Block height'), findsOneWidget);
+    expect(find.text('Details'), findsNothing);
+    await tester.scrollUntilVisible(find.text('Refresh health'), 300);
+    expect(find.text('Refresh health'), findsOneWidget);
+    expect(
+      harness.container.read(toastControllerProvider).current?.id,
+      feedback.current?.id,
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  testWidgets(
+    'health failure hides old metrics at large text on narrow screen',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 700);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      const failure = AppFailure(
+        code: 'health_unavailable',
+        kind: AppFailureKind.unavailable,
+        userMessage: 'Node health is temporarily unavailable.',
+        retryable: true,
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            networkConfigurationViewModelProvider.overrideWith(
+              () => _StaticNetworkConfigurationViewModel(
+                NetworkConfigurationState(
+                  configuration: const WalletServiceConfiguration(
+                    environment: BlockchainEnvironment.regtest,
+                    sdkNetwork: 'regtest',
+                  ),
+                  status: WalletNetworkStatus(
+                    environment: BlockchainEnvironment.regtest,
+                    blockHeight: 42,
+                    nodePublicKey: _nodePublicKey,
+                    channelCount: 0,
+                    usableChannelCount: 0,
+                    peerCount: 0,
+                  ),
+                  healthFailure: failure,
+                ),
+              ),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context)
+                  .copyWith(textScaler: TextScaler.linear(2)),
+              child: child!,
+            ),
+            home: const NetworkConfigurationScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(find.text('Unavailable'), 300);
+      expect(find.text('Responding'), findsNothing);
+      expect(find.text('Block height'), findsNothing);
+      expect(find.text(failure.userMessage), findsNothing);
+      final status = tester.getSemantics(
+        find.bySemanticsLabel('Status, Unavailable'),
+      );
+      expect(status.flagsCollection.isLiveRegion, isTrue);
+      expect(find.bySemanticsLabel('Details'), findsNothing);
+      expect(find.text('Details'), findsNothing);
+      expect(find.text('Health check details'), findsNothing);
+      expect(find.byType(AlertDialog), findsNothing);
+      await tester.scrollUntilVisible(find.text('Retry health check'), 300);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('advanced disclosures are disabled without auth policy', (
     tester,
@@ -666,7 +873,7 @@ void main() {
     expect(haptics.intents, isEmpty);
   });
 
-  testWidgets('Settings owns one navigation command across preference rows', (
+  testWidgets('Settings owns one navigation command across settings rows', (
     tester,
   ) async {
     final haptics = _RecordingHaptics();
@@ -677,9 +884,9 @@ void main() {
           builder: (context, state) => const SettingsScreen(),
           routes: [
             GoRoute(
-              path: RoutePaths.currencySelection,
-              name: RouteNames.currencySelection,
-              builder: (context, state) => const Text('Currency destination'),
+              path: RoutePaths.advancedSettings,
+              name: RouteNames.advancedSettings,
+              builder: (context, state) => const Text('Advanced destination'),
             ),
             GoRoute(
               path: RoutePaths.bitcoinUnitSelection,
@@ -700,12 +907,23 @@ void main() {
     final unit = tester.widget<AsterOptionRow>(
       find.widgetWithText(AsterOptionRow, 'Bitcoin unit'),
     );
-    currency.onTap!();
+    final advanced = tester.widget<AsterOptionRow>(
+      find.widgetWithText(AsterOptionRow, 'Advanced'),
+    );
+    expect(find.widgetWithText(AsterOptionRow, 'Region'), findsNothing);
+    expect(currency.details, 'USD');
+    expect(currency.onTap, isNull);
+    final currencySemantics = tester
+        .getSemantics(find.widgetWithText(AsterOptionRow, 'Currency'))
+        .getSemanticsData();
+    expect(currencySemantics.flagsCollection.isEnabled, ui.Tristate.isFalse);
+    expect(currencySemantics.hasAction(ui.SemanticsAction.tap), isFalse);
     unit.onTap!();
+    advanced.onTap!();
     await tester.pumpAndSettle();
 
-    expect(find.text('Currency destination'), findsOneWidget);
-    expect(find.text('Unit destination'), findsNothing);
+    expect(find.text('Unit destination'), findsOneWidget);
+    expect(find.text('Advanced destination'), findsNothing);
     expect(haptics.intents, [HapticIntent.lightImpact]);
   });
 
@@ -771,19 +989,28 @@ void main() {
     expect(find.text(_walletProfile.displayId), findsOneWidget);
     expect(find.text('Main'), findsNothing);
     expect(find.text('Aster • Version 1.0.0'), findsNothing);
+    for (final label in [
+      'Contact Support',
+      'Twitter',
+      'Telegram',
+      'Instagram',
+      'Notifications',
+    ]) {
+      expect(find.text(label), findsNothing);
+    }
 
     await tester.scrollUntilVisible(
       find.byKey(const ValueKey('settings-version-label')),
       300,
     );
     expect(find.text('Aster • Version 2.3.4 (81)'), findsOneWidget);
+    expect(
+      tester.getCenter(find.byKey(const ValueKey('settings-version-label'))).dx,
+      closeTo(tester.getCenter(find.byType(SettingsScreen)).dx, 0.01),
+    );
     for (final key in [
-      'settings-link-contactSupport',
       'settings-link-termsOfService',
       'settings-link-privacyPolicy',
-      'settings-link-twitter',
-      'settings-link-telegram',
-      'settings-link-instagram',
     ]) {
       final semantics = tester.getSemantics(find.byKey(ValueKey(key)));
       expect(semantics.flagsCollection.isEnabled, ui.Tristate.isFalse);
@@ -872,7 +1099,7 @@ void main() {
       walletFuture: Future.value(WalletState(activeWallet: _walletProfile)),
       appRepository: _appRepository(),
       linkConfiguration: PublicLinkConfiguration(
-        contactSupport: Uri.parse('http://support.example.com'),
+        termsOfService: Uri.parse('http://legal.example.com/terms'),
       ),
     );
     await tester.pumpAndSettle();
@@ -882,10 +1109,10 @@ void main() {
 
     expect(failure, findsOneWidget);
     expect(find.text('Retry'), findsNothing);
-    final support = tester.getSemantics(
-      find.byKey(const ValueKey('settings-link-contactSupport')),
+    final terms = tester.getSemantics(
+      find.byKey(const ValueKey('settings-link-termsOfService')),
     );
-    expect(support.flagsCollection.isEnabled, ui.Tristate.isFalse);
+    expect(terms.flagsCollection.isEnabled, ui.Tristate.isFalse);
   });
 
   testWidgets('configured public link reports a bounded launch failure', (
@@ -903,7 +1130,7 @@ void main() {
     );
     final haptics = _RecordingHaptics();
     final toasts = _RecordingToasts();
-    final support = Uri.parse('https://support.example.com/help');
+    final terms = Uri.parse('https://legal.example.com/terms');
     await _pumpSettingsScreen(
       tester,
       walletFuture: Future.value(WalletState(activeWallet: _walletProfile)),
@@ -915,24 +1142,22 @@ void main() {
         ),
         externalUris,
       ),
-      linkConfiguration: PublicLinkConfiguration(contactSupport: support),
+      linkConfiguration: PublicLinkConfiguration(termsOfService: terms),
       haptics: haptics,
       toasts: toasts,
     );
     await tester.pumpAndSettle();
 
-    final supportRow = find.byKey(
-      const ValueKey('settings-link-contactSupport'),
-    );
-    await tester.scrollUntilVisible(supportRow, 250);
+    final termsRow = find.byKey(const ValueKey('settings-link-termsOfService'));
+    await tester.scrollUntilVisible(termsRow, 250);
     expect(
-      tester.getSemantics(supportRow).flagsCollection.isEnabled,
+      tester.getSemantics(termsRow).flagsCollection.isEnabled,
       ui.Tristate.isTrue,
     );
-    await tester.tap(supportRow);
+    await tester.tap(termsRow);
     await tester.pumpAndSettle();
 
-    expect(externalUris.opened, [support]);
+    expect(externalUris.opened, [terms]);
     expect(haptics.intents, [HapticIntent.error]);
     expect(toasts.messages, ['Link not opened']);
   });

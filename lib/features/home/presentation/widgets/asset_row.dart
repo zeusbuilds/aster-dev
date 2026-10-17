@@ -35,7 +35,7 @@ class AssetRow extends StatelessWidget {
       availableText: kind == WalletAssetKind.bitcoin
           ? '0.00000000 BTC'
           : '0.000000 USDT',
-      fiatContext: 'Fiat estimate',
+      fiatContext: _fiatPlaceholder,
       balancesVisible: true,
       loading: true,
     );
@@ -45,7 +45,6 @@ class AssetRow extends StatelessWidget {
     Key? key,
     required HomeAssetDisplay display,
     required bool balancesVisible,
-    bool fiatLoading = false,
     VoidCallback? onTap,
   }) {
     return AssetRow(
@@ -54,11 +53,11 @@ class AssetRow extends StatelessWidget {
       title: display.title,
       totalText: display.total.text,
       availableText: display.available.text,
-      fiatContext: display.fiatLabel ?? display.fiatContext,
+      fiatContext: display.fiatLabel ?? _fiatPlaceholder,
       fiatSemanticContext: display.fiatContext,
       denomination: display.total.unit,
       balancesVisible: balancesVisible,
-      fiatLoading: fiatLoading,
+      fiatLoading: !display.hasFiatEstimate,
       onTap: onTap,
     );
   }
@@ -75,6 +74,8 @@ class AssetRow extends StatelessWidget {
   final VoidCallback? onTap;
   final bool loading;
   final bool fiatLoading;
+
+  static const _fiatPlaceholder = '0.00';
 
   @override
   Widget build(BuildContext context) {
@@ -133,7 +134,11 @@ class AssetRow extends StatelessWidget {
                     AppSkeletonizer(
                       enabled: loading || (fiatLoading && !hidden),
                       child: _BalanceValue(
-                        value: hidden ? '••••' : fiatContext,
+                        value: hidden
+                            ? '••••'
+                            : loading || fiatLoading
+                            ? _fiatPlaceholder
+                            : fiatContext,
                         style: context.type.assetValue,
                         maxLines: 2,
                         textAlign: TextAlign.end,

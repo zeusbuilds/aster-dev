@@ -17,6 +17,8 @@ extension WalletAssetKindDisplay on WalletAssetKind {
 extension WalletPaymentTargetDisplay on WalletPaymentTarget {
   String get assetLabel => assetKind.displayName;
 
+  String get sendTitle => 'Send $assetLabel';
+
   String get railLabel => switch ((assetKind, rail)) {
     (WalletAssetKind.bitcoin, PaymentRail.onchain) => 'On-chain',
     (WalletAssetKind.bitcoin, PaymentRail.lightning) => 'Lightning',

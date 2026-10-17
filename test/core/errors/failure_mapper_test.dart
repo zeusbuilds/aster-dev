@@ -40,6 +40,88 @@ void main() {
     expect(rejected.context, isNull);
   });
 
+  test(
+    'native unlock conflict describes startup without inventing a cause',
+    () {
+      const secret = 'InvalidIndexer /private/wallet secret-token';
+      final failure = FailureMapper.from(
+        const ConflictError(secret, cause: _OperationCause('rlnUnlockNode')),
+        StackTrace.current,
+      );
+
+      expect(failure.code, 'wallet_unlock_conflict');
+      expect(failure.kind, AppFailureKind.conflict);
+      expect(failure.retryable, isTrue);
+      expect(failure.requiresReconciliation, isFalse);
+      expect(failure.outcomeUnknown, isFalse);
+      expect(
+        failure.userMessage,
+        'The wallet could not start. Check the wallet services and try again.',
+      );
+      expect(
+        failure.cause,
+        const FailureDiagnostic(
+          sourceType: 'ConflictError',
+          sourceCode: 'CONFLICT',
+          statusCode: 409,
+          context: 'rlnUnlockNode',
+        ),
+      );
+      expect(failure.userMessage, isNot(contains(secret)));
+      expect(failure.cause.toString(), isNot(contains(secret)));
+    },
+  );
+
+  test('other conflicts do not inherit native unlock wording', () {
+    for (final error in const [
+      ConflictError('rlnUnlockNode appears only in private message'),
+      ConflictError('private response', cause: _OperationCause('rlnLockNode')),
+      ConflictError(
+        'private response',
+        cause: _OperationCause('rlnCreateNode'),
+      ),
+      ConflictError(
+        'private response',
+        cause: _OperationCause('rlnUnlockNodeExtra'),
+      ),
+      ConflictError(
+        'private response',
+        cause: _OperationCause('rlnUnlockNode /private/wallet'),
+      ),
+      ConflictError(
+        'private response',
+        statusCode: 500,
+        cause: _OperationCause('rlnUnlockNode'),
+      ),
+    ]) {
+      final failure = FailureMapper.from(error, StackTrace.current);
+      expect(failure.code, 'wallet_conflict');
+      expect(failure.kind, AppFailureKind.conflict);
+      expect(
+        failure.userMessage,
+        'The wallet changed while this action was running. Try again.',
+      );
+      expect(failure.retryable, isTrue);
+      expect(failure.requiresReconciliation, isFalse);
+      expect(failure.outcomeUnknown, isFalse);
+    }
+  });
+
+  test('uncertain native unlock still prohibits retry', () {
+    final failure = FailureMapper.from(
+      const RlnOperationTimeoutException(
+        operation: 'rlnUnlockNode',
+        timeout: Duration(seconds: 30),
+      ),
+      StackTrace.current,
+    );
+    expect(failure.code, 'wallet_operation_outcome_unknown');
+    expect(failure.kind, AppFailureKind.timeout);
+    expect(failure.retryable, isFalse);
+    expect(failure.requiresReconciliation, isTrue);
+    expect(failure.outcomeUnknown, isTrue);
+  });
+
   test('retains redacted SDK metadata without retaining its message', () {
     const secret = 'seed invoice token must not leak';
     final failure = FailureMapper.from(

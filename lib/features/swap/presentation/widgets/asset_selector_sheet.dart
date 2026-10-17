@@ -43,6 +43,9 @@ class AssetSelectorSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final onchainCapabilities = capabilities
+        .where((capability) => capability.target.rail == PaymentRail.onchain)
+        .toList(growable: false);
     final maximumHeight =
         MediaQuery.sizeOf(context).height *
         context.metrics.sheetMaxHeightFactor;
@@ -58,7 +61,7 @@ class AssetSelectorSheet extends StatelessWidget {
         padding: EdgeInsets.zero,
         child: SafeArea(
           top: false,
-          minimum: EdgeInsets.only(bottom: context.spacing.lg),
+          bottom: false,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -66,9 +69,13 @@ class AssetSelectorSheet extends StatelessWidget {
               Flexible(
                 child: ListView.builder(
                   shrinkWrap: true,
-                  itemCount: capabilities.length,
+                  padding: EdgeInsets.only(
+                    bottom:
+                        context.windowInsets.bottomSafe + context.spacing.lg,
+                  ),
+                  itemCount: onchainCapabilities.length,
                   itemBuilder: (context, index) {
-                    final capability = capabilities[index];
+                    final capability = onchainCapabilities[index];
                     return _AssetTargetItem(
                       capability: capability,
                       selected: capability.target == selected,

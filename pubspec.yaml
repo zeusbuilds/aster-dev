@@ -101,6 +101,9 @@ flutter:
     - assets/data/currencies.json
     - assets/icons/tokens/btc.svg
     - assets/icons/tokens/usdt.svg
+    - assets/market/send.png
+    - assets/market/receive.png
+    - assets/market/swap.png
     - assets/texture/noise.jpg
     - assets/texture/shape.png
 

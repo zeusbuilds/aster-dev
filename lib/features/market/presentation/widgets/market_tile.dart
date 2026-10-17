@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../shared/shared.dart';
 
-const _marketTextureSourceDimension = 600;
+const _marketArtworkMaximumDecodeDimension = 600;
 
 /// Foreground polarity for the authored light or dark Market artwork.
 enum MarketContentTone { light, dark }
@@ -22,6 +22,9 @@ class MarketTile extends StatelessWidget {
 
   /// Visual identity for this action.
   final IconData icon;
+
+  /// Decorative artwork bundled for this action.
+  final String artworkAsset;
 
   /// Accepted action, or `null` when the capability is unavailable.
   final VoidCallback? onTap;
@@ -42,6 +45,7 @@ class MarketTile extends StatelessWidget {
     this.subtitle,
     this.tipText,
     required this.icon,
+    required this.artworkAsset,
     this.onTap,
     this.hapticIntent = HapticIntent.lightImpact,
     required this.gradient,
@@ -65,10 +69,10 @@ class MarketTile extends StatelessWidget {
     final capsuleBase = darkContent
         ? colors.onMarketTile
         : colors.marketDarkText;
-    final textureDecodeDimension =
+    final artworkDecodeDimension =
         (metrics.marketTextureSize * MediaQuery.devicePixelRatioOf(context))
             .ceil()
-            .clamp(1, _marketTextureSourceDimension);
+            .clamp(1, _marketArtworkMaximumDecodeDimension);
 
     void activate() {
       if (onTap == null) return;
@@ -98,7 +102,7 @@ class MarketTile extends StatelessWidget {
               children: [
                 Positioned(
                   top: -spacing.md,
-                  right: -spacing.xxxl,
+                  right: -spacing.xl,
                   child: Container(
                     decoration: BoxDecoration(
                       boxShadow: shadowColor != null
@@ -109,11 +113,11 @@ class MarketTile extends StatelessWidget {
                     ),
                     child: ExcludeSemantics(
                       child: Image.asset(
-                        'assets/texture/shape.png',
+                        artworkAsset,
                         width: metrics.marketTextureSize,
                         height: metrics.marketTextureSize,
-                        cacheWidth: textureDecodeDimension,
-                        cacheHeight: textureDecodeDimension,
+                        cacheWidth: artworkDecodeDimension,
+                        cacheHeight: artworkDecodeDimension,
                         filterQuality: FilterQuality.medium,
                       ),
                     ),
@@ -145,17 +149,17 @@ class MarketTile extends StatelessWidget {
                             if (tipText case final value?) ...[
                               SizedBox(height: spacing.xxl),
                               AsterPill(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: spacing.sm,
-                                  vertical: spacing.xs,
+                                padding: EdgeInsets.fromLTRB(
+                                  spacing.xs,
+                                  spacing.xs,
+                                  spacing.sm,
+                                  spacing.xs,
                                 ),
                                 color: capsuleBase.withValues(
                                   alpha: effects.marketPillSurfaceOpacity,
                                 ),
-                                child: Wrap(
-                                  spacing: spacing.sm,
-                                  runSpacing: spacing.xxs,
-                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Container(
                                       decoration: BoxDecoration(
@@ -166,11 +170,20 @@ class MarketTile extends StatelessWidget {
                                       ),
                                       width: metrics.marketBadgeDotSize,
                                       height: metrics.marketBadgeDotSize,
+                                      alignment: Alignment.center,
+                                      child: Icon(
+                                        icon,
+                                        size: context.icons.xxs,
+                                        color: colors.onMarketTile,
+                                      ),
                                     ),
-                                    Text(
-                                      value,
-                                      style: type.marketTip.copyWith(
-                                        color: foreground,
+                                    SizedBox(width: spacing.sm),
+                                    Flexible(
+                                      child: Text(
+                                        value,
+                                        style: type.marketTip.copyWith(
+                                          color: foreground,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -179,12 +192,6 @@ class MarketTile extends StatelessWidget {
                             ],
                           ],
                         ),
-                      ),
-                      SizedBox(width: spacing.md),
-                      Icon(
-                        icon,
-                        size: context.icons.lg,
-                        color: colors.onMarketTile,
                       ),
                     ],
                   ),

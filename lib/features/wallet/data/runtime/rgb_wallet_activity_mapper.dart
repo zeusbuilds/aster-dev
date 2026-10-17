@@ -48,11 +48,7 @@ final class RgbWalletActivityMapper {
         WalletActivityDirection.received,
         transaction.received,
       ),
-      'SendBtc' => (
-        WalletActivityOperation.bitcoinSend,
-        WalletActivityDirection.sent,
-        _externalBitcoinAmount(transaction),
-      ),
+      'SendBtc' => _bitcoinSendMovement(transaction),
       'Drain' => (
         WalletActivityOperation.bitcoinDrain,
         WalletActivityDirection.sent,
@@ -263,6 +259,34 @@ final class RgbWalletActivityMapper {
     final normalized = byId.values.toList(growable: false)
       ..sort(WalletActivityFeed.compareByRecency);
     return List<WalletActivity>.unmodifiable(normalized);
+  }
+
+  (WalletActivityOperation, WalletActivityDirection, int) _bitcoinSendMovement(
+    CoreTransaction transaction,
+  ) {
+    final externalAmount = _externalBitcoinAmount(transaction);
+    if (externalAmount > 0) {
+      return (
+        WalletActivityOperation.bitcoinSend,
+        WalletActivityDirection.sent,
+        externalAmount,
+      );
+    }
+    if (transaction.sent == 0 || transaction.received == 0) {
+      throw const NativeProtocolException(
+        'Native Bitcoin self-transfer has no wallet-owned value.',
+        field: 'CoreTransaction.sent',
+      );
+    }
+    // BDK received includes every wallet-owned output, including a recipient
+    // belonging to this wallet. Zero external value is a self-transfer, not an
+    // unknown outgoing amount. Its reviewed send amount comes from the exact
+    // accepted receipt; it cannot be inferred by choosing an output as change.
+    return (
+      WalletActivityOperation.bitcoinSelfTransfer,
+      WalletActivityDirection.internal,
+      0,
+    );
   }
 
   int _externalBitcoinAmount(CoreTransaction transaction) {

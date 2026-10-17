@@ -138,6 +138,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
             ),
             body: SafeArea(
               top: false,
+              bottom: false,
               child: RefreshIndicator(
                 onRefresh: refresh,
                 child: _ActivityBody(
@@ -345,7 +346,11 @@ class _ActivityBody extends StatelessWidget {
               },
             ),
           ),
-        SliverToBoxAdapter(child: SizedBox(height: context.spacing.xxl)),
+        SliverToBoxAdapter(
+          child: SizedBox(
+            height: context.spacing.xxl + context.windowInsets.bottomSafe,
+          ),
+        ),
       ],
     );
   }
@@ -375,7 +380,12 @@ class _ActivityFailureView extends ConsumerWidget {
         SliverFillRemaining(
           hasScrollBody: false,
           child: Padding(
-            padding: EdgeInsets.all(context.spacing.screenPadding),
+            padding: EdgeInsets.fromLTRB(
+              context.spacing.screenPadding,
+              context.spacing.screenPadding,
+              context.spacing.screenPadding,
+              context.spacing.screenPadding + context.windowInsets.bottomSafe,
+            ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -505,7 +515,11 @@ class _ActivityLoadingView extends StatelessWidget {
                 ),
               ),
             ),
-            SliverToBoxAdapter(child: SizedBox(height: context.spacing.xxl)),
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: context.spacing.xxl + context.windowInsets.bottomSafe,
+              ),
+            ),
           ],
         ),
       ),
@@ -533,13 +547,6 @@ class _ActivityBalanceLoading extends StatelessWidget {
                 AmountText(
                   '000 000 sats',
                   style: context.type.amountInline,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                SizedBox(height: context.spacing.xs),
-                AmountText(
-                  'Available 000 000 sats',
-                  style: context.type.rowMeta,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),

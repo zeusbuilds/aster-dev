@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../features/wallet/presentation/view_model/wallet_view_model.dart';
+import '../layout/layout.dart';
 import '../theme/theme.dart';
 import '../widgets/custom_app_bar.dart';
 import '../widgets/custom_button.dart';
@@ -50,9 +51,15 @@ class ErrorScreen extends StatelessWidget {
       appBar: const CustomAppBar(title: 'Page unavailable'),
       body: SafeArea(
         top: false,
+        bottom: false,
         child: Center(
           child: SingleChildScrollView(
-            padding: EdgeInsets.all(spacing.screenPadding),
+            padding: EdgeInsets.fromLTRB(
+              spacing.screenPadding,
+              spacing.screenPadding,
+              spacing.screenPadding,
+              spacing.screenPadding + context.windowInsets.bottomSafe,
+            ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [

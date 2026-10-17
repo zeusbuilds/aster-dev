@@ -16,6 +16,70 @@ import '../../support/wallet_fakes.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  for (final feeRead in [true, false]) {
+    test(
+      '${feeRead ? 'fee' : 'balance'} recovery rejects completion after provider rebuild',
+      () async {
+        final now = DateTime.utc(2026, 10, 16);
+        final engine = FakeWalletEngine()
+          ..feeEstimate = WalletFeeRateEstimate(
+            targetBlocks: 6,
+            satsPerVbyte: 2,
+            observedAt: now,
+          );
+        final harness = await PaymentFlowTestHarness.create(
+          engine: engine,
+          clock: () => now,
+        );
+        addTearDown(harness.dispose);
+        final provider = sendFlowViewModelProvider(
+          WalletPaymentTarget.bitcoinOnchain,
+        );
+        final subscription = harness.container.listen(provider, (_, _) {});
+        addTearDown(subscription.close);
+        await harness.container.read(provider.future);
+        final notifier = harness.container.read(provider.notifier);
+        notifier.updateDestination('mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn');
+        expect(await notifier.validateDestination(), isTrue);
+        final oldGate = Completer<void>();
+        if (feeRead) {
+          engine.feeEstimateGate = oldGate;
+          engine.feeEstimateStarted = Completer<void>();
+        } else {
+          engine.balanceGate = oldGate;
+        }
+        final oldRead = feeRead
+            ? notifier.refreshFee(silent: true)
+            : notifier.refreshBalance(silent: true);
+        if (feeRead) {
+          await engine.feeEstimateStarted!.future;
+        } else {
+          while (engine.calls.where((call) => call == 'balance').length < 2) {
+            await Future<void>.delayed(Duration.zero);
+          }
+        }
+        final newLoadGate = Completer<void>();
+        engine.feeEstimateGate = null;
+        engine.balanceGate = newLoadGate;
+        harness.container.invalidate(provider);
+        final next = harness.container.read(provider.future);
+        expect(harness.container.read(provider).isLoading, isTrue);
+        expect(await notifier.refreshFee(silent: true), isFalse);
+        expect(await notifier.refreshBalance(silent: true), isFalse);
+        oldGate.complete();
+        expect(await oldRead, isFalse);
+        expect(harness.container.read(provider).isLoading, isTrue);
+        newLoadGate.complete();
+        final loaded = await next;
+        expect(loaded.preview, isNull);
+        expect(loaded.destination, isEmpty);
+        expect(harness.container.read(provider).requireValue, same(loaded));
+        expect(harness.haptics.intents, isEmpty);
+        expect(engine.calls, isNot(contains('sendPayment:start')));
+      },
+    );
+  }
+
   test('retained failures reject dedicated clipboard and fee operations', () {
     const failure = AppFailure(
       code: 'operation_failed',
@@ -77,6 +141,11 @@ void main() {
       engine.sendPaymentGate = gate;
       final first = notifier.submit();
       expect(await notifier.submit(), isFalse);
+      notifier.useMaxAmount();
+      expect(
+        harness.container.read(provider).requireValue.amountInput.units,
+        100,
+      );
       expect(
         harness.container.read(provider).requireValue.operation,
         SendFlowOperation.submitting,
@@ -94,6 +163,150 @@ void main() {
       );
       await Future<void>.delayed(Duration.zero);
       expect(harness.haptics.intents, [HapticIntent.success]);
+    },
+  );
+
+  for (final (unit, expected) in [('btc', '0.09989234'), ('sats', '9989234')]) {
+    test('Max fills exact available Bitcoin in $unit display units', () async {
+      final engine = FakeWalletEngine()
+        ..balance = _balance(
+          onchainSpendable: 9989234,
+          lightningSpendable: 123000,
+        );
+      final harness = await PaymentFlowTestHarness.create(
+        engine: engine,
+        preferenceValues: {'aster.settings.v1.bitcoin_unit': unit},
+      );
+      addTearDown(harness.dispose);
+      final provider = sendFlowViewModelProvider(
+        WalletPaymentTarget.bitcoinOnchain,
+      );
+      final subscription = harness.container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      await harness.container.read(provider.future);
+      final notifier = harness.container.read(provider.notifier);
+      final callsBefore = List<String>.of(engine.calls);
+
+      notifier.useMaxAmount();
+
+      final filled = harness.container.read(provider).requireValue;
+      expect(filled.amountText, expected);
+      expect(filled.amountInput.units, 9989234);
+      expect(filled.amountInput.isValid, isTrue);
+      expect(engine.calls, callsBefore);
+    });
+  }
+
+  for (final useMax in [true, false]) {
+    test(
+      '${useMax ? 'Max' : 'Manually entered full balance'} warns before BTC dispatch and permits editing',
+      () async {
+        final now = DateTime.utc(2026, 10, 16);
+        final engine = FakeWalletEngine()
+          ..balance = _balance(onchainSpendable: 1000, lightningSpendable: 0)
+          ..feeEstimate = WalletFeeRateEstimate(
+            targetBlocks: 6,
+            satsPerVbyte: 2,
+            observedAt: now,
+          );
+        final harness = await PaymentFlowTestHarness.create(
+          engine: engine,
+          clock: () => now,
+        );
+        addTearDown(harness.dispose);
+        final provider = sendFlowViewModelProvider(
+          WalletPaymentTarget.bitcoinOnchain,
+        );
+        final subscription = harness.container.listen(provider, (_, _) {});
+        addTearDown(subscription.close);
+        await harness.container.read(provider.future);
+        final notifier = harness.container.read(provider.notifier);
+        notifier.updateDestination('mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn');
+        expect(await notifier.validateDestination(), isTrue);
+        if (useMax) {
+          notifier.useMaxAmount();
+        } else {
+          notifier.updateAmount('0.00001000');
+        }
+        final callsBefore = List<String>.of(engine.calls);
+
+        expect(await notifier.submit(), isFalse);
+
+        final rejected = harness.container.read(provider).requireValue;
+        expect(rejected.amountInput.units, 1000);
+        expect(rejected.failure?.code, 'payment_amount_leaves_no_fee');
+        expect(rejected.failure?.kind, AppFailureKind.validation);
+        expect(
+          rejected.failure?.userMessage,
+          'Leave some BTC for the network fee. Lower the amount and try again.',
+        );
+        expect(rejected.failure?.requiresReconciliation, isFalse);
+        expect(rejected.canChangeAmount, isTrue);
+        expect(engine.calls, callsBefore);
+        expect(
+          await harness.repository.paymentSubmissionStatus(),
+          isA<AppSuccess<WalletPaymentSubmission?>>().having(
+            (status) => status.value,
+            'journal entry',
+            isNull,
+          ),
+        );
+        await Future<void>.delayed(Duration.zero);
+        expect(harness.haptics.intents, [HapticIntent.warning]);
+
+        notifier.updateAmount('0.000001');
+        expect(harness.container.read(provider).requireValue.failure, isNull);
+        expect(await notifier.submit(), isTrue);
+        expect(engine.sentPaymentCommand?.amount.units, 100);
+        expect(
+          engine.calls.where((call) => call == 'sendPayment:start'),
+          hasLength(1),
+        );
+      },
+    );
+  }
+
+  test(
+    'Max preserves six-decimal USDT precision and permits all tokens',
+    () async {
+      final now = DateTime.utc(2026, 10, 16);
+      const available = 9007199254740993;
+      final engine = FakeWalletEngine()
+        ..balance = testRgbBalance(available)
+        ..feeEstimate = WalletFeeRateEstimate(
+          targetBlocks: 6,
+          satsPerVbyte: 2,
+          observedAt: now,
+        )
+        ..decodedInvoice = WalletPaymentPreview(
+          route: testRgbRoute,
+          encodedDestination: 'rgb:invoice',
+          displayDestination: 'rgb:invoice',
+        );
+      final harness = await PaymentFlowTestHarness.create(
+        engine: engine,
+        services: testRgbServices,
+        clock: () => now,
+      );
+      addTearDown(harness.dispose);
+      final provider = sendFlowViewModelProvider(
+        WalletPaymentTarget.usdtOnchain,
+      );
+      final subscription = harness.container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      await harness.container.read(provider.future);
+      final notifier = harness.container.read(provider.notifier);
+      notifier.updateDestination('rgb:invoice');
+      expect(await notifier.validateDestination(), isTrue);
+
+      notifier.useMaxAmount();
+
+      final filled = harness.container.read(provider).requireValue;
+      expect(filled.amountText, '9007199254.740993');
+      expect(filled.amountInput.units, available);
+      expect(await notifier.submit(), isTrue);
+      expect(engine.sentPaymentCommand?.amount.units, available);
+      expect(harness.container.read(provider).requireValue.failure, isNull);
     },
   );
 
@@ -140,6 +353,7 @@ void main() {
     expect(locked.amountIsLocked, isTrue);
     expect(locked.amountText, '0.001001');
     notifier.updateAmount('10');
+    notifier.useMaxAmount();
     expect(
       harness.container.read(provider).requireValue.amountText,
       locked.amountText,
@@ -361,6 +575,7 @@ void main() {
 
     notifier.updateDestination('mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfo');
     notifier.updateAmount('0.000002');
+    notifier.useMaxAmount();
     expect(await notifier.validateDestination(), isFalse);
     expect(await notifier.refreshBalance(), isFalse);
     expect(await notifier.refreshFee(), isFalse);
@@ -423,6 +638,7 @@ void main() {
 
     notifier.updateDestination('mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfo');
     notifier.updateAmount('0.000002');
+    notifier.useMaxAmount();
     expect(await notifier.validateDestination(), isFalse);
     expect(await notifier.refreshBalance(), isFalse);
     expect(await notifier.refreshFee(), isFalse);

@@ -166,7 +166,7 @@ class _SendAddressScreenState extends ConsumerState<SendAddressScreen> {
             child: Scaffold(
               backgroundColor: context.colorScheme.surface,
               appBar: CustomAppBar(
-                title: 'Send ${widget.target.assetLabel}',
+                title: widget.target.sendTitle,
                 leadingIcon: true,
                 centerTitle: false,
                 fallbackLocation: RoutePaths.send,
@@ -183,7 +183,7 @@ class _SendAddressScreenState extends ConsumerState<SendAddressScreen> {
               ),
               body: SafeArea(
                 top: false,
-                minimum: EdgeInsets.only(bottom: context.spacing.lg),
+                bottom: false,
                 child: Padding(
                   padding: EdgeInsets.symmetric(
                     horizontal: context.spacing.screenPadding,
@@ -248,6 +248,7 @@ final class _DestinationBody extends StatelessWidget {
         state.operation == SendFlowOperation.validatingDestination;
     final pasting = state.operation == SendFlowOperation.readingClipboard;
     return AsterFormBody(
+      bottomPadding: context.windowInsets.bottomSafe + context.spacing.lg,
       content: SendAddressCard(
         target: state.route.target,
         controller: controller,
@@ -290,6 +291,7 @@ final class _DestinationLoading extends StatelessWidget {
       label: 'Loading recipient form',
       excludeSemantics: true,
       child: AsterFormBody(
+        bottomPadding: context.windowInsets.bottomSafe + context.spacing.lg,
         content: SendAddressCard.loading(target: target),
         actions: const [CustomButton(text: 'Continue')],
       ),
@@ -305,24 +307,34 @@ final class _DestinationFailure extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Semantics(
-            liveRegion: true,
-            child: Text(
-              failure.userMessage,
-              style: context.type.statusMessage,
-              textAlign: TextAlign.center,
+    return CustomScrollView(
+      slivers: [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: context.windowInsets.bottomSafe + context.spacing.lg,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    failure.userMessage,
+                    style: context.type.statusMessage,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                if (failure.retryable) ...[
+                  SizedBox(height: context.spacing.lg),
+                  CustomButton(text: 'Retry', onTap: onRetry),
+                ],
+              ],
             ),
           ),
-          if (failure.retryable) ...[
-            SizedBox(height: context.spacing.lg),
-            CustomButton(text: 'Retry', onTap: onRetry),
-          ],
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

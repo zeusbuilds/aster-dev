@@ -167,7 +167,9 @@ final class WalletPaymentOperations {
       () => _runtime.readPaymentState((engine) async {
         // History reads sync the on-chain wallet. Its new confirmations can
         // precede the independent Lightning tip, so sample that tip last.
-        final activities = await engine.listActivity(asset);
+        final activities = await _submissions.reviewedHistory(
+          await engine.listActivity(asset),
+        );
         final balance = await engine.getBalance(asset);
         var networkStatus = await engine.getNetworkStatus();
         final originalStatus = networkStatus;

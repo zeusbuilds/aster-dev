@@ -27,7 +27,7 @@ class NetworkConfigurationViewModel extends _$NetworkConfigurationViewModel {
     return _load();
   }
 
-  /// Refreshes health while preserving the last confirmed status.
+  /// Refreshes health and discards a previous status if the check fails.
   Future<bool> refreshHealth() async {
     final current = state.value;
     if (current == null ||
@@ -46,11 +46,17 @@ class NetworkConfigurationViewModel extends _$NetworkConfigurationViewModel {
         refreshing: false,
       ),
       AppFailureResult(:final failure) => current.copyWith(
+        status: null,
         healthFailure: failure,
         refreshing: false,
       ),
     });
     final succeeded = result is AppSuccess<WalletNetworkStatus>;
+    if (!succeeded) {
+      ref
+          .read(toastControllerProvider.notifier)
+          .show(title: 'Health check failed', variant: ToastVariant.failure);
+    }
     unawaited(
       ref
           .read(hapticFeedbackServiceProvider)

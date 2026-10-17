@@ -159,6 +159,63 @@ void main() {
     expect(engine.calls, containsAllInOrder(['shutdown', 'openPersisted']));
   });
 
+  test('refresh cannot publish retained data or queue sync during a portfolio reload', () async {
+    final engine = FakeWalletEngine()..balance = _bitcoinBalance();
+    final harness = await PaymentFlowTestHarness.create(engine: engine);
+    final publications = <AsyncValue<HomeState>>[];
+    final subscription = harness.container.listen<AsyncValue<HomeState>>(
+      homeViewModelProvider,
+      (previous, next) => publications.add(next),
+    );
+    final balanceGate = Completer<void>();
+    addTearDown(() async {
+      if (!balanceGate.isCompleted) balanceGate.complete();
+      subscription.close();
+      await harness.dispose();
+    });
+    final initial = await harness.container.read(homeViewModelProvider.future);
+    final newerBalance = _bitcoinBalance(additionalConfirmedSatoshis: 10000000);
+    engine
+      ..balance = newerBalance
+      ..balanceGate = balanceGate;
+
+    harness.container.invalidate(homeViewModelProvider);
+    await _waitFor(
+      () =>
+          harness.container.read(homeViewModelProvider).isLoading &&
+          engine.calls.where((call) => call == 'balance').length == 2,
+    );
+    final reloading = harness.container.read(homeViewModelProvider);
+    expect(reloading.value, same(initial));
+    publications.clear();
+    final callsBeforeRefresh = List<String>.of(engine.calls);
+    bool? refreshResult;
+    final refresh = harness.container
+        .read(homeViewModelProvider.notifier)
+        .refresh()
+        .then((result) {
+          refreshResult = result;
+          return result;
+        });
+
+    await _waitFor(() => refreshResult != null);
+
+    expect(refreshResult, isFalse);
+    expect(harness.container.read(homeViewModelProvider), same(reloading));
+    expect(publications, isEmpty);
+    expect(engine.calls, callsBeforeRefresh);
+
+    balanceGate.complete();
+    final rebuilt = await harness.container.read(homeViewModelProvider.future);
+    expect(await refresh, isFalse);
+    expect(rebuilt.portfolio.bitcoin, newerBalance);
+    expect(rebuilt.portfolio, isNot(initial.portfolio));
+    expect(rebuilt.refreshing, isFalse);
+    expect(rebuilt.refreshFailure, isNull);
+    expect(engine.calls.where((call) => call == 'balance'), hasLength(2));
+    expect(engine.calls.where((call) => call == 'sync'), isEmpty);
+  });
+
   test('stale refresh cannot overwrite a newer provider generation', () async {
     final engine = FakeWalletEngine();
     final harness = await PaymentFlowTestHarness.create(engine: engine);
@@ -208,18 +265,111 @@ void main() {
     expect(rebuilt.refreshFailure, isNull);
     expect(rebuilt.refreshing, isFalse);
   });
+
+  test(
+    'stale refresh cannot publish after the active wallet identity changes',
+    () async {
+      final engine = FakeWalletEngine()..balance = _bitcoinBalance();
+      final harness = await PaymentFlowTestHarness.create(engine: engine);
+      final publications = <AsyncValue<HomeState>>[];
+      final subscription = harness.container.listen<AsyncValue<HomeState>>(
+        homeViewModelProvider,
+        (previous, next) => publications.add(next),
+      );
+      final syncGate = Completer<void>();
+      final balanceGate = Completer<void>();
+      addTearDown(() async {
+        if (!syncGate.isCompleted) syncGate.complete();
+        if (!balanceGate.isCompleted) balanceGate.complete();
+        subscription.close();
+        await harness.dispose();
+      });
+      final initial = await harness.container.read(
+        homeViewModelProvider.future,
+      );
+      final originalWallet = harness.container
+          .read(walletViewModelProvider)
+          .requireValue
+          .activeWallet!;
+      engine.syncGate = syncGate;
+      final oldRefresh = harness.container
+          .read(homeViewModelProvider.notifier)
+          .refresh();
+      await _waitFor(
+        () => engine.calls.where((call) => call == 'sync').length == 1,
+      );
+
+      final nextWallet = WalletProfile(
+        id: '22222222222222222222222222222222',
+        name: 'Next',
+        createdAt: originalWallet.createdAt,
+        updatedAt: originalWallet.updatedAt,
+        environment: originalWallet.environment,
+        state: WalletProfileState.ready,
+        storageToken: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      );
+      engine.balanceGate = balanceGate;
+      // The registry emission owns this test's wallet change. The fake engine
+      // supplies both snapshots; a native wallet switch is outside this scope.
+      harness.container
+          .read(walletViewModelProvider.notifier)
+          .adoptCommittedRegistry(
+            WalletRegistry(
+              profiles: [originalWallet, nextWallet],
+              activeWalletId: nextWallet.id,
+            ),
+          );
+      await _waitFor(
+        () => harness.container.read(homeViewModelProvider).isLoading,
+      );
+      final reloading = harness.container.read(homeViewModelProvider);
+      publications.clear();
+
+      engine.syncError = StateError('stale wallet refresh failure');
+      syncGate.complete();
+      expect(await oldRefresh, isFalse);
+      await _waitFor(
+        () => engine.calls.where((call) => call == 'balance').length == 2,
+      );
+
+      expect(
+        harness.container
+            .read(walletViewModelProvider)
+            .requireValue
+            .activeWallet,
+        nextWallet,
+      );
+      expect(harness.container.read(homeViewModelProvider), same(reloading));
+      expect(publications, isEmpty);
+      final nextBalance = _bitcoinBalance(
+        additionalConfirmedSatoshis: 10000000,
+      );
+      engine.balance = nextBalance;
+      balanceGate.complete();
+
+      final rebuilt = await harness.container.read(
+        homeViewModelProvider.future,
+      );
+      expect(rebuilt.portfolio.bitcoin, nextBalance);
+      expect(rebuilt.portfolio, isNot(initial.portfolio));
+      expect(rebuilt.refreshFailure, isNull);
+      expect(rebuilt.refreshing, isFalse);
+      expect(engine.calls.where((call) => call == 'balance'), hasLength(2));
+      expect(engine.calls.where((call) => call == 'sync'), hasLength(1));
+    },
+  );
 }
 
-WalletBalance _bitcoinBalance() {
+WalletBalance _bitcoinBalance({int additionalConfirmedSatoshis = 0}) {
   WalletAmount onchain(int units) =>
       WalletAmount.onchain(assetId: WalletAsset.bitcoin.id, units: units);
   WalletAmount lightning(int units) =>
       WalletAmount.lightning(assetId: WalletAsset.bitcoin.id, units: units);
   return WalletBalance(
     asset: WalletAsset.bitcoin,
-    onchainSettled: onchain(2000),
-    onchainFuture: onchain(2100),
-    onchainSpendable: onchain(1500),
+    onchainSettled: onchain(2000 + additionalConfirmedSatoshis),
+    onchainFuture: onchain(2100 + additionalConfirmedSatoshis),
+    onchainSpendable: onchain(1500 + additionalConfirmedSatoshis),
     onchainLocked: onchain(600),
     lightningOwned: lightning(1500),
     lightningSpendable: lightning(1000),

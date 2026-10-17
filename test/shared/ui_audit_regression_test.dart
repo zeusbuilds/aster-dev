@@ -64,6 +64,7 @@ void main() {
       MarketTile(
         label: 'Receive',
         icon: Icons.south_west,
+        artworkAsset: 'assets/market/receive.png',
         gradient: AsterGradients.light.marketReceive,
         hapticIntent: null,
         onTap: () => calls++,
@@ -115,6 +116,7 @@ void main() {
       MarketTile(
         label: 'Unavailable',
         icon: Icons.block,
+        artworkAsset: 'assets/market/send.png',
         gradient: AsterGradients.light.marketSend,
       ),
     );
@@ -447,6 +449,7 @@ void main() {
               subtitle: 'Bitcoin or USDT',
               tipText: 'On-chain or Lightning',
               icon: Icons.call_made,
+              artworkAsset: 'assets/market/${label.toLowerCase()}.png',
               gradient: gradient,
               contentTone: tone,
               hapticIntent: null,

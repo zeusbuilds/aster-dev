@@ -44,15 +44,20 @@ class _NetworkConfigurationContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final spacing = context.spacing;
     final configuration = state.configuration;
-    final status = state.status;
+    // Only a successful, completed check may present live node metrics.
+    final status = state.healthFailure == null && !state.refreshing
+        ? state.status
+        : null;
+    final healthFailure = state.healthFailure;
     return SafeArea(
       top: false,
+      bottom: false,
       child: ListView(
         padding: EdgeInsets.fromLTRB(
           spacing.screenPadding,
           spacing.lg,
           spacing.screenPadding,
-          spacing.xxl,
+          spacing.xxl + context.windowInsets.bottomSafe,
         ),
         children: [
           _ConfigurationGroup(
@@ -94,8 +99,13 @@ class _NetworkConfigurationContent extends ConsumerWidget {
             children: [
               _ConfigurationRow(
                 label: 'Status',
-                value: status == null ? 'Unavailable' : 'Responding',
+                value: state.refreshing
+                    ? 'Checking'
+                    : status == null
+                    ? 'Unavailable'
+                    : 'Responding',
                 valueColor: context.appColors.statusForeground,
+                announce: true,
               ),
               if (status != null) ...[
                 _ConfigurationRow(
@@ -113,16 +123,9 @@ class _NetworkConfigurationContent extends ConsumerWidget {
               ],
             ],
           ),
-          if (state.healthFailure != null) ...[
-            SizedBox(height: spacing.lg),
-            AsterStatusMessage(
-              state.healthFailure!.userMessage,
-              tone: AsterStatusTone.danger,
-              announce: true,
-              textAlign: TextAlign.start,
-            ),
-          ],
-          if (status != null || state.healthFailure?.retryable == true) ...[
+          if (state.refreshing ||
+              healthFailure?.retryable == true ||
+              (healthFailure == null && status != null)) ...[
             SizedBox(height: spacing.md),
             CustomButton(
               text: state.healthFailure == null
@@ -179,20 +182,23 @@ class _ConfigurationRow extends StatelessWidget {
     required this.label,
     required this.value,
     this.valueColor,
+    this.announce = false,
   });
 
   final String label;
   final String value;
   final Color? valueColor;
+  final bool announce;
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      container: true,
-      label: '$label, $value',
-      excludeSemantics: true,
-      child: Padding(
-        padding: EdgeInsets.symmetric(vertical: context.spacing.md),
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: context.spacing.md),
+      child: Semantics(
+        container: true,
+        label: '$label, $value',
+        liveRegion: announce,
+        excludeSemantics: true,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

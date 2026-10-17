@@ -50,7 +50,13 @@ class BitcoinUnitSelectionScreen extends ConsumerWidget {
                     children: [
                       SafeArea(
                         top: false,
+                        bottom: false,
                         child: ListView.separated(
+                          padding: EdgeInsets.only(
+                            bottom:
+                                context.windowInsets.bottomSafe +
+                                context.spacing.lg,
+                          ),
                           itemCount: BitcoinUnit.values.length,
                           separatorBuilder: (context, index) =>
                               const AsterDivider.inset(),

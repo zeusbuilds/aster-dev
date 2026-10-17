@@ -2131,6 +2131,80 @@ void main() {
     },
   );
 
+  test(
+    'distinguishes a Bitcoin self transfer from an external payment',
+    () async {
+      final wallet = MockUtexoWallet();
+      when(() => wallet.listTransactions()).thenAnswer(
+        (_) async => const <CoreTransaction>[
+          CoreTransaction(
+            txid: 'self-transfer-fixture',
+            transactionType: 'SendBtc',
+            received: 9999845,
+            sent: 10000000,
+            fee: 155,
+            confirmationTime: CoreBlockTime(height: 100, timestamp: 1000),
+          ),
+          CoreTransaction(
+            txid: 'external-payment-fixture',
+            transactionType: 'SendBtc',
+            received: 4999845,
+            sent: 10000000,
+            fee: 155,
+          ),
+        ],
+      );
+      when(() => wallet.listPayments()).thenAnswer((_) async => []);
+      final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
+
+      final activities = await engine.listActivity(WalletAsset.bitcoin);
+      final self = activities.singleWhere(
+        (activity) => activity.txid == 'self-transfer-fixture',
+      );
+      expect(self.operation, WalletActivityOperation.bitcoinSelfTransfer);
+      expect(self.direction, WalletActivityDirection.internal);
+      expect(self.amount, isNull);
+      expect(self.fee?.units, 155);
+      expect(self.status, WalletActivityStatus.succeeded);
+      expect(self.confirmationHeight, 100);
+      final external = activities.singleWhere(
+        (activity) => activity.txid == 'external-payment-fixture',
+      );
+      expect(external.operation, WalletActivityOperation.bitcoinSend);
+      expect(external.direction, WalletActivityDirection.sent);
+      expect(external.amount?.units, 5000000);
+      expect(external.fee?.units, 155);
+      expect(external.status, WalletActivityStatus.pending);
+    },
+  );
+
+  for (final (name, received, sent, fee) in [
+    ('all zero', 0, 0, 0),
+    ('fee only without owned outputs', 0, 155, 155),
+    ('outputs exceed inputs after fee', 9999846, 10000000, 155),
+  ]) {
+    test('rejects inconsistent SendBtc accounting: $name', () async {
+      final wallet = MockUtexoWallet();
+      when(() => wallet.listTransactions()).thenAnswer(
+        (_) async => <CoreTransaction>[
+          CoreTransaction(
+            txid: 'invalid-self-transfer-fixture',
+            transactionType: 'SendBtc',
+            received: received,
+            sent: sent,
+            fee: fee,
+          ),
+        ],
+      );
+      when(() => wallet.listPayments()).thenAnswer((_) async => []);
+      final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
+      await expectLater(
+        engine.listActivity(WalletAsset.bitcoin),
+        throwsA(isA<NativeProtocolException>()),
+      );
+    });
+  }
+
   test('normalizes configured RGB onchain and Lightning activity', () async {
     final wallet = MockUtexoWallet();
     final asset = WalletAsset.rgbUsdt(assetId: 'rgb-usdt', precision: 6);

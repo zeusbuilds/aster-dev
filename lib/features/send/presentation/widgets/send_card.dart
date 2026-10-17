@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../../../shared/shared.dart';
 import '../../../wallet/domain/models/models.dart';
 import '../../../wallet/presentation/formatting/formatting.dart';
-import '../../../wallet/presentation/models/models.dart';
 import '../../../wallet/presentation/widgets/widgets.dart';
 
 /// Exact amount, quote, and available-balance surface for Send.
@@ -15,8 +14,7 @@ class SendCard extends StatelessWidget {
     required FormattedWalletAmount available,
     required String fiatText,
     required this.amountLocked,
-    this.validationMessage,
-    this.announceValidation = false,
+    this.onMax,
   }) : _content = _SendCardContent(
          route: route,
          amountText: amountText,
@@ -28,14 +26,12 @@ class SendCard extends StatelessWidget {
   /// Inert content skeleton with the same responsive geometry as the card.
   const SendCard.loading({super.key, required WalletPaymentTarget target})
     : amountLocked = false,
-      validationMessage = null,
-      announceValidation = false,
+      onMax = null,
       _content = null,
       _loadingTarget = target;
 
   final bool amountLocked;
-  final String? validationMessage;
-  final bool announceValidation;
+  final VoidCallback? onMax;
   final _SendCardContent? _content;
   final WalletPaymentTarget? _loadingTarget;
 
@@ -89,62 +85,24 @@ class SendCard extends StatelessWidget {
               ),
             ],
           ),
-          if (validationMessage case final message?) ...[
-            SizedBox(height: context.spacing.sm),
-            AsterStatusMessage(
-              message,
-              tone: AsterStatusTone.danger,
-              announce: announceValidation,
-              textAlign: TextAlign.start,
-            ),
-          ],
         ],
       ),
-      footer: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      footer: Row(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  target.railLabel,
-                  style: context.type.rowTitleStrong,
-                ),
-              ),
-              if (amountLocked) ...[
-                AsterPill(
-                  color: context.colorScheme.primaryContainer,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: context.spacing.md,
-                    vertical: context.spacing.xs,
-                  ),
-                  child: Text(
-                    'Invoice amount',
-                    style: context.type.badgeLabel.copyWith(
-                      color: context.colorScheme.primary,
-                    ),
-                  ),
-                ),
-                SizedBox(width: context.spacing.sm),
-              ],
-              const CustomButton.compact(
-                text: 'Max',
-                variant: ButtonVariant.neutral,
-                enabled: false,
-              ),
-            ],
-          ),
-          if (content != null) ...[
-            SizedBox(height: context.spacing.sm),
-            Text(
-              amountLocked
-                  ? 'Max unavailable: fixed invoice amount.'
-                  : 'Max unavailable: fee-aware quote needed.',
-              style: context.type.rowMeta.copyWith(
-                color: context.appColors.textSecondary,
-              ),
+          Expanded(
+            child: Text(
+              target.rail == PaymentRail.onchain ? 'On-chain' : 'Lightning',
+              style: context.type.rowTitleStrong,
             ),
-          ],
+          ),
+          SizedBox(width: context.spacing.sm),
+          CustomButton.compact(
+            text: 'Max',
+            variant: ButtonVariant.tonal,
+            enabled: !amountLocked && onMax != null,
+            hapticIntent: null,
+            onTap: onMax,
+          ),
         ],
       ),
     );

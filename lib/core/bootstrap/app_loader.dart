@@ -206,9 +206,15 @@ class _BootstrapFailureView extends StatelessWidget {
       child: Material(
         color: surface,
         child: SafeArea(
+          bottom: false,
           child: Center(
             child: SingleChildScrollView(
-              padding: EdgeInsets.all(themedSpacing.screenPadding),
+              padding: EdgeInsets.fromLTRB(
+                themedSpacing.screenPadding,
+                themedSpacing.screenPadding,
+                themedSpacing.screenPadding,
+                themedSpacing.screenPadding + context.windowInsets.bottomSafe,
+              ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [

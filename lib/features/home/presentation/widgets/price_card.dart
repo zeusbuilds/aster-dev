@@ -50,7 +50,6 @@ class _PriceCardState extends ConsumerState<PriceCard> {
     _expiryTimer = Timer(remaining + const Duration(milliseconds: 1), () {
       if (!mounted) return;
       setState(() {});
-      unawaited(ref.read(bitcoinMarketViewModelProvider.notifier).retry());
     });
   }
 

@@ -41,26 +41,29 @@ class SettingsVersionFooter extends StatelessWidget {
       liveRegion: failure != null,
       label: loading ? 'Loading app version' : null,
       excludeSemantics: loading,
-      child: Column(
-        children: [
-          AppSkeletonizer(
-            enabled: loading,
-            child: NumericText(
-              loading ? '${AppConstants.appName} • Version loading' : version,
-              key: const ValueKey('settings-version-label'),
-              style: context.type.versionLabel,
-              textAlign: TextAlign.center,
+      child: SizedBox(
+        width: double.infinity,
+        child: Column(
+          children: [
+            AppSkeletonizer(
+              enabled: loading,
+              child: NumericText(
+                loading ? '${AppConstants.appName} • Version loading' : version,
+                key: const ValueKey('settings-version-label'),
+                style: context.type.versionLabel,
+                textAlign: TextAlign.center,
+              ),
             ),
-          ),
-          if (!loading && failure?.retryable == true) ...[
-            SizedBox(height: context.spacing.sm),
-            CustomButton.compact(
-              text: 'Retry version',
-              variant: ButtonVariant.secondary,
-              onTap: onRetry,
-            ),
+            if (!loading && failure?.retryable == true) ...[
+              SizedBox(height: context.spacing.sm),
+              CustomButton.compact(
+                text: 'Retry version',
+                variant: ButtonVariant.secondary,
+                onTap: onRetry,
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

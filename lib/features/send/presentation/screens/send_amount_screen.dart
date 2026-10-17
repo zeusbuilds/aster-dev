@@ -12,6 +12,7 @@ import '../../../market/presentation/view_model/view_models.dart';
 import '../../../wallet/domain/models/models.dart';
 import '../../../wallet/presentation/formatting/formatting.dart';
 import '../../../wallet/presentation/models/models.dart';
+import '../../../wallet/presentation/view_model/view_models.dart';
 import '../models/models.dart';
 import '../view_model/view_models.dart';
 import '../widgets/widgets.dart';
@@ -29,7 +30,22 @@ class SendAmountScreen extends ConsumerStatefulWidget {
 class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
     with WidgetsBindingObserver {
   Timer? _deadlineTimer;
+  Timer? _readRecoveryTimer;
+  Timer? _minimumSubmitTimer;
+  Completer<void>? _minimumSubmitDelay;
   late DateTime _now;
+  AsterNavigationCommandOwner? _navigation;
+  String? _walletId;
+  var _hasDependencies = false;
+  var _readRecoveryInFlight = false;
+  var _feeRecoveryAttempts = 0;
+  var _balanceRecoveryAttempts = 0;
+  var _presentingSubmission = false;
+  var _feedbackScheduled = false;
+  final _announcedFailures = <(String, String, DateTime?)>{};
+  static const _maximumReadRecoveryAttempts = 3;
+  static const _readRecoveryDelay = Duration(seconds: 2);
+  static const _minimumSubmitLoadingDuration = Duration(seconds: 2);
 
   @override
   void initState() {
@@ -51,17 +67,42 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
           _scheduleDeadline(ref.read(flowProvider).value, next.value?.snapshot),
       fireImmediately: true,
     );
+    ref.listenManual(
+      walletLifecycleViewModelProvider,
+      (_, _) => _scheduleReadRecovery(),
+    );
+    ref.listenManual(
+      walletViewModelProvider,
+      (_, _) => _scheduleReadRecovery(),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _hasDependencies = true;
+    ModalRoute.isCurrentOf(context);
+    TickerMode.valuesOf(context);
+    _scheduleReadRecovery();
+    _schedulePresentationFeedback();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _deadlineTimer?.cancel();
+    _readRecoveryTimer?.cancel();
+    _minimumSubmitTimer?.cancel();
+    final minimumSubmitDelay = _minimumSubmitDelay;
+    if (minimumSubmitDelay != null && !minimumSubmitDelay.isCompleted) {
+      minimumSubmitDelay.complete();
+    }
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _scheduleReadRecovery();
     if (state != AppLifecycleState.resumed) return;
     setState(() => _now = ref.read(utcClockProvider)());
     _scheduleDeadline(
@@ -76,7 +117,9 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
     // Provider state can arrive after one of its own deadlines. Keep the
     // render clock synchronized even when there is no future timer to arm.
     _now = now;
-    if (state == null) return;
+    _scheduleReadRecovery();
+    _schedulePresentationFeedback();
+    if (state == null || state.result != null) return;
     final deadlines = <DateTime>[];
     final expiry = state.preview?.expiresAt;
     if (expiry != null) {
@@ -109,33 +152,245 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
     });
   }
 
+  bool get _canRecoverReads {
+    if (!mounted ||
+        !_hasDependencies ||
+        !(ModalRoute.of(context)?.isCurrent ?? true) ||
+        !TickerMode.valuesOf(context).enabled ||
+        (_navigation?.inFlight ?? false) ||
+        (WidgetsBinding.instance.lifecycleState != null &&
+            WidgetsBinding.instance.lifecycleState !=
+                AppLifecycleState.resumed) ||
+        ref.read(walletLifecycleViewModelProvider).blocksInteraction) {
+      return false;
+    }
+    final wallet = ref.read(walletViewModelProvider);
+    if (wallet.isLoading ||
+        wallet.hasError ||
+        wallet.value?.switchingWalletId != null) {
+      return false;
+    }
+    final activeId = wallet.value?.activeWallet?.id;
+    _walletId ??= activeId;
+    return activeId != null && activeId == _walletId;
+  }
+
+  SendFlowOperation? _readRecoveryOperation(SendFlowState state) {
+    if (state.preview == null ||
+        state.isBusy ||
+        state.result != null ||
+        state.isExpiredAt(ref.read(utcClockProvider)())) {
+      return null;
+    }
+    if (state.failureFor(SendFlowOperation.refreshingBalance) != null &&
+        state.canStart(SendFlowOperation.refreshingBalance) &&
+        _balanceRecoveryAttempts < _maximumReadRecoveryAttempts) {
+      return SendFlowOperation.refreshingBalance;
+    }
+    if (state.canRefreshFee &&
+        (state.feeEstimate == null ||
+            state.feeEstimate!.isStaleAt(ref.read(utcClockProvider)())) &&
+        _feeRecoveryAttempts < _maximumReadRecoveryAttempts) {
+      return SendFlowOperation.refreshingFee;
+    }
+    return null;
+  }
+
+  void _scheduleReadRecovery() {
+    if (!mounted || !_hasDependencies) return;
+    final flow = ref.read(sendFlowViewModelProvider(widget.target));
+    final state = flow.value;
+    if (state != null && !state.isBusy) {
+      if (state.failureFor(SendFlowOperation.refreshingBalance) == null) {
+        _balanceRecoveryAttempts = 0;
+      }
+      if (state.feeEstimate?.isStaleAt(ref.read(utcClockProvider)()) == false) {
+        _feeRecoveryAttempts = 0;
+      }
+    }
+    if (!_canRecoverReads ||
+        flow.isLoading ||
+        flow.hasError ||
+        state == null ||
+        _readRecoveryInFlight ||
+        _readRecoveryOperation(state) == null) {
+      _readRecoveryTimer?.cancel();
+      _readRecoveryTimer = null;
+      return;
+    }
+    // Retry read-only prerequisites, never the payment. Keep failures bounded
+    // and preserve the ViewModel's terminal/outcome and fee-review guards.
+    _readRecoveryTimer ??= Timer(_readRecoveryDelay, () {
+      _readRecoveryTimer = null;
+      unawaited(_recoverReads());
+    });
+  }
+
+  Future<void> _recoverReads() async {
+    if (!_canRecoverReads || _readRecoveryInFlight) return;
+    final provider = sendFlowViewModelProvider(widget.target);
+    final flow = ref.read(provider);
+    final state = flow.value;
+    if (flow.isLoading || flow.hasError || state == null) return;
+    final operation = _readRecoveryOperation(state);
+    if (operation == null) return;
+    _readRecoveryInFlight = true;
+    try {
+      final notifier = ref.read(provider.notifier);
+      if (operation == SendFlowOperation.refreshingFee) {
+        _feeRecoveryAttempts += 1;
+        await notifier.refreshFee(silent: true);
+      } else {
+        _balanceRecoveryAttempts += 1;
+        await notifier.refreshBalance(silent: true);
+      }
+    } finally {
+      _readRecoveryInFlight = false;
+      if (mounted) {
+        _scheduleReadRecovery();
+        _schedulePresentationFeedback();
+      }
+    }
+  }
+
+  bool get _canPresentFeedback =>
+      mounted &&
+      _hasDependencies &&
+      (ModalRoute.of(context)?.isCurrent ?? true) &&
+      TickerMode.valuesOf(context).enabled &&
+      (WidgetsBinding.instance.lifecycleState == null ||
+          WidgetsBinding.instance.lifecycleState ==
+              AppLifecycleState.resumed) &&
+      !ref.read(walletLifecycleViewModelProvider).blocksInteraction;
+
+  void _schedulePresentationFeedback() {
+    if (!mounted || !_hasDependencies || _feedbackScheduled) return;
+    _feedbackScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _feedbackScheduled = false;
+      if (!_canPresentFeedback || _presentingSubmission) return;
+      final state = ref.read(sendFlowViewModelProvider(widget.target)).value;
+      if (state == null || state.result != null) return;
+      final retained = state.retainedFailure;
+      if (retained != null) {
+        final recoveryExhausted =
+            _balanceRecoveryAttempts >= _maximumReadRecoveryAttempts;
+        if (retained.operation != SendFlowOperation.refreshingBalance ||
+            !retained.failure.retryable ||
+            (!_readRecoveryInFlight && recoveryExhausted)) {
+          _showFailureFeedback(
+            retained.failure,
+            readOperation:
+                retained.operation == SendFlowOperation.refreshingBalance
+                ? retained.operation
+                : null,
+          );
+        }
+      }
+      final feeFailure = state.feeFailure;
+      if (feeFailure != null &&
+          (!feeFailure.retryable ||
+              (!_readRecoveryInFlight &&
+                  _feeRecoveryAttempts >= _maximumReadRecoveryAttempts))) {
+        _showFailureFeedback(
+          feeFailure,
+          readOperation: SendFlowOperation.refreshingFee,
+        );
+      }
+      if (!state.requiresReconciliation &&
+          state.isExpiredAt(ref.read(utcClockProvider)())) {
+        _showFailureFeedback(
+          const AppFailure(
+            code: 'payment_request_expired',
+            kind: AppFailureKind.validation,
+            userMessage: 'This payment request has expired.',
+            retryable: false,
+          ),
+        );
+      }
+    });
+  }
+
+  void _showFailureFeedback(
+    AppFailure failure, {
+    SendFlowOperation? readOperation,
+    bool userInitiated = false,
+  }) {
+    if (!_canPresentFeedback) return;
+    final preview = ref
+        .read(sendFlowViewModelProvider(widget.target))
+        .value
+        ?.preview;
+    final key = (
+      failure.code,
+      failure.userMessage,
+      failure.code == 'payment_request_expired' ? preview?.expiresAt : null,
+    );
+    if (!_announcedFailures.add(key) && !userInitiated) return;
+    final feeReview =
+        failure.code == walletFeeReviewChangedFailure.code ||
+        failure.code == walletFeeReviewRequiredFailure.code ||
+        failure.code == 'payment_fee_refresh_required';
+    final warning =
+        failure.requiresReconciliation ||
+        failure.kind == AppFailureKind.validation ||
+        feeReview ||
+        readOperation != null;
+    final title = failure.requiresReconciliation
+        ? 'Check payment status'
+        : failure.code == 'payment_request_expired'
+        ? 'Request expired'
+        : feeReview
+        ? 'Review network fee'
+        : readOperation == SendFlowOperation.refreshingBalance
+        ? 'Balance unavailable'
+        : readOperation == SendFlowOperation.refreshingFee
+        ? 'Network fee unavailable'
+        : failure.kind == AppFailureKind.validation
+        ? 'Check amount'
+        : 'Unable to send';
+    context.toasts.show(
+      title: title,
+      message: failure.userMessage,
+      variant: warning ? ToastVariant.warning : ToastVariant.failure,
+    );
+  }
+
   Future<void> _submit(AsterNavigationCommandOwner navigation) async {
     final provider = sendFlowViewModelProvider(widget.target);
-    var submitted = false;
-    final accepted = await navigation.run(
+    await navigation.run(
       command: () async {
-        submitted = await ref.read(provider.notifier).submit();
-        if (!mounted || submitted) return;
-        final failure = ref.read(provider).value?.failure;
-        if (failure != null && failure.kind != AppFailureKind.validation) {
-          context.toasts.show(
-            title: 'Payment not submitted',
-            message: failure.userMessage,
-            variant: ToastVariant.failure,
-          );
+        setState(() => _presentingSubmission = true);
+        final minimumDelay = Completer<void>();
+        _minimumSubmitDelay = minimumDelay;
+        _minimumSubmitTimer = Timer(
+          _minimumSubmitLoadingDuration,
+          minimumDelay.complete,
+        );
+        try {
+          // Submit immediately. Only the accepted receipt's presentation waits
+          // for the minimum interval; slower payments incur no extra delay.
+          final submitted = await ref.read(provider.notifier).submit();
+          if (submitted) await minimumDelay.future;
+          if (!mounted || submitted) return;
+          final state = ref.read(provider).value;
+          final failure = state?.failure ?? state?.feeFailure;
+          if (failure != null) {
+            _showFailureFeedback(failure, userInitiated: true);
+          }
+        } finally {
+          _minimumSubmitTimer?.cancel();
+          _minimumSubmitTimer = null;
+          _minimumSubmitDelay = null;
+          if (!minimumDelay.isCompleted) minimumDelay.complete();
+          if (mounted) setState(() => _presentingSubmission = false);
         }
       },
       failureTitle: 'Payment could not be submitted',
       hapticIntent: null,
       blocksRoutePop: true,
     );
-    if (!accepted || !submitted || !mounted) return;
-    context.toasts.show(
-      title: 'Payment submitted',
-      message: 'The wallet accepted the payment.',
-      variant: ToastVariant.success,
-    );
-    context.go(RoutePaths.home);
+    _scheduleReadRecovery();
   }
 
   @override
@@ -152,6 +407,28 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
       child: Builder(
         builder: (context) {
           final navigation = AsterNavigationScope.of(context);
+          _navigation = navigation;
+          if (flow case AsyncData<SendFlowState>(:final value)
+              when value.result != null && !_presentingSubmission) {
+            return PopScope(
+              canPop: false,
+              child: Scaffold(
+                backgroundColor: context.colorScheme.surface,
+                body: SendSuccessView(
+                  result: value.result!,
+                  bitcoinUnit: value.bitcoinUnit,
+                  continuing: navigation.inFlight,
+                  onContinue: () => unawaited(
+                    navigation.run(
+                      command: () => context.go(RoutePaths.home),
+                      failureTitle: 'Home could not open',
+                      hapticIntent: null,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }
           final submissionOwnsRoute =
               durableSubmissionOwnsRoute || navigation.inFlight;
           return PopScope(
@@ -159,7 +436,7 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
             child: Scaffold(
               backgroundColor: context.colorScheme.surface,
               appBar: CustomAppBar(
-                title: 'Send ${widget.target.assetLabel}',
+                title: widget.target.sendTitle,
                 leadingIcon: true,
                 leadingEnabled: !submissionOwnsRoute,
                 centerTitle: false,
@@ -167,7 +444,7 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
               ),
               body: SafeArea(
                 top: false,
-                minimum: EdgeInsets.only(bottom: context.spacing.lg),
+                bottom: false,
                 child: Padding(
                   padding: EdgeInsets.symmetric(
                     horizontal: context.spacing.screenPadding,
@@ -195,22 +472,11 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
                             state: state,
                             now: _now,
                             market: market,
+                            presentingSubmission: _presentingSubmission,
                             onAmountChanged: ref
                                 .read(provider.notifier)
                                 .updateAmount,
-                            onRefreshBalance: () => unawaited(
-                              ref.read(provider.notifier).refreshBalance(),
-                            ),
-                            onRefreshFee: () => unawaited(
-                              ref.read(provider.notifier).refreshFee(),
-                            ),
-                            onRetryQuote: _marketRetryable(state, market, _now)
-                                ? () => ref
-                                      .read(
-                                        bitcoinMarketViewModelProvider.notifier,
-                                      )
-                                      .retry()
-                                : null,
+                            onMax: ref.read(provider.notifier).useMaxAmount,
                             onSubmit: () => unawaited(_submit(navigation)),
                           ),
                     loading: () => _AmountLoading(target: widget.target),
@@ -229,34 +495,6 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
       ),
     );
   }
-
-  static bool _marketRetryable(
-    SendFlowState state,
-    AsyncValue<BitcoinMarketState> market,
-    DateTime now,
-  ) {
-    final presentation = market.value;
-    if (presentation?.refreshing ?? false) return false;
-    if (presentation?.refreshFailure case final failure?) {
-      return failure.retryable;
-    }
-    if (market.isLoading) return false;
-    if (market case AsyncError(:final error, :final stackTrace)) {
-      final failure = error is AppFailureException
-          ? error.failure
-          : FailureMapper.from(error, stackTrace);
-      return failure.retryable;
-    }
-    final snapshot = presentation?.snapshot;
-    if (snapshot == null || snapshot.quoteCurrency.code != state.currencyCode) {
-      return true;
-    }
-    final price = switch (state.route.asset.kind) {
-      WalletAssetKind.bitcoin => snapshot.currentBitcoinPrice,
-      WalletAssetKind.usdt => snapshot.currentUsdtPrice,
-    };
-    return !(price?.isCurrentAt(now) ?? false);
-  }
 }
 
 final class _AmountBody extends StatelessWidget {
@@ -264,20 +502,18 @@ final class _AmountBody extends StatelessWidget {
     required this.state,
     required this.now,
     required this.market,
+    required this.presentingSubmission,
     required this.onAmountChanged,
-    required this.onRefreshBalance,
-    required this.onRefreshFee,
-    required this.onRetryQuote,
+    required this.onMax,
     required this.onSubmit,
   });
 
   final SendFlowState state;
   final DateTime now;
   final AsyncValue<BitcoinMarketState> market;
+  final bool presentingSubmission;
   final ValueChanged<String> onAmountChanged;
-  final VoidCallback onRefreshBalance;
-  final VoidCallback onRefreshFee;
-  final VoidCallback? onRetryQuote;
+  final VoidCallback onMax;
   final VoidCallback onSubmit;
   final WalletAmountDisplayFormatter _amountFormatter =
       WalletAmountDisplayFormatter();
@@ -292,17 +528,13 @@ final class _AmountBody extends StatelessWidget {
     );
     final preview = state.preview!;
     final fiatText = _fiatText(state, market, now);
-    final inputMessage = _amountMessage(state, now);
     final fee = state.feeEstimate;
-    final feeStale = fee?.isStaleAt(now) ?? false;
-    final balanceFailure = state.failureFor(
-      SendFlowOperation.refreshingBalance,
-    );
-    final submissionFailure = state.failureFor(SendFlowOperation.submitting);
-    final submitting = state.operation == SendFlowOperation.submitting;
-    final canSubmit = state.canSubmitAt(now);
+    final submitting =
+        presentingSubmission || state.operation == SendFlowOperation.submitting;
+    final canSubmit = !presentingSubmission && state.canSubmitAt(now);
 
     return AsterFormBody(
+      bottomPadding: context.windowInsets.bottomSystem + context.spacing.lg,
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -312,9 +544,13 @@ final class _AmountBody extends StatelessWidget {
             available: available,
             fiatText: fiatText,
             amountLocked: state.amountIsLocked,
-            validationMessage: inputMessage,
-            announceValidation:
-                submissionFailure != null || state.isExpiredAt(now),
+            onMax:
+                !presentingSubmission &&
+                    state.canChangeAmount &&
+                    !state.amountIsLocked &&
+                    state.availableUnits > 0
+                ? onMax
+                : null,
           ),
           SizedBox(height: context.spacing.md),
           Padding(
@@ -323,6 +559,7 @@ final class _AmountBody extends StatelessWidget {
               vertical: context.spacing.sm,
             ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 DetailRow(
                   title: state.route.rail == PaymentRail.onchain
@@ -336,96 +573,38 @@ final class _AmountBody extends StatelessWidget {
                             : '${fee.satsPerVbyte} sats/vbyte'
                       : 'Lightning',
                 ),
+                SizedBox(height: context.spacing.sm),
+                Semantics(
+                  label: 'Address, ${preview.displayDestination}',
+                  excludeSemantics: true,
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(text: 'Address', style: context.type.rowMeta),
+                        WidgetSpan(
+                          alignment: PlaceholderAlignment.baseline,
+                          baseline: TextBaseline.alphabetic,
+                          child: SizedBox(width: context.spacing.lg),
+                        ),
+                        ...NumericTextSpans.build(
+                          context,
+                          // Display-only break opportunities keep long identifiers
+                          // beside the label. Semantics and payment state retain
+                          // the unmodified destination.
+                          preview.displayDestination.characters.join('\u200B'),
+                          context.type.rowValue,
+                        ),
+                      ],
+                    ),
+                    textAlign: TextAlign.start,
+                  ),
+                ),
                 if (preview.witnessBitcoinAmountSats != null) ...[
                   SizedBox(height: context.spacing.sm),
                   const DetailRow(
                     title: 'Recipient Bitcoin output',
                     value: '1,000 sats',
                   ),
-                  const AsterStatusMessage(
-                    'Sends 1,000 sats to recipient in addition to network fee. The final network fee is determined during construction.',
-                    tone: AsterStatusTone.warning,
-                  ),
-                ],
-                if (feeStale || state.feeFailure != null) ...[
-                  SizedBox(height: context.spacing.sm),
-                  AsterStatusMessage(
-                    state.feeFailure?.userMessage ??
-                        (fee?.source == WalletFeeRateSource.localRegtestPolicy
-                            ? 'Refresh the local test fee rate before sending.'
-                            : 'Refresh the network fee before sending.'),
-                    tone: AsterStatusTone.warning,
-                    announce: true,
-                  ),
-                  if (state.feeFailure?.retryable != false) ...[
-                    SizedBox(height: context.spacing.sm),
-                    CustomButton.compact(
-                      text: 'Refresh fee',
-                      variant: ButtonVariant.tonal,
-                      loading:
-                          state.operation == SendFlowOperation.refreshingFee,
-                      enabled: state.canRefreshFee,
-                      hapticIntent: null,
-                      onTap: onRefreshFee,
-                    ),
-                  ],
-                ],
-                if (onRetryQuote case final retry?) ...[
-                  SizedBox(height: context.spacing.sm),
-                  CustomButton.compact(
-                    text: 'Retry fiat quote',
-                    variant: ButtonVariant.tonal,
-                    enabled: state.canEditPayment,
-                    hapticIntent: null,
-                    onTap: retry,
-                  ),
-                ],
-                SizedBox(height: context.spacing.sm),
-                if (balanceFailure case final failure?) ...[
-                  AsterStatusMessage(
-                    failure.userMessage,
-                    tone: AsterStatusTone.danger,
-                    announce: true,
-                  ),
-                  SizedBox(height: context.spacing.sm),
-                ],
-                CustomButton.compact(
-                  text: 'Refresh balance',
-                  variant: ButtonVariant.tonal,
-                  loading:
-                      state.operation == SendFlowOperation.refreshingBalance,
-                  enabled: state.canStart(SendFlowOperation.refreshingBalance),
-                  hapticIntent: null,
-                  onTap: onRefreshBalance,
-                ),
-              ],
-            ),
-          ),
-          SizedBox(height: context.spacing.md),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: context.spacing.xl),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Recipient', style: context.type.sectionLabel),
-                SizedBox(height: context.spacing.xs),
-                Text(
-                  preview.displayDestination,
-                  style: context.type.addressSmall,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (preview.recipientLabel case final label?) ...[
-                  SizedBox(height: context.spacing.md),
-                  Text('Payment label', style: context.type.sectionLabel),
-                  SizedBox(height: context.spacing.xs),
-                  Text(label, style: context.type.statusMessage),
-                ],
-                if (preview.message case final message?) ...[
-                  SizedBox(height: context.spacing.md),
-                  Text('Message', style: context.type.sectionLabel),
-                  SizedBox(height: context.spacing.xs),
-                  Text(message, style: context.type.statusMessage),
                 ],
               ],
             ),
@@ -462,18 +641,18 @@ final class _AmountBody extends StatelessWidget {
   ) {
     final units = state.amountInput.units;
     if (market.isLoading) {
-      return '${state.currencyCode} quote loading';
+      return '—';
     }
     final snapshot = market.value?.snapshot;
     if (snapshot == null || snapshot.quoteCurrency.code != state.currencyCode) {
-      return '${state.currencyCode} quote unavailable';
+      return '—';
     }
     final price = switch (state.route.asset.kind) {
       WalletAssetKind.bitcoin => snapshot.currentBitcoinPrice,
       WalletAssetKind.usdt => snapshot.currentUsdtPrice,
     };
     if (!(price?.isCurrentAt(now) ?? false)) {
-      return '${state.currencyCode} quote unavailable';
+      return '—';
     }
     if (units == null) {
       return WalletFiatEstimate.formatMinorUnits(
@@ -489,7 +668,7 @@ final class _AmountBody extends StatelessWidget {
       assetPriceMinorUnits: price?.minorUnits,
     );
     if (minorUnits == null) {
-      return '${state.currencyCode} quote unavailable';
+      return '—';
     }
     final value = WalletFiatEstimate.formatMinorUnits(
       minorUnits: minorUnits,
@@ -498,33 +677,6 @@ final class _AmountBody extends StatelessWidget {
       minorUnitDigits: snapshot.quoteCurrency.minorUnitDigits,
     );
     return '≈ $value';
-  }
-
-  static String? _amountMessage(SendFlowState state, DateTime now) {
-    if (state.failureFor(SendFlowOperation.submitting) case final failure?) {
-      return failure.userMessage;
-    }
-    if (state.isExpiredAt(now)) {
-      return 'This payment request has expired.';
-    }
-    if (!state.amountInput.isValid) {
-      return switch (state.amountInput.issue) {
-        WalletAmountInputIssue.empty => null,
-        WalletAmountInputIssue.malformed => 'Enter a valid decimal amount.',
-        WalletAmountInputIssue.precisionExceeded =>
-          'This amount has too many decimal places.',
-        WalletAmountInputIssue.zero => 'Amount must be greater than zero.',
-        WalletAmountInputIssue.outOfRange => 'This amount is too large.',
-        null => null,
-      };
-    }
-    if (!state.amountUsesSupportedGranularity) {
-      return 'Enter a whole-satoshi Lightning amount.';
-    }
-    if (!state.hasSufficientBalance) {
-      return 'The available balance is too low for this amount.';
-    }
-    return null;
   }
 }
 
@@ -536,9 +688,10 @@ final class _MissingDestination extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+    return AsterFormBody(
+      bottomPadding: context.windowInsets.bottomSystem + context.spacing.lg,
+      actions: const [],
+      content: Column(
         children: [
           Text(
             'Enter and validate a recipient before choosing an amount.',
@@ -566,6 +719,7 @@ final class _AmountLoading extends StatelessWidget {
       label: 'Loading payment amount',
       excludeSemantics: true,
       child: AsterFormBody(
+        bottomPadding: context.windowInsets.bottomSystem + context.spacing.lg,
         content: SendCard.loading(target: target),
         actions: [
           Padding(
@@ -588,9 +742,10 @@ final class _AmountFailure extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+    return AsterFormBody(
+      bottomPadding: context.windowInsets.bottomSystem + context.spacing.lg,
+      actions: const [],
+      content: Column(
         children: [
           Semantics(
             liveRegion: true,

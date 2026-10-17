@@ -288,6 +288,21 @@ abstract final class FailureMapper {
       );
     }
     if (error is ConflictError) {
+      // Native unlock also reports service/startup rejection as a conflict.
+      // Its stable operation context does not establish a profile change or
+      // a network failure; preserve conflict and retry/outcome semantics.
+      if (error.statusCode == 409 && error.operation == 'rlnUnlockNode') {
+        return _failure(
+          code: 'wallet_unlock_conflict',
+          kind: AppFailureKind.conflict,
+          message:
+              'The wallet could not start. Check the wallet services and try '
+              'again.',
+          retryable: true,
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }
       return _failure(
         code: 'wallet_conflict',
         kind: AppFailureKind.conflict,

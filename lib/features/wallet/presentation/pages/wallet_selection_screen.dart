@@ -54,8 +54,11 @@ class WalletSelectionScreen extends ConsumerWidget {
                     : () => _openAddWallet(context, navigation),
                 child: SafeArea(
                   top: false,
-                  minimum: EdgeInsets.only(bottom: spacing.lg),
+                  bottom: false,
                   child: ListView.separated(
+                    padding: EdgeInsets.only(
+                      bottom: spacing.lg + context.windowInsets.bottomSafe,
+                    ),
                     itemCount: data.wallets.length,
                     separatorBuilder: (context, index) =>
                         const AsterDivider.inset(),

@@ -29,7 +29,7 @@ class SendScreen extends ConsumerWidget {
           ),
           body: SafeArea(
             top: false,
-            minimum: EdgeInsets.only(bottom: context.spacing.lg),
+            bottom: false,
             child: Padding(
               padding: EdgeInsets.symmetric(
                 horizontal: context.spacing.screenPadding,

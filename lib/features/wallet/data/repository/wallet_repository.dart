@@ -27,6 +27,7 @@ final class WalletRepository implements WalletLifecycleRepository {
     DateTime Function()? clock,
     this.rgbSetupStore,
     this.paymentJournalStore,
+    this.paymentReceiptStore,
   }) : _clock = clock ?? _utcNow {
     _services.validate();
   }
@@ -40,9 +41,15 @@ final class WalletRepository implements WalletLifecycleRepository {
   final DateTime Function() _clock;
   final RgbWalletSetupStore? rgbSetupStore;
   final WalletPaymentJournalStore? paymentJournalStore;
+  final WalletPaymentReceiptStore? paymentReceiptStore;
   late final WalletPaymentSubmissions _submissions = WalletPaymentSubmissions(
     _runtime,
     paymentJournalStore,
+    receipts:
+        paymentReceiptStore ??
+        (paymentJournalStore is WalletPaymentReceiptStore
+            ? paymentJournalStore as WalletPaymentReceiptStore
+            : null),
     newId: _identityGenerator.newStorageToken,
     clock: _clock,
   );

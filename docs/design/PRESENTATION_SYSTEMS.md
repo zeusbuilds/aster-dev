@@ -66,9 +66,11 @@ truthful; historical mock quotes and obsolete assets are not a design contract.
 - `AsterOptionRow.amountDetails` measures mixed-font monetary spans before
   reflowing; `details` keeps ordinary labels and identifiers in DM Sans.
 - `statusForeground` is readable copy on light surfaces/status containers;
-  success/warning/danger remain accent roles. Market uses dark text on Send and
-  Receive artwork and light text on dark artwork, with opposite-polarity capsule
-  fills. Preserve the existing palette and gradients, not low-contrast text.
+  success/warning/danger remain accent roles. Market uses white text on all three tiles, including orange Send and blue
+  Receive, per the author's explicit October 16 correction. Preserve the existing
+  artwork colors and the component's corresponding capsule treatment. MARKET-015
+  records the measured contrast limitation; no contrast-pass claim applies to
+  the first two tiles.
 
 The original palette and bundled DM Sans/Public Sans families are unchanged.
 Do not substitute a different screen composition while normalizing tokens.
@@ -137,9 +139,28 @@ hidden tabs disable tickers, and navigation never waits for cosmetic delays.
 
 Use `SafeArea` for conventional roots. `context.windowInsets` distinguishes the
 current safe viewport, persistent hardware padding, and keyboard obstruction.
-Bottom overlays such as floating navigation use persistent bottom-system
-padding; forms and sheets let `SafeArea` and keyboard insets cooperate without
-double padding.
+Scrolling lists and details use `SafeArea(bottom: false)` and include the bottom
+safe inset in their content padding. Their viewport reaches the bottom of the
+screen; safe spacing appears only after the last item rather than as a fixed
+blank bar. Bottom overlays such as floating navigation use persistent
+bottom-system padding inside the scroll content. Send address and amount forms
+use the same full-height viewport, with safe spacing passed to AsterFormBody
+after its final action. The address viewport still resizes above the system
+keyboard, and amount entry retains its custom keypad. Other bottom-anchored
+forms keep their existing safe-area and keyboard protection without double
+padding.
+
+Home has no manual refresh command or pull-to-refresh gesture. Its top edge
+clamps overscroll and suppresses Android leading stretch while the bottom
+retains platform bounce. The visible,
+foreground Home refreshes wallet balances on return and every 30 seconds.
+Pull-to-refresh remains on Activity and Transaction details; details have no
+app-bar reload command.
+
+The initial phone release supports portrait-up only. Flutter requests this
+before the first frame; iOS metadata and Android activity metadata declare the
+same preference. Android 17 can override orientation requests on large displays
+([platform policy](https://developer.android.com/about/versions/17/changes/ff-restrictions-ignored)).
 
 ## Accessibility
 
@@ -157,13 +178,45 @@ tab wrapper types stable while changing their `excluding`/`ignoring` flags.
 Generated recovery words retain two visual columns, but their grouped numbered
 semantics explicitly traverse 1 through 12.
 
-Receive keeps asset/rail and real expiry visible. At expiry, including foreground
+Receive keeps asset/rail in its title and real expiry visible, without repeating
+the Bitcoin on-chain caption below the QR. At expiry, including foreground
 resume, remove the QR and stale encoded text; retain context and regeneration.
 Transaction details retain the record during explicit refresh and expose
 progress plus failure/retry in place.
+Activity summary cards show the total asset balance once, including their
+loading and accessibility presentations.
 
 Text must remain usable under platform text scaling. New fixed-height text
 containers require compact and large-phone widget tests before acceptance.
+
+Receive Share opens the platform sheet without changing tile labels, arrows or
+layout. The real busy state still prevents overlapping actions; cancellation is
+quiet and failures show feedback. Send recipient and amount titles identify the
+asset. The amount card footer shows the rail and Max; Max fills the
+exact available asset amount and stays disabled for fixed invoices or blocked
+flows. Address appears below fees as one flowing paragraph: a 16-pixel label gap,
+then the value, with continuation lines aligned to the row's leading edge. Validation, fee and payment
+feedback uses guarded toasts rather than prose inside or below the card. Full
+Bitcoin amounts that leave no room for fees are rejected before dispatch with a
+warning; full USDT amounts are allowed because network fees use BTC. Missing or stale read
+prerequisites recover silently with bounded attempts only on the same ready,
+visible wallet; a changed fee requires review and another deliberate Send.
+
+Final Send starts the real payment immediately and keeps its button loading for
+at least two seconds before presenting an accepted receipt. This presentation
+minimum runs alongside the payment; slower submissions add no artificial delay,
+and failures end loading promptly. The screen retains its duplicate-send and
+Back guards throughout the interval.
+
+Accepted Send renders a terminal confirmation on its existing route: a double-size
+token logo, exact accepted amount and Payment sent centered above a bottom Continue action.
+There is no success toast or automatic Home navigation. Continue returns Home;
+Back cannot reveal an already submitted form. Unknown or failed outcomes retain
+their failure/reconciliation surface instead.
+
+Bitcoin sends whose outputs all belong to the active wallet appear as Transfer
+to self, with an unsigned reviewed amount when exact accepted metadata exists.
+The network fee remains separate and the balance reflects the native owned coins.
 
 ## Shimmer
 
