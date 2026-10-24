@@ -6,6 +6,7 @@ import 'package:aster/features/send/presentation/view_model/view_models.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:aster/features/wallet/presentation/view_model/view_models.dart';
 import 'package:aster/shared/feedback/feedback.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rgb_sdk_flutter/rgb_sdk_flutter.dart';
@@ -15,6 +16,136 @@ import '../../support/wallet_fakes.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('late clipboard data cannot replace a different wallet form', () async {
+    final harness = await PaymentFlowTestHarness.create();
+    addTearDown(harness.dispose);
+    final provider = sendFlowViewModelProvider(
+      WalletPaymentTarget.bitcoinOnchain,
+    );
+    final subscription = harness.container.listen(provider, (_, _) {});
+    addTearDown(subscription.close);
+    await harness.container.read(provider.future);
+    harness.clipboard
+      ..text = 'old-wallet-recipient'
+      ..readGate = Completer<void>();
+    final pending = harness.container
+        .read(provider.notifier)
+        .pasteDestination();
+    final old = harness.container
+        .read(walletViewModelProvider)
+        .requireValue
+        .activeWallet!;
+    final next = WalletProfile(
+      id: '2' * 32,
+      name: 'Other',
+      createdAt: old.createdAt,
+      updatedAt: old.updatedAt,
+      environment: old.environment,
+      state: WalletProfileState.ready,
+      storageToken: 'b' * 32,
+    );
+    harness.container
+        .read(walletViewModelProvider.notifier)
+        .adoptCommittedRegistry(
+          WalletRegistry(profiles: [old, next], activeWalletId: next.id),
+        );
+    await harness.container.pump();
+    final rebuilt = await harness.container.read(provider.future);
+    harness.clipboard.readGate!.complete();
+    expect(await pending, isA<AppFailureResult<String>>());
+    expect(harness.container.read(provider).requireValue, same(rebuilt));
+    expect(rebuilt.walletId, next.id);
+    expect(rebuilt.destination, isEmpty);
+    expect(harness.haptics.intents, isEmpty);
+  });
+
+  test('a retained Send form discards the old wallet review when wallet identity changes', () async {
+    final harness = await PaymentFlowTestHarness.create();
+    addTearDown(harness.dispose);
+    final provider = sendFlowViewModelProvider(
+      WalletPaymentTarget.bitcoinOnchain,
+    );
+    final subscription = harness.container.listen(provider, (_, _) {});
+    addTearDown(subscription.close);
+    final initial = await harness.container.read(provider.future);
+    final notifier = harness.container.read(provider.notifier);
+    notifier.updateDestination('mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn');
+    expect(await notifier.validateDestination(), isTrue);
+    final old = harness.container
+        .read(walletViewModelProvider)
+        .requireValue
+        .activeWallet!;
+    final next = WalletProfile(
+      id: '2' * 32,
+      name: 'Other',
+      createdAt: old.createdAt,
+      updatedAt: old.updatedAt,
+      environment: old.environment,
+      state: WalletProfileState.ready,
+      storageToken: 'b' * 32,
+    );
+    harness.container
+        .read(walletViewModelProvider.notifier)
+        .adoptCommittedRegistry(
+          WalletRegistry(profiles: [old, next], activeWalletId: next.id),
+        );
+    await harness.container.pump();
+    final rebuilt = await harness.container.read(provider.future);
+    expect(initial.walletId, old.id);
+    expect(rebuilt.walletId, next.id);
+    expect(rebuilt.preview, isNull);
+    expect(rebuilt.destination, isEmpty);
+    expect(await notifier.submit(), isFalse);
+    expect(harness.engine.calls, isNot(contains('preparePaymentOperation')));
+  });
+
+  test('an accepted payment survives a form rebuild without publishing into the replacement form', () async {
+    final now = DateTime.utc(2026, 10, 24);
+    final engine = FakeWalletEngine()
+      ..balance = _balance(onchainSpendable: 1000, lightningSpendable: 0)
+      ..feeEstimate = WalletFeeRateEstimate(
+        targetBlocks: 6,
+        satsPerVbyte: 2,
+        observedAt: now,
+      );
+    final harness = await PaymentFlowTestHarness.create(
+      engine: engine,
+      clock: () => now,
+    );
+    addTearDown(harness.dispose);
+    final provider = sendFlowViewModelProvider(
+      WalletPaymentTarget.bitcoinOnchain,
+    );
+    final subscription = harness.container.listen(provider, (_, _) {});
+    addTearDown(subscription.close);
+    await harness.container.read(provider.future);
+    final notifier = harness.container.read(provider.notifier);
+    notifier.updateDestination('mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn');
+    expect(await notifier.validateDestination(), isTrue);
+    notifier.updateAmount('0.00000001');
+    engine.sendPaymentGate = Completer<void>();
+    final sending = notifier.submit();
+    for (
+      var turn = 0;
+      turn < 100 && !engine.calls.contains('sendPayment:start');
+      turn += 1
+    ) {
+      await Future<void>.delayed(Duration.zero);
+    }
+    expect(engine.calls, contains('sendPayment:start'));
+    harness.container.invalidate(provider);
+    final replacement = harness.container.read(provider.future);
+    engine.sendPaymentGate!.complete();
+    expect(await sending, isTrue);
+    expect((await replacement).result, isNull);
+    final receipt = await harness.repository.paymentSubmissionStatus();
+    expect(
+      (receipt as AppSuccess<WalletPaymentSubmission?>).value?.outcome,
+      WalletPaymentSubmissionOutcome.accepted,
+    );
+    expect(engine.paymentOperations.dispatchCount, 1);
+  });
 
   for (final feeRead in [true, false]) {
     test(
@@ -103,6 +234,302 @@ void main() {
       throwsArgumentError,
     );
   });
+
+  for (final target in [
+    WalletPaymentTarget.bitcoinOnchain,
+    WalletPaymentTarget.usdtOnchain,
+  ]) {
+    test(
+      'Continue prepares exactly one ${target.assetKind.name} balance and rejects overlap',
+      () async {
+        final rgb = target.assetKind == WalletAssetKind.usdt;
+        final destination = rgb
+            ? 'rgb:prepared-recipient'
+            : 'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn';
+        final engine = FakeWalletEngine()
+          ..balance = rgb
+              ? testRgbBalance(1000)
+              : _balance(onchainSpendable: 1000, lightningSpendable: 0);
+        final harness = await PaymentFlowTestHarness.create(
+          engine: engine,
+          services: testRgbServices,
+        );
+        addTearDown(harness.dispose);
+        final provider = sendFlowViewModelProvider(target);
+        final subscription = harness.container.listen(provider, (_, _) {});
+        addTearDown(subscription.close);
+        await harness.container.read(provider.future);
+        await harness.container.read(walletViewModelProvider.future);
+        final notifier = harness.container.read(provider.notifier);
+        notifier.updateDestination(destination);
+        expect(await notifier.validateDestination(), isTrue);
+        final validated = harness.container.read(provider).requireValue;
+        expect(validated.balancePreparedForDestination, isFalse);
+        expect(engine.calls.where((call) => call == 'balance'), hasLength(1));
+        engine.balance = rgb
+            ? testRgbBalance(2000)
+            : _balance(onchainSpendable: 2000, lightningSpendable: 0);
+        engine.balanceGate = Completer<void>();
+        final pending = notifier.prepareAmount();
+        await Future<void>.delayed(Duration.zero);
+        expect(
+          harness.container.read(provider).requireValue.operation,
+          SendFlowOperation.preparingAmount,
+        );
+        expect(await notifier.prepareAmount(), isFalse);
+        expect(await notifier.validateDestination(), isFalse);
+        notifier.updateDestination('different recipient');
+        expect(
+          harness.container.read(provider).requireValue.destination,
+          destination,
+        );
+        expect(engine.calls.where((call) => call == 'balance'), hasLength(2));
+        engine.balanceGate!.complete();
+        expect(await pending, isTrue);
+        final prepared = harness.container.read(provider).requireValue;
+        expect(prepared.preview, validated.preview);
+        expect(prepared.destination, destination);
+        expect(prepared.availableUnits, 2000);
+        expect(prepared.balancePreparedForDestination, isTrue);
+        expect(prepared.operation, isNull);
+        expect(engine.requestedBalanceAsset?.kind, target.assetKind);
+        expect(
+          prepared.copyWith(preview: null).balancePreparedForDestination,
+          isFalse,
+        );
+        expect(
+          prepared.copyWith(balancePreparedForDestination: false),
+          isNot(prepared),
+        );
+        expect(engine.calls, isNot(contains('sendPayment:start')));
+        expect(await notifier.validateDestination(), isTrue);
+        expect(
+          harness.container
+              .read(provider)
+              .requireValue
+              .balancePreparedForDestination,
+          isFalse,
+        );
+        notifier.updateDestination('new recipient');
+        expect(
+          harness.container
+              .read(provider)
+              .requireValue
+              .balancePreparedForDestination,
+          isFalse,
+        );
+        expect(harness.container.read(provider).requireValue.preview, isNull);
+      },
+    );
+  }
+
+  for (final retryable in [true, false]) {
+    test(
+      'failed Continue balance read stays unprepared and ${retryable ? 'retries deliberately' : 'permits editing'}',
+      () async {
+        final engine = FakeWalletEngine()
+          ..balance = _balance(onchainSpendable: 1000, lightningSpendable: 0);
+        final harness = await PaymentFlowTestHarness.create(engine: engine);
+        addTearDown(harness.dispose);
+        final provider = sendFlowViewModelProvider(
+          WalletPaymentTarget.bitcoinOnchain,
+        );
+        final subscription = harness.container.listen(provider, (_, _) {});
+        addTearDown(subscription.close);
+        await harness.container.read(provider.future);
+        await harness.container.read(walletViewModelProvider.future);
+        final notifier = harness.container.read(provider.notifier);
+        notifier.updateDestination('mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn');
+        expect(await notifier.validateDestination(), isTrue);
+        engine.balanceError = retryable
+            ? TimeoutException('temporary balance timeout')
+            : StateError('terminal balance failure');
+        expect(await notifier.prepareAmount(), isFalse);
+        final failed = harness.container.read(provider).requireValue;
+        expect(
+          failed.failureFor(SendFlowOperation.preparingAmount)?.retryable,
+          retryable,
+        );
+        expect(failed.balancePreparedForDestination, isFalse);
+        expect(failed.availableUnits, 1000);
+        expect(failed.canChangeDestination, isTrue);
+        expect(
+          failed.canStart(SendFlowOperation.validatingDestination),
+          retryable,
+        );
+        expect(failed.canStart(SendFlowOperation.submitting), isFalse);
+        expect(await notifier.submit(), isFalse);
+        await Future<void>.delayed(Duration.zero);
+        expect(engine.calls.where((call) => call == 'balance'), hasLength(2));
+        engine.balanceError = null;
+        if (!retryable) {
+          notifier.updateDestination(
+            'bitcoin:mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn',
+          );
+        }
+        expect(await notifier.validateDestination(), isTrue);
+        expect(await notifier.prepareAmount(), isTrue);
+        expect(
+          harness.container
+              .read(provider)
+              .requireValue
+              .balancePreparedForDestination,
+          isTrue,
+        );
+        expect(engine.calls.where((call) => call == 'balance'), hasLength(3));
+        expect(engine.calls, isNot(contains('sendPayment:start')));
+      },
+    );
+  }
+
+  for (final target in [
+    WalletPaymentTarget.bitcoinOnchain,
+    WalletPaymentTarget.usdtOnchain,
+  ]) {
+    test(
+      'Continue rejects a different asset balance for ${target.assetKind.name} without locking input',
+      () async {
+        final rgb = target.assetKind == WalletAssetKind.usdt;
+        final bitcoin = _balance(onchainSpendable: 1000, lightningSpendable: 0);
+        final usdt = testRgbBalance(2000);
+        final engine = FakeWalletEngine()..balance = rgb ? usdt : bitcoin;
+        final harness = await PaymentFlowTestHarness.create(
+          engine: engine,
+          services: testRgbServices,
+        );
+        addTearDown(harness.dispose);
+        final provider = sendFlowViewModelProvider(target);
+        final subscription = harness.container.listen(provider, (_, _) {});
+        addTearDown(subscription.close);
+        await harness.container.read(provider.future);
+        await harness.container.read(walletViewModelProvider.future);
+        final notifier = harness.container.read(provider.notifier);
+        notifier.updateDestination(
+          rgb ? 'rgb:prepared-recipient' : 'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn',
+        );
+        expect(await notifier.validateDestination(), isTrue);
+        final validated = harness.container.read(provider).requireValue;
+        engine.balanceResultOverride = rgb ? bitcoin : usdt;
+
+        // The fake bypasses its usual matching-asset assertion deliberately.
+        // A malformed adapter result must become owned failure, not escape.
+        expect(await notifier.prepareAmount(), isFalse);
+        final rejected = harness.container.read(provider).requireValue;
+        final failure = rejected.failureFor(SendFlowOperation.preparingAmount)!;
+        expect(failure.code, 'payment_balance_invalid');
+        expect(failure.kind, AppFailureKind.protocol);
+        expect(failure.retryable, isFalse);
+        expect(failure.requiresReconciliation, isFalse);
+        expect(rejected.balance, validated.balance);
+        expect(rejected.availableUnits, rgb ? 2000 : 1000);
+        expect(rejected.balancePreparedForDestination, isFalse);
+        expect(rejected.operation, isNull);
+        expect(rejected.canChangeDestination, isTrue);
+        expect(
+          rejected.canStart(SendFlowOperation.validatingDestination),
+          isFalse,
+        );
+        expect(await notifier.submit(), isFalse);
+        expect(engine.calls.where((call) => call == 'balance'), hasLength(2));
+        expect(engine.calls, isNot(contains('sendPayment:start')));
+
+        // The bad result never clears a terminal failure implicitly. Editing
+        // the recipient permits a new deliberate, valid check.
+        notifier.updateDestination(
+          rgb
+              ? 'rgb:another-recipient'
+              : 'bitcoin:mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn',
+        );
+        engine.balanceResultOverride = null;
+        expect(await notifier.validateDestination(), isTrue);
+        expect(await notifier.prepareAmount(), isTrue);
+        expect(
+          harness.container
+              .read(provider)
+              .requireValue
+              .balancePreparedForDestination,
+          isTrue,
+        );
+        expect(engine.calls.where((call) => call == 'balance'), hasLength(3));
+        expect(engine.calls, isNot(contains('sendPayment:start')));
+      },
+    );
+  }
+
+  for (final departure in ['rebuild', 'wallet', 'background']) {
+    test(
+      'Continue balance completion rejects $departure ownership loss',
+      () async {
+        final engine = FakeWalletEngine()
+          ..balance = _balance(onchainSpendable: 1000, lightningSpendable: 0);
+        final harness = await PaymentFlowTestHarness.create(engine: engine);
+        addTearDown(harness.dispose);
+        final provider = sendFlowViewModelProvider(
+          WalletPaymentTarget.bitcoinOnchain,
+        );
+        final subscription = harness.container.listen(provider, (_, _) {});
+        addTearDown(subscription.close);
+        await harness.container.read(provider.future);
+        await harness.container.read(walletViewModelProvider.future);
+        final notifier = harness.container.read(provider.notifier);
+        notifier.updateDestination('mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn');
+        expect(await notifier.validateDestination(), isTrue);
+        engine.balance = _balance(
+          onchainSpendable: 2000,
+          lightningSpendable: 0,
+        );
+        engine.balanceGate = Completer<void>();
+        final pending = notifier.prepareAmount();
+        await Future<void>.delayed(Duration.zero);
+        Future<SendFlowState>? rebuilt;
+        switch (departure) {
+          case 'rebuild':
+            harness.container.invalidate(provider);
+            rebuilt = harness.container.read(provider.future);
+          case 'wallet':
+            final profile = WalletProfile(
+              id: '33333333333333333333333333333333',
+              name: 'Changed wallet',
+              createdAt: DateTime.utc(2026, 10, 17),
+              updatedAt: DateTime.utc(2026, 10, 17),
+              environment: BlockchainEnvironment.regtest,
+              state: WalletProfileState.ready,
+              storageToken: '44444444444444444444444444444444',
+            );
+            harness.container
+                .read(walletViewModelProvider.notifier)
+                .adoptCommittedRegistry(
+                  WalletRegistry(
+                    profiles: [profile],
+                    activeWalletId: profile.id,
+                  ),
+                );
+          case 'background':
+            await harness.container
+                .read(walletLifecycleViewModelProvider.notifier)
+                .handle(AppLifecycleState.inactive);
+        }
+        engine.balanceGate!.complete();
+        expect(await pending, isFalse);
+        if (departure == 'wallet') {
+          await harness.container.pump();
+          rebuilt = harness.container.read(provider.future);
+        }
+        if (rebuilt != null) await rebuilt;
+        final discarded = harness.container.read(provider).requireValue;
+        expect(discarded.balancePreparedForDestination, isFalse);
+        expect(discarded.preview, isNull);
+        expect(discarded.operation, isNull);
+        expect(discarded.failure, isNull);
+        if (departure == 'background') expect(discarded.availableUnits, 1000);
+        if (departure == 'wallet') {
+          expect(discarded.walletId, '33333333333333333333333333333333');
+          expect(discarded.availableUnits, 2000);
+        }
+        expect(engine.calls, isNot(contains('sendPayment:start')));
+      },
+    );
+  }
 
   test(
     'validates exact on-chain input and suppresses duplicate submit',
@@ -443,7 +870,46 @@ void main() {
   });
 
   test(
-    'stale fee and insufficient funds fail before native mutation',
+    'destination validation cannot publish after the provider rebuilds',
+    () async {
+      final gate = Completer<void>();
+      final engine = FakeWalletEngine()
+        ..balance = testRgbBalance(5000)
+        ..decodeInvoiceGate = gate
+        ..decodedInvoice = WalletPaymentPreview(
+          route: testRgbRoute,
+          encodedDestination: 'rgb:old-invoice',
+          displayDestination: 'rgb:old-invoice',
+        );
+      final harness = await PaymentFlowTestHarness.create(
+        engine: engine,
+        services: testRgbServices,
+      );
+      addTearDown(harness.dispose);
+      final provider = sendFlowViewModelProvider(
+        WalletPaymentTarget.usdtOnchain,
+      );
+      final subscription = harness.container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      await harness.container.read(provider.future);
+      final notifier = harness.container.read(provider.notifier);
+      notifier.updateDestination('rgb:old-invoice');
+      final pending = notifier.validateDestination();
+      await Future<void>.delayed(Duration.zero);
+      expect(engine.calls, contains('decodeInvoice:start'));
+      harness.container.invalidate(provider);
+      final rebuilt = harness.container.read(provider.future);
+      gate.complete();
+      expect(await pending, isFalse);
+      final loaded = await rebuilt;
+      expect(loaded.destination, isEmpty);
+      expect(loaded.preview, isNull);
+      expect(loaded.failure, isNull);
+    },
+  );
+
+  test(
+    'stale returned fee and insufficient funds fail before native mutation',
     () async {
       final engine = FakeWalletEngine()
         ..balance = _balance(onchainSpendable: 50, lightningSpendable: 0)
@@ -482,9 +948,359 @@ void main() {
       expect(await notifier.submit(), isFalse);
       expect(
         harness.container.read(provider).requireValue.feeFailure?.code,
-        'payment_fee_refresh_required',
+        walletFeeReviewRequiredFailure.code,
       );
       expect(engine.calls, isNot(contains('sendPayment:start')));
+    },
+  );
+
+  test(
+    'missing fee retries only on Send and requires review before dispatch',
+    () async {
+      var now = DateTime.utc(2026, 10, 17);
+      final engine = FakeWalletEngine()
+        ..balance = _balance(onchainSpendable: 1000, lightningSpendable: 0)
+        ..feeEstimateError = TimeoutException('temporary quote read failure');
+      final harness = await PaymentFlowTestHarness.create(
+        engine: engine,
+        clock: () => now,
+      );
+      addTearDown(harness.dispose);
+      final provider = sendFlowViewModelProvider(
+        WalletPaymentTarget.bitcoinOnchain,
+      );
+      final subscription = harness.container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      await harness.container.read(provider.future);
+      final notifier = harness.container.read(provider.notifier);
+      notifier.updateDestination('mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn');
+      expect(await notifier.validateDestination(), isTrue);
+      notifier.updateAmount('0.000001');
+      final unavailable = harness.container.read(provider).requireValue;
+      expect(unavailable.canAttemptSubmitAt(now), isTrue);
+      expect(unavailable.canSubmitAt(now), isFalse);
+      expect(
+        engine.calls.where((call) => call == 'estimateFeeRate'),
+        hasLength(1),
+      );
+
+      expect(await notifier.submit(), isFalse);
+      expect(
+        engine.calls.where((call) => call == 'estimateFeeRate'),
+        hasLength(2),
+      );
+      final failed = harness.container.read(provider).requireValue;
+      expect(failed.feeFailure?.retryable, isTrue);
+      expect(failed.canAttemptSubmitAt(now), isTrue);
+      expect(failed.canSubmitAt(now), isFalse);
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        engine.calls.where((call) => call == 'estimateFeeRate'),
+        hasLength(2),
+      );
+      expect(engine.calls, isNot(contains('sendPayment:start')));
+
+      now = now.add(const Duration(seconds: 1));
+      engine.feeEstimateError = null;
+      engine.feeEstimate = WalletFeeRateEstimate(
+        targetBlocks: 6,
+        satsPerVbyte: 4,
+        observedAt: now,
+      );
+      expect(await notifier.submit(), isFalse);
+      final reviewed = harness.container.read(provider).requireValue;
+      expect(reviewed.feeEstimate?.satsPerVbyte, 4);
+      expect(reviewed.feeFailure, isNull);
+      expect(reviewed.failure, walletFeeUpdatedReviewFailure);
+      expect(
+        reviewed.failure?.userMessage,
+        'The fee is updated. Review it and send again.',
+      );
+      expect(reviewed.canSubmitAt(now), isTrue);
+      expect(
+        engine.calls.where((call) => call == 'estimateFeeRate'),
+        hasLength(3),
+      );
+      expect(engine.calls, isNot(contains('sendPayment:start')));
+
+      expect(await notifier.submit(), isTrue);
+      expect(await notifier.submit(), isFalse);
+      expect(
+        engine.calls.where((call) => call == 'sendPayment:start'),
+        hasLength(1),
+      );
+      expect(
+        engine.calls.where((call) => call == 'estimateFeeRate'),
+        hasLength(4),
+      );
+    },
+  );
+
+  test(
+    'stale-fee Send owns one read and rejects simultaneous attempts',
+    () async {
+      var now = DateTime.utc(2026, 10, 17);
+      final engine = FakeWalletEngine()
+        ..balance = _balance(onchainSpendable: 1000, lightningSpendable: 0)
+        ..feeEstimate = WalletFeeRateEstimate(
+          targetBlocks: 6,
+          satsPerVbyte: 2,
+          observedAt: now,
+        );
+      final harness = await PaymentFlowTestHarness.create(
+        engine: engine,
+        clock: () => now,
+      );
+      addTearDown(harness.dispose);
+      final provider = sendFlowViewModelProvider(
+        WalletPaymentTarget.bitcoinOnchain,
+      );
+      final subscription = harness.container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      await harness.container.read(provider.future);
+      final notifier = harness.container.read(provider.notifier);
+      notifier.updateDestination('mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn');
+      expect(await notifier.validateDestination(), isTrue);
+      notifier.updateAmount('0.000001');
+      now = now.add(const Duration(minutes: 3));
+      engine.feeEstimate = WalletFeeRateEstimate(
+        targetBlocks: 6,
+        satsPerVbyte: 4,
+        observedAt: now,
+      );
+      engine.feeEstimateGate = Completer<void>();
+      engine.feeEstimateStarted = Completer<void>();
+      final pending = notifier.submit();
+      await engine.feeEstimateStarted!.future;
+      expect(
+        harness.container.read(provider).requireValue.canAttemptSubmitAt(now),
+        isFalse,
+      );
+      expect(await notifier.submit(), isFalse);
+      expect(await notifier.refreshFee(), isFalse);
+      expect(
+        engine.calls.where((call) => call == 'estimateFeeRate'),
+        hasLength(2),
+      );
+      engine.feeEstimateGate!.complete();
+      expect(await pending, isFalse);
+      expect(
+        harness.container.read(provider).requireValue.failure,
+        walletFeeUpdatedReviewFailure,
+      );
+      expect(engine.calls, isNot(contains('sendPayment:start')));
+      expect(await notifier.submit(), isTrue);
+      expect(
+        engine.calls.where((call) => call == 'sendPayment:start'),
+        hasLength(1),
+      );
+    },
+  );
+
+  test(
+    'fee expiring during pre-dispatch check refreshes without resubmitting',
+    () async {
+      var now = DateTime.utc(2026, 10, 17);
+      final engine = FakeWalletEngine()
+        ..balance = _balance(onchainSpendable: 1000, lightningSpendable: 0)
+        ..feeEstimate = WalletFeeRateEstimate(
+          targetBlocks: 6,
+          satsPerVbyte: 2,
+          observedAt: now,
+        );
+      final harness = await PaymentFlowTestHarness.create(
+        engine: engine,
+        clock: () => now,
+      );
+      addTearDown(harness.dispose);
+      final provider = sendFlowViewModelProvider(
+        WalletPaymentTarget.bitcoinOnchain,
+      );
+      final subscription = harness.container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      await harness.container.read(provider.future);
+      final notifier = harness.container.read(provider.notifier);
+      notifier.updateDestination('mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn');
+      expect(await notifier.validateDestination(), isTrue);
+      notifier.updateAmount('0.000001');
+      engine.feeEstimateGate = Completer<void>();
+      engine.feeEstimateStarted = Completer<void>();
+      final pending = notifier.submit();
+      await engine.feeEstimateStarted!.future;
+      now = now.add(const Duration(minutes: 3));
+      engine.feeEstimate = WalletFeeRateEstimate(
+        targetBlocks: 6,
+        satsPerVbyte: 5,
+        observedAt: now,
+      );
+      engine.feeEstimateGate!.complete();
+      expect(await pending, isFalse);
+      final reviewed = harness.container.read(provider).requireValue;
+      expect(reviewed.failure, walletFeeUpdatedReviewFailure);
+      expect(reviewed.feeEstimate?.satsPerVbyte, 5);
+      expect(
+        engine.calls.where((call) => call == 'estimateFeeRate'),
+        hasLength(3),
+      );
+      expect(engine.calls, isNot(contains('sendPayment:start')));
+      expect(await notifier.submit(), isTrue);
+      expect(
+        engine.calls.where((call) => call == 'sendPayment:start'),
+        hasLength(1),
+      );
+    },
+  );
+
+  test(
+    'invoice expiring during fee recovery reports expiry instead of review',
+    () async {
+      var now = DateTime.utc(2026, 10, 17);
+      final engine = FakeWalletEngine()
+        ..balance = testRgbBalance(5000)
+        ..feeEstimateError = TimeoutException('temporary quote read failure')
+        ..decodedInvoice = WalletPaymentPreview(
+          route: testRgbRoute,
+          encodedDestination: 'rgb:expiring-invoice',
+          displayDestination: 'rgb:expiring-invoice',
+          expiresAt: now.add(const Duration(seconds: 4)),
+        );
+      final harness = await PaymentFlowTestHarness.create(
+        engine: engine,
+        services: testRgbServices,
+        clock: () => now,
+      );
+      addTearDown(harness.dispose);
+      final provider = sendFlowViewModelProvider(
+        WalletPaymentTarget.usdtOnchain,
+      );
+      final subscription = harness.container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      await harness.container.read(provider.future);
+      final notifier = harness.container.read(provider.notifier);
+      notifier.updateDestination('rgb:expiring-invoice');
+      expect(await notifier.validateDestination(), isTrue);
+      notifier.updateAmount('0.001');
+      engine.feeEstimateError = null;
+      engine.feeEstimateGate = Completer<void>();
+      engine.feeEstimateStarted = Completer<void>();
+      final pending = notifier.submit();
+      await engine.feeEstimateStarted!.future;
+      now = now.add(const Duration(seconds: 5));
+      engine.feeEstimate = WalletFeeRateEstimate(
+        targetBlocks: 6,
+        satsPerVbyte: 4,
+        observedAt: now,
+      );
+      engine.feeEstimateGate!.complete();
+      expect(await pending, isFalse);
+      final expired = harness.container.read(provider).requireValue;
+      expect(expired.failure?.code, 'payment_request_expired');
+      expect(
+        expired.failure?.userMessage,
+        'This invoice has expired. Enter a new invoice to continue.',
+      );
+      expect(expired.feeFailure, isNull);
+      expect(expired.canAttemptSubmitAt(now), isFalse);
+      expect(await notifier.submit(), isFalse);
+      expect(
+        engine.calls.where((call) => call == 'estimateFeeRate'),
+        hasLength(2),
+      );
+      expect(engine.calls, isNot(contains('sendPayment:start')));
+    },
+  );
+
+  test(
+    'submit fee recovery cannot publish after the provider rebuilds',
+    () async {
+      final now = DateTime.utc(2026, 10, 17);
+      final engine = FakeWalletEngine()
+        ..balance = _balance(onchainSpendable: 1000, lightningSpendable: 0)
+        ..feeEstimateError = TimeoutException('temporary quote read failure');
+      final harness = await PaymentFlowTestHarness.create(
+        engine: engine,
+        clock: () => now,
+      );
+      addTearDown(harness.dispose);
+      final provider = sendFlowViewModelProvider(
+        WalletPaymentTarget.bitcoinOnchain,
+      );
+      final subscription = harness.container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      await harness.container.read(provider.future);
+      final notifier = harness.container.read(provider.notifier);
+      notifier.updateDestination('mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn');
+      expect(await notifier.validateDestination(), isTrue);
+      notifier.updateAmount('0.000001');
+      engine.feeEstimateError = null;
+      engine.feeEstimate = WalletFeeRateEstimate(
+        targetBlocks: 6,
+        satsPerVbyte: 4,
+        observedAt: now,
+      );
+      final oldGate = Completer<void>();
+      engine.feeEstimateGate = oldGate;
+      engine.feeEstimateStarted = Completer<void>();
+      final pending = notifier.submit();
+      await engine.feeEstimateStarted!.future;
+      final nextLoadGate = Completer<void>();
+      engine.balanceGate = nextLoadGate;
+      engine.feeEstimateGate = null;
+      harness.container.invalidate(provider);
+      final rebuilt = harness.container.read(provider.future);
+      expect(harness.container.read(provider).isLoading, isTrue);
+      oldGate.complete();
+      expect(await pending, isFalse);
+      expect(harness.container.read(provider).isLoading, isTrue);
+      nextLoadGate.complete();
+      final loaded = await rebuilt;
+      expect(loaded.preview, isNull);
+      expect(loaded.failure, isNull);
+      expect(engine.calls, isNot(contains('sendPayment:start')));
+    },
+  );
+
+  test(
+    'submitted payment completion cannot overwrite a rebuilt form',
+    () async {
+      final now = DateTime.utc(2026, 10, 17);
+      final engine = FakeWalletEngine()
+        ..balance = _balance(onchainSpendable: 1000, lightningSpendable: 0)
+        ..feeEstimate = WalletFeeRateEstimate(
+          targetBlocks: 6,
+          satsPerVbyte: 2,
+          observedAt: now,
+        )
+        ..sendPaymentGate = Completer<void>();
+      final harness = await PaymentFlowTestHarness.create(
+        engine: engine,
+        clock: () => now,
+      );
+      addTearDown(harness.dispose);
+      final provider = sendFlowViewModelProvider(
+        WalletPaymentTarget.bitcoinOnchain,
+      );
+      final subscription = harness.container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      await harness.container.read(provider.future);
+      final notifier = harness.container.read(provider.notifier);
+      notifier.updateDestination('mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn');
+      expect(await notifier.validateDestination(), isTrue);
+      notifier.updateAmount('0.000001');
+      final pending = notifier.submit();
+      await Future<void>.delayed(Duration.zero);
+      expect(engine.calls, contains('sendPayment:start'));
+      harness.container.invalidate(provider);
+      final rebuilt = harness.container.read(provider.future);
+      engine.sendPaymentGate!.complete();
+      expect(await pending, isTrue);
+      final loaded = await rebuilt;
+      expect(loaded.destination, isEmpty);
+      expect(loaded.result, isNull);
+      expect(
+        engine.calls.where((call) => call == 'sendPayment:start'),
+        hasLength(1),
+      );
     },
   );
 
@@ -529,7 +1345,8 @@ void main() {
       expect(failed.destination, 'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn');
       expect(failed.amountInput.units, 100);
       expect(failed.result, isNull);
-      expect(failed.failure?.kind, AppFailureKind.validation);
+      // The certificate preserves nonexecution without exposing raw preparation errors.
+      expect(failed.failure?.kind, AppFailureKind.unavailable);
       await Future<void>.delayed(Duration.zero);
       expect(harness.haptics.intents, [HapticIntent.error]);
     },
@@ -570,6 +1387,7 @@ void main() {
     expect(failed.failure?.outcomeUnknown, isTrue);
     expect(failed.requiresReconciliation, isTrue);
     expect(failed.canEditPayment, isFalse);
+    expect(failed.canAttemptSubmitAt(DateTime.now().toUtc()), isFalse);
     expect(failed.canSubmitAt(DateTime.now().toUtc()), isFalse);
     final callsAfterFailure = List<String>.of(engine.calls);
 
@@ -577,6 +1395,7 @@ void main() {
     notifier.updateAmount('0.000002');
     notifier.useMaxAmount();
     expect(await notifier.validateDestination(), isFalse);
+    expect(await notifier.prepareAmount(), isFalse);
     expect(await notifier.refreshBalance(), isFalse);
     expect(await notifier.refreshFee(), isFalse);
     expect(await notifier.pasteDestination(), isA<AppFailureResult<String>>());
@@ -814,6 +1633,7 @@ void main() {
       final failed = harness.container.read(provider).requireValue;
       expect(failed.feeFailure?.retryable, isFalse);
       expect(failed.canRefreshFee, isFalse);
+      expect(failed.canAttemptSubmitAt(DateTime.now().toUtc()), isFalse);
       final feeCalls = engine.calls
           .where((call) => call == 'estimateFeeRate')
           .length;

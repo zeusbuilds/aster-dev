@@ -142,6 +142,16 @@ abstract final class FailureMapper {
         stackTrace: stackTrace,
       );
     }
+    if (error is RecoverableSendStorageException) {
+      return _failure(
+        code: 'payment_recovery_state_lost',
+        kind: AppFailureKind.storage,
+        message: 'The wallet\'s saved payment state could not be read safely.',
+        requiresReconciliation: true,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
     if (error is LspAmountOutOfRangeException) {
       return _failure(
         code: 'lsp_amount_out_of_range',

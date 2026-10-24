@@ -6,18 +6,49 @@ architecture boundaries.
 
 ## Reproducible Dependency
 
-The checked-in `pubspec.yaml` and `pubspec.lock` pin SDK `0.2.0-beta.2` in the
-public UTEXO protocol SDK repository to immutable commit
-`992b86ee528d0811bd17cedca901de08561c1982`. Normal Pub resolution fetches
-that public commit without a path override. It adds typed public-contract
-import, safe native diagnostics, authoritative RGB invoice recipient type and
-cleanup quarantine. The native artifacts are unchanged. The derived Android
-AAR was published in [v0.2.0-beta.1](https://github.com/UTEXO-Protocol/flutter-sdk/releases/tag/v0.2.0-beta.1)
-and beta.2 continues to use its immutable URL/checksum. Historical empty-Git-cache
-restore evidence binds beta.1 commit `c4e3c2d`; it is not relabelled as a beta.2
-restore. Separately, an empty Gradle dependency cache
-fetches the release AAR over HTTPS and verifies its size and SHA-256. These
-checks qualify public dependency restoration, not funded or release flows.
+Aster's source candidate pins the SDK in the private repository
+`https://github.com/zeusbuilds/rgb-sdk-flutter.git` at immutable commit
+`68a690916eabe96407c03669d569bf86babb8e72`. The manifest and portable Git lock
+name the same full commit. Authenticated restoration into an empty Git cache
+passed without a local path override; the hosted Pub cache was reused. All 74
+SDK Dart source files match the tested fixture. This does not claim a fully
+cold hosted-dependency restore or native artifact publication.
+The credential belongs in the developer's credential store or CI secret, never
+in the dependency URL, lockfile or repository.
+
+CI uses a read-only deploy key restricted to the SDK repository, supplied from
+the encrypted App Actions secret `SDK_READ_SSH_KEY`. Its ordinary
+`GITHUB_TOKEN` is scoped to the workflow repository, as
+[GitHub documents](https://docs.github.com/en/actions/concepts/security/github_token).
+The reviewed helper creates runner-only credential files, pins GitHub's host
+key and rewrites only the exact SDK URL. Setup is restricted to trusted events;
+an always-run step removes those credentials immediately after locked Pub
+resolution. Fork pull requests receive no SDK key. The source must not enable
+`pull_request_target` to bypass that boundary.
+
+An isolated real read matched the exact SDK commit with owner tokens removed
+and global/system Git configuration disabled. Credential mode was `0600`, and
+cleanup removed its runner directory. Eight offline helper tests and 23 focused
+governance tests pass. These local checks do not claim a remote workflow result.
+
+This source pin exposes the durable-send Dart and bridge API. It does not
+publish the matching native binaries. The official older native artifacts
+remain unchanged and fail closed with unsupported durable sends; they never
+fall back to a one-shot payment. A verified ignored binary fixture is still
+required for local native protocol qualification. Authenticated Git restoration
+and host tests do not establish a usable native payment release.
+
+Historical published baseline: public SDK beta.2 commit
+`992b86ee528d0811bd17cedca901de08561c1982` added typed public-contract import,
+safe native diagnostics, authoritative RGB invoice recipient type and cleanup
+quarantine. It retained the derived Android AAR published in
+[v0.2.0-beta.1](https://github.com/UTEXO-Protocol/flutter-sdk/releases/tag/v0.2.0-beta.1)
+and its immutable URL/checksum. The historical empty-Git-cache restore binds
+beta.1 commit `c4e3c2d`; it is not a restore of a later candidate. A separate
+empty Gradle cache fetched that release AAR and verified its size/SHA-256.
+Those checks qualify the identified historical dependency, not current funded
+or release flows.
+
 Do not replace the commit with a branch, tag, moving reference, or local path
 in a committed change.
 
@@ -34,9 +65,11 @@ fvm flutter analyze --fatal-warnings --fatal-infos
 fvm flutter test
 ```
 
-Both iOS and Android builds are required before accepting a new SDK commit.
+Both iOS and Android builds are required for release acceptance of a new SDK
+commit. A source-only candidate push does not close those platform gates;
+Android builds remain deferred at the author's direction.
 
-The pinned revision targets RN `1.0.0-beta.39` (commit
+The published native baseline targets RN `1.0.0-beta.39` (commit
 `41ff170f794edff2a1822a672ddab37e29505f14`), core `1.0.0-beta.9`, WebRGB
 `0.1.3`, and RLN `0.17.0-beta.3`. The app's Flutter 3.47.7 / Dart 3.13.5,
 iOS 18.5 minimum, Android compile/target SDK 37 and Java 17 compilation already
@@ -58,14 +91,14 @@ qualification; P02/P03/P04/P06 remain open. Its overlay is absent from the
 published RLN 0.17 release consumed here. The local build record is not a
 signed provenance or independent reproducibility attestation.
 
-SDK-only evidence includes the Android 17 / 16 KiB native Flutter signer test
+Historical SDK evidence includes the Android 17 / 16 KiB native Flutter signer test
 (1/1), 30 JVM bridge tests, all eight packaged native libraries passing ELF
 checks, and APK ZIP alignment. The iOS 27 native signer test (1/1) and 26 Swift
 tests also pass. The final SDK commit passes 496 host tests and coverage policy
 (88.3% package coverage).
 
-Aster passes 977 host tests, fatal analysis, generation, documentation and all
-normal repository policy gates. Its Debug builds launch to visually verified
+The corresponding historical Aster candidate passed 977 host tests, fatal
+analysis, generation, documentation and all normal repository policy gates. Its Debug builds launch to visually verified
 welcome screens on iOS 27 and Android 17. All 25 native libraries in the exact
 Android APK pass ELF inspection and 16 KiB ZIP alignment. That APK runs on an
 API 37 guest with 16,384-byte pages and both linker/package compatibility
@@ -133,8 +166,8 @@ The example below assumes sibling clones only for illustration. Replace `path`
 with your SDK checkout's actual absolute path or a path relative to Aster;
 neither the old machine's directory layout nor sibling clones are required.
 Pub YAML does not expand shell variables such as `$SDK_ROOT`. Normal installs
-use the qualified immutable public Git dependency above with no local SDK
-checkout required.
+use the immutable private Git source dependency above with authenticated access
+and no local SDK checkout. This is separate from native artifact qualification.
 
 ```yaml
 dependency_overrides:
@@ -145,10 +178,153 @@ dependency_overrides:
 Run `fvm flutter pub get` after adding or removing the file. Compilation,
 analysis, documentation, test, and repository-verification Make targets enforce
 the committed lockfile and regenerate ignored sources before consuming that
-graph. Before lint, integration, or release evidence, remove the override, run
-`make dependencies`, and confirm that `pubspec.lock` contains the immutable Git
-`resolved-ref` above. The override is ignored by Git and is never supported for
-candidate evidence.
+graph. Before production-candidate lint, integration or release evidence, remove
+the override, run `make dependencies`, and confirm that `pubspec.lock` contains
+the immutable Git `resolved-ref` above. The override is ignored by Git and is
+never supported for public-release evidence. The local source qualification
+described below does not replace that release requirement.
+
+## October 24 durable on-chain recovery candidate
+
+The ROOT-01 work adds a native prepare/commit/status/cancel protocol and an
+app journal version 3. The private immutable SDK source pin exposes its APIs,
+so an authenticated source restore and host tests do not require an override.
+The official native binaries do not contain this protocol. Exercising it
+locally therefore requires the verified ignored binary fixture described
+below. This is not a qualified native release or a production payment build.
+Never remove native preflight, fall back to a one-shot send, or bypass artifact
+verification to make an older binary appear compatible.
+
+The sibling SDK's `native/durable_onchain_manifest.json` pins the original RLN,
+RGB library and Lightning source revisions plus the reviewed recovery patches.
+Its candidate builder stages a separate, manifest-verified arm64 iOS Simulator
+SDK. Point `pubspec_overrides.yaml` at that explicit fixture for native candidate
+qualification, run the matching Flutter toolchain's `pub get`, then install
+pods. The authenticated Git source pin or a sibling source-only override is
+sufficient for host tests, but both still use the unsupported official native
+artifact unless the verified fixture is selected. Keep the committed dependency
+Git-based and bound to its exact source commit. Update native artifact versions
+and checksums only after qualified publication; never commit the fixture path.
+
+New SDK command envelopes use version 2 and bind the canonical network and both
+full account XPUBs through a domain-separated digest. They do not bind an
+absolute container path: iOS may relocate an intact app directory during an
+ordinary update. Each recovery call verifies the live account identity and
+current physical directory inside a lifecycle lease. Older unpublished SDK
+version 1 envelopes retain their original path and fingerprint; they are never
+silently migrated. This SDK envelope version is separate from the app journal
+version and the unchanged native request schema.
+
+The app creates and validates the immutable request, then checks native support
+before saving its intent. Version 3 records distinguish an intent created
+before Commit from one whose Commit boundary was durably authorized. The former
+proves no payment was submitted even when preparation or journal cleanup still
+needs attention. Older app version 2 records remain conservative; their
+immutable accepted receipt bytes are preserved rather than rewritten as version
+3. A preflight failure creates no payment record or possible-payment UI entry.
+
+Native preparation durably retains the transaction before committing
+reservations or authorizing End. Commit can release only those saved signed
+bytes. A Commit exception triggers at most one observational read of that exact
+native operation in the same user action. Exact Accepted produces the success
+screen; a durable Rejected certificate with End never authorized produces a
+known non-send. Anything else remains genuinely unknown. Prepare, Commit, proxy
+upload and broadcast are never automatically repeated. Exceptions, an empty
+history, similar amounts and elapsed time are not rejection certificates.
+
+Payment certainty and permission to mutate are separate. Exact native Accepted
+remains accepted if Aster cannot persist or archive its required local receipt:
+Send returns success, retains the exact evidence, and keeps a wallet-scoped
+storage-repair fence. A known non-send may similarly need protected cleanup.
+Neither becomes an unknown payment merely because local persistence or later
+native-owner recovery fails. Required repair must finish before another
+financial mutation; stronger native-owner quarantine still blocks native
+access independently. Activity enrichment and status projection are read-only,
+so a failed archive write cannot hide the receipt or its Check action.
+
+The existing transaction-details Check action never commits. It inspects the
+same authoritative operation and can obtain a durable cancellation certificate
+for a preparation that was never authorized for End. If an RGB invoice expires
+between preparation and Commit, rejection requires that certificate; an
+unavailable or contradictory result preserves protection. The separate
+`resumePaymentSubmission` repository action can complete an already-authorized
+operation with its saved transaction. The current UI does not call it, and no
+screen invokes it automatically.
+
+Certified pre-dispatch rejections carry allowlisted native reason codes for
+funds, allocations, recipient, invoice expiry, amount, fee, network,
+configuration and storage. Aster maps these only after the certificate proves
+nonexecution; arbitrary native error text cannot provide that proof. Invalid
+input, fee review, expired invoice and configuration failures do not become
+retryable without the appropriate changed input or review.
+
+Send reviews capture the wallet ID before queued work. The ViewModel and
+serialized repository callback reject an owner change before fee reads or
+native dispatch. Late clipboard/read results cannot restore the prior wallet's
+form. Recovery evidence is retained separately for each wallet. A payment-only
+fence permits audited safe reads, ordinary Bitcoin receive and a serialized
+switch to another wallet; it does not permit another financial mutation in the
+fenced wallet. A stronger native-owner failure cannot be cleared by these reads.
+
+Native work runs on the SDK's owned worker with the RGB Tokio context available
+to the durable commit path. A deadline retains queue ownership until that work
+drains. Bounded non-sending identity, pure invoice and exact-status inspection
+remain available after drain; ordinary work remains quarantined until Aster
+reopens the same persisted native owner. Failed reopen retains the stronger
+quarantine. No timeout causes monetary replay or an automatic cancellation.
+
+An explicit Send therefore shows the success screen when acceptance is known,
+or one action-owned toast. Activity uses one compact entry only in the matching
+asset history; references and deliberate recovery actions live in existing
+transaction details. Operational paragraphs are removed from Send, Activity
+and retained Receive content. Receive preparation keeps concise required or
+pending states and explicit reviewed confirmation; it never repeats uncertain
+output creation. Toast ownership follows route and wallet context, including
+popup presentation lifecycle without invalidating a parent confirmation action.
+
+Version 1 unidentified one-shot records remain protected. They contain no
+native operation identity, so an absent newer native operation cannot prove that
+an older payment never happened. RGB recovery preserves the original concrete
+preparation expiry, including for invoices without their own expiry; restoring
+an intent never extends that deadline. Submission remains distinct from chain
+confirmation.
+
+The qualified storage contract is an intact private local store across native
+and app-process restarts. Restored commands require their existing real outbox
+directory; they must not recreate it and interpret the loss as nonexecution.
+Recoverable sends reject VSS configurations because fingerprint-only VSS restore
+does not preserve this outbox. Aster opens its existing owner-marked profile
+directory rather than restoring an SDK archive over it. Native directories are
+excluded from OS backup and secrets are device-only. General archive/cohort
+restore, selectively deleted operation files and mixed old snapshots remain
+unqualified; directory existence alone does not prove record continuity.
+Terminal outbox records currently retain the request and unsigned/signed PSBTs;
+new preparation validates all retained records. Long-history storage and latency
+have not been qualified. Do not prune operation IDs or rejection certificates
+without a crash-safe compaction and delayed-call nonrevival design.
+
+The source-frozen App aggregate passes 1,497 tests with clean analysis and diff
+whitespace checks. The current native host candidate passes 31 unit cases and
+12 funded cases; SDK Dart checks pass 626 tests. These do not qualify a device,
+Android, mainnet deployment or every storage-restore scenario. Four real iOS 27
+native BTC cases using the current candidate also pass: typed insufficient
+funds without Commit, a confirmed normal send, controlled loss of
+the real Accepted reply resolved by one exact status read, and process restart
+with unchanged operation/transaction identity and dispatch counts. This is
+Simulator/regtest BTC evidence; funded BFA host cases and SDK deadline/queue
+tests remain separate. Earlier candidate receipts do not qualify later
+artifacts. The current staged wrapper manifest is
+`769f2f81af3d2839fa35492d165d025be04557b60d6ee875824ebeb7d158e1fe`.
+
+Device, Android, mainnet, distribution and immutable native-artifact
+qualification remain separate release gates. Legacy unidentified attempts,
+mixed or selectively lost storage, retained-record capacity and native EVM/BFA
+lifecycle coupling remain open. Deleting Aster's EVM identity validation cannot
+safely remove that native startup dependency. Android builds are explicitly
+deferred by the author. Local host/simulator evidence is retained under ignored
+`.buildlog/root01-recovery-20261024/` in both repositories; the public review
+gallery receives only a redacted summary, never private journals, signed PSBTs,
+wallet keys or fixture credentials.
 
 ## Ownership Boundary
 
@@ -173,10 +349,12 @@ selected ready wallet. App pause, resume, and detach transitions enter through
 the repository mutation queue so they cannot split native provisioning from
 its metadata commit. Resume may reopen a suspended owner or recover a
 known-safe retryable lifecycle failure against the durable active profile. It
-cannot clear a reconciliation-required failure: `WalletRuntime` preserves the
-first such failure and blocks normal queued work until a successful rollback
-for the owning wallet or successful disposal completes. An unknown native
-outcome is the strongest subset of this contract, not the only reason
+cannot clear a reconciliation-required failure. `WalletRuntime` distinguishes
+wallet-scoped payment repair from stronger native-owner quarantine. Audited safe
+reads and switching can remain available for a payment fence; ordinary native
+access remains blocked after a stronger owner failure until safe recovery or
+disposal succeeds. Exact accepted/non-send evidence is preserved independently
+of either fence. An unknown native outcome is not the only reason
 reconciliation can be required.
 
 ### Debug hot restart

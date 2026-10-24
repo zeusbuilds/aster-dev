@@ -5,6 +5,7 @@ import 'package:aster/core/core.dart';
 import 'package:aster/features/settings/domain/models/models.dart';
 import 'package:aster/features/settings/presentation/models/models.dart';
 import 'package:aster/features/settings/presentation/view_model/view_models.dart';
+import 'package:aster/features/transaction/presentation/models/models.dart';
 import 'package:aster/features/transaction/presentation/screens/screens.dart';
 import 'package:aster/features/transaction/presentation/view_model/view_models.dart';
 import 'package:aster/features/transaction/presentation/widgets/widgets.dart';
@@ -130,9 +131,10 @@ void main() {
       );
       await _pumpUntil(
         tester,
-        () => find.text('Previous send submitted').evaluate().isNotEmpty,
+        () => find.textContaining('Submitted').evaluate().isNotEmpty,
       );
-      expect(find.text('b' * 64), findsOneWidget);
+      expect(find.text('Previous send submitted'), findsNothing);
+      expect(find.text('b' * 64), findsNothing);
       expect(find.text('Check payment status'), findsNothing);
       expect(tester.takeException(), isNull);
     },
@@ -164,11 +166,29 @@ void main() {
       );
       await _pumpUntil(
         tester,
-        () => find.text('Payment status needs checking').evaluate().isNotEmpty,
+        () => find.textContaining('Status unavailable').evaluate().isNotEmpty,
       );
-      expect(find.text('Check payment status'), findsOneWidget);
-      await tester.ensureVisible(find.text('Check payment status'));
-      await tester.tap(find.text('Check payment status'));
+      expect(find.text('Payment status needs checking'), findsNothing);
+      expect(find.text('Check payment status'), findsNothing);
+      final feed = harness.container
+          .read(activityViewModelProvider(WalletAssetKind.bitcoin))
+          .requireValue
+          .feed;
+      final display = PaymentSubmissionDisplay(feed.paymentSubmission!);
+      await _pump(
+        tester,
+        harness,
+        TransactionDetailsScreen(
+          assetKind: WalletAssetKind.bitcoin,
+          activityId: display.id,
+        ),
+      );
+      await _pumpUntil(
+        tester,
+        () => find.text('Check status').evaluate().isNotEmpty,
+      );
+      await tester.ensureVisible(find.text('Check status'));
+      await tester.tap(find.text('Check status'));
       await tester.pump();
       await _pumpUntil(
         tester,
@@ -177,11 +197,120 @@ void main() {
             .requireValue
             .refreshing,
       );
-      expect(find.text('Payment status needs checking'), findsOneWidget);
+      expect(find.text('Payment status needs checking'), findsNothing);
+      expect(find.text('Status unavailable'), findsWidgets);
       expect(
         engine.calls.where((call) => call == 'sendPayment:start'),
         hasLength(1),
       );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'an accepted receipt repair stays reachable from matching completed native history',
+    (tester) async {
+      final now = DateTime.now().toUtc();
+      final native = WalletActivity(
+        id: 'activity-${'c' * 64}',
+        txid: 'b' * 64,
+        source: WalletActivitySource.bitcoinTransaction,
+        operation: WalletActivityOperation.bitcoinSend,
+        asset: WalletAsset.bitcoin,
+        rail: PaymentRail.onchain,
+        direction: WalletActivityDirection.sent,
+        status: WalletActivityStatus.succeeded,
+        amount: WalletAmount.onchain(assetId: WalletAsset.bitcoin.id, units: 1),
+        occurredAt: now,
+        confirmationHeight: 100,
+        confirmedAt: now,
+      );
+      final engine = FakeWalletEngine()
+        ..activities = [native]
+        ..feeEstimate = WalletFeeRateEstimate(
+          targetBlocks: 6,
+          satsPerVbyte: 2,
+          observedAt: now,
+        );
+      final harness = await _harness(engine: engine, clock: () => now);
+      addTearDown(() => _disposeHarness(tester, harness));
+      final journal =
+          harness.repository.paymentJournalStore!
+              as MemoryWalletPaymentJournalStore;
+      journal.receiptWriteError = StateError('Receipt store unavailable');
+      final result = await harness.repository.sendPayment(
+        target: WalletPaymentTarget.bitcoinOnchain,
+        destination: 'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn',
+        amountUnits: 1,
+        reviewedFeeRate: engine.feeEstimate,
+      );
+      expect(result, isA<AppSuccess<WalletSendResult>>());
+      await _pump(
+        tester,
+        harness,
+        const TransactionListScreen(assetKind: WalletAssetKind.bitcoin),
+      );
+      await _pumpUntil(tester, () => find.text('Sent').evaluate().isNotEmpty);
+      expect(find.byType(PaymentSubmissionItem), findsNothing);
+      expect(find.text('Sent'), findsOneWidget);
+      await _pump(
+        tester,
+        harness,
+        TransactionDetailsScreen(
+          assetKind: WalletAssetKind.bitcoin,
+          activityId: native.id,
+        ),
+      );
+      await _pumpUntil(
+        tester,
+        () => find.text('Completed').evaluate().isNotEmpty,
+      );
+      expect(find.text('Completed'), findsWidgets);
+      await tester.scrollUntilVisible(find.text('Check status'), 300);
+      expect(find.text('Check status'), findsOneWidget);
+      final saved = harness.container
+          .read(activityViewModelProvider(WalletAssetKind.bitcoin))
+          .requireValue
+          .feed
+          .paymentSubmission!;
+      await _pump(
+        tester,
+        harness,
+        TransactionDetailsScreen(
+          assetKind: WalletAssetKind.bitcoin,
+          activityId: PaymentSubmissionDisplay(saved).id,
+        ),
+      );
+      await _pumpUntil(
+        tester,
+        () => find.text('Completed').evaluate().isNotEmpty,
+      );
+      expect(find.text('Completed'), findsWidgets);
+      expect(find.text('Submitted'), findsNothing);
+      await tester.scrollUntilVisible(find.text('Saving pending'), 200);
+      expect(find.text('Saving pending'), findsOneWidget);
+      await tester.scrollUntilVisible(find.text('Check status'), 300);
+      await tester.tap(find.text('Check status'));
+      await tester.pump();
+      await _pumpUntil(
+        tester,
+        () => !harness.container
+            .read(activityViewModelProvider(WalletAssetKind.bitcoin))
+            .requireValue
+            .refreshing,
+      );
+      expect(find.text('Check status'), findsOneWidget);
+      expect(harness.toasts.messages.last.title, 'Payment submitted');
+      expect(engine.paymentOperations.dispatchCount, 1);
+      journal.receiptWriteError = null;
+      await tester.tap(find.text('Check status'));
+      await tester.pump();
+      await _pumpUntil(
+        tester,
+        () => find.text('Check status').evaluate().isEmpty,
+      );
+      expect(find.text('Completed'), findsWidgets);
+      expect(engine.paymentOperations.dispatchCount, 1);
       expect(tester.takeException(), isNull);
     },
   );
@@ -239,10 +368,9 @@ void main() {
       engine.syncError = AppFailureException(failure);
       gate.complete();
       await refreshing;
-      await _pumpUntil(
-        tester,
-        () => find.text(failure.userMessage).evaluate().isNotEmpty,
-      );
+      await tester.pump();
+      await _pumpUntil(tester, () => harness.toasts.messages.isNotEmpty);
+      expect(find.text(failure.userMessage), findsNothing);
       expect(find.text('Received'), findsOneWidget);
       expect(find.byType(LinearProgressIndicator), findsNothing);
       expect(
@@ -657,8 +785,12 @@ void main() {
           ],
           child: MaterialApp(
             theme: AppTheme.light(),
-            home: const TransactionListScreen(
-              assetKind: WalletAssetKind.bitcoin,
+            home: AsterFeedbackScope(
+              haptics: harness.haptics,
+              toasts: harness.toasts,
+              child: const TransactionListScreen(
+                assetKind: WalletAssetKind.bitcoin,
+              ),
             ),
           ),
         ),

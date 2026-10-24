@@ -67,6 +67,7 @@ final class OnboardingTestHarness {
     Object? generationError,
     Object? validationError,
     ResilientHttpClient? httpClient,
+    AssetBundle? onboardingAssets,
   }) async {
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
@@ -105,7 +106,7 @@ final class OnboardingTestHarness {
       overrides: [
         walletRepositoryProvider.overrideWith((ref) async => repository),
         bip39WordListRepositoryProvider.overrideWithValue(
-          Bip39WordListRepository(rootBundle),
+          Bip39WordListRepository(onboardingAssets ?? rootBundle),
         ),
         recoveryQuizRandomProvider.overrideWithValue(Random(19)),
         sensitiveClipboardServiceProvider.overrideWithValue(clipboard),

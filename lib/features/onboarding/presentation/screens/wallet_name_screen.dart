@@ -307,20 +307,6 @@ class _WalletNameScreenState extends ConsumerState<WalletNameScreen> {
                           ),
                         ),
                       ),
-                      if (state.failure case final failure?) ...[
-                        SizedBox(height: spacing.md),
-                        Semantics(
-                          liveRegion: true,
-                          child: Text(
-                            failure.userMessage,
-                            style: context.type.errorMessage.copyWith(
-                              color: widget.onBrandArt
-                                  ? colors.onBrandArt
-                                  : null,
-                            ),
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ),
@@ -401,9 +387,10 @@ class _WalletNameScreenState extends ConsumerState<WalletNameScreen> {
   }
 
   Future<void> _submit(AsterNavigationCommandOwner navigation) async {
+    final toasts = context.toasts;
     FocusScope.of(context).unfocus();
     var completed = false;
-    await navigation.run(
+    final accepted = await navigation.run(
       command: () async {
         completed = switch (widget._source) {
           _WalletNameSource.create =>
@@ -418,7 +405,25 @@ class _WalletNameScreenState extends ConsumerState<WalletNameScreen> {
       hapticIntent: null,
       blocksRoutePop: true,
     );
-    if (!completed || !mounted) return;
+    if (!accepted || !mounted) return;
+    if (!completed) {
+      final failure = switch (widget._source) {
+        _WalletNameSource.create =>
+          ref.read(createWalletViewModelProvider).value?.failure,
+        _WalletNameSource.import =>
+          ref.read(importWalletViewModelProvider).value?.failure,
+      };
+      if (failure != null) {
+        toasts.show(
+          title: widget._source == _WalletNameSource.create
+              ? 'Wallet could not be created'
+              : 'Wallet could not be imported',
+          message: failure.userMessage,
+          variant: ToastVariant.failure,
+        );
+      }
+      return;
+    }
     if (widget.onCompleted case final onCompleted?) {
       onCompleted();
       return;

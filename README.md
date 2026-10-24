@@ -2,8 +2,10 @@
 
 Aster is a Flutter wallet for Bitcoin, RGB USDT, and Lightning. It is powered
 by the UTEXO protocol through the public `rgb_sdk_flutter` API, with SDK
-`0.2.0-beta.3` pinned to immutable public Git commit
-`a8b053766c4ebfdc52f94716caad1c09060eba90`, and uses Riverpod MVVM.
+`0.2.0-beta.3` pinned to immutable commit
+`68a690916eabe96407c03669d569bf86babb8e72` in the private repository
+`https://github.com/zeusbuilds/rgb-sdk-flutter.git`, and uses Riverpod MVVM.
+Source restoration requires authenticated read access to that repository.
 
 ## Release Status
 
@@ -17,17 +19,28 @@ and mainnet external signing are disabled at their release boundaries.
 - Final application identifiers, signing ownership, authentication for secret
   disclosure, screen-capture policy, and store privacy/export declarations
   remain product, security, or release-owner decisions.
-- The SDK candidate includes a derived 16 KiB RLN 0.17 artifact with passing
-  native signer checks on both platforms. Aster's Debug APK passes all 25
-  native ELF checks, 16 KiB ZIP alignment and startup on Android 17 with
+- The published native baseline includes a derived 16 KiB RLN 0.17 artifact
+  with passing native signer checks on both platforms. Its historical Aster
+  Debug APK passes all 25 native ELF checks, 16 KiB ZIP alignment and startup on Android 17 with
   compatibility fallback disabled. SDK-004's exact release AAB/split-APK
   qualification remains open. Local funded wallet evidence is tracked in
   `docs/SHARED_WALLET_QUALIFICATION.md`.
 - SDK [v0.2.0-beta.1](https://github.com/UTEXO-Protocol/flutter-sdk/releases/tag/v0.2.0-beta.1)
-  and its derived Android AAR are published. The current beta.3 Git pin retains
-  those native bytes. Historical empty-Git-cache evidence restores beta.1;
+  and its derived Android AAR are published. The current source pin retains
+  those official native bytes, which fail closed for the new durable Send API.
+  The verified local binary fixture remains development evidence; its native
+  replacement has not been published. Historical empty-Git-cache evidence
+  restores beta.1;
   an empty Gradle dependency cache
   downloads and verifies the release AAR over HTTPS.
+- Authenticated restoration of the current private SDK source into an empty
+  Git cache passes, with the hosted Pub cache reused. This is source evidence,
+  not native publication. CI also needs read access to the private SDK; the
+  workflow repository's ordinary `GITHUB_TOKEN` cannot provide cross-repository
+  access. Trusted CI dependency restoration uses an SDK-only read-only deploy
+  key, with runner credentials removed immediately after Pub. An isolated real
+  read/cleanup check passes; remote workflow results remain separate. See
+  `docs/architecture/SDK_INTEGRATION.md`.
 - `1.0.0+1` is a provisional app version until release ownership defines the
   public version/build-number and upgrade policy.
 - RGB USDT stays unavailable unless a deployment supplies a validated asset ID

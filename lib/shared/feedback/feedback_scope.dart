@@ -43,6 +43,54 @@ extension AsterFeedbackContext on BuildContext {
         'root or provide an explicit scope in widget tests.',
       );
     }
-    return service;
+    final origin = service is OriginScopedToastPresentationService
+        ? service.captureOrigin()
+        : service;
+    final routes = <ModalRoute<Object?>>[];
+    final currentRoute = ModalRoute.of(this);
+    if (currentRoute != null) routes.add(currentRoute);
+    // A root popup can cover a ShellRoute while its nested route remains the
+    // current route in the child Navigator. Check both owners before showing.
+    visitAncestorElements((element) {
+      if (element.widget is Navigator) {
+        final parentRoute = ModalRoute.of(element);
+        if (parentRoute != null && !routes.contains(parentRoute)) {
+          routes.add(parentRoute);
+        }
+      }
+      return true;
+    });
+    return _ContextToasts(origin, this, routes);
+  }
+}
+
+final class _ContextToasts implements ToastPresentationService {
+  const _ContextToasts(this.origin, this.context, this.routes);
+
+  final ToastPresentationService origin;
+  final BuildContext context;
+  final List<ModalRoute<Object?>> routes;
+
+  bool get _isCurrent =>
+      context.mounted && routes.every((route) => route.isCurrent);
+
+  @override
+  bool show({
+    required String title,
+    required ToastVariant variant,
+    String? message,
+    Duration? duration,
+  }) =>
+      _isCurrent &&
+      origin.show(
+        title: title,
+        variant: variant,
+        message: message,
+        duration: duration,
+      );
+
+  @override
+  void dismissCurrent({int? id}) {
+    if (_isCurrent) origin.dismissCurrent(id: id);
   }
 }

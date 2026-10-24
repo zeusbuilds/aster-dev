@@ -32,6 +32,7 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
   late DateTime _now;
   late ProviderSubscription<AsyncValue<ReceiveFlowState>> _requestSubscription;
   bool _setupCommandActive = false;
+  String? _preparationStateCode;
 
   bool get _requestActionInProgress {
     final flow = ref.read(receiveFlowViewModelProvider(widget.target));
@@ -52,7 +53,7 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
           builder: (context) => AlertDialog(
             title: const Text('Use blind receive?'),
             content: const Text(
-              'A blind request uses prepared wallet-owned Bitcoin outputs. If none are available, you can prepare them separately and pay a Bitcoin network fee. Witness receive remains available without preparation.',
+              'Uses prepared Bitcoin outputs. Preparing more outputs costs a Bitcoin network fee.',
             ),
             actions: [
               TextButton(
@@ -77,9 +78,17 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
         if (approved != true || !mounted) return;
       }
       if (!mounted) return;
+      final toasts = context.toasts;
       await ref
           .read(receiveFlowViewModelProvider(widget.target).notifier)
           .setRgbReceiveMode(mode);
+      if (mounted) {
+        _showCurrentFailure(
+          toasts,
+          'Could not change receive mode',
+          skipExpectedSetup: true,
+        );
+      }
     } finally {
       if (mounted) setState(() => _setupCommandActive = false);
     }
@@ -87,6 +96,7 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
 
   Future<void> _prepareRgbSetup() async {
     if (_requestActionInProgress) return;
+    final toasts = context.toasts;
     setState(() => _setupCommandActive = true);
     final notifier = ref.read(
       receiveFlowViewModelProvider(widget.target).notifier,
@@ -98,6 +108,11 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
       if (result case AppSuccess<RgbWalletSetupReview>(:final value)) {
         review = value;
       }
+      if (result case AppFailureResult<RgbWalletSetupReview>(:final failure)) {
+        if (mounted) {
+          _showReceiveFailure(toasts, 'Could not prepare wallet', failure);
+        }
+      }
       if (review == null || !mounted) return;
       final current = review;
       var decisionMade = false;
@@ -107,15 +122,45 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
         builder: (context) => AlertDialog(
           title: const Text('Prepare RGB wallet?'),
           content: SingleChildScrollView(
-            child: Text(
-              'Create up to ${RgbWalletSetupReview.outputCount} wallet-owned outputs of '
-              '${RgbWalletSetupReview.outputValueSats} sat each at '
-              '${current.feeRateSatPerVbyte} sat/vB.\n'
-              '${current.feeSource == WalletFeeRateSource.localRegtestPolicy ? 'Local test fee rate' : 'Network fee rate'}\n\n'
-              'The native wallet may create fewer outputs after allowing for the network fee. The outputs remain in your wallet. Only the Bitcoin network fee is spent. '
-              'The final fee is unknown until construction; no total fee cap applies. '
-              'Receiving USDT starts only after confirmation.\n\n'
-              'This review expires in two minutes.',
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _SetupReviewRow(
+                  label: 'Outputs',
+                  value:
+                      'Up to ${RgbWalletSetupReview.outputCount} × '
+                      '${RgbWalletSetupReview.outputValueSats} sat',
+                ),
+                _SetupReviewRow(
+                  label: 'Fee rate',
+                  value: '${current.feeRateSatPerVbyte} sat/vB',
+                ),
+                _SetupReviewRow(
+                  label: 'Fee source',
+                  value:
+                      current.feeSource ==
+                          WalletFeeRateSource.localRegtestPolicy
+                      ? 'Local test fee rate'
+                      : 'Network fee rate',
+                ),
+                _SetupReviewRow(
+                  label: 'Expires',
+                  value: DateFormat.jm(
+                    Localizations.localeOf(context).toString(),
+                  ).format(current.expiresAt.toLocal()),
+                ),
+                SizedBox(height: context.spacing.md),
+                const Text(
+                  'Outputs stay in your wallet. Only the network fee is spent. The actual output count may be lower.',
+                ),
+                SizedBox(height: context.spacing.sm),
+                const Text(
+                  'The final fee is unknown. No total fee cap applies.',
+                ),
+                SizedBox(height: context.spacing.sm),
+                const Text('USDT receipt is available after confirmation.'),
+              ],
             ),
           ),
           actions: [
@@ -140,20 +185,61 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
       );
       if (confirmed != true || !mounted) return;
       submitted = true;
+      _preparationStateCode = 'rgb_wallet_setup_pending';
+      final confirmationToasts = context.toasts;
       await notifier.confirmRgbSetup(current);
+      if (!mounted) return;
+      final failure = _currentFailure();
+      if (failure?.code == 'rgb_wallet_setup_review_changed') {
+        // The same rejection code also covers a changed or already-dispatched
+        // journal. Inspect its authoritative preparation phase once; never
+        // infer permission to prepare again from wording or elapsed time.
+        await notifier.checkRgbSetup();
+        if (!mounted) return;
+        if (_currentFailure()?.code == 'rgb_wallet_setup_required') {
+          confirmationToasts.show(
+            title: 'Review changed',
+            message: 'Review the fee and confirm again.',
+            variant: ToastVariant.warning,
+          );
+        } else {
+          _showCurrentFailure(
+            confirmationToasts,
+            'Could not check preparation',
+          );
+        }
+      } else {
+        _showCurrentFailure(
+          confirmationToasts,
+          'Could not prepare wallet',
+          skipPending: true,
+        );
+      }
     } finally {
-      if (!submitted && review != null) await notifier.cancelRgbSetup(review);
+      if (!submitted && review != null) {
+        final cancellationToasts = mounted ? context.toasts : null;
+        await notifier.cancelRgbSetup(review);
+        if (mounted && cancellationToasts != null) {
+          _showCurrentFailure(
+            cancellationToasts,
+            'Could not close review',
+            skipExpectedSetup: true,
+          );
+        }
+      }
       if (mounted) setState(() => _setupCommandActive = false);
     }
   }
 
   Future<void> _retryRgbReceive() async {
     if (_requestActionInProgress) return;
+    final toasts = context.toasts;
     setState(() => _setupCommandActive = true);
     try {
       await ref
           .read(receiveFlowViewModelProvider(widget.target).notifier)
           .retryRgbReceive();
+      if (mounted) _showCurrentFailure(toasts, 'Could not create request');
     } finally {
       if (mounted) setState(() => _setupCommandActive = false);
     }
@@ -161,14 +247,75 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
 
   Future<void> _checkRgbSetup() async {
     if (_requestActionInProgress) return;
+    final toasts = context.toasts;
     setState(() => _setupCommandActive = true);
     try {
       await ref
           .read(receiveFlowViewModelProvider(widget.target).notifier)
           .checkRgbSetup();
+      if (mounted) _showCurrentFailure(toasts, 'Could not check preparation');
     } finally {
       if (mounted) setState(() => _setupCommandActive = false);
     }
+  }
+
+  Future<void> _retryRequest() async {
+    if (_requestActionInProgress) return;
+    final toasts = context.toasts;
+    await ref
+        .read(receiveFlowViewModelProvider(widget.target).notifier)
+        .retry();
+    if (mounted) _showCurrentFailure(toasts, 'Could not create request');
+  }
+
+  void _showCurrentFailure(
+    ToastPresentationService toasts,
+    String title, {
+    bool skipPending = false,
+    bool skipExpectedSetup = false,
+  }) {
+    final failure = _currentFailure();
+    if (failure == null ||
+        (skipPending && failure.code == 'rgb_wallet_setup_pending') ||
+        (skipExpectedSetup &&
+            (failure.code == 'rgb_wallet_setup_pending' ||
+                failure.code == 'rgb_wallet_setup_required'))) {
+      return;
+    }
+    _showReceiveFailure(toasts, title, failure);
+  }
+
+  AppFailure? _currentFailure() {
+    final flow = ref.read(receiveFlowViewModelProvider(widget.target));
+    return switch (flow) {
+      AsyncError(:final error, :final stackTrace) => FailureMapper.from(
+        error,
+        stackTrace,
+      ),
+      AsyncData(:final value) => value.failure,
+      _ => null,
+    };
+  }
+
+  static void _showReceiveFailure(
+    ToastPresentationService toasts,
+    String title,
+    AppFailure failure,
+  ) {
+    final (heading, message, variant) = switch (failure.code) {
+      'rgb_wallet_setup_required' => (
+        'Preparation needed',
+        'Prepare the wallet before receiving this asset.',
+        ToastVariant.warning,
+      ),
+      'rgb_wallet_setup_pending' => (
+        'Preparation pending',
+        'Check again after confirmation.',
+        ToastVariant.info,
+      ),
+      _ => (title, failure.userMessage, ToastVariant.failure),
+    };
+    toasts.show(title: heading, message: message, variant: variant);
   }
 
   @override
@@ -190,7 +337,24 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
   void _listenToRequest() {
     _requestSubscription = ref.listenManual(
       receiveFlowViewModelProvider(widget.target),
-      (previous, next) => _scheduleExpiry(next.value),
+      (previous, next) {
+        final failure = switch (next) {
+          AsyncError(:final error, :final stackTrace) => FailureMapper.from(
+            error,
+            stackTrace,
+          ),
+          AsyncData(:final value) => value.failure,
+          _ => null,
+        };
+        if (failure?.code == 'rgb_wallet_setup_required' ||
+            failure?.code == 'rgb_wallet_setup_pending') {
+          _preparationStateCode = failure!.code;
+        } else if (next.isLoading ||
+            (next.hasValue && next.value?.failure == null)) {
+          _preparationStateCode = null;
+        }
+        _scheduleExpiry(next.value);
+      },
       fireImmediately: true,
     );
   }
@@ -232,18 +396,19 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
 
   Future<void> _copy() async {
     if (_requestActionInProgress) return;
+    final toasts = context.toasts;
     final result = await ref
         .read(receiveFlowViewModelProvider(widget.target).notifier)
         .copyRequest();
     if (!mounted) return;
     switch (result) {
       case AppSuccess<void>():
-        context.toasts.show(
+        toasts.show(
           title: 'Payment request copied',
           variant: ToastVariant.success,
         );
       case AppFailureResult<void>(:final failure):
-        context.toasts.show(
+        toasts.show(
           title: 'Could not copy request',
           message: failure.userMessage,
           variant: ToastVariant.failure,
@@ -253,6 +418,7 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
 
   Future<void> _share() async {
     if (_requestActionInProgress) return;
+    final toasts = context.toasts;
     final renderBox = context.findRenderObject();
     final origin = renderBox is RenderBox && renderBox.hasSize
         ? () {
@@ -270,7 +436,7 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
         .shareRequest(origin: origin);
     if (!mounted) return;
     if (result case AppFailureResult<ShareDisposition>(:final failure)) {
-      context.toasts.show(
+      toasts.show(
         title: 'Could not share request',
         message: failure.userMessage,
         variant: ToastVariant.failure,
@@ -280,25 +446,20 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
 
   Future<void> _regenerate(AsterNavigationCommandOwner navigation) async {
     if (_requestActionInProgress) return;
+    final toasts = context.toasts;
     await navigation.run(
       command: () async {
         final regenerated = await ref
             .read(receiveFlowViewModelProvider(widget.target).notifier)
             .regenerate();
         if (!mounted) return;
-        if (regenerated) {
-          context.toasts.show(
-            title: 'New payment request ready',
-            variant: ToastVariant.success,
-          );
-          return;
-        }
+        if (regenerated) return;
         final failure = ref
             .read(receiveFlowViewModelProvider(widget.target))
             .value
             ?.failure;
         if (failure != null) {
-          context.toasts.show(
+          toasts.show(
             title: 'Could not regenerate request',
             message: failure.userMessage,
             variant: ToastVariant.failure,
@@ -421,18 +582,20 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
                               onRetryReceive: () =>
                                   unawaited(_retryRgbReceive()),
                               setupBusy: _setupCommandActive,
+                              preparationStateCode: _preparationStateCode,
                             ),
                             loading: () => const _RequestLoading(),
                             error: (error, stackTrace) => _RequestFailure(
                               failure: error is AppFailureException
                                   ? error.failure
                                   : FailureMapper.from(error, stackTrace),
-                              onRetry: ref.read(provider.notifier).retry,
+                              onRetry: () => unawaited(_retryRequest()),
                               onSetup: () => unawaited(_prepareRgbSetup()),
                               onCheckSetup: () => unawaited(_checkRgbSetup()),
                               onRetryReceive: () =>
                                   unawaited(_retryRgbReceive()),
                               setupBusy: _setupCommandActive,
+                              preparationStateCode: _preparationStateCode,
                             ),
                           ),
                         ),
@@ -462,6 +625,7 @@ final class _RequestBody extends StatelessWidget {
     required this.onCheckSetup,
     required this.onRetryReceive,
     required this.setupBusy,
+    required this.preparationStateCode,
   });
 
   final ReceiveFlowState state;
@@ -475,6 +639,7 @@ final class _RequestBody extends StatelessWidget {
   final VoidCallback onCheckSetup;
   final VoidCallback onRetryReceive;
   final bool setupBusy;
+  final String? preparationStateCode;
   final WalletAmountDisplayFormatter _formatter =
       WalletAmountDisplayFormatter();
 
@@ -541,10 +706,12 @@ final class _RequestBody extends StatelessWidget {
                 ],
                 if (expired) ...[
                   SizedBox(height: context.spacing.sm),
-                  const AsterStatusMessage(
-                    'This payment request has expired.',
-                    tone: AsterStatusTone.warning,
-                    announce: true,
+                  Semantics(
+                    container: true,
+                    label: 'Expired',
+                    excludeSemantics: true,
+                    liveRegion: true,
+                    child: Text('Expired', style: context.type.rowValue),
                   ),
                 ] else if (request.expiresAt case final expiry?) ...[
                   SizedBox(height: context.spacing.sm),
@@ -604,34 +771,33 @@ final class _RequestBody extends StatelessWidget {
                       : null,
                 ),
               ],
+              if ((preparationStateCode ?? state.failure?.code) ==
+                  'rgb_wallet_setup_required') ...[
+                const AsterDivider.inset(),
+                AsterOptionRow(
+                  title: 'Try receive again',
+                  prefixIcon: MingCuteIcons.mgc_refresh_2_line,
+                  onTap: commandsEnabled && !setupBusy ? onRetryReceive : null,
+                ),
+                const AsterDivider.inset(),
+                AsterOptionRow(
+                  title: 'Prepare wallet',
+                  prefixIcon: MingCuteIcons.mgc_settings_3_line,
+                  onTap: commandsEnabled && !setupBusy ? onSetup : null,
+                ),
+              ],
+              if ((preparationStateCode ?? state.failure?.code) ==
+                  'rgb_wallet_setup_pending') ...[
+                const AsterDivider.inset(),
+                AsterOptionRow(
+                  title: 'Check preparation',
+                  prefixIcon: MingCuteIcons.mgc_refresh_2_line,
+                  onTap: commandsEnabled && !setupBusy ? onCheckSetup : null,
+                ),
+              ],
             ],
           ),
         ),
-        if (state.failure case final failure?) ...[
-          SizedBox(height: context.spacing.md),
-          AsterStatusMessage(failure.userMessage, tone: AsterStatusTone.danger),
-          if (failure.code == 'rgb_wallet_setup_required')
-            CustomButton.compact(
-              text: 'Try receive again',
-              enabled: !setupBusy,
-              onTap: onRetryReceive,
-              variant: ButtonVariant.tonal,
-            ),
-          if (failure.code == 'rgb_wallet_setup_required')
-            CustomButton(
-              text: 'Prepare wallet',
-              loading: setupBusy,
-              enabled: !setupBusy,
-              onTap: onSetup,
-            ),
-          if (failure.code == 'rgb_wallet_setup_pending')
-            CustomButton(
-              text: 'Check preparation',
-              loading: setupBusy,
-              enabled: !setupBusy,
-              onTap: onCheckSetup,
-            ),
-        ],
       ],
     );
   }
@@ -658,13 +824,6 @@ final class _AmountRequiredCard extends StatelessWidget {
             Text(
               'Amount required',
               style: context.type.title,
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: context.spacing.sm),
-            Text(
-              'Set a ${target.assetLabel} amount to create this '
-              '${target.railLabel} request.',
-              style: context.type.statusMessage,
               textAlign: TextAlign.center,
             ),
           ],
@@ -706,6 +865,7 @@ final class _RequestFailure extends StatelessWidget {
     required this.onCheckSetup,
     required this.onRetryReceive,
     required this.setupBusy,
+    required this.preparationStateCode,
   });
 
   final AppFailure failure;
@@ -714,6 +874,7 @@ final class _RequestFailure extends StatelessWidget {
   final VoidCallback onCheckSetup;
   final VoidCallback onRetryReceive;
   final bool setupBusy;
+  final String? preparationStateCode;
 
   @override
   Widget build(BuildContext context) {
@@ -721,15 +882,28 @@ final class _RequestFailure extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          Icon(
+            (preparationStateCode ?? failure.code) == 'rgb_wallet_setup_pending'
+                ? MingCuteIcons.mgc_time_line
+                : MingCuteIcons.mgc_information_line,
+            size: context.icons.xl,
+            color: context.appColors.textSecondary,
+          ),
+          SizedBox(height: context.spacing.md),
           Semantics(
             liveRegion: true,
             child: Text(
-              failure.userMessage,
-              style: context.type.statusMessage,
+              switch (preparationStateCode ?? failure.code) {
+                'rgb_wallet_setup_required' => 'Preparation needed',
+                'rgb_wallet_setup_pending' => 'Preparation pending',
+                _ => 'Request unavailable',
+              },
+              style: context.type.title,
               textAlign: TextAlign.center,
             ),
           ),
-          if (failure.code == 'rgb_wallet_setup_required') ...[
+          if ((preparationStateCode ?? failure.code) ==
+              'rgb_wallet_setup_required') ...[
             SizedBox(height: context.spacing.lg),
             CustomButton.compact(
               text: 'Try receive again',
@@ -744,7 +918,8 @@ final class _RequestFailure extends StatelessWidget {
               enabled: !setupBusy,
               onTap: onSetup,
             ),
-          ] else if (failure.code == 'rgb_wallet_setup_pending') ...[
+          ] else if ((preparationStateCode ?? failure.code) ==
+              'rgb_wallet_setup_pending') ...[
             SizedBox(height: context.spacing.lg),
             CustomButton(
               text: 'Check preparation',
@@ -760,4 +935,24 @@ final class _RequestFailure extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Deliberate consent details, rather than operational prose in the QR screen.
+final class _SetupReviewRow extends StatelessWidget {
+  const _SetupReviewRow({required this.label, required this.value});
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.only(bottom: context.spacing.sm),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: Text(label, style: context.type.rowMeta)),
+        SizedBox(width: context.spacing.md),
+        Flexible(child: Text(value, textAlign: TextAlign.end)),
+      ],
+    ),
+  );
 }

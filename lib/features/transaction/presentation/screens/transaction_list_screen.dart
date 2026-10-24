@@ -82,6 +82,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
     final settings = ref.watch(settingsViewModelProvider);
 
     Future<void> refresh() async {
+      final toasts = context.toasts;
       final activityProvider = activityViewModelProvider(assetKind);
       final notifier = ref.read(activityProvider.notifier);
       if (ref.read(activityProvider).value == null) {
@@ -100,7 +101,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
           ?.refreshFailure;
       if (failure == null) return;
       unawaited(context.haptics.trigger(HapticIntent.error));
-      context.toasts.show(
+      toasts.show(
         title: 'Activity refresh failed',
         message: failure.userMessage,
         variant: ToastVariant.failure,
@@ -148,7 +149,6 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
                   now: _now,
                   formatter: TransactionListScreen._formatter,
                   onOpenDetails: navigation.inFlight ? null : openDetails,
-                  onCheckPaymentStatus: () => unawaited(refresh()),
                 ),
               ),
             ),
@@ -167,7 +167,6 @@ class _ActivityBody extends StatelessWidget {
     required this.now,
     required this.formatter,
     required this.onOpenDetails,
-    required this.onCheckPaymentStatus,
   });
 
   final AsyncValue<ActivityState> activity;
@@ -176,7 +175,6 @@ class _ActivityBody extends StatelessWidget {
   final DateTime now;
   final ActivityDisplayFormatter formatter;
   final ValueChanged<String>? onOpenDetails;
-  final VoidCallback onCheckPaymentStatus;
 
   @override
   Widget build(BuildContext context) {
@@ -200,15 +198,26 @@ class _ActivityBody extends StatelessWidget {
     final preferences = settings.requireValue.snapshot.preferences;
     final records = state.feed.activities;
     final submission = state.feed.paymentSubmission;
-    final acceptedReceipt =
-        submission?.phase == WalletPaymentSubmissionPhase.accepted &&
-            submission?.requiresReconciliation == false &&
-            submission?.command.route.asset == state.feed.balance.asset &&
-            !records.any(
-              (record) => record.txid == submission?.result?.referenceId,
-            )
-        ? submission?.result
-        : null;
+    final display = submission == null
+        ? null
+        : PaymentSubmissionDisplay(submission);
+    final showSubmission = display?.visibleIn(state.feed) ?? false;
+    final entries =
+        <(WalletActivity?, PaymentSubmissionDisplay?, DateTime?)>[
+          for (final record in records) (record, null, record.occurredAt),
+          if (showSubmission) (null, display, submission!.submittedAt),
+        ]..sort((left, right) {
+          final a = left.$3;
+          final b = right.$3;
+          if (a == null && b != null) return 1;
+          if (a != null && b == null) return -1;
+          final byTime = a == null ? 0 : b!.compareTo(a);
+          if (byTime != 0) return byTime;
+          return (left.$1?.id ?? left.$2!.id).compareTo(
+            right.$1?.id ?? right.$2!.id,
+          );
+        });
+
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
@@ -228,73 +237,6 @@ class _ActivityBody extends StatelessWidget {
             ),
           ),
         ),
-        if (state.feed.paymentSubmission?.requiresReconciliation == true)
-          SliverPadding(
-            padding: EdgeInsets.fromLTRB(
-              context.spacing.screenPadding,
-              context.spacing.lg,
-              context.spacing.screenPadding,
-              context.spacing.none,
-            ),
-            sliver: SliverToBoxAdapter(
-              child: Semantics(
-                liveRegion: true,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Payment status needs checking',
-                      style: context.type.rowTitle,
-                    ),
-                    SizedBox(height: context.spacing.sm),
-                    Text(
-                      'Your previous send may have completed. Sending and wallet '
-                      'changes stay blocked until its status is confirmed. '
-                      'Checking status never sends another payment. If the status '
-                      'stays unknown, contact support; restarting will not resolve it.',
-                      style: context.type.rowMeta,
-                    ),
-                    SizedBox(height: context.spacing.md),
-                    CustomButton(
-                      text: 'Check payment status',
-                      onTap: onCheckPaymentStatus,
-                      variant: ButtonVariant.secondary,
-                      loading: state.refreshing,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        if (acceptedReceipt != null)
-          SliverPadding(
-            padding: EdgeInsets.fromLTRB(
-              context.spacing.screenPadding,
-              context.spacing.lg,
-              context.spacing.screenPadding,
-              context.spacing.none,
-            ),
-            sliver: SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Previous send submitted', style: context.type.rowTitle),
-                  SizedBox(height: context.spacing.sm),
-                  Text(
-                    'Your wallet accepted this send and saved its transaction '
-                    'receipt. Activity may take a moment to show the transfer. '
-                    'Check this transaction before sending again.',
-                    style: context.type.rowMeta,
-                  ),
-                  SizedBox(height: context.spacing.sm),
-                  SelectableText(
-                    acceptedReceipt.referenceId,
-                    style: context.type.rowMeta,
-                  ),
-                ],
-              ),
-            ),
-          ),
         SliverPadding(
           padding: EdgeInsets.fromLTRB(
             context.spacing.screenPadding,
@@ -304,7 +246,7 @@ class _ActivityBody extends StatelessWidget {
           ),
           sliver: SliverToBoxAdapter(child: const SizedBox.shrink()),
         ),
-        if (records.isEmpty)
+        if (entries.isEmpty)
           SliverFillRemaining(
             hasScrollBody: false,
             child: _EmptyActivity(assetKind: assetKind),
@@ -315,13 +257,13 @@ class _ActivityBody extends StatelessWidget {
               horizontal: context.spacing.screenPadding,
             ),
             sliver: SliverList.builder(
-              itemCount: records.length,
+              itemCount: entries.length,
               itemBuilder: (context, index) {
-                final record = records[index];
-                final group = formatter.groupLabel(record.occurredAt, now);
+                final entry = entries[index];
+                final group = formatter.groupLabel(entry.$3, now);
                 final previousGroup = index == 0
                     ? null
-                    : formatter.groupLabel(records[index - 1].occurredAt, now);
+                    : formatter.groupLabel(entries[index - 1].$3, now);
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -330,16 +272,28 @@ class _ActivityBody extends StatelessWidget {
                       Text(group, style: context.type.rowMeta),
                       SizedBox(height: context.spacing.sm),
                     ],
-                    TransactionItem(
-                      key: ValueKey(record.id),
-                      activity: record,
-                      bitcoinUnit: preferences.bitcoinUnit,
-                      valuesVisible: preferences.balancesVisible,
-                      formatter: formatter,
-                      onTap: onOpenDetails == null
-                          ? null
-                          : () => onOpenDetails!(record.id),
-                    ),
+                    if (entry.$1 case final record?)
+                      TransactionItem(
+                        key: ValueKey(record.id),
+                        activity: record,
+                        bitcoinUnit: preferences.bitcoinUnit,
+                        valuesVisible: preferences.balancesVisible,
+                        formatter: formatter,
+                        onTap: onOpenDetails == null
+                            ? null
+                            : () => onOpenDetails!(record.id),
+                      ),
+                    if (entry.$2 case final pending?)
+                      PaymentSubmissionItem(
+                        key: ValueKey(pending.id),
+                        display: pending,
+                        bitcoinUnit: preferences.bitcoinUnit,
+                        valuesVisible: preferences.balancesVisible,
+                        formatter: formatter,
+                        onTap: onOpenDetails == null
+                            ? null
+                            : () => onOpenDetails!(pending.id),
+                      ),
                     SizedBox(height: context.spacing.md),
                   ],
                 );
@@ -448,12 +402,6 @@ class _EmptyActivity extends StatelessWidget {
           Text(
             'No ${assetKind == WalletAssetKind.bitcoin ? 'Bitcoin' : 'USDT'} activity yet',
             style: context.type.title,
-            textAlign: TextAlign.center,
-          ),
-          SizedBox(height: context.spacing.sm),
-          Text(
-            'Completed and pending payments will appear here.',
-            style: context.type.rowMeta,
             textAlign: TextAlign.center,
           ),
         ],

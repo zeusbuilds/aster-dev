@@ -18,7 +18,6 @@ class SendAddressCard extends StatelessWidget {
     required VoidCallback onClear,
     required VoidCallback onPaste,
     required VoidCallback onSubmitted,
-    this.failureMessage,
     this.pasting = false,
   }) : _behavior = _SendAddressCardBehavior(
          controller: controller,
@@ -31,13 +30,11 @@ class SendAddressCard extends StatelessWidget {
   /// Inert content skeleton with the same responsive geometry as the form.
   const SendAddressCard.loading({super.key, required this.target})
     : enabled = false,
-      failureMessage = null,
       pasting = false,
       _behavior = null;
 
   final WalletPaymentTarget target;
   final bool enabled;
-  final String? failureMessage;
   final bool pasting;
   final _SendAddressCardBehavior? _behavior;
 
@@ -99,15 +96,6 @@ class SendAddressCard extends StatelessWidget {
                   }
                 : null,
           ),
-          if (failureMessage case final message?) ...[
-            SizedBox(height: context.spacing.sm),
-            AsterStatusMessage(
-              message,
-              tone: AsterStatusTone.danger,
-              announce: true,
-              textAlign: TextAlign.start,
-            ),
-          ],
         ],
       ),
       footer: Row(

@@ -318,13 +318,13 @@ void main() {
       expect(find.text(feedback.message!), findsNothing);
       expect(find.byType(AsterStatusMessage), findsNothing);
       if (name == 'confirmed rejection') {
-        expect(feedback.title, 'Check amount');
-        expect(feedback.variant, ToastVariant.warning);
+        expect(feedback.title, 'Unable to send');
+        expect(feedback.variant, ToastVariant.failure);
       } else if (harness.container
           .read(provider)
           .requireValue
           .requiresReconciliation) {
-        expect(feedback.title, 'Check payment status');
+        expect(feedback.title, 'Status unavailable');
         expect(feedback.variant, ToastVariant.warning);
       }
       expect(

@@ -113,6 +113,7 @@ class WalletSelectionScreen extends ConsumerWidget {
     AsterNavigationCommandOwner navigation,
     String walletId,
   ) async {
+    final toasts = context.toasts;
     final viewModel = ref.read(walletViewModelProvider.notifier);
     final confirmationDelay = context.motionPolicy.duration(
       context.motion.selectionCommitDelay,
@@ -136,7 +137,7 @@ class WalletSelectionScreen extends ConsumerWidget {
             ?.operationFailure;
         if (failure == null) return;
         unawaited(context.haptics.trigger(HapticIntent.error));
-        context.toasts.show(
+        toasts.show(
           title: 'Wallet not switched',
           message: failure.userMessage,
           variant: ToastVariant.failure,

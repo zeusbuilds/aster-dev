@@ -83,8 +83,18 @@ jobs:
           flutter-version: "3.47.7"
           cache: true
 
+      - name: Configure read-only SDK access
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+        env:
+          SDK_READ_SSH_KEY: ${{ secrets.SDK_READ_SSH_KEY }}
+        run: python3 -I -S tool/configure_private_sdk_access.py
+
       - name: Resolve locked dependencies
         run: flutter pub get --enforce-lockfile
+
+      - name: Remove SDK dependency credentials
+        if: always()
+        run: python3 -I -S tool/configure_private_sdk_access.py --cleanup
 
       - name: Verify process supervisor runtime
         run: python3 -I -S -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 69)'
@@ -174,8 +184,18 @@ jobs:
       - name: Install exact Bundler
         run: gem install bundler --version 4.0.10 --no-document
 
+      - name: Configure read-only SDK access
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+        env:
+          SDK_READ_SSH_KEY: ${{ secrets.SDK_READ_SSH_KEY }}
+        run: python3 -I -S tool/configure_private_sdk_access.py
+
       - name: Resolve locked dependencies
         run: flutter pub get --enforce-lockfile
+
+      - name: Remove SDK dependency credentials
+        if: always()
+        run: python3 -I -S tool/configure_private_sdk_access.py --cleanup
 
       - name: Verify process supervisor runtime
         run: python3 -I -S -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 69)'

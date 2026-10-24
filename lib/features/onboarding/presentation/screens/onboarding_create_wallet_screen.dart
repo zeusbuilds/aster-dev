@@ -244,21 +244,6 @@ class _CreateWalletContentState extends ConsumerState<_CreateWalletContent>
                           onPressed: _togglePhraseVisibility,
                         ),
                       ),
-                      if (state.failure case final failure?) ...[
-                        SizedBox(height: spacing.md),
-                        Semantics(
-                          liveRegion: true,
-                          child: Text(
-                            failure.userMessage,
-                            style: context.type.errorMessage.copyWith(
-                              color: widget.onBrandArt
-                                  ? colors.onBrandArt
-                                  : colors.statusForeground,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ),

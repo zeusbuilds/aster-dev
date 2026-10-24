@@ -7,6 +7,7 @@ import '../../../../shared/feedback/feedback.dart';
 import '../../../settings/domain/models/models.dart';
 import '../../../wallet/data/repository/repository.dart';
 import '../../../wallet/domain/models/models.dart';
+import '../../../wallet/presentation/view_model/view_models.dart';
 import '../models/models.dart';
 import 'send_destination_handoff.dart';
 
@@ -27,7 +28,11 @@ class SendFlowViewModel extends _$SendFlowViewModel {
     _generation += 1;
     ref.onDispose(() => _generation += 1);
     _target = target;
-    return _load();
+    // A retained route cannot keep a different wallet's balance or review.
+    final walletIdentity = ref.watch(
+      walletViewModelProvider.selectAsync((state) => state.activeWallet?.id),
+    );
+    return _load(walletIdentity: walletIdentity);
   }
 
   /// Retries loading route metadata, display settings, balance, and fee state.
@@ -40,9 +45,10 @@ class SendFlowViewModel extends _$SendFlowViewModel {
       _ => null,
     };
     if (failure == null || !failure.retryable) return;
+    final generation = ++_generation;
     state = const AsyncLoading();
     final next = await AsyncValue.guard(_load);
-    if (ref.mounted) state = next;
+    if (ref.mounted && generation == _generation) state = next;
   }
 
   /// Invalidates a prior preview whenever destination text changes.
@@ -54,6 +60,7 @@ class SendFlowViewModel extends _$SendFlowViewModel {
       current.copyWith(
         destination: value,
         preview: null,
+        balancePreparedForDestination: false,
         amountText: '',
         amountInput: _parseAmount('', current),
         retainedFailure: null,
@@ -63,6 +70,7 @@ class SendFlowViewModel extends _$SendFlowViewModel {
 
   /// Reads a bounded non-secret payment destination from the clipboard.
   Future<AppResult<String>> pasteDestination() async {
+    final generation = _generation;
     final current = state.value;
     if (current == null || !current.canReadClipboard) {
       return AppResult.failure(_operationUnavailableFailure());
@@ -75,6 +83,9 @@ class SendFlowViewModel extends _$SendFlowViewModel {
     );
     final result = await ref.read(clipboardServiceProvider).readText();
     if (!ref.mounted) return _clipboardResult(result);
+    if (generation != _generation) {
+      return AppResult.failure(_operationUnavailableFailure());
+    }
     return switch (result) {
       AppSuccess<String?>(:final value) => () {
         final destination = value?.trim() ?? '';
@@ -86,6 +97,7 @@ class SendFlowViewModel extends _$SendFlowViewModel {
           current.copyWith(
             destination: destination,
             preview: null,
+            balancePreparedForDestination: false,
             amountText: '',
             amountInput: _parseAmount('', current),
             operation: null,
@@ -111,6 +123,7 @@ class SendFlowViewModel extends _$SendFlowViewModel {
 
   /// Validates the destination on demand and adopts any encoded amount.
   Future<bool> validateDestination() async {
+    final generation = _generation;
     final current = state.value;
     if (current == null ||
         !current.canStart(SendFlowOperation.validatingDestination) ||
@@ -120,13 +133,14 @@ class SendFlowViewModel extends _$SendFlowViewModel {
     state = AsyncData(
       current.copyWith(
         operation: SendFlowOperation.validatingDestination,
+        balancePreparedForDestination: false,
         retainedFailure: null,
       ),
     );
     final result = await _walletOperation(
       (repository) => repository.previewPayment(_target, current.destination),
     );
-    if (!ref.mounted) return result is AppSuccess<WalletPaymentPreview>;
+    if (!ref.mounted || generation != _generation) return false;
     return switch (result) {
       AppSuccess<WalletPaymentPreview>(:final value) => _acceptPreview(
         current,
@@ -137,6 +151,112 @@ class SendFlowViewModel extends _$SendFlowViewModel {
         failure,
         failedOperation: SendFlowOperation.validatingDestination,
         emitErrorHaptic: true,
+      ),
+    };
+  }
+
+  /// Prepares the amount step with one balance read owned by recipient Continue.
+  /// The caller must hold the foreground route and its loaded wallet identity.
+  Future<bool> prepareAmount() async {
+    final generation = _generation;
+    final current = state.value;
+    if (state.isLoading ||
+        state.hasError ||
+        current == null ||
+        current.preview == null ||
+        !current.canStart(SendFlowOperation.preparingAmount)) {
+      return false;
+    }
+    final wallet = ref.read(walletViewModelProvider);
+    final walletId = wallet.value?.activeWallet?.id;
+    final lifecycle = ref.read(walletLifecycleViewModelProvider);
+    if (wallet.isLoading ||
+        wallet.hasError ||
+        walletId == null ||
+        wallet.value?.switchingWalletId != null ||
+        lifecycle.blocksInteraction) {
+      return false;
+    }
+    final foregroundGeneration = lifecycle.foregroundGeneration;
+    final unprepared = current.copyWith(balancePreparedForDestination: false);
+    if (current.isExpiredAt(ref.read(utcClockProvider)())) {
+      return _fail(
+        unprepared,
+        _expiredRequestFailure(),
+        failedOperation: SendFlowOperation.preparingAmount,
+      );
+    }
+    state = AsyncData(
+      unprepared.copyWith(
+        operation: SendFlowOperation.preparingAmount,
+        retainedFailure: null,
+      ),
+    );
+    final result = await _walletOperation(
+      (repository) => repository.balance(current.route.asset.kind),
+    );
+    if (!ref.mounted || generation != _generation) return false;
+    final latest = state.value;
+    if (state.isLoading ||
+        state.hasError ||
+        latest == null ||
+        latest.operation != SendFlowOperation.preparingAmount ||
+        latest.destination != current.destination ||
+        latest.preview != current.preview) {
+      return false;
+    }
+    final latestWallet = ref.read(walletViewModelProvider);
+    final latestLifecycle = ref.read(walletLifecycleViewModelProvider);
+    if (latestWallet.isLoading ||
+        latestWallet.hasError ||
+        latestWallet.value?.activeWallet?.id != walletId ||
+        latestWallet.value?.switchingWalletId != null ||
+        latestLifecycle.blocksInteraction ||
+        latestLifecycle.foregroundGeneration != foregroundGeneration) {
+      state = AsyncData(
+        unprepared.copyWith(
+          preview: null,
+          operation: null,
+          retainedFailure: null,
+        ),
+      );
+      return false;
+    }
+    if (current.isExpiredAt(ref.read(utcClockProvider)())) {
+      return _fail(
+        unprepared,
+        _expiredRequestFailure(),
+        failedOperation: SendFlowOperation.preparingAmount,
+      );
+    }
+    return switch (result) {
+      AppSuccess<WalletBalance>(:final value) => () {
+        if (value.asset != unprepared.route.asset) {
+          return _fail(
+            unprepared,
+            const AppFailure(
+              code: 'payment_balance_invalid',
+              kind: AppFailureKind.protocol,
+              userMessage: 'Your balance could not be verified. Re-enter the recipient and try again.',
+              retryable: false,
+            ),
+            failedOperation: SendFlowOperation.preparingAmount,
+          );
+        }
+        state = AsyncData(
+          unprepared.copyWith(
+            balance: value,
+            balancePreparedForDestination: true,
+            operation: null,
+            retainedFailure: null,
+          ),
+        );
+        return true;
+      }(),
+      AppFailureResult<WalletBalance>(:final failure) => _fail(
+        unprepared,
+        failure,
+        failedOperation: SendFlowOperation.preparingAmount,
       ),
     };
   }
@@ -178,7 +298,7 @@ class SendFlowViewModel extends _$SendFlowViewModel {
   }
 
   /// Refreshes the selected rail's available balance.
-  /// [silent] suppresses feedback for screen-owned read recovery.
+  /// [silent] suppresses feedback for callers that own presentation.
   Future<bool> refreshBalance({bool silent = false}) async {
     final generation = _generation;
     final current = state.value;
@@ -226,7 +346,7 @@ class SendFlowViewModel extends _$SendFlowViewModel {
   }
 
   /// Refreshes the displayed quote without submitting or retrying a payment.
-  /// [silent] suppresses feedback for screen-owned read recovery.
+  /// [silent] suppresses feedback for callers that own presentation.
   Future<bool> refreshFee({bool silent = false}) async {
     final generation = _generation;
     final current = state.value;
@@ -286,9 +406,33 @@ class SendFlowViewModel extends _$SendFlowViewModel {
 
   /// Submits exactly once and leaves navigation to the observing screen.
   Future<bool> submit() async {
+    final generation = _generation;
     final current = state.value;
-    if (current == null || !current.canStart(SendFlowOperation.submitting)) {
+    if (state.isLoading ||
+        state.hasError ||
+        current == null ||
+        !current.canStart(SendFlowOperation.submitting)) {
       return false;
+    }
+    final wallet = ref.read(walletViewModelProvider);
+    final walletId = current.walletId;
+    if (walletId == null ||
+        wallet.isLoading ||
+        wallet.hasError ||
+        wallet.value?.switchingWalletId != null ||
+        wallet.value?.activeWallet?.id != walletId ||
+        ref.read(walletLifecycleViewModelProvider).blocksInteraction) {
+      return _fail(
+        current,
+        const AppFailure(
+          code: 'payment_wallet_changed',
+          kind: AppFailureKind.conflict,
+          userMessage:
+              'Select the original wallet and review this payment again.',
+          retryable: false,
+        ),
+        failedOperation: SendFlowOperation.submitting,
+      );
     }
     final now = ref.read(utcClockProvider)();
     // A normal BTC send pays its network fee in addition to the recipient
@@ -314,19 +458,9 @@ class SendFlowViewModel extends _$SendFlowViewModel {
       );
       return rejected;
     }
-    if (!current.canSubmitAt(now)) {
+    if (!current.canAttemptSubmitAt(now)) {
       if (current.feeFailure != null) return false;
       final failure = _submissionFailure(current, now);
-      if (failure.code == 'payment_fee_refresh_required') {
-        state = AsyncData(
-          current.copyWith(
-            feeEstimate: null,
-            feeFailure: failure,
-            retainedFailure: null,
-          ),
-        );
-        return false;
-      }
       state = AsyncData(
         current.copyWith(
           retainedFailure: SendFlowFailure(
@@ -336,6 +470,9 @@ class SendFlowViewModel extends _$SendFlowViewModel {
         ),
       );
       return false;
+    }
+    if (!current.canSubmitAt(now)) {
+      return _refreshFeeForSubmit(current, generation);
     }
     final preview = current.preview!;
     final units = current.amountInput.units!;
@@ -353,9 +490,14 @@ class SendFlowViewModel extends _$SendFlowViewModel {
         rgbRecipientType: preview.rgbRecipientType,
         witnessBitcoinAmountSats: preview.witnessBitcoinAmountSats,
         reviewedFeeRate: current.feeEstimate,
+        expectedWalletId: walletId,
       ),
     );
-    if (!ref.mounted) return result is AppSuccess<WalletSendResult>;
+    if (!ref.mounted || generation != _generation) {
+      // The original wallet's durable receipt remains authoritative, but must
+      // never be published into a new wallet's form or success screen.
+      return result is AppSuccess<WalletSendResult>;
+    }
     return switch (result) {
       AppSuccess<WalletSendResult>(:final value) => () {
         state = AsyncData(
@@ -371,19 +513,12 @@ class SendFlowViewModel extends _$SendFlowViewModel {
         return true;
       }(),
       AppFailureResult<WalletSendResult>(:final failure)
-          when failure.code == walletFeeReviewRequiredFailure.code ||
-              failure.code == walletFeeReviewChangedFailure.code =>
-        () {
-          state = AsyncData(
-            current.copyWith(
-              operation: null,
-              feeEstimate: null,
-              feeFailure: failure,
-              retainedFailure: null,
-            ),
-          );
-          return false;
-        }(),
+          when current.route.rail == PaymentRail.onchain &&
+              failure.retryable &&
+              !failure.requiresReconciliation &&
+              (failure.code == walletFeeReviewRequiredFailure.code ||
+                  failure.code == walletFeeReviewChangedFailure.code) =>
+        _refreshFeeForSubmit(current, generation),
       AppFailureResult<WalletSendResult>(:final failure) => _fail(
         current,
         failure,
@@ -393,15 +528,86 @@ class SendFlowViewModel extends _$SendFlowViewModel {
     };
   }
 
-  Future<SendFlowState> _load() async {
+  /// A read-only prerequisite owned by one explicit Send action. Even a fresh
+  /// quote returns false and requires another user-reviewed Send; this method
+  /// cannot invoke the repository's payment command.
+  Future<bool> _refreshFeeForSubmit(
+    SendFlowState previous,
+    int generation,
+  ) async {
+    state = AsyncData(
+      previous.copyWith(
+        operation: SendFlowOperation.submitting,
+        feeEstimate: null,
+        feeFailure: null,
+        retainedFailure: null,
+      ),
+    );
+    final result = await _walletOperation(
+      (repository) => repository.estimateFeeRate(),
+    );
+    if (!ref.mounted || generation != _generation) return false;
+    if (previous.isExpiredAt(ref.read(utcClockProvider)())) {
+      return _fail(
+        previous.copyWith(feeEstimate: null, feeFailure: null),
+        _expiredRequestFailure(),
+        failedOperation: SendFlowOperation.submitting,
+      );
+    }
+    switch (result) {
+      case AppSuccess<WalletFeeRateEstimate>(:final value)
+          when !value.isStaleAt(ref.read(utcClockProvider)()):
+        return _fail(
+          previous.copyWith(feeEstimate: value, feeFailure: null),
+          walletFeeUpdatedReviewFailure,
+          failedOperation: SendFlowOperation.submitting,
+        );
+      case AppSuccess<WalletFeeRateEstimate>():
+        state = AsyncData(
+          previous.copyWith(
+            operation: null,
+            feeEstimate: null,
+            feeFailure: walletFeeReviewRequiredFailure,
+            retainedFailure: null,
+          ),
+        );
+      case AppFailureResult<WalletFeeRateEstimate>(:final failure):
+        state = AsyncData(
+          previous.copyWith(
+            operation: null,
+            feeEstimate: null,
+            feeFailure: failure,
+            retainedFailure: null,
+          ),
+        );
+    }
+    return false;
+  }
+
+  Future<SendFlowState> _load({Future<String?>? walletIdentity}) async {
     try {
-      return await _loadUnsafe();
+      final identity =
+          await (walletIdentity ??
+              ref
+                  .read(walletViewModelProvider.future)
+                  .then((wallet) => wallet.activeWallet?.id));
+      return await _loadUnsafe(identity);
     } catch (error, stackTrace) {
       throw AppFailureException(FailureMapper.from(error, stackTrace));
     }
   }
 
-  Future<SendFlowState> _loadUnsafe() async {
+  Future<SendFlowState> _loadUnsafe(String? walletId) async {
+    if (walletId == null) {
+      throw const AppFailureException(
+        AppFailure(
+          code: 'wallet_active_missing',
+          kind: AppFailureKind.authentication,
+          userMessage: 'Open a wallet before sending.',
+          retryable: false,
+        ),
+      );
+    }
     final repository = await ref.read(walletRepositoryProvider.future);
     final settings = await ref.read(settingsRepositoryProvider.future);
     final routeResult = repository.resolvePaymentTarget(_target);
@@ -439,6 +645,7 @@ class SendFlowViewModel extends _$SendFlowViewModel {
         .take();
     return SendFlowState(
       route: route,
+      walletId: walletId,
       bitcoinUnit: bitcoinUnit,
       currencyCode: settingsSnapshot.preferences.currencyCode,
       balance: balance,
@@ -473,6 +680,7 @@ class SendFlowViewModel extends _$SendFlowViewModel {
     state = AsyncData(
       previous.copyWith(
         preview: preview,
+        balancePreparedForDestination: false,
         amountText: amountText,
         amountInput: _parseAmount(amountText, previous),
         operation: null,
@@ -510,6 +718,11 @@ class SendFlowViewModel extends _$SendFlowViewModel {
     state = AsyncData(
       previous.copyWith(
         operation: null,
+        balancePreparedForDestination:
+            failedOperation == SendFlowOperation.validatingDestination ||
+                failedOperation == SendFlowOperation.preparingAmount
+            ? false
+            : previous.balancePreparedForDestination,
         retainedFailure: SendFlowFailure(
           operation: failedOperation,
           failure: failure,
@@ -552,17 +765,6 @@ class SendFlowViewModel extends _$SendFlowViewModel {
         retryable: false,
       );
     }
-    if (state.route.rail == PaymentRail.onchain) {
-      return AppFailure(
-        code: 'payment_fee_refresh_required',
-        kind: AppFailureKind.unavailable,
-        userMessage:
-            state.feeEstimate?.source == WalletFeeRateSource.localRegtestPolicy
-            ? 'Refresh the local test fee rate before sending.'
-            : 'Refresh the network fee before sending.',
-        retryable: true,
-      );
-    }
     return const AppFailure(
       code: 'payment_not_ready',
       kind: AppFailureKind.conflict,
@@ -574,7 +776,7 @@ class SendFlowViewModel extends _$SendFlowViewModel {
   static AppFailure _expiredRequestFailure() => const AppFailure(
     code: 'payment_request_expired',
     kind: AppFailureKind.validation,
-    userMessage: 'This payment request has expired.',
+    userMessage: 'This invoice has expired. Enter a new invoice to continue.',
     retryable: false,
   );
 

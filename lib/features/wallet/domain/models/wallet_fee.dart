@@ -9,14 +9,22 @@ enum WalletFeeRateSource { networkEstimate, localRegtestPolicy }
 const walletFeeReviewRequiredFailure = AppFailure(
   code: 'payment_fee_review_required',
   kind: AppFailureKind.conflict,
-  userMessage: 'Refresh the fee and review the payment before sending.',
+  userMessage: 'The network fee needs checking. Tap Send to try again.',
   retryable: true,
 );
 
 const walletFeeReviewChangedFailure = AppFailure(
   code: 'payment_fee_review_changed',
   kind: AppFailureKind.conflict,
-  userMessage: 'The fee rate or policy changed. Refresh the fee and review the payment before sending.',
+  userMessage: 'The fee changed. Tap Send to check it again.',
+  retryable: true,
+);
+
+/// A fresh quote is displayed, but only another deliberate Send may dispatch.
+const walletFeeUpdatedReviewFailure = AppFailure(
+  code: 'payment_fee_review_updated',
+  kind: AppFailureKind.conflict,
+  userMessage: 'The fee is updated. Review it and send again.',
   retryable: true,
 );
 

@@ -7,6 +7,7 @@ import '../../../../shared/shared.dart';
 import '../../../settings/presentation/models/models.dart';
 import '../../../settings/presentation/view_model/view_models.dart';
 import '../../../wallet/domain/models/models.dart';
+import '../../../wallet/presentation/view_model/view_models.dart';
 import '../../../wallet/presentation/widgets/widgets.dart';
 import '../formatting/formatting.dart';
 import '../models/models.dart';
@@ -87,7 +88,29 @@ class _DetailsBody extends ConsumerWidget {
       );
     }
     final state = activity.requireValue;
-    final record = state.feed.findById(activityId);
+    var record = state.feed.findById(activityId);
+    final submission = state.feed.paymentSubmission;
+    final display = submission == null
+        ? null
+        : PaymentSubmissionDisplay(submission);
+    if (display != null &&
+        display.id == activityId &&
+        submission!.command.route.asset.kind == assetKind) {
+      // Keep the opaque saved-send route valid while native history catches
+      // up, and use its authoritative confirmation/status as soon as known.
+      record = display.nativeActivityIn(state.feed);
+      if (record == null) {
+        return _SubmissionDetails(
+          display: display,
+          state: state,
+          bitcoinUnit: settings.requireValue.snapshot.preferences.bitcoinUnit,
+          valuesVisible:
+              settings.requireValue.snapshot.preferences.balancesVisible,
+          formatter: formatter,
+          assetKind: assetKind,
+        );
+      }
+    }
     if (record == null) {
       return _DetailsFailure(
         failure:
@@ -120,7 +143,21 @@ class _DetailsBody extends ConsumerWidget {
     );
     final actionsNotifier = ref.read(actionsProvider.notifier);
     Future<void> refresh() async {
-      await ref.read(activityViewModelProvider(assetKind).notifier).refresh();
+      final toasts = context.toasts;
+      final notifier = ref.read(activityViewModelProvider(assetKind).notifier);
+      final completed = await notifier.refresh();
+      if (!context.mounted || completed) return;
+      final failure = ref
+          .read(activityViewModelProvider(assetKind))
+          .value
+          ?.refreshFailure;
+      if (failure == null) return;
+      toasts.show(
+        title: 'Transaction refresh failed',
+        message: failure.userMessage,
+        variant: ToastVariant.failure,
+      );
+      notifier.clearRefreshFailure();
     }
 
     return RefreshIndicator(
@@ -137,14 +174,6 @@ class _DetailsBody extends ConsumerWidget {
             ),
             sliver: SliverList.list(
               children: [
-                if (state.refreshFailure case final failure?) ...[
-                  AsterStatusMessage(
-                    failure.userMessage,
-                    tone: AsterStatusTone.danger,
-                    announce: true,
-                  ),
-                  SizedBox(height: context.spacing.md),
-                ],
                 if (state.refreshing) ...[
                   const LinearProgressIndicator(
                     semanticsLabel: 'Refreshing transaction',
@@ -220,6 +249,14 @@ class _DetailsBody extends ConsumerWidget {
                     ],
                   ),
                 ),
+                if (submission?.requiresReconciliation == true &&
+                    display?.matchesNative(record) == true) ...[
+                  SizedBox(height: context.spacing.sectionGap),
+                  _PaymentStatusCheck(
+                    assetKind: assetKind,
+                    loading: state.refreshing,
+                  ),
+                ],
                 if (actions.explorerUri != null) ...[
                   SizedBox(height: context.spacing.sectionGap),
                   CustomButton(
@@ -250,16 +287,14 @@ class _DetailsBody extends ConsumerWidget {
     String label,
     String value,
   ) async {
+    final toasts = context.toasts;
     final result = await notifier.copyField(field, value);
     if (!context.mounted || result == null) return;
     switch (result) {
       case AppSuccess<void>():
-        context.toasts.show(
-          title: '$label copied',
-          variant: ToastVariant.success,
-        );
+        toasts.show(title: '$label copied', variant: ToastVariant.success);
       case AppFailureResult<void>(:final failure):
-        context.toasts.show(
+        toasts.show(
           title: 'Could not copy $label',
           message: failure.userMessage,
           variant: ToastVariant.failure,
@@ -271,10 +306,11 @@ class _DetailsBody extends ConsumerWidget {
     BuildContext context,
     TransactionDetailsActionsViewModel notifier,
   ) async {
+    final toasts = context.toasts;
     final result = await notifier.openExplorer();
     if (!context.mounted || result == null) return;
     if (result case AppFailureResult<void>(:final failure)) {
-      context.toasts.show(
+      toasts.show(
         title: 'Could not open explorer',
         message: failure.userMessage,
         variant: ToastVariant.failure,
@@ -298,6 +334,11 @@ class _DetailsBody extends ConsumerWidget {
       ),
       _DetailEntry('Payment rail', formatter.railLabel(record.rail)),
       _DetailEntry('Type', formatter.operationLabel(record.operation)),
+      if (feed.paymentSubmission case final saved?
+          when saved.outcome == WalletPaymentSubmissionOutcome.accepted &&
+              saved.requiresReconciliation &&
+              PaymentSubmissionDisplay(saved).matchesNative(record))
+        const _DetailEntry('Receipt', 'Saving pending'),
     ];
     final amount = formatter.amountText(record, bitcoinUnit);
     if (amount != null) {
@@ -455,6 +496,156 @@ class _DetailEntry {
   final bool identifier;
   final TransactionDetailField? copyField;
   final String? copyValue;
+}
+
+class _SubmissionDetails extends StatelessWidget {
+  const _SubmissionDetails({
+    required this.display,
+    required this.state,
+    required this.bitcoinUnit,
+    required this.valuesVisible,
+    required this.formatter,
+    required this.assetKind,
+  });
+
+  final PaymentSubmissionDisplay display;
+  final ActivityState state;
+  final BitcoinUnit bitcoinUnit;
+  final bool valuesVisible;
+  final ActivityDisplayFormatter formatter;
+  final WalletAssetKind assetKind;
+
+  @override
+  Widget build(BuildContext context) {
+    final submission = display.submission;
+    final entries = <(String, String)>[
+      ('Status', display.status),
+      ('Date', formatter.dateTimeLabel(submission.submittedAt)),
+      ('Network', formatter.networkLabel(state.feed.networkStatus.environment)),
+      ('Address', valuesVisible ? submission.command.destination : 'Hidden'),
+      if (submission.result case final receipt?)
+        ('Transaction ID', formatter.compactIdentifier(receipt.referenceId)),
+      if (submission.outcome == WalletPaymentSubmissionOutcome.accepted &&
+          submission.requiresReconciliation)
+        ('Receipt', 'Saving pending'),
+    ];
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(
+            context.spacing.screenPadding,
+            context.spacing.xl,
+            context.spacing.screenPadding,
+            context.spacing.xxl + context.windowInsets.bottomSafe,
+          ),
+          sliver: SliverList.list(
+            children: [
+              Column(
+                children: [
+                  WalletAssetIcon(kind: assetKind, size: context.icons.xl),
+                  SizedBox(height: context.spacing.md),
+                  Text('Send', style: context.type.title),
+                  SizedBox(height: context.spacing.xs),
+                  AmountText(
+                    valuesVisible ? display.amount(bitcoinUnit) : '••••',
+                    style: context.type.amountLarge,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                  ),
+                  SizedBox(height: context.spacing.md),
+                  _StatusBadge(
+                    status: WalletActivityStatus.pending,
+                    label: display.status,
+                  ),
+                ],
+              ),
+              SizedBox(height: context.spacing.sectionGap),
+              Squircle(
+                color: context.appColors.surfaceRaised,
+                padding: EdgeInsets.symmetric(horizontal: context.spacing.lg),
+                child: Column(
+                  children: [
+                    for (var i = 0; i < entries.length; i++) ...[
+                      TransactionDetailRow(
+                        label: entries[i].$1,
+                        value: entries[i].$2,
+                        identifier:
+                            entries[i].$1 == 'Address' ||
+                            entries[i].$1 == 'Transaction ID',
+                      ),
+                      if (i < entries.length - 1) const AsterDivider(),
+                    ],
+                  ],
+                ),
+              ),
+              if (submission.requiresReconciliation) ...[
+                SizedBox(height: context.spacing.sectionGap),
+                _PaymentStatusCheck(
+                  assetKind: assetKind,
+                  loading: state.refreshing,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PaymentStatusCheck extends ConsumerWidget {
+  const _PaymentStatusCheck({required this.assetKind, required this.loading});
+  final WalletAssetKind assetKind;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => CustomButton(
+    text: 'Check status',
+    variant: ButtonVariant.secondary,
+    loading: loading,
+    onTap: () async {
+      final toasts = context.toasts;
+      final walletId = ref
+          .read(walletViewModelProvider)
+          .value
+          ?.activeWallet
+          ?.id;
+      final result = await ref
+          .read(activityViewModelProvider(assetKind).notifier)
+          .checkPaymentStatus();
+      if (!context.mounted ||
+          !(ModalRoute.of(context)?.isCurrent ?? true) ||
+          ref.read(walletViewModelProvider).value?.activeWallet?.id !=
+              walletId) {
+        return;
+      }
+      final record = result is AppSuccess<WalletPaymentSubmission?>
+          ? result.value
+          : null;
+      final outcome = record?.outcome;
+      final accepted = outcome == WalletPaymentSubmissionOutcome.accepted;
+      final notSent = outcome == WalletPaymentSubmissionOutcome.notSubmitted;
+      toasts.show(
+        title: accepted
+            ? 'Payment submitted'
+            : notSent
+            ? 'Payment not sent'
+            : 'Status unavailable',
+        message: accepted
+            ? record!.requiresReconciliation
+                  ? 'Receipt could not be saved. Check again before sending.'
+                  : null
+            : notSent
+            ? record!.requiresReconciliation
+                  ? 'Wallet cleanup is pending. Check again before sending.'
+                  : 'You can try again.'
+            : 'Check again before sending another payment.',
+        variant: accepted && record?.requiresReconciliation == false
+            ? ToastVariant.success
+            : ToastVariant.warning,
+      );
+    },
+  );
 }
 
 class _StatusBadge extends StatelessWidget {

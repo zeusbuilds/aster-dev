@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:aster/core/core.dart';
@@ -106,7 +107,9 @@ final class MemoryWalletPaymentJournalStore
   final writes = <String>[];
   Object? readError;
   int? failWriteNumber;
+  final Set<int> failWriteNumbers = {};
   bool commitBeforeError = false;
+  final Set<int> commitBeforeErrorNumbers = {};
   void Function(String walletId, String document)? onWrite;
 
   @override
@@ -118,8 +121,12 @@ final class MemoryWalletPaymentJournalStore
   @override
   Future<void> write(String walletId, String document) async {
     writes.add(document);
-    if (writes.length == failWriteNumber) {
-      if (commitBeforeError) documents[walletId] = document;
+    if (writes.length == failWriteNumber ||
+        failWriteNumbers.contains(writes.length)) {
+      if (commitBeforeError ||
+          commitBeforeErrorNumbers.contains(writes.length)) {
+        documents[walletId] = document;
+      }
       throw DurableStorageCommitException([
         StateError('Injected write failure'),
       ]);
@@ -253,7 +260,52 @@ final class FakeWalletEngineFactory implements WalletEngineFactory {
   }
 }
 
-final class FakeWalletEngine implements WalletEngine {
+/// In-memory native outbox shared explicitly by restart tests. App journals
+/// remain a separate store so either side can lose an acknowledgement.
+final class FakeWalletPaymentOperationStore {
+  final Map<String, _FakeWalletPaymentOperation> _operations = {};
+  final Set<String> _dispatchedOperationIds = {};
+
+  /// Distinct payment identities, regardless of exact-operation commit replay.
+  int dispatchCount = 0;
+
+  /// Calls that could release the existing prepared transaction.
+  int commitAttemptCount = 0;
+  int get operationCount => _operations.length;
+}
+
+final class _FakeWalletPaymentOperation {
+  _FakeWalletPaymentOperation(this.request, this.command, this.status);
+  final String request;
+  final WalletSendCommand? command;
+  WalletPaymentRecoveryStatus status;
+}
+
+final class FakeWalletEngine
+    implements
+        WalletEngine,
+        WalletPaymentRecoveryEngine,
+        WalletPaymentDeadlineRecovery {
+  FakeWalletEngine({FakeWalletPaymentOperationStore? paymentOperations})
+    : paymentOperations =
+          paymentOperations ?? FakeWalletPaymentOperationStore();
+
+  final FakeWalletPaymentOperationStore paymentOperations;
+  final _paymentCommands = <String, WalletSendCommand>{};
+  Object? paymentOperationRequestError;
+  bool paymentOperationRequestRequiresReopen = false;
+  @override
+  bool requiresPaymentReopen = false;
+  Object? preparePaymentOperationError;
+  Object? commitPaymentOperationReplyError;
+  Object? inspectPaymentOperationError;
+  Object? cancelPaymentOperationError;
+  Object? cancelPaymentOperationReplyError;
+  WalletPaymentRecoveryStatus? preparePaymentOperationResult;
+  WalletPaymentRecoveryStatus? commitPaymentOperationResult;
+  WalletPaymentRecoveryStatus? inspectPaymentOperationResult;
+  WalletPaymentRecoveryStatus? cancelPaymentOperationResult;
+  int legacySendPaymentCalls = 0;
   final calls = <String>[];
   Object? provisionError;
   Object? openPersistedError;
@@ -288,6 +340,8 @@ final class FakeWalletEngine implements WalletEngine {
   WalletSendResult? sentPayment;
   WalletFeeRateEstimate? feeEstimate;
   WalletBalance? balance;
+  // Opt-in adapter contract violation for defensive result validation tests.
+  WalletBalance? balanceResultOverride;
   List<WalletActivity> activities = const <WalletActivity>[];
   final Map<WalletAssetId, WalletBalance> balances = {};
   PaymentRoute? decodedInvoiceRoute;
@@ -319,6 +373,7 @@ final class FakeWalletEngine implements WalletEngine {
     openedPassword = databasePassword;
     await openPersistedGate?.future;
     if (openPersistedError case final Object error) throw error;
+    requiresPaymentReopen = false;
   }
 
   @override
@@ -389,6 +444,11 @@ final class FakeWalletEngine implements WalletEngine {
 
   @override
   Future<WalletSendResult> sendPayment(WalletSendCommand command) async {
+    legacySendPaymentCalls += 1;
+    return _dispatchPayment(command);
+  }
+
+  Future<WalletSendResult> _dispatchPayment(WalletSendCommand command) async {
     calls.add('sendPayment:start');
     sentPaymentCommand = command;
     await sendPaymentGate?.future;
@@ -406,12 +466,199 @@ final class FakeWalletEngine implements WalletEngine {
         );
   }
 
+  static String _paymentRequest(String id, WalletSendCommand command) =>
+      jsonEncode({
+        'version': 1,
+        'id': id,
+        'asset': command.route.asset.id.value,
+        'precision': command.route.asset.precision,
+        'rail': command.route.rail.name,
+        'destination': command.destination,
+        'amount': command.amount.units,
+        'feeTarget': command.feeRate?.targetBlocks,
+        'feeRate': command.feeRate?.satsPerVbyte,
+        'feeObservedAt': command.feeRate?.observedAt.toIso8601String(),
+        'feeSource': command.feeRate?.source.name,
+        'rgbRecipientType': command.rgbRecipientType?.name,
+        'witnessBitcoinAmountSats': command.witnessBitcoinAmountSats,
+      });
+
+  @override
+  Future<String> paymentOperationRequest(
+    String operationId,
+    WalletSendCommand command,
+  ) async {
+    calls.add('paymentOperationRequest');
+    if (paymentOperationRequestError case final error?) {
+      if (paymentOperationRequestRequiresReopen) requiresPaymentReopen = true;
+      throw error;
+    }
+    final request = _paymentRequest(operationId, command);
+    _paymentCommands[request] = command;
+    return request;
+  }
+
+  @override
+  Future<void> validatePaymentOperationRequest(
+    String request,
+    String operationId,
+    WalletSendCommand command,
+  ) async {
+    calls.add('validatePaymentOperationRequest');
+    if (request != _paymentRequest(operationId, command)) {
+      throw const StoredDataCorruptionException();
+    }
+  }
+
+  String _paymentOperationId(String request) {
+    final parsed = jsonDecode(request);
+    if (parsed is! Map<String, Object?> || parsed['id'] is! String) {
+      throw const StoredDataCorruptionException();
+    }
+    return parsed['id']! as String;
+  }
+
+  _FakeWalletPaymentOperation? _paymentOperation(String request) {
+    final operation =
+        paymentOperations._operations[_paymentOperationId(request)];
+    if (operation != null && operation.request != request) {
+      throw const StoredDataCorruptionException();
+    }
+    return operation;
+  }
+
+  @override
+  Future<WalletPaymentRecoveryStatus> preparePaymentOperation(
+    String request,
+  ) async {
+    calls.add('preparePaymentOperation');
+    final existing = _paymentOperation(request);
+    if (existing != null) return existing.status;
+    final command = _paymentCommands[request];
+    if (command == null) throw const StoredDataCorruptionException();
+    if (sendPaymentError is WalletPaymentRejectedBeforeDispatchException) {
+      // Preserve the existing test gate/attempt trace for a documented local
+      // rejection, while creating no prepared resources or financial dispatch.
+      try {
+        await _dispatchPayment(command);
+      } on WalletPaymentRejectedBeforeDispatchException {
+        const rejected = WalletPaymentRecoveryStatus(
+          phase: WalletPaymentRecoveryPhase.rejected,
+          endAuthorized: false,
+        );
+        paymentOperations._operations[_paymentOperationId(request)] =
+            _FakeWalletPaymentOperation(request, command, rejected);
+        return rejected;
+      }
+      throw const StoredDataCorruptionException();
+    }
+    final result = sentPayment;
+    final status =
+        preparePaymentOperationResult ??
+        WalletPaymentRecoveryStatus(
+          phase: WalletPaymentRecoveryPhase.prepared,
+          endAuthorized: false,
+          referenceId: result?.referenceId ?? 'b' * 64,
+          batchTransferIndex:
+              result?.batchTransferIndex ??
+              (command.route.asset.kind == WalletAssetKind.usdt ? 1 : null),
+        );
+    paymentOperations._operations[_paymentOperationId(request)] =
+        _FakeWalletPaymentOperation(request, command, status);
+    if (preparePaymentOperationError case final error?) throw error;
+    return status;
+  }
+
+  @override
+  Future<WalletPaymentRecoveryStatus> commitPaymentOperation(
+    String request,
+  ) async {
+    calls.add('commitPaymentOperation');
+    final operation = _paymentOperation(request);
+    if (operation == null || operation.command == null) {
+      throw const StoredDataCorruptionException();
+    }
+    if (operation.status.phase == WalletPaymentRecoveryPhase.accepted) {
+      return operation.status;
+    }
+    if (commitPaymentOperationResult case final result?
+        when result.phase == WalletPaymentRecoveryPhase.prepared &&
+            !result.endAuthorized) {
+      operation.status = result;
+      return result;
+    }
+    final prepared = operation.status;
+    operation.status = WalletPaymentRecoveryStatus(
+      phase: WalletPaymentRecoveryPhase.committing,
+      endAuthorized: true,
+      referenceId: prepared.referenceId,
+      batchTransferIndex: prepared.batchTransferIndex,
+    );
+    paymentOperations.commitAttemptCount += 1;
+    if (paymentOperations._dispatchedOperationIds.add(
+      _paymentOperationId(request),
+    )) {
+      paymentOperations.dispatchCount += 1;
+    }
+    final result = await _dispatchPayment(operation.command!);
+    if (result.route != operation.command!.route ||
+        result.amount != operation.command!.amount ||
+        (result.status != WalletPaymentStatus.pending &&
+            result.status != WalletPaymentStatus.succeeded)) {
+      throw const StoredDataCorruptionException();
+    }
+    operation.status =
+        commitPaymentOperationResult ??
+        WalletPaymentRecoveryStatus(
+          phase: WalletPaymentRecoveryPhase.accepted,
+          endAuthorized: true,
+          referenceId: result.referenceId,
+          batchTransferIndex: result.batchTransferIndex,
+        );
+    if (commitPaymentOperationReplyError case final error?) throw error;
+    return operation.status;
+  }
+
+  @override
+  Future<WalletPaymentRecoveryStatus> inspectPaymentOperation(
+    String request,
+  ) async {
+    calls.add('inspectPaymentOperation');
+    if (inspectPaymentOperationError case final error?) throw error;
+    return inspectPaymentOperationResult ??
+        _paymentOperation(request)?.status ??
+        const WalletPaymentRecoveryStatus(
+          phase: WalletPaymentRecoveryPhase.absent,
+          endAuthorized: false,
+        );
+  }
+
+  @override
+  Future<WalletPaymentRecoveryStatus> cancelPaymentOperation(
+    String request,
+  ) async {
+    calls.add('cancelPaymentOperation');
+    if (cancelPaymentOperationError case final error?) throw error;
+    if (cancelPaymentOperationResult case final result?) return result;
+    final existing = _paymentOperation(request);
+    if (existing?.status.endAuthorized == true) return existing!.status;
+    const rejected = WalletPaymentRecoveryStatus(
+      phase: WalletPaymentRecoveryPhase.rejected,
+      endAuthorized: false,
+    );
+    paymentOperations._operations[_paymentOperationId(request)] =
+        _FakeWalletPaymentOperation(request, existing?.command, rejected);
+    if (cancelPaymentOperationReplyError case final error?) throw error;
+    return rejected;
+  }
+
   @override
   Future<WalletBalance> getBalance(WalletAsset asset) async {
     calls.add('balance');
     requestedBalanceAsset = asset;
     await balanceGate?.future;
     if (balanceError case final Object error) throw error;
+    if (balanceResultOverride case final result?) return result;
     final configured = balances[asset.id] ?? balance;
     if (configured != null) {
       if (configured.asset != asset) {

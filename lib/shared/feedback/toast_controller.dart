@@ -8,7 +8,7 @@ part 'toast_controller.g.dart';
 /// Owns the app's bounded, deduplicated FIFO toast queue.
 @Riverpod(keepAlive: true)
 class ToastController extends _$ToastController
-    implements ToastPresentationService {
+    implements OriginScopedToastPresentationService {
   static const int maximumPendingMessages = 4;
   static const int maximumTitleCharacters = 80;
   static const int maximumMessageCharacters = 240;
@@ -29,6 +29,49 @@ class ToastController extends _$ToastController
   }
 
   int _nextId = 0;
+  int _scopeEpoch = 0;
+  int _presentationGeneration = 0;
+  Object? _routeScope;
+  String? _walletScope;
+  bool _hasPresented = false;
+
+  /// Navigation invalidates visible and queued feedback from the old route.
+  /// Returning to the same route later never revives an earlier action.
+  void updateRouteScope(Object route) {
+    if (_routeScope == route) return;
+    _routeScope = route;
+    _invalidateScope();
+  }
+
+  /// Wallet changes invalidate feedback even when the visible route is stable.
+  void updateWalletScope(String? walletId) {
+    if (_walletScope == walletId) return;
+    _walletScope = walletId;
+    _invalidateScope();
+  }
+
+  void _invalidateScope() {
+    _scopeEpoch += 1;
+    discardMessagesForPopup();
+  }
+
+  /// A popup replaces transient presentation, but does not replace the action
+  /// that opened it. Its result can still report feedback after it closes,
+  /// provided the original route and wallet remain current.
+  void discardMessagesForPopup() {
+    _presentationGeneration += 1;
+    if (_hasPresented) {
+      // Notify even if the last toast is already dismissing: its outgoing
+      // animation must not survive into a new route or wallet.
+      state = ToastQueueState(scopeGeneration: _presentationGeneration);
+    }
+  }
+
+  @override
+  ToastPresentationService captureOrigin() =>
+      _OriginBoundToasts(this, _scopeEpoch);
+
+  bool _ownsOrigin(int epoch) => ref.mounted && epoch == _scopeEpoch;
 
   @override
   ToastQueueState build() => ToastQueueState();
@@ -65,8 +108,12 @@ class ToastController extends _$ToastController
     }
 
     _nextId += 1;
+    _hasPresented = true;
     if (state.current == null) {
-      state = ToastQueueState(current: candidate);
+      state = ToastQueueState(
+        current: candidate,
+        scopeGeneration: _presentationGeneration,
+      );
       return true;
     }
     if (state.pending.length >= maximumPendingMessages) return false;
@@ -79,12 +126,13 @@ class ToastController extends _$ToastController
     final current = state.current;
     if (current == null || (id != null && current.id != id)) return;
     if (state.pending.isEmpty) {
-      state = ToastQueueState();
+      state = ToastQueueState(scopeGeneration: _presentationGeneration);
       return;
     }
     state = ToastQueueState(
       current: state.pending.first,
       pending: state.pending.skip(1).toList(growable: false),
+      scopeGeneration: _presentationGeneration,
     );
   }
 
@@ -92,5 +140,32 @@ class ToastController extends _$ToastController
     final current = state.current;
     return (current != null && current.hasSameContent(candidate)) ||
         state.pending.any(candidate.hasSameContent);
+  }
+}
+
+final class _OriginBoundToasts implements ToastPresentationService {
+  const _OriginBoundToasts(this.controller, this.epoch);
+
+  final ToastController controller;
+  final int epoch;
+
+  @override
+  bool show({
+    required String title,
+    required ToastVariant variant,
+    String? message,
+    Duration? duration,
+  }) =>
+      controller._ownsOrigin(epoch) &&
+      controller.show(
+        title: title,
+        variant: variant,
+        message: message,
+        duration: duration,
+      );
+
+  @override
+  void dismissCurrent({int? id}) {
+    if (controller._ownsOrigin(epoch)) controller.dismissCurrent(id: id);
   }
 }

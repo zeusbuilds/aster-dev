@@ -10,6 +10,7 @@ import '../../../../shared/shared.dart';
 import '../../../scan/domain/models/models.dart';
 import '../../../wallet/domain/models/models.dart';
 import '../../../wallet/presentation/models/models.dart';
+import '../../../wallet/presentation/view_model/view_models.dart';
 import '../models/models.dart';
 import '../view_model/view_models.dart';
 import '../widgets/widgets.dart';
@@ -95,6 +96,7 @@ class _SendAddressScreenState extends ConsumerState<SendAddressScreen> {
   }
 
   Future<void> _paste() async {
+    final toasts = context.toasts;
     final result = await ref
         .read(sendFlowViewModelProvider(widget.target).notifier)
         .pasteDestination();
@@ -103,7 +105,7 @@ class _SendAddressScreenState extends ConsumerState<SendAddressScreen> {
       case AppSuccess<String>():
         return;
       case AppFailureResult<String>(:final failure):
-        context.toasts.show(
+        toasts.show(
           title: failure.code == 'clipboard_empty'
               ? 'Clipboard is empty'
               : 'Could not paste',
@@ -128,23 +130,119 @@ class _SendAddressScreenState extends ConsumerState<SendAddressScreen> {
     BuildContext routeContext,
     AsterNavigationCommandOwner navigation,
   ) async {
+    final toasts = routeContext.toasts;
+    final target = widget.target;
+    final provider = sendFlowViewModelProvider(target);
+    final notifier = ref.read(provider.notifier);
+    final destination = ref.read(provider).value?.destination;
+    if (destination == null || destination.trim().isEmpty) return;
+    var walletId = ref.read(walletViewModelProvider).value?.activeWallet?.id;
+
+    bool ownsInput({bool requirePreview = false}) {
+      if (!mounted ||
+          widget.target != target ||
+          !routeContext.mounted ||
+          !(ModalRoute.of(routeContext)?.isCurrent ?? true) ||
+          !TickerMode.valuesOf(routeContext).enabled ||
+          (WidgetsBinding.instance.lifecycleState != null &&
+              WidgetsBinding.instance.lifecycleState !=
+                  AppLifecycleState.resumed) ||
+          !identical(ref.read(provider.notifier), notifier)) {
+        return false;
+      }
+      final wallet = ref.read(walletViewModelProvider);
+      if (walletId == null ||
+          wallet.isLoading ||
+          wallet.hasError ||
+          wallet.value?.switchingWalletId != null ||
+          wallet.value?.activeWallet?.id != walletId) {
+        return false;
+      }
+      final flow = ref.read(provider);
+      final current = flow.value;
+      return !flow.isLoading &&
+          !flow.hasError &&
+          current != null &&
+          current.destination == destination &&
+          (!requirePreview ||
+              (current.hasValidatedDestination &&
+                  current.failureFor(SendFlowOperation.validatingDestination) ==
+                      null &&
+                  current.failureFor(SendFlowOperation.preparingAmount) ==
+                      null));
+    }
+
     var valid = false;
     final accepted = await navigation.run(
       command: () async {
-        valid = await ref
-            .read(sendFlowViewModelProvider(widget.target).notifier)
-            .validateDestination();
+        FocusScope.of(routeContext).unfocus();
+        final wallet = await ref.read(walletViewModelProvider.future);
+        walletId ??= wallet.activeWallet?.id;
+        if (!ownsInput()) return;
+        valid = await notifier.validateDestination();
+        if (!ownsInput()) {
+          valid = false;
+          return;
+        }
+        final current = ref.read(provider).requireValue;
+        final failure = current.failureFor(
+          SendFlowOperation.validatingDestination,
+        );
+        valid = valid && current.hasValidatedDestination && failure == null;
+        if (!valid && failure != null && mounted) {
+          toasts.show(
+            title: 'Check recipient',
+            message: failure.userMessage,
+            variant: ToastVariant.warning,
+          );
+        }
+        if (!valid || !ownsInput(requirePreview: true)) return;
+
+        valid = await notifier.prepareAmount();
+        if (!ownsInput()) {
+          valid = false;
+          return;
+        }
+        final prepared = ref.read(provider).requireValue;
+        final balanceFailure = prepared.failureFor(
+          SendFlowOperation.preparingAmount,
+        );
+        valid =
+            valid &&
+            prepared.hasValidatedDestination &&
+            prepared.balancePreparedForDestination &&
+            balanceFailure == null;
+        if (!valid && balanceFailure != null && mounted) {
+          toasts.show(
+            title: balanceFailure.code == 'payment_request_expired'
+                ? 'Invoice expired'
+                : 'Balance unavailable',
+            message: balanceFailure.userMessage,
+            variant: ToastVariant.warning,
+          );
+        }
       },
       failureTitle: 'Recipient could not be validated',
       hapticIntent: null,
       blocksRoutePop: true,
     );
-    if (!accepted || !valid || !mounted || !routeContext.mounted) return;
+    if (!accepted ||
+        !valid ||
+        !ownsInput(requirePreview: true) ||
+        ref.read(provider).value?.balancePreparedForDestination != true) {
+      return;
+    }
     await navigation.openRoute(
-      command: () => routeContext.pushNamed<void>(
-        RouteNames.sendAmount,
-        pathParameters: {RoutePaths.paymentTargetParameter: widget.target.slug},
-      ),
+      command: () async {
+        if (!ownsInput(requirePreview: true) ||
+            ref.read(provider).value?.balancePreparedForDestination != true) {
+          return;
+        }
+        await routeContext.pushNamed<void>(
+          RouteNames.sendAmount,
+          pathParameters: {RoutePaths.paymentTargetParameter: target.slug},
+        );
+      },
       failureTitle: 'Amount entry could not open',
       hapticIntent: null,
     );
@@ -245,7 +343,8 @@ final class _DestinationBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final validating =
-        state.operation == SendFlowOperation.validatingDestination;
+        state.operation == SendFlowOperation.validatingDestination ||
+        state.operation == SendFlowOperation.preparingAmount;
     final pasting = state.operation == SendFlowOperation.readingClipboard;
     return AsterFormBody(
       bottomPadding: context.windowInsets.bottomSafe + context.spacing.lg,
@@ -254,9 +353,6 @@ final class _DestinationBody extends StatelessWidget {
         controller: controller,
         enabled: commandsEnabled && state.canChangeDestination,
         pasting: pasting,
-        failureMessage: state
-            .failureFor(SendFlowOperation.validatingDestination)
-            ?.userMessage,
         onChanged: onChanged,
         onClear: onClear,
         onPaste: onPaste,

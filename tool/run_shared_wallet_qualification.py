@@ -29,7 +29,7 @@ EVIDENCE = ROOT / '.buildlog/full-wallet-20261015'
 PACKAGE = 'com.example.asterdev.debug'
 RUN_ID_PATTERN = r'[A-Za-z0-9][A-Za-z0-9_-]{2,63}'
 DEVICE_PATTERN = r'(?:emulator-[0-9]+|[A-F0-9-]{36})'
-SDK_REPOSITORY = 'https://github.com/UTEXO-Protocol/flutter-sdk.git'
+SDK_REPOSITORY = 'https://github.com/zeusbuilds/rgb-sdk-flutter.git'
 RECONCILIATION_SOURCE_CHANGES = frozenset({
     'docs/PRODUCTION_REFACTOR_TRACKER.md', 'docs/REGTEST.md',
     'docs/SHARED_WALLET_QUALIFICATION.md', 'integration_test/full_wallet_flow_test.dart',

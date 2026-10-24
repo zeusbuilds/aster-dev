@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
 
+import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
 import '../models/models.dart';
 import '../view_model/view_models.dart';
@@ -62,16 +63,20 @@ enum _WalletSetupStep {
 }
 
 class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   _WalletSetupStep _step = _WalletSetupStep.welcome;
   _WalletSetupStep? _outgoingStep;
   late final AnimationController _transitionController;
+  var _checkingDictionary = false;
+  var _dictionaryCheckDeparted = false;
+  var _dictionaryCheckRevision = 0;
 
   bool get _transitioning => _outgoingStep != null;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _transitionController = AnimationController(vsync: this, value: 1)
       ..addStatusListener(_handleTransitionStatus);
   }
@@ -79,6 +84,11 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    ModalRoute.isCurrentOf(context);
+    TickerMode.valuesOf(context);
+    if (_checkingDictionary && !_ownsWelcomeInteraction) {
+      _dictionaryCheckDeparted = true;
+    }
     final previous = _outgoingStep;
     final duration = _transitionDuration;
     _transitionController.duration = duration;
@@ -92,6 +102,8 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
 
   @override
   void dispose() {
+    _dictionaryCheckRevision += 1;
+    WidgetsBinding.instance.removeObserver(this);
     _transitionController
       ..removeStatusListener(_handleTransitionStatus)
       ..dispose();
@@ -100,18 +112,21 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
 
   @override
   Widget build(BuildContext context) {
+    // Keep the same cached repository alive from preflight through the form.
+    ref.watch(walletSetupPreflightViewModelProvider);
     final operationLocked = switch (_step) {
       _WalletSetupStep.createRecoveryPhrase ||
       _WalletSetupStep.createRecoveryQuiz ||
       _WalletSetupStep.createWalletName => _createOperationLocked(),
       _WalletSetupStep.importRecoveryPhrase ||
       _WalletSetupStep.importWalletName => _importOperationLocked(),
-      _WalletSetupStep.welcome => false,
+      _WalletSetupStep.welcome => _checkingDictionary,
     };
 
     final canLeaveRoute =
         widget.origin == WalletCreationOrigin.walletSelector &&
         _step == _WalletSetupStep.welcome &&
+        !_checkingDictionary &&
         !_transitioning;
     return PopScope(
       canPop: canLeaveRoute,
@@ -143,6 +158,69 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
         ),
       ),
     );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed || !_checkingDictionary) return;
+    _dictionaryCheckDeparted = true;
+  }
+
+  bool get _ownsWelcomeInteraction =>
+      mounted &&
+      _step == _WalletSetupStep.welcome &&
+      !_transitioning &&
+      (ModalRoute.of(context)?.isCurrent ?? true) &&
+      TickerMode.valuesOf(context).enabled &&
+      (WidgetsBinding.instance.lifecycleState == null ||
+          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed);
+
+  Future<void> _openRecoveryStep(
+    _WalletSetupStep next,
+    AsterNavigationCommandOwner navigation,
+  ) async {
+    if (_checkingDictionary || !_ownsWelcomeInteraction) return;
+    final toasts = context.toasts;
+    final revision = ++_dictionaryCheckRevision;
+    _dictionaryCheckDeparted = false;
+    setState(() => _checkingDictionary = true);
+    await navigation.run(
+      command: () async {
+        AppFailure? failure;
+        try {
+          final result = await ref
+              .read(walletSetupPreflightViewModelProvider)
+              .prepareRecoveryPhrase();
+          if (result case AppFailureResult(failure: final value)) {
+            failure = value;
+          }
+        } catch (error, stackTrace) {
+          failure = FailureMapper.from(error, stackTrace);
+        }
+        if (!mounted ||
+            revision != _dictionaryCheckRevision ||
+            _dictionaryCheckDeparted ||
+            !_ownsWelcomeInteraction) {
+          return;
+        }
+        if (failure != null) {
+          unawaited(context.haptics.trigger(HapticIntent.error));
+          toasts.show(
+            title: 'Wallet setup unavailable',
+            message: failure.userMessage,
+            variant: ToastVariant.failure,
+          );
+        } else {
+          _showStep(next);
+        }
+      },
+      failureTitle: 'Wallet setup unavailable',
+      hapticIntent: null,
+      blocksRoutePop: true,
+    );
+    if (mounted && revision == _dictionaryCheckRevision) {
+      setState(() => _checkingDictionary = false);
+    }
   }
 
   /// Gives every step the same shared, item-level choreography timeline.
@@ -187,13 +265,38 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
 
   Widget _buildStep(_WalletSetupStep step) {
     return switch (step) {
-      _WalletSetupStep.welcome => _WalletSetupWelcomeContent(
-        origin: widget.origin,
-        onBack: widget.origin == WalletCreationOrigin.walletSelector
-            ? () => Navigator.of(context).pop()
-            : null,
-        onCreateWallet: () => _showStep(_WalletSetupStep.createRecoveryPhrase),
-        onImportWallet: () => _showStep(_WalletSetupStep.importRecoveryPhrase),
+      _WalletSetupStep.welcome => AsterNavigationScope(
+        child: Builder(
+          builder: (context) {
+            final navigation = AsterNavigationScope.of(context);
+            return _WalletSetupWelcomeContent(
+              origin: widget.origin,
+              checkingDictionary: _checkingDictionary,
+              onBack:
+                  widget.origin == WalletCreationOrigin.walletSelector &&
+                      !_checkingDictionary
+                  ? () {
+                      if (_checkingDictionary || !_ownsWelcomeInteraction) {
+                        return;
+                      }
+                      Navigator.of(context).pop();
+                    }
+                  : null,
+              onCreateWallet: () => unawaited(
+                _openRecoveryStep(
+                  _WalletSetupStep.createRecoveryPhrase,
+                  navigation,
+                ),
+              ),
+              onImportWallet: () => unawaited(
+                _openRecoveryStep(
+                  _WalletSetupStep.importRecoveryPhrase,
+                  navigation,
+                ),
+              ),
+            );
+          },
+        ),
       ),
       _WalletSetupStep.createRecoveryPhrase => OnboardingCreateWalletScreen(
         onBack: _showPreviousStep,
@@ -306,6 +409,7 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
   void _showPreviousStep({
     HapticIntent? hapticIntent = HapticIntent.lightImpact,
   }) {
+    if (_checkingDictionary) return;
     final previous = switch (_step) {
       _WalletSetupStep.welcome => null,
       _WalletSetupStep.createRecoveryPhrase => _WalletSetupStep.welcome,
@@ -397,12 +501,14 @@ class _WalletSetupWelcomeContent extends StatelessWidget {
     required this.onBack,
     required this.onCreateWallet,
     required this.onImportWallet,
+    required this.checkingDictionary,
   });
 
   final WalletCreationOrigin origin;
   final VoidCallback? onBack;
   final VoidCallback onCreateWallet;
   final VoidCallback onImportWallet;
+  final bool checkingDictionary;
 
   @override
   Widget build(BuildContext context) {
@@ -452,8 +558,7 @@ class _WalletSetupWelcomeContent extends StatelessWidget {
                               ),
                               SizedBox(height: spacing.md),
                               Text(
-                                'One wallet for Bitcoin and RGB assets across '
-                                'onchain and Lightning.',
+                                'One wallet for Bitcoin, USDT and RGB assets.',
                                 style: type.brandBody,
                               ),
                             ],
@@ -547,6 +652,8 @@ class _WalletSetupWelcomeContent extends StatelessWidget {
                         },
                         variant: ButtonVariant.translucent,
                         hapticIntent: null,
+                        loading: checkingDictionary,
+                        enabled: !checkingDictionary,
                         onTap: onCreateWallet,
                       ),
                       SizedBox(height: spacing.sm),
@@ -554,6 +661,7 @@ class _WalletSetupWelcomeContent extends StatelessWidget {
                         label: 'Import Wallet',
                         onBrandArt: true,
                         hapticIntent: null,
+                        enabled: !checkingDictionary,
                         onPressed: onImportWallet,
                       ),
                     ],

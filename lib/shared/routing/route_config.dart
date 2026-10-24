@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/onboarding/presentation/screens/screens.dart';
@@ -19,7 +20,9 @@ abstract final class RouteConfig {
   RouteConfig._();
 
   /// Returns a fresh route graph for one [GoRouter] owner.
-  static List<RouteBase> getRoutes() {
+  static List<RouteBase> getRoutes({
+    NavigatorObserver Function()? popupObserverFactory,
+  }) {
     return [
       GoRoute(
         path: RoutePaths.splash,
@@ -27,6 +30,7 @@ abstract final class RouteConfig {
         builder: (context, state) => const WalletAccessScreen(),
       ),
       ShellRoute(
+        observers: [if (popupObserverFactory != null) popupObserverFactory()],
         builder: (context, state, child) => OnboardingShell(child: child),
         routes: [
           GoRoute(

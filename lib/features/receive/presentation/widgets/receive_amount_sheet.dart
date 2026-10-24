@@ -20,13 +20,27 @@ class ReceiveAmountSheet extends ConsumerWidget {
     BuildContext context, {
     required WalletPaymentTarget target,
   }) {
+    // Modal routes can be inserted above the caller's feature scope. Reuse
+    // the underlying feedback services, then capture the sheet's own route
+    // origin at the action; an origin bound to the covered parent would drop
+    // genuine sheet failures.
+    final feedback = AsterFeedbackScope.maybeOf(context);
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       isDismissible: false,
       enableDrag: false,
       backgroundColor: context.appColors.transparentSurface,
-      builder: (context) => ReceiveAmountSheet(target: target),
+      builder: (context) {
+        final sheet = ReceiveAmountSheet(target: target);
+        return feedback == null
+            ? sheet
+            : AsterFeedbackScope(
+                haptics: feedback.haptics,
+                toasts: feedback.toasts,
+                child: sheet,
+              );
+      },
     );
   }
 
@@ -36,6 +50,18 @@ class ReceiveAmountSheet extends ConsumerWidget {
     ReceiveFlowViewModel notifier,
     AsterNavigationCommandOwner navigation,
   ) async {
+    final toasts = context.toasts;
+    final current = ref.read(receiveFlowViewModelProvider(target)).value;
+    if (current == null) return;
+    final validationMessage = _amountValidationMessage(current);
+    if (validationMessage != null) {
+      toasts.show(
+        title: 'Check amount',
+        message: validationMessage,
+        variant: ToastVariant.warning,
+      );
+      return;
+    }
     var applied = false;
     final accepted = await navigation.run(
       command: () async {
@@ -46,7 +72,7 @@ class ReceiveAmountSheet extends ConsumerWidget {
             .value
             ?.failure;
         if (failure != null) {
-          context.toasts.show(
+          toasts.show(
             title: 'Amount not applied',
             message: failure.userMessage,
             variant: ToastVariant.failure,
@@ -59,6 +85,21 @@ class ReceiveAmountSheet extends ConsumerWidget {
     );
     if (!accepted || !applied || !context.mounted) return;
     Navigator.of(context).pop();
+  }
+
+  Future<void> _retry(BuildContext context, WidgetRef ref) async {
+    final toasts = context.toasts;
+    await ref.read(receiveFlowViewModelProvider(target).notifier).retry();
+    if (!context.mounted) return;
+    final next = ref.read(receiveFlowViewModelProvider(target));
+    if (next case AsyncError(:final error, :final stackTrace)) {
+      final failure = FailureMapper.from(error, stackTrace);
+      toasts.show(
+        title: 'Amount editor unavailable',
+        message: failure.userMessage,
+        variant: ToastVariant.failure,
+      );
+    }
   }
 
   void _close(BuildContext context, AsterNavigationCommandOwner navigation) {
@@ -141,7 +182,7 @@ class ReceiveAmountSheet extends ConsumerWidget {
                               failure: error is AppFailureException
                                   ? error.failure
                                   : FailureMapper.from(error, stackTrace),
-                              onRetry: ref.read(provider.notifier).retry,
+                              onRetry: () => unawaited(_retry(context, ref)),
                             ),
                           ),
                         ),
@@ -174,20 +215,6 @@ final class _AmountSheetBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const codec = WalletAmountInputCodec();
-    final issue = switch (state.amountInput.issue) {
-      WalletAmountInputIssue.malformed => 'Enter a valid decimal amount.',
-      WalletAmountInputIssue.precisionExceeded =>
-        'This amount has too many decimal places.',
-      WalletAmountInputIssue.zero => 'Amount must be greater than zero.',
-      WalletAmountInputIssue.outOfRange => 'This amount is too large.',
-      WalletAmountInputIssue.empty || null => null,
-    };
-    final amountMessage =
-        issue ??
-        (!state.amountUsesSupportedGranularity
-            ? 'Enter a whole-satoshi Lightning amount.'
-            : null);
-    final visibleMessage = amountMessage ?? state.failure?.userMessage;
     final submitLabel = state.request == null
         ? 'Create request'
         : state.amountText.isEmpty && !state.amountRequired
@@ -210,14 +237,6 @@ final class _AmountSheetBody extends StatelessWidget {
               assetKind: state.route.asset.kind,
             ),
           ),
-          if (visibleMessage case final message?) ...[
-            SizedBox(height: context.spacing.sm),
-            AsterStatusMessage(
-              message,
-              tone: AsterStatusTone.danger,
-              announce: amountMessage == null && state.failure != null,
-            ),
-          ],
           SizedBox(height: context.spacing.lg),
           AsterNumericKeypad(
             value: state.amountText,
@@ -230,7 +249,12 @@ final class _AmountSheetBody extends StatelessWidget {
           CustomButton(
             text: submitLabel,
             loading: state.isGenerating,
-            enabled: commandsEnabled && state.canApplyAmount,
+            enabled:
+                commandsEnabled &&
+                state.canGenerateRequest &&
+                state.canEditAmount &&
+                (state.hasPendingAmountChange ||
+                    _amountValidationMessage(state) != null),
             hapticIntent: null,
             onTap: onApply,
           ),
@@ -256,7 +280,7 @@ final class _SheetFailure extends StatelessWidget {
           Semantics(
             liveRegion: true,
             child: Text(
-              failure.userMessage,
+              'Amount editor unavailable',
               style: context.type.statusMessage,
               textAlign: TextAlign.center,
             ),
@@ -269,4 +293,22 @@ final class _SheetFailure extends StatelessWidget {
       ),
     );
   }
+}
+
+String? _amountValidationMessage(ReceiveFlowState state) {
+  if (state.amountText.isEmpty && state.amountRequired) {
+    return 'Enter an amount.';
+  }
+  final issue = switch (state.amountInput.issue) {
+    WalletAmountInputIssue.malformed => 'Enter a valid decimal amount.',
+    WalletAmountInputIssue.precisionExceeded =>
+      'This amount has too many decimal places.',
+    WalletAmountInputIssue.zero => 'Amount must be greater than zero.',
+    WalletAmountInputIssue.outOfRange => 'This amount is too large.',
+    WalletAmountInputIssue.empty || null => null,
+  };
+  if (issue != null) return issue;
+  return state.amountUsesSupportedGranularity
+      ? null
+      : 'Enter a whole-satoshi Lightning amount.';
 }

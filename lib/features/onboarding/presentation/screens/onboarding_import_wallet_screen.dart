@@ -66,6 +66,53 @@ class _OnboardingImportWalletScreenState
         );
       }
     }, fireImmediately: true);
+    ref.listenManual(
+      importWalletViewModelProvider,
+      _onChecksumResult,
+      fireImmediately: false,
+    );
+  }
+
+  void _onChecksumResult(
+    AsyncValue<ImportWalletState>? previous,
+    AsyncValue<ImportWalletState> next,
+  ) {
+    final failedState = next.value;
+    final failure = failedState?.failure;
+    if (previous?.value?.checksumStatus != MnemonicChecksumStatus.checking ||
+        next is! AsyncData<ImportWalletState> ||
+        failedState == null ||
+        !failedState.allWordsKnown ||
+        failedState.checksumStatus != MnemonicChecksumStatus.incomplete ||
+        failedState.submitting ||
+        failedState.completed ||
+        failedState.requiresReconciliation ||
+        failure?.retryable != true) {
+      return;
+    }
+    // Report only this newly completed check. A retained failure, an edited
+    // phrase, or a departed screen must not replay it as unrelated feedback.
+    final toasts = context.toasts;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          !identical(
+            ref.read(importWalletViewModelProvider).value,
+            failedState,
+          ) ||
+          !(ModalRoute.of(context)?.isCurrent ?? true) ||
+          !TickerMode.valuesOf(context).enabled ||
+          OnboardingChoreographyScope.maybeOf(context)?.exiting == true ||
+          (WidgetsBinding.instance.lifecycleState != null &&
+              WidgetsBinding.instance.lifecycleState !=
+                  AppLifecycleState.resumed)) {
+        return;
+      }
+      toasts.show(
+        title: 'Phrase could not be checked',
+        message: failure!.userMessage,
+        variant: ToastVariant.failure,
+      );
+    });
   }
 
   @override

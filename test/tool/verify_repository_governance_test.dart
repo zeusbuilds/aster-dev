@@ -170,6 +170,78 @@ void main() {
     expect(failures, contains(contains('must not consume repository secrets')));
   });
 
+  group('private SDK credential boundary', () {
+    const guard =
+        r"        if: ${{ github.event_name != 'pull_request' || "
+        r'github.event.pull_request.head.repo.full_name == github.repository }}';
+    const cleanup = '''
+      - name: Remove SDK dependency credentials
+        if: always()
+        run: python3 -I -S tool/configure_private_sdk_access.py --cleanup
+''';
+    final mutations = <String, (String Function(String), String)>{
+      'fork setup execution': (
+        (source) => source.replaceFirst(guard, '        if: always()'),
+        'exact trusted-event setup',
+      ),
+      'missing cleanup': (
+        (source) => source.replaceFirst(cleanup, ''),
+        'immediate credential cleanup',
+      ),
+      'success-only credential cleanup': (
+        (source) => source.replaceFirst(
+          cleanup,
+          cleanup.replaceFirst('if: always()', 'if: success()'),
+        ),
+        'exact trusted-event setup',
+      ),
+      'credential export to later steps': (
+        (source) => source.replaceFirst(
+          '      - name: Analyze\n',
+          '      - name: Analyze\n'
+              '        env:\n'
+              r'          SDK_READ_SSH_KEY: ${{ secrets.SDK_READ_SSH_KEY }}'
+              '\n',
+        ),
+        'must not consume repository secrets',
+      ),
+      'workflow-wide credential export': (
+        (source) => source.replaceFirst(
+          'permissions:\n',
+          'env:\n'
+              r'  SDK_READ_SSH_KEY: ${{ secrets.SDK_READ_SSH_KEY }}'
+              '\n\npermissions:\n',
+        ),
+        'must not consume repository secrets',
+      ),
+      'alternate secret in approved step': (
+        (source) => source.replaceAll(
+          'secrets.SDK_READ_SSH_KEY',
+          'secrets.RELEASE_TOKEN',
+        ),
+        'must not consume repository secrets',
+      ),
+    };
+    for (final entry in mutations.entries) {
+      test('rejects ${entry.key}', () {
+        final repository = Directory.systemTemp.createTempSync(
+          'aster-governance-sdk-',
+        );
+        addTearDown(() => repository.deleteSync(recursive: true));
+        _copyGovernanceFiles(repository);
+        final quality = File('${repository.path}/.github/workflows/dart.yml');
+        final original = quality.readAsStringSync();
+        final mutated = entry.value.$1(original);
+        expect(mutated, isNot(original));
+        quality.writeAsStringSync(mutated);
+        expect(
+          verifyRepositoryGovernance(repository),
+          contains(contains(entry.value.$2)),
+        );
+      });
+    }
+  });
+
   group('Android post-test cleanup', () {
     const hostTests = '''
       - name: Run Android host tests
@@ -193,8 +265,8 @@ void main() {
       _expectInvalidAndroidCleanup(
         addTearDown,
         (source) => source.replaceFirst(
-          '        if: always()\n',
-          '        if: success()\n',
+          cleanup,
+          cleanup.replaceFirst('if: always()', 'if: success()'),
         ),
       );
     });

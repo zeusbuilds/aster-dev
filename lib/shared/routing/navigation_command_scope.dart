@@ -116,6 +116,9 @@ final class _AsterNavigationScopeState extends State<AsterNavigationScope>
     bool blocksRoutePop = false,
   }) async {
     if (_inFlight || !mounted) return false;
+    final toasts = AsterFeedbackScope.maybeOf(context) == null
+        ? null
+        : context.toasts;
     if (blocksRoutePop) _routeCanPop.value = false;
     setState(() => _inFlight = true);
     if (hapticIntent case final intent?) {
@@ -137,7 +140,7 @@ final class _AsterNavigationScopeState extends State<AsterNavigationScope>
       );
       if (mounted) {
         unawaited(context.haptics.trigger(HapticIntent.error));
-        AsterFeedbackScope.maybeOf(context)?.toasts.show(
+        toasts?.show(
           title: failureTitle,
           message: failure.userMessage,
           variant: ToastVariant.failure,
@@ -159,10 +162,13 @@ final class _AsterNavigationScopeState extends State<AsterNavigationScope>
     HapticIntent? hapticIntent = HapticIntent.lightImpact,
   }) async {
     if (!_acquire(hapticIntent)) return false;
+    final toasts = AsterFeedbackScope.maybeOf(context) == null
+        ? null
+        : context.toasts;
     final completion = Future<void>.sync(command).then(
       (_) => true,
       onError: (Object error, StackTrace stackTrace) {
-        _reportFailure(error, stackTrace, failureTitle);
+        _reportFailure(error, stackTrace, failureTitle, toasts);
         return false;
       },
     );
@@ -179,10 +185,13 @@ final class _AsterNavigationScopeState extends State<AsterNavigationScope>
     if (!_acquire(hapticIntent)) {
       return const AsterRouteCommandResult.rejected();
     }
+    final toasts = AsterFeedbackScope.maybeOf(context) == null
+        ? null
+        : context.toasts;
     final completion = Future<T?>.sync(command).then(
       AsterRouteCommandResult<T>.completed,
       onError: (Object error, StackTrace stackTrace) {
-        _reportFailure(error, stackTrace, failureTitle);
+        _reportFailure(error, stackTrace, failureTitle, toasts);
         return AsterRouteCommandResult<T>.rejected();
       },
     );
@@ -218,6 +227,7 @@ final class _AsterNavigationScopeState extends State<AsterNavigationScope>
     Object error,
     StackTrace stackTrace,
     String failureTitle,
+    ToastPresentationService? toasts,
   ) {
     final failure = FailureMapper.from(error, stackTrace);
     FlutterError.reportError(
@@ -230,7 +240,7 @@ final class _AsterNavigationScopeState extends State<AsterNavigationScope>
     );
     if (!mounted) return;
     unawaited(context.haptics.trigger(HapticIntent.error));
-    AsterFeedbackScope.maybeOf(context)?.toasts.show(
+    toasts?.show(
       title: failureTitle,
       message: failure.userMessage,
       variant: ToastVariant.failure,

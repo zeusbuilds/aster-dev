@@ -34,6 +34,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
   }
 
   Future<void> _scanGallery() async {
+    final toasts = context.toasts;
     final viewModel = ref.read(scanViewModelProvider(widget.purpose).notifier);
     final result = await viewModel.scanGallery();
     if (!mounted) return;
@@ -43,7 +44,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
           case ScanGalleryCaptured(:final payload):
             await _completePayload(payload);
           case ScanGalleryNoCode():
-            context.toasts.show(
+            toasts.show(
               title: 'No QR code found',
               message: 'Choose another image and try again.',
               variant: ToastVariant.warning,
@@ -53,7 +54,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
         }
       case AppFailureResult<ScanGalleryOutcome>(:final failure):
         if (failure.code == 'scan_operation_unavailable') return;
-        context.toasts.show(
+        toasts.show(
           title: failure.kind == AppFailureKind.unsupported
               ? 'Image scanning unavailable'
               : 'Image could not be scanned',
@@ -68,6 +69,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
   }
 
   Future<void> _toggleFlash() async {
+    final toasts = context.toasts;
     final result = await ref
         .read(scanViewModelProvider(widget.purpose).notifier)
         .toggleFlash();
@@ -75,10 +77,12 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     _showControlFailure(
       title: 'Flashlight unavailable',
       failure: (result as AppFailureResult<void>).failure,
+      toasts: toasts,
     );
   }
 
   Future<void> _cycleZoom() async {
+    final toasts = context.toasts;
     final result = await ref
         .read(scanViewModelProvider(widget.purpose).notifier)
         .cycleZoom();
@@ -86,15 +90,17 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     _showControlFailure(
       title: 'Zoom unavailable',
       failure: (result as AppFailureResult<void>).failure,
+      toasts: toasts,
     );
   }
 
   void _showControlFailure({
     required String title,
     required AppFailure failure,
+    required ToastPresentationService toasts,
   }) {
     if (failure.code == 'scan_operation_unavailable') return;
-    context.toasts.show(
+    toasts.show(
       title: title,
       message: failure.userMessage,
       variant:
@@ -160,6 +166,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
 
   Future<void> _openSend() async {
     if (_navigationInFlight) return;
+    final toasts = context.toasts;
     setState(() => _navigationInFlight = true);
     final viewModel = ref.read(scanViewModelProvider(widget.purpose).notifier);
     final destinationHandoff = ref.read(
@@ -173,7 +180,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     if (paused case AppFailureResult<void>(:final failure)) {
       destinationHandoff.clear();
       setState(() => _navigationInFlight = false);
-      context.toasts.show(
+      toasts.show(
         title: 'Scanner could not pause',
         message: failure.userMessage,
         variant: ToastVariant.failure,
@@ -187,7 +194,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       destinationHandoff.clear();
       if (mounted) {
         unawaited(context.haptics.trigger(HapticIntent.error));
-        context.toasts.show(
+        toasts.show(
           title: 'Send could not be opened',
           message: failure.userMessage,
           variant: ToastVariant.failure,

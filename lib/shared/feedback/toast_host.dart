@@ -166,8 +166,10 @@ class _ToastHostState extends ConsumerState<ToastHost>
 
   @override
   Widget build(BuildContext context) {
-    final current = ref.watch(
-      toastControllerProvider.select((state) => state.current),
+    final (current, scopeGeneration) = ref.watch(
+      toastControllerProvider.select(
+        (state) => (state.current, state.scopeGeneration),
+      ),
     );
     final transitionDuration = context.motionPolicy.duration(
       context.motion.toastTransitionDuration,
@@ -191,6 +193,7 @@ class _ToastHostState extends ConsumerState<ToastHost>
               curve: context.motion.toastCurve,
               padding: EdgeInsets.only(bottom: context.windowInsets.keyboard),
               child: AnimatedSwitcher(
+                key: ValueKey(scopeGeneration),
                 duration: transitionDuration,
                 reverseDuration: transitionDuration,
                 switchInCurve: context.motion.toastCurve,

@@ -292,6 +292,15 @@ final class WalletPaymentOperations {
     }
     final amount = (amountResult as AppSuccess<WalletAmount?>).value;
     return _runSerialized(() async {
+      if (target == WalletPaymentTarget.bitcoinOnchain &&
+          rgbReceiveMode != RgbReceiveMode.blind) {
+        // Issuing a fresh Bitcoin address does not spend or reserve inputs and
+        // cannot repeat the unresolved send. Keep it under the same native
+        // owner queue, while RGB invoices remain mutation-fenced below.
+        return _runtime.readPaymentState(
+          (engine) => engine.createReceiveRequest(route, amount: amount),
+        );
+      }
       if (route.rail == PaymentRail.onchain) {
         final gate = await beforeOnchainMutation?.call();
         if (gate case AppFailureResult<void>(:final failure)) {
@@ -328,6 +337,7 @@ final class WalletPaymentOperations {
     RgbRecipientType? rgbRecipientType,
     int? witnessBitcoinAmountSats,
     WalletFeeRateEstimate? reviewedFeeRate,
+    String? expectedWalletId,
   }) {
     final routeResult = resolveTarget(target);
     if (routeResult case AppFailureResult<PaymentRoute>(:final failure)) {
@@ -375,6 +385,18 @@ final class WalletPaymentOperations {
     }
     if (route.rail == PaymentRail.onchain) {
       return _runSerialized(() async {
+        if (expectedWalletId == null ||
+            _runtime.activeProfile?.id != expectedWalletId) {
+          return const AppResult.failure(
+            AppFailure(
+              code: 'payment_wallet_changed',
+              kind: AppFailureKind.conflict,
+              userMessage:
+                  'Select the original wallet and review this payment again.',
+              retryable: false,
+            ),
+          );
+        }
         final gate = await beforeOnchainMutation?.call();
         if (gate case AppFailureResult<void>(:final failure)) {
           return AppResult.failure(failure);

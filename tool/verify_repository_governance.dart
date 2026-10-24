@@ -162,12 +162,7 @@ void _verifyWorkflow(File file, List<String> failures) {
       permissions['contents'] != 'read') {
     failures.add('${file.path} must declare read-only contents permission.');
   }
-  if (RegExp(
-    r'\$\{\{[^}]*\b(?:secrets|github\s*\.\s*token)\b',
-    multiLine: true,
-  ).hasMatch(source)) {
-    failures.add('${file.path} must not consume repository secrets.');
-  }
+  final approvedSdkEnvironments = <YamlMap>[];
   if (_hasWorkflowEvent(document['on'], 'pull_request_target')) {
     failures.add('${file.path} must not use pull_request_target.');
   }
@@ -202,11 +197,19 @@ void _verifyWorkflow(File file, List<String> failures) {
       }
       final steps = value['steps'];
       if (steps is! YamlList) continue;
+      final sdkEnvironment = _verifyPrivateSdkAccess(steps, file, failures);
+      if (sdkEnvironment != null) approvedSdkEnvironments.add(sdkEnvironment);
       for (final step in steps) {
         if (step is! YamlMap || !step.containsKey('uses')) continue;
         _verifyActionReference(step['uses'], file: file, failures: failures);
       }
     }
+  }
+  if (_hasUnapprovedWorkflowCredential(document, approvedSdkEnvironments)) {
+    failures.add(
+      '${file.path} must not consume repository secrets outside the reviewed '
+      'read-only SDK setup step.',
+    );
   }
   final commands = _workflowRunCommands(document);
   if (file.path.endsWith('/platform.yml')) {
@@ -276,6 +279,7 @@ void _verifyWorkflow(File file, List<String> failures) {
     }
     for (final required in const <String>[
       'flutter pub get --enforce-lockfile',
+      'python3 -I -S test/tool/configure_private_sdk_access_test.py',
       'dart format --output=none --set-exit-if-changed .',
       'dart run build_runner build',
       'flutter analyze --no-pub --fatal-warnings --fatal-infos',
@@ -294,6 +298,99 @@ void _verifyWorkflow(File file, List<String> failures) {
       }
     }
   }
+}
+
+const _privateSdkSetup = 'python3 -I -S tool/configure_private_sdk_access.py';
+const _privateSdkCleanup = '$_privateSdkSetup --cleanup';
+const _privateSdkSecret = r'${{ secrets.SDK_READ_SSH_KEY }}';
+const _privateSdkTrustedEvent =
+    r"${{ github.event_name != 'pull_request' || "
+    r'github.event.pull_request.head.repo.full_name == github.repository }}';
+
+YamlMap? _verifyPrivateSdkAccess(
+  YamlList steps,
+  File file,
+  List<String> failures,
+) {
+  final setup = <int>[];
+  final restore = <int>[];
+  final cleanup = <int>[];
+  for (var index = 0; index < steps.length; index += 1) {
+    final step = steps[index];
+    if (step is! YamlMap) continue;
+    if (step['run'] == _privateSdkSetup) setup.add(index);
+    if (step['run'] == 'flutter pub get --enforce-lockfile') restore.add(index);
+    if (step['run'] == _privateSdkCleanup) cleanup.add(index);
+  }
+  if (setup.length != 1 ||
+      restore.length != 1 ||
+      cleanup.length != 1 ||
+      setup.single + 1 != restore.single ||
+      restore.single + 1 != cleanup.single) {
+    failures.add(
+      '${file.path} must bracket locked dependency restore with the reviewed '
+      'SDK setup and immediate credential cleanup.',
+    );
+    return null;
+  }
+  final step = steps[setup.single] as YamlMap;
+  final environment = step['env'];
+  final last = steps[cleanup.single] as YamlMap;
+  if (!_setEquals(step.keys.whereType<String>().toSet(), const {
+        'name',
+        'if',
+        'env',
+        'run',
+      }) ||
+      step['name'] != 'Configure read-only SDK access' ||
+      step['if'] != _privateSdkTrustedEvent ||
+      environment is! YamlMap ||
+      environment.length != 1 ||
+      environment['SDK_READ_SSH_KEY'] != _privateSdkSecret ||
+      !_setEquals(last.keys.whereType<String>().toSet(), const {
+        'name',
+        'if',
+        'run',
+      }) ||
+      last['name'] != 'Remove SDK dependency credentials' ||
+      last['if'] != 'always()') {
+    failures.add(
+      '${file.path} SDK credentials must stay in the exact trusted-event setup '
+      'environment and be removed immediately after dependency restore.',
+    );
+    return null;
+  }
+  return environment;
+}
+
+bool _hasUnapprovedWorkflowCredential(
+  Object? value,
+  List<YamlMap> approvedEnvironments,
+) {
+  if (value is YamlMap) {
+    for (final entry in value.entries) {
+      if (approvedEnvironments.any((map) => identical(map, value)) &&
+          entry.key == 'SDK_READ_SSH_KEY' &&
+          entry.value == _privateSdkSecret) {
+        continue;
+      }
+      if (_hasUnapprovedWorkflowCredential(entry.key, approvedEnvironments) ||
+          _hasUnapprovedWorkflowCredential(entry.value, approvedEnvironments)) {
+        return true;
+      }
+    }
+    return false;
+  }
+  if (value is YamlList) {
+    return value.any(
+      (item) => _hasUnapprovedWorkflowCredential(item, approvedEnvironments),
+    );
+  }
+  return value is String &&
+      RegExp(
+        r'\$\{\{[^}]*\b(?:secrets|github\s*\.\s*token)\b',
+        multiLine: true,
+      ).hasMatch(value);
 }
 
 void _verifyActionReference(

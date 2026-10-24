@@ -166,7 +166,12 @@ final class WalletRepository implements WalletLifecycleRepository {
     final active = registry.activeProfile;
     if (active == null) return AppResult.success(registry);
     final restore = await _runtime.restore(active);
-    if (restore is AppSuccess<void>) await _submissions.restoreFence();
+    if (restore is AppSuccess<void>) {
+      final paymentFence = await _restorePaymentFenceUnsafe();
+      if (paymentFence case AppFailureResult<void>(:final failure)) {
+        return AppResult.failure(failure);
+      }
+    }
     return switch (restore) {
       AppSuccess<void>() => AppResult.success(registry),
       AppFailureResult<void>(:final failure) => AppResult.failure(failure),
@@ -413,10 +418,6 @@ final class WalletRepository implements WalletLifecycleRepository {
   }
 
   Future<AppResult<WalletRegistry>> _switchWalletUnsafe(String walletId) async {
-    final gate = await _submissions.assertResolved();
-    if (gate case AppFailureResult<void>(:final failure)) {
-      return AppResult.failure(failure);
-    }
     final registryResult = await _profiles.read();
     if (registryResult case AppFailureResult<WalletRegistry>()) {
       return registryResult;
@@ -437,6 +438,12 @@ final class WalletRepository implements WalletLifecycleRepository {
     }
     if (registry.activeWalletId == walletId) {
       final activation = await _runtime.switchTo(target);
+      if (activation is AppSuccess<void>) {
+        final paymentFence = await _restorePaymentFenceUnsafe();
+        if (paymentFence case AppFailureResult<void>(:final failure)) {
+          return AppResult.failure(failure);
+        }
+      }
       return switch (activation) {
         AppSuccess<void>() => AppResult.success(registry),
         AppFailureResult<void>(:final failure) => AppResult.failure(failure),
@@ -448,7 +455,10 @@ final class WalletRepository implements WalletLifecycleRepository {
     }
     final persisted = await _profiles.setActive(walletId);
     if (persisted is AppSuccess<WalletRegistry>) {
-      await _submissions.restoreFence();
+      final paymentFence = await _restorePaymentFenceUnsafe();
+      if (paymentFence case AppFailureResult<void>(:final failure)) {
+        return AppResult.failure(failure);
+      }
       return persisted;
     }
 
@@ -478,7 +488,35 @@ final class WalletRepository implements WalletLifecycleRepository {
         ),
       );
     }
+    final paymentFence = await _restorePaymentFenceUnsafe();
+    if (paymentFence case AppFailureResult<void>(:final failure)) {
+      return AppResult.failure(failure);
+    }
     return persisted;
+  }
+
+  Future<AppResult<void>> _restorePaymentFenceUnsafe() async {
+    try {
+      await _submissions.restoreFence();
+      return const AppResult.success(null);
+    } catch (error, stack) {
+      // An unreadable journal must never leave a newly opened engine usable.
+      // Its storage may contain an unresolved operation whose fence could not
+      // be restored. Close the owner before releasing the repository queue.
+      return AppResult.failure(
+        await _quarantineAfterCommitFailure(
+          AppFailure(
+            code: 'wallet_payment_fence_restore_failed',
+            kind: AppFailureKind.storage,
+            userMessage: 'Wallet payment records could not be read safely.',
+            retryable: false,
+            requiresReconciliation: true,
+            cause: FailureMapper.from(error, stack),
+            stackTrace: stack,
+          ),
+        ),
+      );
+    }
   }
 
   Future<AppFailure> _quarantineAfterCommitFailure(AppFailure failure) async {
@@ -544,6 +582,7 @@ final class WalletRepository implements WalletLifecycleRepository {
     RgbRecipientType? rgbRecipientType,
     int? witnessBitcoinAmountSats,
     WalletFeeRateEstimate? reviewedFeeRate,
+    String? expectedWalletId,
   }) => _payments.send(
     target: target,
     destination: destination,
@@ -551,6 +590,9 @@ final class WalletRepository implements WalletLifecycleRepository {
     rgbRecipientType: rgbRecipientType,
     witnessBitcoinAmountSats: witnessBitcoinAmountSats,
     reviewedFeeRate: reviewedFeeRate,
+    // Capture before joining the repository queue: a queued wallet switch may
+    // finish before this command gets its native lease.
+    expectedWalletId: expectedWalletId ?? _runtime.activeProfile?.id,
   );
 
   /// Durable submission evidence never grants permission to repeat dispatch.
@@ -561,6 +603,11 @@ final class WalletRepository implements WalletLifecycleRepository {
   /// payment by amount/date or an empty history. This operation never sends.
   Future<AppResult<void>> reconcilePaymentSubmission() =>
       _enqueueOperation(_submissions.reconcile);
+
+  /// Explicitly resumes only the saved, already-authorized native transaction.
+  /// Separate from Check payment status; no screen invokes this automatically.
+  Future<AppResult<void>> resumePaymentSubmission() =>
+      _enqueueOperation(_submissions.resume);
 
   Future<AppResult<void>> sync() => _enqueueOperation(
     () => _runtime.readPaymentState((engine) => engine.sync()),
@@ -602,23 +649,12 @@ final class WalletRepository implements WalletLifecycleRepository {
     () => _runtime.readPaymentState((engine) => engine.getNetworkStatus()),
   );
 
-  Future<AppResult<WalletPublicKeys>> publicKeys() =>
-      _enqueueOperation(() async {
-        final gate = await _submissions.assertResolved();
-        if (gate case AppFailureResult<void>(:final failure)) {
-          return AppResult.failure(failure);
-        }
-        return _runtime.run((engine) => engine.getPublicKeys());
-      });
+  Future<AppResult<WalletPublicKeys>> publicKeys() => _enqueueOperation(
+    () => _runtime.readPaymentState((engine) => engine.getPublicKeys()),
+  );
 
   Future<AppResult<String>> recoveryMnemonic(String walletId) =>
-      _enqueueOperation(() async {
-        final gate = await _submissions.assertResolved();
-        if (gate case AppFailureResult<void>(:final failure)) {
-          return AppResult.failure(failure);
-        }
-        return _runtime.recoveryMnemonic(walletId);
-      });
+      _enqueueOperation(() => _runtime.recoveryMnemonic(walletId));
 
   Future<AppResult<void>> _assertOnchainMutationResolved() async {
     final payment = await _submissions.assertResolved();

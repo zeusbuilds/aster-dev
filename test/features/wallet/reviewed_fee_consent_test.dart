@@ -218,7 +218,7 @@ void main() {
   });
 
   test(
-    'fee change requires a read-only refresh followed by another Send command',
+    'fee change refreshes once in the action and requires another Send command',
     () async {
       // Leave BTC for fees so this case reaches the fee-review guard rather
       // than the separate guard against sending the full available balance.
@@ -242,21 +242,21 @@ void main() {
         isTrue,
       );
       engine.feeEstimate = quote(rate: 4);
+      final readsBeforeSend = engine.calls
+          .where((call) => call == 'estimateFeeRate')
+          .length;
       expect(await notifier.submit(), isFalse);
       final blocked = harness.container.read(provider).requireValue;
-      expect(blocked.feeFailure, walletFeeReviewChangedFailure);
-      expect(blocked.feeEstimate, isNull);
-      expect(blocked.retainedFailure, isNull);
-      expect(blocked.canRefreshFee, isTrue);
-      expect(blocked.canSubmitAt(now), isFalse);
-      expectNoSend();
-      expect(await notifier.submit(), isFalse);
-      expect(await notifier.refreshFee(silent: true), isTrue);
-      expectNoSend();
+      expect(blocked.feeFailure, isNull);
+      expect(blocked.feeEstimate?.satsPerVbyte, 4);
+      expect(blocked.failure, walletFeeUpdatedReviewFailure);
+      expect(blocked.canSubmitAt(now), isTrue);
+      // One repository pre-dispatch validation and one action-owned read.
       expect(
-        harness.container.read(provider).requireValue.feeEstimate!.satsPerVbyte,
-        4,
+        engine.calls.where((call) => call == 'estimateFeeRate'),
+        hasLength(readsBeforeSend + 2),
       );
+      expectNoSend();
       expect(await notifier.submit(), isTrue);
       expect(await notifier.submit(), isFalse);
       expect(

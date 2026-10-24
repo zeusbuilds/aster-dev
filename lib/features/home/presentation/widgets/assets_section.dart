@@ -83,6 +83,7 @@ class _AssetsSectionState extends ConsumerState<AssetsSection> {
     final balancesVisible = settingsState?.snapshot.preferences.balancesVisible;
 
     Future<void> toggleVisibility() async {
+      final toasts = context.toasts;
       final current = balancesVisible;
       if (current == null || visibilitySaving) return;
       final succeeded = await ref
@@ -99,7 +100,7 @@ class _AssetsSectionState extends ConsumerState<AssetsSection> {
           ?.operationFailure;
       if (failure == null) return;
       unawaited(context.haptics.trigger(HapticIntent.error));
-      context.toasts.show(
+      toasts.show(
         title: 'Could not update balance visibility',
         message: failure.userMessage,
         variant: ToastVariant.failure,

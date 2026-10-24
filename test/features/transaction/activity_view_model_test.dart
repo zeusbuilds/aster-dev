@@ -45,6 +45,42 @@ void main() {
     },
   );
 
+  test(
+    'exact status check does not depend on wallet sync and never sends',
+    () async {
+      final engine = _engine()
+        ..feeEstimate = WalletFeeRateEstimate(
+          targetBlocks: 6,
+          satsPerVbyte: 2,
+          observedAt: DateTime.now().toUtc(),
+        )
+        ..sendPaymentError = StateError('Lost native response');
+      final h = await PaymentFlowTestHarness.create(engine: engine);
+      addTearDown(h.dispose);
+      await h.repository.sendPayment(
+        target: WalletPaymentTarget.bitcoinOnchain,
+        destination: 'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn',
+        amountUnits: 1,
+        reviewedFeeRate: engine.feeEstimate,
+      );
+      final provider = activityViewModelProvider(WalletAssetKind.bitcoin);
+      final subscription = h.container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      await h.container.read(provider.future);
+      engine.syncError = TimeoutException('proxy unavailable');
+      final check = await h.container
+          .read(provider.notifier)
+          .checkPaymentStatus();
+      expect(check, isA<AppSuccess<WalletPaymentSubmission?>>());
+      expect(engine.calls, isNot(contains('sync')));
+      expect(
+        engine.calls.where((call) => call == 'sendPayment:start'),
+        hasLength(1),
+      );
+      expect(h.container.read(provider).requireValue.refreshing, isFalse);
+    },
+  );
+
   test('loads real balance, network, and normalized activity', () async {
     final engine = _engine();
     final harness = await PaymentFlowTestHarness.create(engine: engine);
@@ -88,6 +124,46 @@ void main() {
     expect(failed.feed, initial.feed);
     expect(failed.refreshFailure?.userMessage, isNot(contains('private')));
   });
+
+  test(
+    'failed refresh retains history and the authoritative status-read error',
+    () async {
+      final engine = _engine();
+      final harness = await PaymentFlowTestHarness.create(engine: engine);
+      addTearDown(harness.dispose);
+      final provider = activityViewModelProvider(WalletAssetKind.bitcoin);
+      final subscription = harness.container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final initial = await harness.container.read(provider.future);
+      engine.syncGate = Completer<void>();
+      engine.syncError = TimeoutException('private sync detail');
+      final refresh = harness.container.read(provider.notifier).refresh();
+      for (
+        var attempt = 0;
+        attempt < 20 && !engine.calls.contains('sync');
+        attempt++
+      ) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      expect(engine.calls, contains('sync'));
+      (harness.repository.paymentJournalStore!
+                  as MemoryWalletPaymentJournalStore)
+              .readError =
+          const StoredDataCorruptionException();
+      engine.syncGate!.complete();
+
+      expect(await refresh, isFalse);
+
+      final state = harness.container.read(provider).requireValue;
+      expect(state.feed, initial.feed);
+      expect(state.refreshing, isFalse);
+      expect(state.refreshFailure?.code, 'stored_data_invalid');
+      expect(state.refreshFailure?.kind, AppFailureKind.storage);
+      expect(state.refreshFailure?.stackTrace, isNotNull);
+      expect(state.refreshFailure?.userMessage, isNot(contains('private')));
+      expect(engine.calls, isNot(contains('sendPayment:start')));
+    },
+  );
 
   test(
     'initial native failure retries through the same repository owner',

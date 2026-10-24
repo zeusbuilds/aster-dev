@@ -77,6 +77,12 @@ const _presentationInfrastructureProviders = <String>{
   'walletStorageSecurityProvider',
 };
 
+// This pure, immutable copy mapper distinguishes known payment outcomes in
+// action feedback. It exposes no mutation capability or permission boolean;
+// every other presentation owner must use the full reconciliation fence.
+const _paymentOutcomeCopyOwner =
+    'lib/features/send/presentation/models/send_failure_feedback.dart';
+
 /// Result of checking one repository tree against the architecture policy.
 final class ArchitectureVerification {
   const ArchitectureVerification({
@@ -250,7 +256,9 @@ ArchitectureVerification verifyArchitecture(Directory repositoryRoot) {
       parsed.unit.accept(
         _DiscardedPresentationExceptionCollector(discardedExceptions),
       );
-      for (final reference in diagnosticOutcomeReferences) {
+      for (final reference in diagnosticOutcomeReferences.where(
+        (_) => sourcePath != _paymentOutcomeCopyOwner,
+      )) {
         final line = parsed.lineInfo.getLocation(reference.offset).lineNumber;
         failures.add(
           '$sourcePath:$line: feature presentation must use '

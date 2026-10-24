@@ -18,6 +18,7 @@ import 'rgb_wallet_activity_mapper.dart';
 import 'rgb_wallet_balance_mapper.dart';
 import 'rgb_wallet_native_value_parser.dart';
 import 'wallet_engine.dart';
+import 'wallet_payment_recovery_engine.dart';
 
 /// Resolves explicit deployment overrides and immutable-SDK endpoint defaults.
 ///
@@ -154,7 +155,12 @@ final class RgbWalletKeyGenerator implements WalletKeyGenerator {
 }
 
 /// Converts SDK models to app-owned domain models at the repository boundary.
-final class RgbWalletEngine implements WalletEngine, RgbSetupWalletEngine {
+final class RgbWalletEngine
+    implements
+        WalletEngine,
+        RgbSetupWalletEngine,
+        WalletPaymentRecoveryEngine,
+        WalletPaymentDeadlineRecovery {
   RgbWalletEngine(
     this._wallet,
     this._services,
@@ -178,6 +184,10 @@ final class RgbWalletEngine implements WalletEngine, RgbSetupWalletEngine {
   final BitcoinAddressValidator _bitcoinAddresses;
   final LocalNetworkAccess _localNetworkAccess;
   final EvmChainValidator _evmChainValidator;
+  bool _requiresPaymentReopen = false;
+
+  @override
+  bool get requiresPaymentReopen => _requiresPaymentReopen;
 
   // RLN 0.17 has no Lightning runtime on mainnet; querying its Lightning-only
   // endpoints fails with 403. Never hide a real network error as an empty list.
@@ -193,6 +203,7 @@ final class RgbWalletEngine implements WalletEngine, RgbSetupWalletEngine {
     await _evmChainValidator.verify(_services);
     await _wallet.init(password: databasePassword, mnemonic: mnemonic);
     await _wallet.unlock(password: databasePassword, config: _unlockConfig);
+    _requiresPaymentReopen = false;
   }
 
   @override
@@ -203,6 +214,7 @@ final class RgbWalletEngine implements WalletEngine, RgbSetupWalletEngine {
       password: databasePassword,
       unlockConfig: _unlockConfig,
     );
+    _requiresPaymentReopen = false;
   }
 
   @override
@@ -506,6 +518,192 @@ final class RgbWalletEngine implements WalletEngine, RgbSetupWalletEngine {
       rethrow;
     }
   }
+
+  @override
+  Future<String> paymentOperationRequest(
+    String operationId,
+    WalletSendCommand command,
+  ) => _withPaymentDeadline(() async {
+    final prepared = await _recoverableCommand(
+      operationId,
+      command,
+      requireFreshReview: true,
+    );
+    // An older binary must fail before the app creates a pending marker.
+    // This read also prevents accidental reuse of a native operation identity.
+    final status = await _wallet.onchainSendStatus(prepared);
+    if (status.phase != RecoverableOnchainSendPhase.absent) {
+      throw const WalletValidationException(
+        'The payment identity is already in use. Try again.',
+        field: 'operationId',
+      );
+    }
+    return prepared.requestJson;
+  });
+
+  @override
+  Future<void> validatePaymentOperationRequest(
+    String request,
+    String operationId,
+    WalletSendCommand command,
+  ) => _withPaymentDeadline(() async {
+    final restored = RecoverableOnchainSendCommand.fromJson(request);
+    // Re-decode the original invoice and compare every reviewed input. These
+    // pure SDK inspection calls stay serialized after a deadline and preserve
+    // mutation quarantine; never weaken intent binding to bypass that fence.
+    final expected = await _recoverableCommand(
+      operationId,
+      command,
+      requireFreshReview: false,
+    );
+    if (restored.requestJson == expected.requestJson) return;
+    if (command.route.asset.kind == WalletAssetKind.usdt) {
+      final preview = await _decodeRgbInvoice(
+        command.route,
+        command.destination,
+      );
+      if (preview.expiresAt == null &&
+          _withoutDerivedExpiry(restored.requestJson) ==
+              _withoutDerivedExpiry(expected.requestJson)) {
+        // An amount-only RGB invoice may have no expiry of its own. The SDK
+        // binds a concrete preparation deadline on first creation. Restore
+        // retains that original deadline, including when already expired; it
+        // must never extend it by recreating the default from today's clock.
+        return;
+      }
+    }
+    throw const NativeProtocolException(
+      'Saved payment request does not match its reviewed intent.',
+      field: 'paymentOperation',
+    );
+  });
+
+  static String _withoutDerivedExpiry(String encoded) {
+    // Both inputs have already passed the SDK's strict canonical restoration
+    // and fingerprint checks. Ignore only the fallback deadline and its hash
+    // for comparison; dispatch/status still receive the saved original bytes.
+    final value = jsonDecode(encoded) as Map<String, Object?>;
+    final request = value['request']! as Map<String, Object?>;
+    request.remove('expirationTimestamp');
+    request.remove('fingerprint');
+    return jsonEncode(value);
+  }
+
+  Future<RecoverableOnchainSendCommand> _recoverableCommand(
+    String operationId,
+    WalletSendCommand command, {
+    required bool requireFreshReview,
+  }) async {
+    _requireConfiguredRoute(command.route);
+    if (command.route.rail != PaymentRail.onchain) {
+      throw const UnsupportedWalletFeatureException(
+        'Durable payment recovery supports on-chain sends only.',
+        feature: 'recoverableOnchainSend',
+      );
+    }
+    if (requireFreshReview) _requireReviewedOnchainFee(command);
+    final fee = command.feeRate;
+    if (fee == null) {
+      throw const AppFailureException(walletFeeReviewRequiredFailure);
+    }
+    if (command.route.asset.kind == WalletAssetKind.bitcoin) {
+      final address = _bitcoinAddresses.normalizeAddress(
+        command.destination,
+        _services.environment,
+      );
+      if (address == null) {
+        throw const WalletValidationException(
+          'Check the Bitcoin recipient.',
+          field: 'destination',
+        );
+      }
+      return _wallet.createRecoverableBtcSendCommand(
+        operationId: operationId,
+        amount: command.amount.units,
+        address: address,
+        feeRate: fee.satsPerVbyte.toDouble(),
+      );
+    }
+    final preview = await _decodeRgbInvoice(command.route, command.destination);
+    _requireMatchingAmount(preview, command.amount);
+    if (requireFreshReview) _requireNotExpired(preview);
+    if (command.rgbRecipientType != preview.rgbRecipientType ||
+        command.witnessBitcoinAmountSats != preview.witnessBitcoinAmountSats) {
+      throw const WalletValidationException(
+        'The RGB recipient no longer matches the reviewed payment.',
+        field: 'recipientType',
+      );
+    }
+    return _wallet.createRecoverableRgbSendCommand(
+      operationId: operationId,
+      request: RgbSendRequest(
+        invoice: command.destination,
+        assetId: command.route.asset.id.value,
+        amount: command.amount.units,
+        feeRate: fee.satsPerVbyte.toDouble(),
+        witnessAmountSat: command.witnessBitcoinAmountSats,
+      ),
+    );
+  }
+
+  @override
+  Future<WalletPaymentRecoveryStatus> preparePaymentOperation(String request) =>
+      _withPaymentDeadline(
+        () async => _recoveryStatus(
+          await _wallet.prepareOnchainSend(
+            RecoverableOnchainSendCommand.fromJson(request),
+          ),
+        ),
+      );
+
+  @override
+  Future<WalletPaymentRecoveryStatus> commitPaymentOperation(String request) =>
+      _withPaymentDeadline(
+        () async => _recoveryStatus(
+          await _wallet.commitOnchainSend(
+            RecoverableOnchainSendCommand.fromJson(request),
+          ),
+        ),
+      );
+
+  Future<T> _withPaymentDeadline<T>(Future<T> Function() operation) async {
+    try {
+      return await operation();
+    } on RlnOperationTimeoutException {
+      _requiresPaymentReopen = true;
+      rethrow;
+    }
+  }
+
+  @override
+  Future<WalletPaymentRecoveryStatus> inspectPaymentOperation(String request) =>
+      _withPaymentDeadline(
+        () async => _recoveryStatus(
+          await _wallet.onchainSendStatus(
+            RecoverableOnchainSendCommand.fromJson(request),
+          ),
+        ),
+      );
+
+  @override
+  Future<WalletPaymentRecoveryStatus> cancelPaymentOperation(String request) =>
+      _withPaymentDeadline(
+        () async => _recoveryStatus(
+          await _wallet.cancelOnchainSend(
+            RecoverableOnchainSendCommand.fromJson(request),
+          ),
+        ),
+      );
+
+  static WalletPaymentRecoveryStatus _recoveryStatus(
+    RecoverableOnchainSendStatus status,
+  ) => WalletPaymentRecoveryStatus(
+    phase: WalletPaymentRecoveryPhase.values.byName(status.phase.name),
+    endAuthorized: status.endAuthorized,
+    referenceId: status.txid,
+    batchTransferIndex: status.batchTransferIndex,
+    failureCode: status.failureCode,
+  );
 
   Future<WalletReceiveRequest> _createBitcoinReceive(
     PaymentRoute route,

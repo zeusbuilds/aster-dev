@@ -8,6 +8,7 @@ import '../../../wallet/domain/models/models.dart';
 enum SendFlowOperation {
   readingClipboard,
   validatingDestination,
+  preparingAmount,
   refreshingBalance,
   refreshingFee,
   submitting,
@@ -37,6 +38,7 @@ final class SendFlowFailure {
   bool get allowsDestinationEdit =>
       !failure.requiresReconciliation &&
       (operation == SendFlowOperation.validatingDestination ||
+          operation == SendFlowOperation.preparingAmount ||
           operation == SendFlowOperation.submitting);
 
   bool get allowsAmountEdit =>
@@ -68,7 +70,9 @@ final class SendFlowState {
     required this.destination,
     required this.amountText,
     required this.amountInput,
+    this.walletId,
     this.preview,
+    this.balancePreparedForDestination = false,
     this.feeEstimate,
     this.feeFailure,
     this.operation,
@@ -94,6 +98,9 @@ final class SendFlowState {
     }
     if (currentPreview != null && destination.isEmpty) {
       throw ArgumentError.value(destination, 'destination');
+    }
+    if (balancePreparedForDestination && currentPreview == null) {
+      throw ArgumentError('Prepared balance requires a validated destination.');
     }
     final encodedAmount = currentPreview?.amount;
     if (encodedAmount != null && amountInput.units != encodedAmount.units) {
@@ -129,9 +136,13 @@ final class SendFlowState {
   final String currencyCode;
   final WalletBalance balance;
 
+  /// Non-secret wallet identity owning this form's balance and review.
+  final String? walletId;
+
   /// Raw user input. Never include this value in logs or route arguments.
   final String destination;
   final WalletPaymentPreview? preview;
+  final bool balancePreparedForDestination;
 
   final String amountText;
   final WalletAmountInput amountInput;
@@ -166,7 +177,10 @@ final class SendFlowState {
     if (!canEditPayment) return false;
     final retained = retainedFailure;
     return retained == null ||
-        (retained.operation == candidate && retained.failure.retryable);
+        (retained.failure.retryable &&
+            (retained.operation == candidate ||
+                (retained.operation == SendFlowOperation.preparingAmount &&
+                    candidate == SendFlowOperation.validatingDestination)));
   }
 
   bool get canRefreshFee =>
@@ -195,7 +209,9 @@ final class SendFlowState {
 
   bool isExpiredAt(DateTime now) => preview?.isExpiredAt(now) ?? false;
 
-  bool canSubmitAt(DateTime now) {
+  /// A deliberate Send may recover a retryable fee prerequisite. This never
+  /// permits dispatch without the stricter [canSubmitAt] fee checks.
+  bool canAttemptSubmitAt(DateTime now) {
     final retained = retainedFailure;
     if (isBusy ||
         result != null ||
@@ -209,6 +225,13 @@ final class SendFlowState {
         isExpiredAt(now)) {
       return false;
     }
+    return route.rail == PaymentRail.lightning ||
+        feeFailure == null ||
+        feeFailure!.retryable;
+  }
+
+  bool canSubmitAt(DateTime now) {
+    if (!canAttemptSubmitAt(now)) return false;
     if (route.rail == PaymentRail.lightning) return true;
     final estimate = feeEstimate;
     return feeFailure == null && estimate != null && !estimate.isStaleAt(now);
@@ -218,6 +241,7 @@ final class SendFlowState {
     WalletBalance? balance,
     String? destination,
     Object? preview = _unchanged,
+    bool? balancePreparedForDestination,
     String? amountText,
     WalletAmountInput? amountInput,
     Object? feeEstimate = _unchanged,
@@ -228,6 +252,7 @@ final class SendFlowState {
   }) {
     return SendFlowState(
       route: route,
+      walletId: walletId,
       bitcoinUnit: bitcoinUnit,
       currencyCode: currencyCode,
       balance: balance ?? this.balance,
@@ -235,6 +260,11 @@ final class SendFlowState {
       preview: identical(preview, _unchanged)
           ? this.preview
           : preview as WalletPaymentPreview?,
+      balancePreparedForDestination:
+          balancePreparedForDestination ??
+          (identical(preview, _unchanged) || preview == this.preview
+              ? this.balancePreparedForDestination
+              : false),
       amountText: amountText ?? this.amountText,
       amountInput: amountInput ?? this.amountInput,
       feeEstimate: identical(feeEstimate, _unchanged)
@@ -259,11 +289,13 @@ final class SendFlowState {
   bool operator ==(Object other) =>
       other is SendFlowState &&
       other.route == route &&
+      other.walletId == walletId &&
       other.bitcoinUnit == bitcoinUnit &&
       other.currencyCode == currencyCode &&
       other.balance == balance &&
       other.destination == destination &&
       other.preview == preview &&
+      other.balancePreparedForDestination == balancePreparedForDestination &&
       other.amountText == amountText &&
       other.amountInput == amountInput &&
       other.feeEstimate == feeEstimate &&
@@ -275,11 +307,13 @@ final class SendFlowState {
   @override
   int get hashCode => Object.hash(
     route,
+    walletId,
     bitcoinUnit,
     currencyCode,
     balance,
     destination,
     preview,
+    balancePreparedForDestination,
     amountText,
     amountInput,
     feeEstimate,

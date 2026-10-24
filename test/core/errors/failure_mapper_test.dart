@@ -5,6 +5,29 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rgb_sdk_flutter/rgb_sdk_flutter.dart';
 
 void main() {
+  test(
+    'lost native payment state retains a strong redacted recovery failure',
+    () {
+      final failure = FailureMapper.from(
+        const RecoverableSendStorageException(),
+        StackTrace.current,
+      );
+      expect(failure.code, 'payment_recovery_state_lost');
+      expect(failure.kind, AppFailureKind.storage);
+      expect(failure.retryable, isFalse);
+      expect(failure.requiresReconciliation, isTrue);
+      expect(failure.outcomeUnknown, isFalse);
+      expect(
+        failure.cause,
+        const FailureDiagnostic(
+          sourceType: 'RecoverableSendStorageException',
+          sourceCode: 'RECOVERABLE_SEND_STORAGE_LOST',
+        ),
+      );
+      expect(failure.userMessage, isNot(contains('Nothing was sent')));
+    },
+  );
+
   test('local network denial is actionable before any wallet mutation', () {
     final failure = FailureMapper.from(
       const LocalNetworkAccessException(LocalNetworkAccessFailure.denied),

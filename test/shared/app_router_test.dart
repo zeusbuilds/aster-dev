@@ -5,6 +5,7 @@ import 'package:aster/core/core.dart';
 import 'package:aster/features/onboarding/presentation/screens/screens.dart';
 import 'package:aster/features/onboarding/presentation/view_model/view_models.dart';
 import 'package:aster/features/onboarding/presentation/widgets/widgets.dart';
+import 'package:aster/features/shell/presentation/providers/app_shell_index_provider.dart';
 import 'package:aster/features/shell/presentation/widgets/bottom_nav.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:aster/features/wallet/presentation/pages/pages.dart';
@@ -12,6 +13,7 @@ import 'package:aster/features/wallet/presentation/view_model/wallet_view_model.
 import 'package:aster/shared/shared.dart';
 import 'package:aster/shared/theme/aster_page_transitions.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -54,6 +56,151 @@ void main() {
     expect(_location(router), RoutePaths.home);
     expect(find.byType(BottomNav), findsOneWidget);
   });
+
+  testWidgets(
+    'navigation drops old-route toast queues and late action results',
+    (tester) async {
+      final (harness, transport) = await _createActiveHarness();
+      addTearDown(transport.close);
+      addTearDown(() => _disposeHarness(tester, harness));
+      final router = await _pumpRouter(tester, harness);
+      final controller = harness.container.read(
+        toastControllerProvider.notifier,
+      );
+      final origin = controller.captureOrigin();
+      origin.show(title: 'Old route', variant: ToastVariant.info);
+      origin.show(title: 'Queued old route', variant: ToastVariant.failure);
+      final selection = router.pushNamed<void>(RouteNames.walletSelection);
+      await _pumpFrames(tester);
+      expect(harness.container.read(toastControllerProvider).current, isNull);
+      expect(harness.container.read(toastControllerProvider).pending, isEmpty);
+      expect(
+        origin.show(title: 'Late result', variant: ToastVariant.failure),
+        isFalse,
+      );
+      router.pop();
+      await selection;
+      await _pumpFrames(tester);
+      expect(
+        origin.show(
+          title: 'Previous home visit',
+          variant: ToastVariant.failure,
+        ),
+        isFalse,
+      );
+    },
+  );
+
+  testWidgets('shell tab changes expire old action feedback', (tester) async {
+    final (harness, transport) = await _createActiveHarness();
+    addTearDown(transport.close);
+    addTearDown(() => _disposeHarness(tester, harness));
+    await _pumpRouter(tester, harness);
+    final controller = harness.container.read(toastControllerProvider.notifier);
+    final origin = controller.captureOrigin();
+    origin.show(title: 'Home action', variant: ToastVariant.info);
+    harness.container.read(appShellIndexProvider.notifier).setIndex(2);
+    await tester.pump();
+    expect(harness.container.read(toastControllerProvider).current, isNull);
+    expect(
+      origin.show(title: 'Late Home action', variant: ToastVariant.failure),
+      isFalse,
+    );
+  });
+
+  for (final useRootNavigator in [false, true]) {
+    for (final useBottomSheet in [false, true]) {
+      testWidgets(
+        'popup clears queued feedback and preserves its parent action (root: $useRootNavigator, sheet: $useBottomSheet)',
+        (tester) async {
+          final (harness, transport) = await _createHarness();
+          addTearDown(transport.close);
+          addTearDown(() => _disposeHarness(tester, harness));
+          await harness.container.read(walletViewModelProvider.future);
+          final router = await _pumpRouter(
+            tester,
+            harness,
+            useRealToasts: true,
+          );
+          final context = tester.element(find.byType(OnboardingWelcomeScreen));
+          final origin = context.toasts;
+          origin.show(title: 'Old action', variant: ToastVariant.info);
+          origin.show(title: 'Old queued action', variant: ToastVariant.info);
+          final location = _location(router);
+          late final Future<bool?> decision;
+          Widget content(BuildContext popupContext) => TextButton(
+            onPressed: () => Navigator.of(popupContext).pop(true),
+            child: const Text('Confirm action'),
+          );
+          if (useBottomSheet) {
+            decision = showModalBottomSheet<bool>(
+              context: context,
+              useRootNavigator: useRootNavigator,
+              builder: content,
+            );
+          } else {
+            decision = showDialog<bool>(
+              context: context,
+              useRootNavigator: useRootNavigator,
+              builder: (popupContext) =>
+                  AlertDialog(content: content(popupContext)),
+            );
+          }
+          await _pumpFrames(tester);
+          expect(_location(router), location);
+          expect(
+            harness.container.read(toastControllerProvider).current,
+            isNull,
+          );
+          expect(
+            harness.container.read(toastControllerProvider).pending,
+            isEmpty,
+          );
+          expect(
+            origin.show(title: 'Covered result', variant: ToastVariant.failure),
+            isFalse,
+          );
+
+          // Popup-owned feedback must not survive the popup's removal either.
+          final popupOrigin = tester
+              .element(find.text('Confirm action'))
+              .toasts;
+          expect(
+            popupOrigin.show(
+              title: 'Popup feedback',
+              variant: ToastVariant.info,
+            ),
+            isTrue,
+          );
+          await tester.tap(find.text('Confirm action'));
+          expect(await decision, isTrue);
+          // Report the result when the awaiting action resumes, before waiting
+          // for the popup's exit animation to finish.
+          expect(
+            origin.show(title: 'Confirmed action', variant: ToastVariant.info),
+            isTrue,
+          );
+          expect(
+            harness.container.read(toastControllerProvider).current?.title,
+            'Confirmed action',
+          );
+          expect(
+            harness.container.read(toastControllerProvider).pending,
+            isEmpty,
+          );
+          await _pumpFrames(tester);
+          expect(
+            popupOrigin.show(
+              title: 'Late popup result',
+              variant: ToastVariant.info,
+            ),
+            isFalse,
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
 
   testWidgets('wallet selector is one pushed page above Home', (tester) async {
     final (harness, transport) = await _createActiveHarness();
@@ -102,7 +249,7 @@ void main() {
     final router = await _pumpRouter(tester, harness);
 
     expect(_location(router), '/skeleton');
-    expect(find.text('Route Error'), findsOneWidget);
+    _expectUnavailablePage(tester);
     expect(find.byType(BottomNav), findsNothing);
 
     await tester.tap(find.text('Go to Home'));
@@ -126,7 +273,7 @@ void main() {
     final router = await _pumpRouter(tester, harness);
 
     expect(_location(router), '/market');
-    expect(find.text('Route Error'), findsOneWidget);
+    _expectUnavailablePage(tester);
     expect(find.byType(BottomNav), findsNothing);
 
     await tester.tap(find.text('Go to Home'));
@@ -666,6 +813,36 @@ void main() {
 String _location(GoRouter router) =>
     router.routerDelegate.currentConfiguration.uri.path;
 
+void _expectUnavailablePage(WidgetTester tester) {
+  final page = find.byType(ErrorScreen);
+  expect(page, findsOneWidget);
+  final scaffold = tester.widget<Scaffold>(
+    find.descendant(of: page, matching: find.byType(Scaffold)),
+  );
+  expect(scaffold.appBar, isNull);
+  final systemStyle = tester
+      .widget<AnnotatedRegion<SystemUiOverlayStyle>>(
+        find.descendant(
+          of: page,
+          matching: find.byType(AnnotatedRegion<SystemUiOverlayStyle>),
+        ),
+      )
+      .value;
+  expect(systemStyle.statusBarIconBrightness, Brightness.dark);
+  expect(systemStyle.statusBarBrightness, Brightness.light);
+  expect(find.text('Page unavailable'), findsOneWidget);
+  expect(find.text('Route Error'), findsNothing);
+  expect(find.text('This page is unavailable.'), findsNothing);
+  expect(find.byType(CustomAppBar), findsNothing);
+  expect(find.byIcon(Icons.error_outline), findsOneWidget);
+  expect(find.widgetWithText(CustomButton, 'Go to Home'), findsOneWidget);
+
+  final centerX =
+      tester.view.physicalSize.width / tester.view.devicePixelRatio / 2;
+  expect(tester.getCenter(find.byIcon(Icons.error_outline)).dx, centerX);
+  expect(tester.getCenter(find.text('Page unavailable')).dx, centerX);
+}
+
 Future<(OnboardingTestHarness, ResilientHttpClient)> _createHarness() async {
   final transport = ResilientHttpClient(
     client: MockClient((request) async {
@@ -789,6 +966,7 @@ Future<GoRouter> _pumpRouter(
   WidgetTester tester,
   OnboardingTestHarness harness, {
   TargetPlatform? platform,
+  bool useRealToasts = false,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = const Size(390, 844);
@@ -797,7 +975,11 @@ Future<GoRouter> _pumpRouter(
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: harness.container,
-      child: _RouterApp(harness: harness, platform: platform),
+      child: _RouterApp(
+        harness: harness,
+        platform: platform,
+        useRealToasts: useRealToasts,
+      ),
     ),
   );
   await _pumpFrames(tester);
@@ -835,10 +1017,15 @@ final class _WalletSelectorLauncher extends StatelessWidget {
 }
 
 final class _RouterApp extends ConsumerWidget {
-  const _RouterApp({required this.harness, this.platform});
+  const _RouterApp({
+    required this.harness,
+    this.platform,
+    this.useRealToasts = false,
+  });
 
   final OnboardingTestHarness harness;
   final TargetPlatform? platform;
+  final bool useRealToasts;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -847,7 +1034,9 @@ final class _RouterApp extends ConsumerWidget {
       routerConfig: ref.watch(appRouterProvider),
       builder: (context, child) => AsterFeedbackScope(
         haptics: harness.haptics,
-        toasts: harness.toasts,
+        toasts: useRealToasts
+            ? ref.read(toastControllerProvider.notifier)
+            : harness.toasts,
         child: child!,
       ),
     );

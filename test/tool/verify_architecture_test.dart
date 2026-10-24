@@ -198,6 +198,26 @@ void main() {
     );
   });
 
+  test('permits certainty wording only in the owned Send copy mapper', () {
+    _write(
+      repository,
+      'lib/features/send/presentation/models/send_failure_feedback.dart',
+      "String title(dynamic failure) => failure.outcomeUnknown "
+          "? 'Status unavailable' : 'Payment not sent';",
+    );
+    expect(verifyArchitecture(repository).passed, isTrue);
+    _write(
+      repository,
+      'lib/features/send/presentation/models/send_flow_state.dart',
+      'bool canSubmit(dynamic failure) => !failure.outcomeUnknown;',
+    );
+    final result = verifyArchitecture(repository);
+    expect(result.passed, isFalse);
+    expect(result.failures, hasLength(1));
+    expect(result.failures.single, contains('send_flow_state.dart'));
+    expect(result.failures.single, contains('requiresReconciliation'));
+  });
+
   test('reports every layer, SDK, plugin, and parse violation', () {
     _write(
       repository,

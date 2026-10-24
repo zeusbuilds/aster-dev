@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:aster/core/core.dart';
 import 'package:aster/shared/feedback/feedback.dart';
 
@@ -42,12 +44,14 @@ final class RecordingToastPresentationService
 }
 
 final class MemoryClipboardService implements ClipboardService {
+  Completer<void>? readGate;
   String? text;
   AppFailure? readFailure;
   AppFailure? writeFailure;
 
   @override
   Future<AppResult<String?>> readText() async {
+    await readGate?.future;
     final failure = readFailure;
     return failure == null
         ? AppResult.success(text)

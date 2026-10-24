@@ -36,6 +36,7 @@ class NetworkConfigurationViewModel extends _$NetworkConfigurationViewModel {
       return false;
     }
     final generation = _stateGeneration;
+    final toasts = ref.read(toastControllerProvider.notifier).captureOrigin();
     state = AsyncData(current.copyWith(refreshing: true));
     final result = await _readNetworkStatus();
     if (!ref.mounted || generation != _stateGeneration) return false;
@@ -53,9 +54,7 @@ class NetworkConfigurationViewModel extends _$NetworkConfigurationViewModel {
     });
     final succeeded = result is AppSuccess<WalletNetworkStatus>;
     if (!succeeded) {
-      ref
-          .read(toastControllerProvider.notifier)
-          .show(title: 'Health check failed', variant: ToastVariant.failure);
+      toasts.show(title: 'Health check failed', variant: ToastVariant.failure);
     }
     unawaited(
       ref

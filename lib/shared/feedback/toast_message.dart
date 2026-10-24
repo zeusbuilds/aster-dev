@@ -44,11 +44,15 @@ final class ToastMessage {
 /// Current toast plus the bounded FIFO waiting behind it.
 @immutable
 final class ToastQueueState {
-  ToastQueueState({this.current, List<ToastMessage> pending = const []})
-    : pending = List<ToastMessage>.unmodifiable(pending);
+  ToastQueueState({
+    this.current,
+    List<ToastMessage> pending = const [],
+    this.scopeGeneration = 0,
+  }) : pending = List<ToastMessage>.unmodifiable(pending);
 
   final ToastMessage? current;
   final List<ToastMessage> pending;
+  final int scopeGeneration;
 
   ToastQueueState copyWith({
     Object? current = _unchanged,
@@ -59,6 +63,7 @@ final class ToastQueueState {
           ? this.current
           : current as ToastMessage?,
       pending: pending ?? this.pending,
+      scopeGeneration: scopeGeneration,
     );
   }
 
@@ -66,10 +71,12 @@ final class ToastQueueState {
   bool operator ==(Object other) =>
       other is ToastQueueState &&
       other.current == current &&
+      other.scopeGeneration == scopeGeneration &&
       listEquals(other.pending, pending);
 
   @override
-  int get hashCode => Object.hash(current, Object.hashAll(pending));
+  int get hashCode =>
+      Object.hash(current, Object.hashAll(pending), scopeGeneration);
 }
 
 /// Narrow command interface exposed to non-Riverpod presentation widgets.
@@ -86,6 +93,13 @@ abstract interface class ToastPresentationService {
   /// Dismisses the current message, optionally only when its [id] still owns
   /// the presentation slot.
   void dismissCurrent({int? id});
+}
+
+/// Captures the route/wallet generation that owns an asynchronous action.
+/// Capture before awaiting; a late result cannot acquire a newer scope.
+abstract interface class OriginScopedToastPresentationService
+    implements ToastPresentationService {
+  ToastPresentationService captureOrigin();
 }
 
 const _unchanged = Object();

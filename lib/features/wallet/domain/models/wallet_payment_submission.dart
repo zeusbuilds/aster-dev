@@ -1,24 +1,34 @@
 import '../../../../core/errors/app_failure.dart';
 import 'wallet_payment.dart';
 
-/// A durable dispatch marker is not evidence that native broadcast failed.
+/// An unknown payment remains guarded until its exact native outcome is known.
 const walletPaymentSubmissionPendingFailure = AppFailure(
   code: 'payment_submission_unresolved',
   kind: AppFailureKind.conflict,
-  userMessage:
-      'A payment submission needs reconciliation. Activity remains available. '
-      'Do not send this payment again; restarting does not resolve it.',
+  userMessage: 'Check this payment in Activity before sending again.',
   retryable: false,
   outcomeUnknown: true,
 );
 
 enum WalletPaymentSubmissionPhase { submitting, accepted, rejected }
 
+/// Payment execution certainty is independent of required storage/cleanup work.
+enum WalletPaymentSubmissionOutcome { notSubmitted, unknown, accepted }
+
+bool isWalletPaymentSubmissionFenceFailure(AppFailure failure) =>
+    failure.requiresReconciliation &&
+    const {
+      'payment_submission_unresolved',
+      'payment_not_sent_cleanup_required',
+      'payment_receipt_persistence_required',
+    }.contains(failure.code);
+
 /// Read-only, wallet-bound submission evidence for support and recovery.
 ///
 /// An accepted record contains the exact native transaction identity. A
-/// submitting record has no authoritative transaction identity and must never
-/// be cleared from an empty feed, a similar amount, or elapsed time.
+/// legacy submitting record has no authoritative transaction identity. Version
+/// 2 links to a native durable operation; neither version can be cleared from
+/// an empty feed, a similar amount, or elapsed time.
 final class WalletPaymentSubmission {
   const WalletPaymentSubmission({
     required this.id,
@@ -27,7 +37,10 @@ final class WalletPaymentSubmission {
     required this.submittedAt,
     required this.phase,
     this.result,
+    this.recoveryRequest,
     this.acknowledgementUncertain = false,
+    this.commitAttempted = true,
+    this.journalVersion = 3,
   });
 
   final String id;
@@ -36,7 +49,51 @@ final class WalletPaymentSubmission {
   final DateTime submittedAt;
   final WalletPaymentSubmissionPhase phase;
   final WalletSendResult? result;
+
+  /// Version 2 native operation request. Null identifies a legacy one-shot
+  /// attempt; absence in the new native outbox cannot resolve such an attempt.
+  final String? recoveryRequest;
   final bool acknowledgementUncertain;
+
+  /// Recorded durably before entering Commit. Older journals conservatively
+  /// default to true because they did not record this boundary. Prepare alone
+  /// cannot release a payment, although it may retain reservations to clean up.
+  final bool commitAttempted;
+
+  /// Preserve immutable receipt bytes written by an older journal schema.
+  final int journalVersion;
+
+  WalletPaymentSubmissionOutcome get outcome => switch (phase) {
+    WalletPaymentSubmissionPhase.accepted =>
+      WalletPaymentSubmissionOutcome.accepted,
+    WalletPaymentSubmissionPhase.rejected =>
+      WalletPaymentSubmissionOutcome.notSubmitted,
+    WalletPaymentSubmissionPhase.submitting =>
+      commitAttempted
+          ? WalletPaymentSubmissionOutcome.unknown
+          : WalletPaymentSubmissionOutcome.notSubmitted,
+  };
+
+  AppFailure get reconciliationFailure => switch (outcome) {
+    WalletPaymentSubmissionOutcome.unknown =>
+      walletPaymentSubmissionPendingFailure,
+    WalletPaymentSubmissionOutcome.notSubmitted => const AppFailure(
+      code: 'payment_not_sent_cleanup_required',
+      kind: AppFailureKind.storage,
+      userMessage:
+          'Nothing was sent. Check this send in Activity before trying again.',
+      retryable: false,
+      requiresReconciliation: true,
+    ),
+    WalletPaymentSubmissionOutcome.accepted => const AppFailure(
+      code: 'payment_receipt_persistence_required',
+      kind: AppFailureKind.storage,
+      userMessage:
+          'Payment sent. Check this send in Activity before sending again.',
+      retryable: false,
+      requiresReconciliation: true,
+    ),
+  };
 
   bool get requiresReconciliation =>
       phase == WalletPaymentSubmissionPhase.submitting ||
@@ -50,7 +107,10 @@ final class WalletPaymentSubmission {
         submittedAt: submittedAt,
         phase: phase,
         result: result,
+        recoveryRequest: recoveryRequest,
         acknowledgementUncertain: true,
+        commitAttempted: commitAttempted,
+        journalVersion: journalVersion,
       );
 
   @override
@@ -62,7 +122,10 @@ final class WalletPaymentSubmission {
       other.submittedAt == submittedAt &&
       other.phase == phase &&
       other.result == result &&
-      other.acknowledgementUncertain == acknowledgementUncertain;
+      other.recoveryRequest == recoveryRequest &&
+      other.acknowledgementUncertain == acknowledgementUncertain &&
+      other.commitAttempted == commitAttempted &&
+      other.journalVersion == journalVersion;
 
   @override
   int get hashCode => Object.hash(
@@ -72,7 +135,10 @@ final class WalletPaymentSubmission {
     submittedAt,
     phase,
     result,
+    recoveryRequest,
     acknowledgementUncertain,
+    commitAttempted,
+    journalVersion,
   );
 
   @override

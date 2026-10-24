@@ -63,18 +63,38 @@ class ActivityViewModel extends _$ActivityViewModel {
     );
     final result = await _syncAndLoad(kind);
     if (!ref.mounted || generation != _stateGeneration) return false;
-    return switch (result) {
-      AppSuccess<WalletActivityFeed>(:final value) => () {
+    switch (result) {
+      case AppSuccess<WalletActivityFeed>(:final value):
         state = AsyncData(ActivityState(feed: value));
         return true;
-      }(),
-      AppFailureResult<WalletActivityFeed>(:final failure) => () {
+      case AppFailureResult<WalletActivityFeed>(:final failure):
+        var feed = current.feed;
+        var refreshFailure = failure;
+        // Status is local evidence and must not depend on a failed chain sync.
+        try {
+          final repository = await ref.read(walletRepositoryProvider.future);
+          final submission = await repository.paymentSubmissionStatus();
+          switch (submission) {
+            case AppSuccess<WalletPaymentSubmission?>(:final value):
+              feed = _withSubmission(feed, value);
+            case AppFailureResult<WalletPaymentSubmission?>(:final failure):
+              refreshFailure = failure;
+          }
+        } catch (error, stackTrace) {
+          // Keep the loaded history readable, while retaining the authoritative
+          // status-read failure and its captured diagnostic stack for this check.
+          refreshFailure = FailureMapper.from(error, stackTrace);
+        }
+        if (!ref.mounted || generation != _stateGeneration) return false;
         state = AsyncData(
-          current.copyWith(refreshing: false, refreshFailure: failure),
+          current.copyWith(
+            feed: feed,
+            refreshing: false,
+            refreshFailure: refreshFailure,
+          ),
         );
         return false;
-      }(),
-    };
+    }
   }
 
   void clearRefreshFailure() {
@@ -82,6 +102,62 @@ class ActivityViewModel extends _$ActivityViewModel {
     if (current?.refreshFailure == null) return;
     state = AsyncData(current!.copyWith(clearRefreshFailure: true));
   }
+
+  /// Inspects the exact saved send independently of Esplora/proxy sync.
+  /// This never submits a payment or retries Commit.
+  Future<AppResult<WalletPaymentSubmission?>> checkPaymentStatus() async {
+    final current = state.value;
+    if (current == null || current.refreshing) {
+      return const AppResult.failure(
+        AppFailure(
+          code: 'payment_status_busy',
+          kind: AppFailureKind.conflict,
+          userMessage: 'Please wait for the current check.',
+          retryable: true,
+        ),
+      );
+    }
+    final generation = _stateGeneration;
+    state = AsyncData(current.copyWith(refreshing: true));
+    AppResult<WalletPaymentSubmission?> result;
+    try {
+      final repository = await ref.read(walletRepositoryProvider.future);
+      final check = await repository.reconcilePaymentSubmission();
+      result = await repository.paymentSubmissionStatus();
+      if (result case AppSuccess<WalletPaymentSubmission?>(:final value)) {
+        if (ref.mounted && generation == _stateGeneration) {
+          state = AsyncData(
+            current.copyWith(
+              feed: _withSubmission(current.feed, value),
+              refreshing: false,
+            ),
+          );
+        }
+        if (check case AppFailureResult<void>(:final failure)
+            when !isWalletPaymentSubmissionFenceFailure(failure) &&
+                value?.outcome != WalletPaymentSubmissionOutcome.accepted) {
+          return AppResult.failure(failure);
+        }
+        return result;
+      }
+    } catch (error, stackTrace) {
+      result = AppResult.failure(FailureMapper.from(error, stackTrace));
+    }
+    if (ref.mounted && generation == _stateGeneration) {
+      state = AsyncData(current.copyWith(refreshing: false));
+    }
+    return result;
+  }
+
+  static WalletActivityFeed _withSubmission(
+    WalletActivityFeed feed,
+    WalletPaymentSubmission? submission,
+  ) => WalletActivityFeed(
+    balance: feed.balance,
+    networkStatus: feed.networkStatus,
+    activities: feed.activities,
+    paymentSubmission: submission,
+  );
 
   Future<ActivityState> _load(WalletAssetKind kind) async {
     final result = await _feed(kind);
@@ -108,15 +184,16 @@ class ActivityViewModel extends _$ActivityViewModel {
   ) async {
     try {
       final repository = await ref.read(walletRepositoryProvider.future);
-      final sync = await repository.sync();
-      if (sync case AppFailureResult<void>(:final failure)) {
-        return AppResult.failure(failure);
-      }
-      // This explicit read-only check can resolve only an exact durable native
-      // receipt. An unidentified submission remains visible and fenced.
+      // This explicit check never sends. It may resolve an exact durable native
+      // receipt or cancel a certified undispatched preparation. Legacy
+      // unidentified submissions remain visible and fenced.
       final reconciliation = await repository.reconcilePaymentSubmission();
       if (reconciliation case AppFailureResult<void>(:final failure)
-          when failure.code != walletPaymentSubmissionPendingFailure.code) {
+          when !isWalletPaymentSubmissionFenceFailure(failure)) {
+        return AppResult.failure(failure);
+      }
+      final sync = await repository.sync();
+      if (sync case AppFailureResult<void>(:final failure)) {
         return AppResult.failure(failure);
       }
       return await repository.activityFeed(kind);

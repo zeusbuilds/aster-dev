@@ -399,7 +399,11 @@ void registerVisualCatalog({required VisualCapture capture}) {
             );
             await _settle(tester);
             expect(
-              find.text('Lightning is not available in this release.'),
+              find.text(
+                sending
+                    ? 'Lightning is not available in this release.'
+                    : 'Request unavailable',
+              ),
               findsOneWidget,
             );
             await _shot(

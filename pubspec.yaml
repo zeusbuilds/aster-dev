@@ -24,8 +24,8 @@ dependencies:
   # Wallet SDK. Keep this immutable; see docs/architecture/SDK_INTEGRATION.md.
   rgb_sdk_flutter:
     git:
-      url: https://github.com/UTEXO-Protocol/flutter-sdk.git
-      ref: a8b053766c4ebfdc52f94716caad1c09060eba90
+      url: https://github.com/zeusbuilds/rgb-sdk-flutter.git
+      ref: 68a690916eabe96407c03669d569bf86babb8e72
 
   # Storage
   # Keep the reviewed secure-storage release while upgrading the host platforms.

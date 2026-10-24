@@ -38,8 +38,21 @@ jobs:
       - name: Verify process supervisor runtime
         run: python3 -I -S -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 69)'
 
+      - name: Configure read-only SDK access
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+        env:
+          SDK_READ_SSH_KEY: ${{ secrets.SDK_READ_SSH_KEY }}
+        run: python3 -I -S tool/configure_private_sdk_access.py
+
       - name: Install dependencies
         run: flutter pub get --enforce-lockfile
+
+      - name: Remove SDK dependency credentials
+        if: always()
+        run: python3 -I -S tool/configure_private_sdk_access.py --cleanup
+
+      - name: Verify private SDK access helper
+        run: python3 -I -S test/tool/configure_private_sdk_access_test.py
 
       - name: Check formatting
         run: dart format --output=none --set-exit-if-changed .

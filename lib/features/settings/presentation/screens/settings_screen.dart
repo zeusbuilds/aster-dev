@@ -279,6 +279,7 @@ class SettingsScreen extends ConsumerWidget {
     WidgetRef ref,
     SettingsExternalLink link,
   ) async {
+    final toasts = context.toasts;
     final opened = await ref
         .read(settingsAppViewModelProvider.notifier)
         .openLink(link);
@@ -293,7 +294,7 @@ class SettingsScreen extends ConsumerWidget {
         ?.operationFailure;
     if (failure == null) return;
     unawaited(context.haptics.trigger(HapticIntent.error));
-    context.toasts.show(
+    toasts.show(
       title: 'Link not opened',
       message: failure.userMessage,
       variant: ToastVariant.failure,

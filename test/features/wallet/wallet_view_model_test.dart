@@ -15,43 +15,54 @@ import '../../support/payment_flow_harness.dart';
 import '../../support/wallet_fakes.dart';
 
 void main() {
-  test('pending payment switch denial preserves the active wallet and Activity access', () async {
-    final now = DateTime.now().toUtc();
-    final engine = FakeWalletEngine()
-      ..feeEstimate = WalletFeeRateEstimate(
-        targetBlocks: 6,
-        satsPerVbyte: 2,
-        observedAt: now,
-      )
-      ..sendPaymentError = StateError('Lost payment response');
-    final h = await PaymentFlowTestHarness.create(engine: engine);
-    addTearDown(h.dispose);
-    final before = await h.container.read(walletViewModelProvider.future);
-    final result = await h.repository.sendPayment(
-      target: WalletPaymentTarget.bitcoinOnchain,
-      destination: 'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn',
-      amountUnits: 1,
-      reviewedFeeRate: engine.feeEstimate,
-    );
-    expect(result, isA<AppFailureResult<WalletSendResult>>());
-    final vm = h.container.read(walletViewModelProvider.notifier);
-    expect(await vm.switchWallet(_secondWalletId), isFalse);
-    final after = await h.container.read(walletViewModelProvider.future);
-    expect(after.activeWallet, before.activeWallet);
-    expect(after.wallets, before.wallets);
-    expect(
-      after.operationFailure?.code,
-      walletPaymentSubmissionPendingFailure.code,
-    );
-    final activity = await h.container.read(
-      activityViewModelProvider(WalletAssetKind.bitcoin).future,
-    );
-    expect(activity.feed.paymentSubmission?.requiresReconciliation, isTrue);
-    expect(
-      engine.calls.where((call) => call == 'sendPayment:start'),
-      hasLength(1),
-    );
-  });
+  test(
+    'a missing switch target preserves the active wallet and its payment fence',
+    () async {
+      final now = DateTime.now().toUtc();
+      final engine = FakeWalletEngine()
+        ..feeEstimate = WalletFeeRateEstimate(
+          targetBlocks: 6,
+          satsPerVbyte: 2,
+          observedAt: now,
+        )
+        ..sendPaymentError = StateError('Lost payment response');
+      final h = await PaymentFlowTestHarness.create(engine: engine);
+      addTearDown(h.dispose);
+      final before = await h.container.read(walletViewModelProvider.future);
+      final result = await h.repository.sendPayment(
+        target: WalletPaymentTarget.bitcoinOnchain,
+        destination: 'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn',
+        amountUnits: 1,
+        reviewedFeeRate: engine.feeEstimate,
+      );
+      expect(result, isA<AppFailureResult<WalletSendResult>>());
+      final vm = h.container.read(walletViewModelProvider.notifier);
+      expect(await vm.switchWallet(_secondWalletId), isFalse);
+      final after = await h.container.read(walletViewModelProvider.future);
+      expect(after.activeWallet, before.activeWallet);
+      expect(after.wallets, before.wallets);
+      expect(after.operationFailure?.code, 'wallet_profile_not_found');
+      final activity = await h.container.read(
+        activityViewModelProvider(WalletAssetKind.bitcoin).future,
+      );
+      expect(activity.feed.paymentSubmission?.requiresReconciliation, isTrue);
+      final blocked = await h.repository.sendPayment(
+        target: WalletPaymentTarget.bitcoinOnchain,
+        destination: 'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn',
+        amountUnits: 1,
+        reviewedFeeRate: engine.feeEstimate,
+      );
+      expect(
+        (blocked as AppFailureResult<WalletSendResult>).failure.code,
+        walletPaymentSubmissionPendingFailure.code,
+      );
+      expect(engine.calls, isNot(contains('destroy')));
+      expect(
+        engine.calls.where((call) => call == 'sendPayment:start'),
+        hasLength(1),
+      );
+    },
+  );
 
   test('ignores reload while the initial wallet read is active', () async {
     final harness = await _createHarness(delayRepository: true);

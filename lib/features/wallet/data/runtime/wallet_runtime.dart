@@ -6,6 +6,7 @@ import '../../domain/models/models.dart';
 import '../storage/wallet_secret_store.dart';
 import 'wallet_directory_manager.dart';
 import 'wallet_engine.dart';
+import 'wallet_payment_recovery_engine.dart';
 
 enum WalletRuntimePhase {
   inactive,
@@ -21,6 +22,7 @@ enum _ReconciliationAccess {
   audit,
   paymentAudit,
   paymentLifecycle,
+  paymentSwitch,
   paymentResolution,
   rollback,
   disposal,
@@ -99,10 +101,20 @@ final class WalletRuntime {
   Future<AppResult<void>>? _disposeInFlight;
   String? _reconciliationRollbackWalletId;
   bool _paymentAuditSuspended = false;
+  String? _paymentFenceWalletId;
 
   WalletRuntimeSnapshot get snapshot => _snapshot;
   WalletProfile? get activeProfile => _activeProfile;
   Stream<WalletRuntimeSnapshot> get states => _states.stream;
+
+  /// A payment journal fence belongs to the active wallet, rather than the
+  /// process or every wallet in its registry. Other native-owner failures are
+  /// deliberately not eligible for payment-only read/lifecycle access.
+  bool get hasPaymentSubmissionFence =>
+      _snapshot.phase == WalletRuntimePhase.failed &&
+      _paymentFenceWalletId != null &&
+      _paymentFenceWalletId == _activeProfile?.id &&
+      _paymentFenceWalletId == _snapshot.walletId;
 
   Future<AppResult<void>> restore(WalletProfile profile) {
     return _enqueue(() async {
@@ -271,32 +283,37 @@ final class WalletRuntime {
   }
 
   Future<AppResult<void>> switchTo(WalletProfile profile) {
-    return _enqueue(() async {
-      if (profile.state != WalletProfileState.ready) {
-        return AppResult.failure(_profileStateFailure(profile));
-      }
-      if (profile.environment != _services.environment) {
-        return AppResult.failure(_networkMismatchFailure());
-      }
-      if (_snapshot.phase == WalletRuntimePhase.active &&
-          _activeProfile?.id == profile.id) {
-        return const AppResult.success(null);
-      }
-      final secretResult = await _secrets.read(
-        profile.id,
-        expectedStorageToken: profile.storageToken,
-      );
-      return switch (secretResult) {
-        AppSuccess<WalletSecret>(:final value) => _activateReplacingUnsafe(
-          profile,
-          value,
-          activation: const _OpenPersistedWalletActivation(),
-        ),
-        AppFailureResult<WalletSecret>(:final failure) => AppResult.failure(
-          failure,
-        ),
-      };
-    }, reconciliationWalletId: profile.id);
+    return _enqueue(
+      () async {
+        if (profile.state != WalletProfileState.ready) {
+          return AppResult.failure(_profileStateFailure(profile));
+        }
+        if (profile.environment != _services.environment) {
+          return AppResult.failure(_networkMismatchFailure());
+        }
+        if ((_snapshot.phase == WalletRuntimePhase.active ||
+                _hasPaymentQuarantine) &&
+            _activeProfile?.id == profile.id) {
+          return const AppResult.success(null);
+        }
+        final secretResult = await _secrets.read(
+          profile.id,
+          expectedStorageToken: profile.storageToken,
+        );
+        return switch (secretResult) {
+          AppSuccess<WalletSecret>(:final value) => _activateReplacingUnsafe(
+            profile,
+            value,
+            activation: const _OpenPersistedWalletActivation(),
+          ),
+          AppFailureResult<WalletSecret>(:final failure) => AppResult.failure(
+            failure,
+          ),
+        };
+      },
+      reconciliationAccess: _ReconciliationAccess.paymentSwitch,
+      reconciliationWalletId: profile.id,
+    );
   }
 
   Future<AppResult<T>> run<T>(
@@ -315,6 +332,7 @@ final class WalletRuntime {
         );
       }
       try {
+        await recoverPaymentOwnerIfNeeded(engine);
         return AppResult.success(await operation(engine));
       } catch (error, stackTrace) {
         return AppResult.failure(FailureMapper.from(error, stackTrace));
@@ -322,15 +340,37 @@ final class WalletRuntime {
     });
   }
 
-  bool get _hasPaymentQuarantine =>
-      _snapshot.phase == WalletRuntimePhase.failed &&
-      _snapshot.failure?.code == walletPaymentSubmissionPendingFailure.code;
+  bool get _hasPaymentQuarantine => hasPaymentSubmissionFence;
 
   /// Installs the durable send fence without discarding the native reader.
   /// This is used only after a wallet-scoped submitting record is verified.
-  Future<AppResult<void>> retainUnresolvedPayment() => _enqueue(
-    () async => const AppResult.failure(walletPaymentSubmissionPendingFailure),
-  );
+  Future<AppResult<void>> retainUnresolvedPayment({AppFailure? failure}) =>
+      _enqueue(() async {
+        final retained = failure ?? walletPaymentSubmissionPendingFailure;
+        retainPaymentSubmissionFence(retained);
+        return AppResult.failure(retained);
+      }, reconciliationAccess: _ReconciliationAccess.paymentAudit);
+
+  /// Installs a wallet-scoped journal fence from the current serialized lease.
+  /// A known native receipt may still be returned successfully while local
+  /// receipt persistence needs repair. This method never permits another send.
+  void retainPaymentSubmissionFence(AppFailure failure) {
+    if (!isWalletPaymentSubmissionFenceFailure(failure) ||
+        _engine == null ||
+        _activeProfile == null ||
+        (_snapshot.phase != WalletRuntimePhase.active &&
+            !_hasPaymentQuarantine)) {
+      throw StateError('A payment fence requires its active wallet owner.');
+    }
+    _paymentFenceWalletId = _activeProfile!.id;
+    _emit(
+      WalletRuntimeSnapshot(
+        phase: WalletRuntimePhase.failed,
+        walletId: _activeProfile!.id,
+        failure: failure,
+      ),
+    );
+  }
 
   /// Narrow audit path for balance, fees, network status, and Activity. Callers
   /// must not dispatch wallet mutations in this lease. Other reconciliation
@@ -353,22 +393,81 @@ final class WalletRuntime {
       );
     }
     try {
+      await recoverPaymentOwnerIfNeeded(engine);
       return AppResult.success(await operation(engine));
     } catch (error, stackTrace) {
       return AppResult.failure(FailureMapper.from(error, stackTrace));
     }
   }, reconciliationAccess: _ReconciliationAccess.paymentAudit);
 
-  /// Reopens mutations only after the owned journal and exact native history
-  /// agree. The callback is supplied by WalletPaymentSubmissions, not by UI.
+  /// Reopens only this wallet's drained native owner after a payment deadline.
+  /// Call inside the current runtime lease, including just before an explicit
+  /// cancellation after exact inspection. No operation is enqueued or resent,
+  /// and the password stays in the secure credential boundary.
+  Future<void> recoverPaymentOwnerIfNeeded(WalletEngine engine) async {
+    if (engine is! WalletPaymentDeadlineRecovery ||
+        !(engine as WalletPaymentDeadlineRecovery).requiresPaymentReopen) {
+      return;
+    }
+    final profile = _activeProfile;
+    if (!identical(engine, _engine) ||
+        profile == null ||
+        _paymentAuditSuspended) {
+      throw const AppFailureException(
+        AppFailure(
+          code: 'wallet_payment_owner_recovery_required',
+          kind: AppFailureKind.storage,
+          userMessage: 'The wallet must be reopened before continuing.',
+          retryable: false,
+          requiresReconciliation: true,
+        ),
+      );
+    }
+    try {
+      final secret = await _secrets.read(
+        profile.id,
+        expectedStorageToken: profile.storageToken,
+      );
+      if (secret case AppFailureResult<WalletSecret>(:final failure)) {
+        throw AppFailureException(failure);
+      }
+      await engine.openPersisted(
+        databasePassword:
+            (secret as AppSuccess<WalletSecret>).value.databasePassword,
+      );
+    } catch (error, stack) {
+      final mapped = FailureMapper.from(error, stack);
+      Error.throwWithStackTrace(
+        AppFailureException(
+          AppFailure(
+            code: 'wallet_payment_owner_recovery_required',
+            kind: mapped.kind,
+            userMessage: 'The wallet could not be reopened. Try again after restarting the app.',
+            retryable: false,
+            requiresReconciliation: true,
+            // This describes native-owner recovery, never new payment uncertainty.
+            // The separate journal retains its exact execution outcome.
+            outcomeUnknown: mapped.outcomeUnknown,
+            cause: mapped,
+            stackTrace: stack,
+          ),
+        ),
+        stack,
+      );
+    }
+  }
+
+  /// Reopens mutations only after the owned journal has an authoritative native
+  /// receipt or nonexecution certificate. The callback is owned by
+  /// WalletPaymentSubmissions; UI cannot retire the fence directly.
   Future<AppResult<void>> reconcilePaymentSubmission(
-    Future<bool> Function(WalletEngine engine) verifyExactAcceptance,
+    Future<bool> Function(WalletEngine engine) verifyResolution,
   ) => _enqueue(() async {
     if (!_hasPaymentQuarantine) return const AppResult.success(null);
     final engine = _engine;
     if (engine == null ||
         _paymentAuditSuspended ||
-        !await verifyExactAcceptance(engine)) {
+        !await verifyResolution(engine)) {
       return const AppResult.failure(walletPaymentSubmissionPendingFailure);
     }
     return const AppResult.success(null);
@@ -576,7 +675,8 @@ final class WalletRuntime {
           ),
         );
       }
-      if (_snapshot.phase != WalletRuntimePhase.active) {
+      if (_snapshot.phase != WalletRuntimePhase.active &&
+          !_hasPaymentQuarantine) {
         return AppResult.failure(
           const AppFailure(
             code: 'wallet_not_ready',
@@ -599,7 +699,7 @@ final class WalletRuntime {
           failure,
         ),
       };
-    });
+    }, reconciliationAccess: _ReconciliationAccess.paymentAudit);
   }
 
   Future<AppResult<void>> rollbackProvision(
@@ -1056,12 +1156,14 @@ final class WalletRuntime {
         _ => null,
       };
       final retainedFailure = retainedSnapshot?.failure;
+      final retainedPaymentFence = _hasPaymentQuarantine;
       if (retainedFailure != null) {
         final canRun = switch (reconciliationAccess) {
           _ReconciliationAccess.blocked => false,
           _ReconciliationAccess.audit || _ReconciliationAccess.disposal => true,
           _ReconciliationAccess.paymentAudit ||
           _ReconciliationAccess.paymentLifecycle ||
+          _ReconciliationAccess.paymentSwitch ||
           _ReconciliationAccess.paymentResolution => _hasPaymentQuarantine,
           _ReconciliationAccess.rollback =>
             _reconciliationRollbackWalletId != null &&
@@ -1078,6 +1180,7 @@ final class WalletRuntime {
         _settleReconciliation(
           result,
           retainedSnapshot: retainedSnapshot,
+          retainedPaymentFence: retainedPaymentFence,
           access: reconciliationAccess,
           reconciliationWalletId: reconciliationWalletId,
           reconciliationRollbackWalletId: reconciliationRollbackWalletId,
@@ -1090,6 +1193,7 @@ final class WalletRuntime {
         _settleReconciliation(
           result,
           retainedSnapshot: retainedSnapshot,
+          retainedPaymentFence: retainedPaymentFence,
           access: reconciliationAccess,
           reconciliationWalletId: reconciliationWalletId,
           reconciliationRollbackWalletId: reconciliationRollbackWalletId,
@@ -1104,23 +1208,42 @@ final class WalletRuntime {
   void _settleReconciliation<T>(
     AppResult<T> result, {
     required WalletRuntimeSnapshot? retainedSnapshot,
+    required bool retainedPaymentFence,
     required _ReconciliationAccess access,
     required String? reconciliationWalletId,
     required String? reconciliationRollbackWalletId,
   }) {
     if (retainedSnapshot != null) {
-      if (retainedSnapshot.failure?.code ==
-              walletPaymentSubmissionPendingFailure.code &&
+      if (retainedPaymentFence &&
+          access == _ReconciliationAccess.paymentResolution &&
+          result is AppFailureResult<T> &&
+          isWalletPaymentSubmissionFenceFailure(result.failure) &&
+          !result.failure.outcomeUnknown) {
+        // The owned native audit can prove Accepted or nonexecution while a
+        // required local receipt/cleanup write still fails. Keep that stronger
+        // certainty and its mutation fence; generic failed checks never turn
+        // a known result back into an unknown payment.
+        _paymentFenceWalletId = retainedSnapshot.walletId;
+        _emit(
+          WalletRuntimeSnapshot(
+            phase: WalletRuntimePhase.failed,
+            walletId: retainedSnapshot.walletId,
+            failure: result.failure,
+          ),
+        );
+        return;
+      }
+      if (retainedPaymentFence &&
           result is AppFailureResult<T> &&
           ((result.failure.requiresReconciliation &&
-                  result.failure.code !=
-                      walletPaymentSubmissionPendingFailure.code) ||
+                  !isWalletPaymentSubmissionFenceFailure(result.failure)) ||
               access == _ReconciliationAccess.paymentLifecycle ||
               access == _ReconciliationAccess.disposal)) {
         // A read-only payment fence assumes the native owner is intact. Lost
         // shutdown/reopen/disposal outcomes or a stronger native failure revoke
         // that assumption; exact transaction history cannot repair its owner.
         _paymentAuditSuspended = true;
+        _paymentFenceWalletId = null;
         final failure = result.failure.requiresReconciliation
             ? result.failure
             : AppFailure(
@@ -1139,10 +1262,23 @@ final class WalletRuntime {
         _emit(
           WalletRuntimeSnapshot(
             phase: WalletRuntimePhase.failed,
-            walletId: retainedSnapshot.walletId,
+            walletId: access == _ReconciliationAccess.paymentSwitch
+                ? _snapshot.walletId ?? retainedSnapshot.walletId
+                : retainedSnapshot.walletId,
             failure: failure,
           ),
         );
+        return;
+      }
+      if (result is AppSuccess<T> &&
+          access == _ReconciliationAccess.paymentSwitch &&
+          _activeProfile?.id != retainedSnapshot.walletId) {
+        // The old wallet's durable journal stays untouched. Its native owner
+        // has been closed successfully, so it cannot fence the new wallet.
+        // The repository restores the target wallet's own journal fence before
+        // releasing its serialized switch operation.
+        _paymentFenceWalletId = null;
+        _paymentAuditSuspended = false;
         return;
       }
       if (result is AppSuccess<T> &&
@@ -1150,6 +1286,8 @@ final class WalletRuntime {
               access == _ReconciliationAccess.disposal ||
               access == _ReconciliationAccess.paymentResolution)) {
         _reconciliationRollbackWalletId = null;
+        _paymentFenceWalletId = null;
+        _paymentAuditSuspended = false;
         if (access == _ReconciliationAccess.rollback ||
             access == _ReconciliationAccess.paymentResolution) {
           _emit(
@@ -1168,6 +1306,17 @@ final class WalletRuntime {
 
       // Audit and failed recovery attempts may return their own diagnostics,
       // but they cannot replace the failure that established quarantine.
+      if (retainedPaymentFence &&
+          _hasPaymentQuarantine &&
+          !identical(_snapshot, retainedSnapshot)) {
+        // A journal owner may establish stronger execution certainty during
+        // this lease (for example Accepted with a receipt-store failure). Do
+        // not overwrite that explicit classification with an older Unknown.
+        return;
+      }
+      if (retainedPaymentFence) {
+        _paymentFenceWalletId = retainedSnapshot.walletId;
+      }
       if (!identical(_snapshot, retainedSnapshot)) _emit(retainedSnapshot);
       return;
     }
@@ -1175,6 +1324,9 @@ final class WalletRuntime {
     if (result case AppFailureResult<T>(:final failure)
         when failure.requiresReconciliation) {
       _reconciliationRollbackWalletId = reconciliationRollbackWalletId;
+      _paymentFenceWalletId = isWalletPaymentSubmissionFenceFailure(failure)
+          ? _activeProfile?.id
+          : null;
       _emit(
         WalletRuntimeSnapshot(
           phase: WalletRuntimePhase.failed,

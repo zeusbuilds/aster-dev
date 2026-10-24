@@ -24,12 +24,26 @@ final class WalletPaymentSubmissions {
   final WalletPaymentReceiptStore? receipts;
   final String Function() newId;
   final DateTime Function() clock;
-  WalletPaymentSubmission? _unconfirmedAttempt;
+  // Per-wallet volatile evidence survives a safe switch to another wallet.
+  // An acceptance/known non-submission must not be downgraded merely because
+  // a different wallet begins its own independent send.
+  final Map<String, WalletPaymentSubmission> _retainedAttempts = {};
+
+  WalletPaymentSubmission? get _unconfirmedAttempt =>
+      _retainedAttempts[runtime.activeProfile?.id];
+
+  set _unconfirmedAttempt(WalletPaymentSubmission? value) {
+    if (value != null) {
+      _retainedAttempts[value.walletId] = value;
+    } else {
+      _retainedAttempts.remove(runtime.activeProfile?.id);
+    }
+  }
 
   Future<void> validateProfiles(Iterable<WalletProfile> profiles) async {
     if (store == null) return;
     for (final profile in profiles) {
-      await _read(profile);
+      await _read(profile, archiveAccepted: false);
       await _archived(profile);
     }
   }
@@ -39,10 +53,38 @@ final class WalletPaymentSubmissions {
   Future<void> restoreFence() async {
     final profile = runtime.activeProfile;
     if (profile == null || store == null) return;
-    final record = await _read(profile);
-    if (record?.requiresReconciliation == true) {
+    final record = await _read(profile, archiveAccepted: false);
+    final retained = _unconfirmedAttempt;
+    if (retained != null &&
+        (record == null ||
+            record.id == retained.id ||
+            !record.requiresReconciliation)) {
+      await runtime.retainUnresolvedPayment(
+        failure: retained.reconciliationFailure,
+      );
+      return;
+    }
+    if (record == null) return;
+    if (record.phase == WalletPaymentSubmissionPhase.accepted) {
+      try {
+        await _archive(record, profile);
+      } on StoredDataCorruptionException {
+        rethrow;
+      } catch (_) {
+        // Exact acceptance survives a process restart even while its required
+        // archive remains unavailable. Restore a storage fence, not ambiguity.
+        _unconfirmedAttempt = record.withUncertainAcknowledgement();
+        await runtime.retainUnresolvedPayment(
+          failure: record.reconciliationFailure,
+        );
+        return;
+      }
+    }
+    if (record.requiresReconciliation) {
       _unconfirmedAttempt = record;
-      await runtime.retainUnresolvedPayment();
+      await runtime.retainUnresolvedPayment(
+        failure: record.reconciliationFailure,
+      );
     }
   }
 
@@ -50,17 +92,31 @@ final class WalletPaymentSubmissions {
     try {
       // A durable acknowledgement written just before an I/O error still
       // requires explicit exact-history reconciliation in this process.
-      if (runtime.snapshot.failure?.code ==
-          walletPaymentSubmissionPendingFailure.code) {
-        return const AppResult.failure(walletPaymentSubmissionPendingFailure);
+      if (runtime.hasPaymentSubmissionFence) {
+        return AppResult.failure(runtime.snapshot.failure!);
       }
       final profile = runtime.activeProfile;
       if (profile == null || store == null) {
         return const AppResult.success(null);
       }
-      final record = await _read(profile);
+      final record = await _read(profile, archiveAccepted: false);
+      if (record?.phase == WalletPaymentSubmissionPhase.accepted) {
+        try {
+          // A newer intent may not overwrite the last accepted receipt before
+          // it is archived. This mutation gate owns the backfill; read-only
+          // status/history never attempt it.
+          await _archive(record!, profile);
+        } on StoredDataCorruptionException {
+          rethrow;
+        } catch (_) {
+          _unconfirmedAttempt = record!.withUncertainAcknowledgement();
+          return await runtime.retainUnresolvedPayment(
+            failure: record.reconciliationFailure,
+          );
+        }
+      }
       if (record?.requiresReconciliation == true) {
-        return const AppResult.failure(walletPaymentSubmissionPendingFailure);
+        return AppResult.failure(record!.reconciliationFailure);
       }
       return const AppResult.success(null);
     } catch (error, stack) {
@@ -71,38 +127,151 @@ final class WalletPaymentSubmissions {
   Future<AppResult<WalletPaymentSubmission?>> status() async {
     try {
       final profile = runtime.activeProfile;
-      var record = profile == null || store == null
+      // Read-only status must not itself retry required archive writes. Exact
+      // native acceptance retained in this process remains acceptance even if
+      // the local receipt/archive acknowledgement is unavailable.
+      final record = profile == null || store == null
           ? null
-          : await _read(profile);
+          : await _read(profile, archiveAccepted: false);
       final attempt = _unconfirmedAttempt;
       if (attempt != null &&
           attempt.walletId == profile?.id &&
-          runtime.snapshot.failure?.code ==
-              walletPaymentSubmissionPendingFailure.code &&
-          record?.id != attempt.id) {
-        record = attempt;
+          (record == null ||
+              record.id == attempt.id ||
+              !record.requiresReconciliation)) {
+        return AppResult.success(attempt.withUncertainAcknowledgement());
       }
-      return AppResult.success(
-        record != null &&
-                runtime.snapshot.failure?.code ==
-                    walletPaymentSubmissionPendingFailure.code
-            ? record.withUncertainAcknowledgement()
-            : record,
-      );
+      return AppResult.success(record);
     } catch (error, stack) {
       return AppResult.failure(FailureMapper.from(error, stack));
     }
   }
 
-  /// An exact durably recorded native response can resolve a lost journal
-  /// acknowledgement. An unidentifiable submission remains unresolved forever
-  /// until a separate authoritative native recovery protocol is available.
-  Future<AppResult<void>> reconcile() => runtime.reconcilePaymentSubmission((
-    engine,
-  ) async {
+  /// New operations query the native durable outbox by the saved immutable
+  /// request. Legacy unidentified one-shot submissions retain their fence.
+  Future<AppResult<void>> reconcile() =>
+      _recover(resumeAuthorizedCommit: false);
+
+  /// Deliberate recovery action for an already-authorized native operation.
+  /// This never prepares a new transaction or changes its saved signed bytes.
+  /// It is intentionally separate from the non-sending status check.
+  Future<AppResult<void>> resume() => _recover(resumeAuthorizedCommit: true);
+
+  Future<AppResult<void>> _recover({
+    required bool resumeAuthorizedCommit,
+  }) => runtime.reconcilePaymentSubmission((engine) async {
     final profile = runtime.activeProfile;
     if (profile == null || store == null) return false;
-    final record = await _read(profile);
+    var record = await _recoverJournalAcknowledgement(
+      () => _read(profile, archiveAccepted: false),
+    );
+    final attempt = _unconfirmedAttempt;
+    if (attempt != null && record?.id != attempt.id) {
+      if (resumeAuthorizedCommit ||
+          attempt.recoveryRequest == null ||
+          attempt.walletId != profile.id ||
+          record?.requiresReconciliation == true) {
+        return false;
+      }
+      // Both app marker/rejection writes can fail before native entry, leaving
+      // the previous terminal record or no record on disk. The non-sending
+      // Check action can certify and durably close this exact in-memory intent
+      // once storage recovers. It must never resolve an older receipt instead,
+      // replace a different unresolved intent, or authorize commit from memory.
+      record = _decode(_encode(attempt, profile), profile);
+    }
+    final request = record?.recoveryRequest;
+    if (record != null && request != null) {
+      final recoveryRecord = record;
+      if (engine is! WalletPaymentRecoveryEngine) return false;
+      final recovery = engine as WalletPaymentRecoveryEngine;
+      await recovery.validatePaymentOperationRequest(
+        request,
+        record.id,
+        record.command,
+      );
+      var status = await recovery.inspectPaymentOperation(request);
+      if (resumeAuthorizedCommit &&
+          status.phase == WalletPaymentRecoveryPhase.committing &&
+          status.endAuthorized) {
+        final referenceId = status.referenceId;
+        if (referenceId == null ||
+            !RegExp(r'^[a-f0-9]{64}$').hasMatch(referenceId)) {
+          throw const StoredDataCorruptionException();
+        }
+        await runtime.recoverPaymentOwnerIfNeeded(engine);
+        status = await recovery.commitPaymentOperation(request);
+        if (status.referenceId != referenceId) {
+          throw const AppFailureException(
+            AppFailure(
+              code: 'payment_native_identity_changed',
+              kind: AppFailureKind.storage,
+              userMessage: 'Wallet recovery is required.',
+              retryable: false,
+              requiresReconciliation: true,
+            ),
+          );
+        }
+      } else if (!resumeAuthorizedCommit &&
+          !status.endAuthorized &&
+          (status.phase == WalletPaymentRecoveryPhase.absent ||
+              status.phase == WalletPaymentRecoveryPhase.preparing ||
+              status.phase == WalletPaymentRecoveryPhase.prepared)) {
+        // The explicit Check action may release a proven undispatched native
+        // preparation. It never commits or re-sends the user's payment.
+        await runtime.recoverPaymentOwnerIfNeeded(engine);
+        status = await recovery.cancelPaymentOperation(request);
+      }
+      if (status.phase == WalletPaymentRecoveryPhase.accepted) {
+        final receipt = _recoveryReceipt(record.command, status);
+        _unconfirmedAttempt = _updated(
+          record,
+          phase: WalletPaymentSubmissionPhase.accepted,
+          result: receipt,
+        ).withUncertainAcknowledgement();
+        await _recoverJournalAcknowledgement(() async {
+          await _write(
+            recoveryRecord,
+            profile,
+            WalletPaymentSubmissionPhase.accepted,
+            result: receipt,
+          );
+          // Read back and archive before reopening the mutation lease. A lost
+          // write acknowledgement leaves recovery repeatable by native identity.
+          final accepted = await _read(profile);
+          if (accepted?.id != recoveryRecord.id ||
+              accepted?.result != receipt) {
+            throw const StoredDataCorruptionException();
+          }
+        });
+        _unconfirmedAttempt = null;
+        return true;
+      }
+      if (status.phase == WalletPaymentRecoveryPhase.rejected &&
+          !status.endAuthorized) {
+        _unconfirmedAttempt = _updated(
+          record,
+          phase: WalletPaymentSubmissionPhase.rejected,
+        ).withUncertainAcknowledgement();
+        await _recoverJournalAcknowledgement(() async {
+          await _write(
+            recoveryRecord,
+            profile,
+            WalletPaymentSubmissionPhase.rejected,
+          );
+          final rejected = await _read(profile);
+          if (rejected?.id != recoveryRecord.id ||
+              rejected?.phase != WalletPaymentSubmissionPhase.rejected) {
+            throw const StoredDataCorruptionException();
+          }
+        });
+        _unconfirmedAttempt = null;
+        return true;
+      }
+      // Absence is not a cancellation certificate. Interrupted preparation may
+      // own native resources, and prepared/committing are not acceptance.
+      return false;
+    }
     final result = record?.result;
     if (record?.phase != WalletPaymentSubmissionPhase.accepted ||
         result == null ||
@@ -129,12 +298,25 @@ final class WalletPaymentSubmissions {
   ) async {
     final profile = runtime.activeProfile;
     if (profile == null || store == null) return activities;
-    await _read(profile); // Backfill the existing v1 accepted journal first.
+    // History is an audit read. A required receipt repair must not retry its
+    // archive write here or hide the native entry that opens the Check action.
+    final current = await _read(profile, archiveAccepted: false);
     final archive = await _archived(profile);
-    final byIdentity = {
-      for (final receipt in archive)
-        _receiptKey(profile, receipt.result!): receipt.result!,
-    };
+    final retained = _unconfirmedAttempt;
+    final byIdentity = <String, WalletSendResult>{};
+    for (final receipt in [
+      ...archive,
+      if (current?.phase == WalletPaymentSubmissionPhase.accepted) current!,
+      if (retained?.phase == WalletPaymentSubmissionPhase.accepted) retained!,
+    ]) {
+      final result = receipt.result!;
+      final key = _receiptKey(profile, result);
+      final previous = byIdentity[key];
+      if (previous != null && previous != result) {
+        throw const AppFailureException(walletActivityConsistencyFailure);
+      }
+      byIdentity[key] = result;
+    }
     final matched = <String>{};
     return List.unmodifiable(
       activities.map((activity) {
@@ -174,9 +356,20 @@ final class WalletPaymentSubmissions {
         ),
       );
     }
-    final previous = await _read(profile);
+    if (engine is! WalletPaymentRecoveryEngine) {
+      throw const AppFailureException(
+        AppFailure(
+          code: 'payment_recovery_unavailable',
+          kind: AppFailureKind.configuration,
+          userMessage: 'Safe payment recovery is unavailable.',
+          retryable: false,
+        ),
+      );
+    }
+    final recovery = engine as WalletPaymentRecoveryEngine;
+    final previous = await _read(profile, archiveAccepted: false);
     if (previous?.requiresReconciliation == true) {
-      throw const AppFailureException(walletPaymentSubmissionPendingFailure);
+      throw AppFailureException(previous!.reconciliationFailure);
     }
     await _archived(profile);
     String? id;
@@ -197,12 +390,55 @@ final class WalletPaymentSubmissions {
         ),
       );
     }
-    final intent = WalletPaymentSubmission(
+    // Command construction performs only validation/reads. No native prepare,
+    // proxy post or broadcast may occur before the app intent is durable.
+    final String recoveryRequest;
+    try {
+      recoveryRequest = await recovery.paymentOperationRequest(id, command);
+    } catch (error, stack) {
+      // Request construction is reads/validation only. Even a native deadline
+      // here cannot mean a payment was sent: Prepare and Commit did not run.
+      final failure = FailureMapper.from(error, stack);
+      final deadlineNeedsReopen =
+          engine is WalletPaymentDeadlineRecovery &&
+          (engine as WalletPaymentDeadlineRecovery).requiresPaymentReopen;
+      if (deadlineNeedsReopen) {
+        // Restore only the native owner. Never retry request construction or a
+        // monetary operation automatically. A failed reopen keeps its stronger
+        // owner quarantine rather than installing an unidentified payment.
+        await runtime.recoverPaymentOwnerIfNeeded(engine);
+      }
+      Error.throwWithStackTrace(
+        AppFailureException(
+          AppFailure(
+            code: deadlineNeedsReopen ? 'payment_not_dispatched' : failure.code,
+            kind: failure.kind,
+            userMessage: failure.outcomeUnknown
+                ? 'Nothing was sent. Try again.'
+                : failure.userMessage,
+            retryable: deadlineNeedsReopen || failure.retryable,
+            requiresReconciliation:
+                !deadlineNeedsReopen && failure.requiresReconciliation,
+            outcomeUnknown: false,
+            retryAfter: failure.retryAfter,
+            cause: FailureMapper.diagnosticCause(error),
+            stackTrace: stack,
+          ),
+        ),
+        stack,
+      );
+    }
+    if (recoveryRequest.isEmpty || recoveryRequest.length > 100000) {
+      throw const StoredDataCorruptionException();
+    }
+    var intent = WalletPaymentSubmission(
       id: id,
       walletId: profile.id,
       command: command,
       submittedAt: clock().toUtc(),
       phase: WalletPaymentSubmissionPhase.submitting,
+      recoveryRequest: recoveryRequest,
+      commitAttempted: false,
     );
     // Validate the same strict representation that must survive a restart.
     final encoded = _encode(intent, profile);
@@ -210,16 +446,156 @@ final class WalletPaymentSubmissions {
     _unconfirmedAttempt = intent;
     try {
       await store!.write(profile.id, encoded);
-    } catch (error, stack) {
-      // The write may be durable despite an error. Native was not called, but
-      // this marker must never be overwritten by a new submission attempt.
-      _unresolved(error, stack);
+    } catch (_, stack) {
+      // Native was not entered. Record a definite rejection if storage can
+      // acknowledge it; otherwise retain the marker for native cancellation
+      // certification on the next explicit status check.
+      try {
+        await _write(intent, profile, WalletPaymentSubmissionPhase.rejected);
+        final rejected = await _read(profile);
+        if (rejected?.id != intent.id ||
+            rejected?.phase != WalletPaymentSubmissionPhase.rejected) {
+          throw const StoredDataCorruptionException();
+        }
+        _unconfirmedAttempt = null;
+      } catch (rejectionError, rejectionStack) {
+        _unresolved(rejectionError, rejectionStack);
+      }
+      Error.throwWithStackTrace(
+        const AppFailureException(
+          AppFailure(
+            code: 'payment_not_dispatched',
+            kind: AppFailureKind.storage,
+            userMessage: 'The payment could not be saved. Nothing was sent.',
+            retryable: true,
+          ),
+        ),
+        stack,
+      );
     }
 
     final WalletSendResult result;
+    var nativeRejectionRecorded = false;
     try {
-      result = await engine.sendPayment(command);
+      final prepared = await recovery.preparePaymentOperation(recoveryRequest);
+      if (prepared.phase == WalletPaymentRecoveryPhase.rejected &&
+          !prepared.endAuthorized) {
+        _unconfirmedAttempt = _updated(
+          intent,
+          phase: WalletPaymentSubmissionPhase.rejected,
+        ).withUncertainAcknowledgement();
+        await _write(intent, profile, WalletPaymentSubmissionPhase.rejected);
+        final rejected = await _read(profile);
+        if (rejected?.id != intent.id ||
+            rejected?.phase != WalletPaymentSubmissionPhase.rejected) {
+          throw const StoredDataCorruptionException();
+        }
+        _unconfirmedAttempt = null;
+        nativeRejectionRecorded = true;
+        throw AppFailureException(_rejectionFailure(prepared.failureCode));
+      }
+      if (prepared.phase == WalletPaymentRecoveryPhase.accepted) {
+        // Idempotent native replay returns its existing exact receipt.
+        result = _recoveryReceipt(command, prepared);
+      } else {
+        if (prepared.phase != WalletPaymentRecoveryPhase.prepared ||
+            prepared.endAuthorized) {
+          _unresolved(
+            const StoredDataCorruptionException(),
+            StackTrace.current,
+          );
+        }
+        _recoveryReceipt(command, prepared); // Validate pre-dispatch identity.
+        // The app's durable boundary must precede native release authorization.
+        // If this write fails, Commit is never called and this process retains
+        // definite non-submission. A lost acknowledgement after restart is
+        // conservatively resolved against the native operation, never guessed.
+        final committing = _updated(intent, commitAttempted: true);
+        await _write(
+          committing,
+          profile,
+          WalletPaymentSubmissionPhase.submitting,
+        );
+        intent = committing;
+        _unconfirmedAttempt = intent;
+        final commitStatus = await _commitWithInspection(
+          recovery,
+          recoveryRequest,
+        );
+        if (commitStatus.phase == WalletPaymentRecoveryPhase.rejected &&
+            !commitStatus.endAuthorized) {
+          _unconfirmedAttempt = _updated(
+            intent,
+            phase: WalletPaymentSubmissionPhase.rejected,
+          ).withUncertainAcknowledgement();
+          await _write(intent, profile, WalletPaymentSubmissionPhase.rejected);
+          final rejected = await _read(profile);
+          if (rejected?.id != intent.id ||
+              rejected?.phase != WalletPaymentSubmissionPhase.rejected) {
+            throw const StoredDataCorruptionException();
+          }
+          _unconfirmedAttempt = null;
+          nativeRejectionRecorded = true;
+          throw AppFailureException(
+            _rejectionFailure(commitStatus.failureCode),
+          );
+        }
+        if (commitStatus.phase == WalletPaymentRecoveryPhase.prepared &&
+            !commitStatus.endAuthorized &&
+            commitStatus.failureCode == 'invoice_expired') {
+          _unconfirmedAttempt = _updated(intent, commitAttempted: false);
+          // The invoice can expire after preparation. Only a durable native
+          // revocation certificate proves that this exact payment cannot be
+          // released later; the expiry response alone is not enough.
+          final cancelled = await recovery.cancelPaymentOperation(
+            recoveryRequest,
+          );
+          if (cancelled.phase != WalletPaymentRecoveryPhase.rejected ||
+              cancelled.endAuthorized) {
+            _unconfirmedAttempt = intent;
+            _unresolved(
+              const StoredDataCorruptionException(),
+              StackTrace.current,
+            );
+          }
+          await _write(intent, profile, WalletPaymentSubmissionPhase.rejected);
+          final rejected = await _read(profile);
+          if (rejected?.id != intent.id ||
+              rejected?.phase != WalletPaymentSubmissionPhase.rejected) {
+            throw const StoredDataCorruptionException();
+          }
+          _unconfirmedAttempt = null;
+          nativeRejectionRecorded = true;
+          throw const AppFailureException(
+            AppFailure(
+              code: 'payment_request_expired',
+              kind: AppFailureKind.validation,
+              userMessage:
+                  'This invoice has expired. Enter a new invoice to continue.',
+              retryable: false,
+            ),
+          );
+        }
+        final committed = _recoveryReceipt(
+          command,
+          commitStatus,
+          requireAccepted: true,
+        );
+        if (committed.referenceId != prepared.referenceId) {
+          throw const AppFailureException(
+            AppFailure(
+              code: 'payment_native_identity_changed',
+              kind: AppFailureKind.storage,
+              userMessage: 'Wallet recovery is required.',
+              retryable: false,
+              requiresReconciliation: true,
+            ),
+          );
+        }
+        result = committed;
+      }
     } catch (error, stack) {
+      if (nativeRejectionRecorded) Error.throwWithStackTrace(error, stack);
       if (error is AppFailureException &&
           error.failure.requiresReconciliation &&
           !error.failure.outcomeUnknown) {
@@ -228,17 +604,8 @@ final class WalletPaymentSubmissions {
         // replay after restart. This is not a proven payment rejection.
         Error.throwWithStackTrace(error, stack);
       }
-      if (_isConfirmedPreDispatchRejection(error)) {
-        // Only documented local validation failures prove no native mutation.
-        // Persist that fact before allowing a new user-reviewed submission.
-        try {
-          await _write(intent, profile, WalletPaymentSubmissionPhase.rejected);
-          _unconfirmedAttempt = null;
-        } catch (storageError, storageStack) {
-          _unresolved(storageError, storageStack);
-        }
-        Error.throwWithStackTrace(error, stack);
-      }
+      // Error categories are not nonexecution certificates: an error may be
+      // delivered after the native operation has already released a payment.
       _unresolved(error, stack);
     }
     if (result.route != command.route ||
@@ -248,9 +615,16 @@ final class WalletPaymentSubmissions {
             result.status != WalletPaymentStatus.succeeded)) {
       _unresolved(const StoredDataCorruptionException(), StackTrace.current);
     }
+    final acceptedEvidence = _updated(
+      intent,
+      phase: WalletPaymentSubmissionPhase.accepted,
+      result: result,
+    );
+    _unconfirmedAttempt = acceptedEvidence.withUncertainAcknowledgement();
     try {
-      // No success reaches presentation before its exact native acceptance is
-      // durable. A lost response after this commit is recoverable by identity.
+      // Native acceptance is already durable. Required app receipt persistence
+      // is a separate storage responsibility, never a reason to claim that a
+      // known accepted payment has become unknown or failed.
       await _write(
         intent,
         profile,
@@ -264,17 +638,35 @@ final class WalletPaymentSubmissions {
         throw const StoredDataCorruptionException();
       }
     } catch (error, stack) {
-      _unresolved(error, stack);
+      final failure = acceptedEvidence.reconciliationFailure;
+      runtime.retainPaymentSubmissionFence(
+        AppFailure(
+          code: failure.code,
+          kind: failure.kind,
+          userMessage: failure.userMessage,
+          retryable: false,
+          requiresReconciliation: true,
+          cause: FailureMapper.diagnosticCause(error),
+          stackTrace: stack,
+        ),
+      );
+      // Presentation can truthfully show the accepted receipt. Further wallet
+      // mutations remain fenced until the same receipt is durably repaired.
+      return result;
     }
     _unconfirmedAttempt = null;
     return result;
   }
 
-  Future<WalletPaymentSubmission?> _read(WalletProfile profile) async {
+  Future<WalletPaymentSubmission?> _read(
+    WalletProfile profile, {
+    bool archiveAccepted = true,
+  }) async {
     final encoded = await store!.read(profile.id);
     if (encoded == null) return null;
     final value = _decode(encoded, profile);
-    if (value.phase == WalletPaymentSubmissionPhase.accepted) {
+    if (archiveAccepted &&
+        value.phase == WalletPaymentSubmissionPhase.accepted) {
       await _archive(value, profile);
     }
     return value;
@@ -370,6 +762,116 @@ final class WalletPaymentSubmissions {
               activity.batchTransferIndex == result.batchTransferIndex;
   }
 
+  /// A lost Commit reply is inspected once in the same explicit Send action.
+  /// This only reads the exact saved native operation; it never repeats Prepare,
+  /// Commit, proxy upload, broadcast or cancellation. If inspection is blocked
+  /// by the engine's lifecycle or cannot establish an outcome, preserve the
+  /// original error and the mutation fence.
+  Future<WalletPaymentRecoveryStatus> _commitWithInspection(
+    WalletPaymentRecoveryEngine recovery,
+    String request,
+  ) async {
+    try {
+      return await recovery.commitPaymentOperation(request);
+    } catch (error, stack) {
+      try {
+        final status = await recovery.inspectPaymentOperation(request);
+        if (status.phase == WalletPaymentRecoveryPhase.accepted ||
+            (status.phase == WalletPaymentRecoveryPhase.rejected &&
+                !status.endAuthorized)) {
+          return status;
+        }
+        if (_unconfirmedAttempt case final attempt?
+            when !status.endAuthorized) {
+          _unconfirmedAttempt = _updated(attempt, commitAttempted: false);
+        }
+      } catch (_) {
+        // Failure to inspect is not evidence of payment failure or permission
+        // to dispatch again. The original error remains the diagnostic cause.
+      }
+      Error.throwWithStackTrace(error, stack);
+    }
+  }
+
+  static WalletPaymentSubmission _updated(
+    WalletPaymentSubmission original, {
+    WalletPaymentSubmissionPhase? phase,
+    WalletSendResult? result,
+    bool? commitAttempted,
+  }) => WalletPaymentSubmission(
+    id: original.id,
+    walletId: original.walletId,
+    command: original.command,
+    submittedAt: original.submittedAt,
+    phase: phase ?? original.phase,
+    result: result,
+    recoveryRequest: original.recoveryRequest,
+    commitAttempted: commitAttempted ?? original.commitAttempted,
+    journalVersion: original.journalVersion,
+  );
+
+  /// Only called after a matching permanent native rejection certificate. Raw
+  /// native errors never reach user copy and never establish nonexecution.
+  static AppFailure _rejectionFailure(String? code) {
+    final (kind, message) = switch (code) {
+      'insufficient_bitcoins' => (
+        AppFailureKind.validation,
+        'Not enough Bitcoin to cover this payment and the network fee.',
+      ),
+      'insufficient_asset_balance' => (
+        AppFailureKind.validation,
+        'Not enough funds to send this amount.',
+      ),
+      'insufficient_allocations' => (
+        AppFailureKind.unavailable,
+        'Prepare the wallet before sending this asset.',
+      ),
+      'invalid_recipient' => (
+        AppFailureKind.validation,
+        'Check the recipient and try again.',
+      ),
+      'invoice_expired' => (
+        AppFailureKind.validation,
+        'This invoice has expired. Enter a new invoice to continue.',
+      ),
+      'invalid_amount' => (AppFailureKind.validation, 'Enter a valid amount.'),
+      'invalid_fee' => (
+        AppFailureKind.validation,
+        'Review the network fee and try again.',
+      ),
+      'network_unavailable' => (
+        AppFailureKind.connectivity,
+        'Could not connect. Nothing was sent. Try again.',
+      ),
+      'invalid_configuration' => (
+        AppFailureKind.configuration,
+        'Sending is unavailable with the current network settings.',
+      ),
+      'storage_unavailable' => (
+        AppFailureKind.storage,
+        'The payment could not be saved. Nothing was sent.',
+      ),
+      _ => (
+        AppFailureKind.unavailable,
+        'The payment was not sent. Review the details and try again.',
+      ),
+    };
+    return AppFailure(
+      code: code == 'invoice_expired'
+          ? 'payment_request_expired'
+          : 'payment_not_dispatched',
+      kind: kind,
+      userMessage: message,
+      retryable: const {
+        'network_unavailable',
+        'storage_unavailable',
+        'insufficient_allocations',
+        'insufficient_bitcoins',
+        'insufficient_asset_balance',
+      }.contains(code),
+    );
+  }
+
   Future<void> _write(
     WalletPaymentSubmission intent,
     WalletProfile profile,
@@ -385,26 +887,47 @@ final class WalletPaymentSubmissions {
         submittedAt: intent.submittedAt,
         phase: phase,
         result: result,
+        recoveryRequest: intent.recoveryRequest,
+        commitAttempted: intent.commitAttempted,
+        journalVersion: intent.journalVersion,
       ),
       profile,
     ),
   );
 
-  static Never _unresolved(Object error, StackTrace stack) =>
-      Error.throwWithStackTrace(
-        AppFailureException(
-          AppFailure(
-            code: walletPaymentSubmissionPendingFailure.code,
-            kind: walletPaymentSubmissionPendingFailure.kind,
-            userMessage: walletPaymentSubmissionPendingFailure.userMessage,
-            retryable: false,
-            outcomeUnknown: true,
-            cause: FailureMapper.diagnosticCause(error),
-            stackTrace: stack,
-          ),
+  Never _unresolved(Object error, StackTrace stack) {
+    final failure =
+        _unconfirmedAttempt?.reconciliationFailure ??
+        walletPaymentSubmissionPendingFailure;
+    return Error.throwWithStackTrace(
+      AppFailureException(
+        AppFailure(
+          code: failure.code,
+          kind: failure.kind,
+          userMessage: failure.userMessage,
+          retryable: false,
+          requiresReconciliation: true,
+          outcomeUnknown: failure.outcomeUnknown,
+          cause: FailureMapper.diagnosticCause(error),
+          stackTrace: stack,
         ),
-        stack,
-      );
+      ),
+      stack,
+    );
+  }
+
+  /// An uncertain app-journal acknowledgement retains the payment fence, not a
+  /// native-owner quarantine. A later explicit Check can finish the same write.
+  /// Native operation failures and corrupt records are deliberately not caught.
+  Future<T> _recoverJournalAcknowledgement<T>(
+    Future<T> Function() action,
+  ) async {
+    try {
+      return await action();
+    } on DurableStorageCommitException catch (error, stack) {
+      _unresolved(error, stack);
+    }
+  }
 
   static bool _isValidNativeReceipt(WalletSendResult result) =>
       RegExp(r'^[a-f0-9]{64}$').hasMatch(result.referenceId) &&
@@ -412,20 +935,42 @@ final class WalletPaymentSubmissions {
           ? result.batchTransferIndex == null
           : result.batchTransferIndex != null);
 
-  static bool _isConfirmedPreDispatchRejection(Object error) =>
-      (error is WalletPaymentRejectedBeforeDispatchException &&
-          !error.failure.requiresReconciliation &&
-          !error.failure.outcomeUnknown) ||
-      (error is AppFailureException &&
-          (error.failure == walletFeeReviewRequiredFailure ||
-              error.failure == walletFeeReviewChangedFailure));
+  static WalletSendResult _recoveryReceipt(
+    WalletSendCommand command,
+    WalletPaymentRecoveryStatus status, {
+    bool requireAccepted = false,
+  }) {
+    if ((requireAccepted &&
+            status.phase != WalletPaymentRecoveryPhase.accepted) ||
+        (status.phase != WalletPaymentRecoveryPhase.accepted &&
+            status.phase != WalletPaymentRecoveryPhase.prepared) ||
+        (status.phase == WalletPaymentRecoveryPhase.accepted &&
+            !status.endAuthorized)) {
+      throw const StoredDataCorruptionException();
+    }
+    final receipt = WalletSendResult(
+      route: command.route,
+      amount: command.amount,
+      referenceId: status.referenceId ?? '',
+      batchTransferIndex: status.batchTransferIndex,
+      status: WalletPaymentStatus.pending,
+    );
+    if (!_isValidNativeReceipt(receipt)) {
+      throw const StoredDataCorruptionException();
+    }
+    return receipt;
+  }
 
   static String _encode(WalletPaymentSubmission value, WalletProfile profile) {
     final command = value.command;
     final fee = command.feeRate!;
     final result = value.result;
     return jsonEncode({
-      'version': 1,
+      'version': value.recoveryRequest == null ? 1 : value.journalVersion,
+      if (value.recoveryRequest != null && value.journalVersion == 3)
+        'commitAttempted': value.commitAttempted,
+      if (value.recoveryRequest != null)
+        'recoveryRequest': value.recoveryRequest,
       'id': value.id,
       'walletId': value.walletId,
       'storageToken': profile.storageToken,
@@ -461,6 +1006,7 @@ final class WalletPaymentSubmissions {
     try {
       if (encoded.length > 400000) throw const FormatException();
       final value = jsonDecode(encoded);
+      final version = value is Map<String, Object?> ? value['version'] : null;
       if (value is! Map<String, Object?> ||
           !_hasKeys(value, {
             'version',
@@ -472,8 +1018,15 @@ final class WalletPaymentSubmissions {
             'phase',
             'command',
             'result',
+            if (version == 2 || version == 3) 'recoveryRequest',
+            if (version == 3) 'commitAttempted',
           }) ||
-          value['version'] != 1 ||
+          (version != 1 && version != 2 && version != 3) ||
+          (version == 3 && value['commitAttempted'] is! bool) ||
+          ((version == 2 || version == 3) &&
+              (value['recoveryRequest'] is! String ||
+                  (value['recoveryRequest']! as String).isEmpty ||
+                  (value['recoveryRequest']! as String).length > 100000)) ||
           value['walletId'] != profile.id ||
           value['storageToken'] != profile.storageToken ||
           value['network'] != profile.environment.name ||
@@ -585,6 +1138,11 @@ final class WalletPaymentSubmissions {
         submittedAt: _utcDate(value['submittedAt']),
         phase: phase,
         result: result,
+        recoveryRequest: value['recoveryRequest'] as String?,
+        commitAttempted: version == 3
+            ? value['commitAttempted']! as bool
+            : true,
+        journalVersion: version! as int,
       );
     } catch (_) {
       throw const StoredDataCorruptionException();

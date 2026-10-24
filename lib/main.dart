@@ -43,6 +43,13 @@ class _AsterAppState extends ConsumerState<AsterApp>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    ref.listenManual(
+      walletViewModelProvider.select((state) => state.value?.activeWallet?.id),
+      (_, walletId) => ref
+          .read(toastControllerProvider.notifier)
+          .updateWalletScope(walletId),
+      fireImmediately: true,
+    );
   }
 
   @override

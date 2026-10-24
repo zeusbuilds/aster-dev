@@ -104,6 +104,7 @@ class _CurrencyList extends ConsumerWidget {
     AsterNavigationCommandOwner navigation,
     String code,
   ) async {
+    final toasts = context.toasts;
     var saved = false;
     final accepted = await navigation.run(
       command: () async {
@@ -117,7 +118,7 @@ class _CurrencyList extends ConsumerWidget {
             ?.operationFailure;
         if (failure == null) return;
         unawaited(context.haptics.trigger(HapticIntent.error));
-        context.toasts.show(
+        toasts.show(
           title: 'Currency not saved',
           message: failure.userMessage,
           variant: ToastVariant.failure,
