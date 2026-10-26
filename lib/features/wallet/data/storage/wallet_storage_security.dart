@@ -27,8 +27,15 @@ abstract interface class WalletStorageSecurity {
   Future<void> replaceTextFile(String path, String contents);
 }
 
+/// Native directory durability required before a deletion marker is retired.
+/// Fsync the surviving parent after renaming or removing its owned child.
+abstract interface class WalletStorageDurability {
+  Future<void> flushDirectory(String path);
+}
+
 /// Method-channel adapter for the app's iOS and Android storage policy.
-final class PlatformWalletStorageSecurity implements WalletStorageSecurity {
+final class PlatformWalletStorageSecurity
+    implements WalletStorageSecurity, WalletStorageDurability {
   const PlatformWalletStorageSecurity();
 
   static const _channel = MethodChannel('com.aster.wallet/storage_security');
@@ -44,6 +51,9 @@ final class PlatformWalletStorageSecurity implements WalletStorageSecurity {
 
   @override
   Future<void> verifyFile(String path) => _invoke('verifyFile', path);
+
+  @override
+  Future<void> flushDirectory(String path) => _invoke('flushDirectory', path);
 
   @override
   Future<void> replaceTextFile(String path, String contents) =>

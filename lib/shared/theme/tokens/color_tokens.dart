@@ -30,6 +30,7 @@ class _AsterPalette {
   static const warning = Color(0xFFFF7D00);
   static const warningContainer = Color(0xFFFFF7E8);
   static const danger = Color(0xFFF53F3F);
+  static const dangerAction = Color(0xFFD92D20);
   static const dangerContainer = Color(0xFFFFECE8);
   static const bitcoin = Color(0xFFF7931A);
 }
@@ -56,6 +57,7 @@ class AsterColors extends ThemeExtension<AsterColors> {
     required this.onWarning,
     required this.warningContainer,
     required this.danger,
+    required this.dangerAction,
     required this.onDanger,
     required this.dangerContainer,
     required this.bitcoin,
@@ -94,6 +96,7 @@ class AsterColors extends ThemeExtension<AsterColors> {
   final Color onWarning;
   final Color warningContainer;
   final Color danger;
+  final Color dangerAction;
   final Color onDanger;
   final Color dangerContainer;
   final Color bitcoin;
@@ -131,6 +134,7 @@ class AsterColors extends ThemeExtension<AsterColors> {
     onWarning: _AsterPalette.ink,
     warningContainer: _AsterPalette.warningContainer,
     danger: _AsterPalette.danger,
+    dangerAction: _AsterPalette.dangerAction,
     onDanger: _AsterPalette.white,
     dangerContainer: _AsterPalette.dangerContainer,
     bitcoin: _AsterPalette.bitcoin,
@@ -204,6 +208,7 @@ class AsterColors extends ThemeExtension<AsterColors> {
     Color? onWarning,
     Color? warningContainer,
     Color? danger,
+    Color? dangerAction,
     Color? onDanger,
     Color? dangerContainer,
     Color? bitcoin,
@@ -239,6 +244,7 @@ class AsterColors extends ThemeExtension<AsterColors> {
       onWarning: onWarning ?? this.onWarning,
       warningContainer: warningContainer ?? this.warningContainer,
       danger: danger ?? this.danger,
+      dangerAction: dangerAction ?? this.dangerAction,
       onDanger: onDanger ?? this.onDanger,
       dangerContainer: dangerContainer ?? this.dangerContainer,
       bitcoin: bitcoin ?? this.bitcoin,
@@ -291,6 +297,7 @@ class AsterColors extends ThemeExtension<AsterColors> {
         t,
       )!,
       danger: Color.lerp(danger, other.danger, t)!,
+      dangerAction: Color.lerp(dangerAction, other.dangerAction, t)!,
       onDanger: Color.lerp(onDanger, other.onDanger, t)!,
       dangerContainer: Color.lerp(dangerContainer, other.dangerContainer, t)!,
       bitcoin: Color.lerp(bitcoin, other.bitcoin, t)!,

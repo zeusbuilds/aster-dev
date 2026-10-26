@@ -5,6 +5,7 @@ import 'package:aster/core/core.dart';
 import 'package:aster/features/onboarding/presentation/screens/screens.dart';
 import 'package:aster/features/onboarding/presentation/view_model/view_models.dart';
 import 'package:aster/features/onboarding/presentation/widgets/widgets.dart';
+import 'package:aster/features/settings/presentation/screens/screens.dart';
 import 'package:aster/features/shell/presentation/providers/app_shell_index_provider.dart';
 import 'package:aster/features/shell/presentation/widgets/bottom_nav.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
@@ -104,6 +105,110 @@ void main() {
     expect(harness.container.read(toastControllerProvider).current, isNull);
     expect(
       origin.show(title: 'Late Home action', variant: ToastVariant.failure),
+      isFalse,
+    );
+  });
+
+  testWidgets(
+    'wallet metadata refresh preserves feedback owned by the same pushed page',
+    (tester) async {
+      final (harness, transport) = await _createActiveHarness();
+      addTearDown(transport.close);
+      addTearDown(() => _disposeHarness(tester, harness));
+      final router = await _pumpRouter(tester, harness);
+      unawaited(router.pushNamed<void>(RouteNames.walletSelection));
+      await _pumpFrames(tester);
+      final controller = harness.container.read(
+        toastControllerProvider.notifier,
+      );
+      final origin = controller.captureOrigin();
+      final before = router.state.pageKey;
+      final current = harness.container
+          .read(walletViewModelProvider)
+          .requireValue;
+      final active = current.activeWallet!;
+      harness.container
+          .read(walletViewModelProvider.notifier)
+          .adoptCommittedRegistry(
+            WalletRegistry(
+              profiles: [active.copyWith(name: 'Updated fixture name')],
+              activeWalletId: active.id,
+            ),
+          );
+      await _pumpFrames(tester);
+
+      expect(router.state.name, RouteNames.walletSelection);
+      expect(router.state.pageKey, before);
+      expect(
+        origin.show(title: 'Same page result', variant: ToastVariant.info),
+        isTrue,
+      );
+      router.pop();
+      await _pumpFrames(tester);
+      expect(
+        origin.show(title: 'Departed page result', variant: ToastVariant.info),
+        isFalse,
+      );
+    },
+  );
+
+  testWidgets(
+    'pushing the same URI gives a new feedback owner and returning does not revive it',
+    (tester) async {
+      final (harness, transport) = await _createActiveHarness();
+      addTearDown(transport.close);
+      addTearDown(() => _disposeHarness(tester, harness));
+      final router = await _pumpRouter(tester, harness);
+      final first = router.pushNamed<void>(RouteNames.walletDetails);
+      await _pumpFrames(tester);
+      final controller = harness.container.read(
+        toastControllerProvider.notifier,
+      );
+      final origin = controller.captureOrigin();
+      final firstPage = router.state.pageKey;
+      final uri = router.state.uri;
+      final second = router.pushNamed<void>(RouteNames.walletDetails);
+      await _pumpFrames(tester);
+
+      expect(router.state.uri, uri);
+      expect(router.state.pageKey, isNot(firstPage));
+      expect(
+        origin.show(title: 'Covered earlier page', variant: ToastVariant.info),
+        isFalse,
+      );
+      router.pop();
+      await _pumpFrames(tester);
+      await second;
+      await _pumpFrames(tester);
+      expect(router.state.pageKey, firstPage);
+      expect(
+        origin.show(title: 'Earlier visit', variant: ToastVariant.info),
+        isFalse,
+      );
+      router.pop();
+      await _pumpFrames(tester);
+      await first;
+      await _pumpFrames(tester);
+    },
+  );
+
+  testWidgets('query changes expire an earlier page action', (tester) async {
+    final (harness, transport) = await _createActiveHarness();
+    addTearDown(transport.close);
+    addTearDown(() => _disposeHarness(tester, harness));
+    final router = await _pumpRouter(tester, harness);
+    router.go('${RoutePaths.settings}?review=one');
+    await _pumpFrames(tester);
+    final controller = harness.container.read(toastControllerProvider.notifier);
+    final origin = controller.captureOrigin();
+    final pageKey = router.state.pageKey;
+    router.go('${RoutePaths.settings}?review=two');
+    await _pumpFrames(tester);
+
+    expect(router.state.pageKey, pageKey);
+    expect(router.state.uri.queryParameters['review'], 'two');
+    expect(
+      origin.show(title: 'Earlier query result', variant: ToastVariant.info),
       isFalse,
     );
   });
@@ -347,6 +452,74 @@ void main() {
     await tester.tap(find.bySemanticsLabel('Back'));
     await _pumpFrames(tester);
     expect(_location(router), RoutePaths.settings);
+  });
+
+  testWidgets(
+    'wallet details opens from Settings and Back preserves Settings',
+    (tester) async {
+      final (harness, transport) = await _createActiveHarness();
+      addTearDown(transport.close);
+      addTearDown(() => _disposeHarness(tester, harness));
+      final router = await _pumpRouter(tester, harness);
+      router.go(RoutePaths.settings);
+      await _pumpFrames(tester);
+
+      await tester.tap(find.text('Wallet details'));
+      await _pumpFrames(tester);
+
+      expect(
+        router.namedLocation(RouteNames.walletDetails),
+        '${RoutePaths.settings}/${RoutePaths.walletDetails}',
+      );
+      expect(find.byType(WalletDetailsScreen), findsOneWidget);
+      expect(router.canPop(), isTrue);
+      expect(find.text('Primary Wallet'), findsOneWidget);
+      expect(find.byType(BottomNav), findsNothing);
+
+      await tester.tap(find.bySemanticsLabel('Back'));
+      await _pumpFrames(tester);
+      expect(_location(router), RoutePaths.settings);
+      expect(find.byType(SettingsScreen), findsOneWidget);
+      expect(find.byType(WalletDetailsScreen), findsNothing);
+    },
+  );
+
+  testWidgets('a direct wallet details link has a Settings Back action', (
+    tester,
+  ) async {
+    tester.binding.platformDispatcher.defaultRouteNameTestValue =
+        '${RoutePaths.settings}/${RoutePaths.walletDetails}';
+    addTearDown(
+      tester.binding.platformDispatcher.clearDefaultRouteNameTestValue,
+    );
+    final (harness, transport) = await _createActiveHarness();
+    addTearDown(transport.close);
+    addTearDown(() => _disposeHarness(tester, harness));
+    final router = await _pumpRouter(tester, harness);
+
+    expect(find.byType(WalletDetailsScreen), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('Back'));
+    await _pumpFrames(tester);
+    expect(_location(router), RoutePaths.settings);
+    expect(find.byType(SettingsScreen), findsOneWidget);
+  });
+
+  testWidgets('a wallet details link without a wallet enters onboarding', (
+    tester,
+  ) async {
+    tester.binding.platformDispatcher.defaultRouteNameTestValue =
+        '${RoutePaths.settings}/${RoutePaths.walletDetails}';
+    addTearDown(
+      tester.binding.platformDispatcher.clearDefaultRouteNameTestValue,
+    );
+    final (harness, transport) = await _createHarness();
+    addTearDown(transport.close);
+    addTearDown(() => _disposeHarness(tester, harness));
+    await harness.container.read(walletViewModelProvider.future);
+    final router = await _pumpRouter(tester, harness);
+
+    expect(_location(router), RoutePaths.onboardingWelcome);
+    expect(find.byType(WalletDetailsScreen), findsNothing);
   });
 
   testWidgets('a direct network child Back returns to Advanced Settings', (

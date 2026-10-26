@@ -42,7 +42,6 @@ final class _ReceiveGenerationChanged implements Exception {
 class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
   static const _amountCodec = WalletAmountInputCodec();
 
-  late WalletPaymentTarget _target;
   _ReceiveGeneration? _generation;
   bool _isCurrent(_ReceiveGeneration? value) =>
       value != null && value.active && identical(value, _generation);
@@ -64,7 +63,7 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
     changing:
         wallet.isLoading ||
         wallet.hasError ||
-        wallet.value?.switchingWalletId != null,
+        wallet.value?.isChangingWallet == true,
   );
 
   Future<void> _requireWalletContext(_ReceiveGeneration generation) async {
@@ -72,138 +71,13 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
     _requireCurrent(generation);
     if (generation.walletId == null ||
         wallet.activeWallet?.id != generation.walletId ||
-        wallet.switchingWalletId != null) {
+        wallet.isChangingWallet) {
       throw AppFailureException(_operationUnavailableFailure());
-    }
-  }
-
-  bool _setupCommandInFlight = false;
-  RgbReceiveMode _rgbReceiveMode = RgbReceiveMode.witness;
-  RgbReceiveMode get rgbReceiveMode => _rgbReceiveMode;
-
-  Future<void> setRgbReceiveMode(RgbReceiveMode mode) async {
-    final generation = _generation;
-    if (!_isCurrent(generation)) return;
-    if (_target != WalletPaymentTarget.usdtOnchain ||
-        _setupCommandInFlight ||
-        state.isLoading ||
-        (state.value?.isBusy ?? false) ||
-        mode == _rgbReceiveMode) {
-      return;
-    }
-    _rgbReceiveMode = mode;
-    state = const AsyncLoading();
-    final next = await AsyncValue.guard(() => _load(generation!, mode));
-    if (_isCurrent(generation)) state = next;
-  }
-
-  Future<AppResult<RgbWalletSetupReview>> prepareRgbSetup() async {
-    final generation = _generation;
-    if (!_isCurrent(generation)) {
-      return AppResult.failure(_operationUnavailableFailure());
-    }
-    if (_setupCommandInFlight ||
-        _target != WalletPaymentTarget.usdtOnchain ||
-        _rgbReceiveMode != RgbReceiveMode.blind) {
-      return AppResult.failure(_operationUnavailableFailure());
-    }
-    _setupCommandInFlight = true;
-    try {
-      final result = await _walletOperation(
-        (repository) => repository.prepareRgbWalletSetup(),
-      );
-      if (result case AppFailureResult<RgbWalletSetupReview>(:final failure)) {
-        _setupFailure(failure, generation);
-      }
-      return result;
-    } finally {
-      _setupCommandInFlight = false;
-    }
-  }
-
-  Future<void> cancelRgbSetup(RgbWalletSetupReview review) async {
-    final generation = _generation;
-    final result = await _walletOperation(
-      (repository) => repository.cancelRgbWalletSetup(review),
-    );
-    if (result case AppFailureResult<void>(:final failure)) {
-      _setupFailure(failure, generation);
-    }
-  }
-
-  Future<void> confirmRgbSetup(RgbWalletSetupReview review) async {
-    final generation = _generation;
-    if (!_isCurrent(generation)) return;
-    if (_setupCommandInFlight) return;
-    _setupCommandInFlight = true;
-    try {
-      final result = await _walletOperation(
-        (repository) => repository.confirmRgbWalletSetup(review),
-      );
-      if (!_isCurrent(generation)) return;
-      switch (result) {
-        case AppSuccess<RgbWalletSetupStatus>(:final value):
-          await _adoptRgbSetupStatus(value, generation!);
-        case AppFailureResult<RgbWalletSetupStatus>(:final failure):
-          _setupFailure(failure, generation);
-      }
-    } finally {
-      _setupCommandInFlight = false;
-    }
-  }
-
-  Future<void> checkRgbSetup() async {
-    final generation = _generation;
-    if (!_isCurrent(generation)) return;
-    if (_setupCommandInFlight) return;
-    _setupCommandInFlight = true;
-    try {
-      final result = await _walletOperation(
-        (repository) => repository.rgbWalletSetupStatus(),
-      );
-      if (!_isCurrent(generation)) return;
-      switch (result) {
-        case AppSuccess<RgbWalletSetupStatus>(:final value):
-          await _adoptRgbSetupStatus(value, generation!);
-        case AppFailureResult<RgbWalletSetupStatus>(:final failure):
-          _setupFailure(failure, generation);
-      }
-    } finally {
-      _setupCommandInFlight = false;
-    }
-  }
-
-  Future<void> _adoptRgbSetupStatus(
-    RgbWalletSetupStatus status,
-    _ReceiveGeneration generation,
-  ) async {
-    if (!_isCurrent(generation)) return;
-    if (status.phase == RgbWalletSetupPhase.ready ||
-        status.phase == RgbWalletSetupPhase.required) {
-      state = const AsyncLoading();
-      final next = await AsyncValue.guard(
-        () => _load(generation, _rgbReceiveMode),
-      );
-      if (_isCurrent(generation)) state = next;
-    } else {
-      _setupFailure(
-        status.phase == RgbWalletSetupPhase.required
-            ? rgbWalletSetupRequiredFailure
-            : rgbWalletSetupPendingFailure,
-        generation,
-      );
-    }
-  }
-
-  void _setupFailure(AppFailure failure, _ReceiveGeneration? generation) {
-    if (_isCurrent(generation)) {
-      state = AsyncError(AppFailureException(failure), StackTrace.current);
     }
   }
 
   @override
   Future<ReceiveFlowState> build(WalletPaymentTarget target) {
-    _target = target;
     final walletContext = ref.watch(
       walletViewModelProvider.select(_walletContext),
     );
@@ -223,7 +97,7 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
       if (_walletContext(next) != walletContext) generation.active = false;
     });
     ref.onDispose(() => generation.active = false);
-    return _load(generation, _rgbReceiveMode);
+    return _load(generation);
   }
 
   /// Retries initial route resolution and request generation.
@@ -239,27 +113,7 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
     };
     if (failure == null || !failure.retryable) return;
     state = const AsyncLoading();
-    final next = await AsyncValue.guard(
-      () => _load(generation!, _rgbReceiveMode),
-    );
-    if (_isCurrent(generation)) state = next;
-  }
-
-  /// A user-requested genuine receive attempt after native capacity changed.
-  /// This never prepares outputs, spends Bitcoin, or cancels a probe invoice.
-  Future<void> retryRgbReceive() async {
-    final generation = _generation;
-    if (!_isCurrent(generation) ||
-        _rgbReceiveMode != RgbReceiveMode.blind ||
-        _setupCommandInFlight ||
-        state.isLoading ||
-        (state.value?.isBusy ?? false)) {
-      return;
-    }
-    state = const AsyncLoading();
-    final next = await AsyncValue.guard(
-      () => _load(generation!, RgbReceiveMode.blind),
-    );
+    final next = await AsyncValue.guard(() => _load(generation!));
     if (_isCurrent(generation)) state = next;
   }
 
@@ -362,12 +216,9 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
     return result;
   }
 
-  Future<ReceiveFlowState> _load(
-    _ReceiveGeneration generation,
-    RgbReceiveMode mode,
-  ) async {
+  Future<ReceiveFlowState> _load(_ReceiveGeneration generation) async {
     try {
-      return await _loadUnsafe(generation, mode);
+      return await _loadUnsafe(generation);
     } on _ReceiveGenerationChanged {
       rethrow;
     } catch (error, stackTrace) {
@@ -375,10 +226,7 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
     }
   }
 
-  Future<ReceiveFlowState> _loadUnsafe(
-    _ReceiveGeneration generation,
-    RgbReceiveMode mode,
-  ) async {
+  Future<ReceiveFlowState> _loadUnsafe(_ReceiveGeneration generation) async {
     await _requireWalletContext(generation);
     final repository = await generation.repository;
     _requireCurrent(generation);
@@ -405,7 +253,6 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
     } else {
       final requestResult = await repository.createReceiveRequest(
         generation.target,
-        rgbReceiveMode: mode,
       );
       _requireCurrent(generation);
       if (requestResult case AppFailureResult<WalletReceiveRequest>(
@@ -436,7 +283,6 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
     final generation = _generation;
     if (!_isCurrent(generation)) return false;
     final haptics = ref.read(hapticFeedbackServiceProvider);
-    final mode = _rgbReceiveMode;
     state = AsyncData(
       previous.copyWith(
         operation: ReceiveFlowOperation.generatingRequest,
@@ -447,7 +293,6 @@ class ReceiveFlowViewModel extends _$ReceiveFlowViewModel {
       (repository) => repository.createReceiveRequest(
         generation!.target,
         amountUnits: amountUnits,
-        rgbReceiveMode: mode,
       ),
     );
     if (!_isCurrent(generation)) {

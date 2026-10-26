@@ -23,6 +23,11 @@ final class WalletRegistry {
         (profile) => profile.state == WalletProfileState.provisioning,
       ),
     );
+    deletingProfiles = List<WalletProfile>.unmodifiable(
+      this.profiles.where(
+        (profile) => profile.state == WalletProfileState.deleting,
+      ),
+    );
     final activeProfiles = readyProfiles.where(
       (profile) => profile.id == activeWalletId,
     );
@@ -43,6 +48,9 @@ final class WalletRegistry {
 
   /// Interrupted provisioning transactions requiring startup rollback.
   late final List<WalletProfile> provisioningProfiles;
+
+  /// Authorized removals whose scoped cleanup must complete before opening.
+  late final List<WalletProfile> deletingProfiles;
 
   /// Selected ready profile, or `null` when no wallet has been committed.
   late final WalletProfile? activeProfile;

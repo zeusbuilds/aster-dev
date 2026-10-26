@@ -17,6 +17,7 @@ import 'rgb_setup_wallet_engine.dart';
 import 'rgb_wallet_activity_mapper.dart';
 import 'rgb_wallet_balance_mapper.dart';
 import 'rgb_wallet_native_value_parser.dart';
+import 'wallet_deletion_safety_engine.dart';
 import 'wallet_engine.dart';
 import 'wallet_payment_recovery_engine.dart';
 
@@ -159,6 +160,7 @@ final class RgbWalletEngine
     implements
         WalletEngine,
         RgbSetupWalletEngine,
+        WalletDeletionSafetyEngine,
         WalletPaymentRecoveryEngine,
         WalletPaymentDeadlineRecovery {
   RgbWalletEngine(
@@ -166,10 +168,12 @@ final class RgbWalletEngine
     this._services,
     this._unlockConfig, {
     DateTime Function()? clock,
+    Stopwatch Function()? deletionAuditStopwatch,
     this._bitcoinAddresses = const BitcoinPaymentInstructionParser(),
     LocalNetworkAccess? localNetworkAccess,
     this._evmChainValidator = const HttpEvmChainValidator(),
   }) : _clock = clock ?? _utcNow,
+       _deletionAuditStopwatch = deletionAuditStopwatch ?? Stopwatch.new,
        _localNetworkAccess = localNetworkAccess ?? PlatformLocalNetworkAccess();
 
   static const _receiveLifetime = Duration(hours: 1);
@@ -181,6 +185,7 @@ final class RgbWalletEngine
   final WalletServiceConfiguration _services;
   final UtexoUnlockConfig _unlockConfig;
   final DateTime Function() _clock;
+  final Stopwatch Function() _deletionAuditStopwatch;
   final BitcoinAddressValidator _bitcoinAddresses;
   final LocalNetworkAccess _localNetworkAccess;
   final EvmChainValidator _evmChainValidator;
@@ -334,6 +339,171 @@ final class RgbWalletEngine
       size: RgbWalletSetupReview.outputValueSats,
       feeRate: feeRateSatPerVbyte.toDouble(),
     );
+  }
+
+  /// The 60-second aggregate budget is checked between SDK operations. Each
+  /// current call retains its own native deadline/queue; nothing is abandoned.
+  static const deletionAuditBudget = Duration(seconds: 60);
+
+  @override
+  Future<bool> hasProtectedRgbState() async {
+    try {
+      return await _withPaymentDeadline(_auditWalletDeletionUnsafe);
+    } on RlnOperationTimeoutException catch (error, stackTrace) {
+      // No deletion has been staged, and this path never dispatches a send.
+      // The SDK still owns/drains its native future; the next explicit action
+      // reopens that owner before regular work, rather than clearing its queue.
+      throw AppFailureException(
+        AppFailure(
+          code: 'wallet_deletion_audit_unavailable',
+          kind: AppFailureKind.timeout,
+          userMessage: 'Wallet assets could not be checked in time. Try again.',
+          retryable: true,
+          cause: FailureMapper.diagnosticCause(error),
+          stackTrace: stackTrace,
+        ),
+      );
+    } on BadRequestError catch (error, stackTrace) {
+      // Audit has no user-entered fields. A native contract rejection must
+      // never incorrectly ask the user to correct wallet input.
+      throw AppFailureException(
+        AppFailure(
+          code: 'wallet_deletion_audit_unavailable',
+          kind: AppFailureKind.protocol,
+          userMessage: 'Wallet assets could not be checked. Try again later.',
+          retryable: false,
+          cause: FailureMapper.diagnosticCause(error),
+          stackTrace: stackTrace,
+        ),
+      );
+    }
+  }
+
+  Future<bool> _auditWalletDeletionUnsafe() async {
+    final stopwatch = _deletionAuditStopwatch()..start();
+    void checkBudget() {
+      if (stopwatch.elapsed >= deletionAuditBudget) {
+        throw const AppFailureException(
+          AppFailure(
+            code: 'wallet_deletion_audit_unavailable',
+            kind: AppFailureKind.timeout,
+            userMessage:
+                'Wallet assets could not be checked in time. Try again.',
+            retryable: true,
+          ),
+        );
+      }
+    }
+
+    Future<T> checked<T>(Future<T> Function() operation) async {
+      checkBudget();
+      final result = await operation();
+      checkBudget();
+      return result;
+    }
+
+    Future<RefreshTransfersResult> refresh() async {
+      final result = await checked(() => _wallet.refreshTransfers());
+      if (result.transfers.keys.any((index) => index < 0) ||
+          result.transfers.values.any((transfer) => transfer.failure != null)) {
+        throw const AppFailureException(
+          AppFailure(
+            code: 'wallet_deletion_audit_unavailable',
+            kind: AppFailureKind.connectivity,
+            userMessage: 'Wallet assets could not be checked. Try again.',
+            retryable: true,
+          ),
+        );
+      }
+      return result;
+    }
+
+    Future<List<String>> assets() async {
+      final inventory = await checked(() => _wallet.listAssets());
+      final ids = inventory.assetIds.toList(growable: false);
+      if (ids.length > 5000 || ids.toSet().length != ids.length) {
+        throw const FormatException('RGB asset inventory is invalid.');
+      }
+      return ids;
+    }
+
+    bool terminal(String? status) =>
+        status == CoreTransferStatuses.settled ||
+        status == CoreTransferStatuses.failed;
+    try {
+      // RLN 0.17 rejects listTransfers without an asset or transaction ID.
+      // Refresh is instead the native inventory of every waiting batch,
+      // including a first receive whose asset is not imported yet. A null
+      // updatedStatus means unchanged/pending, never an empty or safe result.
+      var refreshed = await refresh();
+      final ids = await assets();
+      final transfers = <CoreTransfer>[];
+      for (final id in ids) {
+        transfers.addAll(
+          await checked(() => _wallet.listTransfers(assetId: id)),
+        );
+      }
+      final knownBatches = transfers
+          .map((transfer) => transfer.batchTransferIdx)
+          .whereType<int>()
+          .toSet();
+      var reconciled = false;
+      if (refreshed.transfers.entries.any(
+        (entry) =>
+            !terminal(entry.value.updatedStatus) &&
+            !knownBatches.contains(entry.key),
+      )) {
+        // The native bulk sweep selects ONLY expired, fallible batches with
+        // no associated asset. It synchronizes and refreshes them first; a
+        // progressed/funded transfer is preserved, and prepared transactions
+        // cannot be swept. No app clock or guessed transaction proves expiry.
+        await checked(() => _wallet.failTransfers(noAssetOnly: true));
+        reconciled = true;
+      }
+      for (final transfer in transfers) {
+        final expiry = transfer.expiration;
+        if (transfer.status == CoreTransferStatuses.waitingCounterparty &&
+            (transfer.kind == 'ReceiveWitness' ||
+                transfer.kind == 'ReceiveBlind') &&
+            transfer.assignments.isEmpty &&
+            transfer.txid == null &&
+            expiry != null &&
+            expiry > 0 &&
+            expiry <= _clock().toUtc().millisecondsSinceEpoch ~/ 1000 &&
+            transfer.batchTransferIdx != null) {
+          await checked(
+            () => _wallet.failTransfers(
+              batchTransferIdx: transfer.batchTransferIdx,
+            ),
+          );
+          reconciled = true;
+        }
+      }
+      if (reconciled) refreshed = await refresh();
+      // Reconciliation may import the first incoming contract. Read inventory,
+      // balances and scoped history again before authorizing any deletion.
+      for (final id in await assets()) {
+        final balance = await checked(() => _wallet.getAssetBalance(id));
+        final amounts = [
+          balance.settled,
+          balance.future,
+          balance.spendable,
+          balance.offchainOutbound,
+          balance.offchainInbound,
+        ];
+        if (amounts.any((amount) => amount < BigInt.zero)) {
+          throw const FormatException('RGB balance is invalid.');
+        }
+        if (amounts.any((amount) => amount != BigInt.zero)) return true;
+        final history = await checked(() => _wallet.listTransfers(assetId: id));
+        if (history.any((transfer) => !terminal(transfer.status))) return true;
+      }
+      return refreshed.transfers.values.any(
+        (transfer) => !terminal(transfer.updatedStatus),
+      );
+    } finally {
+      stopwatch.stop();
+    }
   }
 
   @override
@@ -781,28 +951,20 @@ final class RgbWalletEngine
 
   Future<WalletReceiveRequest> _createRgbReceive(
     PaymentRoute route,
-    WalletAmount? amount, {
-    RgbReceiveMode mode = RgbReceiveMode.witness,
-  }) async {
+    WalletAmount? amount,
+  ) async {
     final assetImported = await _isRgbAssetImported(route.asset.id.value);
-    final OnchainReceiveResponse response;
-    try {
-      response = await _wallet.onchainReceive(
-        RgbInvoiceRequest(
-          assetId: assetImported ? route.asset.id.value : null,
-          amount: assetImported ? amount?.units : null,
-          durationSeconds: _receiveLifetime.inSeconds,
-          witness: mode == RgbReceiveMode.witness,
-        ),
-      );
-    } on RgbSdkException catch (error) {
-      if (mode == RgbReceiveMode.blind &&
-          (error.nativeCode == 'NoAvailableUtxos' ||
-              error.nativeCode == 'InsufficientAllocationSlots')) {
-        throw const AppFailureException(rgbWalletSetupRequiredFailure);
-      }
-      rethrow;
-    }
+    // Receiving never spends Bitcoin or requires pre-existing allocation slots.
+    // The sender creates the witness output. Blind recipient decoding remains
+    // supported for sends to other wallets and historical receive records.
+    final response = await _wallet.onchainReceive(
+      RgbInvoiceRequest(
+        assetId: assetImported ? route.asset.id.value : null,
+        amount: assetImported ? amount?.units : null,
+        durationSeconds: _receiveLifetime.inSeconds,
+        witness: true,
+      ),
+    );
     final invoice = _nativeQrPaymentValue(
       response.invoice,
       'OnchainReceiveResponse.invoice',
@@ -816,10 +978,7 @@ final class RgbWalletEngine
       'OnchainReceiveResponse.batchTransferIdx',
     );
     final preview = await _decodeRgbInvoice(route, invoice);
-    if (preview.rgbRecipientType !=
-            (mode == RgbReceiveMode.witness
-                ? RgbRecipientType.witness
-                : RgbRecipientType.blind) ||
+    if (preview.rgbRecipientType != RgbRecipientType.witness ||
         (assetImported ? preview.amount != amount : preview.amount != null) ||
         (nativeRecipient != null && preview.referenceId != nativeRecipient)) {
       throw const NativeProtocolException(
@@ -848,19 +1007,6 @@ final class RgbWalletEngine
       referenceId: preview.referenceId,
       batchTransferIndex: batchTransferIndex,
     );
-  }
-
-  @override
-  Future<WalletReceiveRequest> createBlindRgbReceive(
-    PaymentRoute route, {
-    WalletAmount? amount,
-  }) {
-    _requireConfiguredRoute(route);
-    _requireOptionalAmount(route, amount);
-    if (route.target != WalletPaymentTarget.usdtOnchain) {
-      throw const AppConfigurationException();
-    }
-    return _createRgbReceive(route, amount, mode: RgbReceiveMode.blind);
   }
 
   Future<WalletPaymentPreview> _decodeRgbInvoice(

@@ -105,13 +105,16 @@ class SendAddressCard extends StatelessWidget {
           Expanded(
             child: Text(target.assetLabel, style: context.type.rowTitleStrong),
           ),
-          CustomButton.compact(
-            text: hasValue ? 'Clear' : 'Paste',
-            variant: ButtonVariant.tonal,
-            loading: pasting,
-            enabled: enabled,
-            hapticIntent: hasValue ? HapticIntent.lightImpact : null,
-            onTap: hasValue ? _behavior?.onClear : _behavior?.onPaste,
+          QuietPendingAction(
+            pending: pasting,
+            label: hasValue ? 'Clear' : 'Paste',
+            child: CustomButton.compact(
+              text: hasValue ? 'Clear' : 'Paste',
+              variant: ButtonVariant.tonal,
+              enabled: enabled || pasting,
+              hapticIntent: hasValue ? HapticIntent.lightImpact : null,
+              onTap: hasValue ? _behavior?.onClear : _behavior?.onPaste,
+            ),
           ),
         ],
       ),

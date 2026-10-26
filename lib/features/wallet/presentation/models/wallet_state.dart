@@ -10,18 +10,24 @@ class WalletState {
     List<WalletProfile> wallets = const [],
     this.activeWallet,
     this.switchingWalletId,
+    this.deletingWalletId,
     this.operationFailure,
   }) : wallets = List<WalletProfile>.unmodifiable(wallets);
 
   final List<WalletProfile> wallets;
   final WalletProfile? activeWallet;
   final String? switchingWalletId;
+  final String? deletingWalletId;
+
+  bool get isChangingWallet =>
+      switchingWalletId != null || deletingWalletId != null;
   final AppFailure? operationFailure;
 
   WalletState copyWith({
     List<WalletProfile>? wallets,
     Object? activeWallet = _unset,
     Object? switchingWalletId = _unset,
+    Object? deletingWalletId = _unset,
     Object? operationFailure = _unset,
   }) {
     return WalletState(
@@ -32,6 +38,9 @@ class WalletState {
       switchingWalletId: identical(switchingWalletId, _unset)
           ? this.switchingWalletId
           : switchingWalletId as String?,
+      deletingWalletId: identical(deletingWalletId, _unset)
+          ? this.deletingWalletId
+          : deletingWalletId as String?,
       operationFailure: identical(operationFailure, _unset)
           ? this.operationFailure
           : operationFailure as AppFailure?,
@@ -44,6 +53,7 @@ class WalletState {
       listEquals(other.wallets, wallets) &&
       other.activeWallet == activeWallet &&
       other.switchingWalletId == switchingWalletId &&
+      other.deletingWalletId == deletingWalletId &&
       other.operationFailure == operationFailure;
 
   @override
@@ -51,6 +61,7 @@ class WalletState {
     Object.hashAll(wallets),
     activeWallet,
     switchingWalletId,
+    deletingWalletId,
     operationFailure,
   );
 }

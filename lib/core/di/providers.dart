@@ -19,6 +19,7 @@ import '../config/config.dart';
 import '../errors/errors.dart';
 import '../network/network.dart';
 import '../platform/platform.dart';
+import '../security/security_controller.dart';
 import '../storage/storage.dart';
 
 part 'providers.g.dart';
@@ -184,23 +185,27 @@ WalletStorageSecurity walletStorageSecurity(Ref ref) {
 
 @riverpod
 Future<WalletDirectoryManager> walletDirectoryManager(Ref ref) async {
+  final security = ref.watch(walletStorageSecurityProvider);
   final support = await getApplicationSupportDirectory();
   return IoWalletDirectoryManager(
     '${support.path}${Platform.pathSeparator}aster_wallets',
-    ref.watch(walletStorageSecurityProvider),
+    security,
   );
 }
 
 @riverpod
 Future<WalletRegistryDocumentStore> walletRegistryDocumentStore(Ref ref) async {
+  final security = ref.watch(walletStorageSecurityProvider);
   final support = await getApplicationSupportDirectory();
   return IoWalletRegistryDocumentStore(
     '${support.path}${Platform.pathSeparator}aster_wallet_metadata',
-    ref.watch(walletStorageSecurityProvider),
+    security,
   );
 }
 
-@riverpod
+// Public registry ownership starts before authentication and lasts through
+// slow native path lookup and the system prompt, before the router mounts.
+@Riverpod(keepAlive: true)
 Future<WalletProfilePersistence> walletProfileStore(Ref ref) async {
   final documents = await ref.watch(walletRegistryDocumentStoreProvider.future);
   return WalletProfileStore(documents, clock: ref.watch(utcClockProvider));
@@ -254,6 +259,7 @@ Future<WalletRepository> walletRepository(Ref ref) async {
     keyGenerator,
     identityGenerator,
     services,
+    securityController: ref.watch(securityControllerProvider),
     bitcoinInstructions: bitcoinInstructions,
     clock: clock,
     paymentJournalStore: setupDocuments is IoWalletRegistryDocumentStore

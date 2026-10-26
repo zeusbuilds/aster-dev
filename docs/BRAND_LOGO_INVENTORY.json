@@ -1,0 +1,209 @@
+{
+  "reviewedAt": "2026-10-26",
+  "canonical": {
+    "path": "assets/brand/aster-mark.svg",
+    "sha256": "936ac7f9191ade2877ea3ceff899e1b0f5b006d3a749cb7e8664b2fc3ff8a517",
+    "userProvidedFile": "logo.svg",
+    "viewBox": [
+      0,
+      0,
+      705,
+      373
+    ],
+    "fill": "white"
+  },
+  "scope": "Every active Aster product mark is updated except native launch artwork, explicitly reserved for the user. Historical screenshots and ignored build artifacts are not current assets. Bitcoin and USDT token icons are separate marks.",
+  "uses": [
+    {
+      "id": "flutter-home",
+      "where": "Home header",
+      "kind": "SVG",
+      "source": {
+        "path": "lib/features/home/presentation/widgets/home_header.dart",
+        "line": 52
+      },
+      "artwork": "assets/brand/aster-mark.svg",
+      "status": "Updated"
+    },
+    {
+      "id": "flutter-onboarding",
+      "where": "Welcome and Add Wallet header",
+      "kind": "SVG",
+      "source": {
+        "path": "lib/features/onboarding/presentation/widgets/onboarding_welcome_header.dart",
+        "line": 23
+      },
+      "artwork": "assets/brand/aster-mark.svg",
+      "status": "Updated"
+    },
+    {
+      "id": "flutter-settings",
+      "where": "Settings footer",
+      "kind": "SVG",
+      "source": {
+        "path": "lib/features/settings/presentation/screens/settings_screen.dart",
+        "line": 259
+      },
+      "artwork": "assets/brand/aster-mark.svg",
+      "status": "Updated"
+    },
+    {
+      "id": "flutter-static-cover",
+      "where": "Flutter static splash, lock and privacy cover",
+      "kind": "SVG",
+      "source": {
+        "path": "lib/shared/screens/splash_screen.dart",
+        "line": 32
+      },
+      "artwork": "assets/brand/aster-mark.svg",
+      "status": "Updated",
+      "consumers": [
+        {
+          "path": "lib/core/security/security_gate.dart",
+          "line": 56
+        },
+        {
+          "path": "lib/features/wallet/presentation/widgets/wallet_lifecycle_gate.dart",
+          "line": 39
+        },
+        {
+          "path": "lib/features/wallet/presentation/pages/wallet_access_screen.dart",
+          "line": 28
+        },
+        {
+          "path": "lib/features/onboarding/presentation/screens/onboarding_welcome_screen.dart",
+          "line": 189
+        }
+      ]
+    },
+    {
+      "id": "flutter-animation",
+      "where": "Animated startup reveal",
+      "kind": "Drawn path",
+      "source": {
+        "path": "lib/shared/screens/animated_splash_screen.dart",
+        "line": 336
+      },
+      "artwork": "lib/shared/branding/aster_logo_geometry.dart",
+      "status": "Updated",
+      "consumers": [
+        {
+          "path": "lib/core/bootstrap/app_loader.dart",
+          "line": 208
+        }
+      ],
+      "verification": "test/shared/animated_splash_logo_test.dart compares drawn opening frame with canonical SVG at displayed and source widths; rotation, reveal handoff and settled frame are checked."
+    },
+    {
+      "id": "ios-icon",
+      "where": "iOS launcher icon",
+      "kind": "Icon Composer SVG",
+      "source": {
+        "path": "ios/Runner/AsterIcon.icon/icon.json",
+        "line": 29
+      },
+      "artwork": "ios/Runner/AsterIcon.icon/Assets/aster_mark.svg",
+      "status": "Updated",
+      "note": "Preserves prior 360-unit intrinsic width and layer scale; proportional height is 190.468085106383."
+    },
+    {
+      "id": "ios-privacy",
+      "where": "iOS native privacy cover",
+      "kind": "Native SVG image",
+      "source": {
+        "path": "ios/Runner/AppDelegate.swift",
+        "line": 326
+      },
+      "artwork": "ios/Runner/Assets.xcassets/aster-privacy-mark.imageset/aster-privacy-mark.svg",
+      "status": "Updated",
+      "note": "Separate imageset prevents changes to the native launch screen."
+    },
+    {
+      "id": "android-legacy-icon",
+      "where": "Android legacy launcher icon",
+      "kind": "Vector drawable",
+      "source": {
+        "path": "android/app/src/main/res/mipmap-anydpi-v24/ic_launcher.xml",
+        "line": 7
+      },
+      "artwork": "android/app/src/main/res/drawable/aster_brand_mark.xml",
+      "status": "Updated",
+      "note": "Preserves 72dp width; height follows the canonical aspect ratio."
+    },
+    {
+      "id": "android-adaptive-icon",
+      "where": "Android adaptive launcher icon",
+      "kind": "Vector drawable",
+      "source": {
+        "path": "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml",
+        "line": 4
+      },
+      "artwork": "android/app/src/main/res/drawable/aster_launcher_foreground.xml",
+      "status": "Updated",
+      "note": "Preserves existing mark width of 63.45 in a 108-unit foreground; centered at (54,54)."
+    },
+    {
+      "id": "android-privacy",
+      "where": "Android native privacy cover",
+      "kind": "Vector drawable",
+      "source": {
+        "path": "android/app/src/main/kotlin/com/example/asterdev/DeviceAuthenticationBridge.kt",
+        "line": 206
+      },
+      "artwork": "android/app/src/main/res/drawable/aster_privacy_background.xml",
+      "status": "Updated",
+      "dependencies": [
+        "android/app/src/main/res/drawable/aster_brand_mark.xml",
+        "android/app/src/main/res/drawable/aster_launch_gradient.xml"
+      ]
+    }
+  ],
+  "nativeSplashReservedForUser": {
+    "status": "Unchanged by user instruction",
+    "ios": {
+      "storyboard": "ios/Runner/Launch Screen.storyboard",
+      "artwork": "ios/Runner/Assets.xcassets/aster-mark.imageset/aster-mark.svg"
+    },
+    "androidBefore12": {
+      "layout": "android/app/src/main/res/drawable/launch_background.xml",
+      "artwork": "android/app/src/main/res/drawable/aster_mark_white.xml"
+    },
+    "android12AndLater": {
+      "styles": [
+        "android/app/src/main/res/values-v31/styles.xml",
+        "android/app/src/main/res/values-night-v31/styles.xml"
+      ],
+      "artwork": "android/app/src/main/res/drawable/aster_icon_foreground.xml"
+    },
+    "preservedHashes": {
+      "ios/Runner/Assets.xcassets/aster-mark.imageset/Contents.json": "308a5af56129eb707e495ad977a0919512db31ea27dc00cecc2a9bb63a31743b",
+      "ios/Runner/Assets.xcassets/aster-mark.imageset/aster-mark.svg": "75048dbe84db8665b7fb6b3e70f762e38f322f98abd08fce0bc4c9732423e15c",
+      "ios/Runner/Launch Screen.storyboard": "3e33e5fe94411568a7aa4ded965500f63fa44dd556dd0d7c77317a0a29c542d8",
+      "android/app/src/main/res/drawable/launch_background.xml": "92796ce0e17935828a9fb34c16e653f1da3ca074c8f3dac2719c5420fe57d236",
+      "android/app/src/main/res/drawable/aster_mark_white.xml": "d46d879624dd3a18e2a5ee92fe9d358fe18c303410100d1f6d2d1279891ca423",
+      "android/app/src/main/res/drawable/aster_icon_foreground.xml": "7b011a128d1908d42d47f87dad2b04c34626a8138c3d359601fd6ff9f5dd6eb2",
+      "android/app/src/main/res/values-v31/styles.xml": "182fe29fe5971e32550a46d4892e92fecef9e0da434c52d938bf6d9bf9bcd908",
+      "android/app/src/main/res/values-night-v31/styles.xml": "bd92f9bb5aef0391a20f924be191dfd54130bf462210e96bedc513c21d4ac8b6"
+    }
+  },
+  "registration": {
+    "flutter": {
+      "path": "pubspec.yaml",
+      "line": 98
+    },
+    "iosIcon": {
+      "path": "ios/Runner.xcodeproj/project.pbxproj",
+      "line": 482
+    },
+    "androidIcon": {
+      "path": "android/app/src/main/AndroidManifest.xml",
+      "line": 11
+    }
+  },
+  "verification": {
+    "assetManifest": "assets/README.md",
+    "animationTests": "test/shared/animated_splash_logo_test.dart",
+    "nativeAssetTests": "test/shared/native_brand_assets_test.dart",
+    "runtimeRasterAsterLogoAssets": []
+  }
+}

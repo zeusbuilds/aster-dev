@@ -21,12 +21,16 @@ class RoutePaths {
   static const String transactionDetails =
       '/transactions/:assetKind/:activityId';
   static const String settings = '/settings';
+  static const String walletDetails = 'wallet-details';
   static const String scan = '/scan';
   static const String walletSelection = 'wallet-selection';
   static const String addWallet = 'add-wallet';
   static const String countrySelection = 'country-selection';
   static const String currencySelection = 'currency-selection';
   static const String bitcoinUnitSelection = 'bitcoin-unit-selection';
+  static const String security = 'security';
+  static const String revealSeed = 'reveal-seed';
+  static const String exportXpubs = 'export-xpubs';
   static const String advancedSettings = 'advanced';
   static const String networkConfiguration = 'network-configuration';
 

@@ -63,6 +63,7 @@ void main() {
       }.contains(_stage)) {
         throw const FullWalletQaFailure('qa_stage_invalid');
       }
+      requireQaSupportedFundingStage(_stage);
       final storage = await FullWalletQaStorage.open(
         runId: _storageRunId.isEmpty ? _runId : _storageRunId,
         existing: readOnly,
@@ -618,7 +619,7 @@ Future<void> _fundedFlows(
     'txid': sent.referenceId,
     ...await _publicSnapshot(repository),
   });
-  final rgbReceive = await qualifyRgbPreparationUi(
+  final rgbReceive = await qualifyRgbReceiveUi(
     tester: tester,
     container: container,
     repository: repository,

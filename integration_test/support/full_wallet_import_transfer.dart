@@ -142,7 +142,7 @@ Future<void> qualifyImportedWalletTransfer({
     return balance.onchainSettled.units == 2000000 &&
         balance.onchainSpendable.units == 2000000;
   });
-  final invoice = await qualifyRgbPreparationUi(
+  final invoice = await qualifyRgbReceiveUi(
     tester: tester,
     container: container,
     repository: repository,
@@ -178,6 +178,7 @@ Future<void> qualifyImportedWalletTransfer({
     ),
     'bfa_transfer_preview',
   );
+  requireQaWitnessPreview(preview);
   if (preview.amount != null) {
     throw const FullWalletQaFailure(
       'qa_first_invoice_preview_unexpected_amount',
@@ -240,8 +241,8 @@ Future<void> qualifyImportedWalletTransfer({
     'imported_units': 1000000,
     'total_units': 5000000,
   });
-  // The default witness route is independently exercised after the explicit
-  // blind transfer. The extra Bitcoin output must be visible before one Send.
+  // Exercise the ordinary witness route in both directions. The additional
+  // Bitcoin output must be visible before the second transfer is submitted.
   final originalBtc = requireQaSuccess(
     await repository.balance(WalletAssetKind.bitcoin),
     'before_witness_bitcoin',

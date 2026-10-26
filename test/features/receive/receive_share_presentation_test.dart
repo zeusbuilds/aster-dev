@@ -112,14 +112,6 @@ void main() {
               .onTap!;
           final regenerateAction = _row(tester, 'Generate new request').onTap!;
           final amountAction = _row(tester, 'Set amount').onTap!;
-          final modeAction = target == WalletPaymentTarget.usdtOnchain
-              ? tester
-                    .widget<TextButton>(
-                      find.widgetWithText(TextButton, 'Use blind receive'),
-                    )
-                    .onPressed!
-              : null;
-
           // Exercise callbacks from the initiating frame as well as input
           // after rebuilding: a platform sheet need not appear immediately.
           shareAction();
@@ -127,7 +119,6 @@ void main() {
           copyAction();
           regenerateAction();
           amountAction();
-          modeAction?.call();
           await tester.pump();
           await tester.pump(const Duration(milliseconds: 250));
 
@@ -145,7 +136,8 @@ void main() {
           expect(_requestPresentation(tester), baseline);
           expect(find.text('Opening'), findsNothing);
           expect(find.byType(ReceiveAmountSheet), findsNothing);
-          expect(find.text('Use blind receive?'), findsNothing);
+          expect(find.text('Use blind receive'), findsNothing);
+          expect(find.text('Witness receive'), findsNothing);
           expect(harness.clipboard.text, isNull);
           expect(engine.calls, engineCalls);
           expect(harness.toasts.messages, isEmpty);
@@ -246,14 +238,6 @@ Object _requestPresentation(WidgetTester tester) {
           find.descendant(of: copy, matching: find.byType(Opacity)),
         )
         .opacity,
-    'rgbModeEnabled': find.text('Use blind receive').evaluate().isEmpty
-        ? null
-        : tester
-                  .widget<TextButton>(
-                    find.widgetWithText(TextButton, 'Use blind receive'),
-                  )
-                  .onPressed !=
-              null,
   };
 }
 

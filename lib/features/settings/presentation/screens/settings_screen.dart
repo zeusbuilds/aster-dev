@@ -8,6 +8,7 @@ import 'package:ming_cute_icons/ming_cute_icons.dart';
 
 import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
+import '../../../wallet/domain/models/models.dart';
 import '../../../wallet/presentation/view_model/view_models.dart';
 import '../../domain/models/models.dart';
 import '../view_model/view_models.dart';
@@ -36,6 +37,11 @@ class SettingsScreen extends ConsumerWidget {
           )
         : null;
     final walletLoading = walletState.isLoading;
+    final walletDetailsEnabled =
+        !walletLoading &&
+        walletFailure == null &&
+        walletState.value?.isChangingWallet != true &&
+        activeWallet?.state == WalletProfileState.ready;
     final settingsState = settings.value;
     final settingsSnapshot = settingsState?.snapshot;
     final settingsFailure = settings.hasError
@@ -132,14 +138,29 @@ class SettingsScreen extends ConsumerWidget {
                       children: [
                         AsterOptionRow(
                           title: 'Wallet details',
-                          details: walletLoading ? 'Loading' : 'Unavailable',
+                          details: walletDetailsEnabled
+                              ? null
+                              : walletLoading
+                              ? 'Loading'
+                              : 'Unavailable',
                           prefixIcon: MingCuteIcons.mgc_information_line,
+                          hapticIntent: null,
+                          onTap: walletDetailsEnabled
+                              ? openNamed(
+                                  RouteNames.walletDetails,
+                                  'Wallet details could not open',
+                                )
+                              : null,
                         ),
                         const AsterDivider.inset(),
-                        const AsterOptionRow(
-                          title: 'Manage assets',
-                          details: 'Unavailable',
-                          prefixIcon: MingCuteIcons.mgc_coin_2_line,
+                        AsterOptionRow(
+                          title: 'Security',
+                          prefixIcon: MingCuteIcons.mgc_shield_line,
+                          hapticIntent: null,
+                          onTap: openNamed(
+                            RouteNames.security,
+                            'Security settings could not open',
+                          ),
                         ),
                         const AsterDivider.inset(),
                         AsterOptionRow(

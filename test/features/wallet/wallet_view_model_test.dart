@@ -314,6 +314,120 @@ void main() {
       );
     },
   );
+
+  test(
+    'deletion publishes progress and suppresses overlapping wallet changes',
+    () async {
+      final auditGate = Completer<void>();
+      final first = FakeWalletEngine()..deletionAuditGate = auditGate;
+      final h = await _createHarness(
+        seedWalletProfiles: true,
+        engines: [first, FakeWalletEngine()],
+      );
+      addTearDown(h.dispose);
+      expect(await h.repository.bootstrap(), isA<AppSuccess<WalletRegistry>>());
+      await h.container.read(walletViewModelProvider.future);
+      final vm = h.container.read(walletViewModelProvider.notifier);
+      final deleting = vm.deleteWallet(_firstWalletId);
+      await Future<void>.delayed(Duration.zero);
+      final during = h.container.read(walletViewModelProvider).requireValue;
+      expect(during.deletingWalletId, _firstWalletId);
+      expect(during.isChangingWallet, isTrue);
+      expect(await vm.deleteWallet(_firstWalletId), isFalse);
+      expect(await vm.switchWallet(_secondWalletId), isFalse);
+      final reads = h.documents.readCount;
+      await vm.reload();
+      expect(h.documents.readCount, reads);
+      auditGate.complete();
+      expect(await deleting, isTrue);
+      final after = h.container.read(walletViewModelProvider).requireValue;
+      expect(after.activeWallet?.id, _secondWalletId);
+      expect(after.wallets, hasLength(1));
+      expect(after.isChangingWallet, isFalse);
+      expect(after.operationFailure, isNull);
+    },
+  );
+
+  test(
+    'deletion preflight warning preserves wallet and is consumed once',
+    () async {
+      final first = FakeWalletEngine()..protectedRgbState = true;
+      final h = await _createHarness(
+        seedWalletProfiles: true,
+        engines: [first],
+      );
+      addTearDown(h.dispose);
+      await h.repository.bootstrap();
+      await h.container.read(walletViewModelProvider.future);
+      final vm = h.container.read(walletViewModelProvider.notifier);
+      expect(await vm.deleteWallet(_firstWalletId), isFalse);
+      final after = h.container.read(walletViewModelProvider).requireValue;
+      expect(after.activeWallet?.id, _firstWalletId);
+      expect(after.wallets, hasLength(2));
+      expect(after.isChangingWallet, isFalse);
+      expect(after.operationFailure?.code, 'wallet_deletion_rgb_state_present');
+      vm.clearOperationFailure();
+      expect(
+        h.container.read(walletViewModelProvider).requireValue.operationFailure,
+        isNull,
+      );
+      expect(first.calls, isNot(contains('destroy')));
+    },
+  );
+
+  test(
+    'explicit recovery reopens survivor after committed deletion failure',
+    () async {
+      final failedOpen = FakeWalletEngine()
+        ..openPersistedError = StateError('unavailable');
+      final h = await _createHarness(
+        seedWalletProfiles: true,
+        engines: [FakeWalletEngine(), failedOpen, FakeWalletEngine()],
+      );
+      addTearDown(h.dispose);
+      await h.repository.bootstrap();
+      await h.container.read(walletViewModelProvider.future);
+      final vm = h.container.read(walletViewModelProvider.notifier);
+      expect(await vm.deleteWallet(_firstWalletId), isFalse);
+      final failed = h.container.read(walletViewModelProvider);
+      expect(failed.hasError, isTrue);
+      final failure = FailureMapper.from(failed.error!, failed.stackTrace!);
+      expect(WalletViewModel.canResumeDeletion(failure), isTrue);
+      expect(failure.code, 'wallet_deleted_activation_failed');
+      await vm.reload();
+      final after = h.container.read(walletViewModelProvider).requireValue;
+      expect(after.activeWallet?.id, _secondWalletId);
+      expect(after.wallets, hasLength(1));
+      expect(after.wallets.any((p) => p.id == _firstWalletId), isFalse);
+    },
+  );
+
+  test('only durable deletion failures qualify for explicit resume', () {
+    expect(
+      WalletViewModel.canResumeDeletion(
+        const AppFailure(
+          code: 'wallet_deletion_incomplete',
+          kind: AppFailureKind.storage,
+          userMessage: 'Wallet removal could not finish.',
+          retryable: false,
+          requiresReconciliation: true,
+        ),
+      ),
+      isTrue,
+    );
+    expect(
+      WalletViewModel.canResumeDeletion(
+        const AppFailure(
+          code: 'wallet_payment_submission_pending',
+          kind: AppFailureKind.conflict,
+          userMessage: 'Payment outcome unknown.',
+          retryable: false,
+          requiresReconciliation: true,
+        ),
+      ),
+      isFalse,
+    );
+  });
 }
 
 Future<_WalletViewModelHarness> _createHarness({

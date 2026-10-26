@@ -55,11 +55,11 @@ class _WalletNameScreenState extends ConsumerState<WalletNameScreen> {
     switch (widget._source) {
       case _WalletNameSource.create:
         ref.listenManual(createWalletViewModelProvider, (_, next) {
-          _hydrate(next.value?.walletName);
+          if (next.value?.completed != true) _hydrate(next.value?.walletName);
         }, fireImmediately: true);
       case _WalletNameSource.import:
         ref.listenManual(importWalletViewModelProvider, (_, next) {
-          _hydrate(next.value?.walletName);
+          if (next.value?.completed != true) _hydrate(next.value?.walletName);
         }, fireImmediately: true);
     }
   }
@@ -121,7 +121,7 @@ class _WalletNameScreenState extends ConsumerState<WalletNameScreen> {
           final navigation = AsterNavigationScope.of(context);
           final locked =
               navigation.inFlight ||
-              value?.submitting == true ||
+              value?.busy == true ||
               value?.requiresReconciliation == true;
           return PopScope(
             canPop: !locked,
@@ -136,14 +136,8 @@ class _WalletNameScreenState extends ConsumerState<WalletNameScreen> {
               body: SafeArea(
                 child: switch (asyncState) {
                   AsyncData<_WalletNameViewState>(:final value)
-                      when value.previousStepComplete && !value.completed =>
+                      when value.previousStepComplete || value.completed =>
                     _buildForm(value, navigation),
-                  AsyncData<_WalletNameViewState>(:final value)
-                      when value.completed =>
-                    OnboardingStatusPanel.loading(
-                      message: 'Finishing wallet setup...',
-                      onBrandArt: widget.onBrandArt,
-                    ),
                   AsyncData<_WalletNameViewState>() =>
                     OnboardingStatusPanel.failure(
                       title: 'Finish the previous step',
@@ -181,9 +175,7 @@ class _WalletNameScreenState extends ConsumerState<WalletNameScreen> {
     final colors = context.appColors;
     final invalidVisible = state.name.isNotEmpty && !state.nameValid;
     final canNavigateBack =
-        !state.submitting &&
-        !state.requiresReconciliation &&
-        !navigation.inFlight;
+        !state.busy && !state.requiresReconciliation && !navigation.inFlight;
     return AsterFormBody(
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -256,9 +248,7 @@ class _WalletNameScreenState extends ConsumerState<WalletNameScreen> {
                           key: const ValueKey('wallet-name-field'),
                           controller: _controller,
                           autofocus: true,
-                          enabled:
-                              !state.submitting &&
-                              !state.requiresReconciliation,
+                          enabled: !state.busy && !state.requiresReconciliation,
                           textCapitalization: TextCapitalization.words,
                           textInputAction: TextInputAction.done,
                           inputFormatters: [
@@ -335,10 +325,10 @@ class _WalletNameScreenState extends ConsumerState<WalletNameScreen> {
                   : ButtonVariant.primary,
               enabled:
                   state.canSubmit &&
-                  !state.submitting &&
+                  !state.busy &&
                   !state.requiresReconciliation &&
                   !navigation.inFlight,
-              loading: state.submitting,
+              loading: state.busy,
               hapticIntent: null,
               onTap: () => unawaited(_submit(navigation)),
             ),
@@ -481,6 +471,11 @@ final class _WalletNameViewState {
   final bool completed;
   final bool requiresReconciliation;
   final AppFailure? failure;
+
+  /// Keep the naming form and its button stable through the route handoff.
+  /// Provisioning clears the secret draft before publishing the committed
+  /// registry; completion must not replace the form with a separate loader.
+  bool get busy => submitting || completed;
 
   @override
   bool operator ==(Object other) {

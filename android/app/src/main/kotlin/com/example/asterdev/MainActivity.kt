@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.Build
 import android.content.pm.PackageManager
+import android.content.Intent
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.plugin.common.MethodCall
@@ -19,6 +20,7 @@ import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : FlutterActivity() {
+    private val deviceAuthentication by lazy { DeviceAuthenticationBridge(this) }
     private val mainHandler = Handler(Looper.getMainLooper())
     private var walletStorageChannel: MethodChannel? = null
     private var walletStorageExecutor: ExecutorService? = null
@@ -30,6 +32,7 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        deviceAuthentication.configure(flutterEngine.dartExecutor.binaryMessenger)
         detachWalletStorageChannel()
         val generation = walletStorageGeneration
         val session = StorageChannelSession()
@@ -87,9 +90,36 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        deviceAuthentication.detach()
         detachLocalNetworkChannel()
         detachWalletStorageChannel()
         super.cleanUpFlutterEngine(flutterEngine)
+    }
+
+    override fun onPause() {
+        deviceAuthentication.coverForBackground()
+        super.onPause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        deviceAuthentication.uncoverOnResume()
+    }
+
+    override fun onStop() {
+        deviceAuthentication.onHostStopped()
+        super.onStop()
+    }
+
+    override fun onUserLeaveHint() {
+        deviceAuthentication.onUserLeaveHint()
+        super.onUserLeaveHint()
+    }
+
+    @Deprecated("Android retains this callback for system credential fallback")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        deviceAuthentication.onActivityResult(requestCode, resultCode)
+        super.onActivityResult(requestCode, resultCode, data)
     }
 
     private fun configureLocalNetworkChannel(flutterEngine: FlutterEngine) {
@@ -245,6 +275,10 @@ private class WalletStoragePolicy(private val filesRoot: File) {
             "createDirectory" -> createDirectory(target)
             "verifyDirectory" -> verifyDirectory(target)
             "verifyFile" -> verifyFile(target)
+            "flushDirectory" -> {
+                verifyDirectory(target)
+                syncDirectory(target)
+            }
             "replaceTextFile" -> {
                 val contents = call.argument<String>("contents") ?: fail(PolicyError.argument)
                 replaceTextFile(target, contents)

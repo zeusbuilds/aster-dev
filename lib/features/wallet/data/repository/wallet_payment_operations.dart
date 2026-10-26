@@ -24,6 +24,7 @@ final class WalletPaymentOperations {
     this._bitcoinInstructions,
     this._runSerialized, {
     this.beforeOnchainMutation,
+    this.captureAccessGuard,
     required this._clock,
     required this._submissions,
   });
@@ -33,6 +34,7 @@ final class WalletPaymentOperations {
   final BitcoinPaymentInstructionDecoder _bitcoinInstructions;
   final WalletSerializedOperationRunner _runSerialized;
   final Future<AppResult<void>> Function()? beforeOnchainMutation;
+  final void Function()? Function()? captureAccessGuard;
   final DateTime Function() _clock;
   final WalletPaymentSubmissions _submissions;
 
@@ -276,7 +278,6 @@ final class WalletPaymentOperations {
   Future<AppResult<WalletReceiveRequest>> createReceiveRequest(
     WalletPaymentTarget target, {
     int? amountUnits,
-    RgbReceiveMode rgbReceiveMode = RgbReceiveMode.witness,
   }) {
     final routeResult = resolveTarget(target);
     if (routeResult case AppFailureResult<PaymentRoute>(:final failure)) {
@@ -292,8 +293,7 @@ final class WalletPaymentOperations {
     }
     final amount = (amountResult as AppSuccess<WalletAmount?>).value;
     return _runSerialized(() async {
-      if (target == WalletPaymentTarget.bitcoinOnchain &&
-          rgbReceiveMode != RgbReceiveMode.blind) {
+      if (target == WalletPaymentTarget.bitcoinOnchain) {
         // Issuing a fresh Bitcoin address does not spend or reserve inputs and
         // cannot repeat the unresolved send. Keep it under the same native
         // owner queue, while RGB invoices remain mutation-fenced below.
@@ -307,26 +307,9 @@ final class WalletPaymentOperations {
           return AppResult.failure(failure);
         }
       }
-      return _runtime.run((engine) {
-        if (rgbReceiveMode == RgbReceiveMode.blind) {
-          if (target != WalletPaymentTarget.usdtOnchain ||
-              engine is! RgbSetupWalletEngine) {
-            throw const AppFailureException(
-              AppFailure(
-                code: 'rgb_blind_receive_unavailable',
-                kind: AppFailureKind.unavailable,
-                userMessage: 'Blind RGB receipt is unavailable.',
-                retryable: false,
-              ),
-            );
-          }
-          return (engine as RgbSetupWalletEngine).createBlindRgbReceive(
-            route,
-            amount: amount,
-          );
-        }
-        return engine.createReceiveRequest(route, amount: amount);
-      });
+      return _runtime.run(
+        (engine) => engine.createReceiveRequest(route, amount: amount),
+      );
     });
   }
 
@@ -339,6 +322,7 @@ final class WalletPaymentOperations {
     WalletFeeRateEstimate? reviewedFeeRate,
     String? expectedWalletId,
   }) {
+    final assertAuthorized = captureAccessGuard?.call();
     final routeResult = resolveTarget(target);
     if (routeResult case AppFailureResult<PaymentRoute>(:final failure)) {
       return Future.value(AppResult.failure(failure));
@@ -402,6 +386,7 @@ final class WalletPaymentOperations {
           return AppResult.failure(failure);
         }
         return _runtime.run((engine) async {
+          assertAuthorized?.call();
           if (!_isValidReview(reviewedFeeRate)) {
             throw const AppFailureException(walletFeeReviewRequiredFailure);
           }
@@ -427,8 +412,9 @@ final class WalletPaymentOperations {
               rgbRecipientType: rgbRecipientType,
               witnessBitcoinAmountSats: witnessBitcoinAmountSats,
             ),
+            assertAuthorized: assertAuthorized,
           );
-        });
+        }, authorize: assertAuthorized);
       });
     }
     final command = WalletSendCommand(
@@ -437,7 +423,10 @@ final class WalletPaymentOperations {
       amount: amount,
     );
     return _runSerialized(
-      () => _runtime.run((engine) => engine.sendPayment(command)),
+      () => _runtime.run(
+        (engine) => engine.sendPayment(command),
+        authorize: assertAuthorized,
+      ),
     );
   }
 

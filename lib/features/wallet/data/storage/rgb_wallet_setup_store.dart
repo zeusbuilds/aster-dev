@@ -1,5 +1,6 @@
 import '../../../../core/errors/errors.dart';
 import 'wallet_registry_document_store.dart';
+import 'wallet_scoped_data_removal.dart';
 import 'wallet_storage_security.dart';
 
 /// Private crash-tolerant wallet-scoped financial-operation journal.
@@ -8,10 +9,15 @@ abstract interface class RgbWalletSetupStore {
   Future<void> write(String walletId, String document);
 }
 
-final class IoRgbWalletSetupStore implements RgbWalletSetupStore {
+final class IoRgbWalletSetupStore
+    implements RgbWalletSetupStore, WalletScopedDataRemoval {
   const IoRgbWalletSetupStore(this.rootPath, this.security);
   final String rootPath;
   final WalletStorageSecurity security;
+
+  @override
+  Future<void> removeWallet(String walletId) =>
+      removeWalletScopedDirectory(rootPath, walletId, security);
 
   Future<IoWalletRegistryDocumentStore> _wallet(String walletId) async {
     if (!RegExp(r'^[a-f0-9]{32}$').hasMatch(walletId)) {

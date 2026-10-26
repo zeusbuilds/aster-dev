@@ -11,16 +11,19 @@ class WalletUnavailableScreen extends StatelessWidget {
     required this.title,
     required this.retrying,
     this.onRetry,
+    this.canResumeCommittedDeletion = false,
   });
 
   final AppFailure failure;
   final String title;
   final bool retrying;
   final VoidCallback? onRetry;
+  final bool canResumeCommittedDeletion;
 
   @override
   Widget build(BuildContext context) {
-    final canRetry = failure.retryable && onRetry != null;
+    final canRetry =
+        (failure.retryable || canResumeCommittedDeletion) && onRetry != null;
     return Scaffold(
       body: SafeArea(
         bottom: false,

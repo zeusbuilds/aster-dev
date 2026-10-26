@@ -63,7 +63,7 @@ Public endpoint profiles do not request this local permission. See Android's
 Local HTTP transport is Debug/Profile only. These defines do not satisfy the
 TLS or deployment ownership requirements of a Release artifact.
 
-## Funding and RGB preparation
+## Funding and RGB receiving
 
 Create only disposable local test wallets. Obtain an actual new `bcrt1...`
 receive address from the app, then use the shared stack's locked funding tool:
@@ -79,20 +79,26 @@ journal before acting on a lost response. Never repeat an uncertain mint or
 burn. Never expose a mnemonic, native password, RPC credential or private key
 in a command, log or screenshot.
 
-Witness receive remains the default and does not require output preparation.
+Aster creates witness receive requests only. Receiving does not require output
+preparation.
 Its sender separately reviews a 1,000-sat Bitcoin output to the recipient plus
-network fees. The optional **Use blind receive** action explains its different
-requirements before changing mode.
+network fees. Receive has one QR flow, with no blind/witness selector or output-
+preparation action. Amount changes and regeneration also create witness requests.
+The app never spends BTC to create a receive request or silently falls back to
+blind receive. Sending to a valid blind recipient remains supported.
 
-A fresh RGB blind receive may need wallet-owned allocation outputs. Aster's
-Receive flow provides an explicit preparation review and confirmation. The
-review requests up to four outputs of 20,000 satoshis each and discloses the
-fee rate; native RLN does not supply an exact total fee or a guaranteed created
-count. Funds stay wallet-owned except transaction fees. Cancelling the review
-does not call `createUtxos`. Confirm dispatches once after a durable marker;
-pending or uncertain outcomes block another onchain mutation until reconciled.
-The app observes confirmed history and free allocation outputs before declaring
-the wallet ready. It never silently spends BTC to create a receive request.
+Flutter SDK blind receive remains available to integrations that require it.
+The existing bridge mint protocol accepts blind recipients only because its
+request does not carry a witness Bitcoin output amount. Do not pass an Aster
+witness invoice directly to that bridge or substitute contract identities. Test
+funding through that bridge requires a separate SDK-backed blind receiver,
+followed by an ordinary reviewed RGB transfer into Aster's witness invoice.
+
+Previously started preparation journals remain protected. The on-chain mutation
+guard checks their authoritative status without creating more outputs. Pending
+or uncertain records continue blocking unsafe mutations. Removing the preparation
+UI does not prove an old transaction completed, authorize replay, or erase its
+journal.
 
 The first receive invoice can be unbound to an asset and amount until the
 first valid consignment imports the contract. The sender must review and enter
@@ -114,9 +120,19 @@ controller must follow the shared consumer contract, mutation lock and durable
 mint/burn journals. The runner neither starts it nor provisions infrastructure.
 Android requires `adb -s <ASTER_SERIAL> reverse tcp:29671 tcp:29671`.
 
+The `full` stage is currently blocked before QA storage creation, wallet
+provisioning or funding with `qa_bridge_mint_requires_external_blind_receiver`.
+Its original bridge seeding expected an Aster blind invoice. Enabling it again
+requires a separate SDK-backed blind bridge receiver, an ordinary witness
+transfer into Aster and verified host conservation/receipts. Do not bypass the
+guard, silently re-enable blind receive, or pass a witness invoice to blind-only
+mint. Use `lifecycle` for a new disposable namespace. `restore`, `reconcile-mint`
+and `reconcile-transfer` require their exact retained fixture/checkpoint and do
+not replace full funded qualification.
+
 ```sh
 FLUTTER_BIN="$(command -v flutter)" python3 tool/run_shared_wallet_qualification.py \
-  --device <ASTER_DEVICE_ID> --run-id <NEW_UNIQUE_RUN_ID> --stage full
+  --device <ASTER_DEVICE_ID> --run-id <NEW_UNIQUE_RUN_ID> --stage lifecycle
 ```
 
 Use the pinned Flutter, scoped JDK, Bundler and Xcode environment described in
@@ -133,8 +149,8 @@ unresolved after actual removal, so its completion is not navigation proof;
 Future errors are still observed. Its binding retains a framework-error
 latch after an exception has been consumed, while preserving normal Flutter
 and driver failure reporting. A late asynchronous failure stops further UI and
-financial work. Preparation confirmation is submitted once; the helper waits
-for a delayed, enabled Check preparation action without repeating Confirm.
+financial work. Historical preparation-confirmation receipts remain evidence
+for the earlier app and are never replayed by the current witness-only flow.
 A failed scheduling run remains failed even when earlier financial steps
 completed. Preserve its closed fixture and receipts; do not rerun its financial
 requests to repair the report. A fresh full qualification uses a new run ID.

@@ -46,7 +46,7 @@ class WalletSelectionScreen extends ConsumerWidget {
             data: (data) {
               final switchingWalletId = data.switchingWalletId;
               final navigationLocked =
-                  switchingWalletId != null || navigation.inFlight;
+                  data.isChangingWallet || navigation.inFlight;
               return _WalletSelectionScaffold(
                 navigationLocked: navigationLocked,
                 onAddWallet: navigationLocked

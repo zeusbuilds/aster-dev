@@ -14,8 +14,14 @@ abstract interface class WalletProfilePersistence {
   Future<AppResult<WalletRegistry>> remove(String walletId);
 }
 
+/// Persists delete authority before any wallet resources are destroyed.
+abstract interface class WalletDeletionPersistence {
+  Future<AppResult<WalletRegistry>> stageDeletion(String walletId);
+}
+
 /// Serialized, versioned storage for current non-secret wallet metadata.
-final class WalletProfileStore implements WalletProfilePersistence {
+final class WalletProfileStore
+    implements WalletProfilePersistence, WalletDeletionPersistence {
   WalletProfileStore(this._documents, {DateTime Function()? clock})
     : _clock = clock ?? _utcNow;
 
@@ -101,6 +107,38 @@ final class WalletProfileStore implements WalletProfilePersistence {
         activeWalletId: walletId,
       );
     }, fallbackCode: 'wallet_registry_activate_failed');
+  }
+
+  @override
+  Future<AppResult<WalletRegistry>> stageDeletion(String walletId) {
+    return _mutate((snapshot) {
+      final target = snapshot.readyProfiles
+          .where((profile) => profile.id == walletId)
+          .firstOrNull;
+      if (target == null ||
+          snapshot.provisioningProfiles.isNotEmpty ||
+          snapshot.deletingProfiles.isNotEmpty) {
+        throw _profileConflict('wallet_deletion_conflict');
+      }
+      return WalletRegistry(
+        profiles: [
+          for (final profile in snapshot.profiles)
+            if (profile.id == walletId)
+              profile.copyWith(
+                state: WalletProfileState.deleting,
+                updatedAt: _nextUpdatedAt(profile),
+              )
+            else
+              profile,
+        ],
+        activeWalletId: snapshot.activeWalletId == walletId
+            ? snapshot.readyProfiles
+                  .where((profile) => profile.id != walletId)
+                  .firstOrNull
+                  ?.id
+            : snapshot.activeWalletId,
+      );
+    }, fallbackCode: 'wallet_registry_delete_stage_failed');
   }
 
   @override
@@ -221,6 +259,7 @@ final class WalletProfileStore implements WalletProfilePersistence {
       final state = switch (stateValue) {
         'provisioning' => WalletProfileState.provisioning,
         'ready' => WalletProfileState.ready,
+        'deleting' => WalletProfileState.deleting,
         _ => throw const StoredDataCorruptionException(),
       };
       return WalletProfile(

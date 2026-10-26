@@ -38,12 +38,15 @@ class TransactionDetailRow extends StatelessWidget {
             children: [
               Expanded(child: Text(label, style: context.type.rowMeta)),
               if (copy != null)
-                AsterIconButton(
-                  icon: RemixIcons.file_copy_line,
-                  tooltip: 'Copy $label',
-                  hapticIntent: null,
-                  loading: copying,
-                  onPressed: copyEnabled ? copy : null,
+                QuietPendingAction(
+                  pending: !copyEnabled || copying,
+                  label: 'Copy $label',
+                  child: AsterIconButton(
+                    icon: RemixIcons.file_copy_line,
+                    tooltip: 'Copy $label',
+                    hapticIntent: null,
+                    onPressed: copy,
+                  ),
                 ),
             ],
           ),

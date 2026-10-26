@@ -40,6 +40,7 @@ class ScanFrame extends StatelessWidget {
         padding: EdgeInsets.symmetric(vertical: spacing.sm),
         child: _ScanFailureStatus(failure: failure, onRetry: onRetry),
       ),
+      null when state.galleryBusy => const SizedBox.shrink(),
       null when !state.cameraReady => Semantics(
         liveRegion: true,
         label: 'Starting camera',
@@ -80,7 +81,8 @@ class ScanFrame extends StatelessWidget {
                         order: const NumericFocusOrder(1),
                         child: ScanControlButton(
                           semanticLabel: 'Choose a QR image',
-                          loading: state.galleryBusy,
+                          busy: state.galleryBusy,
+                          loading: state.galleryAnalyzing,
                           onTap: onGalleryTap,
                           child: Icon(
                             MingCuteIcons.mgc_photo_album_line,

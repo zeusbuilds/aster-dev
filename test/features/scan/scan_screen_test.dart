@@ -2,7 +2,8 @@ import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:aster/core/core.dart';
-import 'package:aster/features/scan/data/services/services.dart';
+import 'package:aster/features/scan/data/services/scan_session.dart';
+import 'package:aster/features/scan/data/services/scan_session_contract.dart';
 import 'package:aster/features/scan/domain/models/models.dart';
 import 'package:aster/features/scan/presentation/models/models.dart';
 import 'package:aster/features/scan/presentation/screens/screens.dart';
@@ -25,6 +26,202 @@ import '../../support/presentation_fakes.dart';
 import '../../support/scan_fakes.dart';
 
 void main() {
+  testWidgets(
+    'gallery keeps its icon during selection and loads only during decoding',
+    (tester) async {
+      final driver = FakeScanCameraDriver()
+        ..analyzeGate = Completer<Iterable<String?>>();
+      final gallery = FakeScanGallerySource()
+        ..selectionGate = Completer<String?>();
+      final session = ManagedScanSession(driver, gallery);
+      final router = _launcherRouter();
+      addTearDown(router.dispose);
+      final harness = _ScanWidgetHarness(
+        session: session,
+        router: router,
+        purpose: ScanPurpose.sendLauncher,
+      );
+      addTearDown(harness.dispose);
+
+      await tester.pumpWidget(harness.app);
+      harness.activateScanTab();
+      await tester.pumpAndSettle();
+      final control = find.byWidgetPredicate(
+        (widget) =>
+            widget is ScanControlButton &&
+            widget.semanticLabel == 'Choose a QR image',
+      );
+      final originalOpacity = tester
+          .widget<Opacity>(
+            find.descendant(of: control, matching: find.byType(Opacity)),
+          )
+          .opacity;
+
+      await tester.tap(find.bySemanticsLabel('Choose a QR image'));
+      await tester.pump();
+
+      expect(session.snapshot.galleryPhase, ScanGalleryPhase.selecting);
+      expect(tester.widget<ScanControlButton>(control).loading, isFalse);
+      expect(tester.widget<ScanControlButton>(control).busy, isTrue);
+      expect(
+        find.descendant(of: control, matching: find.byType(Icon)),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<Opacity>(
+              find.descendant(of: control, matching: find.byType(Opacity)),
+            )
+            .opacity,
+        originalOpacity,
+      );
+      expect(find.byType(GridLoader), findsNothing);
+      expect(
+        tester
+            .getSemantics(find.bySemanticsLabel('Choose a QR image'))
+            .getSemanticsData()
+            .hasAction(ui.SemanticsAction.tap),
+        isFalse,
+      );
+      final duplicate = await harness.container
+          .read(scanViewModelProvider(ScanPurpose.sendLauncher).notifier)
+          .scanGallery();
+      expect(duplicate, isA<AppFailureResult<ScanGalleryOutcome>>());
+      expect(gallery.calls, 1);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pump();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      expect(driver.commandLog, ['start', 'stop']);
+
+      gallery.selectionGate!.complete('temporary-selected-image');
+      await tester.pump();
+      await tester.pump();
+      expect(session.snapshot.galleryPhase, ScanGalleryPhase.analyzing);
+      expect(tester.widget<ScanControlButton>(control).loading, isTrue);
+      expect(
+        find.descendant(of: control, matching: find.byType(GridLoader)),
+        findsOneWidget,
+      );
+      expect(find.byType(GridLoader), findsOneWidget);
+      expect(harness.toasts.messages, isEmpty);
+
+      driver.analyzeGate!.complete(const []);
+      await tester.pumpAndSettle();
+      expect(session.snapshot.galleryPhase, ScanGalleryPhase.idle);
+      expect(tester.widget<ScanControlButton>(control).loading, isFalse);
+      expect(tester.widget<ScanControlButton>(control).busy, isFalse);
+      expect(harness.toasts.messages, hasLength(1));
+      expect(harness.toasts.messages.single.title, 'No QR code found');
+      expect(driver.commandLog, ['start', 'stop', 'analyze', 'start']);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      expect(await session.close(), isA<AppSuccess<void>>());
+    },
+  );
+
+  for (final pickerFailure in [true, false]) {
+    testWidgets(
+      'gallery ${pickerFailure ? 'permission' : 'decode'} failure is shown once and restores controls',
+      (tester) async {
+        final driver = FakeScanCameraDriver();
+        final gallery = FakeScanGallerySource()..paths.add('selected-image');
+        if (pickerFailure) {
+          gallery.failure = const ScanDriverException(
+            code: 'scan_gallery_selection_failed',
+            kind: ScanDriverFailureKind.permissionDenied,
+          );
+        } else {
+          driver.analyzeFailure = const ScanDriverException(
+            code: 'scan_gallery_analysis_failed',
+            kind: ScanDriverFailureKind.unavailable,
+          );
+        }
+        final session = ManagedScanSession(driver, gallery);
+        final router = _launcherRouter();
+        addTearDown(router.dispose);
+        final harness = _ScanWidgetHarness(
+          session: session,
+          router: router,
+          purpose: ScanPurpose.sendLauncher,
+        );
+        addTearDown(harness.dispose);
+        await tester.pumpWidget(harness.app);
+        harness.activateScanTab();
+        await tester.pumpAndSettle();
+        await tester.tap(find.bySemanticsLabel('Choose a QR image'));
+        await tester.pumpAndSettle();
+
+        expect(harness.toasts.messages, hasLength(1));
+        expect(
+          harness.toasts.messages.single.title,
+          'Image could not be scanned',
+        );
+        expect(
+          harness.toasts.messages.single.variant,
+          pickerFailure ? ToastVariant.warning : ToastVariant.failure,
+        );
+        expect(session.snapshot.galleryPhase, ScanGalleryPhase.idle);
+        expect(session.snapshot.isRunning, isTrue);
+        expect(session.snapshot.failure, isNull);
+        expect(
+          harness.container
+              .read(scanViewModelProvider(ScanPurpose.sendLauncher))
+              .canUseGallery,
+          isTrue,
+        );
+
+        // A second, cancelled picker remains usable and adds no feedback.
+        gallery.failure = null;
+        gallery.paths.clear();
+        await tester.tap(find.bySemanticsLabel('Choose a QR image'));
+        await tester.pumpAndSettle();
+        expect(gallery.calls, 2);
+        expect(harness.toasts.messages, hasLength(1));
+        expect(session.snapshot.isRunning, isTrue);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+        expect(await session.close(), isA<AppSuccess<void>>());
+      },
+    );
+  }
+
+  testWidgets(
+    'disposed gallery does not navigate or show delayed decode feedback',
+    (tester) async {
+      final driver = FakeScanCameraDriver()
+        ..analyzeGate = Completer<Iterable<String?>>();
+      final gallery = FakeScanGallerySource()..paths.add('selected-image');
+      final session = ManagedScanSession(driver, gallery);
+      final router = _launcherRouter();
+      addTearDown(router.dispose);
+      final harness = _ScanWidgetHarness(
+        session: session,
+        router: router,
+        purpose: ScanPurpose.sendLauncher,
+      );
+      addTearDown(harness.dispose);
+      await tester.pumpWidget(harness.app);
+      harness.activateScanTab();
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsLabel('Choose a QR image'));
+      await tester.pump();
+      expect(session.snapshot.galleryPhase, ScanGalleryPhase.analyzing);
+      await tester.pumpWidget(const SizedBox.shrink());
+      final closing = session.close();
+      driver.analyzeGate!.complete(['bitcoin:bc1qlate']);
+      await tester.pump();
+      expect(await closing, isA<AppSuccess<void>>());
+      expect(harness.toasts.messages, isEmpty);
+      expect(harness.container.read(sendDestinationHandoffProvider), isNull);
+      expect(session.snapshot.captureLocked, isFalse);
+      expect(driver.closeCalls, 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('loading wallet header is one live non-fabricated status', (
     tester,
   ) async {
@@ -739,7 +936,7 @@ GoRouter _launcherRouter() {
 
 final class _ScanWidgetHarness {
   factory _ScanWidgetHarness({
-    required FakeScanSession session,
+    required ScanSession session,
     required GoRouter router,
     ScanPurpose purpose = ScanPurpose.destinationPicker,
     ScanSession Function()? sessionBuilder,
@@ -780,7 +977,7 @@ final class _ScanWidgetHarness {
          ],
        );
 
-  final FakeScanSession session;
+  final ScanSession session;
   final GoRouter router;
   final ScanPurpose purpose;
   final RecordingHapticFeedbackService haptics;

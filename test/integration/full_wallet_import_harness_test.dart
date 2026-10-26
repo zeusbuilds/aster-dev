@@ -424,57 +424,100 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  test(
-    'blind preparation rejects retained loading data and witness decoding',
-    () {
-      final route = PaymentRoute(
-        asset: WalletAsset.rgbUsdt(assetId: 'rgb:public-fixture', precision: 6),
-        rail: PaymentRail.onchain,
-      );
-      final state = ReceiveFlowState(
+  test('witness receive rejects retained loading data and blind decoding', () {
+    final route = PaymentRoute(
+      asset: WalletAsset.rgbUsdt(assetId: 'rgb:public-fixture', precision: 6),
+      rail: PaymentRail.onchain,
+    );
+    final state = ReceiveFlowState(
+      route: route,
+      bitcoinUnit: BitcoinUnit.sats,
+      request: WalletReceiveRequest(
+        route: route,
+        encodedRequest: 'public-invoice',
+        displayValue: 'public-invoice',
+      ),
+      amountText: '',
+      amountInput: const WalletAmountInputCodec().parse(
+        text: '',
         route: route,
         bitcoinUnit: BitcoinUnit.sats,
-        request: WalletReceiveRequest(
+      ),
+    );
+    final data = AsyncData(state);
+    expect(qaWitnessReceiveReady(data), isTrue);
+    expect(
+      qaWitnessReceiveReady(
+        AsyncData(
+          state.copyWith(operation: ReceiveFlowOperation.generatingRequest),
+        ),
+      ),
+      isFalse,
+    );
+    expect(
+      qaWitnessReceiveReady(
+        AsyncData(
+          state.copyWith(
+            request: WalletReceiveRequest(
+              route: route,
+              encodedRequest: 'public-expired-invoice',
+              displayValue: 'public-expired-invoice',
+              expiresAt: DateTime.utc(2020),
+            ),
+          ),
+        ),
+      ),
+      isFalse,
+    );
+    final previousError = AsyncError<ReceiveFlowState>(
+      StateError('public-fixture'),
+      StackTrace.empty,
+    );
+    expect(
+      qaWitnessReceiveReady(
+        // Error-with-previous-data must never qualify a retained invoice.
+        // ignore: invalid_use_of_internal_member
+        previousError.copyWithPrevious(data),
+      ),
+      isFalse,
+    );
+    expect(
+      qaWitnessReceiveReady(
+        // Reproduce Riverpod's retained-data loading state at the boundary.
+        // ignore: invalid_use_of_internal_member
+        const AsyncLoading<ReceiveFlowState>().copyWithPrevious(data),
+      ),
+      isFalse,
+    );
+    WalletPaymentPreview preview(RgbRecipientType? type) =>
+        WalletPaymentPreview(
           route: route,
-          encodedRequest: 'public-invoice',
-          displayValue: 'public-invoice',
-        ),
-        amountText: '',
-        amountInput: const WalletAmountInputCodec().parse(
-          text: '',
-          route: route,
-          bitcoinUnit: BitcoinUnit.sats,
-        ),
-      );
-      final data = AsyncData(state);
-      expect(qaBlindReceiveReady(data, RgbReceiveMode.blind), isTrue);
-      expect(qaBlindReceiveReady(data, RgbReceiveMode.witness), isFalse);
-      expect(
-        qaBlindReceiveReady(
-          // Reproduce Riverpod's retained-data loading state at the boundary.
-          // ignore: invalid_use_of_internal_member
-          const AsyncLoading<ReceiveFlowState>().copyWithPrevious(data),
-          RgbReceiveMode.blind,
-        ),
-        isFalse,
-      );
-      WalletPaymentPreview preview(RgbRecipientType type) =>
-          WalletPaymentPreview(
-            route: route,
-            encodedDestination: 'public-invoice',
-            displayDestination: 'public-invoice',
-            rgbRecipientType: type,
-          );
-      expect(
-        () => requireQaBlindPreview(preview(RgbRecipientType.blind)),
-        returnsNormally,
-      );
-      expect(
-        () => requireQaBlindPreview(preview(RgbRecipientType.witness)),
-        throwsA(isA<FullWalletQaFailure>()),
-      );
-    },
-  );
+          encodedDestination: 'public-invoice',
+          displayDestination: 'public-invoice',
+          rgbRecipientType: type,
+        );
+    expect(
+      () => requireQaWitnessPreview(preview(RgbRecipientType.witness)),
+      returnsNormally,
+    );
+    expect(
+      () => requireQaWitnessPreview(preview(RgbRecipientType.blind)),
+      throwsA(isA<FullWalletQaFailure>()),
+    );
+    expect(
+      () => requireQaWitnessPreview(preview(null)),
+      throwsA(isA<FullWalletQaFailure>()),
+    );
+    // Old blind checkpoints stay readable without reserving another invoice.
+    expect(
+      () => requireQaBlindPreview(preview(RgbRecipientType.blind)),
+      returnsNormally,
+    );
+    expect(
+      () => requireQaBlindPreview(preview(RgbRecipientType.witness)),
+      throwsA(isA<FullWalletQaFailure>()),
+    );
+  });
 
   testWidgets(
     'import Continue dismisses an obstructing input keyboard before one tap',

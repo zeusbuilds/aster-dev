@@ -1,5 +1,6 @@
 import '../../../../core/errors/errors.dart';
 import 'wallet_registry_document_store.dart';
+import 'wallet_scoped_data_removal.dart';
 import 'wallet_storage_security.dart';
 
 /// Durable, private, wallet-scoped reviewed payment intent storage.
@@ -8,11 +9,16 @@ abstract interface class WalletPaymentJournalStore {
   Future<void> write(String walletId, String document);
 }
 
-final class IoWalletPaymentJournalStore implements WalletPaymentJournalStore {
+final class IoWalletPaymentJournalStore
+    implements WalletPaymentJournalStore, WalletScopedDataRemoval {
   const IoWalletPaymentJournalStore(this.rootPath, this.security);
 
   final String rootPath;
   final WalletStorageSecurity security;
+
+  @override
+  Future<void> removeWallet(String walletId) =>
+      removeWalletScopedDirectory(rootPath, walletId, security);
 
   Future<IoWalletRegistryDocumentStore> _wallet(String walletId) async {
     if (!RegExp(r'^[a-f0-9]{32}$').hasMatch(walletId)) {

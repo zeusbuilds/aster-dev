@@ -1,0 +1,237 @@
+{
+  "reviewedAt": "2026-10-26",
+  "appOwnedDialogs": [
+    {
+      "id": "APP-LOCK-OFF",
+      "location": "Settings → Security → switch App lock off",
+      "title": "Turn off App lock?",
+      "source": "lib/features/settings/presentation/screens/security_settings_screen.dart",
+      "line": 35,
+      "body": "Anyone using this device will be able to open Aster. Revealing your seed phrase and exporting keys will still require device authentication.",
+      "before": {
+        "titleFont": 24,
+        "titleWeight": "bold",
+        "contentFont": 14,
+        "titleContentGap": 16,
+        "sidePadding": 24,
+        "bottomPadding": 24,
+        "actions": "TextButton"
+      },
+      "current": {
+        "titleFont": 20,
+        "titleWeight": "bold",
+        "contentFont": 16,
+        "titleContentGap": 8,
+        "sidePadding": 22,
+        "bottomPadding": 22,
+        "buttonGap": 12,
+        "actions": [
+          "CustomButton.tonal: Cancel (pale blue)",
+          "CustomButton.primary: Turn off (rich blue)"
+        ],
+        "responsive": "Equal-width actions in one row; stack when scaled labels do not fit. Button height and internal text padding accommodate large text. Title/content can scroll while actions remain accessible.",
+        "contentActionsGap": 40,
+        "screenSideMargin": 24,
+        "topPadding": 22,
+        "titleFontWeight": 700
+      },
+      "behavior": "Cancel, barrier dismissal and Back leave App lock enabled; confirmation still invokes fresh system authentication.",
+      "priorRevisions": [
+        {
+          "description": "First October 26 button/body styling, before spacing refinement",
+          "style": {
+            "titleFont": 24,
+            "titleWeight": "bold",
+            "contentFont": 16,
+            "titleContentGap": 16,
+            "sidePadding": 24,
+            "bottomPadding": 24,
+            "buttonGap": 12,
+            "actions": [
+              "CustomButton.tonal: Cancel (pale blue)",
+              "CustomButton.primary: Turn off (rich blue)"
+            ],
+            "responsive": "Equal-width actions in one row; stack when scaled labels do not fit. Button height and internal text padding accommodate large text. Title/content can scroll while actions remain accessible."
+          }
+        },
+        {
+          "description": "Earlier October 26 spacing refinement, before bold title and 22-point inner padding",
+          "style": {
+            "titleFont": 18,
+            "titleWeight": "semibold",
+            "contentFont": 16,
+            "titleContentGap": 8,
+            "sidePadding": 20,
+            "bottomPadding": 20,
+            "buttonGap": 12,
+            "actions": [
+              "CustomButton.tonal: Cancel (pale blue)",
+              "CustomButton.primary: Turn off (rich blue)"
+            ],
+            "responsive": "Equal-width actions in one row; stack when scaled labels do not fit. Button height and internal text padding accommodate large text. Title/content can scroll while actions remain accessible.",
+            "contentActionsGap": 32,
+            "screenSideMargin": 24,
+            "topPadding": 20
+          }
+        },
+        {
+          "description": "Earlier October 26 refinement: 18 bold title with 22 inner padding",
+          "style": {
+            "titleFont": 18,
+            "titleWeight": "bold",
+            "contentFont": 16,
+            "titleContentGap": 8,
+            "sidePadding": 22,
+            "bottomPadding": 22,
+            "buttonGap": 12,
+            "actions": [
+              "CustomButton.tonal: Cancel (pale blue)",
+              "CustomButton.primary: Turn off (rich blue)"
+            ],
+            "responsive": "Equal-width actions in one row; stack when scaled labels do not fit. Button height and internal text padding accommodate large text. Title/content can scroll while actions remain accessible.",
+            "contentActionsGap": 32,
+            "screenSideMargin": 24,
+            "topPadding": 22,
+            "titleFontWeight": 700
+          }
+        }
+      ],
+      "sharedComponent": "AsterConfirmationDialog"
+    },
+    {
+      "id": "DELETE-WALLET",
+      "location": "Select the wallet first if necessary → Settings → Wallet details → Delete wallet",
+      "title": "Delete wallet?",
+      "source": "lib/features/settings/presentation/screens/wallet_details_screen.dart",
+      "line": 45,
+      "sharedComponent": "AsterConfirmationDialog",
+      "bodyTemplate": "Remove “{walletName}” and its wallet data from this device. Keep your seed phrase safe. A seed phrase alone cannot restore USDT or other RGB assets.",
+      "bodyVariants": {
+        "lastWallet": "Remove “{walletName}” and its wallet data from this device. Keep your seed phrase safe. A seed phrase alone cannot restore USDT or other RGB assets. You will return to the welcome screen.",
+        "otherWalletsRemain": "Remove “{walletName}” and its wallet data from this device. Keep your seed phrase safe. A seed phrase alone cannot restore USDT or other RGB assets. Your other wallets will stay. Aster will open the next wallet."
+      },
+      "actions": [
+        "Cancel (tonal)",
+        "Delete (primary blue)"
+      ],
+      "current": {
+        "titleFont": 20,
+        "titleWeight": "bold",
+        "contentFont": 16,
+        "titleContentGap": 8,
+        "sidePadding": 22,
+        "bottomPadding": 22,
+        "buttonGap": 12,
+        "actions": [
+          "CustomButton.tonal: Cancel (pale blue)",
+          "CustomButton.primary: Delete (rich blue)"
+        ],
+        "responsive": "Equal-width actions in one row; stack when scaled labels do not fit. Button height and internal text padding accommodate large text. Title/content can scroll while actions remain accessible.",
+        "contentActionsGap": 40,
+        "screenSideMargin": 24,
+        "topPadding": 22,
+        "titleFontWeight": 700
+      },
+      "behavior": "Cancel/dismissal leaves wallet data unchanged. Confirm requests fresh wallet-bound device authentication when a device credential exists; no credential follows the approved no-auth policy. Deletion proceeds only after active-wallet identity, payment/preparation fences and native RGB audit pass.",
+      "priorPresentation": {
+        "description": "Historical initial deletion confirmation",
+        "actions": [
+          "Cancel (tonal)",
+          "Delete (danger)"
+        ],
+        "paragraphBreakBeforeDestination": true
+      },
+      "paragraphLayout": "Single continuous paragraph, including destination sentence.",
+      "contentActionsGapProof": "The same shared 40 logical-pixel layout gap as App lock. 18 geometry tests cover both copies, original paragraph break, 1×/3× text, button-only and inherited caller Theme overrides.",
+      "authenticationOrdering": "Keep prompt ownership until foreground both before and after the final device-security status reply. Ordinary prompt completion can arrive before Flutter lifecycle events; actual background and wallet/request changes still revoke the grant."
+    }
+  ],
+  "appBottomSheets": [
+    {
+      "location": "Swap → either asset",
+      "title": "Select payment option",
+      "source": "lib/features/swap/presentation/widgets/asset_selector_sheet.dart:31"
+    },
+    {
+      "location": "Receive → Set amount",
+      "title": "Set amount",
+      "source": "lib/features/receive/presentation/widgets/receive_amount_sheet.dart:28"
+    }
+  ],
+  "systemManagedPrompts": [
+    {
+      "trigger": "Launch/unlock/return locked",
+      "presentation": "Device authentication — Unlock Aster"
+    },
+    {
+      "trigger": "Create/Import initial or additional wallet",
+      "presentation": "Device authentication — Set up your wallet"
+    },
+    {
+      "trigger": "Reveal recovery phrase",
+      "presentation": "Device authentication — Reveal your recovery phrase"
+    },
+    {
+      "trigger": "Export xpubs",
+      "presentation": "Device authentication — Export your wallet public keys"
+    },
+    {
+      "trigger": "Enable App lock or confirmed disable",
+      "presentation": "Device authentication — Change Aster app lock"
+    },
+    {
+      "trigger": "Delete selected wallet",
+      "presentation": "Device authentication — Delete this wallet"
+    },
+    {
+      "trigger": "First scanner camera access",
+      "presentation": "Camera permission"
+    },
+    {
+      "trigger": "Scanner gallery",
+      "presentation": "System photo picker; any additional permission is platform-dependent"
+    },
+    {
+      "trigger": "Receive Share / xpubs Share",
+      "presentation": "System share sheet"
+    },
+    {
+      "trigger": "Local endpoint access when required by the OS",
+      "presentation": "Local-network permission"
+    },
+    {
+      "trigger": "iOS Paste when required by the OS",
+      "presentation": "Paste permission"
+    }
+  ],
+  "externalPresentations": [
+    "Terms/Privacy open a browser or chooser",
+    "Transaction explorer opens a browser or chooser"
+  ],
+  "scope": "Two current Aster confirmation-dialog instances share AsterConfirmationDialog. The two bottom sheets remain separate. Deleted blind-receive/setup dialogs are historical. Native fonts/permissions are OS-managed. This documentation does not change wallet, security preference or stack state; wallet deletion execution and platform qualification are documented separately.",
+  "sharedConfirmationComponent": {
+    "name": "AsterConfirmationDialog",
+    "source": "lib/shared/widgets/aster_confirmation_dialog.dart",
+    "line": 10,
+    "themeSource": "lib/shared/theme/app_theme.dart",
+    "current": {
+      "titleFont": 20,
+      "titleWeight": "bold",
+      "contentFont": 16,
+      "titleContentGap": 8,
+      "sidePadding": 22,
+      "bottomPadding": 22,
+      "buttonGap": 12,
+      "actions": [
+        "CustomButton.tonal: Cancel (pale blue)",
+        "CustomButton.primary: Turn off (rich blue)"
+      ],
+      "responsive": "Equal-width actions in one row; stack when scaled labels do not fit. Button height and internal text padding accommodate large text. Title/content can scroll while actions remain accessible.",
+      "contentActionsGap": 40,
+      "screenSideMargin": 24,
+      "topPadding": 22,
+      "titleFontWeight": 700
+    },
+    "behavior": "Shared geometry and responsive actions. Each caller supplies title/content, confirmation text and semantic button variant. App lock uses primary Turn off; wallet deletion uses danger Delete."
+  }
+}

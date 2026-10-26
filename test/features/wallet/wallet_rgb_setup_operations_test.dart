@@ -200,6 +200,30 @@ void main() {
   tearDown(() => h.runtime.dispose());
 
   test(
+    'delete guard reconciles completed preparation without repeating it',
+    () async {
+      final review = await h.prepare();
+      h.dispatch = () async {
+        h.history = [RgbWalletSetupTransaction(txid: _tx, confirmed: false)];
+      };
+      await h.operations.confirm(review);
+      final profile = (await h.profiles.read() as AppSuccess<WalletRegistry>)
+          .value
+          .activeProfile!;
+      expect(
+        await h.operations.assertWalletDeletionSafe(profile),
+        isA<AppFailureResult<void>>(),
+      );
+      h.history = [RgbWalletSetupTransaction(txid: _tx, confirmed: true)];
+      expect(
+        await h.operations.assertWalletDeletionSafe(profile),
+        isA<AppSuccess<void>>(),
+      );
+      expect(h.dispatches, 1);
+    },
+  );
+
+  test(
     'cancel persists without any native mutation; a fresh review is required',
     () async {
       final review = await h.prepare();

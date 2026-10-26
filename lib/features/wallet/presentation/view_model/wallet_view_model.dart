@@ -14,20 +14,38 @@ class WalletViewModel extends _$WalletViewModel {
 
   /// Reloads known state or retries an initial failure only when replay is safe.
   Future<void> reload() async {
-    if (state.isLoading || state.value?.switchingWalletId != null) return;
-    if (state case AsyncError(:final error, :final stackTrace)
-        when !FailureMapper.from(error, stackTrace).retryable) {
+    if (state.isLoading ||
+        (!state.hasError && state.value?.isChangingWallet == true)) {
       return;
     }
+    var resumeDeletion = false;
+    if (state case AsyncError(:final error, :final stackTrace)) {
+      final failure = FailureMapper.from(error, stackTrace);
+      resumeDeletion = canResumeDeletion(failure);
+      if (!failure.retryable && !resumeDeletion) return;
+    }
     state = const AsyncLoading();
-    final next = await AsyncValue.guard(_loadWallets);
+    final next = await AsyncValue.guard(
+      () => _loadWallets(resumeDeletion: resumeDeletion),
+    );
     if (ref.mounted) state = next;
   }
+
+  /// These commands resume an already-authorized durable deletion. Retrying
+  /// ordinary mutations with uncertain outcomes remains prohibited.
+  static bool canResumeDeletion(AppFailure failure) =>
+      failure.requiresReconciliation &&
+      const {
+        'wallet_deletion_incomplete',
+        'wallet_deleted_activation_failed',
+      }.contains(failure.code);
 
   /// Clears a transient switch failure after presentation consumes it.
   void clearOperationFailure() {
     final current = state.value;
-    if (current == null || current.operationFailure == null) return;
+    if (state.hasError || current == null || current.operationFailure == null) {
+      return;
+    }
     state = AsyncData(current.copyWith(operationFailure: null));
   }
 
@@ -50,8 +68,10 @@ class WalletViewModel extends _$WalletViewModel {
   /// commit successfully.
   Future<bool> switchWallet(String walletId) async {
     final current = state.value;
-    if (current == null ||
-        current.switchingWalletId != null ||
+    if (state.isLoading ||
+        state.hasError ||
+        current == null ||
+        current.isChangingWallet ||
         current.activeWallet?.id == walletId) {
       return false;
     }
@@ -82,6 +102,58 @@ class WalletViewModel extends _$WalletViewModel {
     };
   }
 
+  /// Deletes only the wallet the user reviewed. The repository consumes the
+  /// fresh device grant inside its serialized transaction, never in the UI.
+  Future<bool> deleteWallet(
+    String walletId, {
+    SensitiveAuthorization? authorization,
+  }) async {
+    final current = state.value;
+    if (state.isLoading ||
+        state.hasError ||
+        current == null ||
+        current.isChangingWallet ||
+        current.activeWallet?.id != walletId) {
+      return false;
+    }
+    state = AsyncData(
+      current.copyWith(deletingWalletId: walletId, operationFailure: null),
+    );
+    AppResult<WalletRegistry> result;
+    try {
+      final repository = await ref.read(walletRepositoryProvider.future);
+      result = await repository.deleteWallet(
+        walletId,
+        authorization: authorization,
+      );
+    } catch (error, stackTrace) {
+      result = AppResult.failure(FailureMapper.from(error, stackTrace));
+    }
+    if (!ref.mounted) return result is AppSuccess<WalletRegistry>;
+    switch (result) {
+      case AppSuccess<WalletRegistry>(:final value):
+        if (value.profiles.isEmpty) {
+          ref.read(securityControllerProvider).clearWalletPresence();
+        }
+        state = AsyncData(_toState(value));
+        return true;
+      case AppFailureResult<WalletRegistry>(:final failure):
+        // Once destructive cleanup starts, the prior wallet must never be
+        // restored optimistically. A reload resumes its durable deletion.
+        if (failure.requiresReconciliation) {
+          state = AsyncError(
+            AppFailureException(failure),
+            failure.stackTrace ?? StackTrace.current,
+          );
+        } else {
+          state = AsyncData(
+            current.copyWith(deletingWalletId: null, operationFailure: failure),
+          );
+        }
+        return false;
+    }
+  }
+
   Future<AppResult<WalletRegistry>> _switchWallet(String walletId) async {
     try {
       final repository = await ref.read(walletRepositoryProvider.future);
@@ -91,9 +163,15 @@ class WalletViewModel extends _$WalletViewModel {
     }
   }
 
-  Future<WalletState> _loadWallets() async {
+  Future<WalletState> _loadWallets({bool resumeDeletion = false}) async {
     final repository = await ref.read(walletRepositoryProvider.future);
-    final result = await repository.load();
+    final result = resumeDeletion
+        ? await repository.recoverWalletDeletion()
+        : await repository.load();
+    if (result case AppSuccess<WalletRegistry>(:final value)
+        when resumeDeletion && value.profiles.isEmpty) {
+      ref.read(securityControllerProvider).clearWalletPresence();
+    }
     return switch (result) {
       AppSuccess<WalletRegistry>(:final value) => _toState(value),
       AppFailureResult<WalletRegistry>(:final failure) =>

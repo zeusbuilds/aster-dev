@@ -256,6 +256,7 @@ class ScanViewModel extends _$ScanViewModel {
       flashOn: snapshot.torchOn,
       zoomPreset: ScanZoomPreset.nearest(snapshot.zoomScale),
       captureLocked: snapshot.captureLocked,
+      galleryPhase: snapshot.galleryPhase,
       failure: snapshot.failure,
     );
     final failure = snapshot.failure;
@@ -299,6 +300,7 @@ class ScanViewModel extends _$ScanViewModel {
       flashOn: snapshot.torchOn,
       zoomPreset: ScanZoomPreset.nearest(snapshot.zoomScale),
       captureLocked: snapshot.captureLocked,
+      galleryPhase: snapshot.galleryPhase,
       failure: snapshot.failure,
     );
   }

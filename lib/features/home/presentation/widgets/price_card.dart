@@ -9,7 +9,6 @@ import 'package:unicons/unicons.dart';
 import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
 import '../../../market/domain/models/models.dart';
-import '../../../market/presentation/models/models.dart';
 import '../../../market/presentation/view_model/view_models.dart';
 import 'candle_chart.dart';
 
@@ -24,15 +23,18 @@ class PriceCard extends ConsumerStatefulWidget {
 class _PriceCardState extends ConsumerState<PriceCard> {
   static final _fiatFormatter = FiatAmountFormatter();
   Timer? _expiryTimer;
+  BitcoinMarketSnapshot? _lastChartSnapshot;
 
   @override
   void initState() {
     super.initState();
-    ref.listenManual(
-      bitcoinMarketViewModelProvider,
-      (previous, next) => _scheduleExpiry(next.value?.snapshot),
-      fireImmediately: true,
-    );
+    ref.listenManual(bitcoinMarketViewModelProvider, (previous, next) {
+      final snapshot = next.value?.snapshot;
+      if (snapshot != null && snapshot.history.isNotEmpty) {
+        _lastChartSnapshot = snapshot;
+      }
+      _scheduleExpiry(snapshot);
+    }, fireImmediately: true);
   }
 
   @override
@@ -43,14 +45,22 @@ class _PriceCardState extends ConsumerState<PriceCard> {
 
   void _scheduleExpiry(BitcoinMarketSnapshot? snapshot) {
     _expiryTimer?.cancel();
-    if (snapshot == null) return;
     final now = ref.read(utcClockProvider)().toUtc();
-    final remaining = snapshot.expiresAt.difference(now);
-    if (remaining <= Duration.zero) return;
-    _expiryTimer = Timer(remaining + const Duration(milliseconds: 1), () {
-      if (!mounted) return;
-      setState(() {});
-    });
+    final expiries = [
+      if (snapshot != null) snapshot.expiresAt,
+      if (_lastChartSnapshot != null) _lastChartSnapshot!.expiresAt,
+    ].where((expiry) => expiry.isAfter(now)).toList()..sort();
+    if (expiries.isEmpty) return;
+    _expiryTimer = Timer(
+      expiries.first.difference(now) + const Duration(milliseconds: 1),
+      () {
+        if (!mounted) return;
+        setState(() {});
+        _scheduleExpiry(
+          ref.read(bitcoinMarketViewModelProvider).value?.snapshot,
+        );
+      },
+    );
   }
 
   @override
@@ -66,19 +76,20 @@ class _PriceCardState extends ConsumerState<PriceCard> {
             rawSnapshot?.isCurrentAt(now) == true
         ? rawSnapshot
         : null;
-    final chartData = snapshot?.history;
+    // A partial quote response must not erase an independently validated chart.
+    // Retain its own freshness deadline rather than extending it with each new
+    // spot quote, and never reuse history for a different selected currency.
+    final retainedChart = _lastChartSnapshot;
+    final chartSnapshot = snapshot?.history.isNotEmpty == true
+        ? snapshot
+        : retainedChart?.quoteCurrency == selectedCurrency &&
+              retainedChart?.isCurrentAt(now) == true
+        ? retainedChart
+        : null;
+    final chartData = chartSnapshot?.history;
     final change = snapshot?.changeBasisPoints;
-    final ownsCurrentCurrency =
-        rawSnapshot != null && rawSnapshot.quoteCurrency == selectedCurrency;
-    final visibleFailure = _visibleFailure(
-      selectedQuote: selectedQuote,
-      market: market,
-      ownsCurrentCurrency: ownsCurrentCurrency,
-    );
     final headerLoading = snapshot == null;
     final chartUnavailable = chartData?.isEmpty ?? true;
-    final chartOffline =
-        chartUnavailable && visibleFailure?.kind == AppFailureKind.connectivity;
     final colors = context.appColors;
     final effects = context.effects;
     final spacing = context.spacing;
@@ -91,15 +102,7 @@ class _PriceCardState extends ConsumerState<PriceCard> {
         children: NumericTextSpans.build(context, r'$0', type.brandAmount),
       ),
     ).height;
-    final Widget chart = switch ((chartUnavailable, chartOffline)) {
-      (true, true) => _OfflineMarketChart(
-        onRetry: () => unawaited(
-          ref.read(bitcoinMarketViewModelProvider.notifier).retry(),
-        ),
-      ),
-      (true, false) => const CandleChart(data: null, isSkeleton: true),
-      (false, _) => CandleChart(data: chartData, isSkeleton: false),
-    };
+    final chart = CandleChart(data: chartData, isSkeleton: chartUnavailable);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -245,29 +248,6 @@ class _PriceCardState extends ConsumerState<PriceCard> {
     };
     return 'Bitcoin price ${_formatPrice(snapshot)}. $change.';
   }
-
-  static AppFailure _failure(Object error, StackTrace stackTrace) =>
-      error is AppFailureException
-      ? error.failure
-      : FailureMapper.from(error, stackTrace);
-
-  static AppFailure? _visibleFailure({
-    required AsyncValue<MarketQuoteCurrency> selectedQuote,
-    required AsyncValue<BitcoinMarketState> market,
-    required bool ownsCurrentCurrency,
-  }) {
-    if (selectedQuote case AsyncError(:final error, :final stackTrace)) {
-      return _failure(error, stackTrace);
-    }
-    if (market case AsyncError(:final error, :final stackTrace)) {
-      return _failure(error, stackTrace);
-    }
-    final state = market.value;
-    if (state == null) return null;
-    return state.snapshot == null || ownsCurrentCurrency
-        ? state.refreshFailure
-        : null;
-  }
 }
 
 class _PriceChangeVisual extends StatelessWidget {
@@ -318,46 +298,6 @@ class _PriceChangeVisual extends StatelessWidget {
         alpha: effects.chartContentOpacity,
       ),
       child: content,
-    );
-  }
-}
-
-class _OfflineMarketChart extends StatelessWidget {
-  const _OfflineMarketChart({required this.onRetry});
-
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final muted = context.appColors.onBrandArt.withValues(
-      alpha: context.effects.brandContentMutedOpacity,
-    );
-    return Semantics(
-      button: true,
-      liveRegion: true,
-      label: "You're offline. Tap to try again.",
-      onTap: onRetry,
-      excludeSemantics: true,
-      child: SizedBox(
-        width: double.infinity,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: context.metrics.chartHeight),
-          child: TextButton(
-            onPressed: onRetry,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text("You're offline", style: context.type.brandTitle),
-                SizedBox(height: context.spacing.xs),
-                Text(
-                  'Tap to try again',
-                  style: context.type.brandMetric.copyWith(color: muted),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

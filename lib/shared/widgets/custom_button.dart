@@ -8,7 +8,7 @@ import '../theme/theme.dart';
 import 'grid_loader.dart';
 
 /// Visual variants supported by [CustomButton].
-enum ButtonVariant { primary, secondary, translucent, tonal, neutral }
+enum ButtonVariant { primary, secondary, translucent, tonal, neutral, danger }
 
 /// App button with stable loading geometry, keyboard support, and semantic
 /// haptics.
@@ -22,6 +22,7 @@ class CustomButton extends StatefulWidget {
     this.variant = ButtonVariant.primary,
     this.enabled = true,
     this.loading = false,
+    this.labelMaxLines = 1,
     this.width,
     this.hapticIntent = HapticIntent.lightImpact,
   }) : _isCompact = false;
@@ -37,6 +38,7 @@ class CustomButton extends StatefulWidget {
     this.variant = ButtonVariant.primary,
     this.enabled = true,
     this.loading = false,
+    this.labelMaxLines = 1,
     this.width,
     this.hapticIntent = HapticIntent.lightImpact,
   }) : _isCompact = true;
@@ -48,6 +50,9 @@ class CustomButton extends StatefulWidget {
   final ButtonVariant variant;
   final bool enabled;
   final bool loading;
+
+  /// Owners allowing a wrapped label must also provide enough button height.
+  final int labelMaxLines;
   final double? width;
 
   /// Tap feedback intent. Use `null` when the owning async flow emits one
@@ -141,7 +146,8 @@ class _CustomButtonState extends State<CustomButton> {
         : visualHeight;
     final buttonWidth = widget.width ?? (isCompact ? null : double.infinity);
     final foregroundColor = switch (widget.variant) {
-      ButtonVariant.primary => context.colorScheme.onPrimary,
+      ButtonVariant.primary ||
+      ButtonVariant.danger => context.colorScheme.onPrimary,
       ButtonVariant.tonal => context.colorScheme.primary,
       ButtonVariant.neutral => context.colorScheme.surface,
       _ => context.colorScheme.onSurface,
@@ -152,6 +158,7 @@ class _CustomButtonState extends State<CustomButton> {
     };
     final backgroundColor = switch (widget.variant) {
       ButtonVariant.primary => context.colorScheme.primary,
+      ButtonVariant.danger => colors.dangerAction,
       ButtonVariant.secondary => context.colorScheme.surface,
       ButtonVariant.tonal => context.colorScheme.primaryContainer,
       ButtonVariant.neutral => context.colorScheme.onSurface,
@@ -281,7 +288,7 @@ class _CustomButtonState extends State<CustomButton> {
                                                   color: foregroundColor,
                                                 ),
                                         textAlign: TextAlign.center,
-                                        maxLines: 1,
+                                        maxLines: widget.labelMaxLines,
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),

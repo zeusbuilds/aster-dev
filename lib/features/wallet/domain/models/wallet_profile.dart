@@ -10,6 +10,9 @@ enum WalletProfileState {
 
   /// Native state and credentials were provisioned and committed.
   ready,
+
+  /// Explicitly authorized local removal, resumed after an interrupted delete.
+  deleting,
 }
 
 /// Non-secret app identity for one native wallet store.

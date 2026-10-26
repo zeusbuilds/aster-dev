@@ -1,7 +1,6 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
+import '../branding/aster_logo_geometry.dart';
 import '../theme/theme.dart';
 
 /// Animated splash screen used during app startup.
@@ -88,7 +87,9 @@ class _BackgroundState extends State<_Background> {
         linesLength: _linesLength,
         linesGap: _linesGap,
         gradient: gradients.splashBackdrop,
-        initialLineHeight: context.art.splashLineInitialHeight,
+        initialLineHeight: AsterLogoGeometry.horizontalThicknessForWidth(
+          context.metrics.splashLogoWidth,
+        ),
         maximumLineHeight: context.art.splashLineMaximumHeight,
       ),
       child: const SizedBox.expand(),
@@ -219,7 +220,9 @@ class _ForegroundState extends State<_Foreground> {
       delegate: _ForegroundLayoutDelegate(
         linesLength: _linesLength,
         linesGap: _linesGap,
-        initialLineHeight: art.splashLineInitialHeight,
+        initialLineHeight: AsterLogoGeometry.horizontalThicknessForWidth(
+          context.metrics.splashLogoWidth,
+        ),
         maximumLineHeight: art.splashLineMaximumHeight,
       ),
       children: [
@@ -232,8 +235,6 @@ class _ForegroundState extends State<_Foreground> {
               expansion: _expansion,
               linesLength: _linesLength,
               logoWidth: context.metrics.splashLogoWidth,
-              diagonalRatio: art.splashLogoDiagonalRatio,
-              thicknessRatio: art.splashLogoThicknessRatio,
               handoffProgress: art.splashLogoHandoffProgress,
               diagonalExitProgress: art.splashLogoDiagonalExitProgress,
             ),
@@ -316,8 +317,6 @@ class _LogoPainter extends CustomPainter {
     required this.expansion,
     required this.linesLength,
     required this.logoWidth,
-    required this.diagonalRatio,
-    required this.thicknessRatio,
     required this.handoffProgress,
     required this.diagonalExitProgress,
   }) : super(repaint: Listenable.merge([rotation, expansion, linesLength]));
@@ -327,65 +326,26 @@ class _LogoPainter extends CustomPainter {
   final Animation<double> expansion;
   final Animation<double> linesLength;
   final double logoWidth;
-  final double diagonalRatio;
-  final double thicknessRatio;
   final double handoffProgress;
   final double diagonalExitProgress;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final w = size.width;
-
-    final logoWidthFactor = logoWidth / w;
-    final logoFullWidth = w * logoWidthFactor;
-    final horizontalHalfWidth = logoFullWidth / 2;
-
-    final diagonalLength = logoFullWidth * diagonalRatio;
-    final thickness = logoFullWidth * thicknessRatio;
-
-    final center = Offset(size.width / 2, size.height / 2);
-    final halfWidth =
-        horizontalHalfWidth + (w / 2 - horizontalHalfWidth) * expansion.value;
-
+    final horizontalWidth =
+        logoWidth + (size.width - logoWidth) * expansion.value;
+    final path = AsterLogoGeometry.animatedPath(
+      logoWidth: logoWidth,
+      horizontalWidth: horizontalWidth,
+      rotationProgress: rotation.value,
+      expansionProgress: expansion.value,
+      includeHorizontal: linesLength.value < handoffProgress,
+      includeDiagonals: rotation.value < diagonalExitProgress,
+    );
     canvas
       ..save()
-      ..translate(center.dx, center.dy);
-
-    if (linesLength.value < handoffProgress && halfWidth > 0) {
-      final fillPaint = Paint()
-        ..color = color
-        ..style = PaintingStyle.fill;
-      canvas.drawRect(
-        Rect.fromCenter(
-          center: Offset.zero,
-          width: halfWidth * 2,
-          height: thickness,
-        ),
-        fillPaint,
-      );
-    }
-
-    if (rotation.value < diagonalExitProgress) {
-      final fillPaint = Paint()
-        ..color = color
-        ..style = PaintingStyle.fill;
-      final diagonalRect = Rect.fromCenter(
-        center: Offset.zero,
-        width: diagonalLength,
-        height: thickness,
-      );
-      canvas
-        ..save()
-        ..rotate((math.pi / 4) * (1 - rotation.value))
-        ..drawRect(diagonalRect, fillPaint)
-        ..restore()
-        ..save()
-        ..rotate(-(math.pi / 4) * (1 - rotation.value))
-        ..drawRect(diagonalRect, fillPaint)
-        ..restore();
-    }
-
-    canvas.restore();
+      ..translate(size.width / 2, size.height / 2)
+      ..drawPath(path, Paint()..color = color)
+      ..restore();
   }
 
   @override
@@ -395,8 +355,6 @@ class _LogoPainter extends CustomPainter {
         expansion != oldDelegate.expansion ||
         linesLength != oldDelegate.linesLength ||
         logoWidth != oldDelegate.logoWidth ||
-        diagonalRatio != oldDelegate.diagonalRatio ||
-        thicknessRatio != oldDelegate.thicknessRatio ||
         handoffProgress != oldDelegate.handoffProgress ||
         diagonalExitProgress != oldDelegate.diagonalExitProgress;
   }

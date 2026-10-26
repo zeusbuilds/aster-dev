@@ -35,7 +35,7 @@ class SettingsVersionFooter extends StatelessWidget {
     final version = metadata == null
         ? '${AppConstants.appName} • Version unavailable'
         : '${AppConstants.appName} • Version ${metadata.version}'
-              '${metadata.buildNumber.isEmpty ? '' : ' (${metadata.buildNumber})'}';
+              '${metadata.buildNumber.isEmpty ? '' : ' • Build ${metadata.buildNumber}'}';
 
     return Semantics(
       liveRegion: failure != null,

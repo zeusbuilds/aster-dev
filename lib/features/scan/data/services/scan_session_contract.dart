@@ -13,6 +13,7 @@ final class ScanSessionSnapshot {
     this.torchOn = false,
     this.zoomScale = 0,
     this.captureLocked = false,
+    this.galleryPhase = ScanGalleryPhase.idle,
     this.failure,
   });
 
@@ -22,6 +23,7 @@ final class ScanSessionSnapshot {
   final bool torchOn;
   final double zoomScale;
   final bool captureLocked;
+  final ScanGalleryPhase galleryPhase;
   final AppFailure? failure;
 
   bool get isReady => isInitialized && isRunning && failure == null;
@@ -33,6 +35,7 @@ final class ScanSessionSnapshot {
     bool? torchOn,
     double? zoomScale,
     bool? captureLocked,
+    ScanGalleryPhase? galleryPhase,
     Object? failure = _unset,
   }) {
     return ScanSessionSnapshot(
@@ -42,6 +45,7 @@ final class ScanSessionSnapshot {
       torchOn: torchOn ?? this.torchOn,
       zoomScale: zoomScale ?? this.zoomScale,
       captureLocked: captureLocked ?? this.captureLocked,
+      galleryPhase: galleryPhase ?? this.galleryPhase,
       failure: identical(failure, _unset)
           ? this.failure
           : failure as AppFailure?,
@@ -57,6 +61,7 @@ final class ScanSessionSnapshot {
       other.torchOn == torchOn &&
       other.zoomScale == zoomScale &&
       other.captureLocked == captureLocked &&
+      other.galleryPhase == galleryPhase &&
       other.failure == failure;
 
   @override
@@ -67,6 +72,7 @@ final class ScanSessionSnapshot {
     torchOn,
     zoomScale,
     captureLocked,
+    galleryPhase,
     failure,
   );
 }

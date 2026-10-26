@@ -185,10 +185,12 @@ class AppTheme {
         shape: RoundedSuperellipseBorder(
           borderRadius: BorderRadius.circular(_radii.card),
         ),
-        titleTextStyle: textTheme.headlineSmall?.copyWith(
+        titleTextStyle: textTheme.titleMedium?.copyWith(
           color: scheme.onSurface,
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
         ),
-        contentTextStyle: textTheme.bodyMedium?.copyWith(
+        contentTextStyle: textTheme.bodyLarge?.copyWith(
           color: _colors.textSecondary,
         ),
       ),

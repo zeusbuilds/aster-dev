@@ -54,6 +54,9 @@ final class FullWalletQaStorage {
   Future<ProviderContainer> bootstrap({
     Future<void> Function(Map<String, Object?> evidence)? onFailureLogs,
   }) async {
+    if (kReleaseMode) {
+      throw const FullWalletQaFailure('qa_run_configuration_invalid');
+    }
     const security = PlatformWalletStorageSecurity();
     final secureStorage = SecureStorageService(
       storage: FlutterSecureStorage(
@@ -74,41 +77,53 @@ final class FullWalletQaStorage {
       ),
     );
     final preferences = await SharedPreferences.getInstance();
-    return bootstrapApplicationContainer(
-      ProviderContainer(
-        retry: applicationProviderRetryPolicy,
-        overrides: [
-          sharedPreferencesProvider.overrideWith((ref) => preferences),
-          secureStorageServiceProvider.overrideWithValue(secureStorage),
-          walletDirectoryManagerProvider.overrideWith(
-            (ref) async => IoWalletDirectoryManager(
-              '${root.path}/native',
-              security,
-              deleteDirectory: (directory) async {
-                try {
-                  final evidence = await _retainFailureLogs(
-                    directory,
-                    security,
-                  );
-                  await onFailureLogs?.call(evidence);
-                } catch (_) {
-                  // Private diagnostics must never change production rollback
-                  // success, retain an unintended live owner or hide its cause.
-                } finally {
-                  await directory.delete(recursive: true);
-                }
-              },
-            ),
+    final container = ProviderContainer(
+      retry: applicationProviderRetryPolicy,
+      overrides: [
+        // This run-isolated harness qualifies real financial/runtime flows,
+        // not interactive UI authentication. Keep device capability checks
+        // real and disclosure authorization enforced, while explicitly
+        // disabling the app-lock prompt for this process only. Never persist
+        // or inherit this policy in the normal application preferences.
+        securityControllerProvider.overrideWith((ref) {
+          final authentication = SecurityController(
+            PlatformDeviceAuthentication(),
+            appLockEnabled: false,
+          );
+          ref.onDispose(authentication.dispose);
+          return authentication;
+        }),
+        sharedPreferencesProvider.overrideWith((ref) => preferences),
+        secureStorageServiceProvider.overrideWithValue(secureStorage),
+        walletDirectoryManagerProvider.overrideWith(
+          (ref) async => IoWalletDirectoryManager(
+            '${root.path}/native',
+            security,
+            deleteDirectory: (directory) async {
+              try {
+                final evidence = await _retainFailureLogs(directory, security);
+                await onFailureLogs?.call(evidence);
+              } catch (_) {
+                // Private diagnostics must never change production rollback
+                // success, retain an unintended live owner or hide its cause.
+              } finally {
+                await directory.delete(recursive: true);
+              }
+            },
           ),
-          walletRegistryDocumentStoreProvider.overrideWith(
-            (ref) async => IoWalletRegistryDocumentStore(
-              '${root.path}/metadata',
-              security,
-            ),
-          ),
-        ],
-      ),
+        ),
+        walletRegistryDocumentStoreProvider.overrideWith(
+          (ref) async =>
+              IoWalletRegistryDocumentStore('${root.path}/metadata', security),
+        ),
+      ],
     );
+    // Initialization still fails closed when native capability is unknown.
+    // No native wallet or credential is opened before this policy is ready.
+    await container
+        .read(securityControllerProvider)
+        .initialize(hasWallet: true);
+    return bootstrapApplicationContainer(container);
   }
 
   Future<Map<String, Object?>> _retainFailureLogs(

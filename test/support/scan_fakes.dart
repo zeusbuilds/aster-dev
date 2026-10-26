@@ -166,6 +166,7 @@ final class FakeScanCameraDriver extends ChangeNotifier
   Iterable<String?> analyzedValues = const [];
   Completer<void>? startGate;
   Completer<void>? closeGate;
+  Completer<Iterable<String?>>? analyzeGate;
   final commandLog = <String>[];
   var closeCalls = 0;
   ValueChanged<Iterable<String?>>? _onDetected;
@@ -255,6 +256,8 @@ final class FakeScanCameraDriver extends ChangeNotifier
     commandLog.add('analyze');
     final failure = analyzeFailure;
     if (failure != null) throw failure;
+    final gate = analyzeGate;
+    if (gate != null) return gate.future;
     return analyzedValues;
   }
 

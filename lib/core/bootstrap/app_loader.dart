@@ -10,6 +10,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shared/shared.dart';
 import '../errors/errors.dart';
+import '../security/security_controller.dart';
+import '../security/security_gate.dart';
 
 const _bootstrapMotion = AsterMotion();
 
@@ -18,7 +20,14 @@ const _bootstrapMotion = AsterMotion();
 /// Once initialization is complete, the animation plays and reveals the app
 /// underneath; the splash overlay is removed when the animation completes.
 class AppLoader extends StatefulWidget {
-  const AppLoader({super.key, required this.initialize, required this.child});
+  const AppLoader({
+    super.key,
+    required this.initialize,
+    required this.child,
+    this.security,
+  });
+
+  final SecurityController? security;
 
   /// Callback that performs all app bootstrapping and returns a ready
   /// [ProviderContainer].
@@ -33,7 +42,7 @@ class AppLoader extends StatefulWidget {
 }
 
 class _AppLoaderState extends State<AppLoader>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final _isSplashScreenVisible = ValueNotifier(true);
   final _container = ValueNotifier<ProviderContainer?>(null);
   final _failure = ValueNotifier<AppFailure?>(null);
@@ -48,6 +57,8 @@ class _AppLoaderState extends State<AppLoader>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    widget.security?.addListener(_securityChanged);
     _controller.addStatusListener((status) {
       _isSplashScreenVisible.value = !status.isCompleted;
     });
@@ -64,6 +75,8 @@ class _AppLoaderState extends State<AppLoader>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    widget.security?.removeListener(_securityChanged);
     _isSplashScreenVisible.dispose();
     _failure.dispose();
     _isRetrying.dispose();
@@ -72,6 +85,40 @@ class _AppLoaderState extends State<AppLoader>
     _container.dispose();
     _controller.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    widget.security?.handleLifecycle(state);
+  }
+
+  bool get _canReveal =>
+      widget.security == null ||
+      (!widget.security!.isLocked &&
+          !widget.security!.isObscured &&
+          !widget.security!.isAuthenticating);
+
+  void _securityChanged() {
+    if (!mounted || !_isSplashScreenVisible.value) return;
+    if (!_canReveal) {
+      _revealTimer?.cancel();
+      _controller.reset();
+    } else if (_container.value != null) {
+      _scheduleReveal();
+    }
+  }
+
+  void _scheduleReveal() {
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_canReveal || !_isSplashScreenVisible.value) return;
+      _revealTimer?.cancel();
+      _revealTimer = Timer(
+        context.motionPolicy.duration(_bootstrapMotion.bootstrapRevealDelay),
+        () {
+          if (mounted && _canReveal) _controller.forward().ignore();
+        },
+      );
+    });
   }
 
   Future<void> _load() async {
@@ -84,16 +131,7 @@ class _AppLoaderState extends State<AppLoader>
         return;
       }
       _container.value = container;
-      SchedulerBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        _revealTimer?.cancel();
-        _revealTimer = Timer(
-          context.motionPolicy.duration(_bootstrapMotion.bootstrapRevealDelay),
-          () {
-            if (mounted) _controller.forward().ignore();
-          },
-        );
-      });
+      _scheduleReveal();
     } catch (error, stackTrace) {
       if (!mounted) return;
       final failure = FailureMapper.from(
@@ -166,7 +204,20 @@ class _AppLoaderState extends State<AppLoader>
                           if (!isVisible) return const SizedBox.shrink();
                           return splash!;
                         },
-                        child: AnimatedSplashScreen(controller: _controller),
+                        child: widget.security == null
+                            ? AnimatedSplashScreen(controller: _controller)
+                            : ListenableBuilder(
+                                listenable: widget.security!,
+                                builder: (context, _) =>
+                                    widget.security!.isLocked ||
+                                        widget.security!.isObscured
+                                    ? AsterLockScreen(
+                                        controller: widget.security!,
+                                      )
+                                    : AnimatedSplashScreen(
+                                        controller: _controller,
+                                      ),
+                              ),
                       );
                     },
                   ),

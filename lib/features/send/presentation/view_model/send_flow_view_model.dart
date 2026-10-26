@@ -173,7 +173,7 @@ class SendFlowViewModel extends _$SendFlowViewModel {
     if (wallet.isLoading ||
         wallet.hasError ||
         walletId == null ||
-        wallet.value?.switchingWalletId != null ||
+        wallet.value?.isChangingWallet == true ||
         lifecycle.blocksInteraction) {
       return false;
     }
@@ -210,7 +210,7 @@ class SendFlowViewModel extends _$SendFlowViewModel {
     if (latestWallet.isLoading ||
         latestWallet.hasError ||
         latestWallet.value?.activeWallet?.id != walletId ||
-        latestWallet.value?.switchingWalletId != null ||
+        latestWallet.value?.isChangingWallet == true ||
         latestLifecycle.blocksInteraction ||
         latestLifecycle.foregroundGeneration != foregroundGeneration) {
       state = AsyncData(
@@ -419,7 +419,7 @@ class SendFlowViewModel extends _$SendFlowViewModel {
     if (walletId == null ||
         wallet.isLoading ||
         wallet.hasError ||
-        wallet.value?.switchingWalletId != null ||
+        wallet.value?.isChangingWallet == true ||
         wallet.value?.activeWallet?.id != walletId ||
         ref.read(walletLifecycleViewModelProvider).blocksInteraction) {
       return _fail(

@@ -20,6 +20,9 @@ class WalletAccessScreen extends ConsumerWidget {
           failure: FailureMapper.from(error, stackTrace),
           title: 'Wallet access unavailable',
           retrying: false,
+          canResumeCommittedDeletion: WalletViewModel.canResumeDeletion(
+            FailureMapper.from(error, stackTrace),
+          ),
           onRetry: () => ref.read(walletViewModelProvider.notifier).reload(),
         ),
       _ => const SplashScreen(),

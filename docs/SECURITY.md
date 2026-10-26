@@ -36,6 +36,145 @@ or transient toasts. Tests use synthetic values that cannot spend funds.
 Dart strings cannot be reliably zeroized. Keep secret objects route-scoped and
 inside the narrowest asynchronous scope; release references deterministically.
 
+## Device Authentication And Sensitive Views
+
+The approved October 25, 2026 policy uses operating-system authentication.
+Aster does not create, collect or store its own PIN or passcode. App lock is
+on by default for all wallets in the installation when the device has a
+screen-lock credential. iOS uses `LAContext` with
+`deviceOwnerAuthentication` (Face ID/Touch ID with device-passcode fallback).
+Android uses its biometric/device-credential APIs with strong biometrics or
+the device PIN, pattern or password; weak biometric recognition is not enough.
+A biometric enrollment is optional when a device credential is available.
+
+The user explicitly chose unrestricted access if the operating system reports
+that **no device screen lock exists**, including when it is removed after a
+wallet already exists. This bypass applies to app unlock, create/import,
+seed viewing, xpub export, wallet deletion and App lock preferences. A failed capability check,
+cancelled prompt or unavailable biometric sensor is never treated as proof
+that the device is unsecured. Foreground and protected actions recheck device
+security so adding or removing a device credential takes effect without a
+wallet reset.
+
+The first-run Welcome animation does not require an empty-wallet unlock.
+Create/import authenticates before recovery words are generated or accepted.
+For an existing wallet, cold launch holds the original gradient/logo at its
+initial frame until authentication and wallet bootstrap complete, then plays
+the reveal once. Cancellation stays on the locked gradient with Unlock.
+Genuine background/device-lock transitions hide the complete UI immediately;
+a warm return unlocks the prior ordinary screen without replaying launch.
+The native authentication sheet's own lifecycle cannot recursively relock it.
+
+Settings > Security offers App lock, immediate automatic locking and Lock now.
+Disabling App lock requires confirmation plus fresh device authentication.
+Regardless of that preference, each seed reveal and xpub export obtains a
+fresh, purpose- and wallet-bound, single-use authorization. Repository guards
+check it inside the serialized operation and discard a late result after
+lock, capture, wallet/session change or route departure. New queued wallet
+work cannot begin while locked; already-dispatched payments retain their
+existing journal/outcome protection and are never resent by unlocking.
+
+Seed words remain in the protected route only, with no Copy or Share action.
+Xpub export explicitly labels Bitcoin and RGB account keys and offers Copy
+and Share; public keys still reveal sensitive wallet activity. Backgrounding,
+capture or wallet changes remove disclosed values and require a new reveal.
+Create/import holds a native sensitive-view lease throughout its private
+steps. Capture covers its entire content and accessibility tree without
+resetting an in-flight provisioning attempt or replaying its operation.
+
+Android sensitive views use `FLAG_SECURE`. iOS covers app-switcher snapshots
+and hides sensitive content while recording/mirroring is detected. **iOS
+cannot reliably prevent ordinary screenshots**; screenshot notification is
+after capture and is not presented as prevention. This platform asymmetry is
+part of the approved policy. Synthetic review captures are isolated, labelled
+TEST DATA and do not prove platform screenshot prevention.
+
+The existing encrypted credential envelope is independent of this app access
+policy: keys are not newly bound to a passcode or biometric enrollment that
+would invalidate funds when the user removes device security. No released-user
+migration is required for this unreleased app. Dart strings cannot be promised
+to be zeroized. Hardware authentication, fallback/lockout and capture behavior
+still require qualification on supported physical devices; Android execution
+has not been performed for this change while Android builds remain deferred.
+Implementation and host/Simulator review are not a mainnet release sign-off.
+
+## Local Wallet Deletion
+
+Settings > Wallet details deletes the selected active wallet. To remove a
+different wallet, select it first. A deliberate confirmation identifies the
+wallet and warns that a recovery phrase alone cannot restore USDT/RGB state.
+Cancel, dialog dismissal and cancelled system authentication leave its data
+unchanged.
+
+Deletion requires fresh device authentication even when App lock is off. The
+authorization is single-use, bound to the deletion purpose, wallet and security
+session, and consumed inside the serialized repository operation. The approved
+no-device-screen-lock policy applies here too: an authoritative unsecured-device
+result bypasses authentication; capability or sensor failures do not.
+
+The authentication owner waits for Flutter foreground both before and after
+the final device-security status reply. A successful native prompt can precede
+its lifecycle events; a late `inactive` event during that last status request
+must not silently discard an otherwise valid completion. Genuine background,
+wallet/session changes and request revocation still invalidate the grant. This
+is covered through the full application/router and production MethodChannel
+adapter; an ordinary pre-fix native run is not evidence of a failed ordering.
+
+Before recording irreversible authority, Aster checks selected runtime/registry
+identity, unresolved outgoing payments and RGB preparation records, then audits
+the native wallet. Nonzero RGB holdings, nonterminal RGB transfers or an
+unavailable/untrustworthy audit block removal. All imported RGB contracts are
+checked, including asset-less pending receives. An exact expired, unfulfilled
+receive may be retired only after the native check and a fresh state read. Time
+alone does not establish that it is safe. The audit never dispatches/resumes a
+payment. Bitcoin-only holdings are not an RGB-holdings blocker; the confirmation
+still requires the user to retain the recovery phrase.
+
+RLN requires an asset or transaction filter for transfer history. Aster's
+deletion audit therefore reads the imported asset inventory and per-asset
+history, plus the native refresh map for batches whose incoming asset is not
+yet known. A null refresh `updatedStatus` means unchanged/pending, never an
+empty or safe result. Native `noAssetOnly` reconciliation may retire only
+eligible expired unassigned receives. A current waiting request continues to
+block deletion even when the imported asset inventory is empty. After any
+reconciliation, inventory, balances and transfer state are read again. Native
+query rejection, malformed state or unavailable refresh fails closed. The SDK
+correctly rejected Aster's former unscoped query and was not changed for this
+fix.
+
+An action's feedback follows the authoritative top page key, effective URI and
+shell tab. A router metadata refresh must not replace an imperatively pushed
+Wallet details page with its underlying Home URI and discard its result.
+Actual navigation, a covered origin or wallet changes still expire obsolete
+feedback. A refused deletion shows one action-owned toast; it adds no inline
+operational paragraph. This routing defect and the native query defect are
+separate from the authentication completion ordering fix above.
+
+A durable `deleting` profile is written before destructive cleanup. That exact
+record authorizes idempotent cleanup across restarts without a new deletion
+grant. Aster closes the native wallet, removes its wallet-owned credential and
+owned native directory/tombstone, then removes wallet-scoped payment and setup
+records and finally the registry profile. Ownership and path checks remain in
+force. Missing native data is not permission to invent a deletion. Partial
+cleanup or a failed survivor activation blocks wallet access rather than
+presenting an erased wallet as usable. The owned Retry resumes committed
+cleanup, never a payment and never an unreviewed wallet removal.
+
+The SDK native close call is uncancellable and must drain before files can be
+removed. If that native work never settles, process restart is the recovery
+boundary. Elapsed time does not release its owner for concurrent cleanup; not
+all native calls are bounded. An application deadline cannot safely cancel
+that native work or authorize erasure beneath it.
+
+With surviving wallets, Aster opens the first remaining ready profile. Only a
+committed empty registry clears wallet presence and returns to Welcome; there
+is no empty-wallet unlock prompt, while the next Create/Import still follows
+its normal authentication policy. Existing security preferences are retained.
+Deletion removes local application data. It does not move funds, remove chain
+history, erase copies held elsewhere or guarantee physical secure erasure of
+flash media. No release or physical-device qualification is implied by this
+source contract.
+
 ## Runtime And Network
 
 All native wallet calls pass through the serialized `WalletRuntime`. All
@@ -114,17 +253,17 @@ legal export classification, or App Store approval.
 - Apple's export-compliance classification for the app and native wallet
   cryptography requires release-owner/legal approval. The repository must not
   infer or publish `ITSAppUsesNonExemptEncryption` before that decision.
-- Authentication for seed viewing and xpub export is not selected.
-- Recovery-screen screenshot/screen-recording policy is not selected and has
-  platform asymmetry.
+- The approved device-authentication and capture policy above is implemented;
+  physical iOS/Android authentication and capture qualification remains open.
 - SDK native artifact provenance is accepted for internal beta only.
 - No public security-reporting contact is configured in this repository.
 - Store privacy/data-safety disclosures, an owned privacy-policy destination,
   and cryptography/export-compliance answers are not approved. They require a
   release-owned data-flow review across every configured wallet service.
 
-These are tracked blockers. Sensitive actions remain disabled rather than
-shipping an implicit policy.
+These are tracked release blockers. Enabled sensitive actions follow the
+explicit device-authentication policy above; their implementation does not
+resolve the separate hardware and distribution qualification requirements.
 
 ## Platform Privacy Manifests
 

@@ -22,6 +22,115 @@ import '../../support/wallet_fakes.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  testWidgets('identifier and explorer handoffs stay quiet and single-owned', (
+    tester,
+  ) async {
+    final harness = await _harness();
+    addTearDown(() => _disposeHarness(tester, harness));
+    final clipboard = _PendingClipboard();
+    final externalUris = _PendingExternalUris();
+    final record = _onchainActivity();
+    final container = ProviderContainer(
+      parent: harness.container,
+      overrides: [
+        clipboardServiceProvider.overrideWithValue(clipboard),
+        externalUriServiceProvider.overrideWithValue(externalUris),
+        transactionDetailsActionsViewModelProvider(
+          record.id,
+          record.txid,
+        ).overrideWith(TransactionDetailsActionsViewModel.new),
+      ],
+    );
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      container.dispose();
+      await tester.pump();
+    });
+    await _pump(
+      tester,
+      harness,
+      TransactionDetailsScreen(
+        assetKind: WalletAssetKind.bitcoin,
+        activityId: record.id,
+      ),
+      container: container,
+    );
+    final copy = find.byTooltip('Copy Transaction ID');
+    await _pumpUntil(tester, () => copy.evaluate().isNotEmpty);
+    await tester.ensureVisible(copy);
+    await tester.pumpAndSettle();
+    final copyWidget = find.byWidgetPredicate(
+      (widget) =>
+          widget is AsterIconButton && widget.tooltip == 'Copy Transaction ID',
+    );
+    final beforeCopy = tester.widget<AsterIconButton>(copyWidget);
+    final copyRect = tester.getRect(copyWidget);
+    beforeCopy.onPressed!();
+    beforeCopy.onPressed!();
+    await tester.pump();
+    expect(clipboard.writes, 1);
+    expect(tester.widget<AsterIconButton>(copyWidget).icon, beforeCopy.icon);
+    expect(tester.widget<AsterIconButton>(copyWidget).loading, false);
+    expect(tester.getRect(copyWidget), copyRect);
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('Copy Transaction ID'))
+          .getSemanticsData()
+          .hasAction(ui.SemanticsAction.tap),
+      false,
+    );
+    await tester.tap(copy, warnIfMissed: false);
+    expect(clipboard.writes, 1);
+    clipboard.result.complete(const AppResult.success(null));
+    await tester.pumpAndSettle();
+    expect(harness.toasts.messages.single.title, 'Transaction ID copied');
+
+    final explorer = find.widgetWithText(CustomButton, 'View in explorer');
+    await tester.ensureVisible(explorer);
+    await tester.pumpAndSettle();
+    final explorerRect = tester.getRect(explorer);
+    final open = tester.widget<CustomButton>(explorer).onTap!;
+    open();
+    open();
+    await tester.pump();
+    expect(externalUris.opens, 1);
+    expect(tester.widget<CustomButton>(explorer).loading, false);
+    expect(tester.widget<CustomButton>(explorer).enabled, true);
+    expect(tester.getRect(explorer), explorerRect);
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('View in explorer'))
+          .getSemanticsData()
+          .hasAction(ui.SemanticsAction.tap),
+      false,
+    );
+    await tester.tap(explorer, warnIfMissed: false);
+    expect(externalUris.opens, 1);
+    externalUris.result.complete(
+      const AppResult.failure(
+        AppFailure(
+          code: 'external_uri_unavailable',
+          kind: AppFailureKind.unavailable,
+          userMessage: 'The explorer could not open.',
+          retryable: true,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(harness.toasts.messages.last.title, 'Could not open explorer');
+    expect(find.text('The explorer could not open.'), findsNothing);
+    externalUris.result = Completer<AppResult<void>>()
+      ..complete(const AppResult.success(null));
+    await tester.tap(explorer);
+    await tester.pumpAndSettle();
+    expect(externalUris.opens, 2);
+    expect(harness.toasts.messages, hasLength(2));
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+  });
+
   for (final (unit, amount, fee) in [
     ('btc', '0.05 BTC', '0.00000155 BTC'),
     ('sats', '5,000,000 sats', '155 sats'),
@@ -1005,11 +1114,12 @@ Future<void> _pump(
   PaymentFlowTestHarness harness,
   Widget child, {
   TextScaler? textScaler,
+  ProviderContainer? container,
 }) {
   _configurePhone(tester);
   return tester.pumpWidget(
     UncontrolledProviderScope(
-      container: harness.container,
+      container: container ?? harness.container,
       child: MaterialApp(
         theme: AppTheme.light(),
         home: Builder(
@@ -1031,6 +1141,31 @@ Future<void> _pump(
       ),
     ),
   );
+}
+
+final class _PendingClipboard implements ClipboardService {
+  final result = Completer<AppResult<void>>();
+  var writes = 0;
+
+  @override
+  Future<AppResult<String?>> readText() async => const AppResult.success(null);
+
+  @override
+  Future<AppResult<void>> writeText(String text) {
+    writes += 1;
+    return result.future;
+  }
+}
+
+final class _PendingExternalUris implements ExternalUriService {
+  var result = Completer<AppResult<void>>();
+  var opens = 0;
+
+  @override
+  Future<AppResult<void>> open(Uri uri) {
+    opens += 1;
+    return result.future;
+  }
 }
 
 Future<void> _pumpRouter(

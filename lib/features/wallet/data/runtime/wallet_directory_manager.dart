@@ -11,7 +11,16 @@ abstract interface class WalletDirectoryManager {
   Future<Set<String>> walletIds();
 }
 
-final class IoWalletDirectoryManager implements WalletDirectoryManager {
+/// Crash-safe removal called only for a durably staged deletion.
+abstract interface class WalletDeletionDirectoryManager {
+  Future<void> removeDeletedWallet(
+    String walletId, {
+    required String storageToken,
+  });
+}
+
+final class IoWalletDirectoryManager
+    implements WalletDirectoryManager, WalletDeletionDirectoryManager {
   IoWalletDirectoryManager(
     this.rootPath,
     this._security, {
@@ -73,6 +82,71 @@ final class IoWalletDirectoryManager implements WalletDirectoryManager {
       await _security.verifyDirectory(directory.path);
       await _verifyOwnership(directory, storageToken);
       await _deleteDirectory(directory);
+    }
+  }
+
+  @override
+  Future<void> removeDeletedWallet(
+    String walletId, {
+    required String storageToken,
+  }) async {
+    _validateWalletId(walletId);
+    _validateStorageToken(storageToken);
+    final rootType = await FileSystemEntity.type(rootPath, followLinks: false);
+    if (rootType == FileSystemEntityType.notFound) return;
+    if (rootType != FileSystemEntityType.directory) {
+      throw FileSystemException('Wallet storage is not a directory.');
+    }
+    await _security.verifyDirectory(rootPath);
+    final original = _directory(walletId);
+    // Rename before recursive deletion. A crash may remove the ownership file
+    // first; the tombstone's exact random owner token then remains recoverable
+    // through the durable deletion profile, without reopening partial data.
+    final tombstone = Directory('$rootPath/.$walletId.deleting-$storageToken');
+    final originalType = await FileSystemEntity.type(
+      original.path,
+      followLinks: false,
+    );
+    final tombstoneType = await FileSystemEntity.type(
+      tombstone.path,
+      followLinks: false,
+    );
+    if (originalType != FileSystemEntityType.notFound) {
+      if (originalType != FileSystemEntityType.directory ||
+          tombstoneType != FileSystemEntityType.notFound) {
+        throw FileSystemException('Wallet deletion ownership is ambiguous.');
+      }
+      await _security.verifyDirectory(original.path);
+      await _verifyOwnership(original, storageToken);
+      await original.rename(tombstone.path);
+      await _flushDeletionRoot();
+    } else if (tombstoneType == FileSystemEntityType.notFound) {
+      // Also completes a prior delete whose parent fsync was interrupted.
+      await _flushDeletionRoot();
+      return;
+    } else if (tombstoneType != FileSystemEntityType.directory) {
+      throw FileSystemException('Wallet deletion ownership is invalid.');
+    }
+    await _security.verifyDirectory(tombstone.path);
+    final markerType = await FileSystemEntity.type(
+      _ownershipFile(tombstone).path,
+      followLinks: false,
+    );
+    if (markerType != FileSystemEntityType.notFound) {
+      await _verifyOwnership(tombstone, storageToken);
+    }
+    await _deleteDirectory(tombstone);
+    if (await FileSystemEntity.type(tombstone.path, followLinks: false) !=
+        FileSystemEntityType.notFound) {
+      throw FileSystemException('Wallet removal did not complete.');
+    }
+    await _flushDeletionRoot();
+  }
+
+  Future<void> _flushDeletionRoot() async {
+    final security = _security;
+    if (security is WalletStorageDurability) {
+      await (security as WalletStorageDurability).flushDirectory(rootPath);
     }
   }
 

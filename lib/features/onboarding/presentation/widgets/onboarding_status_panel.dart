@@ -29,6 +29,9 @@ class OnboardingStatusPanel extends StatelessWidget {
        );
 
   final String? title;
+
+  /// Loading announcements stay available to assistive technology without
+  /// painting transient progress copy. Failure messages remain visible.
   final String message;
   final String? primaryLabel;
   final VoidCallback? onPrimary;
@@ -79,32 +82,34 @@ class OnboardingStatusPanel extends StatelessWidget {
                             size: context.icons.xl,
                           ),
                   ),
-                  SizedBox(height: context.spacing.lg),
-                  OnboardingChoreographyItem(
-                    id: 'onboarding-status-copy-motion',
-                    visualIndex: 1,
-                    child: Column(
-                      children: [
-                        if (title case final title?) ...[
+                  if (!_loading) ...[
+                    SizedBox(height: context.spacing.lg),
+                    OnboardingChoreographyItem(
+                      id: 'onboarding-status-copy-motion',
+                      visualIndex: 1,
+                      child: Column(
+                        children: [
+                          if (title case final title?) ...[
+                            Text(
+                              title,
+                              style: context.type.brandTitle.copyWith(
+                                color: foreground,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            SizedBox(height: context.spacing.sm),
+                          ],
                           Text(
-                            title,
-                            style: context.type.brandTitle.copyWith(
-                              color: foreground,
+                            message,
+                            style: context.type.brandBody.copyWith(
+                              color: secondary,
                             ),
                             textAlign: TextAlign.center,
                           ),
-                          SizedBox(height: context.spacing.sm),
                         ],
-                        Text(
-                          message,
-                          style: context.type.brandBody.copyWith(
-                            color: secondary,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),

@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:aster/core/bootstrap/app_bootstrap.dart';
 import 'package:aster/core/core.dart';
+import 'package:aster/core/security/security_gate.dart';
 import 'package:aster/features/onboarding/data/repository/repository.dart';
 import 'package:aster/features/onboarding/domain/models/models.dart';
 import 'package:aster/features/onboarding/presentation/models/models.dart';
@@ -43,6 +44,882 @@ void main() {
     }
   });
   tearDownAll(() => WidgetController.hitTestWarningShouldBeFatal = false);
+
+  for (final scenario in [
+    (
+      label: 'recovery phrase',
+      screen: const OnboardingCreateWalletScreen(),
+      announcement: 'Generating your recovery phrase...',
+      createsWallet: true,
+    ),
+    (
+      label: 'recovery quiz',
+      screen: const CreateWalletQuizScreen(),
+      announcement: 'Preparing recovery check...',
+      createsWallet: true,
+    ),
+    (
+      label: 'import',
+      screen: const OnboardingImportWalletScreen(),
+      announcement: 'Preparing wallet security...',
+      createsWallet: false,
+    ),
+    (
+      label: 'initial create naming',
+      screen: const WalletNameScreen.create(),
+      announcement: 'Preparing wallet security...',
+      createsWallet: true,
+    ),
+    (
+      label: 'initial import naming',
+      screen: const WalletNameScreen.import(),
+      announcement: 'Preparing wallet security...',
+      createsWallet: false,
+    ),
+  ]) {
+    testWidgets(
+      'standalone ${scenario.label} defensively loads quietly without a journey',
+      (tester) async {
+        final assets = await _DictionaryAssetBundle.create(succeeds: true);
+        final harness = await OnboardingTestHarness.create(
+          onboardingAssets: assets,
+        );
+        addTearDown(() => _disposeHarness(tester, harness));
+        addTearDown(assets.release);
+        await _pumpScreen(tester, harness, scenario.screen);
+
+        // Hold a real dependency open across frames: this must verify the
+        // loading screen itself rather than a fast initialization that skips it.
+        expect(assets.loadCount, 1);
+        expect(find.byType(OnboardingStatusPanel), findsOneWidget);
+        expect(find.byType(GridLoader), findsOneWidget);
+        expect(find.text(scenario.announcement), findsNothing);
+        expect(
+          tester
+              .getSemantics(find.bySemanticsLabel(scenario.announcement))
+              .label,
+          scenario.announcement,
+        );
+        expect(harness.toasts.messages, isEmpty);
+        expect(harness.engine.calls, isEmpty);
+        await tester.pump(const Duration(seconds: 1));
+        expect(find.byType(GridLoader), findsOneWidget);
+        expect(find.text(scenario.announcement), findsNothing);
+
+        assets.release();
+        await _pumpUntil(
+          tester,
+          () => scenario.createsWallet
+              ? harness.container.read(createWalletViewModelProvider).hasValue
+              : harness.container.read(importWalletViewModelProvider).hasValue,
+        );
+        await tester.pump();
+        expect(find.byType(GridLoader), findsNothing);
+        expect(find.text(scenario.announcement), findsNothing);
+        expect(harness.toasts.messages, isEmpty);
+      },
+    );
+  }
+
+  for (final addWallet in [false, true]) {
+    testWidgets(
+      '${addWallet ? 'add-wallet' : 'initial'} create keeps Welcome button loading '
+      'until the real phrase and all later steps are ready',
+      (tester) async {
+        final harness = await OnboardingTestHarness.create();
+        addTearDown(() => _disposeHarness(tester, harness));
+        final generation = Completer<void>();
+        harness.keyGenerator.generationGate = generation;
+        addTearDown(() {
+          if (!generation.isCompleted) generation.complete();
+        });
+        final primaryLabel = addWallet ? 'Add New Wallet' : 'Create Wallet';
+        await _pumpScreen(
+          tester,
+          harness,
+          addWallet ? const AddWalletScreen() : const OnboardingWelcomeScreen(),
+          disableAnimations: true,
+        );
+        final create = tester.widget<CustomButton>(
+          find.widgetWithText(CustomButton, primaryLabel),
+        );
+        final import = tester.widget<OnboardingTextAction>(
+          find.widgetWithText(OnboardingTextAction, 'Import Wallet'),
+        );
+        create.onTap!();
+        await _pumpUntil(
+          tester,
+          () => harness.keyGenerator.generationCount == 1,
+        );
+        await tester.pump();
+        final pending = tester.widget<CustomButton>(
+          find.widgetWithText(CustomButton, primaryLabel),
+        );
+        expect(pending.loading, isTrue);
+        expect(pending.enabled, isFalse);
+        expect(find.byType(OnboardingCreateWalletScreen), findsNothing);
+        expect(find.byType(OnboardingStatusPanel), findsNothing);
+        expect(find.byType(GridLoader), findsOneWidget);
+        create.onTap!();
+        import.onPressed();
+        await tester.binding.handlePopRoute();
+        await tester.pump(const Duration(seconds: 1));
+        expect(harness.keyGenerator.generationCount, 1);
+        expect(find.byType(OnboardingCreateWalletScreen), findsNothing);
+
+        generation.complete();
+        await _pumpUntil(
+          tester,
+          () => find.byType(OnboardingCreateWalletScreen).evaluate().isNotEmpty,
+        );
+        await tester.pump();
+        final prepared = harness.container
+            .read(createWalletViewModelProvider)
+            .value!;
+        final phrase = tester.widget<OnboardingCreateWalletScreen>(
+          find.byType(OnboardingCreateWalletScreen),
+        );
+        expect(find.text('Your 12-word recovery phrase'), findsOneWidget);
+        expect(find.byType(OnboardingStatusPanel), findsNothing);
+        expect(find.byType(GridLoader), findsNothing);
+        expect(harness.keyGenerator.generationCount, 1);
+
+        phrase.onContinue!();
+        await tester.pump();
+        expect(find.text('Verify seed phrase'), findsOneWidget);
+        expect(find.byType(OnboardingStatusPanel), findsNothing);
+        expect(find.byType(GridLoader), findsNothing);
+        expect(
+          harness.container.read(createWalletViewModelProvider).value,
+          same(prepared),
+        );
+        final notifier = harness.container.read(
+          createWalletViewModelProvider.notifier,
+        );
+        for (final question in prepared.questions) {
+          notifier.selectQuizOption(
+            wordNumber: question.wordNumber,
+            word: question.expectedWord,
+          );
+        }
+        await tester.pump();
+        tester
+            .widget<CreateWalletQuizScreen>(find.byType(CreateWalletQuizScreen))
+            .onContinue!();
+        await tester.pump();
+        expect(find.text('Name your wallet'), findsOneWidget);
+        expect(find.byType(OnboardingStatusPanel), findsNothing);
+        expect(find.byType(GridLoader), findsNothing);
+        expect(harness.keyGenerator.generationCount, 1);
+        tester
+            .widget<WalletNameScreen>(find.byType(WalletNameScreen))
+            .onBack!();
+        await tester.pump();
+        tester
+            .widget<CreateWalletQuizScreen>(find.byType(CreateWalletQuizScreen))
+            .onBack!();
+        await tester.pump();
+        tester
+            .widget<OnboardingCreateWalletScreen>(
+              find.byType(OnboardingCreateWalletScreen),
+            )
+            .onBack!();
+        await tester.pump();
+        await tester.pump();
+        expect(find.widgetWithText(CustomButton, primaryLabel), findsOneWidget);
+        expect(
+          harness.keyGenerator.generationCount,
+          1,
+          reason: 'Abandoning a phrase must not generate a replacement in the outgoing widget.',
+        );
+        phrase.onContinue!();
+        await tester.pump();
+        expect(
+          find.byType(CreateWalletQuizScreen),
+          findsNothing,
+          reason: 'An abandoned phrase callback cannot enter a later step.',
+        );
+        tester
+            .widget<CustomButton>(
+              find.widgetWithText(CustomButton, primaryLabel),
+            )
+            .onTap!();
+        await _pumpUntil(
+          tester,
+          () => find.byType(OnboardingCreateWalletScreen).evaluate().isNotEmpty,
+        );
+        expect(harness.keyGenerator.generationCount, 2);
+        expect(
+          harness.container.read(createWalletViewModelProvider).value,
+          isNot(same(prepared)),
+        );
+        expect(harness.toasts.messages, isEmpty);
+        expect(harness.engine.calls, isEmpty);
+      },
+    );
+  }
+
+  testWidgets(
+    'phrase preparation failure belongs to Welcome and a new tap retries once',
+    (tester) async {
+      final harness = await OnboardingTestHarness.create(
+        generationError: const AppFailureException(
+          AppFailure(
+            code: 'mnemonic_generation_unavailable',
+            kind: AppFailureKind.unavailable,
+            userMessage: 'Wallet preparation is temporarily unavailable.',
+            retryable: true,
+          ),
+        ),
+      );
+      addTearDown(() => _disposeHarness(tester, harness));
+      await _pumpScreen(
+        tester,
+        harness,
+        const OnboardingWelcomeScreen(),
+        disableAnimations: true,
+      );
+      tester
+          .widget<CustomButton>(
+            find.widgetWithText(CustomButton, 'Create Wallet'),
+          )
+          .onTap!();
+      await _pumpUntil(tester, () => harness.toasts.messages.isNotEmpty);
+      await tester.pump();
+      expect(find.byType(OnboardingCreateWalletScreen), findsNothing);
+      expect(find.byType(OnboardingStatusPanel), findsNothing);
+      expect(harness.toasts.messages, hasLength(1));
+      expect(harness.toasts.messages.single.title, 'Wallet setup unavailable');
+      expect(
+        harness.toasts.messages.single.message,
+        'Wallet preparation is temporarily unavailable.',
+      );
+      expect(harness.keyGenerator.generationCount, 1);
+      final retry = tester.widget<CustomButton>(
+        find.widgetWithText(CustomButton, 'Create Wallet'),
+      );
+      expect(retry.loading, isFalse);
+      expect(retry.enabled, isTrue);
+      harness.keyGenerator.generationError = null;
+      retry.onTap!();
+      await _pumpUntil(
+        tester,
+        () => find.byType(OnboardingCreateWalletScreen).evaluate().isNotEmpty,
+      );
+      expect(find.text('Your 12-word recovery phrase'), findsOneWidget);
+      expect(find.byType(OnboardingStatusPanel), findsNothing);
+      expect(harness.keyGenerator.generationCount, 2);
+      expect(harness.toasts.messages, hasLength(1));
+    },
+  );
+
+  for (final departure in ['background', 'unmount']) {
+    testWidgets(
+      'phrase preparation completing after $departure cannot show a destination or late toast',
+      (tester) async {
+        final harness = await OnboardingTestHarness.create();
+        addTearDown(() => _disposeHarness(tester, harness));
+        final generation = Completer<void>();
+        harness.keyGenerator.generationGate = generation;
+        addTearDown(() {
+          if (!generation.isCompleted) generation.complete();
+        });
+        addTearDown(
+          () => tester.binding.handleAppLifecycleStateChanged(
+            AppLifecycleState.resumed,
+          ),
+        );
+        await _pumpScreen(
+          tester,
+          harness,
+          const OnboardingWelcomeScreen(),
+          disableAnimations: true,
+        );
+        tester
+            .widget<CustomButton>(
+              find.widgetWithText(CustomButton, 'Create Wallet'),
+            )
+            .onTap!();
+        await _pumpUntil(
+          tester,
+          () => harness.keyGenerator.generationCount == 1,
+        );
+        if (departure == 'unmount') {
+          await tester.pumpWidget(const SizedBox.shrink());
+        } else {
+          tester.binding.handleAppLifecycleStateChanged(
+            AppLifecycleState.inactive,
+          );
+          tester.binding.handleAppLifecycleStateChanged(
+            AppLifecycleState.resumed,
+          );
+        }
+        generation.complete();
+        for (var index = 0; index < 10; index += 1) {
+          await tester.pump();
+        }
+        expect(find.byType(OnboardingCreateWalletScreen), findsNothing);
+        expect(find.byType(OnboardingStatusPanel), findsNothing);
+        expect(harness.keyGenerator.generationCount, 1);
+        expect(harness.toasts.messages, isEmpty);
+        expect(harness.engine.calls, isEmpty);
+        expect(tester.takeException(), isNull);
+        if (departure == 'background') {
+          final retry = tester.widget<CustomButton>(
+            find.widgetWithText(CustomButton, 'Create Wallet'),
+          );
+          expect(retry.loading, isFalse);
+          retry.onTap!();
+          await _pumpUntil(
+            tester,
+            () =>
+                find.byType(OnboardingCreateWalletScreen).evaluate().isNotEmpty,
+          );
+          expect(harness.keyGenerator.generationCount, 2);
+        }
+      },
+    );
+  }
+
+  for (final addWallet in [false, true]) {
+    testWidgets(
+      '${addWallet ? 'add-wallet' : 'initial'} import opens only the ready form '
+      'then names the same validated phrase without any loading panel',
+      (tester) async {
+        final assets = await _DictionaryAssetBundle.create(succeeds: true);
+        addTearDown(assets.release);
+        final harness = await OnboardingTestHarness.create(
+          onboardingAssets: assets,
+        );
+        addTearDown(() => _disposeHarness(tester, harness));
+        final primaryLabel = addWallet ? 'Add New Wallet' : 'Create Wallet';
+        await _pumpScreen(
+          tester,
+          harness,
+          addWallet ? const AddWalletScreen() : const OnboardingWelcomeScreen(),
+          disableAnimations: true,
+        );
+        tester
+            .widget<OnboardingTextAction>(
+              find.widgetWithText(OnboardingTextAction, 'Import Wallet'),
+            )
+            .onPressed();
+        await _pumpUntil(tester, () => assets.loadCount == 1);
+        await tester.pump();
+        expect(
+          tester
+              .widget<CustomButton>(
+                find.widgetWithText(CustomButton, primaryLabel),
+              )
+              .loading,
+          isTrue,
+        );
+        expect(
+          tester
+              .widget<OnboardingTextAction>(
+                find.widgetWithText(OnboardingTextAction, 'Import Wallet'),
+              )
+              .loading,
+          isFalse,
+        );
+        expect(find.byType(OnboardingImportWalletScreen), findsNothing);
+        expect(find.byType(OnboardingStatusPanel), findsNothing);
+        assets.release();
+        await _pumpUntil(
+          tester,
+          () => find.byType(OnboardingImportWalletScreen).evaluate().isNotEmpty,
+        );
+        final input = tester.widget<OnboardingImportWalletScreen>(
+          find.byType(OnboardingImportWalletScreen),
+        );
+        expect(find.byType(TextField), findsNWidgets(12));
+        expect(find.byType(OnboardingStatusPanel), findsNothing);
+        expect(find.byType(GridLoader), findsNothing);
+        // A stale or programmatic Continue cannot bypass checksum validation.
+        input.onContinue!();
+        await tester.pump();
+        expect(find.byType(WalletNameScreen), findsNothing);
+        harness.container
+            .read(importWalletViewModelProvider.notifier)
+            .updateWords(0, validTestMnemonicWords);
+        await _pumpUntil(
+          tester,
+          () =>
+              harness.container
+                  .read(importWalletViewModelProvider)
+                  .value
+                  ?.phraseValid ==
+              true,
+        );
+        final validated = harness.container
+            .read(importWalletViewModelProvider)
+            .value;
+        input.onContinue!();
+        await tester.pump();
+        expect(find.text('Name your wallet'), findsOneWidget);
+        expect(find.byType(OnboardingStatusPanel), findsNothing);
+        expect(find.byType(GridLoader), findsNothing);
+        expect(
+          harness.container.read(importWalletViewModelProvider).value,
+          same(validated),
+        );
+        tester
+            .widget<WalletNameScreen>(find.byType(WalletNameScreen))
+            .onBack!();
+        await tester.pump();
+        expect(
+          tester
+              .widget<TextField>(find.byType(TextField).first)
+              .controller!
+              .text,
+          'abandon',
+        );
+        tester
+            .widget<OnboardingImportWalletScreen>(
+              find.byType(OnboardingImportWalletScreen),
+            )
+            .onBack!();
+        await tester.pump();
+        await tester.pump();
+        input.onContinue!();
+        await tester.pump();
+        expect(find.byType(WalletNameScreen), findsNothing);
+        tester
+            .widget<OnboardingTextAction>(
+              find.widgetWithText(OnboardingTextAction, 'Import Wallet'),
+            )
+            .onPressed();
+        await _pumpUntil(
+          tester,
+          () => find.byType(OnboardingImportWalletScreen).evaluate().isNotEmpty,
+        );
+        expect(
+          harness.container
+              .read(importWalletViewModelProvider)
+              .value!
+              .words
+              .every((word) => word.isEmpty),
+          isTrue,
+        );
+        expect(assets.loadCount, 1);
+        expect(harness.keyGenerator.generationCount, 0);
+        expect(harness.keyGenerator.validatedMnemonics, hasLength(1));
+        expect(harness.toasts.messages, isEmpty);
+        expect(harness.engine.calls, isEmpty);
+      },
+    );
+  }
+
+  for (final addWallet in [false, true]) {
+    for (final importing in [false, true]) {
+      final flow =
+          '${addWallet ? 'add-wallet' : 'initial'} '
+          '${importing ? 'import' : 'create'}';
+      testWidgets('$flow accepts native success before the root gate has '
+          'rendered its resumed frame', (tester) async {
+        final assets = await _DictionaryAssetBundle.create(succeeds: true);
+        // An already available asset must not accidentally introduce a frame
+        // that hides the native callback/render-order race.
+        assets.release();
+        final device = _SetupAuthentication();
+        addTearDown(device.close);
+        final security = SecurityController(device);
+        final harness = await OnboardingTestHarness.create(
+          onboardingAssets: assets,
+          securityController: security,
+        );
+        addTearDown(() => _disposeHarness(tester, harness));
+        addTearDown(
+          () => tester.binding.handleAppLifecycleStateChanged(
+            AppLifecycleState.resumed,
+          ),
+        );
+        if (addWallet) security.updateWallet('existing-wallet');
+        _configureDictionaryPreflightPhone(tester);
+        final screen = addWallet
+            ? const AddWalletScreen()
+            : const OnboardingWelcomeScreen();
+        final route = await _pumpOnboardingRoute(
+          tester,
+          harness,
+          path: '/test-root-auth-preflight',
+          screen: screen,
+          securityAtRoot: true,
+        );
+        addTearDown(route.router.dispose);
+        await tester.pumpAndSettle();
+        await _tapSetupAction(
+          tester,
+          addWallet: addWallet,
+          importing: importing,
+        );
+        await tester.pump();
+        expect(device.prompts, 1);
+        expect(assets.loadCount, 0);
+        expect(harness.keyGenerator.validatedMnemonics, isEmpty);
+        final welcome = tester.element(find.byType(screen.runtimeType));
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.inactive,
+        );
+        await tester.pump();
+        expect(security.isObscured, isTrue);
+        expect(TickerMode.valuesOf(welcome).enabled, isFalse);
+
+        // The native resumed event and result can arrive in one platform turn.
+        // Deliberately do not render the SecurityGate between these callbacks.
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        device.prompt.complete(DeviceAuthenticationResult.authenticated);
+        expect(
+          TickerMode.valuesOf(welcome).enabled,
+          isFalse,
+          reason: 'This test must retain the previously painted inactive gate.',
+        );
+        await _pumpUntil(
+          tester,
+          () => find
+              .byType(
+                importing
+                    ? OnboardingImportWalletScreen
+                    : OnboardingCreateWalletScreen,
+              )
+              .evaluate()
+              .isNotEmpty,
+        );
+        await _pumpOnboardingTransition(tester);
+        expect(
+          find.byType(
+            importing
+                ? OnboardingImportWalletScreen
+                : OnboardingCreateWalletScreen,
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.byType(
+            importing
+                ? OnboardingCreateWalletScreen
+                : OnboardingImportWalletScreen,
+          ),
+          findsNothing,
+        );
+        expect(assets.loadCount, 1);
+        expect(device.prompts, 1);
+        expect(device.sensitiveValues, [true]);
+        expect(
+          harness.keyGenerator.validatedMnemonics,
+          importing ? isEmpty : hasLength(1),
+        );
+        expect(harness.engine.calls, isEmpty);
+        expect(harness.toasts.messages, isEmpty);
+      });
+
+      for (final interruption in _SetupAuthInterruption.values) {
+        testWidgets('$flow rejects ${interruption.name} before reading any '
+            'dictionary or recovery data under the root gate', (tester) async {
+          final assets = await _DictionaryAssetBundle.create(succeeds: true);
+          assets.release();
+          final device = _SetupAuthentication();
+          addTearDown(device.close);
+          final security = SecurityController(device);
+          final harness = await OnboardingTestHarness.create(
+            onboardingAssets: assets,
+            securityController: security,
+          );
+          addTearDown(() => _disposeHarness(tester, harness));
+          addTearDown(
+            () => tester.binding.handleAppLifecycleStateChanged(
+              AppLifecycleState.resumed,
+            ),
+          );
+          if (addWallet) security.updateWallet('existing-wallet');
+          _configureDictionaryPreflightPhone(tester);
+          final route = await _pumpOnboardingRoute(
+            tester,
+            harness,
+            path: '/test-root-auth-interruption',
+            screen: addWallet
+                ? const AddWalletScreen()
+                : const OnboardingWelcomeScreen(),
+            securityAtRoot: true,
+          );
+          addTearDown(route.router.dispose);
+          await tester.pumpAndSettle();
+          await _tapSetupAction(
+            tester,
+            addWallet: addWallet,
+            importing: importing,
+          );
+          await tester.pump();
+          tester.binding.handleAppLifecycleStateChanged(
+            AppLifecycleState.inactive,
+          );
+          await tester.pump();
+          if (interruption == _SetupAuthInterruption.background) {
+            device.background();
+            tester.binding.handleAppLifecycleStateChanged(
+              AppLifecycleState.hidden,
+            );
+            tester.binding.handleAppLifecycleStateChanged(
+              AppLifecycleState.paused,
+            );
+          } else if (interruption == _SetupAuthInterruption.walletChanged) {
+            security.updateWallet('different-wallet');
+          }
+          tester.binding.handleAppLifecycleStateChanged(
+            AppLifecycleState.resumed,
+          );
+          device.prompt.complete(
+            interruption == _SetupAuthInterruption.cancelled
+                ? DeviceAuthenticationResult.cancelled
+                : DeviceAuthenticationResult.authenticated,
+          );
+          await tester.pump();
+          await tester.pumpAndSettle();
+          expect(
+            find.byType(OnboardingCreateWalletScreen, skipOffstage: false),
+            findsNothing,
+          );
+          expect(
+            find.byType(OnboardingImportWalletScreen, skipOffstage: false),
+            findsNothing,
+          );
+          expect(assets.loadCount, 0);
+          expect(harness.keyGenerator.validatedMnemonics, isEmpty);
+          expect(harness.engine.calls, isEmpty);
+          expect(device.sensitiveValues, isEmpty);
+          expect(device.prompts, 1);
+          expect(harness.toasts.messages, isEmpty);
+        });
+      }
+    }
+  }
+
+  for (final importing in [false, true]) {
+    testWidgets('${importing ? 'import' : 'create'} protects recovery content '
+        'from capture without discarding its draft or redoing wallet work', (
+      tester,
+    ) async {
+      final device = _SetupAuthentication();
+      addTearDown(device.close);
+      final security = SecurityController(device);
+      final harness = await OnboardingTestHarness.create(
+        securityController: security,
+      );
+      addTearDown(() => _disposeHarness(tester, harness));
+      await _pumpScreen(tester, harness, const OnboardingWelcomeScreen());
+      if (importing) {
+        tester
+            .widget<OnboardingTextAction>(
+              find.widgetWithText(OnboardingTextAction, 'Import Wallet'),
+            )
+            .onPressed();
+      } else {
+        tester
+            .widget<CustomButton>(
+              find.widgetWithText(CustomButton, 'Create Wallet'),
+            )
+            .onTap!();
+      }
+      await tester.pump();
+      expect(device.sensitiveValues, isEmpty);
+      device.prompt.complete(DeviceAuthenticationResult.authenticated);
+      await _pumpUntil(
+        tester,
+        () => find
+            .byType(
+              importing
+                  ? OnboardingImportWalletScreen
+                  : OnboardingCreateWalletScreen,
+            )
+            .evaluate()
+            .isNotEmpty,
+      );
+      await _pumpOnboardingTransition(tester);
+      expect(device.sensitiveValues, [true]);
+      if (importing) {
+        await tester.enterText(
+          find.byKey(const ValueKey('recovery-word-1')),
+          'abandon',
+        );
+      } else {
+        await tester.tap(find.widgetWithText(OnboardingTextAction, 'Reveal'));
+      }
+      await tester.pumpAndSettle();
+      final retained = importing
+          ? harness.container.read(importWalletViewModelProvider).value
+          : harness.container.read(createWalletViewModelProvider).value;
+      final validations = harness.keyGenerator.validatedMnemonics.length;
+      device.capture(true);
+      await tester.pump();
+      expect(find.byType(SplashScreen), findsOneWidget);
+      expect(find.text('abandon'), findsNothing);
+      expect(find.byKey(const ValueKey('recovery-word-1')), findsNothing);
+      device.capture(false);
+      await tester.pump();
+      expect(find.byType(SplashScreen), findsNothing);
+      expect(
+        identical(
+          retained,
+          importing
+              ? harness.container.read(importWalletViewModelProvider).value
+              : harness.container.read(createWalletViewModelProvider).value,
+        ),
+        isTrue,
+      );
+      expect(harness.keyGenerator.validatedMnemonics.length, validations);
+      expect(harness.engine.calls, isEmpty);
+      expect(device.prompts, 1);
+      expect(harness.toasts.messages, isEmpty);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      expect(device.sensitiveValues.last, isFalse);
+    });
+
+    testWidgets(
+      '${importing ? 'import' : 'create'} waits for fresh device auth '
+      'without losing preflight to its own native prompt',
+      (tester) async {
+        final assets = await _DictionaryAssetBundle.create(succeeds: true);
+        addTearDown(assets.release);
+        final device = _SetupAuthentication();
+        addTearDown(device.close);
+        final security = SecurityController(device);
+        final harness = await OnboardingTestHarness.create(
+          onboardingAssets: assets,
+          securityController: security,
+        );
+        addTearDown(() => _disposeHarness(tester, harness));
+        addTearDown(
+          () => tester.binding.handleAppLifecycleStateChanged(
+            AppLifecycleState.resumed,
+          ),
+        );
+        _configureDictionaryPreflightPhone(tester);
+        final route = await _pumpOnboardingRoute(
+          tester,
+          harness,
+          path: '/test-auth-preflight',
+          screen: SecurityGate(
+            controller: security,
+            child: const OnboardingWelcomeScreen(),
+          ),
+        );
+        addTearDown(route.router.dispose);
+        await tester.pumpAndSettle();
+        if (importing) {
+          tester
+              .widget<OnboardingTextAction>(
+                find.widgetWithText(OnboardingTextAction, 'Import Wallet'),
+              )
+              .onPressed();
+        } else {
+          tester
+              .widget<CustomButton>(
+                find.widgetWithText(CustomButton, 'Create Wallet'),
+              )
+              .onTap!();
+        }
+        await tester.pump();
+        expect(device.prompts, 1);
+        expect(assets.loadCount, 0);
+        expect(harness.keyGenerator.validatedMnemonics, isEmpty);
+        expect(
+          tester
+              .widget<CustomButton>(
+                find.widgetWithText(CustomButton, 'Create Wallet'),
+              )
+              .loading,
+          isTrue,
+        );
+        expect(
+          tester
+              .widget<OnboardingTextAction>(
+                find.widgetWithText(OnboardingTextAction, 'Import Wallet'),
+              )
+              .loading,
+          isFalse,
+        );
+
+        security.handleLifecycle(AppLifecycleState.inactive);
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.inactive,
+        );
+        await tester.pump();
+        security.handleLifecycle(AppLifecycleState.resumed);
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pump();
+        device.prompt.complete(DeviceAuthenticationResult.authenticated);
+        await _pumpUntil(tester, () => assets.loadCount == 1);
+        expect(harness.toasts.messages, isEmpty);
+        expect(find.byType(OnboardingCreateWalletScreen), findsNothing);
+        expect(find.byType(OnboardingImportWalletScreen), findsNothing);
+        assets.release();
+        await _pumpUntil(
+          tester,
+          () => find
+              .byType(
+                importing
+                    ? OnboardingImportWalletScreen
+                    : OnboardingCreateWalletScreen,
+              )
+              .evaluate()
+              .isNotEmpty,
+        );
+        await _pumpOnboardingTransition(tester);
+        expect(device.prompts, 1);
+        expect(assets.loadCount, 1);
+        expect(harness.toasts.messages, isEmpty);
+      },
+    );
+
+    testWidgets('${importing ? 'import' : 'create'} auth cancellation stays '
+        'on Welcome without dictionary/phrase work or a toast', (tester) async {
+      final assets = await _DictionaryAssetBundle.create(succeeds: true);
+      addTearDown(assets.release);
+      final device = _SetupAuthentication();
+      addTearDown(device.close);
+      final harness = await OnboardingTestHarness.create(
+        onboardingAssets: assets,
+        securityController: SecurityController(device),
+      );
+      addTearDown(() => _disposeHarness(tester, harness));
+      await _pumpScreen(tester, harness, const OnboardingWelcomeScreen());
+      if (importing) {
+        tester
+            .widget<OnboardingTextAction>(
+              find.widgetWithText(OnboardingTextAction, 'Import Wallet'),
+            )
+            .onPressed();
+      } else {
+        tester
+            .widget<CustomButton>(
+              find.widgetWithText(CustomButton, 'Create Wallet'),
+            )
+            .onTap!();
+      }
+      await tester.pump();
+      device.prompt.complete(DeviceAuthenticationResult.cancelled);
+      await _pumpUntil(
+        tester,
+        () => !tester
+            .widget<CustomButton>(
+              find.widgetWithText(CustomButton, 'Create Wallet'),
+            )
+            .loading,
+      );
+      expect(assets.loadCount, 0);
+      expect(harness.engine.calls, isEmpty);
+      expect(harness.keyGenerator.validatedMnemonics, isEmpty);
+      expect(find.byType(OnboardingCreateWalletScreen), findsNothing);
+      expect(find.byType(OnboardingImportWalletScreen), findsNothing);
+      expect(harness.toasts.messages, isEmpty);
+      expect(harness.security.canAccessWallet, isTrue);
+    });
+  }
 
   for (final addWallet in [false, true]) {
     for (final importing in [false, true]) {
@@ -98,6 +975,9 @@ void main() {
             // Direct stale callbacks in the initiating frame must share one intent.
             primary.onTap!();
             import.onPressed();
+            // Device-security preflight precedes the dictionary read. The
+            // unsecured policy resolves asynchronously without a native prompt.
+            await tester.pump();
             expect(
               assets.loadCount,
               1,
@@ -1696,6 +2576,91 @@ void main() {
 
   for (final source in _walletNameTestSources) {
     testWidgets(
+      '${source.label} retains the name button while committed navigation completes',
+      (tester) async {
+        final harness = await OnboardingTestHarness.create();
+        addTearDown(() => _disposeHarness(tester, harness));
+        await harness.container.read(walletViewModelProvider.future);
+        await _prepareWalletNameSource(tester, harness, source);
+        addTearDown(_keepWalletNameSourceAlive(harness, source));
+        final nativeGate = Completer<void>();
+        addTearDown(() {
+          if (!nativeGate.isCompleted) nativeGate.complete();
+        });
+        harness.engine.provisionGate = nativeGate;
+        var completions = 0;
+        // Hold the completed route on screen, as it remains while a Home
+        // transition paints. This exposes the entire committed-state frame
+        // instead of letting a fast test router hide an intermediate loader.
+        final screen = source.createsWallet
+            ? WalletNameScreen.create(onCompleted: () => completions += 1)
+            : WalletNameScreen.import(onCompleted: () => completions += 1);
+        await _pumpScreen(tester, harness, screen);
+        final submitFinder = find.widgetWithText(
+          CustomButton,
+          source.submitLabel,
+        );
+        tester.widget<CustomButton>(submitFinder).onTap!();
+        await _pumpUntil(
+          tester,
+          () => harness.engine.calls.contains('provision'),
+        );
+        expect(tester.widget<CustomButton>(submitFinder).loading, isTrue);
+        expect(find.byType(OnboardingStatusPanel), findsNothing);
+
+        nativeGate.complete();
+        await _pumpUntil(tester, () => completions == 1);
+        await tester.pump(const Duration(milliseconds: 200));
+
+        expect(find.text('Name your wallet'), findsOneWidget);
+        expect(find.byType(OnboardingStatusPanel), findsNothing);
+        expect(find.text('Finishing wallet setup...'), findsNothing);
+        final button = tester.widget<CustomButton>(submitFinder);
+        expect(button.loading, isTrue);
+        expect(button.enabled, isFalse);
+        final nameField = tester.widget<TextField>(
+          find.byKey(const ValueKey('wallet-name-field')),
+        );
+        expect(nameField.controller!.text, source.walletName);
+        expect(nameField.enabled, isFalse);
+        expect(
+          tester
+              .widget<PopScope<dynamic>>(
+                find.byWidgetPredicate((widget) => widget is PopScope),
+              )
+              .canPop,
+          isFalse,
+        );
+        expect(
+          harness.container
+              .read(walletViewModelProvider)
+              .requireValue
+              .activeWallet
+              ?.name,
+          source.walletName,
+        );
+        // Preserve immediate secret erasure; only the non-secret field text
+        // stays visible while the outgoing route is retained for animation.
+        if (source.createsWallet) {
+          final completed = harness.container
+              .read(createWalletViewModelProvider)
+              .requireValue;
+          expect(completed.completed, isTrue);
+          expect(completed.words, isEmpty);
+          expect(completed.questions, isEmpty);
+        } else {
+          final completed = harness.container
+              .read(importWalletViewModelProvider)
+              .requireValue;
+          expect(completed.completed, isTrue);
+          expect(completed.words.every((word) => word.isEmpty), isTrue);
+        }
+        expect(completions, 1);
+        expect(harness.toasts.messages, isEmpty);
+      },
+    );
+
+    testWidgets(
       '${source.label} reports a naming failure once without retaining visible copy',
       (tester) async {
         final harness = await OnboardingTestHarness.create();
@@ -2125,7 +3090,7 @@ void main() {
     );
     create.onTap!();
     import.onPressed();
-    await tester.pump();
+    await _pumpSetupActionHandoff(tester);
     expect(find.byType(OnboardingImportWalletScreen), findsNothing);
 
     const motion = AsterMotion();
@@ -2585,7 +3550,7 @@ void main() {
           find.widgetWithText(CustomButton, 'Create Wallet'),
         )
         .onTap!();
-    await tester.pump();
+    await _pumpSetupActionHandoff(tester);
 
     expect(find.text('Built for\nUSDT on Bitcoin'), findsNothing);
     expect(find.byType(OnboardingCreateWalletScreen), findsOneWidget);
@@ -3121,10 +4086,30 @@ Future<void> _expectOrchestratedStepHandoff(
 
 Future<void> _pumpOnboardingTransition(WidgetTester tester) async {
   const motion = AsterMotion();
-  await tester.pump();
+  await _pumpSetupActionHandoff(tester);
   await tester.pump(
     motion.onboardingStepTransitionDuration + const Duration(milliseconds: 20),
   );
+}
+
+Future<void> _pumpSetupActionHandoff(WidgetTester tester) async {
+  // Device authentication deliberately waits for a painted foreground frame
+  // before loading recovery data. Flush that asynchronous action handoff with
+  // zero elapsed animation time, then measure the existing choreography from
+  // its unchanged first frame.
+  for (var frame = 0; frame < 20; frame += 1) {
+    await tester.pump();
+    final welcomeActions = find.descendant(
+      of: find.byKey(const ValueKey('welcome-actions-motion-opacity')),
+      matching: find.byType(CustomButton),
+    );
+    if (!tester
+        .widgetList<CustomButton>(welcomeActions)
+        .any((button) => button.loading)) {
+      return;
+    }
+  }
+  fail('Timed out waiting for the recovery action handoff.');
 }
 
 void _configureDictionaryPreflightPhone(WidgetTester tester) {
@@ -3158,10 +4143,62 @@ final class _DictionaryAssetBundle extends CachingAssetBundle {
 
   @override
   Future<ByteData> load(String key) async {
-    expect(key, Bip39WordListRepository.assetPath);
+    // The read now runs after asynchronous device-security preflight and can
+    // legitimately complete inside tester.pump's guard.
+    expectSync(key, Bip39WordListRepository.assetPath);
     loadCount += 1;
     await _gate.future;
     return data;
+  }
+}
+
+enum _SetupAuthInterruption { cancelled, background, walletChanged }
+
+final class _SetupAuthentication
+    implements DeviceAuthentication, DeviceAuthenticationBackgroundEvents {
+  final prompt = Completer<DeviceAuthenticationResult>();
+  int prompts = 0;
+  final sensitiveValues = <bool>[];
+  final _captures = StreamController<bool>.broadcast(sync: true);
+  final _backgrounds = StreamController<void>.broadcast(sync: true);
+  bool _captured = false;
+
+  @override
+  Future<DeviceSecurityStatus> status() async => DeviceSecurityStatus.secured;
+
+  @override
+  Future<DeviceAuthenticationResult> authenticate(String reason) {
+    prompts += 1;
+    return prompt.future;
+  }
+
+  @override
+  Future<void> cancel() async {}
+
+  @override
+  Future<void> setSensitive(bool sensitive) async {
+    sensitiveValues.add(sensitive);
+  }
+
+  @override
+  Stream<bool> get captureChanges => _captures.stream;
+
+  @override
+  bool get isCaptured => _captured;
+
+  void capture(bool value) {
+    _captured = value;
+    _captures.add(value);
+  }
+
+  @override
+  Stream<void> get backgroundEvents => _backgrounds.stream;
+
+  void background() => _backgrounds.add(null);
+
+  Future<void> close() async {
+    await _captures.close();
+    await _backgrounds.close();
   }
 }
 
@@ -3240,6 +4277,7 @@ Future<({GoRouter router, Future<Object?> completion})> _pumpOnboardingRoute(
   OnboardingTestHarness harness, {
   required String path,
   required Widget screen,
+  bool securityAtRoot = false,
 }) async {
   final router = GoRouter(
     initialLocation: RoutePaths.onboardingWelcome,
@@ -3264,7 +4302,15 @@ Future<({GoRouter router, Future<Object?> completion})> _pumpOnboardingRoute(
         builder: (context, child) => AsterFeedbackScope(
           haptics: harness.haptics,
           toasts: harness.toasts,
-          child: OnboardingShell(child: child!),
+          child: securityAtRoot
+              ? _RootSecurityLifecycleHost(
+                  security: harness.security,
+                  child: SecurityGate(
+                    controller: harness.security,
+                    child: OnboardingShell(child: child!),
+                  ),
+                )
+              : OnboardingShell(child: child!),
         ),
       ),
     ),
@@ -3275,4 +4321,54 @@ Future<({GoRouter router, Future<Object?> completion})> _pumpOnboardingRoute(
     () => find.byType(screen.runtimeType).evaluate().isNotEmpty,
   );
   return (router: router, completion: completion);
+}
+
+Future<void> _tapSetupAction(
+  WidgetTester tester, {
+  required bool addWallet,
+  required bool importing,
+}) => tester.tap(
+  importing
+      ? find.widgetWithText(OnboardingTextAction, 'Import Wallet')
+      : find.widgetWithText(
+          CustomButton,
+          addWallet ? 'Add New Wallet' : 'Create Wallet',
+        ),
+);
+
+/// Mirrors AppLoader's outer lifecycle owner and AsterApp's root SecurityGate
+/// placement. The gate encloses Navigator instead of living inside one route.
+class _RootSecurityLifecycleHost extends StatefulWidget {
+  const _RootSecurityLifecycleHost({
+    required this.security,
+    required this.child,
+  });
+  final SecurityController security;
+  final Widget child;
+
+  @override
+  State<_RootSecurityLifecycleHost> createState() =>
+      _RootSecurityLifecycleHostState();
+}
+
+class _RootSecurityLifecycleHostState extends State<_RootSecurityLifecycleHost>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) =>
+      widget.security.handleLifecycle(state);
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

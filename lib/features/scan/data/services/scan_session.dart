@@ -119,6 +119,9 @@ final class ManagedScanSession extends ChangeNotifier implements ScanSession {
     final completion = Completer<void>();
     _galleryInFlight = true;
     _galleryCompletion = completion;
+    _replaceSnapshot(
+      _snapshot.copyWith(galleryPhase: ScanGalleryPhase.selecting),
+    );
     try {
       final path = await _gallery.selectImagePath();
       if (_disposeRequested) {
@@ -127,7 +130,16 @@ final class ManagedScanSession extends ChangeNotifier implements ScanSession {
       if (path == null) {
         return const AppResult.success(ScanGalleryCancelled());
       }
-      final values = await _serialize(() => _driver.analyzeImage(path));
+      final values = await _serialize(() async {
+        if (_disposeRequested) return const <String?>[];
+        _replaceSnapshot(
+          _snapshot.copyWith(galleryPhase: ScanGalleryPhase.analyzing),
+        );
+        return _driver.analyzeImage(path);
+      });
+      if (_disposeRequested) {
+        return AppResult.failure(_operationInProgressFailure());
+      }
       final selected = _selectPayload(values, ScanCaptureSource.gallery);
       switch (selected) {
         case AppFailureResult<ScanPayload?>(:final failure):
@@ -150,6 +162,7 @@ final class ManagedScanSession extends ChangeNotifier implements ScanSession {
       return AppResult.failure(failure);
     } finally {
       _galleryInFlight = false;
+      _replaceSnapshot(_snapshot.copyWith(galleryPhase: ScanGalleryPhase.idle));
       if (identical(_galleryCompletion, completion)) {
         _galleryCompletion = null;
       }

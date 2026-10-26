@@ -24,7 +24,7 @@ const _links = <_LinkDescriptor>[
   ),
 ];
 
-/// Public-link group with explicit loading, disabled, and opening states.
+/// Public-link group with quiet, guarded external-page handoffs.
 class SettingsLinksCard extends StatelessWidget {
   const SettingsLinksCard({
     super.key,
@@ -50,22 +50,23 @@ class SettingsLinksCard extends StatelessWidget {
     for (var index = 0; index < _links.length; index++) {
       final descriptor = _links[index];
       final available = state?.isAvailable(descriptor.link) ?? false;
-      final opening = openingLink == descriptor.link;
-      final enabled = available && openingLink == null && !loading;
+      final enabled = available && !loading;
       rows.add(
-        AsterOptionRow(
-          key: ValueKey('settings-link-${descriptor.link.name}'),
-          title: descriptor.title,
-          details: loading
-              ? 'Loading'
-              : opening
-              ? 'Opening'
-              : available
-              ? null
-              : 'Unavailable',
-          prefixIcon: descriptor.icon,
-          onTap: enabled ? () => onOpen(descriptor.link) : null,
-          hapticIntent: null,
+        QuietPendingAction(
+          pending: enabled && openingLink != null,
+          label: descriptor.title,
+          child: AsterOptionRow(
+            key: ValueKey('settings-link-${descriptor.link.name}'),
+            title: descriptor.title,
+            details: loading
+                ? 'Loading'
+                : available
+                ? null
+                : 'Unavailable',
+            prefixIcon: descriptor.icon,
+            onTap: enabled ? () => onOpen(descriptor.link) : null,
+            hapticIntent: null,
+          ),
         ),
       );
       if (index != _links.length - 1) {

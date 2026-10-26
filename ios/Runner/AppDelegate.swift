@@ -1,6 +1,7 @@
 import Flutter
 import Darwin
 import UIKit
+import LocalAuthentication
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
@@ -15,11 +16,15 @@ import UIKit
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
+    DeviceAuthenticationBridge.shared.startPrivacyMonitoring()
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    DeviceAuthenticationBridge.shared.configure(
+      messenger: engineBridge.applicationRegistrar.messenger()
+    )
     walletStorageSession?.invalidate()
     walletStorageChannel?.setMethodCallHandler(nil)
     let channel = FlutterMethodChannel(
@@ -60,6 +65,281 @@ import UIKit
     }
     walletStorageChannel = channel
     walletStorageSession = session
+  }
+}
+
+/// The OS owns the credential UI. Only passcodeNotSet is an unsecured device;
+/// unavailable biometry and all unknown failures remain failures.
+@MainActor final class DeviceAuthenticationBridge: NSObject {
+  static let shared = DeviceAuthenticationBridge()
+  private var channel: FlutterMethodChannel?
+  private var context: LAContext?
+  private var pending: FlutterResult?
+  private var requestID: UUID?
+  private var sensitive = false
+  private var captured = false
+  private var monitoringPrivacy = false
+  private var privacyWindows: [String: UIWindow] = [:]
+  private var monitoredScenes = Set<String>()
+
+  private override init() { super.init() }
+
+  func configure(messenger: FlutterBinaryMessenger) {
+    cancelAuthentication()
+    channel?.setMethodCallHandler(nil)
+    let next = FlutterMethodChannel(
+      name: "com.aster.wallet/device_authentication",
+      binaryMessenger: messenger
+    )
+    next.setMethodCallHandler { [weak self] call, result in
+      guard let self else { return }
+      switch call.method {
+      case "getStatus":
+        do {
+          self.refreshCaptureState()
+          result(["secured": try self.isDeviceSecured(), "captured": self.captured])
+        } catch {
+          result(self.failure("unavailable"))
+        }
+      case "authenticate":
+        guard let arguments = call.arguments as? [String: Any],
+          let reason = arguments["reason"] as? String,
+          !reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+          reason.count <= 160
+        else {
+          result(self.failure("argument"))
+          return
+        }
+        self.authenticate(reason: reason, result: result)
+      case "cancel":
+        self.cancelAuthentication()
+        result(nil)
+      case "setSensitive":
+        guard let arguments = call.arguments as? [String: Any],
+          let value = arguments["sensitive"] as? Bool
+        else {
+          result(self.failure("argument"))
+          return
+        }
+        self.sensitive = value
+        self.refreshCaptureState()
+        self.updateAllPrivacyWindows()
+        result(nil)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+    channel = next
+  }
+
+  private func isDeviceSecured() throws -> Bool {
+    let probe = LAContext()
+    defer { probe.invalidate() }
+    var error: NSError?
+    if probe.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) {
+      return true
+    }
+    if let error, error.domain == LAError.errorDomain,
+      error.code == LAError.passcodeNotSet.rawValue {
+      return false
+    }
+    throw AuthenticationFailure.unavailable
+  }
+
+  private func authenticate(reason: String, result: @escaping FlutterResult) {
+    guard pending == nil else {
+      result(failure("busy"))
+      return
+    }
+    do {
+      guard try isDeviceSecured() else {
+        result("unsecured")
+        return
+      }
+    } catch {
+      result(failure("unavailable"))
+      return
+    }
+    guard UIApplication.shared.connectedScenes.contains(where: {
+      $0.activationState == .foregroundActive
+    }) else {
+      result(failure("not_active"))
+      return
+    }
+    let nextContext = LAContext()
+    // A new context and zero reuse ensure every disclosure has fresh consent.
+    nextContext.touchIDAuthenticationAllowableReuseDuration = 0
+    nextContext.localizedCancelTitle = "Cancel"
+    let id = UUID()
+    context = nextContext
+    pending = result
+    requestID = id
+    nextContext.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason) {
+      [weak self] success, error in
+      DispatchQueue.main.async {
+        guard let self, self.requestID == id else { return }
+        if success {
+          self.completeAuthentication("authenticated")
+          return
+        }
+        let nativeError = error as NSError?
+        guard let nativeError, nativeError.domain == LAError.errorDomain,
+          let code = LAError.Code(rawValue: nativeError.code)
+        else {
+          self.completeAuthentication(self.failure("unavailable"))
+          return
+        }
+        switch code {
+        case .userCancel, .systemCancel, .appCancel:
+          self.completeAuthentication("cancelled")
+        case .passcodeNotSet:
+          self.completeAuthentication("unsecured")
+        case .authenticationFailed:
+          self.completeAuthentication(self.failure("failed"))
+        case .biometryLockout:
+          self.completeAuthentication(self.failure("locked_out"))
+        default:
+          self.completeAuthentication(self.failure("unavailable"))
+        }
+      }
+    }
+  }
+
+  private func completeAuthentication(_ response: Any) {
+    let reply = pending
+    pending = nil
+    requestID = nil
+    context?.invalidate()
+    context = nil
+    reply?(response)
+  }
+
+  private func cancelAuthentication() {
+    guard pending != nil else { return }
+    completeAuthentication("cancelled")
+  }
+
+  private func failure(_ code: String) -> FlutterError {
+    FlutterError(
+      code: "device_auth_\(code)",
+      message: "Device authentication is unavailable.",
+      details: nil
+    )
+  }
+
+  func startPrivacyMonitoring() {
+    guard !monitoringPrivacy else { return }
+    monitoringPrivacy = true
+    let center = NotificationCenter.default
+    for name in [UIScene.willConnectNotification, UIScene.didActivateNotification,
+                 UIScene.willDeactivateNotification, UIScene.didEnterBackgroundNotification,
+                 UIScene.didDisconnectNotification] {
+      center.addObserver(self, selector: #selector(sceneChanged(_:)), name: name, object: nil)
+    }
+    for scene in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }) {
+      monitorCapture(scene)
+    }
+  }
+
+  @objc private func sceneChanged(_ notification: Notification) {
+    guard let scene = notification.object as? UIWindowScene else { return }
+    let id = scene.session.persistentIdentifier
+    let name = notification.name
+    if name == UIScene.didDisconnectNotification {
+      privacyWindows.removeValue(forKey: id)?.isHidden = true
+      monitoredScenes.remove(id)
+      refreshCaptureState()
+      return
+    }
+    monitorCapture(scene)
+    if name == UIScene.willDeactivateNotification ||
+      name == UIScene.didEnterBackgroundNotification {
+      // Synchronous native cover precedes UIKit's app-switcher snapshot.
+      // Do not cancel on inactivity: the system auth prompt causes it too.
+      showPrivacyWindow(scene)
+    } else {
+      updatePrivacyWindow(scene)
+    }
+    if name == UIScene.didEnterBackgroundNotification {
+      channel?.invokeMethod("backgrounded", arguments: nil)
+      cancelAuthentication()
+    }
+    refreshCaptureState()
+  }
+
+  private func monitorCapture(_ scene: UIWindowScene) {
+    guard monitoredScenes.insert(scene.session.persistentIdentifier).inserted else { return }
+    scene.registerForTraitChanges([UITraitSceneCaptureState.self]) {
+      [weak self] (scene: UIWindowScene, _: UITraitCollection) in
+      self?.refreshCaptureState()
+      self?.updatePrivacyWindow(scene)
+    }
+  }
+
+  private func refreshCaptureState() {
+    let next = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+      .contains { $0.traitCollection.sceneCaptureState == .active }
+    guard captured != next else { return }
+    captured = next
+    channel?.invokeMethod("captureChanged", arguments: next)
+  }
+
+  private func updateAllPrivacyWindows() {
+    for scene in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }) {
+      monitorCapture(scene)
+      updatePrivacyWindow(scene)
+    }
+  }
+
+  private func updatePrivacyWindow(_ scene: UIWindowScene) {
+    if scene.activationState != .foregroundActive ||
+      (sensitive && scene.traitCollection.sceneCaptureState == .active) {
+      showPrivacyWindow(scene)
+    } else {
+      privacyWindows.removeValue(forKey: scene.session.persistentIdentifier)?.isHidden = true
+    }
+  }
+
+  private func showPrivacyWindow(_ scene: UIWindowScene) {
+    let id = scene.session.persistentIdentifier
+    guard privacyWindows[id] == nil else { return }
+    let window = UIWindow(windowScene: scene)
+    window.windowLevel = .alert + 1
+    window.rootViewController = WalletPrivacyViewController()
+    window.isUserInteractionEnabled = true
+    // Never take key-window status from Flutter or the system credential UI.
+    privacyWindows[id] = window
+    window.isHidden = false
+  }
+
+  private enum AuthenticationFailure: Error { case unavailable }
+}
+
+private final class WalletPrivacyViewController: UIViewController {
+  override func loadView() {
+    let root = UIView()
+    root.backgroundColor = .black
+    let background = UIImageView(image: UIImage(named: "aster-launch-background"))
+    background.contentMode = .scaleAspectFill
+    background.clipsToBounds = true
+    background.translatesAutoresizingMaskIntoConstraints = false
+    let mark = UIImageView(image: UIImage(named: "aster-privacy-mark"))
+    mark.contentMode = .scaleAspectFit
+    mark.translatesAutoresizingMaskIntoConstraints = false
+    root.addSubview(background)
+    root.addSubview(mark)
+    NSLayoutConstraint.activate([
+      background.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+      background.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+      background.topAnchor.constraint(equalTo: root.topAnchor),
+      background.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+      mark.centerXAnchor.constraint(equalTo: root.centerXAnchor),
+      mark.centerYAnchor.constraint(equalTo: root.centerYAnchor),
+      mark.widthAnchor.constraint(equalToConstant: 160),
+      mark.heightAnchor.constraint(equalToConstant: 128),
+    ])
+    root.accessibilityElementsHidden = true
+    view = root
   }
 }
 
@@ -113,6 +393,9 @@ enum WalletStoragePolicy {
       try verifyDirectory(url)
     case "verifyFile":
       try verifyFile(url)
+    case "flushDirectory":
+      try verifyDirectory(url)
+      try syncDirectory(url)
     case "replaceTextFile":
       guard let contents = arguments["contents"] as? String else {
         throw PolicyError.argument

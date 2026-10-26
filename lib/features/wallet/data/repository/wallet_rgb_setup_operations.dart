@@ -280,6 +280,25 @@ final class WalletRgbSetupOperations {
     }
   }
 
+  /// Exact read-only reconciliation may establish a completed preparation.
+  /// It never repeats output creation or treats elapsed time as completion.
+  Future<AppResult<void>> assertWalletDeletionSafe(
+    WalletProfile profile,
+  ) async {
+    if (store == null) return const AppResult.success(null);
+    try {
+      final journal = await _read(profile);
+      if (journal != null &&
+          !_isUnsubmitted(journal) &&
+          journal.phase != _Phase.confirmed) {
+        return await assertResolved();
+      }
+      return const AppResult.success(null);
+    } catch (error, stackTrace) {
+      return AppResult.failure(FailureMapper.from(error, stackTrace));
+    }
+  }
+
   Future<RgbWalletSetupStatus> _observe(
     _Journal journal,
     RgbSetupWalletEngine engine,

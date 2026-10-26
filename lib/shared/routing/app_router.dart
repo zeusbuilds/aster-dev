@@ -44,15 +44,25 @@ GoRouter appRouter(Ref ref) {
     errorBuilder: (context, state) => const ErrorScreen(),
     debugLogDiagnostics: false,
   );
-  void updateToastRouteScope() => toasts.updateRouteScope((
-    router.routeInformationProvider.value.uri,
-    ref.read(appShellIndexProvider),
-  ));
+  void updateToastRouteScope() {
+    final configuration = router.routerDelegate.currentConfiguration;
+    // There is no screen owner until the first route is resolved. In
+    // particular, a transient reported URL must not replace a pushed page's
+    // authority when wallet state refreshes the router.
+    if (configuration.isEmpty && !configuration.isError) return;
+    final top = configuration.lastOrNull;
+    toasts.updateRouteScope((
+      top?.pageKey,
+      top == null ? configuration.uri : router.state.uri,
+      ref.read(appShellIndexProvider),
+    ));
+  }
+
   updateToastRouteScope();
-  router.routeInformationProvider.addListener(updateToastRouteScope);
+  router.routerDelegate.addListener(updateToastRouteScope);
   ref.listen(appShellIndexProvider, (_, _) => updateToastRouteScope());
   ref.onDispose(
-    () => router.routeInformationProvider.removeListener(updateToastRouteScope),
+    () => router.routerDelegate.removeListener(updateToastRouteScope),
   );
   ref.onDispose(router.dispose);
   return router;

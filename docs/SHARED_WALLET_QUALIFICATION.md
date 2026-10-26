@@ -1,5 +1,11 @@
 # Shared-stack wallet qualification — October 15, 2026
 
+This is historical evidence for the October 15 candidate. As of October 25,
+Aster Receive is witness-only and its blind/preparation controls are removed.
+SDK blind receiving remains available. The old blind-choice and preparation
+captures below do not describe the current app. See `REGTEST.md` for current
+receive and qualification-harness policy.
+
 This campaign tests Aster and the Flutter SDK against already running local
 infrastructure. Iris and WDK are read-only references. No stack, container,
 chain, contract or existing wallet was created, replaced, reset or cleared.

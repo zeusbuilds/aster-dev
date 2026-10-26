@@ -2,10 +2,7 @@
   "fill-specializations" : [
     {
       "value" : {
-        "linear-gradient" : [
-          "display-p3:0.00000,0.10196,1.00000,1.00000",
-          "extended-gray:0.00000,1.00000"
-        ]
+        "solid" : "extended-gray:1.00000,1.00000"
       }
     },
     {
@@ -21,21 +18,7 @@
   "groups" : [
     {
       "layers" : [
-        {
-          "fill" : {
-            "solid" : "srgb:1.00000,1.00000,1.00000,1.00000"
-          },
-          "glass" : true,
-          "image-name" : "aster_mark.svg",
-          "name" : "aster_app_icon",
-          "position" : {
-            "scale" : 2,
-            "translation-in-points" : [
-              0,
-              0
-            ]
-          }
-        }
+
       ],
       "shadow" : {
         "kind" : "neutral",

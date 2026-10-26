@@ -6,6 +6,8 @@ import 'package:aster/core/core.dart';
 import 'package:aster/features/wallet/data/runtime/runtime.dart';
 import 'package:aster/features/wallet/data/storage/storage.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
+import 'package:rgb_sdk_flutter/rgb_sdk_flutter.dart'
+    show RlnOperationTimeoutException;
 
 final class MemorySecureStore implements SecureKeyValueStore {
   final values = <String, String>{};
@@ -76,10 +78,21 @@ final class MemoryWalletRegistryDocumentStore
 }
 
 final class MemoryWalletPaymentJournalStore
-    implements WalletPaymentJournalStore, WalletPaymentReceiptStore {
+    implements
+        WalletPaymentJournalStore,
+        WalletPaymentReceiptStore,
+        WalletScopedDataRemoval {
   final receiptDocuments = <String, Map<String, String>>{};
   Object? receiptWriteError;
   bool receiptCommitBeforeError = false;
+  Object? removeWalletError;
+
+  @override
+  Future<void> removeWallet(String walletId) async {
+    if (removeWalletError case final error?) throw error;
+    documents.remove(walletId);
+    receiptDocuments.remove(walletId);
+  }
 
   @override
   Future<Map<String, String>> readAll(String walletId) async =>
@@ -136,7 +149,17 @@ final class MemoryWalletPaymentJournalStore
   }
 }
 
-final class MemoryWalletStorageSecurity implements WalletStorageSecurity {
+final class MemoryWalletStorageSecurity
+    implements WalletStorageSecurity, WalletStorageDurability {
+  final flushedDirectories = <String>[];
+  Object? flushError;
+
+  @override
+  Future<void> flushDirectory(String path) async {
+    flushedDirectories.add(path);
+    if (flushError case final error?) throw error;
+  }
+
   final preparedRoots = <String>[];
   final createdDirectories = <String>[];
   final verifiedDirectories = <String>[];
@@ -284,6 +307,7 @@ final class _FakeWalletPaymentOperation {
 final class FakeWalletEngine
     implements
         WalletEngine,
+        WalletDeletionSafetyEngine,
         WalletPaymentRecoveryEngine,
         WalletPaymentDeadlineRecovery {
   FakeWalletEngine({FakeWalletPaymentOperationStore? paymentOperations})
@@ -291,6 +315,32 @@ final class FakeWalletEngine
           paymentOperations ?? FakeWalletPaymentOperationStore();
 
   final FakeWalletPaymentOperationStore paymentOperations;
+  bool protectedRgbState = false;
+  Object? deletionAuditError;
+  Completer<void>? deletionAuditGate;
+
+  @override
+  Future<bool> hasProtectedRgbState() async {
+    calls.add('deletionAudit');
+    await deletionAuditGate?.future;
+    if (deletionAuditError case final error?) {
+      if (error is RlnOperationTimeoutException) {
+        requiresPaymentReopen = true;
+        throw const AppFailureException(
+          AppFailure(
+            code: 'wallet_deletion_audit_unavailable',
+            kind: AppFailureKind.timeout,
+            userMessage:
+                'Wallet assets could not be checked in time. Try again.',
+            retryable: true,
+          ),
+        );
+      }
+      throw error;
+    }
+    return protectedRgbState;
+  }
+
   final _paymentCommands = <String, WalletSendCommand>{};
   Object? paymentOperationRequestError;
   bool paymentOperationRequestRequiresReopen = false;
@@ -737,6 +787,8 @@ final class FakeWalletKeyGenerator implements WalletKeyGenerator {
   String generatedMnemonic =
       'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
   Object? generationError;
+  Completer<void>? generationGate;
+  var generationCount = 0;
   Object? validationError;
   Completer<void>? validationGate;
   final validatedMnemonics = <String>[];
@@ -744,6 +796,8 @@ final class FakeWalletKeyGenerator implements WalletKeyGenerator {
 
   @override
   Future<String> generateMnemonic(BlockchainEnvironment environment) async {
+    generationCount += 1;
+    await generationGate?.future;
     if (generationError case final Object error) throw error;
     return generatedMnemonic;
   }

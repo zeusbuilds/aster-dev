@@ -3,7 +3,7 @@
     <item android:drawable="@drawable/aster_icon_background" />
     <item
         android:width="72dp"
-        android:height="37dp"
-        android:drawable="@drawable/aster_mark_white"
+        android:height="38.093617021277dp"
+        android:drawable="@drawable/aster_brand_mark"
         android:gravity="center" />
 </layer-list>

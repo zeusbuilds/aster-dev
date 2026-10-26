@@ -116,17 +116,22 @@ class _AssetsSectionState extends ConsumerState<AssetsSection> {
           Row(
             children: [
               Expanded(child: Text('Assets', style: context.type.sectionTitle)),
-              AsterIconButton(
-                icon: balancesVisible == false
-                    ? MingCuteIcons.mgc_eye_close_line
-                    : MingCuteIcons.mgc_eye_2_line,
-                tooltip: balancesVisible == false
+              QuietPendingAction(
+                pending: visibilitySaving,
+                label: balancesVisible == false
                     ? 'Show balances'
                     : 'Hide balances',
-                hapticIntent: null,
-                loading: visibilitySaving,
-                color: context.appColors.textSecondary,
-                onPressed: balancesVisible == null ? null : toggleVisibility,
+                child: AsterIconButton(
+                  icon: balancesVisible == false
+                      ? MingCuteIcons.mgc_eye_close_line
+                      : MingCuteIcons.mgc_eye_2_line,
+                  tooltip: balancesVisible == false
+                      ? 'Show balances'
+                      : 'Hide balances',
+                  hapticIntent: null,
+                  color: context.appColors.textSecondary,
+                  onPressed: balancesVisible == null ? null : toggleVisibility,
+                ),
               ),
             ],
           ),

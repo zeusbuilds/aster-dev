@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../../core/errors/errors.dart';
+import '../../domain/models/models.dart';
 
 /// User-initiated operations that temporarily disable Scan controls.
 enum ScanOperation {
@@ -52,6 +53,7 @@ final class ScanState {
     this.flashOn = false,
     this.zoomPreset = ScanZoomPreset.normal,
     this.captureLocked = false,
+    this.galleryPhase = ScanGalleryPhase.idle,
     this.operation,
     this.failure,
   });
@@ -62,12 +64,14 @@ final class ScanState {
   final bool flashOn;
   final ScanZoomPreset zoomPreset;
   final bool captureLocked;
+  final ScanGalleryPhase galleryPhase;
   final ScanOperation? operation;
   final AppFailure? failure;
 
   bool get cameraReady => cameraInitialized && cameraRunning && failure == null;
   bool get isBusy => operation != null;
   bool get galleryBusy => operation == ScanOperation.selectingGallery;
+  bool get galleryAnalyzing => galleryPhase == ScanGalleryPhase.analyzing;
   bool get hasCommittedCapture => captureLocked && failure == null;
   bool get canUseGallery => !isBusy && !hasCommittedCapture;
   bool get canEnterManually => !isBusy && !hasCommittedCapture;
@@ -83,6 +87,7 @@ final class ScanState {
     bool? flashOn,
     ScanZoomPreset? zoomPreset,
     bool? captureLocked,
+    ScanGalleryPhase? galleryPhase,
     Object? operation = _unset,
     Object? failure = _unset,
   }) {
@@ -93,6 +98,7 @@ final class ScanState {
       flashOn: flashOn ?? this.flashOn,
       zoomPreset: zoomPreset ?? this.zoomPreset,
       captureLocked: captureLocked ?? this.captureLocked,
+      galleryPhase: galleryPhase ?? this.galleryPhase,
       operation: identical(operation, _unset)
           ? this.operation
           : operation as ScanOperation?,
@@ -111,6 +117,7 @@ final class ScanState {
       other.flashOn == flashOn &&
       other.zoomPreset == zoomPreset &&
       other.captureLocked == captureLocked &&
+      other.galleryPhase == galleryPhase &&
       other.operation == operation &&
       other.failure == failure;
 
@@ -122,6 +129,7 @@ final class ScanState {
     flashOn,
     zoomPreset,
     captureLocked,
+    galleryPhase,
     operation,
     failure,
   );

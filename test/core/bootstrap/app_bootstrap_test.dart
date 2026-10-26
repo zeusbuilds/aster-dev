@@ -2,6 +2,7 @@ import 'package:aster/core/bootstrap/app_bootstrap.dart';
 import 'package:aster/core/core.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:aster/features/wallet/presentation/view_model/wallet_view_model.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -76,6 +77,62 @@ void main() {
     expect(container, same(harness.container));
     expect(container.read(walletViewModelProvider).hasValue, isTrue);
     expect(container.read(walletViewModelProvider).value?.activeWallet, isNull);
+  });
+
+  test(
+    'authoritative empty bootstrap returns to unprotected Welcome',
+    () async {
+      final device = _SecuredDevice();
+      final security = SecurityController(device);
+      await security.initialize(hasWallet: true);
+      expect(await security.unlock(), isTrue);
+      security.updateWallet(_profile.id);
+      // An interrupted deletion was classified as an existing wallet by the
+      // public pre-auth registry. Bootstrap then finishes with no wallet left.
+      expect(await security.authorize(SecurityPurpose.walletSetup), isNotNull);
+      final harness = await OnboardingTestHarness.create(
+        securityController: security,
+      );
+      addTearDown(harness.dispose);
+      device.reasons.clear();
+
+      await bootstrapApplicationContainer(harness.container);
+      expect(
+        harness.container.read(walletViewModelProvider).value?.wallets,
+        isEmpty,
+      );
+      expect(security.canAccessWallet, isTrue);
+      expect(security.appLockEnabled, isTrue);
+      security.handleLifecycle(AppLifecycleState.paused);
+      expect(security.isLocked, isFalse);
+      security.handleLifecycle(AppLifecycleState.resumed);
+      expect(await security.prepareForeground(), isTrue);
+      expect(device.reasons, isEmpty);
+    },
+  );
+
+  test('nonempty bootstrap preserves app-lock protection', () async {
+    final device = _SecuredDevice();
+    final security = SecurityController(device);
+    final harness = await OnboardingTestHarness.create(
+      securityController: security,
+    );
+    addTearDown(harness.dispose);
+    final created = await harness.repository.createFromMnemonic(
+      name: 'Wallet',
+      mnemonic: validTestMnemonic,
+    );
+    expect(created, isA<AppSuccess<WalletRegistry>>());
+    final registry = (created as AppSuccess<WalletRegistry>).value;
+    security.updateWallet(registry.activeWalletId);
+    device.reasons.clear();
+
+    await bootstrapApplicationContainer(harness.container);
+    security.handleLifecycle(AppLifecycleState.paused);
+    expect(security.isLocked, isTrue);
+    security.handleLifecycle(AppLifecycleState.resumed);
+    expect(await security.prepareForeground(), isTrue);
+    expect(device.reasons, ['Unlock Aster']);
   });
 
   test(
@@ -232,3 +289,28 @@ final _profile = WalletProfile(
   state: WalletProfileState.provisioning,
   storageToken: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
 );
+
+final class _SecuredDevice implements DeviceAuthentication {
+  final reasons = <String>[];
+
+  @override
+  Future<DeviceSecurityStatus> status() async => DeviceSecurityStatus.secured;
+
+  @override
+  Future<DeviceAuthenticationResult> authenticate(String reason) async {
+    reasons.add(reason);
+    return DeviceAuthenticationResult.authenticated;
+  }
+
+  @override
+  Future<void> cancel() async {}
+
+  @override
+  Future<void> setSensitive(bool value) async {}
+
+  @override
+  Stream<bool> get captureChanges => const Stream.empty();
+
+  @override
+  bool get isCaptured => false;
+}

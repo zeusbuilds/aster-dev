@@ -11,6 +11,9 @@ enum ScanPurpose { sendLauncher, destinationPicker }
 /// Where a bounded scan payload originated.
 enum ScanCaptureSource { camera, gallery }
 
+/// Actual progress of one gallery command, independent of its action guard.
+enum ScanGalleryPhase { idle, selecting, analyzing }
+
 /// A bounded, potentially sensitive QR payload held only long enough for Send.
 ///
 /// The payload is intentionally excluded from [toString] so provider and error

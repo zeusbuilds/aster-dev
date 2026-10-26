@@ -12,6 +12,7 @@ class ScanControlButton extends StatelessWidget {
     this.selected,
     this.value,
     this.loading = false,
+    this.busy = false,
   });
 
   final Widget child;
@@ -20,6 +21,9 @@ class ScanControlButton extends StatelessWidget {
   final bool? selected;
   final String? value;
   final bool loading;
+
+  /// Silently guards a command without replacing or dimming its content.
+  final bool busy;
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +34,7 @@ class ScanControlButton extends StatelessWidget {
 
     void activate() => onTap?.call();
 
-    final enabled = onTap != null && !loading;
+    final enabled = onTap != null && !loading && !busy;
 
     return Semantics(
       button: true,
@@ -48,7 +52,7 @@ class ScanControlButton extends StatelessWidget {
           highlightShape: BoxShape.circle,
           radius: metrics.minTouchTarget / 2,
           child: Opacity(
-            opacity: enabled || loading
+            opacity: enabled || loading || busy
                 ? stateLayers.visible
                 : stateLayers.disabled,
             child: SizedBox(

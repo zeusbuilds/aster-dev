@@ -5,6 +5,7 @@ import '../../features/wallet/data/repository/repository.dart';
 import '../../features/wallet/presentation/view_model/wallet_view_model.dart';
 import '../di/providers.dart';
 import '../errors/errors.dart';
+import '../security/security_controller.dart';
 
 /// Production policy that keeps provider-build retry under app ownership.
 ///
@@ -37,6 +38,14 @@ Future<ProviderContainer> bootstrapApplicationContainer(
     final result = await resolvedRepository.bootstrap();
     if (result case AppFailureResult(:final failure)) {
       throw AppFailureException(failure);
+    }
+    if (result case AppSuccess(:final value) when value.profiles.isEmpty) {
+      // Startup may have just finished an interrupted last-wallet deletion.
+      // The pre-auth public registry still contained its deletion marker, so
+      // only this successful, authoritative result may clear wallet presence.
+      // Loading or missing UI state must retain the prior lock policy.
+      final security = container.read(securityControllerProvider);
+      if (security.initialized) security.clearWalletPresence();
     }
     // Preload the keep-alive wallet session before constructing GoRouter so
     // access guards never race startup or discard an incoming deep link.
@@ -75,23 +84,16 @@ Future<ProviderContainer> bootstrapApplicationContainer(
 
 /// Creates the production Riverpod composition root.
 ProviderContainer createApplicationProviderContainer(
-  SharedPreferences sharedPreferences,
-) {
+  SharedPreferences sharedPreferences, {
+  SecurityController? securityController,
+}) {
   return ProviderContainer(
     retry: applicationProviderRetryPolicy,
     overrides: [
       sharedPreferencesProvider.overrideWith((ref) => sharedPreferences),
+      if (securityController != null)
+        securityControllerProvider.overrideWithValue(securityController),
     ],
-  );
-}
-
-/// Creates the production container with an already-resolved preferences
-/// instance so startup never creates two competing preference owners.
-Future<ProviderContainer> bootstrapApplication(
-  SharedPreferences sharedPreferences,
-) {
-  return bootstrapApplicationContainer(
-    createApplicationProviderContainer(sharedPreferences),
   );
 }
 

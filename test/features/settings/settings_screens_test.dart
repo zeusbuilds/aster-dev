@@ -850,28 +850,32 @@ void main() {
     },
   );
 
-  testWidgets('advanced disclosures are disabled without auth policy', (
-    tester,
-  ) async {
-    final haptics = _RecordingHaptics();
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.light(),
-        home: AsterFeedbackScope(
-          haptics: haptics,
-          toasts: _RecordingToasts(),
-          child: const AdvancedSettingsScreen(),
+  testWidgets(
+    'advanced disclosures expose protected actions without placeholder prose',
+    (tester) async {
+      final haptics = _RecordingHaptics();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: AsterFeedbackScope(
+            haptics: haptics,
+            toasts: _RecordingToasts(),
+            child: const AdvancedSettingsScreen(),
+          ),
         ),
-      ),
-    );
+      );
 
-    final exportSemantics = tester.getSemantics(find.text('Export xpubs'));
-    final seedSemantics = tester.getSemantics(find.text('Check seed phrase'));
-    expect(exportSemantics.flagsCollection.isEnabled, ui.Tristate.isFalse);
-    expect(seedSemantics.flagsCollection.isEnabled, ui.Tristate.isFalse);
-    expect(find.text('Unavailable'), findsNWidgets(2));
-    expect(haptics.intents, isEmpty);
-  });
+      final exportSemantics = tester.getSemantics(find.text('Export xpubs'));
+      final seedSemantics = tester.getSemantics(
+        find.text('Reveal seed phrase'),
+      );
+      expect(exportSemantics.flagsCollection.isEnabled, ui.Tristate.isTrue);
+      expect(seedSemantics.flagsCollection.isEnabled, ui.Tristate.isTrue);
+      expect(find.text('Unavailable'), findsNothing);
+      expect(find.textContaining('authentication policy'), findsNothing);
+      expect(haptics.intents, isEmpty);
+    },
+  );
 
   testWidgets('Settings owns one navigation command across settings rows', (
     tester,
@@ -995,6 +999,7 @@ void main() {
       'Telegram',
       'Instagram',
       'Notifications',
+      'Manage assets',
     ]) {
       expect(find.text(label), findsNothing);
     }
@@ -1003,7 +1008,7 @@ void main() {
       find.byKey(const ValueKey('settings-version-label')),
       300,
     );
-    expect(find.text('Aster • Version 2.3.4 (81)'), findsOneWidget);
+    expect(find.text('Aster • Version 2.3.4 • Build 81'), findsOneWidget);
     expect(
       tester.getCenter(find.byKey(const ValueKey('settings-version-label'))).dx,
       closeTo(tester.getCenter(find.byType(SettingsScreen)).dx, 0.01),

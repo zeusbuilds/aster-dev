@@ -259,12 +259,15 @@ class _DetailsBody extends ConsumerWidget {
                 ],
                 if (actions.explorerUri != null) ...[
                   SizedBox(height: context.spacing.sectionGap),
-                  CustomButton(
-                    text: 'View in explorer',
-                    suffixIcon: RemixIcons.external_link_line,
-                    loading: actions.openingExplorer,
-                    hapticIntent: null,
-                    onTap: () => _openExplorer(context, actionsNotifier),
+                  QuietPendingAction(
+                    pending: actions.openingExplorer,
+                    label: 'View in explorer',
+                    child: CustomButton(
+                      text: 'View in explorer',
+                      suffixIcon: RemixIcons.external_link_line,
+                      hapticIntent: null,
+                      onTap: () => _openExplorer(context, actionsNotifier),
+                    ),
                   ),
                 ],
               ],

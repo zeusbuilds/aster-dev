@@ -124,6 +124,28 @@ final class WalletPaymentSubmissions {
     }
   }
 
+  /// Pure deletion guard: never clears or retries a payment during removal.
+  Future<AppResult<void>> assertWalletDeletionSafe(
+    WalletProfile profile,
+  ) async {
+    try {
+      final retained = _retainedAttempts[profile.id];
+      final record = store == null
+          ? null
+          : await _read(profile, archiveAccepted: false);
+      await _archived(profile);
+      if (retained != null || record?.requiresReconciliation == true) {
+        return AppResult.failure((retained ?? record!).reconciliationFailure);
+      }
+      return const AppResult.success(null);
+    } catch (error, stackTrace) {
+      return AppResult.failure(FailureMapper.from(error, stackTrace));
+    }
+  }
+
+  void forgetDeletedWallet(String walletId) =>
+      _retainedAttempts.remove(walletId);
+
   Future<AppResult<WalletPaymentSubmission?>> status() async {
     try {
       final profile = runtime.activeProfile;
@@ -343,8 +365,10 @@ final class WalletPaymentSubmissions {
 
   Future<WalletSendResult> dispatch(
     WalletEngine engine,
-    WalletSendCommand command,
-  ) async {
+    WalletSendCommand command, {
+    void Function()? assertAuthorized,
+  }) async {
+    assertAuthorized?.call();
     final profile = runtime.activeProfile;
     if (store == null || receipts == null || profile == null) {
       throw const AppFailureException(
@@ -431,6 +455,9 @@ final class WalletPaymentSubmissions {
     if (recoveryRequest.isEmpty || recoveryRequest.length > 100000) {
       throw const StoredDataCorruptionException();
     }
+    // Request construction cannot send. Reject a revoked foreground session
+    // before creating a new durable intent or entering native preparation.
+    assertAuthorized?.call();
     var intent = WalletPaymentSubmission(
       id: id,
       walletId: profile.id,
@@ -476,7 +503,50 @@ final class WalletPaymentSubmissions {
 
     final WalletSendResult result;
     var nativeRejectionRecorded = false;
+
+    Future<void> rejectRevokedAuthorization(
+      Object error,
+      StackTrace stack, {
+      required bool prepared,
+    }) async {
+      // No Commit has been entered. If native preparation happened, revoke
+      // that exact request and require its nonexecution certificate before
+      // recording a definite rejection. Never clear an uncertain operation.
+      if (prepared) {
+        final cancelled = await recovery.cancelPaymentOperation(
+          recoveryRequest,
+        );
+        if (cancelled.phase != WalletPaymentRecoveryPhase.rejected ||
+            cancelled.endAuthorized) {
+          _unresolved(
+            const StoredDataCorruptionException(),
+            StackTrace.current,
+          );
+        }
+      }
+      await _write(intent, profile, WalletPaymentSubmissionPhase.rejected);
+      final rejected = await _read(profile);
+      if (rejected?.id != intent.id ||
+          rejected?.phase != WalletPaymentSubmissionPhase.rejected) {
+        throw const StoredDataCorruptionException();
+      }
+      _unconfirmedAttempt = null;
+      nativeRejectionRecorded = true;
+      Error.throwWithStackTrace(error, stack);
+    }
+
+    Future<void>? requireAuthorization({bool prepared = false}) {
+      try {
+        assertAuthorized?.call();
+        return null;
+      } catch (error, stack) {
+        return rejectRevokedAuthorization(error, stack, prepared: prepared);
+      }
+    }
+
     try {
+      final initialRevocation = requireAuthorization();
+      if (initialRevocation != null) await initialRevocation;
       final prepared = await recovery.preparePaymentOperation(recoveryRequest);
       if (prepared.phase == WalletPaymentRecoveryPhase.rejected &&
           !prepared.endAuthorized) {
@@ -506,6 +576,8 @@ final class WalletPaymentSubmissions {
           );
         }
         _recoveryReceipt(command, prepared); // Validate pre-dispatch identity.
+        final preparedRevocation = requireAuthorization(prepared: true);
+        if (preparedRevocation != null) await preparedRevocation;
         // The app's durable boundary must precede native release authorization.
         // If this write fails, Commit is never called and this process retains
         // definite non-submission. A lost acknowledgement after restart is
@@ -518,6 +590,8 @@ final class WalletPaymentSubmissions {
         );
         intent = committing;
         _unconfirmedAttempt = intent;
+        final commitRevocation = requireAuthorization(prepared: true);
+        if (commitRevocation != null) await commitRevocation;
         final commitStatus = await _commitWithInspection(
           recovery,
           recoveryRequest,

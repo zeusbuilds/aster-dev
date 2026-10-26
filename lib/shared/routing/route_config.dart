@@ -127,6 +127,11 @@ abstract final class RouteConfig {
         builder: (context, state) => const SettingsScreen(),
         routes: [
           GoRoute(
+            path: RoutePaths.walletDetails,
+            name: RouteNames.walletDetails,
+            builder: (context, state) => const WalletDetailsScreen(),
+          ),
+          GoRoute(
             path: RoutePaths.countrySelection,
             name: RouteNames.countrySelection,
             builder: (context, state) => const CountrySelectionScreen(),
@@ -142,10 +147,27 @@ abstract final class RouteConfig {
             builder: (context, state) => const BitcoinUnitSelectionScreen(),
           ),
           GoRoute(
+            path: RoutePaths.security,
+            name: RouteNames.security,
+            builder: (context, state) => const SecuritySettingsScreen(),
+          ),
+          GoRoute(
             path: RoutePaths.advancedSettings,
             name: RouteNames.advancedSettings,
             builder: (context, state) => const AdvancedSettingsScreen(),
             routes: [
+              GoRoute(
+                path: RoutePaths.revealSeed,
+                name: RouteNames.revealSeed,
+                builder: (context, state) =>
+                    const WalletDisclosureScreen.seed(),
+              ),
+              GoRoute(
+                path: RoutePaths.exportXpubs,
+                name: RouteNames.exportXpubs,
+                builder: (context, state) =>
+                    const WalletDisclosureScreen.xpubs(),
+              ),
               GoRoute(
                 path: RoutePaths.networkConfiguration,
                 name: RouteNames.networkConfiguration,

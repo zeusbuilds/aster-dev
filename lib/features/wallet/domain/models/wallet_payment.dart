@@ -9,8 +9,6 @@ import 'wallet_fee.dart';
 /// App-owned lifecycle state for a payment or transfer.
 enum RgbRecipientType { blind, witness }
 
-enum RgbReceiveMode { witness, blind }
-
 /// Explicit app policy for the additional Bitcoin output of a witness send.
 const rgbWitnessRecipientSats = 1000;
 

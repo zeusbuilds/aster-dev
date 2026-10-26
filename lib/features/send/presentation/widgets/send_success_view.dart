@@ -86,12 +86,14 @@ class SendSuccessView extends StatelessWidget {
                         ),
                       ),
                     ),
-                    CustomButton(
-                      text: 'Continue',
-                      enabled: !continuing,
-                      loading: continuing,
-                      hapticIntent: null,
-                      onTap: onContinue,
+                    QuietPendingAction(
+                      pending: continuing,
+                      label: 'Continue',
+                      child: CustomButton(
+                        text: 'Continue',
+                        hapticIntent: null,
+                        onTap: onContinue,
+                      ),
                     ),
                   ],
                 ),

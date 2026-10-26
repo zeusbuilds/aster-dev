@@ -60,6 +60,7 @@ void main() {
 
     await security.prepareRoot(root.path);
     await security.verifyDirectory(root.path);
+    await security.flushDirectory(root.path);
     expect((await root.stat()).mode & 0x1ff, 0x1c0);
 
     final child = Directory(
@@ -67,6 +68,7 @@ void main() {
     );
     await security.createDirectory(child.path);
     await security.verifyDirectory(child.path);
+    await security.flushDirectory(child.path);
     expect((await child.stat()).mode & 0x1ff, 0x1c0);
     await expectLater(
       security.createDirectory(child.path),
@@ -101,6 +103,10 @@ void main() {
       throwsA(isA<FileSystemException>()),
     );
     await expectLater(
+      security.flushDirectory(metadata.path),
+      throwsA(isA<FileSystemException>()),
+    );
+    await expectLater(
       security.replaceTextFile(child.path, 'replacement'),
       throwsA(isA<FileSystemException>()),
     );
@@ -125,6 +131,10 @@ void main() {
     await link.create(child.path);
     await expectLater(
       security.verifyDirectory(link.path),
+      throwsA(isA<FileSystemException>()),
+    );
+    await expectLater(
+      security.flushDirectory(link.path),
       throwsA(isA<FileSystemException>()),
     );
 
@@ -159,11 +169,21 @@ void main() {
       throwsA(isA<FileSystemException>()),
     );
     await expectLater(
+      security.flushDirectory('relative_wallet'),
+      throwsA(isA<FileSystemException>()),
+    );
+    await expectLater(
       security.verifyDirectory(' ${root.path}'),
       throwsA(isA<FileSystemException>()),
     );
     await expectLater(
       security.verifyDirectory(
+        '${support.parent.path}${Platform.pathSeparator}outside_wallet',
+      ),
+      throwsA(isA<FileSystemException>()),
+    );
+    await expectLater(
+      security.flushDirectory(
         '${support.parent.path}${Platform.pathSeparator}outside_wallet',
       ),
       throwsA(isA<FileSystemException>()),

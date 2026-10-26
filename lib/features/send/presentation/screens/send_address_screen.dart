@@ -96,10 +96,10 @@ class _SendAddressScreenState extends ConsumerState<SendAddressScreen> {
   }
 
   Future<void> _paste() async {
+    final provider = sendFlowViewModelProvider(widget.target);
+    if (ref.read(provider).value?.canReadClipboard != true) return;
     final toasts = context.toasts;
-    final result = await ref
-        .read(sendFlowViewModelProvider(widget.target).notifier)
-        .pasteDestination();
+    final result = await ref.read(provider.notifier).pasteDestination();
     if (!mounted) return;
     switch (result) {
       case AppSuccess<String>():
@@ -154,7 +154,7 @@ class _SendAddressScreenState extends ConsumerState<SendAddressScreen> {
       if (walletId == null ||
           wallet.isLoading ||
           wallet.hasError ||
-          wallet.value?.switchingWalletId != null ||
+          wallet.value?.isChangingWallet == true ||
           wallet.value?.activeWallet?.id != walletId) {
         return false;
       }

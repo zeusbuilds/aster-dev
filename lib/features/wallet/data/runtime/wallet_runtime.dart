@@ -107,6 +107,11 @@ final class WalletRuntime {
   WalletProfile? get activeProfile => _activeProfile;
   Stream<WalletRuntimeSnapshot> get states => _states.stream;
 
+  bool get hasDeletionRecovery =>
+      _snapshot.phase == WalletRuntimePhase.failed &&
+      _snapshot.failure?.code == 'wallet_deletion_incomplete' &&
+      _reconciliationRollbackWalletId != null;
+
   /// A payment journal fence belongs to the active wallet, rather than the
   /// process or every wallet in its registry. Other native-owner failures are
   /// deliberately not eligible for payment-only read/lifecycle access.
@@ -317,9 +322,11 @@ final class WalletRuntime {
   }
 
   Future<AppResult<T>> run<T>(
-    Future<T> Function(WalletEngine engine) operation,
-  ) {
+    Future<T> Function(WalletEngine engine) operation, {
+    void Function()? authorize,
+  }) {
     return _enqueue(() async {
+      authorize?.call();
       final engine = _engine;
       if (engine == null || _snapshot.phase != WalletRuntimePhase.active) {
         return AppResult.failure(
@@ -333,6 +340,7 @@ final class WalletRuntime {
       }
       try {
         await recoverPaymentOwnerIfNeeded(engine);
+        authorize?.call();
         return AppResult.success(await operation(engine));
       } catch (error, stackTrace) {
         return AppResult.failure(FailureMapper.from(error, stackTrace));
@@ -376,8 +384,10 @@ final class WalletRuntime {
   /// must not dispatch wallet mutations in this lease. Other reconciliation
   /// failures retain the existing complete runtime quarantine.
   Future<AppResult<T>> readPaymentState<T>(
-    Future<T> Function(WalletEngine engine) operation,
-  ) => _enqueue(() async {
+    Future<T> Function(WalletEngine engine) operation, {
+    void Function()? authorize,
+  }) => _enqueue(() async {
+    authorize?.call();
     final engine = _engine;
     if (engine == null ||
         _paymentAuditSuspended ||
@@ -394,6 +404,7 @@ final class WalletRuntime {
     }
     try {
       await recoverPaymentOwnerIfNeeded(engine);
+      authorize?.call();
       return AppResult.success(await operation(engine));
     } catch (error, stackTrace) {
       return AppResult.failure(FailureMapper.from(error, stackTrace));
@@ -663,8 +674,12 @@ final class WalletRuntime {
     }, reconciliationAccess: _ReconciliationAccess.paymentLifecycle);
   }
 
-  Future<AppResult<String>> recoveryMnemonic(String walletId) {
+  Future<AppResult<String>> recoveryMnemonic(
+    String walletId, {
+    void Function()? authorize,
+  }) {
     return _enqueue(() async {
+      authorize?.call();
       if (_activeProfile?.id != walletId) {
         return AppResult.failure(
           const AppFailure(
@@ -687,6 +702,7 @@ final class WalletRuntime {
         );
       }
       final activeProfile = _activeProfile!;
+      authorize?.call();
       final result = await _secrets.read(
         walletId,
         expectedStorageToken: activeProfile.storageToken,
@@ -762,6 +778,102 @@ final class WalletRuntime {
         }
         return const AppResult.success(null);
       },
+      reconciliationAccess: _ReconciliationAccess.rollback,
+      reconciliationWalletId: walletId,
+      reconciliationRollbackWalletId: walletId,
+    );
+  }
+
+  /// Closes the target owner before erasing its secret and native store. The
+  /// caller must retain the deleting profile until every cleanup has finished.
+  /// Native close is uncancellable and must drain before any files are removed.
+  /// If native work never settles, process restart is the recovery boundary;
+  /// elapsed time never releases this owner for concurrent cleanup.
+  Future<AppResult<void>> deleteWallet(WalletProfile profile) {
+    return _enqueue(
+      () async {
+        if (profile.state != WalletProfileState.deleting) {
+          return AppResult.failure(_profileStateFailure(profile));
+        }
+        if (_activeProfile?.id == profile.id) {
+          final closed = await _destroyCurrentUnsafe();
+          if (closed case AppFailureResult<void>(:final failure)) {
+            return AppResult.failure(_deletionFailure(failure));
+          }
+        }
+        final secret = await _secrets.delete(
+          profile.id,
+          storageToken: profile.storageToken,
+        );
+        if (secret case AppFailureResult<void>(:final failure)) {
+          return AppResult.failure(_deletionFailure(failure));
+        }
+        try {
+          final directories = _directories;
+          if (directories is WalletDeletionDirectoryManager) {
+            await (directories as WalletDeletionDirectoryManager)
+                .removeDeletedWallet(
+                  profile.id,
+                  storageToken: profile.storageToken,
+                );
+          } else {
+            await directories.remove(
+              profile.id,
+              storageToken: profile.storageToken,
+            );
+          }
+          return const AppResult.success(null);
+        } catch (error, stackTrace) {
+          return AppResult.failure(
+            _deletionFailure(FailureMapper.from(error, stackTrace)),
+          );
+        }
+      },
+      reconciliationAccess: _ReconciliationAccess.rollback,
+      reconciliationWalletId: profile.id,
+      reconciliationRollbackWalletId: profile.id,
+    );
+  }
+
+  static AppFailure _deletionFailure(AppFailure cause) => AppFailure(
+    code: 'wallet_deletion_incomplete',
+    kind: AppFailureKind.storage,
+    userMessage: 'Wallet removal could not finish. Try again to finish it.',
+    retryable: false,
+    requiresReconciliation: true,
+    outcomeUnknown: cause.outcomeUnknown,
+    cause: cause,
+  );
+
+  /// Keeps the owner reusable when deletion's metadata acknowledgement is
+  /// uncertain. Only a verified registry/storage audit may release this fence.
+  Future<AppResult<void>> quarantineDeletion(
+    WalletProfile profile,
+    AppFailure cause,
+  ) => _enqueue(
+    () async {
+      if (_activeProfile?.id == profile.id) {
+        final closed = await _destroyCurrentUnsafe();
+        if (closed case AppFailureResult<void>(:final failure)) {
+          return AppResult.failure(_deletionFailure(failure));
+        }
+      }
+      return AppResult.failure(_deletionFailure(cause));
+    },
+    reconciliationAccess: _ReconciliationAccess.rollback,
+    reconciliationWalletId: profile.id,
+    reconciliationRollbackWalletId: profile.id,
+  );
+
+  /// Called after the registry and every ready profile's files/secret have
+  /// passed verification. Never releases an unrelated native-owner failure.
+  Future<AppResult<void>> recoverDeletionOwnership() {
+    final walletId = _reconciliationRollbackWalletId;
+    if (!hasDeletionRecovery || walletId == null) {
+      return Future.value(const AppResult.success(null));
+    }
+    return _enqueue(
+      _destroyCurrentUnsafe,
       reconciliationAccess: _ReconciliationAccess.rollback,
       reconciliationWalletId: walletId,
       reconciliationRollbackWalletId: walletId,

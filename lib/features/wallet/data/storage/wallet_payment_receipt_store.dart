@@ -2,6 +2,7 @@ import 'dart:io';
 
 import '../../../../core/errors/errors.dart';
 import 'wallet_registry_document_store.dart';
+import 'wallet_scoped_data_removal.dart';
 import 'wallet_storage_security.dart';
 
 /// Permanent accepted-payment receipts, separate from the latest intent fence.
@@ -16,11 +17,16 @@ abstract interface class WalletPaymentReceiptStore {
 
 /// Immutable, private receipt documents with the financial journal's strict
 /// checksum and durable-commit policy. A newer send never replaces an old key.
-final class IoWalletPaymentReceiptStore implements WalletPaymentReceiptStore {
+final class IoWalletPaymentReceiptStore
+    implements WalletPaymentReceiptStore, WalletScopedDataRemoval {
   const IoWalletPaymentReceiptStore(this.rootPath, this.security);
 
   final String rootPath;
   final WalletStorageSecurity security;
+
+  @override
+  Future<void> removeWallet(String walletId) =>
+      removeWalletScopedDirectory(rootPath, walletId, security);
 
   Future<String> _wallet(String walletId) async {
     if (!RegExp(r'^[a-f0-9]{32}$').hasMatch(walletId)) {

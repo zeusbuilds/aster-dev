@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Aster uses the camera to scan payment QR codes.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Use Face ID to unlock Aster and approve access to your recovery phrase and public keys.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

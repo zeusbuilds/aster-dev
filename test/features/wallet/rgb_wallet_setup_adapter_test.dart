@@ -106,7 +106,7 @@ void main() {
     'InsufficientAllocationSlots',
   ]) {
     test(
-      'typed $nativeCode offers explicit preparation without dispatch',
+      'typed $nativeCode during witness receive never offers paid preparation or retries',
       () async {
         when(wallet.listUnspents).thenAnswer(
           (_) async => [
@@ -124,9 +124,11 @@ void main() {
         when(wallet.listAssets).thenAnswer(
           (_) async => CoreListAssets(nia: [], cfa: [], ifa: [], uda: []),
         );
-        when(
-          () => wallet.onchainReceive(any()),
-        ).thenThrow(RgbNodeError('safe error', cause: _NativeCode(nativeCode)));
+        final failure = RgbNodeError(
+          'safe error',
+          cause: _NativeCode(nativeCode),
+        );
+        when(() => wallet.onchainReceive(any())).thenThrow(failure);
         final configured = RgbWalletEngine(
           wallet,
           const WalletServiceConfiguration(
@@ -140,7 +142,7 @@ void main() {
           UtexoUnlockConfig(),
         );
         await expectLater(
-          configured.createBlindRgbReceive(
+          configured.createReceiveRequest(
             PaymentRoute(
               asset: WalletAsset.rgbUsdt(
                 assetId: 'rgb:configured-usdt',
@@ -149,14 +151,14 @@ void main() {
               rail: PaymentRail.onchain,
             ),
           ),
-          throwsA(
-            isA<AppFailureException>().having(
-              (e) => e.failure.code,
-              'code',
-              'rgb_wallet_setup_required',
-            ),
-          ),
+          throwsA(same(failure)),
         );
+        final request =
+            verify(() => wallet.onchainReceive(captureAny())).captured.single
+                as RgbInvoiceRequest;
+        expect(request.witness, isTrue);
+        verifyNever(wallet.listUnspents);
+        verifyNever(wallet.getBtcBalance);
         verifyNever(
           () =>
               wallet.createUtxos(upTo: false, num: 4, size: 20000, feeRate: 20),
@@ -166,7 +168,7 @@ void main() {
   }
 
   test(
-    'native message text never triggers setup without its exact typed code',
+    'witness receive never infers paid preparation from native message text',
     () async {
       when(wallet.listAssets).thenAnswer(
         (_) async => CoreListAssets(nia: [], cfa: [], ifa: [], uda: []),

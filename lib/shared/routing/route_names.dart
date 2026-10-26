@@ -17,12 +17,16 @@ class RouteNames {
   static const String transactionList = 'transactionList';
   static const String transactionDetails = 'transactionDetails';
   static const String settings = 'settings';
+  static const String walletDetails = 'walletDetails';
   static const String scan = 'scan';
   static const String walletSelection = 'walletSelection';
   static const String addWallet = 'addWallet';
   static const String countrySelection = 'countrySelection';
   static const String currencySelection = 'currencySelection';
   static const String bitcoinUnitSelection = 'bitcoinUnitSelection';
+  static const String security = 'security';
+  static const String revealSeed = 'revealSeed';
+  static const String exportXpubs = 'exportXpubs';
   static const String advancedSettings = 'advancedSettings';
   static const String networkConfiguration = 'networkConfiguration';
 }

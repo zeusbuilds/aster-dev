@@ -91,7 +91,7 @@ void main() {
     );
   });
 
-  test('witness stays default and requires neither prepared outputs nor receiver Bitcoin', () async {
+  test('receive always uses witness and requires neither prepared outputs nor receiver Bitcoin', () async {
     spendable = 0;
     final request = await engine.createReceiveRequest(route);
     expect(request.encodedRequest, 'rgb:invoice');
@@ -99,66 +99,34 @@ void main() {
         verify(() => wallet.onchainReceive(captureAny())).captured.single
             as RgbInvoiceRequest;
     expect(native.witness, isTrue);
+    expect(native.assetId, isNull);
+    expect(native.amount, isNull);
     verifyNever(wallet.listUnspents);
     verifyNever(wallet.getBtcBalance);
   });
 
-  test('partly occupied native outputs do not block a genuine blind request or force paid setup', () async {
+  test('receive rejects a native blind invoice without preparing outputs or retrying', () async {
     kind = 'Blind';
-    when(wallet.listUnspents).thenAnswer(
-      (_) async => [
-        CoreUnspent(
-          utxo: CoreUtxo(
-            outpoint: Outpoint(txid: '2' * 64, vout: 0),
-            btcAmount: 20000,
-            colorable: true,
-            exists: true,
-          ),
-          rgbAllocations: [
-            CoreRgbAllocation(
-              assetId: asset.id.value,
-              assignment: Assignment(type: 'Fungible', amount: BigInt.one),
-              settled: true,
-            ),
-          ],
+    await expectLater(
+      engine.createReceiveRequest(route),
+      throwsA(
+        isA<NativeProtocolException>().having(
+          (error) => error.field,
+          'field',
+          'CoreInvoiceData',
         ),
-      ],
+      ),
     );
-    final request = await engine.createBlindRgbReceive(route);
-    expect(request.encodedRequest, 'rgb:invoice');
-    verify(() => wallet.onchainReceive(any())).called(1);
+    final request =
+        verify(() => wallet.onchainReceive(captureAny())).captured.single
+            as RgbInvoiceRequest;
+    expect(request.witness, isTrue);
     verifyNever(wallet.listUnspents);
+    verifyNever(wallet.getBtcBalance);
     verifyNever(
       () => wallet.createUtxos(upTo: false, num: 4, size: 20000, feeRate: 1),
     );
   });
-
-  test(
-    'explicit blind mode is forwarded without changing the witness default',
-    () async {
-      kind = 'Blind';
-      when(wallet.listUnspents).thenAnswer(
-        (_) async => [
-          CoreUnspent(
-            utxo: CoreUtxo(
-              outpoint: Outpoint(txid: '2' * 64, vout: 0),
-              btcAmount: 20000,
-              colorable: true,
-              exists: true,
-            ),
-            rgbAllocations: [],
-          ),
-        ],
-      );
-      await engine.createBlindRgbReceive(route);
-      expect(
-        (verify(() => wallet.onchainReceive(captureAny())).captured.single
-                as RgbInvoiceRequest)
-            .witness,
-        isFalse,
-      );
-    },
-  );
 
   test('witness preview and send bind the separately reviewed 1000-sat output exactly once', () async {
     final preview = await engine.decodeInvoice(route, 'rgb:invoice');
@@ -174,9 +142,12 @@ void main() {
     expect(request.feeRate, 1);
   });
 
-  test('blind send carries no additional Bitcoin output', () async {
+  test('blind recipient preview and send remain supported without an additional Bitcoin output', () async {
     kind = 'Blind';
-    await engine.sendPayment(command(RgbRecipientType.blind));
+    final preview = await engine.decodeInvoice(route, 'rgb:invoice');
+    expect(preview.rgbRecipientType, RgbRecipientType.blind);
+    expect(preview.witnessBitcoinAmountSats, isNull);
+    await engine.sendPayment(command(preview.rgbRecipientType));
     expect(
       (verify(() => wallet.onchainSend(captureAny())).captured.single
               as RgbSendRequest)

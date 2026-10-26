@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:aster/core/core.dart';
 import 'package:aster/features/home/presentation/screens/screens.dart';
@@ -184,13 +185,14 @@ void main() {
       final now = DateTime.utc(2026, 8, 11, 12);
       final preferencesWrite = Completer<void>();
       final releaseWrite = Completer<void>();
+      late _BlockingVisibilityPreferencesService preferencesService;
       final httpClient = _marketClient(now);
       final harness = await PaymentFlowTestHarness.create(
         clock: () => now,
         httpClient: httpClient,
         preferenceValues: const {'aster.settings.v1.balances_visible': true},
         preferenceServiceBuilder: (preferences) =>
-            _BlockingVisibilityPreferencesService(
+            preferencesService = _BlockingVisibilityPreferencesService(
               preferences,
               writeStarted: preferencesWrite,
               releaseWrite: releaseWrite,
@@ -213,8 +215,29 @@ void main() {
       final visibilityButton = tester.widget<AsterIconButton>(
         enabledVisibilityButton,
       );
+      final eyeRect = tester.getRect(enabledVisibilityButton);
       visibilityButton.onPressed!();
       await preferencesWrite.future;
+      await tester.pump();
+      final pendingButton = tester.widget<AsterIconButton>(
+        enabledVisibilityButton,
+      );
+      expect(pendingButton.loading, false);
+      expect(pendingButton.icon, visibilityButton.icon);
+      expect(pendingButton.tooltip, visibilityButton.tooltip);
+      expect(tester.getRect(enabledVisibilityButton), eyeRect);
+      final pendingSemantics = tester.getSemantics(
+        find.bySemanticsLabel('Hide balances'),
+      );
+      expect(
+        pendingSemantics.getSemanticsData().hasAction(ui.SemanticsAction.tap),
+        false,
+      );
+      await tester.tap(enabledVisibilityButton, warnIfMissed: false);
+      visibilityButton.onPressed!();
+      await tester.pump();
+      expect(preferencesService.writeCount, 1);
+      expect(harness.toasts.messages, isEmpty);
       harness.container.invalidate(settingsViewModelProvider);
       await tester.pump();
       releaseWrite.complete();
@@ -946,15 +969,17 @@ void main() {
     expect(find.byType(LinearProgressIndicator), findsNothing);
   });
 
-  testWidgets('offline history replaces only the chart and tap retries', (
+  testWidgets('offline chart shimmers quietly and recovers without a tap', (
     tester,
   ) async {
-    final now = DateTime.utc(2026, 8, 11, 12);
+    var now = DateTime.utc(2026, 8, 11, 12);
     var offline = true;
+    var requests = 0;
     final httpClient = ResilientHttpClient(
       client: MockClient((request) async {
+        requests += 1;
+        if (offline) throw const SocketException('offline');
         if (request.url.path.endsWith('/range')) {
-          if (offline) throw const SocketException('offline');
           return _historyResponse(
             now: now,
             firstPrice: 99000,
@@ -962,50 +987,174 @@ void main() {
           );
         }
         return _currentResponse(
-          observedAt: now.subtract(const Duration(minutes: 1)),
+          observedAt: now,
           bitcoinPrice: 100000,
+          usdtPrice: 1,
         );
       }),
       retryPolicy: RetryPolicy(maxAttempts: 1),
     );
-    final harness = await PaymentFlowTestHarness.create(
-      clock: () => now,
-      httpClient: httpClient,
-    );
+    final container = _priceContainer(httpClient, () => now);
     addTearDown(httpClient.close);
-    addTearDown(() => _disposeHarness(tester, harness));
+    addTearDown(container.dispose);
+    await _pumpMarketCard(tester, container);
+    await tester.pump();
 
-    await _pump(
-      tester,
-      harness,
-      const PriceCard(),
-      textScaler: const TextScaler.linear(2),
-    );
-    await _pumpUntil(
-      tester,
-      () => find.text("You're offline").evaluate().isNotEmpty,
-    );
-
-    expect(find.text(r'$100,000'), findsOneWidget);
-    expect(find.text("You're offline"), findsOneWidget);
-    expect(find.text('Tap to try again'), findsOneWidget);
+    expect(requests, 2);
     expect(
-      find.bySemanticsLabel("You're offline. Tap to try again."),
-      findsOneWidget,
+      tester.widget<CandleChart>(find.byType(CandleChart)).isSkeleton,
+      isTrue,
     );
-    expect(find.text('Check your connection and try again.'), findsNothing);
+    expect(find.text("You're offline"), findsNothing);
+    expect(find.text('Tap to try again'), findsNothing);
+    expect(find.byType(TextButton), findsNothing);
+    expect(find.bySemanticsLabel('Bitcoin price loading.'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
-    offline = false;
-    await tester.tap(find.text('Tap to try again'));
-    await _pumpUntil(
-      tester,
-      () =>
-          find.byType(CandleChart).evaluate().isNotEmpty &&
-          tester.widget<CandleChart>(find.byType(CandleChart)).isSkeleton ==
-              false,
+    now = now.add(const Duration(seconds: 1));
+    await tester.pump(const Duration(seconds: 1));
+    expect(requests, 4);
+    expect(
+      tester.widget<CandleChart>(find.byType(CandleChart)).isSkeleton,
+      isTrue,
     );
 
+    offline = false;
+    now = now.add(const Duration(seconds: 1));
+    await tester.pump(const Duration(seconds: 1));
+    expect(
+      requests,
+      4,
+      reason: 'The second failed read backs off for two seconds.',
+    );
+    now = now.add(const Duration(seconds: 1));
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+
+    expect(requests, 6);
+    expect(find.text(r'$100,000'), findsOneWidget);
+    expect(
+      tester.widget<CandleChart>(find.byType(CandleChart)).isSkeleton,
+      isFalse,
+    );
+    expect(find.text("You're offline"), findsNothing);
+    expect(find.text('Tap to try again'), findsNothing);
+    expect(find.byType(TextButton), findsNothing);
+
+    // Removing the surface disposes its provider: an expiry timer may not issue
+    // new network reads after the user leaves the owning tree.
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    final completedRequests = requests;
+    now = now.add(const Duration(hours: 1));
+    await tester.pump(const Duration(hours: 1));
+    expect(requests, completedRequests);
+  });
+
+  testWidgets(
+    'leaving Home drains an active chart read without restarting it',
+    (tester) async {
+      var now = DateTime.utc(2026, 8, 11, 12);
+      final releaseRead = Completer<void>();
+      var requests = 0;
+      final httpClient = ResilientHttpClient(
+        client: MockClient((request) async {
+          requests += 1;
+          if (requests <= 2) throw const SocketException('offline');
+          await releaseRead.future;
+          return request.url.path.endsWith('/range')
+              ? _historyResponse(now: now, firstPrice: 99000, lastPrice: 100000)
+              : _currentResponse(
+                  observedAt: now,
+                  bitcoinPrice: 100000,
+                  usdtPrice: 1,
+                );
+        }),
+        retryPolicy: RetryPolicy(maxAttempts: 1),
+      );
+      final container = _priceContainer(httpClient, () => now);
+      addTearDown(httpClient.close);
+      addTearDown(container.dispose);
+      addTearDown(() {
+        if (!releaseRead.isCompleted) releaseRead.complete();
+      });
+      await _pumpMarketCard(tester, container);
+      await tester.pump();
+      now = now.add(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+      expect(requests, 4);
+      expect(
+        container.read(bitcoinMarketViewModelProvider).requireValue.refreshing,
+        isTrue,
+      );
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      releaseRead.complete();
+      await tester.pump();
+      now = now.add(const Duration(hours: 1));
+      await tester.pump(const Duration(hours: 1));
+      expect(requests, 4);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('partial history failure retains only a still-current chart', (
+    tester,
+  ) async {
+    var now = DateTime.utc(2026, 8, 11, 12);
+    final originalObservation = now.subtract(
+      const Duration(minutes: 29, seconds: 59),
+    );
+    var historyOffline = false;
+    final httpClient = ResilientHttpClient(
+      client: MockClient((request) async {
+        if (request.url.path.endsWith('/range')) {
+          if (historyOffline) throw const SocketException('offline');
+          return _historyResponse(
+            now: now,
+            firstPrice: 99000,
+            lastPrice: 100000,
+          );
+        }
+        return _currentResponse(
+          observedAt: historyOffline ? now : originalObservation,
+          bitcoinPrice: historyOffline ? 101000 : 100000,
+          usdtPrice: 1,
+        );
+      }),
+      retryPolicy: RetryPolicy(maxAttempts: 1),
+    );
+    final container = _priceContainer(httpClient, () => now);
+    addTearDown(httpClient.close);
+    addTearDown(container.dispose);
+    addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+    await _pumpMarketCard(tester, container);
+    await tester.pump();
+    final originalChart = tester
+        .widget<CandleChart>(find.byType(CandleChart))
+        .data;
+    expect(originalChart, isNotEmpty);
+
+    historyOffline = true;
+    await container.read(bitcoinMarketViewModelProvider.notifier).retry();
+    await tester.pump();
+    final retained = tester.widget<CandleChart>(find.byType(CandleChart));
+    expect(retained.isSkeleton, isFalse);
+    expect(retained.data, originalChart);
+    expect(find.text(r'$101,000'), findsOneWidget);
+    expect(find.text("You're offline"), findsNothing);
+    expect(find.text('Tap to try again'), findsNothing);
+
+    // Fresh spot responses do not extend the old chart's original deadline.
+    now = now.add(const Duration(seconds: 1, milliseconds: 1));
+    await tester.pump(const Duration(seconds: 1, milliseconds: 1));
+    await tester.pump();
+    expect(find.text(r'$101,000'), findsOneWidget);
+    expect(
+      tester.widget<CandleChart>(find.byType(CandleChart)).isSkeleton,
+      isTrue,
+    );
     expect(find.text("You're offline"), findsNothing);
   });
 
@@ -1301,6 +1450,47 @@ WalletBalance _usdtBalance(WalletAsset asset) {
   );
 }
 
+ProviderContainer _priceContainer(
+  ResilientHttpClient httpClient,
+  UtcClock clock,
+) => ProviderContainer(
+  retry: (retryCount, error) => null,
+  overrides: [
+    utcClockProvider.overrideWithValue(clock),
+    resilientHttpClientProvider.overrideWithValue(httpClient),
+    selectedMarketQuoteCurrencyProvider.overrideWith(
+      (ref) async =>
+          MarketQuoteCurrency(code: 'USD', symbol: r'$', minorUnitDigits: 2),
+    ),
+    bitcoinMarketBackgroundRetryPolicyProvider.overrideWithValue(
+      RetryPolicy(
+        maxAttempts: 1,
+        baseDelay: const Duration(seconds: 1),
+        maximumDelay: const Duration(seconds: 8),
+        jitterFactor: 0,
+      ),
+    ),
+  ],
+);
+
+Future<void> _pumpMarketCard(WidgetTester tester, ProviderContainer container) {
+  _configurePhone(tester);
+  return tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        theme: AppTheme.light(),
+        home: const Scaffold(body: PriceCard()),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: const TextScaler.linear(2)),
+          child: child!,
+        ),
+      ),
+    ),
+  );
+}
+
 Future<void> _pump(
   WidgetTester tester,
   PaymentFlowTestHarness harness,
@@ -1399,10 +1589,12 @@ final class _BlockingVisibilityPreferencesService extends PreferencesService {
 
   final Completer<void> writeStarted;
   final Completer<void> releaseWrite;
+  var writeCount = 0;
 
   @override
   Future<void> setBool(String key, bool value) async {
     if (key == 'aster.settings.v1.balances_visible') {
+      writeCount += 1;
       if (!writeStarted.isCompleted) writeStarted.complete();
       await releaseWrite.future;
     }

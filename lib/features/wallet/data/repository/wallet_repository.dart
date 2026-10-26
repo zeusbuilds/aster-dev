@@ -2,6 +2,7 @@ import 'dart:async';
 
 import '../../../../core/config/app_environment.dart';
 import '../../../../core/errors/errors.dart';
+import '../../../../core/security/security_controller.dart';
 import '../../domain/models/models.dart';
 import '../runtime/runtime.dart';
 import '../storage/storage.dart';
@@ -28,6 +29,7 @@ final class WalletRepository implements WalletLifecycleRepository {
     this.rgbSetupStore,
     this.paymentJournalStore,
     this.paymentReceiptStore,
+    this.securityController,
   }) : _clock = clock ?? _utcNow {
     _services.validate();
   }
@@ -42,6 +44,7 @@ final class WalletRepository implements WalletLifecycleRepository {
   final RgbWalletSetupStore? rgbSetupStore;
   final WalletPaymentJournalStore? paymentJournalStore;
   final WalletPaymentReceiptStore? paymentReceiptStore;
+  final SecurityController? securityController;
   late final WalletPaymentSubmissions _submissions = WalletPaymentSubmissions(
     _runtime,
     paymentJournalStore,
@@ -68,6 +71,7 @@ final class WalletRepository implements WalletLifecycleRepository {
     _bitcoinInstructions,
     _enqueueOperation,
     beforeOnchainMutation: _assertOnchainMutationResolved,
+    captureAccessGuard: _captureAccessGuard,
     submissions: _submissions,
     clock: _clock,
   );
@@ -76,7 +80,8 @@ final class WalletRepository implements WalletLifecycleRepository {
   static const standardFeeTargetBlocks =
       WalletPaymentOperations.standardFeeTargetBlocks;
 
-  Future<AppResult<WalletRegistry>> load() => _enqueueOperation(_profiles.read);
+  Future<AppResult<WalletRegistry>> load() =>
+      _enqueueOperation(_profiles.read, requiresUnlocked: false);
 
   Future<AppResult<RgbWalletSetupReview>> prepareRgbWalletSetup() =>
       _enqueueOperation(() async {
@@ -116,12 +121,24 @@ final class WalletRepository implements WalletLifecycleRepository {
     return _enqueueOperation(_bootstrapUnsafe);
   }
 
+  /// Resumes only persisted deletion authority, then restores the surviving
+  /// selection. Does not ask for another delete grant or invent a new deletion.
+  Future<AppResult<WalletRegistry>> recoverWalletDeletion() =>
+      _enqueueOperation(_bootstrapUnsafe);
+
   Future<AppResult<WalletRegistry>> _bootstrapUnsafe() async {
     final registryResult = await _profiles.read();
     if (registryResult case AppFailureResult<WalletRegistry>()) {
       return registryResult;
     }
     var registry = (registryResult as AppSuccess<WalletRegistry>).value;
+    // Deletion authority was committed before any resource was removed. Finish
+    // only those exact records; never infer deletions from missing native data.
+    for (final deleting in registry.deletingProfiles) {
+      final cleanup = await _finishWalletDeletionUnsafe(deleting);
+      if (cleanup case AppFailureResult<WalletRegistry>()) return cleanup;
+      registry = (cleanup as AppSuccess<WalletRegistry>).value;
+    }
     for (final pending in registry.provisioningProfiles) {
       final cleanup = await _runtime.rollbackProvision(
         pending.id,
@@ -161,6 +178,10 @@ final class WalletRepository implements WalletLifecycleRepository {
     await _submissions.validateProfiles(registry.readyProfiles);
     final storageAudit = await _runtime.verifyStorage(registry.readyProfiles);
     if (storageAudit case AppFailureResult<void>(:final failure)) {
+      return AppResult.failure(failure);
+    }
+    final recoveredDeletion = await _runtime.recoverDeletionOwnership();
+    if (recoveredDeletion case AppFailureResult<void>(:final failure)) {
       return AppResult.failure(failure);
     }
     final active = registry.activeProfile;
@@ -417,6 +438,210 @@ final class WalletRepository implements WalletLifecycleRepository {
     return _enqueueOperation(() => _switchWalletUnsafe(walletId));
   }
 
+  /// Removes only the selected wallet from this device. A fresh, wallet-bound
+  /// authorization is consumed inside the serialized command. Once its deleting
+  /// profile is durable, cleanup must finish even if the app is backgrounded.
+  Future<AppResult<WalletRegistry>> deleteWallet(
+    String walletId, {
+    SensitiveAuthorization? authorization,
+  }) {
+    final assertAuthorized = _captureAccessGuard();
+    return _enqueueOperation(() async {
+      final controller = securityController;
+      if (controller != null &&
+          !controller.consume(
+            authorization,
+            SecurityPurpose.deleteWallet,
+            walletId: walletId,
+          )) {
+        return AppResult.failure(
+          const AppFailure(
+            code: 'wallet_deletion_authentication_required',
+            kind: AppFailureKind.authentication,
+            userMessage: 'Authenticate again to delete this wallet.',
+            retryable: true,
+          ),
+        );
+      }
+      final result = await _profiles.read();
+      if (result case AppFailureResult<WalletRegistry>(:final failure)) {
+        return AppResult.failure(failure);
+      }
+      final registry = (result as AppSuccess<WalletRegistry>).value;
+      final target = registry.readyProfiles
+          .where((profile) => profile.id == walletId)
+          .firstOrNull;
+      if (target == null) {
+        return AppResult.failure(
+          const AppFailure(
+            code: 'wallet_profile_not_found',
+            kind: AppFailureKind.notFound,
+            userMessage: 'That wallet is no longer available.',
+            retryable: false,
+          ),
+        );
+      }
+      if (registry.activeWalletId != walletId ||
+          _runtime.activeProfile?.id != walletId) {
+        return AppResult.failure(
+          const AppFailure(
+            code: 'wallet_deletion_select_wallet',
+            kind: AppFailureKind.conflict,
+            userMessage: 'Select this wallet before deleting it.',
+            retryable: true,
+          ),
+        );
+      }
+      if (registry.provisioningProfiles.isNotEmpty ||
+          registry.deletingProfiles.isNotEmpty) {
+        return AppResult.failure(_deletionRecoveryFailure());
+      }
+      final profiles = _profiles;
+      if (profiles is! WalletDeletionPersistence || !_canRemoveScopedData) {
+        return AppResult.failure(
+          const AppFailure(
+            code: 'wallet_deletion_unavailable',
+            kind: AppFailureKind.storage,
+            userMessage: 'Wallet deletion is unavailable. Try again later.',
+            retryable: false,
+          ),
+        );
+      }
+      final payment = await _submissions.assertWalletDeletionSafe(target);
+      if (payment case AppFailureResult<void>(:final failure)) {
+        return AppResult.failure(failure);
+      }
+      final setup = await _rgbSetup.assertWalletDeletionSafe(target);
+      if (setup case AppFailureResult<void>(:final failure)) {
+        return AppResult.failure(failure);
+      }
+      assertAuthorized?.call();
+      final audit = await _runtime.readPaymentState((engine) async {
+        if (engine is! WalletDeletionSafetyEngine) {
+          throw const AppFailureException(
+            AppFailure(
+              code: 'wallet_deletion_audit_unavailable',
+              kind: AppFailureKind.protocol,
+              userMessage: 'Wallet assets could not be checked. Try again.',
+              retryable: true,
+            ),
+          );
+        }
+        return (engine as WalletDeletionSafetyEngine).hasProtectedRgbState();
+      }, authorize: assertAuthorized);
+      if (audit case AppFailureResult<bool>(:final failure)) {
+        return AppResult.failure(failure);
+      }
+      if ((audit as AppSuccess<bool>).value) {
+        return AppResult.failure(
+          const AppFailure(
+            code: 'wallet_deletion_rgb_state_present',
+            kind: AppFailureKind.conflict,
+            userMessage:
+                'Send all USDT/RGB assets and finish pending requests before '
+                'deleting this wallet.',
+            retryable: false,
+          ),
+        );
+      }
+      assertAuthorized?.call();
+      final staged = await (profiles as WalletDeletionPersistence)
+          .stageDeletion(walletId);
+      if (staged case AppFailureResult<WalletRegistry>(:final failure)) {
+        // An ambiguous durable commit may already contain the delete marker.
+        // Do not reopen or erase anything until bootstrap reads its authority.
+        if (failure.requiresReconciliation) {
+          final quarantine = await _runtime.quarantineDeletion(target, failure);
+          return AppResult.failure(
+            quarantine is AppFailureResult<void>
+                ? quarantine.failure
+                : _deletionRecoveryFailure(cause: failure),
+          );
+        }
+        return AppResult.failure(failure);
+      }
+      final deleting = (staged as AppSuccess<WalletRegistry>)
+          .value
+          .deletingProfiles
+          .singleWhere((profile) => profile.id == walletId);
+      final cleaned = await _finishWalletDeletionUnsafe(deleting);
+      if (cleaned case AppFailureResult<WalletRegistry>()) return cleaned;
+      final after = (cleaned as AppSuccess<WalletRegistry>).value;
+      final next = after.activeProfile;
+      if (next != null) {
+        final opened = await _runtime.restore(next);
+        if (opened case AppFailureResult<void>(:final failure)) {
+          return AppResult.failure(
+            _deletionRecoveryFailure(cause: failure, committed: true),
+          );
+        }
+        final fence = await _restorePaymentFenceUnsafe();
+        if (fence case AppFailureResult<void>(:final failure)) {
+          return AppResult.failure(
+            _deletionRecoveryFailure(cause: failure, committed: true),
+          );
+        }
+      }
+      return AppResult.success(after);
+    });
+  }
+
+  bool get _canRemoveScopedData => <Object?>[
+    paymentJournalStore,
+    paymentReceiptStore,
+    rgbSetupStore,
+  ].every((store) => store == null || store is WalletScopedDataRemoval);
+
+  Future<AppResult<WalletRegistry>> _finishWalletDeletionUnsafe(
+    WalletProfile profile,
+  ) async {
+    if (!_canRemoveScopedData) {
+      return AppResult.failure(_deletionRecoveryFailure());
+    }
+    final removed = await _runtime.deleteWallet(profile);
+    if (removed case AppFailureResult<void>(:final failure)) {
+      return AppResult.failure(_deletionRecoveryFailure(cause: failure));
+    }
+    try {
+      for (final store in <Object?>{
+        paymentJournalStore,
+        paymentReceiptStore,
+        rgbSetupStore,
+      }) {
+        if (store is WalletScopedDataRemoval) {
+          await store.removeWallet(profile.id);
+        }
+      }
+    } catch (error, stackTrace) {
+      return AppResult.failure(
+        _deletionRecoveryFailure(cause: FailureMapper.from(error, stackTrace)),
+      );
+    }
+    final result = await _profiles.remove(profile.id);
+    if (result case AppFailureResult<WalletRegistry>(:final failure)) {
+      return AppResult.failure(_deletionRecoveryFailure(cause: failure));
+    }
+    _submissions.forgetDeletedWallet(profile.id);
+    return result;
+  }
+
+  static AppFailure _deletionRecoveryFailure({
+    AppFailure? cause,
+    bool committed = false,
+  }) => AppFailure(
+    code: committed
+        ? 'wallet_deleted_activation_failed'
+        : 'wallet_deletion_incomplete',
+    kind: AppFailureKind.storage,
+    userMessage: committed
+        ? 'Wallet deleted. Try again to open the next wallet.'
+        : 'Wallet removal could not finish. Try again to finish it.',
+    retryable: false,
+    requiresReconciliation: true,
+    outcomeUnknown: cause?.outcomeUnknown ?? false,
+    cause: cause,
+  );
+
   Future<AppResult<WalletRegistry>> _switchWalletUnsafe(String walletId) async {
     final registryResult = await _profiles.read();
     if (registryResult case AppFailureResult<WalletRegistry>()) {
@@ -562,15 +787,11 @@ final class WalletRepository implements WalletLifecycleRepository {
   ///
   /// Units are sats for Bitcoin on-chain, millisats for Bitcoin Lightning, and
   /// RGB smallest units for USDT. Omit [amountUnits] for an amountless request.
+  /// RGB requests always use witness receipt and never prepare Bitcoin outputs.
   Future<AppResult<WalletReceiveRequest>> createReceiveRequest(
     WalletPaymentTarget target, {
     int? amountUnits,
-    RgbReceiveMode rgbReceiveMode = RgbReceiveMode.witness,
-  }) => _payments.createReceiveRequest(
-    target,
-    amountUnits: amountUnits,
-    rgbReceiveMode: rgbReceiveMode,
-  );
+  }) => _payments.createReceiveRequest(target, amountUnits: amountUnits);
 
   /// Submits one non-retryable payment mutation through the serialized owner.
   /// On-chain sends require [reviewedFeeRate]; changed or expired quotes must
@@ -615,7 +836,8 @@ final class WalletRepository implements WalletLifecycleRepository {
 
   /// Suspends the native owner after all in-flight wallet metadata mutations.
   @override
-  Future<AppResult<void>> suspend() => _enqueueOperation(_runtime.suspend);
+  Future<AppResult<void>> suspend() =>
+      _enqueueOperation(_runtime.suspend, requiresUnlocked: false);
 
   /// Resumes the native owner and recovers only a known-safe runtime failure
   /// from the durable active profile.
@@ -643,18 +865,90 @@ final class WalletRepository implements WalletLifecycleRepository {
 
   /// Destroys the native owner after all repository mutations complete.
   @override
-  Future<AppResult<void>> dispose() => _enqueueOperation(_runtime.dispose);
+  Future<AppResult<void>> dispose() =>
+      _enqueueOperation(_runtime.dispose, requiresUnlocked: false);
 
   Future<AppResult<WalletNetworkStatus>> networkStatus() => _enqueueOperation(
     () => _runtime.readPaymentState((engine) => engine.getNetworkStatus()),
   );
 
-  Future<AppResult<WalletPublicKeys>> publicKeys() => _enqueueOperation(
-    () => _runtime.readPaymentState((engine) => engine.getPublicKeys()),
-  );
+  /// Each disclosure consumes a fresh authorization inside the serialized
+  /// operation, after earlier wallet/lifecycle changes have settled.
+  Future<AppResult<WalletPublicKeys>> publicKeys({
+    SensitiveAuthorization? authorization,
+    String? walletId,
+  }) => _enqueueOperation(() async {
+    final expectedWallet = walletId ?? _runtime.activeProfile?.id;
+    if (!_authorizeDisclosure(
+      authorization,
+      SecurityPurpose.exportXpubs,
+      expectedWallet,
+    )) {
+      return AppResult.failure(_disclosureAuthenticationFailure());
+    }
+    final generation = securityController?.generation;
+    final assertAuthorized = _captureAccessGuard();
+    final result = await _runtime.readPaymentState(
+      (engine) => engine.getPublicKeys(),
+      authorize: assertAuthorized,
+    );
+    if (!_disclosureStillCurrent(expectedWallet, generation)) {
+      return AppResult.failure(_disclosureAuthenticationFailure());
+    }
+    return result;
+  });
 
-  Future<AppResult<String>> recoveryMnemonic(String walletId) =>
-      _enqueueOperation(() => _runtime.recoveryMnemonic(walletId));
+  Future<AppResult<String>> recoveryMnemonic(
+    String walletId, {
+    SensitiveAuthorization? authorization,
+  }) => _enqueueOperation(() async {
+    if (!_authorizeDisclosure(
+      authorization,
+      SecurityPurpose.revealSeed,
+      walletId,
+    )) {
+      return AppResult.failure(_disclosureAuthenticationFailure());
+    }
+    final generation = securityController?.generation;
+    final result = await _runtime.recoveryMnemonic(
+      walletId,
+      authorize: _captureAccessGuard(),
+    );
+    if (!_disclosureStillCurrent(walletId, generation)) {
+      return AppResult.failure(_disclosureAuthenticationFailure());
+    }
+    return result;
+  });
+
+  bool _authorizeDisclosure(
+    SensitiveAuthorization? authorization,
+    SecurityPurpose purpose,
+    String? walletId,
+  ) {
+    // Legacy repository fixtures without a security controller still exercise
+    // the runtime's own identity/lifecycle checks. Production always injects
+    // the controller at the application composition root.
+    final controller = securityController;
+    if (controller == null) return true;
+    return walletId != null &&
+        _runtime.activeProfile?.id == walletId &&
+        controller.consume(authorization, purpose, walletId: walletId);
+  }
+
+  bool _disclosureStillCurrent(String? walletId, int? generation) {
+    final controller = securityController;
+    return controller == null ||
+        (controller.sensitiveVisible &&
+            controller.generation == generation &&
+            _runtime.activeProfile?.id == walletId);
+  }
+
+  static AppFailure _disclosureAuthenticationFailure() => const AppFailure(
+    code: 'wallet_disclosure_authentication_required',
+    kind: AppFailureKind.authentication,
+    userMessage: 'Unlock again to view this wallet information.',
+    retryable: true,
+  );
 
   Future<AppResult<void>> _assertOnchainMutationResolved() async {
     final payment = await _submissions.assertResolved();
@@ -663,11 +957,16 @@ final class WalletRepository implements WalletLifecycleRepository {
   }
 
   Future<AppResult<T>> _enqueueOperation<T>(
-    Future<AppResult<T>> Function() operation,
-  ) {
+    Future<AppResult<T>> Function() operation, {
+    bool requiresUnlocked = true,
+  }) {
+    // A foreground session cannot inherit work that was requested before a
+    // background/lock, even if the device has been unlocked by execution time.
+    final assertAuthorized = requiresUnlocked ? _captureAccessGuard() : null;
     final completer = Completer<AppResult<T>>();
     _operationTail = _operationTail.then((_) async {
       try {
+        assertAuthorized?.call();
         completer.complete(await operation());
       } catch (error, stackTrace) {
         completer.complete(
@@ -676,6 +975,24 @@ final class WalletRepository implements WalletLifecycleRepository {
       }
     });
     return completer.future;
+  }
+
+  void Function()? _captureAccessGuard() {
+    final controller = securityController;
+    if (controller == null) return null;
+    final generation = controller.generation;
+    return () {
+      if (!controller.canAccessWallet || controller.generation != generation) {
+        throw const AppFailureException(
+          AppFailure(
+            code: 'wallet_locked',
+            kind: AppFailureKind.authentication,
+            userMessage: 'Unlock Aster and try again.',
+            retryable: true,
+          ),
+        );
+      }
+    };
   }
 
   static bool _outcomeUnknown<T>(AppResult<T> result) => switch (result) {

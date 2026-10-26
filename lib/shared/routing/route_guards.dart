@@ -11,7 +11,9 @@ abstract final class RouteGuards {
     required AsyncValue<WalletState> walletState,
   }) {
     final wallet = walletState.value;
-    if (wallet == null) {
+    // Riverpod may retain a previous value on AsyncError. It is not authority
+    // to display a wallet after a partially committed deletion or switch.
+    if (walletState.hasError || wallet == null) {
       return location == RoutePaths.splash ? null : RoutePaths.splash;
     }
 

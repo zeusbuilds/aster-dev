@@ -142,6 +142,20 @@ Detailed refresh, UTXO existence and linked-IFA metadata are SDK capabilities,
 not newly exposed app APIs. Existing sync uses syncWallet; fee-aware Send Max
 and Swap remain unavailable rather than approximated or simulated.
 
+Aster's RGB Receive policy is witness-only, including initial requests, amount
+changes and regeneration. The app has no blind receive selector, output-
+preparation action or automatic fallback. New receive requests do not spend BTC.
+Flutter SDK blind receive remains supported for other consumers, and Aster Send
+still accepts valid blind recipients. The current bridge mint protocol requires
+blind recipients; its funding flow needs a separate SDK-backed receiver followed
+by an ordinary RGB transfer into Aster. It is not a direct Aster Receive route.
+
+The app retains the reader and mutation fence for preparation journals from
+earlier versions. Observational reconciliation can establish their status before
+later on-chain mutations. A pending or uncertain record stays protected and is
+never cleared or replayed because the Receive controls were removed. This policy
+does not qualify mainnet or resolve historical uncertain transactions.
+
 The optional SDK WebRGB provider supports witness receiving and approved native
 message signing. Its WalletConnect router is not a complete connection flow:
 Aster has no live WalletKit pairing/consent integration or configured Reown

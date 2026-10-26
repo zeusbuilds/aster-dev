@@ -46,6 +46,7 @@ final class OnboardingTestHarness {
     required this.preferences,
     required this.haptics,
     required this.toasts,
+    required this.security,
     required this.readClipboard,
   });
 
@@ -58,6 +59,7 @@ final class OnboardingTestHarness {
   final SharedPreferences preferences;
   final RecordingHapticFeedbackService haptics;
   final RecordingToastPresentationService toasts;
+  final SecurityController security;
   final String Function() readClipboard;
   var _disposed = false;
 
@@ -68,9 +70,16 @@ final class OnboardingTestHarness {
     Object? validationError,
     ResilientHttpClient? httpClient,
     AssetBundle? onboardingAssets,
+    SecurityController? securityController,
   }) async {
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
+    // Most onboarding cases intentionally exercise a device with no screen
+    // credential. This is the approved bypass policy, not an absent plugin.
+    final security =
+        securityController ??
+        SecurityController(const _UnsecuredDeviceAuthentication());
+    if (!security.initialized) await security.initialize(hasWallet: false);
     final engines = List<FakeWalletEngine>.generate(
       3,
       (_) => FakeWalletEngine(),
@@ -104,6 +113,7 @@ final class OnboardingTestHarness {
     final container = ProviderContainer(
       retry: applicationProviderRetryPolicy,
       overrides: [
+        securityControllerProvider.overrideWithValue(security),
         walletRepositoryProvider.overrideWith((ref) async => repository),
         bip39WordListRepositoryProvider.overrideWithValue(
           Bip39WordListRepository(onboardingAssets ?? rootBundle),
@@ -125,6 +135,7 @@ final class OnboardingTestHarness {
       preferences: preferences,
       haptics: haptics,
       toasts: toasts,
+      security: security,
       readClipboard: () => '',
     );
   }
@@ -133,7 +144,31 @@ final class OnboardingTestHarness {
     if (_disposed) return;
     _disposed = true;
     container.dispose();
+    security.dispose();
     await clipboard.dispose();
     await repository.dispose();
   }
+}
+
+final class _UnsecuredDeviceAuthentication implements DeviceAuthentication {
+  const _UnsecuredDeviceAuthentication();
+
+  @override
+  Future<DeviceSecurityStatus> status() async => DeviceSecurityStatus.unsecured;
+
+  @override
+  Future<DeviceAuthenticationResult> authenticate(String reason) async =>
+      throw StateError('An unsecured device must not show an auth prompt.');
+
+  @override
+  Future<void> cancel() async {}
+
+  @override
+  Future<void> setSensitive(bool sensitive) async {}
+
+  @override
+  Stream<bool> get captureChanges => const Stream<bool>.empty();
+
+  @override
+  bool get isCaptured => false;
 }

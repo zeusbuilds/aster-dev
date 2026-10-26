@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:aster/core/core.dart';
 import 'package:aster/features/receive/presentation/screens/screens.dart';
 import 'package:aster/features/receive/presentation/view_model/view_models.dart';
@@ -19,9 +21,13 @@ const _generationFailure = AppFailure(
 );
 
 void main() {
-  Future<PaymentFlowTestHarness> mount(WidgetTester tester) async {
+  Future<PaymentFlowTestHarness> mount(
+    WidgetTester tester, {
+    WalletPaymentTarget target = WalletPaymentTarget.bitcoinOnchain,
+  }) async {
     final harness = await PaymentFlowTestHarness.create(
       engine: FakeWalletEngine(),
+      services: testRgbServices,
     );
     addTearDown(() async {
       await tester.pumpWidget(const SizedBox.shrink());
@@ -44,16 +50,12 @@ void main() {
           home: AsterFeedbackScope(
             haptics: harness.haptics,
             toasts: harness.toasts,
-            child: const ReceiveRequestScreen(
-              target: WalletPaymentTarget.bitcoinOnchain,
-            ),
+            child: ReceiveRequestScreen(target: target),
           ),
         ),
       ),
     );
-    final provider = receiveFlowViewModelProvider(
-      WalletPaymentTarget.bitcoinOnchain,
-    );
+    final provider = receiveFlowViewModelProvider(target);
     for (
       var frame = 0;
       frame < 40 && !harness.container.read(provider).hasValue;
@@ -64,6 +66,103 @@ void main() {
     expect(harness.container.read(provider).hasValue, isTrue);
     await tester.pumpAndSettle();
     return harness;
+  }
+
+  for (final target in [
+    WalletPaymentTarget.bitcoinOnchain,
+    WalletPaymentTarget.usdtOnchain,
+  ]) {
+    testWidgets(
+      '${target.name} regeneration keeps the previous QR without progress copy or duplicate work',
+      (tester) async {
+        final harness = await mount(tester, target: target);
+        final provider = receiveFlowViewModelProvider(target);
+        final initial = harness.container.read(provider).requireValue.request!;
+        final initialQr = tester.widget<ReceiveRequestQr>(
+          find.byType(ReceiveRequestQr),
+        );
+        final gate = Completer<void>();
+        harness.engine.createReceiveGate = gate;
+        addTearDown(() {
+          if (!gate.isCompleted) gate.complete();
+        });
+        final replacement = WalletReceiveRequest(
+          route: initial.route,
+          encodedRequest: 'replacement-${target.slug}',
+          displayValue: 'replacement-${target.slug}',
+        );
+        harness.engine.createdReceiveRequest = replacement;
+        final callsBefore = harness.engine.calls
+            .where((call) => call == 'createReceiveRequest:start')
+            .length;
+        await tester.ensureVisible(find.text('Generate new request'));
+        final regenerate = tester
+            .widget<AsterOptionRow>(
+              find.widgetWithText(AsterOptionRow, 'Generate new request'),
+            )
+            .onTap!;
+        regenerate();
+        // A callback from the same frame must not start a second request.
+        regenerate();
+        for (var frame = 0; frame < 20; frame += 1) {
+          await tester.pump(const Duration(milliseconds: 16));
+          if (harness.engine.calls
+                  .where((call) => call == 'createReceiveRequest:start')
+                  .length >
+              callsBefore) {
+            break;
+          }
+        }
+        await tester.pump(const Duration(milliseconds: 250));
+        expect(
+          harness.container.read(provider).requireValue.isGenerating,
+          isTrue,
+        );
+        expect(harness.container.read(provider).requireValue.request, initial);
+        expect(
+          tester
+              .widget<ReceiveRequestQr>(find.byType(ReceiveRequestQr))
+              .encodedRequest,
+          initialQr.encodedRequest,
+        );
+        expect(find.text('Generating'), findsNothing);
+        expect(find.byType(AsterStatusMessage), findsNothing);
+        for (final title in ['Set amount', 'Generate new request', 'Share']) {
+          expect(
+            tester
+                .widget<AsterOptionRow>(
+                  find.widgetWithText(AsterOptionRow, title),
+                )
+                .onTap,
+            isNull,
+          );
+        }
+        expect(
+          harness.engine.calls
+              .where((call) => call == 'createReceiveRequest:start')
+              .length,
+          callsBefore + 1,
+        );
+        expect(harness.toasts.messages, isEmpty);
+        gate.complete();
+        await tester.pumpAndSettle();
+        expect(
+          harness.container.read(provider).requireValue.request,
+          replacement,
+        );
+        expect(find.text('Generating'), findsNothing);
+        expect(harness.toasts.messages, isEmpty);
+        expect(
+          tester
+              .widget<AsterOptionRow>(
+                find.widgetWithText(AsterOptionRow, 'Generate new request'),
+              )
+              .onTap,
+          isNotNull,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   testWidgets(

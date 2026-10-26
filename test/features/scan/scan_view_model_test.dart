@@ -414,6 +414,11 @@ void main() {
     session = second;
     container.invalidate(scanSessionProvider(purpose));
     await _waitFor(() => first.listenerCount == 0 && second.listenerCount == 1);
+    first.replaceSnapshot(
+      first.current.copyWith(galleryPhase: ScanGalleryPhase.analyzing),
+    );
+    expect(container.read(provider).galleryPhase, ScanGalleryPhase.idle);
+    expect(container.read(provider).galleryAnalyzing, isFalse);
     first.galleryGate!.complete(
       AppResult.success(
         ScanGalleryCaptured(

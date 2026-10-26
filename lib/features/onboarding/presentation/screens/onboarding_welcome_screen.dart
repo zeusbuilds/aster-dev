@@ -70,6 +70,11 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
   var _checkingDictionary = false;
   var _dictionaryCheckDeparted = false;
   var _dictionaryCheckRevision = 0;
+  var _authenticatingSetup = false;
+  late final SecurityController _security;
+  var _sensitiveLease = false;
+  ProviderSubscription<AsyncValue<CreateWalletState>>? _preparedCreate;
+  ProviderSubscription<AsyncValue<ImportWalletState>>? _preparedImport;
 
   bool get _transitioning => _outgoingStep != null;
 
@@ -77,6 +82,7 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _security = ref.read(securityControllerProvider);
     _transitionController = AnimationController(vsync: this, value: 1)
       ..addStatusListener(_handleTransitionStatus);
   }
@@ -86,7 +92,9 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
     super.didChangeDependencies();
     ModalRoute.isCurrentOf(context);
     TickerMode.valuesOf(context);
-    if (_checkingDictionary && !_ownsWelcomeInteraction) {
+    if (_checkingDictionary &&
+        !_authenticatingSetup &&
+        !_ownsWelcomeInteraction) {
       _dictionaryCheckDeparted = true;
     }
     final previous = _outgoingStep;
@@ -104,6 +112,9 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
   void dispose() {
     _dictionaryCheckRevision += 1;
     WidgetsBinding.instance.removeObserver(this);
+    _preparedCreate?.close();
+    _preparedImport?.close();
+    _releaseSensitive();
     _transitionController
       ..removeStatusListener(_handleTransitionStatus)
       ..dispose();
@@ -128,7 +139,7 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
         _step == _WalletSetupStep.welcome &&
         !_checkingDictionary &&
         !_transitioning;
-    return PopScope(
+    final journey = PopScope(
       canPop: canLeaveRoute,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop && !_transitioning && !operationLocked) {
@@ -158,11 +169,58 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
         ),
       ),
     );
+    return ListenableBuilder(
+      listenable: _security,
+      builder: (context, _) {
+        final captured = _sensitiveLease && _security.isCaptured;
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            Offstage(
+              offstage: captured,
+              child: TickerMode(
+                enabled: !captured,
+                child: ExcludeSemantics(
+                  excluding: captured,
+                  child: IgnorePointer(ignoring: captured, child: journey),
+                ),
+              ),
+            ),
+            if (captured) const Positioned.fill(child: SplashScreen()),
+          ],
+        );
+      },
+    );
+  }
+
+  static const _captureFailure = AppFailure(
+    code: 'wallet_setup_capture_active',
+    kind: AppFailureKind.unavailable,
+    userMessage: 'Stop screen sharing to continue.',
+    retryable: true,
+  );
+
+  Future<void> _acquireSensitive() async {
+    if (_sensitiveLease) return;
+    _sensitiveLease = true;
+    await _security.setSensitive(true);
+  }
+
+  void _releaseSensitive() {
+    if (!_sensitiveLease) return;
+    _sensitiveLease = false;
+    // Releasing a native cover can fail closed (over-protection), but must not
+    // escape as an unhandled async error after the route is disposed.
+    unawaited(_security.setSensitive(false).catchError((Object _) {}));
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed || !_checkingDictionary) return;
+    if (state == AppLifecycleState.resumed ||
+        !_checkingDictionary ||
+        _authenticatingSetup) {
+      return;
+    }
     _dictionaryCheckDeparted = true;
   }
 
@@ -187,20 +245,78 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
     await navigation.run(
       command: () async {
         AppFailure? failure;
+        int? authorizedGeneration;
         try {
+          _authenticatingSetup = true;
+          final security = ref.read(securityControllerProvider);
+          if (security.isCaptured) {
+            throw const AppFailureException(_captureFailure);
+          }
+          final authorization = await security.authorize(
+            SecurityPurpose.walletSetup,
+          );
+          if (authorization != null) {
+            // System authentication can complete before SecurityGate's queued
+            // unblocking frame updates this route's inherited TickerMode.
+            // Keep ownership of our own prompt until that frame is painted.
+            // Consume afterwards so a real background/lock during the wait
+            // invalidates the grant rather than continuing into private UI.
+            await WidgetsBinding.instance.endOfFrame;
+          }
+          _authenticatingSetup = false;
+          if (!mounted || revision != _dictionaryCheckRevision) return;
+          if (!security.consume(authorization, SecurityPurpose.walletSetup)) {
+            if (security.isCaptured) {
+              throw const AppFailureException(_captureFailure);
+            }
+            return;
+          }
+          if (!_ownsWelcomeInteraction) return;
+          authorizedGeneration = security.generation;
+          // The native prompt may have obscured the route. Its result belongs
+          // to this still-current welcome action, not to the dictionary loader.
+          _dictionaryCheckDeparted = false;
           final result = await ref
               .read(walletSetupPreflightViewModelProvider)
               .prepareRecoveryPhrase();
           if (result case AppFailureResult(failure: final value)) {
             failure = value;
+          } else {
+            if (!mounted ||
+                revision != _dictionaryCheckRevision ||
+                _dictionaryCheckDeparted ||
+                !_ownsWelcomeInteraction ||
+                authorizedGeneration != _security.generation) {
+              return;
+            }
+            // Acquire native screenshot/capture protection before any recovery
+            // words are generated or an import field becomes available.
+            await _acquireSensitive();
+            if (_security.isCaptured) {
+              failure = _captureFailure;
+            } else if (mounted &&
+                revision == _dictionaryCheckRevision &&
+                !_dictionaryCheckDeparted &&
+                _ownsWelcomeInteraction &&
+                authorizedGeneration == _security.generation &&
+                _security.sensitiveVisible) {
+              // Prepare the actual destination, not just its dictionary. The
+              // Welcome button owns this wait, and the subscription retains
+              // the same phrase/form through quiz and naming transitions.
+              await _prepareRecoveryStep(next);
+            }
           }
         } catch (error, stackTrace) {
+          _authenticatingSetup = false;
           failure = FailureMapper.from(error, stackTrace);
         }
         if (!mounted ||
             revision != _dictionaryCheckRevision ||
             _dictionaryCheckDeparted ||
-            !_ownsWelcomeInteraction) {
+            !_ownsWelcomeInteraction ||
+            (authorizedGeneration != null &&
+                (authorizedGeneration != _security.generation ||
+                    !_security.sensitiveVisible))) {
           return;
         }
         if (failure != null) {
@@ -219,7 +335,76 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
       blocksRoutePop: true,
     );
     if (mounted && revision == _dictionaryCheckRevision) {
+      if (_step == _WalletSetupStep.welcome) {
+        _discardPreparedBranch(next);
+        _releaseSensitive();
+      }
       setState(() => _checkingDictionary = false);
+    }
+  }
+
+  Future<void> _prepareRecoveryStep(_WalletSetupStep next) async {
+    switch (next) {
+      case _WalletSetupStep.createRecoveryPhrase:
+        _preparedCreate ??= ref.listenManual(
+          createWalletViewModelProvider,
+          (_, _) {},
+        );
+        await ref.read(createWalletViewModelProvider.future);
+      case _WalletSetupStep.importRecoveryPhrase:
+        _preparedImport ??= ref.listenManual(
+          importWalletViewModelProvider,
+          (_, _) {},
+        );
+        await ref.read(importWalletViewModelProvider.future);
+      case _WalletSetupStep.welcome ||
+          _WalletSetupStep.createRecoveryQuiz ||
+          _WalletSetupStep.createWalletName ||
+          _WalletSetupStep.importWalletName:
+        throw StateError('Only a recovery entry can be prepared from Welcome.');
+    }
+  }
+
+  void _discardPreparedBranch(
+    _WalletSetupStep step, {
+    bool afterOutgoingUnmounts = false,
+  }) {
+    switch (step) {
+      case _WalletSetupStep.createRecoveryPhrase:
+        _preparedCreate?.close();
+        _preparedCreate = null;
+        void discardCreate() {
+          if (mounted &&
+              _step == _WalletSetupStep.welcome &&
+              _preparedCreate == null) {
+            ref.invalidate(createWalletViewModelProvider);
+          }
+        }
+        if (afterOutgoingUnmounts) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => discardCreate());
+        } else {
+          discardCreate();
+        }
+      case _WalletSetupStep.importRecoveryPhrase:
+        _preparedImport?.close();
+        _preparedImport = null;
+        void discardImport() {
+          if (mounted &&
+              _step == _WalletSetupStep.welcome &&
+              _preparedImport == null) {
+            ref.invalidate(importWalletViewModelProvider);
+          }
+        }
+        if (afterOutgoingUnmounts) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => discardImport());
+        } else {
+          discardImport();
+        }
+      case _WalletSetupStep.welcome ||
+          _WalletSetupStep.createRecoveryQuiz ||
+          _WalletSetupStep.createWalletName ||
+          _WalletSetupStep.importWalletName:
+        break;
     }
   }
 
@@ -300,13 +485,19 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
       ),
       _WalletSetupStep.createRecoveryPhrase => OnboardingCreateWalletScreen(
         onBack: _showPreviousStep,
-        onContinue: () => _showStep(_WalletSetupStep.createRecoveryQuiz),
+        onContinue: () => _advancePreparedStep(
+          from: _WalletSetupStep.createRecoveryPhrase,
+          to: _WalletSetupStep.createRecoveryQuiz,
+        ),
         onBrandArt: true,
         showNavigationBar: false,
       ),
       _WalletSetupStep.createRecoveryQuiz => CreateWalletQuizScreen(
         onBack: _showPreviousStep,
-        onContinue: () => _showStep(_WalletSetupStep.createWalletName),
+        onContinue: () => _advancePreparedStep(
+          from: _WalletSetupStep.createRecoveryQuiz,
+          to: _WalletSetupStep.createWalletName,
+        ),
         onBrandArt: true,
         showNavigationBar: false,
       ),
@@ -318,7 +509,10 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
       ),
       _WalletSetupStep.importRecoveryPhrase => OnboardingImportWalletScreen(
         onBack: _showPreviousStep,
-        onContinue: () => _showStep(_WalletSetupStep.importWalletName),
+        onContinue: () => _advancePreparedStep(
+          from: _WalletSetupStep.importRecoveryPhrase,
+          to: _WalletSetupStep.importWalletName,
+        ),
         onBrandArt: true,
         showNavigationBar: false,
       ),
@@ -448,6 +642,44 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
     }
   }
 
+  void _advancePreparedStep({
+    required _WalletSetupStep from,
+    required _WalletSetupStep to,
+  }) {
+    if (!mounted || _step != from || _transitioning) return;
+    final create =
+        from == _WalletSetupStep.createRecoveryPhrase ||
+            from == _WalletSetupStep.createRecoveryQuiz
+        ? ref.read(createWalletViewModelProvider).asData?.value
+        : null;
+    final imported = from == _WalletSetupStep.importRecoveryPhrase
+        ? ref.read(importWalletViewModelProvider).asData?.value
+        : null;
+    final ready = switch ((from, to)) {
+      (
+        _WalletSetupStep.createRecoveryPhrase,
+        _WalletSetupStep.createRecoveryQuiz,
+      ) =>
+        create?.canContinue == true && create?.requiresReconciliation == false,
+      (
+        _WalletSetupStep.createRecoveryQuiz,
+        _WalletSetupStep.createWalletName,
+      ) =>
+        create?.canContinue == true &&
+            create?.requiresReconciliation == false &&
+            create?.quizComplete == true,
+      (
+        _WalletSetupStep.importRecoveryPhrase,
+        _WalletSetupStep.importWalletName,
+      ) =>
+        imported?.canContinue == true &&
+            imported?.requiresReconciliation == false,
+      _ => false,
+    };
+    if (!ready) return;
+    _showStep(to);
+  }
+
   void _showStep(
     _WalletSetupStep next, {
     HapticIntent? hapticIntent = HapticIntent.lightImpact,
@@ -481,17 +713,20 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
     _WalletSetupStep next,
   ) {
     if (next != _WalletSetupStep.welcome) return;
-    switch (previous) {
-      case _WalletSetupStep.createRecoveryPhrase:
-        ref.invalidate(createWalletViewModelProvider);
-      case _WalletSetupStep.importRecoveryPhrase:
-        ref.invalidate(importWalletViewModelProvider);
-      case _WalletSetupStep.welcome ||
-          _WalletSetupStep.createRecoveryQuiz ||
-          _WalletSetupStep.createWalletName ||
-          _WalletSetupStep.importWalletName:
-        break;
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Native capture protection must outlive the final painted phrase frame.
+      // A new welcome action, if any, inherits and owns the existing lease.
+      if (mounted &&
+          _step == _WalletSetupStep.welcome &&
+          !_checkingDictionary) {
+        _releaseSensitive();
+      }
+    });
+    // The outgoing widget remains mounted until this frame's rebuild. Clearing
+    // its watched provider earlier would start a second phrase generation just
+    // as the user abandons it. Drop the retained subscription now, then clear
+    // the branch once its old presentation has unmounted.
+    _discardPreparedBranch(previous, afterOutgoingUnmounts: true);
   }
 }
 

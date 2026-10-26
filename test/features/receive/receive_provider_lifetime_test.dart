@@ -41,7 +41,7 @@ void main() {
     expect(value, isNot(isA<Exception>()));
   });
 
-  test('Receive retains real settings dependencies over slow frames and a mode change', () async {
+  test('Receive retains real settings dependencies over slow frames and request regeneration', () async {
     final harness = await PaymentFlowTestHarness.create(
       services: testRgbServices,
     );
@@ -83,17 +83,12 @@ void main() {
     final initial = await container.read(provider.future);
     expect(initial.request, isNotNull);
     await container.pump();
-    await container
-        .read(provider.notifier)
-        .setRgbReceiveMode(RgbReceiveMode.blind);
-    final next = container.read(provider);
-    expect(next.hasError, isTrue);
-    final failure = (next.error! as AppFailureException).failure;
-    expect(failure.code, 'rgb_blind_receive_unavailable');
+    expect(await container.read(provider.notifier).regenerate(), isTrue);
+    expect(container.read(provider).hasError, isFalse);
     expect(settingsDisposed, isFalse);
     expect(
       harness.engine.calls.where((c) => c == 'createReceiveRequest:start'),
-      hasLength(1),
+      hasLength(2),
     );
   });
 

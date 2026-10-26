@@ -7,6 +7,7 @@ import 'package:aster/features/market/domain/models/models.dart';
 import 'package:aster/features/receive/presentation/screens/screens.dart';
 import 'package:aster/features/receive/presentation/view_model/view_models.dart';
 import 'package:aster/features/receive/presentation/widgets/widgets.dart';
+import 'package:aster/features/send/presentation/models/models.dart';
 import 'package:aster/features/send/presentation/screens/screens.dart';
 import 'package:aster/features/send/presentation/view_model/view_models.dart';
 import 'package:aster/features/send/presentation/widgets/widgets.dart';
@@ -29,6 +30,72 @@ import '../../support/wallet_fakes.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('Paste reads once quietly and recovers after clipboard failure', (
+    tester,
+  ) async {
+    final harness = await PaymentFlowTestHarness.create();
+    addTearDown(() => _disposeHarness(tester, harness));
+    final gate = Completer<void>();
+    harness.clipboard
+      ..readGate = gate
+      ..readFailure = const AppFailure(
+        code: 'clipboard_unavailable',
+        kind: AppFailureKind.unavailable,
+        userMessage: 'Clipboard could not be read.',
+        retryable: true,
+      );
+    const target = WalletPaymentTarget.bitcoinOnchain;
+    final provider = sendFlowViewModelProvider(target);
+    await _pumpWidget(tester, harness, const SendAddressScreen(target: target));
+    final paste = find.widgetWithText(CustomButton, 'Paste');
+    await _pumpUntil(
+      tester,
+      () => paste.evaluate().any(
+        (element) => (element.widget as CustomButton).onTap != null,
+      ),
+    );
+    final original = tester.widget<CustomButton>(paste);
+    final before = tester.getRect(paste);
+    original.onTap!();
+    original.onTap!();
+    await tester.pump();
+    expect(tester.widget<CustomButton>(paste).loading, false);
+    expect(tester.widget<CustomButton>(paste).enabled, true);
+    expect(tester.getRect(paste), before);
+    expect(
+      harness.container.read(provider).requireValue.operation,
+      SendFlowOperation.readingClipboard,
+    );
+    final semantics = tester.getSemantics(find.bySemanticsLabel('Paste'));
+    expect(semantics.flagsCollection.isEnabled, ui.Tristate.isFalse);
+    expect(
+      semantics.getSemanticsData().hasAction(ui.SemanticsAction.tap),
+      false,
+    );
+    await tester.tap(paste, warnIfMissed: false);
+    expect(harness.toasts.messages, isEmpty);
+    gate.complete();
+    await _pumpUntil(tester, () => harness.toasts.messages.isNotEmpty);
+    expect(harness.toasts.messages, hasLength(1));
+    expect(harness.toasts.messages.single.title, 'Could not paste');
+    expect(find.text('Clipboard could not be read.'), findsNothing);
+
+    harness.clipboard
+      ..readFailure = null
+      ..text = 'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn';
+    await tester.tap(paste);
+    await _pumpUntil(
+      tester,
+      () => find.widgetWithText(CustomButton, 'Clear').evaluate().isNotEmpty,
+    );
+    expect(
+      harness.container.read(provider).requireValue.destination,
+      'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn',
+    );
+    expect(harness.toasts.messages, hasLength(1));
+    expect(tester.takeException(), isNull);
+  });
 
   for (final (name, screen) in [
     ('Send', const SendScreen()),
