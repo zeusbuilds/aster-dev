@@ -46,9 +46,13 @@ uses a separately versioned Flutter integration built from a sealed source,
 overlay and lock with exact archive digests; it never relabels official RN
 BFA.5 bytes. Runtime metadata is checked before key access. Authenticated Git
 restoration and host tests alone do not establish funded production readiness.
-Any local artifact-directory override qualifies only that machine; a portable
-SDK install also requires the exact pinned archives to be published and
-reachable. Product activation remains gated independently of distribution.
+Any local artifact-directory override qualifies only that machine. The exact
+pinned BFA.7 archives are now available in the public
+[native beta](https://github.com/UTEXO-Protocol/flutter-sdk/releases/tag/native-bfa7-flutter.1).
+Fresh native-cache acquisition passed through the actual SDK Android Gradle
+verification task and the iOS installer without artifact overrides or credentials;
+archive digests and embedded identities match the existing source pin. Product
+activation remains gated independently of distribution.
 
 Historical published baseline: public SDK beta.2 commit
 `992b86ee528d0811bd17cedca901de08561c1982` added typed public-contract import,
@@ -78,10 +82,10 @@ fvm flutter test
 ```
 
 Both iOS and Android builds are required for release acceptance of a new SDK
-commit. A source-only candidate push does not close those platform gates;
-Android builds remain deferred at the author's direction.
+commit. The current pin builds Android arm64 Debug and iOS Simulator Debug;
+signed-release, device and funds-bearing acceptance remain separate gates.
 
-The published native baseline targets RN `1.0.0-beta.39` (commit
+The published legacy RLN baseline targets RN `1.0.0-beta.39` (commit
 `41ff170f794edff2a1822a672ddab37e29505f14`), core `1.0.0-beta.9`, WebRGB
 `0.1.3`, and RLN `0.17.0-beta.3`. The app's Flutter 3.47.7 / Dart 3.13.5,
 iOS 18.5 minimum, Android compile/target SDK 37 and Java 17 compilation already

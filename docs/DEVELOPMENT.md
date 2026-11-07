@@ -277,10 +277,15 @@ BFA.7 Flutter native integration. Its current arm64 Debug APK passes all ten
 packaged native ELF checks and 16 KiB ZIP alignment. The exact pinned graph
 also builds the iOS Simulator Debug app. These are compilation and packaging
 results, not a fresh Aster device launch or signed-release qualification.
-Both builds used checksum-verified local BFA.7 archives while their public
-native-beta publication is awaiting explicit approval. Fresh default mobile
-builds require those pinned archives to be published. RGB_L1 and Dev activation
-remain closed; the SDK's `doc/BFA7_QUALIFICATION.md` distinguishes real isolated
+Both builds used checksum-verified local BFA.7 archives before publication.
+The matching archives are now published in
+[native-bfa7-flutter.1](https://github.com/UTEXO-Protocol/flutter-sdk/releases/tag/native-bfa7-flutter.1).
+Fresh native-cache acquisition passed through the actual SDK Android Gradle
+verification task and the iOS installer, including all Apple framework slices,
+with no local archive overrides or authentication. Public downloads match the
+same immutable sizes and SHA-256 values; no SDK pin change is needed.
+RGB_L1 and Dev activation remain closed. The release's qualification record and
+the SDK's `doc/BFA7_QUALIFICATION.md` distinguish distribution and isolated
 native/mobile transfer evidence from the remaining product/deployment gates.
 
 ### iOS Release Archives
