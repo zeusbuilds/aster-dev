@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:aster/core/config/signet_deployment.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../tool/release_configuration_manifest.dart';
@@ -8,6 +9,45 @@ import '../../tool/verify_release_configuration.dart';
 
 void main() {
   group('ReleaseConfigurationManifest', () {
+    test('Dev profile and mixed Dev evidence fail before a release build', () {
+      ReleaseConfigurationManifest parse(Map<String, String> overrides) =>
+          ReleaseConfigurationManifest.parse(
+            _manifest({..._baseValues, ...overrides}),
+            audience: ReleaseAudience.internalBeta,
+          );
+      expect(
+        parse({ReleaseConfigurationKey.signetDeployment: 'public'}).values,
+        containsPair(ReleaseConfigurationKey.signetDeployment, 'public'),
+      );
+      for (final profile in ['dev-signet', 'utexo', 'dev', 'Public']) {
+        expect(
+          () => parse({ReleaseConfigurationKey.signetDeployment: profile}),
+          throwsFormatException,
+        );
+      }
+      for (final id in UtexoDevSignetPolicy.quarantinedAssetIds) {
+        expect(
+          () => parse({ReleaseConfigurationKey.usdtAssetId: id}),
+          throwsFormatException,
+        );
+      }
+      for (final host in UtexoDevSignetPolicy.quarantinedHosts) {
+        for (final key in [
+          ReleaseConfigurationKey.indexerUrl,
+          ReleaseConfigurationKey.rgbProxyUrl,
+          ReleaseConfigurationKey.vssUrl,
+          ReleaseConfigurationKey.lspUrl,
+          ReleaseConfigurationKey.explorerUrl,
+          ReleaseConfigurationKey.ethRpcUrl,
+        ]) {
+          expect(
+            () => parse({key: 'https://${host.toUpperCase()}:443/other'}),
+            throwsFormatException,
+          );
+        }
+      }
+    });
+
     test('RGB_L1 deployment is blocked until durable sends are qualified', () {
       ReleaseConfigurationManifest parse(String backend) =>
           ReleaseConfigurationManifest.parse(

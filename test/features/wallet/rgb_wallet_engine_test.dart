@@ -30,6 +30,45 @@ const _nodeInfo = WalletNodeInfo(
 );
 
 void main() {
+  test('unqualified Dev configuration cannot construct a native wallet', () {
+    final sdk = MockRgbSdkFlutter();
+    for (final configuration in [
+      const WalletServiceConfiguration(
+        environment: BlockchainEnvironment.signet,
+        sdkNetwork: 'utexo',
+        signetDeployment: SignetDeployment.utexoDev,
+      ),
+      const WalletServiceConfiguration(
+        environment: BlockchainEnvironment.signet,
+        sdkNetwork: 'utexo',
+        indexerUrl: 'https://dev.esplora-01.mint.utexo.com',
+      ),
+      const WalletServiceConfiguration(
+        environment: BlockchainEnvironment.signet,
+        sdkNetwork: 'utexo',
+        usdtAsset: RgbAssetConfiguration(
+          contractId: 'rgb:unbound-bfa',
+          precision: 6,
+        ),
+      ),
+    ]) {
+      expect(
+        () => RgbWalletServiceConfigurationResolver.resolve(configuration),
+        throwsA(isA<AppConfigurationException>()),
+      );
+      expect(
+        () => RgbWalletEngineFactory.withSdk(sdk).create(
+          WalletEngineConfiguration(
+            storageDirectory: '/untouched-wallet',
+            services: configuration,
+          ),
+        ),
+        throwsA(isA<AppConfigurationException>()),
+      );
+    }
+    verifyZeroInteractions(sdk);
+  });
+
   const services = WalletServiceConfiguration(
     environment: BlockchainEnvironment.regtest,
     sdkNetwork: 'regtest',
@@ -111,22 +150,30 @@ void main() {
     expect(config.ldkPeerListeningPort, 19736);
   });
 
-  test('resolves and validates immutable SDK endpoint defaults once', () {
-    const configured = WalletServiceConfiguration(
-      environment: BlockchainEnvironment.signet,
-      sdkNetwork: 'utexo',
-      explorerBaseUrl: 'https://mempool.space/signet',
-    );
+  test(
+    'public Signet resolves public services instead of legacy Dev defaults',
+    () {
+      const configured = WalletServiceConfiguration(
+        environment: BlockchainEnvironment.signet,
+        sdkNetwork: 'utexo',
+        explorerBaseUrl: 'https://mempool.space/signet',
+      );
 
-    final resolved = RgbWalletServiceConfigurationResolver.resolve(configured);
+      final resolved = RgbWalletServiceConfigurationResolver.resolve(
+        configured,
+      );
 
-    expect(resolved.indexerUrl, 'https://esplora-api.utexo.com');
-    expect(resolved.rgbTransportProxy, 'rpcs://rgb-proxy.utexo.com/json-rpc');
-    expect(resolved.lspBaseUrl, 'https://lsp-signet.utexo.com');
-    expect(resolved.explorerBaseUrl, configured.explorerBaseUrl);
-    expect(resolved.environment, configured.environment);
-    expect(resolved.sdkNetwork, configured.sdkNetwork);
-  });
+      expect(resolved.indexerUrl, 'https://mempool.space/signet/api');
+      expect(
+        resolved.rgbTransportProxy,
+        'rpcs://proxy.iriswallet.com/0.2/json-rpc',
+      );
+      expect(resolved.lspBaseUrl, 'https://lsp-signet.utexo.com');
+      expect(resolved.explorerBaseUrl, configured.explorerBaseUrl);
+      expect(resolved.environment, configured.environment);
+      expect(resolved.sdkNetwork, configured.sdkNetwork);
+    },
+  );
 
   test('release resolution rejects the SDK insecure regtest default', () {
     const unconfigured = WalletServiceConfiguration(
@@ -1455,7 +1502,11 @@ void main() {
     const configuredServices = WalletServiceConfiguration(
       environment: BlockchainEnvironment.regtest,
       sdkNetwork: 'regtest',
-      usdtAsset: RgbAssetConfiguration(contractId: assetId, precision: 6),
+      usdtAsset: RgbAssetConfiguration(
+        contractId: assetId,
+        precision: 6,
+        requiresEvmValidation: false,
+      ),
     );
     final invoice = 'r' * (WalletProtocolText.maximumQrPayloadCharacters + 1);
     final wallet = MockUtexoWallet();
@@ -1605,7 +1656,11 @@ void main() {
     const configuredServices = WalletServiceConfiguration(
       environment: BlockchainEnvironment.regtest,
       sdkNetwork: 'regtest',
-      usdtAsset: RgbAssetConfiguration(contractId: assetId, precision: 6),
+      usdtAsset: RgbAssetConfiguration(
+        contractId: assetId,
+        precision: 6,
+        requiresEvmValidation: false,
+      ),
     );
     final asset = WalletAsset.rgbUsdt(assetId: assetId, precision: 6);
     final route = PaymentRoute(asset: asset, rail: PaymentRail.onchain);
@@ -1691,7 +1746,11 @@ void main() {
       const configuredServices = WalletServiceConfiguration(
         environment: BlockchainEnvironment.regtest,
         sdkNetwork: 'regtest',
-        usdtAsset: RgbAssetConfiguration(contractId: assetId, precision: 6),
+        usdtAsset: RgbAssetConfiguration(
+          contractId: assetId,
+          precision: 6,
+          requiresEvmValidation: false,
+        ),
       );
       final asset = WalletAsset.rgbUsdt(assetId: assetId, precision: 6);
       final route = PaymentRoute(asset: asset, rail: PaymentRail.onchain);
@@ -1774,7 +1833,11 @@ void main() {
       const configuredServices = WalletServiceConfiguration(
         environment: BlockchainEnvironment.regtest,
         sdkNetwork: 'regtest',
-        usdtAsset: RgbAssetConfiguration(contractId: assetId, precision: 6),
+        usdtAsset: RgbAssetConfiguration(
+          contractId: assetId,
+          precision: 6,
+          requiresEvmValidation: false,
+        ),
       );
       final asset = WalletAsset.rgbUsdt(assetId: assetId, precision: 6);
       final route = PaymentRoute(asset: asset, rail: PaymentRail.lightning);
@@ -1991,7 +2054,11 @@ void main() {
     const configuredServices = WalletServiceConfiguration(
       environment: BlockchainEnvironment.regtest,
       sdkNetwork: 'regtest',
-      usdtAsset: RgbAssetConfiguration(contractId: assetId, precision: 6),
+      usdtAsset: RgbAssetConfiguration(
+        contractId: assetId,
+        precision: 6,
+        requiresEvmValidation: false,
+      ),
     );
     final asset = WalletAsset.rgbUsdt(assetId: assetId, precision: 6);
     final rgbRoute = PaymentRoute(asset: asset, rail: PaymentRail.onchain);
@@ -2457,6 +2524,7 @@ void main() {
           usdtAsset: RgbAssetConfiguration(
             contractId: 'rgb-usdt',
             precision: 6,
+            requiresEvmValidation: false,
           ),
         );
         final engine = RgbWalletEngine(wallet, configured, UtexoUnlockConfig());

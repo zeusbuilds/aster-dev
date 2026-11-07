@@ -1191,6 +1191,16 @@ final class WalletRuntime {
   }
 
   AppFailure? _profileConfigurationFailure(WalletProfile profile) {
+    try {
+      _services.validate();
+    } on AppConfigurationException {
+      return const AppFailure(
+        code: 'wallet_configuration_invalid',
+        kind: AppFailureKind.configuration,
+        userMessage: 'This wallet configuration is unavailable.',
+        retryable: false,
+      );
+    }
     if (profile.environment != _services.environment) {
       return const AppFailure(
         code: 'wallet_network_mismatch',
@@ -1206,6 +1216,24 @@ final class WalletRuntime {
         userMessage: 'This wallet uses a different wallet format.',
         retryable: false,
       );
+    }
+    if (profile.environment == BlockchainEnvironment.signet) {
+      if (profile.signetDeployment == null) {
+        return const AppFailure(
+          code: 'wallet_signet_deployment_unverified',
+          kind: AppFailureKind.configuration,
+          userMessage: 'This wallet’s Signet deployment could not be verified.',
+          retryable: false,
+        );
+      }
+      if (profile.signetDeployment != _services.signetDeployment) {
+        return const AppFailure(
+          code: 'wallet_signet_deployment_mismatch',
+          kind: AppFailureKind.configuration,
+          userMessage: 'This wallet belongs to a different Signet deployment.',
+          retryable: false,
+        );
+      }
     }
     return null;
   }

@@ -31,6 +31,7 @@ void main() {
         usdtAsset: RgbAssetConfiguration(
           contractId: 'deployment-owned-contract',
           precision: 6,
+          requiresEvmValidation: false,
         ),
       ),
     );

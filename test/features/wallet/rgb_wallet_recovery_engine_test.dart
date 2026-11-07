@@ -32,7 +32,11 @@ const _coloredKey = 'tpub-readonly-fixture-full-colored-account-key';
 const _services = WalletServiceConfiguration(
   environment: BlockchainEnvironment.regtest,
   sdkNetwork: 'regtest',
-  usdtAsset: RgbAssetConfiguration(contractId: _assetId, precision: 6),
+  usdtAsset: RgbAssetConfiguration(
+    contractId: _assetId,
+    precision: 6,
+    requiresEvmValidation: false,
+  ),
 );
 final _now = DateTime.utc(2026, 10, 24, 10);
 final _asset = WalletAsset.rgbUsdt(assetId: _assetId, precision: 6);

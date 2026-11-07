@@ -20,6 +20,7 @@ const _services = WalletServiceConfiguration(
   usdtAsset: RgbAssetConfiguration(
     contractId: 'rgb:configured-usdt',
     precision: 6,
+    requiresEvmValidation: false,
   ),
 );
 final _now = DateTime.utc(2026, 10, 24);

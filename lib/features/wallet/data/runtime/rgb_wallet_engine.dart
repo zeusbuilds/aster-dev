@@ -39,7 +39,15 @@ abstract final class RgbWalletServiceConfigurationResolver {
       allowInsecureDevelopmentEndpoints: allowInsecureDevelopmentEndpoints,
     );
     _requireQualifiedBackend(configured.backend);
-    final defaults = getNetworkDefaults(configured.sdkNetwork);
+    // The RLN `utexo` carrier is a native enum alias, not proof of chain
+    // deployment. Its legacy defaults point at Dev and must never select the
+    // services for a public Bitcoin Signet wallet.
+    final defaults = configured.environment == BlockchainEnvironment.signet
+        ? const NetworkEndpoints(
+            indexerUrl: 'https://mempool.space/signet/api',
+            proxyEndpoint: 'rpcs://proxy.iriswallet.com/0.2/json-rpc',
+          )
+        : getNetworkDefaults(configured.sdkNetwork);
     final indexerUrl = configured.indexerUrl ?? defaults?.indexerUrl;
     final rgbTransportProxy =
         configured.rgbTransportProxy ?? defaults?.proxyEndpoint;
@@ -50,6 +58,7 @@ abstract final class RgbWalletServiceConfigurationResolver {
       environment: configured.environment,
       sdkNetwork: configured.sdkNetwork,
       backend: configured.backend,
+      signetDeployment: configured.signetDeployment,
       daemonListeningPort: configured.daemonListeningPort,
       ldkPeerListeningPort: configured.ldkPeerListeningPort,
       indexerUrl: indexerUrl,

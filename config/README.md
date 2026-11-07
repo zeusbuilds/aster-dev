@@ -1,5 +1,29 @@
 # Release Configuration
 
+For a **Debug public Signet BTC-only** test, use the committed, non-secret
+`signet-public.debug.json` preset:
+
+```sh
+fvm flutter run --debug -d <device-id> \
+  --dart-define-from-file=config/signet-public.debug.json
+```
+
+This is public Bitcoin Signet, not the separate UTEXO Dev chain. It configures
+public Esplora, the RLN-compatible proxy 0.2 and dedicated Aster listener ports
+`19775`/`19776`. It intentionally configures no USDT, EVM or VSS and is not a
+release manifest. Aster's public Signet defaults select these public services
+rather than the native `utexo` carrier's historical Dev defaults.
+
+`ASTER_SIGNET_DEPLOYMENT` accepts `public` (the default) or `dev-signet`.
+The latter is explicitly blocked before wallet/native access. Known Dev service
+hosts and current/historical Dev asset IDs are also blocked if mixed into an
+ordinary profile. `dev-signet.evidence.json` records quarantined deployment
+evidence, including missing current contract bytes, checksum and verified
+precision. It is not a Flutter defines preset or an asset registry. The
+historical BFA.5 export cannot substitute for the current BFA.6 asset. RGB_L1
+remains gated separately; neither profile selection nor a debug build enables
+it.
+
 Aster release artifacts consume one non-secret JSON manifest through Flutter's
 `--dart-define-from-file` option. Copy `release.example.json` to an ignored
 local file, replace every placeholder, keep keys sorted, and validate it before
@@ -47,8 +71,11 @@ rejecting unavailable, malformed, redirected, or wrong-chain responses. There
 is no chain default: the release owner must verify it alongside the canonical
 mainnet RGB asset ID, precision, BFA contract identities, and backing policy.
 This check does not authenticate contracts or establish bridge payout proof.
-The mainnet USDT route fails configuration validation if either EVM setting is
-missing. `ASTER_LSP_URL` is optional for the onchain-only release and cannot enable
+Environment-configured BFA USDT on every network, and any public-network USDT,
+fails configuration validation if either EVM setting is missing. Generic
+in-memory regtest RGB fixtures need not use a BFA schema; only those explicitly
+set `RgbAssetConfiguration.requiresEvmValidation: false`. It defaults to true.
+`ASTER_LSP_URL` is optional for the onchain-only release and cannot enable
 Lightning payment actions. `ASTER_VSS_URL` remains required by the RLN release
 configuration contract. Current RLN VSS does not back up the durable on-chain
 outbox, so enabling it prevents recoverable BTC and RGB sends. Public

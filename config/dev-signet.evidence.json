@@ -1,0 +1,51 @@
+{
+  "profile": "dev-signet",
+  "walletAccessEnabled": false,
+  "reason": "The current Dev contract export and checksum are unavailable; no compatible mobile runtime pair or checkpoint-bound wallet identity is qualified.",
+  "bitcoin": {
+    "network": "signet",
+    "checkpoint": {
+      "height": 1,
+      "blockHash": "0000001b808e4ece11c0cd922eaf9eee8d7dfba7e23e90b4f9614248daaf72cb"
+    },
+    "esplora": "https://dev.esplora-01.mint.utexo.com"
+  },
+  "rgbProxy": "rpcs://dev.rgb-proxy.utexo.com/json-rpc",
+  "evm": {
+    "chainId": "42161",
+    "rpc": "https://arb1.arbitrum.io/rpc"
+  },
+  "deployedRgbLib": {
+    "version": "v0.3.0-beta.7-upstream-dev-bfa.6",
+    "revision": "5010eefa355beb9c42a4c1b69883f7651241a111"
+  },
+  "irisCandidateRgbLib": {
+    "version": "v0.3.0-beta.7-upstream-dev-bfa.7",
+    "revision": "9ec49c08be2e68f08521281e3efbd760ec989cb9"
+  },
+  "currentAsset": {
+    "assetId": "rgb:A6k89KtR-e3oXqRP-uH3jUrz-LU_sYL3-hMZ0k3O-6u8DXbE",
+    "nativeName": "Bridged USDT",
+    "nativeTicker": "BUSDT",
+    "precision": null,
+    "precisionVerified": false,
+    "contractArtifact": null,
+    "contractSha256": null,
+    "admitted": false,
+    "evidence": "https://github.com/UTEXO-Protocol/devops/issues/217"
+  },
+  "historicalAsset": {
+    "assetId": "rgb:fbkO6B_i-qyLXa6d-x3sAOaX-cx~vZB9-rxNSUle-9lXBTf8",
+    "nativeName": "Bridged USDT",
+    "nativeTicker": "BUSDT",
+    "precision": 6,
+    "contractSha256": "a678ebf73f3a0523b307cd2fe8019a321ac938eaf547c2c65a7ac079948332ce",
+    "compatibility": "historical-bfa5",
+    "admitted": false
+  },
+  "lastRecordedBridgeE2e": {
+    "runId": "42261217049",
+    "status": "failed",
+    "failure": "UI mint-confirmation button failure; this does not establish a settlement failure."
+  }
+}

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import '../../../../core/config/app_environment.dart';
+import '../../../../core/config/signet_deployment.dart';
 import '../../../../core/errors/errors.dart';
 import '../../domain/models/models.dart';
 import 'wallet_registry_document_store.dart';
@@ -31,6 +32,7 @@ final class WalletProfileStore
 
   static const _rlnSchemaVersion = 1;
   static const _backendSchemaVersion = 2;
+  static const _signetDeploymentSchemaVersion = 3;
 
   @override
   Future<AppResult<WalletRegistry>> read() {
@@ -195,10 +197,13 @@ final class WalletProfileStore
     }
     final version = decoded['version'];
     if (version is! int ||
-        (version != _rlnSchemaVersion && version != _backendSchemaVersion)) {
+        (version != _rlnSchemaVersion &&
+            version != _backendSchemaVersion &&
+            version != _signetDeploymentSchemaVersion)) {
       throw const StoredDataCorruptionException();
     }
-    final storesBackend = version == _backendSchemaVersion;
+    final storesBackend = version != _rlnSchemaVersion;
+    final storesSignetDeployment = version == _signetDeploymentSchemaVersion;
     final rawProfiles = decoded['profiles'];
     final activeWalletId = decoded['activeWalletId'];
     if (rawProfiles is! List<Object?> ||
@@ -210,15 +215,25 @@ final class WalletProfileStore
         profiles: [
           for (final item in rawProfiles)
             if (item case final Map<String, Object?> profile)
-              _profileFromJson(profile, storesBackend: storesBackend)
+              _profileFromJson(
+                profile,
+                storesBackend: storesBackend,
+                storesSignetDeployment: storesSignetDeployment,
+              )
             else
               throw const StoredDataCorruptionException(),
         ],
         activeWalletId: activeWalletId as String?,
       );
-      if (storesBackend &&
+      if (version == _backendSchemaVersion &&
           registry.profiles.every(
             (profile) => profile.backend == WalletBackend.rln,
+          )) {
+        throw const StoredDataCorruptionException();
+      }
+      if (storesSignetDeployment &&
+          !registry.profiles.any(
+            (profile) => profile.signetDeployment != null,
           )) {
         throw const StoredDataCorruptionException();
       }
@@ -231,18 +246,32 @@ final class WalletProfileStore
   }
 
   Future<void> _writeUnsafe(WalletRegistry snapshot) async {
-    // Older app builds reject the new schema instead of opening RGB_L1
-    // profiles as RLN. Keep the historical encoding for RLN-only registries.
-    final storesBackend = snapshot.profiles.any(
-      (profile) => profile.backend != WalletBackend.rln,
+    // Older builds must reject format/deployment-aware records rather than
+    // reopen them under legacy assumptions. Unbound RLN registries retain
+    // their historical encoding without inferring any Signet deployment.
+    final storesSignetDeployment = snapshot.profiles.any(
+      (profile) => profile.signetDeployment != null,
     );
+    final storesBackend =
+        storesSignetDeployment ||
+        snapshot.profiles.any(
+          (profile) => profile.backend != WalletBackend.rln,
+        );
     await _documents.write(
       jsonEncode({
-        'version': storesBackend ? _backendSchemaVersion : _rlnSchemaVersion,
+        'version': storesSignetDeployment
+            ? _signetDeploymentSchemaVersion
+            : storesBackend
+            ? _backendSchemaVersion
+            : _rlnSchemaVersion,
         'activeWalletId': snapshot.activeWalletId,
         'profiles': [
           for (final profile in snapshot.profiles)
-            _profileToJson(profile, storesBackend: storesBackend),
+            _profileToJson(
+              profile,
+              storesBackend: storesBackend,
+              storesSignetDeployment: storesSignetDeployment,
+            ),
         ],
       }),
     );
@@ -251,6 +280,7 @@ final class WalletProfileStore
   static WalletProfile _profileFromJson(
     Map<String, Object?> json, {
     required bool storesBackend,
+    required bool storesSignetDeployment,
   }) {
     try {
       final id = json['id'];
@@ -259,6 +289,7 @@ final class WalletProfileStore
       final updatedAtValue = json['updatedAt'];
       final environmentValue = json['environment'];
       final backendValue = json['backend'];
+      final signetDeploymentValue = json['signetDeployment'];
       final stateValue = json['state'];
       final storageTokenValue = json['storageToken'];
       if (id is! String ||
@@ -269,6 +300,10 @@ final class WalletProfileStore
           (storesBackend
               ? backendValue is! String
               : json.containsKey('backend')) ||
+          (storesSignetDeployment
+              ? signetDeploymentValue != null &&
+                    signetDeploymentValue is! String
+              : json.containsKey('signetDeployment')) ||
           stateValue is! String ||
           storageTokenValue is! String) {
         throw const StoredDataCorruptionException();
@@ -297,6 +332,10 @@ final class WalletProfileStore
         backend: storesBackend
             ? WalletBackend.parse(backendValue as String)
             : WalletBackend.rln,
+        signetDeployment:
+            storesSignetDeployment && signetDeploymentValue != null
+            ? SignetDeployment.parse(signetDeploymentValue as String)
+            : null,
         state: state,
         storageToken: storageTokenValue,
       );
@@ -306,12 +345,15 @@ final class WalletProfileStore
       throw const StoredDataCorruptionException();
     } on AppConfigurationException {
       throw const StoredDataCorruptionException();
+    } on FormatException {
+      throw const StoredDataCorruptionException();
     }
   }
 
   static Map<String, Object?> _profileToJson(
     WalletProfile profile, {
     required bool storesBackend,
+    required bool storesSignetDeployment,
   }) => {
     'id': profile.id,
     'name': profile.name,
@@ -319,6 +361,9 @@ final class WalletProfileStore
     'updatedAt': profile.updatedAt.toUtc().toIso8601String(),
     'environment': profile.environment.name,
     if (storesBackend) 'backend': profile.backend.wireName,
+    if (storesSignetDeployment &&
+        profile.environment == BlockchainEnvironment.signet)
+      'signetDeployment': profile.signetDeployment?.wireName,
     'state': profile.state.name,
     'storageToken': profile.storageToken,
   };

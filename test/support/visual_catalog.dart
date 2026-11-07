@@ -50,7 +50,11 @@ const _services = WalletServiceConfiguration(
   sdkNetwork: 'regtest',
   indexerUrl: 'tcp://127.0.0.1:51001',
   rgbTransportProxy: 'http://127.0.0.1:3100',
-  usdtAsset: RgbAssetConfiguration(contractId: 'catalog-usdt', precision: 6),
+  usdtAsset: RgbAssetConfiguration(
+    contractId: 'catalog-usdt',
+    precision: 6,
+    requiresEvmValidation: false,
+  ),
 );
 final _usdt = WalletAsset.rgbUsdt(assetId: 'catalog-usdt', precision: 6);
 const _failure = AppFailure(

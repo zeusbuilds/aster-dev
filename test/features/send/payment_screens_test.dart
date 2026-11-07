@@ -1458,6 +1458,7 @@ void main() {
     const assetConfiguration = RgbAssetConfiguration(
       contractId: 'contract-id',
       precision: 2,
+      requiresEvmValidation: false,
     );
     const services = WalletServiceConfiguration(
       environment: BlockchainEnvironment.regtest,
@@ -1838,6 +1839,7 @@ void main() {
       usdtAsset: RgbAssetConfiguration(
         contractId: 'rgb:configured-usdt',
         precision: 6,
+        requiresEvmValidation: false,
       ),
     );
     final harness = await PaymentFlowTestHarness.create(services: services);

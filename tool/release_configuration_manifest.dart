@@ -1,6 +1,8 @@
 import 'dart:collection';
 import 'dart:convert';
 
+import 'package:aster/core/config/signet_deployment.dart';
+
 /// Maximum accepted byte length of one release-configuration manifest.
 const maximumReleaseConfigurationBytes = 64 * 1024;
 
@@ -26,6 +28,7 @@ ReleaseAudience parseReleaseAudience(String value) => switch (value) {
 abstract final class ReleaseConfigurationKey {
   static const network = 'ASTER_NETWORK';
   static const walletBackend = 'ASTER_WALLET_BACKEND';
+  static const signetDeployment = 'ASTER_SIGNET_DEPLOYMENT';
   static const daemonPort = 'ASTER_DAEMON_PORT';
   static const ldkPeerPort = 'ASTER_LDK_PEER_PORT';
   static const indexerUrl = 'ASTER_INDEXER_URL';
@@ -58,6 +61,7 @@ abstract final class ReleaseConfigurationKey {
     network,
     privacyUrl,
     rgbProxyUrl,
+    signetDeployment,
     supportUrl,
     telegramUrl,
     termsUrl,
@@ -137,6 +141,29 @@ final class ReleaseConfigurationManifest {
         throw FormatException('$key still contains a placeholder value.');
       }
       values[key] = value;
+    }
+
+    final deployment = SignetDeployment.parse(
+      values[ReleaseConfigurationKey.signetDeployment] ?? 'public',
+    );
+    if (deployment != SignetDeployment.publicBitcoin ||
+        UtexoDevSignetPolicy.quarantinedAssetIds.contains(
+          values[ReleaseConfigurationKey.usdtAssetId],
+        ) ||
+        const [
+          ReleaseConfigurationKey.indexerUrl,
+          ReleaseConfigurationKey.rgbProxyUrl,
+          ReleaseConfigurationKey.lspUrl,
+          ReleaseConfigurationKey.vssUrl,
+          ReleaseConfigurationKey.ethRpcUrl,
+          ReleaseConfigurationKey.explorerUrl,
+        ].any(
+          (key) => UtexoDevSignetPolicy.isQuarantinedEndpoint(values[key]),
+        )) {
+      throw const FormatException(
+        'UTEXO Dev Signet is unqualified; its endpoints and assets '
+        'cannot be used by a public Signet or RLN build.',
+      );
     }
 
     switch (values[ReleaseConfigurationKey.walletBackend] ?? 'rln') {

@@ -16,6 +16,7 @@ void main() {
     usdtAsset: RgbAssetConfiguration(
       contractId: 'rgb:configured-usdt',
       precision: 6,
+      requiresEvmValidation: false,
     ),
   );
   final asset = WalletAsset.rgbUsdt(

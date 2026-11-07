@@ -22,6 +22,7 @@ const testRgbServices = WalletServiceConfiguration(
   usdtAsset: RgbAssetConfiguration(
     contractId: 'rgb:configured-usdt',
     precision: 6,
+    requiresEvmValidation: false,
   ),
 );
 
@@ -103,6 +104,9 @@ final class PaymentFlowTestHarness {
       createdAt: DateTime.utc(2026, 8, 11),
       updatedAt: DateTime.utc(2026, 8, 11),
       environment: services.environment,
+      signetDeployment: services.environment == BlockchainEnvironment.signet
+          ? services.signetDeployment
+          : null,
       state: WalletProfileState.provisioning,
       storageToken: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     );

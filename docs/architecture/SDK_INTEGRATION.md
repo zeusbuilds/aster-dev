@@ -8,7 +8,7 @@ architecture boundaries.
 
 Aster pins the SDK in the private repository
 `https://github.com/zeusbuilds/rgb-sdk-flutter.git` at immutable commit
-`3e6fb46171e21f02581d752080edd6f2fb8c0116`. The manifest and portable Git lock
+`b969118f3e506191d1e4a718189a5bb0d2b586d7`. The manifest and portable Git lock
 name the same full commit. This candidate adds the explicit RGB_L1 backend
 and React Native beta.40 compatibility. Aster defaults to RLN and rejects
 RGB_L1 before opening wallet storage. Its activation requires qualified durable
@@ -403,13 +403,14 @@ manifest documented in `config/README.md` and consumes it through
 | Define | Purpose |
 | --- | --- |
 | `ASTER_NETWORK` | `regtest` (default), `signet`, or `mainnet` |
+| `ASTER_SIGNET_DEPLOYMENT` | `public` (default). `dev-signet` identifies the distinct Dev chain and remains blocked pending its compatible native runtime and approved asset. It is not an endpoint override for a public Signet wallet. |
 | `ASTER_WALLET_BACKEND` | `rln` (default). `rgb-l1` selects an incompatible store format and is gated until durable BTC and RGB recovery are qualified. |
 | `ASTER_INDEXER_URL` | Optional Electrum/Esplora override |
 | `ASTER_RGB_PROXY_URL` | Optional RGB transport proxy override |
 | `ASTER_LSP_URL` | Optional LSP base URL |
 | `ASTER_VSS_URL` | Optional for development. The current RLN release contract requires a backup, but VSS restore omits the on-chain outbox. Public distribution is blocked until a compatible backup and recovery strategy passes qualification. |
-| `ASTER_ETH_RPC_URL` | Required credential-free HTTPS BFA validation RPC for release manifests and mainnet USDT; not an Ethereum wallet or payout verifier |
-| `ASTER_ETH_CHAIN_ID` | Required deployment-approved decimal EVM chain identity for release manifests and mainnet USDT; checked through bounded `eth_chainId` before native initialization/unlock |
+| `ASTER_ETH_RPC_URL` | Required credential-free HTTPS BFA validation RPC for release manifests and public-network USDT; not an Ethereum wallet or payout verifier |
+| `ASTER_ETH_CHAIN_ID` | Required deployment-approved decimal EVM chain identity for release manifests and public-network USDT; checked through bounded `eth_chainId` before native initialization/unlock |
 | `ASTER_EXPLORER_URL` | Optional public transaction explorer base |
 
 Credentials and bearer tokens must never be supplied through either individual
@@ -417,7 +418,9 @@ defines or the manifest; those values are recoverable from the application
 binary. Release validation rejects unknown keys, placeholders, and non-TLS
 service endpoints before packaging. At composition,
 `RgbWalletServiceConfigurationResolver` fills missing indexer and RGB transport
-values from the immutable SDK's public network-default contract and fills the
+values from the immutable SDK's public network-default contract. Public Signet
+uses explicit public Esplora and legacy proxy-0.2 endpoints, rather than the
+legacy `utexo` carrier's former Dev defaults. The resolver also fills the
 same UTEXO protocol signet LSP default used by that pinned SDK. The resolved
 object is then validated once and shared unchanged by the runtime and the
 read-only Network Configuration screen. Settings therefore reports the complete
@@ -442,6 +445,12 @@ documented in `docs/DEVELOPMENT.md`.
 The product-facing network is `mainnet`, `signet`, or `regtest`. The SDK's
 `utexo` service profile is an implementation detail used for UTEXO protocol
 signet services and is never treated as a fourth blockchain.
+
+Public Signet and UTEXO Dev Signet are different chain histories. The legacy
+RLN SDK's `utexo` carrier does not authorize Dev access. Known Dev service
+hosts and its historical/current BUSDT identifiers are quarantined while Dev
+is unqualified. See [Dev Signet readiness](DEV_SIGNET_READINESS.md) for the exact
+checkpoint, native generation, metadata and remaining qualification work.
 
 ## Credential Ownership
 

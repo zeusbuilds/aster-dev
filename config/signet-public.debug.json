@@ -1,0 +1,10 @@
+{
+  "ASTER_DAEMON_PORT": "19775",
+  "ASTER_EXPLORER_URL": "https://mempool.space/signet",
+  "ASTER_INDEXER_URL": "https://mempool.space/signet/api",
+  "ASTER_LDK_PEER_PORT": "19776",
+  "ASTER_NETWORK": "signet",
+  "ASTER_RGB_PROXY_URL": "rpcs://proxy.iriswallet.com/0.2/json-rpc",
+  "ASTER_SIGNET_DEPLOYMENT": "public",
+  "ASTER_WALLET_BACKEND": "rln"
+}

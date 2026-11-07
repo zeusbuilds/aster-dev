@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../errors/app_failure.dart';
 import '../validation/validation.dart';
 import 'host_address_policy.dart';
+import 'signet_deployment.dart';
 
 /// Bitcoin chain environment, independent from asset and payment rail.
 enum BlockchainEnvironment {
@@ -54,6 +55,7 @@ final class RgbAssetConfiguration {
   const RgbAssetConfiguration({
     required this.contractId,
     required this.precision,
+    this.requiresEvmValidation = true,
   });
 
   final String contractId;
@@ -61,14 +63,21 @@ final class RgbAssetConfiguration {
   /// Decimal precision used to format integer asset-smallest units.
   final int precision;
 
+  /// Whether this approved contract is a bridge-backed fungible asset.
+  ///
+  /// USDT defaults to BFA validation. An explicitly approved non-BFA regtest
+  /// fixture may opt out; a ticker or precision cannot establish its schema.
+  final bool requiresEvmValidation;
+
   @override
   bool operator ==(Object other) =>
       other is RgbAssetConfiguration &&
       other.contractId == contractId &&
-      other.precision == precision;
+      other.precision == precision &&
+      other.requiresEvmValidation == requiresEvmValidation;
 
   @override
-  int get hashCode => Object.hash(contractId, precision);
+  int get hashCode => Object.hash(contractId, precision, requiresEvmValidation);
 
   void validate() {
     if (!ProtocolTextPolicy.isVisibleAscii(
@@ -90,6 +99,7 @@ final class WalletServiceConfiguration {
     required this.environment,
     required this.sdkNetwork,
     this.backend = WalletBackend.rln,
+    this.signetDeployment = SignetDeployment.publicBitcoin,
     this.indexerUrl,
     this.rgbTransportProxy,
     this.lspBaseUrl,
@@ -121,10 +131,22 @@ final class WalletServiceConfiguration {
     final backend = WalletBackend.parse(
       const String.fromEnvironment('ASTER_WALLET_BACKEND', defaultValue: 'rln'),
     );
+    final SignetDeployment signetDeployment;
+    try {
+      signetDeployment = SignetDeployment.parse(
+        const String.fromEnvironment(
+          'ASTER_SIGNET_DEPLOYMENT',
+          defaultValue: 'public',
+        ),
+      );
+    } on FormatException {
+      throw const AppConfigurationException();
+    }
     return WalletServiceConfiguration(
       environment: environment,
       sdkNetwork: backend.sdkNetwork(environment),
       backend: backend,
+      signetDeployment: signetDeployment,
       daemonListeningPort: _listenerPort(
         const String.fromEnvironment('ASTER_DAEMON_PORT', defaultValue: '9735'),
       ),
@@ -161,6 +183,9 @@ final class WalletServiceConfiguration {
 
   /// Engine and on-disk wallet format selected at build time.
   final WalletBackend backend;
+
+  /// Explicit chain deployment; UTEXO Dev is currently quarantined.
+  final SignetDeployment signetDeployment;
 
   /// Stable SDK network carrier. UTEXO protocol signet uses the SDK's `utexo`
   /// service profile while Aster still reports the chain as `signet`.
@@ -200,6 +225,7 @@ final class WalletServiceConfiguration {
       other is WalletServiceConfiguration &&
       other.environment == environment &&
       other.backend == backend &&
+      other.signetDeployment == signetDeployment &&
       other.sdkNetwork == sdkNetwork &&
       other.daemonListeningPort == daemonListeningPort &&
       other.ldkPeerListeningPort == ldkPeerListeningPort &&
@@ -216,6 +242,7 @@ final class WalletServiceConfiguration {
   int get hashCode => Object.hash(
     environment,
     backend,
+    signetDeployment,
     sdkNetwork,
     daemonListeningPort,
     ldkPeerListeningPort,
@@ -252,6 +279,23 @@ final class WalletServiceConfiguration {
   /// property of regtest itself. The explicit parameter is a deterministic
   /// test seam; it cannot weaken the Release-mode policy.
   void validate({bool allowInsecureDevelopmentEndpoints = !kReleaseMode}) {
+    // Fail before resolving native defaults, wallet storage or credentials.
+    // Current Dev requires a compatible runtime, checkpoint-bound identity and
+    // an approved current contract export; none can be inferred from Signet.
+    if (signetDeployment != SignetDeployment.publicBitcoin ||
+        UtexoDevSignetPolicy.quarantinedAssetIds.contains(
+          usdtAsset?.contractId,
+        ) ||
+        [
+          indexerUrl,
+          rgbTransportProxy,
+          lspBaseUrl,
+          vssUrl,
+          ethRpcUrl,
+          explorerBaseUrl,
+        ].any(UtexoDevSignetPolicy.isQuarantinedEndpoint)) {
+      throw const AppConfigurationException();
+    }
     final permitsInsecureDevelopmentEndpoints =
         !kReleaseMode && allowInsecureDevelopmentEndpoints;
     final expectedSdkNetwork = backend.sdkNetwork(environment);
@@ -313,11 +357,12 @@ final class WalletServiceConfiguration {
                 BigInt.parse(expectedChain).bitLength > 64))) {
       throw const AppConfigurationException();
     }
-    // Native RLN enables BFA schemas only with an EVM RPC. A mainnet USDT
+    // Native RLN enables BFA schemas only with an EVM RPC. A public-network USDT
     // route must never be advertised while this validation is disabled or
     // while the backing chain's expected identity has not been supplied.
-    if (environment == BlockchainEnvironment.mainnet &&
-        usdtAsset != null &&
+    if (usdtAsset != null &&
+        (environment != BlockchainEnvironment.regtest ||
+            usdtAsset!.requiresEvmValidation) &&
         (ethRpcUrl == null || expectedChain == null)) {
       throw const AppConfigurationException();
     }
@@ -464,5 +509,9 @@ RgbAssetConfiguration? _rgbAssetEnvironment({
   if (!hasContractId || !hasPrecision) {
     throw const AppConfigurationException();
   }
-  return RgbAssetConfiguration(contractId: contractId, precision: precision);
+  return RgbAssetConfiguration(
+    contractId: contractId,
+    precision: precision,
+    requiresEvmValidation: true,
+  );
 }

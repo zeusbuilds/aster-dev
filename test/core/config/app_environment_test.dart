@@ -537,6 +537,7 @@ void main() {
       usdtAsset: RgbAssetConfiguration(
         contractId: 'rgb:usdt-contract',
         precision: 6,
+        requiresEvmValidation: false,
       ),
     );
 
@@ -550,6 +551,7 @@ void main() {
       usdtAsset: RgbAssetConfiguration(
         contractId: 'rgb:usdt contract',
         precision: 6,
+        requiresEvmValidation: false,
       ),
     );
     const malformedPrecision = WalletServiceConfiguration(
@@ -558,6 +560,7 @@ void main() {
       usdtAsset: RgbAssetConfiguration(
         contractId: 'rgb:usdt-contract',
         precision: 19,
+        requiresEvmValidation: false,
       ),
     );
     const deceptiveId = WalletServiceConfiguration(
@@ -566,6 +569,7 @@ void main() {
       usdtAsset: RgbAssetConfiguration(
         contractId: 'rgb:usdt\u202econtract',
         precision: 6,
+        requiresEvmValidation: false,
       ),
     );
 

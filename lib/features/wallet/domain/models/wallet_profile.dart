@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../../core/config/app_environment.dart';
+import '../../../../core/config/signet_deployment.dart';
 import '../../../../core/validation/validation.dart';
 
 /// Durable state of one wallet profile transaction.
@@ -29,6 +30,7 @@ final class WalletProfile {
     required this.updatedAt,
     required this.environment,
     this.backend = WalletBackend.rln,
+    this.signetDeployment,
     required this.state,
     required this.storageToken,
   }) {
@@ -47,6 +49,10 @@ final class WalletProfile {
         'storageToken',
         'Has an invalid shape.',
       );
+    }
+    if (signetDeployment != null &&
+        environment != BlockchainEnvironment.signet) {
+      throw ArgumentError('Only Signet profiles carry a Signet deployment.');
     }
   }
 
@@ -71,6 +77,12 @@ final class WalletProfile {
 
   /// Native store format that owns this profile's directory.
   final WalletBackend backend;
+
+  /// Chain deployment proven when this Signet wallet was provisioned.
+  ///
+  /// `null` on an older Signet record means unknown, never public by default.
+  /// Such records remain readable but cannot activate against any deployment.
+  final SignetDeployment? signetDeployment;
 
   /// Transaction state used to recover interrupted wallet provisioning.
   final WalletProfileState state;
@@ -100,6 +112,7 @@ final class WalletProfile {
       updatedAt: updatedAt ?? this.updatedAt,
       environment: environment,
       backend: backend,
+      signetDeployment: signetDeployment,
       state: state ?? this.state,
       storageToken: storageToken,
     );
@@ -114,6 +127,7 @@ final class WalletProfile {
       other.updatedAt == updatedAt &&
       other.environment == environment &&
       other.backend == backend &&
+      other.signetDeployment == signetDeployment &&
       other.state == state &&
       other.storageToken == storageToken;
 
@@ -125,6 +139,7 @@ final class WalletProfile {
     updatedAt,
     environment,
     backend,
+    signetDeployment,
     state,
     storageToken,
   );

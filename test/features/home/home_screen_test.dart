@@ -437,6 +437,7 @@ void main() {
       const configuration = RgbAssetConfiguration(
         contractId: 'contract-id',
         precision: 2,
+        requiresEvmValidation: false,
       );
       final usdt = WalletAsset.rgbUsdt(
         assetId: configuration.contractId,
@@ -545,6 +546,7 @@ void main() {
     const assetConfiguration = RgbAssetConfiguration(
       contractId: 'contract-id',
       precision: 2,
+      requiresEvmValidation: false,
     );
     final usdt = WalletAsset.rgbUsdt(
       assetId: assetConfiguration.contractId,

@@ -66,6 +66,7 @@ void main() {
       usdtAsset: RgbAssetConfiguration(
         contractId: 'rgb:configured-usdt',
         precision: 6,
+        requiresEvmValidation: false,
       ),
     );
     final runtime = WalletRuntime(
@@ -103,6 +104,7 @@ void main() {
         usdtAsset: RgbAssetConfiguration(
           contractId: 'rgb:configured-usdt',
           precision: 6,
+          requiresEvmValidation: false,
         ),
       );
       final harness = await _createActiveRepository(services: configured);
@@ -356,6 +358,7 @@ void main() {
       usdtAsset: RgbAssetConfiguration(
         contractId: 'rgb:configured-usdt',
         precision: 6,
+        requiresEvmValidation: false,
       ),
     );
     final harness = await _createActiveRepository(services: configured);
@@ -460,6 +463,7 @@ void main() {
       usdtAsset: RgbAssetConfiguration(
         contractId: 'rgb:configured-usdt',
         precision: 6,
+        requiresEvmValidation: false,
       ),
     );
     final harness = await _createActiveRepository(services: configured);
@@ -493,6 +497,7 @@ void main() {
       usdtAsset: RgbAssetConfiguration(
         contractId: 'rgb:configured-usdt',
         precision: 6,
+        requiresEvmValidation: false,
       ),
     );
     final harness = await _createActiveRepository(services: configured);
@@ -626,6 +631,7 @@ void main() {
         usdtAsset: RgbAssetConfiguration(
           contractId: 'rgb:configured-usdt',
           precision: 6,
+          requiresEvmValidation: false,
         ),
       ),
     );
@@ -733,6 +739,7 @@ void main() {
         usdtAsset: RgbAssetConfiguration(
           contractId: 'rgb:configured-usdt',
           precision: 6,
+          requiresEvmValidation: false,
         ),
       ),
     );
@@ -1779,6 +1786,9 @@ Future<_ActiveRepositoryHarness> _createActiveRepository({
       createdAt: DateTime.utc(2026, 8, 11),
       updatedAt: DateTime.utc(2026, 8, 11),
       environment: services.environment,
+      signetDeployment: services.environment == BlockchainEnvironment.signet
+          ? services.signetDeployment
+          : null,
       state: WalletProfileState.provisioning,
       storageToken: storageToken,
     ),

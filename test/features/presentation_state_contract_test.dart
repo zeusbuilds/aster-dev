@@ -171,6 +171,7 @@ WalletServiceConfiguration _services({
     usdtAsset: RgbAssetConfiguration(
       contractId: 'deployment-usdt',
       precision: 6,
+      requiresEvmValidation: false,
     ),
   );
 }

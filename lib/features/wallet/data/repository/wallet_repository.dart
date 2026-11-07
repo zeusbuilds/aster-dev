@@ -339,6 +339,9 @@ final class WalletRepository implements WalletLifecycleRepository {
         updatedAt: now,
         environment: _services.environment,
         backend: _services.backend,
+        signetDeployment: _services.environment == BlockchainEnvironment.signet
+            ? _services.signetDeployment
+            : null,
         state: WalletProfileState.provisioning,
         storageToken: storageToken,
       );
