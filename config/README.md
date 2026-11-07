@@ -111,3 +111,13 @@ These configure app-process listeners, not the indexer or LSP endpoint. Local
 simulator builds use separate Aster ports to avoid other wallets; see
 [local regtest](../docs/REGTEST.md). That ignored Debug/Profile configuration
 is not a release manifest and does not weaken the TLS release policy.
+
+The staged RGB_L1 release validator is backend-aware: it rejects LSP and VSS
+rather than requiring incompatible VSS. An internal BTC-only candidate may omit
+USDT/EVM settings; supplying USDT requires the complete approved contract plus
+RPC, canonical positive uint64 chain ID and both mint-lock bounds. Public
+Aster's BTC/USDT product still requires that complete USDT deployment. Structural
+validation does not lift the final RGB_L1 release gate, and no compile-time flag
+can approve backend activation or RGB backup freshness. The separate Debug-only
+local qualification entrypoint is documented in
+[RGB_L1_ACTIVATION_QUALIFICATION.md](../docs/architecture/RGB_L1_ACTIVATION_QUALIFICATION.md).

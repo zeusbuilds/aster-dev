@@ -252,8 +252,88 @@ final class WalletPaymentSubmissions {
   /// It is intentionally separate from the non-sending status check.
   Future<AppResult<void>> resume() => _recover(resumeAuthorizedCommit: true);
 
+  /// Read-only eligibility for the exact details entry; never revokes a handoff.
+  Future<AppResult<bool>> canRevoke(WalletPaymentSubmission expected) async {
+    final current = await status();
+    if (current case AppFailureResult<WalletPaymentSubmission?>(
+      :final failure,
+    )) {
+      return AppResult.failure(failure);
+    }
+    final record = (current as AppSuccess<WalletPaymentSubmission?>).value;
+    if (!_matchesRevocation(expected, record)) {
+      return const AppResult.success(false);
+    }
+    return runtime.readPaymentState((engine) async {
+      if (engine is! WalletPaymentRecoveryEngine ||
+          engine is! WalletDispatchedRgbRevocationEngine ||
+          !await (engine as WalletDispatchedRgbRevocationEngine)
+              .supportsDispatchedRgbRevocation() ||
+          runtime.activeProfile?.id != expected.walletId) {
+        return false;
+      }
+      final recovery = engine as WalletPaymentRecoveryEngine;
+      if (!await _validateRevocationRecord(engine, recovery, record!)) {
+        return false;
+      }
+      final native = await recovery.inspectPaymentOperation(
+        record.recoveryRequest!,
+      );
+      return native.phase == WalletPaymentRecoveryPhase.committing &&
+          native.endAuthorized;
+    });
+  }
+
+  /// Deliberate cancellation only. Native acceptance or a signed revocation
+  /// certificate must survive the existing durable acknowledgement path.
+  Future<AppResult<void>> revoke(WalletPaymentSubmission expected) {
+    if (runtime.activeProfile?.id != expected.walletId) {
+      return Future.value(const AppResult.failure(_revocationContextFailure));
+    }
+    return _recover(resumeAuthorizedCommit: false, revokeExpected: expected);
+  }
+
+  bool _matchesRevocation(
+    WalletPaymentSubmission expected,
+    WalletPaymentSubmission? record,
+  ) =>
+      runtime.activeProfile?.id == expected.walletId &&
+      record != null &&
+      record.walletId == expected.walletId &&
+      record.id == expected.id &&
+      record.command == expected.command &&
+      record.recoveryRequest != null &&
+      record.recoveryRequest == expected.recoveryRequest &&
+      record.nativeDiscovered == expected.nativeDiscovered &&
+      record.outcome == WalletPaymentSubmissionOutcome.unknown &&
+      record.command.route.target == WalletPaymentTarget.usdtOnchain;
+
+  Future<bool> _validateRevocationRecord(
+    WalletEngine engine,
+    WalletPaymentRecoveryEngine recovery,
+    WalletPaymentSubmission record,
+  ) async {
+    if (record.nativeDiscovered) {
+      if (engine is! WalletPaymentDiscoveryEngine) return false;
+      await (engine as WalletPaymentDiscoveryEngine)
+          .validateDiscoveredPaymentOperation(
+            record.recoveryRequest!,
+            record.id,
+            record.command,
+          );
+    } else {
+      await recovery.validatePaymentOperationRequest(
+        record.recoveryRequest!,
+        record.id,
+        record.command,
+      );
+    }
+    return true;
+  }
+
   Future<AppResult<void>> _recover({
     required bool resumeAuthorizedCommit,
+    WalletPaymentSubmission? revokeExpected,
   }) => runtime.reconcilePaymentSubmission((engine) async {
     final profile = runtime.activeProfile;
     if (profile == null || store == null) return false;
@@ -275,6 +355,9 @@ final class WalletPaymentSubmissions {
       // replace a different unresolved intent, or authorize commit from memory.
       record = _decode(_encode(attempt, profile), profile);
     }
+    if (revokeExpected != null && !_matchesRevocation(revokeExpected, record)) {
+      throw const AppFailureException(_revocationContextFailure);
+    }
     final request = record?.recoveryRequest;
     if (record != null && request != null) {
       final recoveryRecord = record;
@@ -295,8 +378,27 @@ final class WalletPaymentSubmissions {
           record.command,
         );
       }
+      if (revokeExpected != null &&
+          (engine is! WalletDispatchedRgbRevocationEngine ||
+              !await (engine as WalletDispatchedRgbRevocationEngine)
+                  .supportsDispatchedRgbRevocation())) {
+        throw const AppFailureException(_revocationUnavailableFailure);
+      }
       var status = await recovery.inspectPaymentOperation(request);
-      if (resumeAuthorizedCommit &&
+      if (revokeExpected != null) {
+        if (status.phase == WalletPaymentRecoveryPhase.committing &&
+            status.endAuthorized) {
+          await runtime.recoverPaymentOwnerIfNeeded(engine);
+          status = await (engine as WalletDispatchedRgbRevocationEngine)
+              .revokeDispatchedRgbOperation(request);
+          if (status.phase == WalletPaymentRecoveryPhase.rejected &&
+              (!status.endAuthorized && status.failureCode != 'cancelled')) {
+            return false;
+          }
+        }
+        // Acceptance is checked first by native cancellation. Anything except
+        // exact acceptance or certified rejection keeps the mutation fence.
+      } else if (resumeAuthorizedCommit &&
           !record.nativeDiscovered &&
           status.phase == WalletPaymentRecoveryPhase.committing &&
           status.endAuthorized) {
@@ -1349,3 +1451,16 @@ final class WalletPaymentSubmissions {
     return parsed;
   }
 }
+
+const _revocationContextFailure = AppFailure(
+  code: 'payment_cancellation_context_changed',
+  kind: AppFailureKind.conflict,
+  userMessage: 'Open this payment again before cancelling.',
+  retryable: false,
+);
+const _revocationUnavailableFailure = AppFailure(
+  code: 'payment_cancellation_unavailable',
+  kind: AppFailureKind.configuration,
+  userMessage: 'This payment cannot be cancelled here. Check its status.',
+  retryable: false,
+);

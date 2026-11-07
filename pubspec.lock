@@ -994,8 +994,8 @@ packages:
     dependency: "direct main"
     description:
       path: "."
-      ref: "6cd33f9db355f202979c09ad59ebb938e06d9cb6"
-      resolved-ref: "6cd33f9db355f202979c09ad59ebb938e06d9cb6"
+      ref: "349978fbeaac1f43ca563d103b271346c55fe0f1"
+      resolved-ref: "349978fbeaac1f43ca563d103b271346c55fe0f1"
       url: "https://github.com/zeusbuilds/rgb-sdk-flutter.git"
     source: git
     version: "0.2.0-beta.3"

@@ -8,14 +8,17 @@ architecture boundaries.
 
 Aster pins the SDK in the private repository
 `https://github.com/zeusbuilds/rgb-sdk-flutter.git` at immutable commit
-`6cd33f9db355f202979c09ad59ebb938e06d9cb6`. The manifest and portable Git lock
-name the same full commit. This candidate adds the explicit RGB_L1 backend
-and React Native beta.40 compatibility. The BFA.7 follow-up implements native
-standalone contract registration, durable payment discovery/receipts and the
-gated app adapter. Aster defaults to RLN and rejects RGB_L1 before opening
-wallet storage. Its activation still requires exact-artifact funded/mobile,
-reorg, backup-freshness and deployment qualification. See
+`349978fbeaac1f43ca563d103b271346c55fe0f1`. The manifest and portable Git lock
+name the same full commit, with no local SDK override. It includes the explicit
+RGB_L1 backend, React Native beta.40 compatibility and the sealed BFA.7 Flutter
+`.2` integration: standalone registration, durable payment discovery/receipts,
+explicit dispatched revocation and existing-only open. Aster defaults to RLN
+and rejects RGB_L1 before opening product wallet storage. Final-source native
+and actual isolated iOS/Android Aster funded/restart mechanisms are qualified;
+portable restore freshness, approved public deployment, aggregate privacy and
+signed delivery remain separate gates. See
 [the adapter contract](RGB_L1_ADAPTER.md) and
+[the exact mobile qualification record](../handoff/BFA7_ASTER_MOBILE_QUALIFICATION_20261108.md), plus
 [current Dev team inputs](DEV_USDT_TEAM_INPUTS.md).
 
 Verification resolves the pushed Git commit with authenticated access and no
@@ -48,11 +51,14 @@ BFA.5 bytes. Runtime metadata is checked before key access. Authenticated Git
 restoration and host tests alone do not establish funded production readiness.
 Any local artifact-directory override qualifies only that machine. The exact
 pinned BFA.7 archives are now available in the public
-[native beta](https://github.com/UTEXO-Protocol/flutter-sdk/releases/tag/native-bfa7-flutter.1).
-Fresh native-cache acquisition passed through the actual SDK Android Gradle
-verification task and the iOS installer without artifact overrides or credentials;
-archive digests and embedded identities match the existing source pin. Product
-activation remains gated independently of distribution.
+[native beta .2](https://github.com/UTEXO-Protocol/flutter-sdk/releases/tag/native-bfa7-flutter.2).
+All seven release assets passed fresh anonymous acquisition. The actual SDK
+Android Gradle verifier acquired the public URL without local artifact overrides;
+the unmodified iOS installer acquired and checked 47 files from an empty native
+cache. All six linked iOS binary pairs passed the native DiskSpace disposition
+check. Archive digests and embedded identities bind native integration tree
+`8ac556ee67db70b93abb69b4ebd8fb0e6752dc0e`. Distribution success does not
+authorize product activation or clear the separate aggregate privacy gate.
 
 Historical published baseline: public SDK beta.2 commit
 `992b86ee528d0811bd17cedca901de08561c1982` added typed public-contract import,
@@ -68,10 +74,12 @@ or release flows.
 Do not replace the commit with a branch, tag, moving reference, or local path
 in a committed change.
 
-After changing the SDK pin intentionally, clear app build outputs before
-resolving dependencies. Immutable Git pins use different Pub checkout paths;
-stale Kotlin incremental outputs can otherwise omit plugin classes even when
-Gradle reports compilation as up to date. Then run:
+Before a platform rebuild after changing the SDK pin, preserve retained QA
+artifacts, then clear regenerable app build outputs. Immutable Git pins use
+different Pub checkout paths; stale Kotlin incremental outputs can otherwise
+omit plugin classes even when Gradle reports compilation as up to date. The
+source-only pin checks resolve the immutable Git checkout directly and do not
+need to erase preserved native artifacts. For a fresh platform build, run:
 
 ```sh
 fvm flutter clean
@@ -82,8 +90,11 @@ fvm flutter test
 ```
 
 Both iOS and Android builds are required for release acceptance of a new SDK
-commit. The current pin builds Android arm64 Debug and iOS Simulator Debug;
-signed-release, device and funds-bearing acceptance remain separate gates.
+commit. The current SDK source was compiled and exercised in the separately
+recorded Android arm64 Debug and iOS Simulator Debug Aster campaigns before its
+immutable Git publication. No new signed release build is inferred from Pub
+resolution. Physical-device, signed-delivery and public-deployment acceptance
+remain separate gates.
 
 The published legacy RLN baseline targets RN `1.0.0-beta.39` (commit
 `41ff170f794edff2a1822a672ddab37e29505f14`), core `1.0.0-beta.9`, WebRGB

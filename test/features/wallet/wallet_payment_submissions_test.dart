@@ -15,6 +15,7 @@ import '../../support/wallet_fakes.dart';
 
 part 'wallet_payment_expiry_cases.dart';
 part 'wallet_payment_marker_recovery_cases.dart';
+part 'wallet_payment_revocation_cases.dart';
 
 const _id = '11111111111111111111111111111111';
 const _storageToken = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -35,6 +36,7 @@ void main() {
   group('native operation recovery v3', () {
     _expiryRecoveryCases();
     _markerRecoveryCases();
+    _revocationCases();
     test('request preflight deadline restores the owner without creating a phantom payment or retry', () async {
       final h = await _Harness.create();
       addTearDown(h.dispose);
@@ -1863,9 +1865,10 @@ final class _Harness {
   late WalletRepository repository;
   late FakeWalletEngine engine;
   late WalletFeeRateEstimate fee;
+  bool revocableRgb = false;
 
-  static Future<_Harness> create() async {
-    final h = _Harness();
+  static Future<_Harness> create({bool revocableRgb = false}) async {
+    final h = _Harness()..revocableRgb = revocableRgb;
     h._newRuntime();
     final profile = WalletProfile(
       id: _id,
@@ -1902,8 +1905,11 @@ final class _Harness {
       satsPerVbyte: 2,
       observedAt: _now,
     );
-    engine = FakeWalletEngine(paymentOperations: paymentOperations)
-      ..feeEstimate = fee;
+    engine =
+        (revocableRgb
+              ? FakeRevocableWalletEngine(paymentOperations: paymentOperations)
+              : FakeWalletEngine(paymentOperations: paymentOperations))
+          ..feeEstimate = fee;
     runtime = WalletRuntime(
       FakeWalletEngineFactory([engine]),
       directories,

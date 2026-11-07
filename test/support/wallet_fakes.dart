@@ -788,6 +788,50 @@ class FakeWalletEngine
   }
 }
 
+/// Explicit capability fixture; ordinary fake/legacy engines do not advertise it.
+class FakeRevocableWalletEngine extends FakeWalletEngine
+    implements WalletDispatchedRgbRevocationEngine {
+  FakeRevocableWalletEngine({super.paymentOperations});
+
+  bool dispatchedRgbRevocationSupported = true;
+  Object? revocationCapabilityError;
+  Completer<void>? revocationGate;
+  WalletPaymentRecoveryStatus? revocationResult;
+  Object? revocationError;
+
+  @override
+  Future<bool> supportsDispatchedRgbRevocation() async {
+    calls.add('supportsDispatchedRgbRevocation');
+    if (revocationCapabilityError case final error?) throw error;
+    return dispatchedRgbRevocationSupported;
+  }
+
+  @override
+  Future<WalletPaymentRecoveryStatus> revokeDispatchedRgbOperation(
+    String request,
+  ) async {
+    calls.add('revokeDispatchedRgbOperation');
+    calls.add('revocation:start');
+    await revocationGate?.future;
+    if (revocationError case final error?) throw error;
+    final operation = _paymentOperation(request);
+    final result =
+        revocationResult ??
+        operation?.status ??
+        const WalletPaymentRecoveryStatus(
+          phase: WalletPaymentRecoveryPhase.committing,
+          endAuthorized: true,
+        );
+    if (result.phase == WalletPaymentRecoveryPhase.accepted ||
+        (result.phase == WalletPaymentRecoveryPhase.rejected &&
+            !result.endAuthorized &&
+            result.failureCode == 'cancelled')) {
+      if (operation != null) operation.status = result;
+    }
+    return result;
+  }
+}
+
 final class FakeWalletKeyGenerator implements WalletKeyGenerator {
   String generatedMnemonic =
       'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';

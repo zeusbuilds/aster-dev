@@ -25,7 +25,7 @@ dependencies:
   rgb_sdk_flutter:
     git:
       url: https://github.com/zeusbuilds/rgb-sdk-flutter.git
-      ref: 6cd33f9db355f202979c09ad59ebb938e06d9cb6
+      ref: 349978fbeaac1f43ca563d103b271346c55fe0f1
 
   # Storage
   # Keep the reviewed secure-storage release while upgrading the host platforms.

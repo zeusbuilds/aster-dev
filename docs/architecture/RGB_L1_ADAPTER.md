@@ -5,7 +5,11 @@ gates. `WalletBackend.activationAllowed` remains false for RGB_L1. The resolver,
 factory and runtime reject product activation; runtime does so before creating
 directories, persisting credentials or constructing a native engine. There is
 no compile-time override that enables this gate. Native adapter tests construct
-their isolated boundary directly and do not enable a product wallet.
+their isolated boundary directly and do not enable a product wallet. The separate
+integration entrypoint additionally uses a typed Debug-only regtest constructor
+with owned `aster_full_wallet_qa/<run>/native` storage and explicit loopback
+services. Profile/Release, public chains, Dev and ordinary storage are rejected;
+normal app composition cannot select that constructor.
 
 ## Canonical asset bootstrap
 
@@ -25,6 +29,10 @@ registration validates the expected asset ID; the app then verifies the returned
 and reread BFA schema, native name, ticker and precision before online access.
 An unavailable or malformed metadata read never becomes permission to import.
 The first witness receive binds the canonical asset and exact requested amount.
+Every Aster witness request explicitly requires one confirmation, including an
+amountless request. An unconfirmed receipt stays pending with zero settled and
+spendable RGB balance. This is an app policy; the SDK's zero-confirmation
+default remains compatible for other consumers.
 
 BFA.7 EVM configuration also requires explicit minimum/maximum mint-lock bounds.
 These count **external backing EVM blocks**, not Bitcoin blocks. There is no
@@ -40,6 +48,16 @@ including failures. Its reader scope ends immediately after native open, before
 registration and online RPC work. Signing material is never put into provider
 state or retained for later automatic opens. Dart strings cannot promise physical zeroization.
 Public xpub export reads the actual verified native profile derivation.
+
+The app-owned wallet directory contains its ownership token. RGB_L1 therefore
+uses a dedicated, stable `rgb-l1` child as the SDK's native directory. Fresh
+provisioning requires a genuinely fresh layout; root-level legacy native state
+is preserved and rejected rather than bypassed. Ready-wallet activation checks
+the child and regular profile exist before reading keys, then uses the SDK's
+explicit `openExisting` lease to authenticate the persisted profile/cohort and
+native database. Missing/empty/ambiguous state is a nonretryable storage recovery
+failure, never permission to initialize a blank same-seed RGB wallet. The parent
+ownership token continues to govern recursive deletion and local snapshots.
 
 ## Durable payment flow
 
@@ -82,7 +100,8 @@ but old snapshot of an operation that later continued elsewhere. Restored native
 snapshots therefore cannot certify absence, authorize cancellation or permit a
 new spend until freshness authority is qualified. Exact historical acceptance
 may remain readable, but `RECOVERY_RESTORE_UNCERTAIN` preserves the mutation
-fence. Full native/mobile funded and restore qualification remains required.
+fence. Intact-storage funded mobile qualification has passed; portable restore
+freshness authority remains unavailable and is a separate release blocker.
 
 ## Truthful backend observations
 
@@ -91,6 +110,13 @@ tip and unavailable Lightning node/channel/peer observations remain absent;
 confirmation counts remain unknown until a tip exists. The existing Settings
 layout uses its compact unavailable value and omits unsupported Lightning rows.
 The RLN path retains its existing observations and presentation.
+
+Sync waits for one chain sync and one detailed RGB transfer refresh. Any batch
+failure, including an older witness whose ancestry cannot currently be checked,
+makes the overall refresh unavailable even when newer batches succeeded. Home
+keeps its entire last-known portfolio and its existing quiet background recovery;
+it does not reread or publish the partially refreshed cache, add inline prose or
+show an unsolicited toast. Native failure text never becomes user-facing copy.
 
 RGB-output preparation binds an explicit identity kind. Existing RLN reviews
 retain their historical compressed-node-key encoding; RGB_L1 binds its real
@@ -115,8 +141,10 @@ Preparation identity includes the actual native wallet binding, storage cohort
 and sealed source identity, preventing a review from moving to another copy of
 the same account. The existing RLN flow and all activation gates are unchanged.
 The presentation is tested using an isolated fake native engine with the real
-repository journal; funded/mobile setup and interruption qualification remain
-requirements before RGB_L1 activation.
+repository journal. Actual iOS/Android Aster campaigns also reviewed/cancelled
+preparation, prepared once, confirmed the exact transaction, and subsequently
+sent once. Native interrupted/reply-loss coverage remains identified separately
+in the SDK qualification record.
 
 Deletion reads the complete native unspent allocation inventory. Every
 assignment kind is protected, including mint/inflation rights with zero fungible
@@ -124,6 +152,28 @@ balance, foreign assets and unsettled allocations. Missing, malformed or failed
 inventory never authorizes deletion. The inventory is read again after transfer
 refresh so newly received rights cannot be missed.
 
-Both platform native artifacts, funded transfers, interrupted sends, process
-restart, mixed/lost storage, encrypted backup restoration and the exact Dev
-contract/deployment must pass qualification before the gates are lifted.
+Both final platform native artifacts and the actual Aster funded/lifecycle flows
+have exact recorded regtest acceptance, including a separate process reopen
+with the same intact storage. Portable RGB backup restoration has no approved
+freshness service; local tests cannot invent that authority, so the product gate
+remains closed. Dev contract/deployment admission is independent and remains
+blocked even when non-Dev local mechanisms pass. Public contract/service,
+aggregate privacy and signed release delivery admission remain separate gates.
+
+## Deliberate dispatched-handoff revocation
+
+A verified successor archive advertises dispatched RGB revocation separately
+from ordinary Cancel. Only an explicit reviewed action on the exact unknown
+payment's details invokes `revokeOnchainSend`. Check and passive reads retain
+pre-dispatch-only Cancel, including when a queued dispatch races their observed
+state. Eligibility reads add no messages or loaders; the compact action is
+hidden when unsupported. The shared confirmation keeps a blue primary action
+and a separate Keep payment choice.
+
+Native acceptance wins over cancellation. A signed `cancelled` rejection must
+be acknowledged durably before the app retires its fence. Unknown/released
+outcomes, changed request or wallet, and failed acknowledgement preserve it.
+Route/foreground/wallet changes suppress stale presentation; duplicate taps
+cannot invoke another revocation. No Begin/End/Commit is retried.
+
+See [the current qualification boundary and harness](RGB_L1_ACTIVATION_QUALIFICATION.md).

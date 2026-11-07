@@ -227,7 +227,7 @@ void main() {
     expect(_attribute(application, 'icon'), '@mipmap/ic_launcher');
     expect(_attribute(application, 'roundIcon'), '@mipmap/ic_launcher_round');
     final activity = application.findElements('activity').single;
-    expect(_attribute(activity, 'name'), '.MainActivity');
+    expect(_attribute(activity, 'name'), 'com.example.asterdev.MainActivity');
     expect(_attribute(activity, 'theme'), '@style/LaunchTheme');
     final normalTheme = activity
         .findElements('meta-data')

@@ -1,6 +1,9 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+
 import '../../../../core/config/app_environment.dart';
+import '../../../../core/config/signet_deployment.dart';
 import '../../../../core/errors/errors.dart';
 import '../../domain/models/models.dart';
 import '../storage/wallet_secret_store.dart';
@@ -82,8 +85,58 @@ final class WalletRuntime {
     this._directories,
     this._secrets,
     this._services,
-  );
+  ) : _localQualification = false;
 
+  /// Exercises the real on-chain adapter through the app repository while its
+  /// product admission remains closed. Integration tests alone use this path.
+  /// It cannot open Release/Profile, a public chain, Dev, or ordinary storage.
+  WalletRuntime.forQualification(
+    this._engineFactory,
+    IoWalletDirectoryManager directories,
+    this._secrets,
+    this._services,
+  ) : _directories = directories,
+      _localQualification = _requireLocalQualification(
+        _services,
+        directories.rootPath,
+      );
+
+  static bool _requireLocalQualification(
+    WalletServiceConfiguration services,
+    String root,
+  ) {
+    if (!kDebugMode ||
+        services.backend != WalletBackend.rgbL1 ||
+        services.environment != BlockchainEnvironment.regtest ||
+        services.signetDeployment != SignetDeployment.publicBitcoin ||
+        !RegExp(
+          r'^/(?:[^/]+/)*aster_full_wallet_qa/'
+          r'[a-zA-Z0-9][a-zA-Z0-9_-]{2,63}/native$',
+        ).hasMatch(root) ||
+        root.split('/').any((segment) => segment == '.' || segment == '..')) {
+      throw ArgumentError('An isolated Debug RGB_L1 regtest run is required.');
+    }
+    services.validate();
+    for (final endpoint in [
+      services.indexerUrl,
+      services.rgbTransportProxy,
+      if (services.ethRpcUrl != null) services.ethRpcUrl,
+    ]) {
+      if (endpoint == null ||
+          !{
+            '127.0.0.1',
+            '::1',
+            'localhost',
+          }.contains(Uri.tryParse(endpoint)?.host.toLowerCase())) {
+        throw ArgumentError(
+          'Qualification services must use owned loopback mappings.',
+        );
+      }
+    }
+    return true;
+  }
+
+  final bool _localQualification;
   final WalletEngineFactory _engineFactory;
   final WalletDirectoryManager _directories;
   final WalletSecretStore _secrets;
@@ -1202,7 +1255,7 @@ final class WalletRuntime {
   }
 
   AppFailure? _profileConfigurationFailure(WalletProfile profile) {
-    if (!_services.backend.activationAllowed) {
+    if (!_services.backend.activationAllowed && !_localQualification) {
       return const AppFailure(
         code: 'wallet_backend_unqualified',
         kind: AppFailureKind.configuration,

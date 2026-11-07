@@ -10,6 +10,7 @@ final class RgbLibWalletEngine
         WalletMnemonicOpenEngine,
         WalletPaymentRecoveryEngine,
         WalletPaymentDiscoveryEngine,
+        WalletDispatchedRgbRevocationEngine,
         WalletDeletionSafetyEngine,
         RgbSetupWalletEngine {
   RgbLibWalletEngine(
@@ -21,6 +22,10 @@ final class RgbLibWalletEngine
     LocalNetworkAccess? localNetworkAccess,
     this._evmChainValidator = const HttpEvmChainValidator(),
   }) : _clock = clock ?? RgbWalletEngine._utcNow,
+       _storageDirectory = storageDirectory,
+       _nativeStorageDirectory = Uri.directory(storageDirectory)
+           .resolve('rgb-l1')
+           .toFilePath(),
        _localNetworkAccess =
            localNetworkAccess ?? PlatformLocalNetworkAccess() {
     _services.validate();
@@ -35,13 +40,15 @@ final class RgbLibWalletEngine
         RgbLibWallet(
           params: RgbLibWalletParams(
             network: _services.sdkNetwork,
-            storageDirPath: storageDirectory,
+            storageDirPath: _nativeStorageDirectory,
           ),
           keys: keys,
         );
   }
 
   final WalletServiceConfiguration _services;
+  final String _storageDirectory;
+  final String _nativeStorageDirectory;
   final DateTime Function() _clock;
   final BitcoinAddressValidator _bitcoinAddresses;
   final LocalNetworkAccess _localNetworkAccess;
@@ -81,10 +88,12 @@ final class RgbLibWalletEngine
     _activating = true;
     _assetReady = false;
     try {
+      await _checkNativeStorageLayout(reopen: reopen);
       await _localNetworkAccess.ensureFor(_services);
       await _evmChainValidator.verify(_services);
       final runtime = await RgbLibWallet.getRuntimeInfo();
       if (!runtime.durableOnchainRecovery ||
+          !runtime.supportsExistingOnlyOpen ||
           (_services.usdtAsset != null && !runtime.contractRegistration)) {
         throw const AppFailureException(
           AppFailure(
@@ -98,10 +107,23 @@ final class RgbLibWalletEngine
       _openingMnemonic = mnemonic;
       try {
         if (reopen) {
-          await _wallet.reinit();
+          await _wallet.openExisting();
         } else {
           await _wallet.init();
         }
+      } on RgbLibWalletException catch (error) {
+        if (reopen &&
+            {
+              'WALLET_STORAGE_NOT_EMPTY',
+              'WALLET_STORAGE_MISSING',
+              'WALLET_PROFILE_MISMATCH',
+              'WALLET_CONFIG_MISMATCH',
+              'RECOVERY_STORAGE_INVALID',
+              'RECOVERY_IDENTITY_MISMATCH',
+            }.contains(error.code)) {
+          throw const AppFailureException(_storageIntegrityFailure);
+        }
+        rethrow;
       } finally {
         // Registration/online RPC work needs the native owner, not another
         // read of the recovery phrase. End the reader scope immediately.
@@ -134,6 +156,73 @@ final class RgbLibWalletEngine
       _activating = false;
     }
   }
+
+  /// The app's ownership token stays outside the SDK's exclusive empty root.
+  /// Never bypass old root-level native state or recreate a lost ready cohort.
+  Future<void> _checkNativeStorageLayout({required bool reopen}) async {
+    Never invalid() =>
+        throw const AppFailureException(_storageIntegrityFailure);
+    try {
+      final parentType = await FileSystemEntity.type(
+        _storageDirectory,
+        followLinks: false,
+      );
+      if (parentType == FileSystemEntityType.notFound) {
+        if (reopen) invalid();
+        return;
+      }
+      if (parentType != FileSystemEntityType.directory) invalid();
+      await for (final entry in Directory(
+        _storageDirectory,
+      ).list(followLinks: false)) {
+        final name = entry.path.split(Platform.pathSeparator).last;
+        final type = await FileSystemEntity.type(
+          entry.path,
+          followLinks: false,
+        );
+        if (name == '.aster-storage-owner' &&
+            type == FileSystemEntityType.file) {
+          continue;
+        }
+        if (name == 'rgb-l1' && type == FileSystemEntityType.directory) {
+          continue;
+        }
+        invalid();
+      }
+      final childType = await FileSystemEntity.type(
+        _nativeStorageDirectory,
+        followLinks: false,
+      );
+      if (!reopen) {
+        if (childType == FileSystemEntityType.notFound) return;
+        if (childType != FileSystemEntityType.directory ||
+            !await Directory(_nativeStorageDirectory).list().isEmpty) {
+          invalid();
+        }
+        return;
+      }
+      if (childType != FileSystemEntityType.directory) invalid();
+      // Presence is checked before key access. Explicit SDK openExisting then
+      // authenticates the complete profile/cohort under its exclusive lease.
+      final profile = File('$_nativeStorageDirectory/rgb-sdk-profile.json');
+      if (await FileSystemEntity.type(profile.path, followLinks: false) !=
+              FileSystemEntityType.file ||
+          await profile.length() == 0 ||
+          await profile.length() > 65536) {
+        invalid();
+      }
+    } on FileSystemException {
+      invalid();
+    }
+  }
+
+  static const _storageIntegrityFailure = AppFailure(
+    code: 'wallet_storage_layout_mismatch',
+    kind: AppFailureKind.storage,
+    userMessage: 'Wallet recovery is required.',
+    retryable: false,
+    requiresReconciliation: true,
+  );
 
   Future<void> _bootstrapContract() async {
     final asset = _services.usdtAsset;
@@ -178,7 +267,20 @@ final class RgbLibWalletEngine
   @override
   Future<void> sync() async {
     await _wallet.syncWallet();
-    await _wallet.refreshWallet();
+    final refresh = await _wallet.refreshTransfers();
+    if (refresh.transfers.values.any((transfer) => transfer.failure != null)) {
+      // A successful chain sync or a newer successful batch does not establish
+      // the freshness of every historical RGB witness. Keep the portfolio's
+      // prior observation instead of publishing a partially refreshed cache.
+      throw const AppFailureException(
+        AppFailure(
+          code: 'wallet_sync_incomplete',
+          kind: AppFailureKind.unavailable,
+          userMessage: 'Wallet updates are unavailable. Try again.',
+          retryable: true,
+        ),
+      );
+    }
   }
 
   @override
@@ -531,6 +633,7 @@ final class RgbLibWalletEngine
       assetId: route.asset.id.value,
       amount: amount == null ? null : BigInt.from(amount.units),
       durationSeconds: RgbWalletEngine._receiveLifetime.inSeconds,
+      minConfirmations: 1,
     );
     final invoice = RgbWalletEngine._nativeQrPaymentValue(
       response.invoice,
@@ -685,6 +788,18 @@ final class RgbLibWalletEngine
   @override
   Future<WalletPaymentRecoveryStatus> inspectPaymentOperation(String request) =>
       _recover(request, _wallet.onchainSendStatus);
+
+  @override
+  Future<bool> supportsDispatchedRgbRevocation() async {
+    if (!_assetReady || _services.usdtAsset == null) return false;
+    final runtime = await RgbLibWallet.getRuntimeInfo();
+    return runtime.supportsDispatchedRgbRevocation;
+  }
+
+  @override
+  Future<WalletPaymentRecoveryStatus> revokeDispatchedRgbOperation(
+    String request,
+  ) => _recover(request, _wallet.revokeOnchainSend);
 
   @override
   Future<WalletPaymentRecoveryStatus> cancelPaymentOperation(String request) =>

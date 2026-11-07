@@ -6,11 +6,61 @@ import 'package:aster/core/bootstrap/app_bootstrap.dart';
 import 'package:aster/core/core.dart';
 import 'package:aster/features/wallet/data/runtime/runtime.dart';
 import 'package:aster/features/wallet/data/storage/storage.dart';
+import 'package:aster/features/wallet/data/validation/validation.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+/// Mirrors AppLoader's security-first lifecycle forwarding for this entrypoint.
+///
+/// The campaign bootstraps its isolated container before pumping AsterApp and
+/// therefore does not mount the ordinary AppLoader. AsterApp deliberately
+/// defers prompt lifecycle ownership to that outer layer. Omitting this bridge
+/// would let a native auth result race the actual foreground acknowledgement.
+class FullWalletQaSecurityLifecycle extends StatefulWidget {
+  const FullWalletQaSecurityLifecycle({
+    super.key,
+    required this.security,
+    required this.child,
+  });
+
+  final SecurityController security;
+  final Widget child;
+
+  @override
+  State<FullWalletQaSecurityLifecycle> createState() =>
+      _FullWalletQaSecurityLifecycleState();
+}
+
+class _FullWalletQaSecurityLifecycleState
+    extends State<FullWalletQaSecurityLifecycle>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    // Register before the child AsterApp, matching the production outer owner.
+    WidgetsBinding.instance.addObserver(this);
+    widget.security.handleLifecycle(
+      WidgetsBinding.instance.lifecycleState ?? AppLifecycleState.resumed,
+    );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) =>
+      widget.security.handleLifecycle(state);
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
 
 /// Real platform storage with a separate, retained namespace for each QA run.
 /// No wallet, signer, repository, transport or cryptographic implementation is
@@ -53,8 +103,11 @@ final class FullWalletQaStorage {
 
   Future<ProviderContainer> bootstrap({
     Future<void> Function(Map<String, Object?> evidence)? onFailureLogs,
+    WalletServiceConfiguration? qualifiedLocalL1Services,
+    Map<String, Object?>? readOnlyCheckpoint,
+    Future<void> Function(Map<String, Object?> evidence)? onReadOnlyAudit,
   }) async {
-    if (kReleaseMode) {
+    if (kReleaseMode || (qualifiedLocalL1Services != null && !kDebugMode)) {
       throw const FullWalletQaFailure('qa_run_configuration_invalid');
     }
     const security = PlatformWalletStorageSecurity();
@@ -93,6 +146,35 @@ final class FullWalletQaStorage {
           ref.onDispose(authentication.dispose);
           return authentication;
         }),
+        if (qualifiedLocalL1Services != null) ...[
+          walletServiceConfigurationProvider.overrideWith(
+            (ref) => qualifiedLocalL1Services,
+          ),
+          walletEngineFactoryProvider.overrideWith(
+            (ref) => _LocalL1QualificationFactory(
+              ref.watch(bitcoinPaymentInstructionDecoderProvider),
+              ref.watch(utcClockProvider),
+            ),
+          ),
+          walletRuntimeProvider.overrideWith((ref) async {
+            final factory = ref.watch(walletEngineFactoryProvider);
+            final secrets = ref.watch(walletSecretStoreProvider);
+            final directories = await ref.watch(
+              walletDirectoryManagerProvider.future,
+            );
+            if (!ref.mounted || directories is! IoWalletDirectoryManager) {
+              throw const FullWalletQaFailure('qa_storage_owner_invalid');
+            }
+            final runtime = WalletRuntime.forQualification(
+              factory,
+              directories,
+              secrets,
+              qualifiedLocalL1Services,
+            );
+            ref.onDispose(() => unawaited(runtime.dispose()));
+            return runtime;
+          }),
+        ],
         sharedPreferencesProvider.overrideWith((ref) => preferences),
         secureStorageServiceProvider.overrideWithValue(secureStorage),
         walletDirectoryManagerProvider.overrideWith(
@@ -123,6 +205,69 @@ final class FullWalletQaStorage {
     await container
         .read(securityControllerProvider)
         .initialize(hasWallet: true);
+    if (readOnlyCheckpoint != null) {
+      if (qualifiedLocalL1Services == null) {
+        container.dispose();
+        throw const FullWalletQaFailure('qa_readonly_local_l1_required');
+      }
+      final repository = await container.read(walletRepositoryProvider.future);
+      try {
+        // Validate READY metadata before selecting an open. The ordinary app
+        // bootstrap may finish staged provisioning/deletion, so it is not used
+        // by this observational process-reopen proof.
+        final registry = requireQaSuccess(
+          await repository.load(),
+          'readonly_registry',
+        );
+        final active = registry.activeProfile;
+        if (active == null ||
+            registry.profiles.length != 1 ||
+            registry.readyProfiles.length != 1 ||
+            active.id != readOnlyCheckpoint['wallet_id']) {
+          throw const FullWalletQaFailure('qa_readonly_registry_changed');
+        }
+        final runtime = await container.read(walletRuntimeProvider.future);
+        requireQaSuccess(
+          await runtime.verifyStorage(registry.readyProfiles),
+          'readonly_storage',
+        );
+        requireQaSuccess(
+          await runtime.restore(active),
+          'readonly_existing_open',
+        );
+        final pending = requireQaSuccess(
+          await runtime.readPaymentState((engine) async {
+            if (engine is! WalletPaymentDiscoveryEngine) {
+              throw const FullWalletQaFailure(
+                'qa_readonly_native_audit_missing',
+              );
+            }
+            return (engine as WalletPaymentDiscoveryEngine)
+                .discoverPendingPaymentOperations();
+          }),
+          'readonly_native_pending',
+        );
+        final appPending = requireQaSuccess(
+          await repository.paymentSubmissionStatus(),
+          'readonly_app_pending',
+        );
+        if (pending.isNotEmpty || appPending?.requiresReconciliation == true) {
+          throw const FullWalletQaFailure('qa_readonly_pending_operation');
+        }
+        await onReadOnlyAudit?.call({
+          'wallet_id': active.id,
+          'native_pending_count': 0,
+          'app_pending_fence': false,
+          'generic_refresh_invoked': false,
+          'maintenance_bootstrap_invoked': false,
+        });
+        return container;
+      } catch (_) {
+        await repository.dispose();
+        container.dispose();
+        rethrow;
+      }
+    }
     return bootstrapApplicationContainer(container);
   }
 
@@ -193,6 +338,33 @@ final class FullWalletQaStorage {
   }
 }
 
+/// Integration-entrypoint composition only; no product flag can select it.
+/// Every cryptographic, storage and SDK operation still uses the real engine.
+final class _LocalL1QualificationFactory implements WalletEngineFactory {
+  const _LocalL1QualificationFactory(this.addresses, this.clock);
+
+  final BitcoinAddressValidator addresses;
+  final DateTime Function() clock;
+
+  @override
+  WalletEngine create(WalletEngineConfiguration configuration) {
+    final services = configuration.services;
+    if (!kDebugMode ||
+        services.backend != WalletBackend.rgbL1 ||
+        services.environment != BlockchainEnvironment.regtest ||
+        services.signetDeployment != SignetDeployment.publicBitcoin) {
+      throw const FullWalletQaFailure('qa_local_l1_profile_required');
+    }
+    services.validate();
+    return RgbLibWalletEngine(
+      services,
+      storageDirectory: configuration.storageDirectory,
+      bitcoinAddresses: addresses,
+      clock: clock,
+    );
+  }
+}
+
 /// Public-only test coordination. Financial calls are never retried here.
 /// Polling only reads a command acknowledgement; event publication has no
 /// automatic retry. Host receipts must preserve an uncertain mutation outcome.
@@ -202,8 +374,10 @@ final class FullWalletQaControl {
     required String controlUrl,
     this.readOnly = false,
     this.beforeFinancialDispatch,
+    int initialSequence = 0,
   }) : role = Platform.isIOS ? 'app-ios27' : 'app-android17',
-       _base = Uri.parse(controlUrl) {
+       _base = Uri.parse(controlUrl),
+       _sequence = initialSequence {
     if (_base.scheme != 'http' ||
         _base.host != '127.0.0.1' ||
         _base.port != 29671 ||
@@ -222,7 +396,7 @@ final class FullWalletQaControl {
   final String role;
   final Uri _base;
   final HttpClient _client = HttpClient();
-  var _sequence = 0;
+  int _sequence;
 
   Future<void> event(
     String event, [
@@ -239,6 +413,8 @@ final class FullWalletQaControl {
       'bfa_mint_requested',
       'bfa_burn_requested',
       'btc_confirm_requested',
+      'rgb_witness_funding_requested',
+      'rgb_setup_confirm_requested',
     }.contains(event);
     if (readOnly && financial) {
       throw const FullWalletQaFailure(

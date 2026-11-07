@@ -101,6 +101,7 @@ class _DetailsBody extends ConsumerWidget {
       record = display.nativeActivityIn(state.feed);
       if (record == null) {
         return _SubmissionDetails(
+          routeContext: context,
           display: display,
           state: state,
           bitcoinUnit: settings.requireValue.snapshot.preferences.bitcoinUnit,
@@ -503,6 +504,7 @@ class _DetailEntry {
 
 class _SubmissionDetails extends StatelessWidget {
   const _SubmissionDetails({
+    required this.routeContext,
     required this.display,
     required this.state,
     required this.bitcoinUnit,
@@ -511,6 +513,7 @@ class _SubmissionDetails extends StatelessWidget {
     required this.assetKind,
   });
 
+  final BuildContext routeContext;
   final PaymentSubmissionDisplay display;
   final ActivityState state;
   final BitcoinUnit bitcoinUnit;
@@ -594,6 +597,16 @@ class _SubmissionDetails extends StatelessWidget {
                   assetKind: assetKind,
                   loading: state.refreshing,
                 ),
+                if (submission.outcome ==
+                        WalletPaymentSubmissionOutcome.unknown &&
+                    submission.command.route.target ==
+                        WalletPaymentTarget.usdtOnchain)
+                  PaymentRevocationAction(
+                    submission: submission,
+                    assetKind: assetKind,
+                    checking: state.refreshing,
+                    routeContext: routeContext,
+                  ),
               ],
             ],
           ),

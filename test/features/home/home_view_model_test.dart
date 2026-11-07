@@ -63,6 +63,72 @@ void main() {
   });
 
   test(
+    'a partial historical RGB refresh retains the whole last-known portfolio',
+    () async {
+      final engine = FakeWalletEngine()
+        ..balance = _bitcoinBalance()
+        ..balances[testRgbRoute.asset.id] = testRgbBalance(100);
+      final harness = await PaymentFlowTestHarness.create(
+        engine: engine,
+        services: testRgbServices,
+      );
+      addTearDown(harness.dispose);
+      final subscription = harness.container.listen(
+        homeViewModelProvider,
+        (_, _) {},
+      );
+      addTearDown(subscription.close);
+      final initial = await harness.container.read(
+        homeViewModelProvider.future,
+      );
+      final balanceReads = engine.calls
+          .where((call) => call == 'balance')
+          .length;
+      const failure = AppFailure(
+        code: 'wallet_sync_incomplete',
+        kind: AppFailureKind.unavailable,
+        userMessage: 'Wallet updates are unavailable. Try again.',
+        retryable: true,
+      );
+      engine
+        ..balance = _bitcoinBalance(additionalConfirmedSatoshis: 10000000)
+        ..balances[testRgbRoute.asset.id] = testRgbBalance(5995)
+        ..syncError = const AppFailureException(failure);
+
+      expect(
+        await harness.container.read(homeViewModelProvider.notifier).refresh(),
+        isFalse,
+      );
+      final retained = harness.container
+          .read(homeViewModelProvider)
+          .requireValue;
+      expect(retained.portfolio, same(initial.portfolio));
+      expect(retained.refreshFailure, failure);
+      expect(retained.refreshing, isFalse);
+      expect(
+        engine.calls.where((call) => call == 'balance').length,
+        balanceReads,
+        reason: 'Partially refreshed native caches must not be published.',
+      );
+      expect(harness.toasts.messages, isEmpty);
+
+      engine
+        ..syncError = null
+        ..balances[testRgbRoute.asset.id] = testRgbBalance(101);
+      expect(
+        await harness.container.read(homeViewModelProvider.notifier).refresh(),
+        isTrue,
+      );
+      final recovered = harness.container
+          .read(homeViewModelProvider)
+          .requireValue;
+      expect(recovered.portfolio.usdt?.onchainSettled.units, 101);
+      expect(recovered.refreshFailure, isNull);
+      expect(harness.toasts.messages, isEmpty);
+    },
+  );
+
+  test(
     'initial portfolio failure can retry without bypassing wallet state',
     () async {
       final engine = FakeWalletEngine()

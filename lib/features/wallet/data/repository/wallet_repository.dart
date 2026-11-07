@@ -834,6 +834,16 @@ final class WalletRepository implements WalletLifecycleRepository {
   Future<AppResult<void>> resumePaymentSubmission() =>
       _enqueueOperation(_submissions.resume);
 
+  /// Capability and exact pending-entry observation only; never cancels.
+  Future<AppResult<bool>> canRevokePaymentSubmission(
+    WalletPaymentSubmission expected,
+  ) => _enqueueOperation(() => _submissions.canRevoke(expected));
+
+  /// User-confirmed revocation of one exact RGB handoff. No dispatch is retried.
+  Future<AppResult<void>> revokePaymentSubmission(
+    WalletPaymentSubmission expected,
+  ) => _enqueueOperation(() => _submissions.revoke(expected));
+
   Future<AppResult<void>> sync() => _enqueueOperation(
     () => _runtime.readPaymentState((engine) => engine.sync()),
   );

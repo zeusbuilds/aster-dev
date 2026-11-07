@@ -149,6 +149,94 @@ class ActivityViewModel extends _$ActivityViewModel {
     return result;
   }
 
+  /// Details-only eligibility; this performs observations and never cancels.
+  Future<AppResult<bool>> canRevokePayment(
+    WalletPaymentSubmission expected,
+  ) async {
+    final current = state.value;
+    if (current == null ||
+        current.refreshing ||
+        current.feed.paymentSubmission != expected) {
+      return const AppResult.success(false);
+    }
+    final generation = _stateGeneration;
+    try {
+      final repository = await ref.read(walletRepositoryProvider.future);
+      final result = await repository.canRevokePaymentSubmission(expected);
+      return ref.mounted && generation == _stateGeneration
+          ? result
+          : const AppResult.success(false);
+    } catch (error, stack) {
+      return AppResult.failure(FailureMapper.from(error, stack));
+    }
+  }
+
+  /// One user-confirmed revocation of this exact details entry. It shares the
+  /// refresh lease so Check and repeated taps cannot overlap cancellation.
+  Future<AppResult<WalletPaymentSubmission?>> revokePayment(
+    WalletPaymentSubmission expected,
+  ) async {
+    final current = state.value;
+    final lifecycle = ref.read(walletLifecycleViewModelProvider);
+    if (current == null ||
+        current.refreshing ||
+        lifecycle.blocksInteraction ||
+        current.feed.paymentSubmission != expected ||
+        ref.read(walletViewModelProvider).value?.activeWallet?.id !=
+            expected.walletId) {
+      return const AppResult<WalletPaymentSubmission?>.failure(
+        _paymentActionContextChanged,
+      );
+    }
+    final generation = _stateGeneration;
+    final foreground = lifecycle.foregroundGeneration;
+    state = AsyncData(current.copyWith(refreshing: true));
+    AppResult<WalletPaymentSubmission?> result;
+    try {
+      final repository = await ref.read(walletRepositoryProvider.future);
+      final revoked = await repository.revokePaymentSubmission(expected);
+      result = await repository.paymentSubmissionStatus();
+      if (result case AppSuccess<WalletPaymentSubmission?>(:final value)) {
+        if (value?.id != expected.id || value?.walletId != expected.walletId) {
+          result = const AppResult<WalletPaymentSubmission?>.failure(
+            _paymentActionContextChanged,
+          );
+        } else if (ref.mounted && generation == _stateGeneration) {
+          state = AsyncData(
+            current.copyWith(
+              feed: _withSubmission(current.feed, value),
+              refreshing: false,
+            ),
+          );
+          if (revoked case AppFailureResult<void>(:final failure)
+              when value?.outcome == WalletPaymentSubmissionOutcome.unknown) {
+            result = AppResult<WalletPaymentSubmission?>.failure(failure);
+          }
+        }
+      }
+    } catch (error, stack) {
+      result = AppResult.failure(FailureMapper.from(error, stack));
+    }
+    if (!ref.mounted || generation != _stateGeneration) {
+      return const AppResult<WalletPaymentSubmission?>.failure(
+        _paymentActionContextChanged,
+      );
+    }
+    if (state.value?.refreshing == true) {
+      state = AsyncData(current.copyWith(refreshing: false));
+    }
+    final now = ref.read(walletLifecycleViewModelProvider);
+    if (now.blocksInteraction ||
+        now.foregroundGeneration != foreground ||
+        ref.read(walletViewModelProvider).value?.activeWallet?.id !=
+            expected.walletId) {
+      return const AppResult<WalletPaymentSubmission?>.failure(
+        _paymentActionContextChanged,
+      );
+    }
+    return result;
+  }
+
   static WalletActivityFeed _withSubmission(
     WalletActivityFeed feed,
     WalletPaymentSubmission? submission,
@@ -207,5 +295,12 @@ const _missingWalletFailure = AppFailure(
   code: 'wallet_active_missing',
   kind: AppFailureKind.configuration,
   userMessage: 'No active wallet is available.',
+  retryable: false,
+);
+
+const _paymentActionContextChanged = AppFailure(
+  code: 'payment_action_context_changed',
+  kind: AppFailureKind.conflict,
+  userMessage: 'Open this payment again to continue.',
   retryable: false,
 );

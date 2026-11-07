@@ -55,14 +55,10 @@ void main() {
     );
   });
 
-  test('requires aggregate privacy reasons and tracking false', () {
+  test('requires justified app privacy reasons and tracking false', () {
     final valid = <String, Object?>{
       'NSPrivacyTracking': false,
       'NSPrivacyAccessedAPITypes': <Object?>[
-        <String, Object?>{
-          'NSPrivacyAccessedAPIType': 'NSPrivacyAccessedAPICategoryDiskSpace',
-          'NSPrivacyAccessedAPITypeReasons': <Object?>['E174.1'],
-        },
         <String, Object?>{
           'NSPrivacyAccessedAPIType':
               'NSPrivacyAccessedAPICategoryFileTimestamp',
@@ -72,6 +68,21 @@ void main() {
     };
 
     expect(() => validateIosPrivacyManifest(valid), returnsNormally);
+    // An app-owned reason cannot paper over an unreviewed native dependency.
+    expect(
+      () => validateIosPrivacyManifest({
+        ...valid,
+        'NSPrivacyAccessedAPITypes': <Object?>[
+          ...(valid['NSPrivacyAccessedAPITypes']! as List<Object?>),
+          <String, Object?>{
+            'NSPrivacyAccessedAPIType': 'NSPrivacyAccessedAPICategoryDiskSpace',
+            'NSPrivacyAccessedAPITypeReasons': <Object?>['E174.1'],
+          },
+        ],
+      }),
+      throwsA(isA<FormatException>()),
+    );
+
     expect(
       () => validateIosPrivacyManifest({...valid, 'NSPrivacyTracking': true}),
       throwsA(isA<FormatException>()),
@@ -79,9 +90,7 @@ void main() {
     expect(
       () => validateIosPrivacyManifest({
         ...valid,
-        'NSPrivacyAccessedAPITypes': <Object?>[
-          (valid['NSPrivacyAccessedAPITypes']! as List<Object?>).first,
-        ],
+        'NSPrivacyAccessedAPITypes': <Object?>[],
       }),
       throwsA(isA<FormatException>()),
     );

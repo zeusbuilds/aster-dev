@@ -4969,6 +4969,11 @@
             <sha256 value="dbd92d006d2f99711bc4d2a989b67a33d9e799d69eb048f5abeeac04dc3bc35f" origin="Reviewed RGB_L1 BFA.5 Maven Central metadata"/>
          </artifact>
       </component>
+      <component group="com.utexo" name="rgb-lib-bfa-android" version="0.3.0-beta.7-upstream-dev-bfa.7-bfa-flutter.2">
+         <artifact name="rgb-lib-bfa-android-0.3.0-beta.7-upstream-dev-bfa.7-bfa-flutter.2.aar">
+            <sha256 value="73301c7c7e7d3844aa30c0ff8ccc78b3ebd360327c652e7718b252877761fc42" origin="Verified BFA.7 Flutter source overlay 08f7ac7b8a357ae09716bf11144f327ec9f9e559; exact SDK native archive baseline"/>
+         </artifact>
+      </component>
       <component group="com.utexo" name="rgb-lib-bfa-android" version="0.3.0-beta.7-upstream-dev-bfa.7-bfa-flutter.1">
          <artifact name="rgb-lib-bfa-android-0.3.0-beta.7-upstream-dev-bfa.7-bfa-flutter.1.aar">
             <sha256 value="4ebd513f0559b28b2b76334ad9cecd343b6c5414f4627e0ba4c13e3d2d43186d" origin="Verified BFA.7 Flutter source overlay c06ffffce1f0fd5273113132295fce3e6be25052; exact SDK native archive baseline"/>

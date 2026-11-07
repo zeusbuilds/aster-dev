@@ -1133,6 +1133,66 @@ void main() {
     expect(find.text('Amount step'), findsOneWidget);
   });
 
+  testWidgets('a rejected recipient can be edited and continued once', (
+    tester,
+  ) async {
+    final harness = await PaymentFlowTestHarness.create();
+    addTearDown(() => _disposeHarness(tester, harness));
+    const target = WalletPaymentTarget.bitcoinOnchain;
+    final provider = sendFlowViewModelProvider(target);
+    final router = GoRouter(
+      initialLocation: '/send/bitcoin-onchain/address',
+      routes: [
+        GoRoute(
+          path: RoutePaths.sendAddress,
+          name: RouteNames.sendAddress,
+          builder: (_, _) => const SendAddressScreen(target: target),
+        ),
+        GoRoute(
+          path: RoutePaths.sendAmount,
+          name: RouteNames.sendAmount,
+          builder: (_, _) => const Text('Amount step'),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await _pumpRouter(tester, harness, router);
+    final field = find.byType(TextField);
+    await _pumpUntil(
+      tester,
+      () =>
+          field.evaluate().length == 1 &&
+          tester.widget<TextField>(field).enabled == true,
+    );
+    await tester.enterText(field, 'invalid-payment-recipient');
+    await tester.pump();
+    final continueButton = find.widgetWithText(CustomButton, 'Continue');
+    await tester.tap(continueButton);
+    await _pumpUntil(tester, () => harness.toasts.messages.isNotEmpty);
+    expect(harness.toasts.messages.single.title, 'Check recipient');
+    expect(find.text('Amount step'), findsNothing);
+    await _pumpUntil(
+      tester,
+      () =>
+          harness.container.read(provider).value?.canChangeDestination ==
+              true &&
+          tester.widget<TextField>(field).enabled == true,
+    );
+    const address = 'mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn';
+    await tester.enterText(field, address);
+    await tester.pump();
+    expect(harness.container.read(provider).requireValue.destination, address);
+    expect(harness.container.read(provider).requireValue.failure, isNull);
+    expect(tester.widget<CustomButton>(continueButton).enabled, isTrue);
+    await tester.tap(continueButton);
+    await _pumpUntil(
+      tester,
+      () => find.text('Amount step').evaluate().isNotEmpty,
+    );
+    expect(find.text('Amount step'), findsOneWidget);
+    expect(harness.engine.calls, isNot(contains('sendPayment:start')));
+  });
+
   testWidgets('Send destination serializes validation, Scan, and navigation', (
     tester,
   ) async {

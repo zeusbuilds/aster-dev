@@ -97,7 +97,8 @@ Object? parsePlistXml(String source) {
   return _parsePlistElement(values.single);
 }
 
-/// Validates app-owned privacy declarations in a packaged aggregate manifest.
+/// Validates the app-owned declarations; native dependency privacy admission
+/// remains a separate required gate, not inferred from this manifest.
 void validateIosPrivacyManifest(Map<String, Object?> plist) {
   const allowedRootKeys = <String>{
     'NSPrivacyAccessedAPITypes',
@@ -140,7 +141,6 @@ void validateIosPrivacyManifest(Map<String, Object?> plist) {
     reasons[category] = categoryReasons;
   }
   const required = <String, Set<String>>{
-    'NSPrivacyAccessedAPICategoryDiskSpace': {'E174.1'},
     'NSPrivacyAccessedAPICategoryFileTimestamp': {'C617.1'},
   };
   if (reasons.length != required.length ||

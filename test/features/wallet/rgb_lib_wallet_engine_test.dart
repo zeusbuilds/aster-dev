@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:aster/core/config/config.dart';
 import 'package:aster/core/errors/errors.dart';
@@ -10,6 +11,8 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rgb_sdk_flutter/rgb_sdk_flutter.dart';
+
+import '../../support/wallet_fakes.dart';
 
 const _channel = MethodChannel('com.utexo.rgb_sdk_flutter/rgb_lib');
 const _id = '0123456789abcdef0123456789abcdef';
@@ -51,7 +54,10 @@ void main() {
   late FutureOr<Object?> Function(MethodCall) dispatch;
   late RgbLibKeys signingReader;
   late RgbLibWalletEngine engine;
+  late Directory storage;
   var phase = 'absent';
+  var dispatchedRevocation = false;
+  var existingOnlyOpen = true;
   var lostCommitReply = false;
   var pendingNative = false;
   String? pendingCommandJson;
@@ -61,7 +67,8 @@ void main() {
   var nativeReceipts = <Map<String, Object?>>[];
   var assetPresent = false;
   var orphanReceive = false;
-  var decodedAmount = '1000000';
+  String? decodedAmount = '1000000';
+  String? receivedTransferStatus;
   int? decodedExpiry = 4102444800;
 
   final publicBytes = utf8.encode('public contract fixture');
@@ -128,9 +135,25 @@ void main() {
           'consignment': true,
           'contractRegistration': true,
           'durableOnchainRecovery': true,
+          'supportsDispatchedRgbRevocation': dispatchedRevocation,
+          'supportsExistingOnlyOpen': existingOnlyOpen,
           'nativeOverlay': 'flutter-bfa7-durable-v1',
         };
       case 'openWallet':
+        final directory = Directory(args!['dataDir']! as String);
+        directory.createSync(recursive: true);
+        final profile = File('${directory.path}/rgb-sdk-profile.json');
+        if (!profile.existsSync()) {
+          profile.writeAsStringSync(
+            jsonEncode({
+              'formatVersion': 2,
+              'backend': 'rgb-lib',
+              'id': _binding,
+              'network': 'regtest',
+              'recoveryCohort': _cohort,
+            }),
+          );
+        }
         return 'handle';
       case 'getWalletIdentity':
         return {
@@ -158,6 +181,7 @@ void main() {
         }();
       case 'closeWallet':
       case 'assertNoPendingOnchainSend':
+      case 'sync':
         return null;
       case 'getNetworkInfo':
         return {'network': 'regtest', 'blockHeight': null};
@@ -168,7 +192,10 @@ void main() {
           'assetSchema': 'Bfa',
           'assetId': _assetId,
           'network': 'regtest',
-          'assignment': {'type': 'Fungible', 'amount': decodedAmount},
+          'assignment': {
+            'type': decodedAmount == null ? 'Any' : 'Fungible',
+            'amount': decodedAmount,
+          },
           'expirationTimestamp': decodedExpiry?.toString(),
           'transportEndpoints': ['rpc://127.0.0.1:29300/json-rpc'],
           'encryption': 'Optional',
@@ -217,11 +244,42 @@ void main() {
           'receipts': nativeReceipts,
         });
       case 'listTransfers':
-        return <Object?>[];
+        return receivedTransferStatus == null
+            ? <Object?>[]
+            : [
+                {
+                  'idx': 1,
+                  'batchTransferIdx': 7,
+                  'createdAt': '1000',
+                  'updatedAt': '1001',
+                  'status': receivedTransferStatus,
+                  'kind': 'ReceiveWitness',
+                  'requestedAssignment': {
+                    'type': 'Fungible',
+                    'amount': '1000000',
+                  },
+                  'assignments': [
+                    {'type': 'Fungible', 'amount': '1000000'},
+                  ],
+                  'txid': _txid,
+                  'transportEndpoints': <Object?>[],
+                  'changeUtxos': <Object?>[],
+                },
+              ];
       case 'listUnspents':
         return <Object?>[];
       case 'getAssetBalance':
-        return {'settled': '0', 'future': '0', 'spendable': '0'};
+        return receivedTransferStatus == null
+            ? {'settled': '0', 'future': '0', 'spendable': '0'}
+            : {
+                'settled': receivedTransferStatus == 'Settled'
+                    ? '1000000'
+                    : '0',
+                'future': '1000000',
+                'spendable': receivedTransferStatus == 'Settled'
+                    ? '1000000'
+                    : '0',
+              };
       case 'getBtcBalance':
         return {
           'vanilla': {
@@ -274,6 +332,7 @@ void main() {
         if (lostCommitReply) {
           throw PlatformException(code: 'IO', message: 'lost response');
         }
+      case 'revokeOnchainSend':
       case 'cancelOnchainSend':
         phase = 'rejected';
       case 'onchainSendStatus':
@@ -296,14 +355,20 @@ void main() {
           hasIdentity && command.kind == RecoverableOnchainSendKind.rgb
           ? 7
           : null,
-      'failureCode': phase == 'rejected' ? 'Cancelled' : null,
+      'failureCode': phase == 'rejected'
+          ? (call.method == 'revokeOnchainSend' ? 'cancelled' : 'Cancelled')
+          : null,
       'endAuthorized': phase == 'accepted',
     });
   }
 
-  setUp(() {
+  setUp(() async {
+    storage = await Directory.systemTemp.createTemp('aster_l1_adapter_');
+    await File('${storage.path}/.aster-storage-owner').writeAsString(_id);
     calls.clear();
     phase = 'absent';
+    dispatchedRevocation = false;
+    existingOnlyOpen = true;
     lostCommitReply = false;
     pendingNative = false;
     pendingCommandJson = null;
@@ -314,6 +379,7 @@ void main() {
     assetPresent = false;
     orphanReceive = false;
     decodedAmount = '1000000';
+    receivedTransferStatus = null;
     decodedExpiry = 4102444800;
     dispatch = reply;
     messenger.setMockMethodCallHandler(_channel, (call) async {
@@ -322,15 +388,15 @@ void main() {
     });
     engine = RgbLibWalletEngine(
       services,
-      storageDirectory: '/aster-l1-adapter-fixture',
+      storageDirectory: storage.path,
       localNetworkAccess: _NetworkAccess(),
       evmChainValidator: _ChainValidator(),
       walletFactory: (keys) {
         signingReader = keys;
         return RgbLibWallet(
-          params: const RgbLibWalletParams(
+          params: RgbLibWalletParams(
             network: 'regtest',
-            storageDirPath: '/aster-l1-adapter-fixture',
+            storageDirPath: '${storage.path}/rgb-l1',
           ),
           keys: keys,
         );
@@ -340,12 +406,258 @@ void main() {
   tearDown(() async {
     await engine.destroy();
     messenger.setMockMethodCallHandler(_channel, null);
+    await storage.delete(recursive: true);
   });
 
   Future<void> open() => engine.provision(
     databasePassword: 'database-password-fixture',
     mnemonic: _mnemonic,
   );
+
+  test('fresh creation rejects a wrapper unable to reopen existing-only before signing', () async {
+    existingOnlyOpen = false;
+    await expectLater(
+      open(),
+      throwsA(
+        isA<AppFailureException>().having(
+          (error) => error.failure.code,
+          'code',
+          'wallet_backend_capability_unavailable',
+        ),
+      ),
+    );
+    expect(calls.map((call) => call.method), ['getRuntimeInfo']);
+    expect(await signingReader.readMnemonic!(), isNull);
+    expect(await Directory('${storage.path}/rgb-l1').exists(), isFalse);
+  });
+
+  test(
+    'fresh provisioning cannot adopt an existing nonempty native child',
+    () async {
+      final child = await Directory('${storage.path}/rgb-l1').create();
+      final profile = File('${child.path}/rgb-sdk-profile.json');
+      await profile.writeAsString('retained native state');
+      await expectLater(open(), throwsA(isA<AppFailureException>()));
+      expect(calls, isEmpty);
+      expect(await profile.readAsString(), 'retained native state');
+    },
+  );
+
+  test('default adapter isolates native data beneath its ownership marker and reopens the same cohort', () async {
+    await engine.destroy();
+    engine = RgbLibWalletEngine(
+      services,
+      storageDirectory: storage.path,
+      localNetworkAccess: _NetworkAccess(),
+      evmChainValidator: _ChainValidator(),
+    );
+    await open();
+    await engine.shutdown();
+    await engine.openPersistedWithMnemonic(
+      databasePassword: 'database-password-fixture',
+      mnemonic: _mnemonic,
+    );
+    final paths = calls
+        .where((call) => call.method == 'openWallet')
+        .map((call) => (call.arguments as Map)['dataDir']);
+    expect(paths, ['${storage.path}/rgb-l1', '${storage.path}/rgb-l1']);
+    final opened = calls.where((call) => call.method == 'openWallet').toList();
+    expect((opened.first.arguments as Map)['requireExisting'], isNot(isTrue));
+    expect((opened.last.arguments as Map)['requireExisting'], isTrue);
+    expect(
+      await File('${storage.path}/.aster-storage-owner').readAsString(),
+      _id,
+    );
+    final profile = jsonDecode(
+      await File('${storage.path}/rgb-l1/rgb-sdk-profile.json').readAsString(),
+    ) as Map<String, dynamic>;
+    expect(profile['recoveryCohort'], _cohort);
+  });
+
+  test(
+    'legacy root-level native state is preserved without creating a new child',
+    () async {
+      final legacy = File('${storage.path}/rgb-sdk-profile.json');
+      await legacy.writeAsString('preserved old native profile');
+      final failure = throwsA(
+        isA<AppFailureException>().having(
+          (error) => error.failure,
+          'failure',
+          const AppFailure(
+            code: 'wallet_storage_layout_mismatch',
+            kind: AppFailureKind.storage,
+            userMessage: 'Wallet recovery is required.',
+            retryable: false,
+            requiresReconciliation: true,
+          ),
+        ),
+      );
+      await expectLater(open(), failure);
+      await expectLater(
+        engine.openPersistedWithMnemonic(
+          databasePassword: 'database-password-fixture',
+          mnemonic: _mnemonic,
+        ),
+        failure,
+      );
+      expect(await legacy.readAsString(), 'preserved old native profile');
+      expect(await Directory('${storage.path}/rgb-l1').exists(), isFalse);
+      expect(calls, isEmpty);
+    },
+  );
+
+  test('missing, empty and symlinked ready-child profiles never access keys or create a cohort', () async {
+    final child = Directory('${storage.path}/rgb-l1');
+    for (final state in [
+      'missing',
+      'empty',
+      'zero-profile',
+      'oversized-profile',
+      'symlink',
+    ]) {
+      if (await child.exists()) await child.delete(recursive: true);
+      if (state != 'missing') await child.create();
+      final marker = File('${child.path}/rgb-sdk-profile.json');
+      if (state == 'zero-profile') await marker.writeAsString('');
+      if (state == 'oversized-profile') await marker.writeAsString('x' * 65537);
+      if (state == 'symlink') {
+        await Link(marker.path).create('${storage.path}/.aster-storage-owner');
+      }
+      await expectLater(
+        engine.openPersistedWithMnemonic(
+          databasePassword: 'database-password-fixture',
+          mnemonic: _mnemonic,
+        ),
+        throwsA(
+          isA<AppFailureException>().having(
+            (error) => error.failure.requiresReconciliation,
+            'requiresReconciliation',
+            isTrue,
+          ),
+        ),
+      );
+      expect(calls, isEmpty, reason: state);
+      expect(
+        await File('${storage.path}/.aster-storage-owner').readAsString(),
+        _id,
+      );
+    }
+  });
+
+  test(
+    'SDK profile/cohort rejection remains a preserved integrity failure',
+    () async {
+      await open();
+      await engine.shutdown();
+      final profile = File('${storage.path}/rgb-l1/rgb-sdk-profile.json');
+      await profile.writeAsString('damaged native profile');
+      dispatch = (call) {
+        if (call.method == 'openWallet') {
+          expect((call.arguments as Map)['requireExisting'], isTrue);
+          throw PlatformException(code: 'WALLET_PROFILE_MISMATCH');
+        }
+        return reply(call);
+      };
+      calls.clear();
+      await expectLater(
+        engine.openPersistedWithMnemonic(
+          databasePassword: 'database-password-fixture',
+          mnemonic: _mnemonic,
+        ),
+        throwsA(
+          isA<AppFailureException>().having(
+            (error) => error.failure.requiresReconciliation,
+            'requiresReconciliation',
+            isTrue,
+          ),
+        ),
+      );
+      expect(calls.map((call) => call.method), isNot(contains('goOnline')));
+      expect(await profile.readAsString(), 'damaged native profile');
+    },
+  );
+
+  test(
+    'owned recursive deletion removes the native child and retains siblings',
+    () async {
+      final nativeRoot = await Directory.systemTemp.createTemp(
+        'aster_l1_owned_',
+      );
+      addTearDown(() => nativeRoot.delete(recursive: true));
+      final directories = IoWalletDirectoryManager(
+        nativeRoot.path,
+        MemoryWalletStorageSecurity(),
+      );
+      final owned = await directories.create(_id, storageToken: _cohort);
+      final siblingId = 'e' * 32;
+      final sibling = await directories.create(
+        siblingId,
+        storageToken: 'f' * 32,
+      );
+      await Directory('$owned/rgb-l1').create();
+      await File('$owned/rgb-l1/preserved-native-state')
+          .writeAsString('native state');
+      await directories.removeDeletedWallet(_id, storageToken: _cohort);
+      expect(await Directory(owned).exists(), isFalse);
+      expect(
+        await File('$sibling/.aster-storage-owner').readAsString(),
+        'f' * 32,
+      );
+    },
+  );
+
+  test(
+    'sync awaits one complete transfer refresh after the chain sync',
+    () async {
+      await open();
+      calls.clear();
+      await engine.sync();
+      expect(calls.map((call) => call.method), ['sync', 'refresh']);
+    },
+  );
+
+  test('one historical witness failure prevents a successful sync despite newer successful batches', () async {
+    await open();
+    dispatch = (call) {
+      if (call.method == 'refresh') {
+        return [
+          {'batchTransferIdx': 23, 'updatedStatus': 'Settled', 'failure': null},
+          {
+            'batchTransferIdx': 3,
+            'updatedStatus': null,
+            'failure': {
+              'name': 'RGB_LIB_Proxy',
+              'message': 'private witness endpoint and response payload',
+            },
+          },
+        ];
+      }
+      return reply(call);
+    };
+    calls.clear();
+    await expectLater(
+      engine.sync(),
+      throwsA(
+        isA<AppFailureException>().having(
+          (error) => error.failure,
+          'failure',
+          const AppFailure(
+            code: 'wallet_sync_incomplete',
+            kind: AppFailureKind.unavailable,
+            userMessage: 'Wallet updates are unavailable. Try again.',
+            retryable: true,
+          ),
+        ),
+      ),
+    );
+    expect(calls.map((call) => call.method), ['sync', 'refresh']);
+
+    // Recovery is a later read-only sync, never a payment or prepare replay.
+    dispatch = reply;
+    calls.clear();
+    await engine.sync();
+    expect(calls.map((call) => call.method), ['sync', 'refresh']);
+  });
 
   test(
     'imports exact approved metadata before online and clears mnemonic reader',
@@ -405,6 +717,61 @@ void main() {
     },
   );
 
+  test(
+    'old archive does not advertise or invoke explicit dispatched revocation',
+    () async {
+      await open();
+      expect(await engine.supportsDispatchedRgbRevocation(), isFalse);
+      final request = await engine.paymentOperationRequest(
+        _id,
+        intent(rgb: true),
+      );
+      await expectLater(
+        engine.revokeDispatchedRgbOperation(request),
+        throwsA(isA<RgbLibWalletException>()),
+      );
+      expect(
+        calls.where((call) => call.method == 'revokeOnchainSend'),
+        isEmpty,
+      );
+      expect(
+        calls.where((call) => call.method == 'cancelOnchainSend'),
+        isEmpty,
+      );
+    },
+  );
+
+  test(
+    'explicit revocation forwards only the reviewed new native operation',
+    () async {
+      dispatchedRevocation = true;
+      await open();
+      expect(await engine.supportsDispatchedRgbRevocation(), isTrue);
+      final request = await engine.paymentOperationRequest(
+        _id,
+        intent(rgb: true),
+      );
+      final status = await engine.revokeDispatchedRgbOperation(request);
+      expect(status.phase, WalletPaymentRecoveryPhase.rejected);
+      expect(status.endAuthorized, isFalse);
+      expect(status.failureCode, 'cancelled');
+      final sent = calls.singleWhere(
+        (call) => call.method == 'revokeOnchainSend',
+      );
+      expect((sent.arguments as Map<Object?, Object?>)['requestJson'], request);
+      expect(
+        calls.where(
+          (call) => {
+            'cancelOnchainSend',
+            'prepareOnchainSend',
+            'commitOnchainSend',
+          }.contains(call.method),
+        ),
+        isEmpty,
+      );
+    },
+  );
+
   test('metadata mismatch prevents asset admission and connection', () async {
     dispatch = (call) => call.method == 'importContract'
         ? {
@@ -433,12 +800,48 @@ void main() {
     expect((native.arguments as Map<Object?, Object?>)['witness'], isTrue);
     expect((native.arguments as Map<Object?, Object?>)['assetId'], _assetId);
     expect((native.arguments as Map<Object?, Object?>)['amount'], '1000000');
+    expect((native.arguments as Map<Object?, Object?>)['minConfirmations'], 1);
     expect(
       (native.arguments as Map<Object?, Object?>)['assignmentKind'],
       'Fungible',
     );
     expect(request.batchTransferIndex, 7);
   });
+
+  test('amountless witness requests also require one confirmation', () async {
+    await open();
+    decodedAmount = null;
+    final request = await engine.createReceiveRequest(rgbRoute);
+    expect(request.amount, isNull);
+    final arguments =
+        calls.singleWhere((call) => call.method == 'receive').arguments
+            as Map<Object?, Object?>;
+    expect(arguments['witness'], isTrue);
+    expect(arguments['amount'], isNull);
+    expect(arguments['minConfirmations'], 1);
+  });
+
+  test(
+    'unconfirmed RGB stays waiting and unspendable until native settlement',
+    () async {
+      await open();
+      receivedTransferStatus = 'WaitingConfirmations';
+      var balance = await engine.getBalance(asset);
+      var history = await engine.listActivity(asset);
+      expect(balance.onchainFuture.units, 1000000);
+      expect(balance.onchainSettled.units, 0);
+      expect(balance.onchainSpendable.units, 0);
+      expect(history.single.status, WalletActivityStatus.waitingConfirmations);
+      expect(history.single.amount!.units, 1000000);
+      receivedTransferStatus = 'Settled';
+      balance = await engine.getBalance(asset);
+      history = await engine.listActivity(asset);
+      expect(balance.onchainSettled.units, 1000000);
+      expect(balance.onchainSpendable.units, 1000000);
+      expect(history.single.status, WalletActivityStatus.succeeded);
+      expect(history.single.amount!.units, 1000000);
+    },
+  );
 
   test(
     'receive rejects a native invoice that changed the requested amount',
@@ -927,6 +1330,13 @@ void main() {
       await open();
       final original = await engine.rgbSetupInventory();
       await engine.destroy();
+      final secondStorage = await Directory.systemTemp.createTemp(
+        'aster_l1_other_cohort_',
+      );
+      addTearDown(() async {
+        await engine.destroy();
+        await secondStorage.delete(recursive: true);
+      });
       dispatch = (call) => call.method == 'getWalletIdentity'
           ? {
               ...(reply(call) as Map<String, Object?>),
@@ -935,13 +1345,13 @@ void main() {
           : reply(call);
       engine = RgbLibWalletEngine(
         services,
-        storageDirectory: '/aster-l1-second-cohort',
+        storageDirectory: secondStorage.path,
         localNetworkAccess: _NetworkAccess(),
         evmChainValidator: _ChainValidator(),
         walletFactory: (keys) => RgbLibWallet(
-          params: const RgbLibWalletParams(
+          params: RgbLibWalletParams(
             network: 'regtest',
-            storageDirPath: '/aster-l1-second-cohort',
+            storageDirPath: '${secondStorage.path}/rgb-l1',
           ),
           keys: keys,
         ),

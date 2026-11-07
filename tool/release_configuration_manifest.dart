@@ -98,6 +98,33 @@ abstract final class ReleaseConfigurationKey {
     vssUrl,
   };
 
+  /// Internal on-chain qualification may omit USDT but never fabricates it.
+  static const rgbL1InternalRequired = <String>{
+    explorerUrl,
+    indexerUrl,
+    network,
+    rgbProxyUrl,
+  };
+
+  /// Public Aster's BTC/USDT product requires an approved BFA deployment.
+  static const rgbL1PublicRequired = <String>{
+    ...rgbL1InternalRequired,
+    bfaMinMintLockBlocks,
+    bfaMaxMintLockBlocks,
+    ethChainId,
+    ethRpcUrl,
+    usdtAssetId,
+    usdtPrecision,
+    usdtContractBase64,
+    usdtContractSha256,
+    usdtNativeName,
+    usdtNativeTicker,
+    marketApiBaseUrl,
+    privacyUrl,
+    supportUrl,
+    termsUrl,
+  };
+
   static const publicRequired = <String>{
     ...internalRequired,
     marketApiBaseUrl,
@@ -224,20 +251,24 @@ final class ReleaseConfigurationManifest {
       );
     }
 
-    switch (values[ReleaseConfigurationKey.walletBackend] ?? 'rln') {
+    final backend = values[ReleaseConfigurationKey.walletBackend] ?? 'rln';
+    switch (backend) {
       case 'rln':
         break;
       case 'rgb-l1':
-        throw const FormatException(
-          'RGB_L1 requires verified durable payment recovery before release.',
-        );
+        _validateRgbL1Deployment(values);
+        break;
       default:
         throw const FormatException(
           'ASTER_WALLET_BACKEND must be rln or rgb-l1.',
         );
     }
 
-    final required = audience == ReleaseAudience.publicDistribution
+    final required = backend == 'rgb-l1'
+        ? audience == ReleaseAudience.publicDistribution
+              ? ReleaseConfigurationKey.rgbL1PublicRequired
+              : ReleaseConfigurationKey.rgbL1InternalRequired
+        : audience == ReleaseAudience.publicDistribution
         ? ReleaseConfigurationKey.publicRequired
         : ReleaseConfigurationKey.internalRequired;
     final missing = required.difference(values.keys.toSet());
@@ -279,16 +310,18 @@ final class ReleaseConfigurationManifest {
       ReleaseConfigurationKey.vssUrl,
       ReleaseConfigurationKey.explorerUrl,
     ]) {
-      _validatePublicHttps(values[key]!, key: key);
+      final value = values[key];
+      if (value != null) _validatePublicHttps(value, key: key);
     }
-    _validateAsset(
-      values[ReleaseConfigurationKey.usdtAssetId]!,
-      values[ReleaseConfigurationKey.usdtPrecision]!,
-    );
-    final expectedEvmChain = values[ReleaseConfigurationKey.ethChainId]!;
-    if (expectedEvmChain.length > 78 ||
-        !RegExp(r'^[1-9][0-9]*$').hasMatch(expectedEvmChain) ||
-        BigInt.parse(expectedEvmChain).bitLength > 256) {
+    final assetId = values[ReleaseConfigurationKey.usdtAssetId];
+    if (assetId != null) {
+      _validateAsset(assetId, values[ReleaseConfigurationKey.usdtPrecision]!);
+    }
+    final expectedEvmChain = values[ReleaseConfigurationKey.ethChainId];
+    if (expectedEvmChain != null &&
+        (expectedEvmChain.length > 78 ||
+            !RegExp(r'^[1-9][0-9]*$').hasMatch(expectedEvmChain) ||
+            BigInt.parse(expectedEvmChain).bitLength > 256)) {
       throw const FormatException(
         'ASTER_ETH_CHAIN_ID must be a canonical positive decimal uint256.',
       );
@@ -331,6 +364,13 @@ final class ReleaseConfigurationManifest {
         'durable on-chain payment recovery. Current RLN VSS is incompatible.',
       );
     }
+    if (backend == 'rgb-l1') {
+      // Structural validation is staged for qualification, not admission. Keep
+      // this closed until the exact Aster/native/recovery/release slice passes.
+      throw const FormatException(
+        'RGB_L1 requires verified durable payment recovery before release.',
+      );
+    }
     return ReleaseConfigurationManifest._(audience, values);
   }
 
@@ -339,6 +379,49 @@ final class ReleaseConfigurationManifest {
 
   /// Validated non-secret compile-time values in deterministic source order.
   final Map<String, String> values;
+}
+
+void _validateRgbL1Deployment(Map<String, String> values) {
+  if (values.containsKey(ReleaseConfigurationKey.vssUrl) ||
+      values.containsKey(ReleaseConfigurationKey.lspUrl)) {
+    throw const FormatException('RGB_L1 does not support LSP or VSS services.');
+  }
+  const assetKeys = {
+    ReleaseConfigurationKey.usdtAssetId,
+    ReleaseConfigurationKey.usdtPrecision,
+    ReleaseConfigurationKey.usdtContractBase64,
+    ReleaseConfigurationKey.usdtContractSha256,
+    ReleaseConfigurationKey.usdtNativeName,
+    ReleaseConfigurationKey.usdtNativeTicker,
+  };
+  const evmKeys = {
+    ReleaseConfigurationKey.ethRpcUrl,
+    ReleaseConfigurationKey.ethChainId,
+    ReleaseConfigurationKey.bfaMinMintLockBlocks,
+    ReleaseConfigurationKey.bfaMaxMintLockBlocks,
+  };
+  final supplied = values.keys.toSet();
+  final assetFields = assetKeys.intersection(supplied);
+  if (assetFields.isNotEmpty && assetFields.length != assetKeys.length) {
+    throw const FormatException(
+      'RGB_L1 USDT requires its complete approved contract metadata.',
+    );
+  }
+  final evmFields = evmKeys.intersection(supplied);
+  if ((assetFields.isNotEmpty || evmFields.isNotEmpty) &&
+      evmFields.length != evmKeys.length) {
+    throw const FormatException(
+      'RGB_L1 BFA validation requires RPC, chain ID and both mint-lock bounds.',
+    );
+  }
+  final chain = values[ReleaseConfigurationKey.ethChainId];
+  if (chain != null &&
+      (!RegExp(r'^[1-9][0-9]*$').hasMatch(chain) ||
+          BigInt.parse(chain).bitLength > 64)) {
+    throw const FormatException(
+      'RGB_L1 requires a canonical positive uint64 EVM chain ID.',
+    );
+  }
 }
 
 /// Minimal strict parser for the only JSON shape Flutter dart-defines accept.

@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io' show pid;
+
 import 'package:aster/core/core.dart';
 import 'package:aster/features/onboarding/presentation/view_model/view_models.dart';
 import 'package:aster/features/wallet/data/repository/repository.dart';
@@ -7,12 +10,16 @@ import 'package:aster/features/wallet/presentation/view_model/wallet_view_model.
 import 'package:aster/main.dart';
 import 'package:aster/shared/shared.dart';
 import 'package:collection/collection.dart';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'support/full_wallet_home_observation.dart';
 import 'support/full_wallet_import_transfer.dart';
 import 'support/full_wallet_qa.dart';
+import 'support/full_wallet_rgb_checkpoint.dart';
+import 'support/full_wallet_rgb_l1.dart';
 import 'support/full_wallet_rgb_setup.dart';
 import 'support/full_wallet_send_ui.dart';
 import 'support/full_wallet_test_guard.dart';
@@ -20,13 +27,45 @@ import 'support/full_wallet_test_guard.dart';
 const _runId = String.fromEnvironment('ASTER_QA_RUN_ID');
 const _controlUrl = String.fromEnvironment('ASTER_QA_CONTROL_URL');
 const _storageRunId = String.fromEnvironment('ASTER_QA_STORAGE_RUN_ID');
+const _resumePublicIdentity = String.fromEnvironment(
+  'ASTER_QA_RESUME_PUBLIC_IDENTITY',
+);
+const _resumeBtcDestination = String.fromEnvironment(
+  'ASTER_QA_RESUME_BTC_DESTINATION',
+);
+const _resumeCohort = String.fromEnvironment('ASTER_QA_RESUME_COHORT');
+const _resumeBtcTxid = String.fromEnvironment('ASTER_QA_RESUME_BTC_TXID');
+const _resumeRgbTxid = String.fromEnvironment('ASTER_QA_RESUME_RGB_TXID');
+const _resumeReturnInvoice = String.fromEnvironment(
+  'ASTER_QA_RESUME_RETURN_INVOICE',
+);
+const _resumeReturnInvoiceHash = String.fromEnvironment(
+  'ASTER_QA_RESUME_RETURN_INVOICE_SHA256',
+);
 const _stage = String.fromEnvironment(
   'ASTER_QA_STAGE',
   defaultValue: 'lifecycle',
 );
 const _nativeTimeout = Duration(minutes: 5);
 
-void main() {
+void main() => runFullWalletFlowQualification();
+
+/// The separate RGB_L1 integration entrypoint uses only Debug isolated storage.
+/// Normal Aster startup and all product/release admission gates are unchanged.
+void runFullWalletFlowQualification({
+  bool qualifyLocalRgbL1 = false,
+  bool observeCompletedHome = false,
+}) {
+  final qualifiedServices = qualifyLocalRgbL1
+      ? requireLocalRgbL1Services(
+          WalletServiceConfiguration.fromEnvironment(),
+          requireUsdt: {
+            'rgb-l1-full',
+            'rgb-l1-resume-funded',
+            'rgb-l1-resume-return',
+          }.contains(_stage),
+        )
+      : null;
   final binding = FullWalletQaIntegrationBinding();
   // Keep the real accessibility tree available throughout device inspection.
   // Establish the platform-owned semantics lifetime before the test baseline,
@@ -37,15 +76,28 @@ void main() {
   testWidgets('real isolated wallet lifecycle and local funded flows', (
     tester,
   ) async {
-    final readOnly = {
+    final historicalReadOnly = {
       'restore',
       'reconcile-mint',
       'reconcile-transfer',
     }.contains(_stage);
+    final completedCheckpoint = qualifyLocalRgbL1
+        ? await readQaFundedCheckpoint(
+            _storageRunId.isEmpty ? _runId : _storageRunId,
+          )
+        : null;
+    if (observeCompletedHome &&
+        (!qualifyLocalRgbL1 || completedCheckpoint == null)) {
+      throw const FullWalletQaFailure('qa_home_completed_store_required');
+    }
+    final readOnly = historicalReadOnly || completedCheckpoint != null;
+    final resumeFunded = _stage == 'rgb-l1-resume-funded';
+    final resumeReturn = _stage == 'rgb-l1-resume-return';
     final control = FullWalletQaControl(
       runId: _runId,
       controlUrl: _controlUrl,
       readOnly: readOnly,
+      initialSequence: completedCheckpoint == null ? 0 : 1000,
       beforeFinancialDispatch: () => requireQaFrameworkHealthy(tester),
     );
     ProviderContainer? container;
@@ -57,17 +109,34 @@ void main() {
       if (!{
         'lifecycle',
         'full',
+        'rgb-l1-full',
+        'rgb-l1-resume-funded',
+        'rgb-l1-resume-return',
         'restore',
         'reconcile-mint',
         'reconcile-transfer',
       }.contains(_stage)) {
         throw const FullWalletQaFailure('qa_stage_invalid');
       }
-      requireQaSupportedFundingStage(_stage);
+      if (qualifyLocalRgbL1) {
+        if (!{
+          'lifecycle',
+          'rgb-l1-full',
+          'rgb-l1-resume-funded',
+          'rgb-l1-resume-return',
+        }.contains(_stage)) {
+          throw const FullWalletQaFailure('qa_local_l1_stage_invalid');
+        }
+      } else {
+        if (_stage == 'rgb-l1-full' || resumeFunded || resumeReturn) {
+          throw const FullWalletQaFailure('qa_local_l1_entrypoint_required');
+        }
+        requireQaSupportedFundingStage(_stage);
+      }
       final storage = await FullWalletQaStorage.open(
         runId: _storageRunId.isEmpty ? _runId : _storageRunId,
-        existing: readOnly,
-        restoreMissing: !readOnly
+        existing: readOnly || resumeFunded || resumeReturn,
+        restoreMissing: !historicalReadOnly
             ? null
             : (root) async {
                 final receipt = await control.request(
@@ -80,8 +149,16 @@ void main() {
               },
       );
       retainedStorage = storage;
-      await control.event('test_started', {'stage': _stage});
+      await control.event('test_started', {
+        'stage': _stage,
+        'process_id': pid,
+        'read_only_checkpoint': completedCheckpoint != null,
+      });
       container = await storage.bootstrap(
+        qualifiedLocalL1Services: qualifiedServices,
+        readOnlyCheckpoint: completedCheckpoint,
+        onReadOnlyAudit: (evidence) =>
+            control.event('readonly_native_audit_passed', evidence),
         onFailureLogs: (evidence) =>
             control.event('native_failure_logs_copied', evidence),
       );
@@ -94,12 +171,247 @@ void main() {
         throw const FullWalletQaFailure('qa_local_onchain_profile_required');
       }
       await control.preflight(services);
+      if (qualifyLocalRgbL1) await recordQaNativeRuntime(control);
+      if (completedCheckpoint != null) {
+        final pending = requireQaSuccess(
+          await repository.paymentSubmissionStatus(),
+          'cold_process_no_pending',
+        );
+        if (pending?.requiresReconciliation == true) {
+          throw const FullWalletQaFailure(
+            'qa_cold_process_pending_native_or_app',
+          );
+        }
+        final verified = await verifyQaFundedCheckpoint(
+          storage: storage,
+          repository: repository,
+          expected: completedCheckpoint,
+          snapshot: await _publicSnapshot(repository),
+          assetId: services.usdtAsset!.contractId,
+        );
+        if (observeCompletedHome) {
+          // Separate from strict cold observation: normal Home background
+          // refresh is deliberately allowed; payment commands are never used.
+          await tester.pumpWidget(
+            UncontrolledProviderScope(
+              container: container,
+              child: FullWalletQaSecurityLifecycle(
+                security: container.read(securityControllerProvider),
+                child: const AsterApp(),
+              ),
+            ),
+          );
+          await qualifyCompletedHomeObservation(
+            tester: tester,
+            container: container,
+            control: control,
+            checkpoint: verified,
+          );
+          binding.reportData = {
+            'stage': 'rgb-l1-home-observation',
+            'checkpoint': verified,
+            'ordinary_home_refresh_allowed': true,
+            'new_payment_commands': false,
+          };
+          await control.event('test_passed', {
+            'stage': 'rgb-l1-home-observation',
+          });
+          completed = true;
+          return;
+        }
+        await control.event('funded_cold_process_reopen_passed', {
+          ...verified,
+          'process_id': pid,
+          'generic_refresh_invoked': false,
+          'app_ui_mounted': false,
+          'no_new_payment_commands': true,
+        });
+        await control.event('test_passed', {
+          'stage': 'rgb-l1-readonly-cold-reopen',
+        });
+        binding.reportData = {
+          'stage': 'rgb-l1-readonly-cold-reopen',
+          'checkpoint': verified,
+        };
+        completed = true;
+        return;
+      }
+
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
-          child: const AsterApp(),
+          child: FullWalletQaSecurityLifecycle(
+            security: container.read(securityControllerProvider),
+            child: const AsterApp(),
+          ),
         ),
       );
+
+      if (resumeReturn) {
+        if (_storageRunId.isEmpty ||
+            _storageRunId == _runId ||
+            !RegExp(r'^[a-f0-9]{64}$').hasMatch(_resumePublicIdentity) ||
+            !RegExp(r'^[a-f0-9]{32}$').hasMatch(_resumeCohort) ||
+            !RegExp(r'^[a-f0-9]{64}$').hasMatch(_resumeBtcTxid) ||
+            !RegExp(r'^[a-f0-9]{64}$').hasMatch(_resumeRgbTxid) ||
+            !RegExp(r'^[a-f0-9]{64}$').hasMatch(_resumeReturnInvoiceHash) ||
+            _resumeReturnInvoice.isEmpty ||
+            sha256.convert(utf8.encode(_resumeReturnInvoice)).toString() !=
+                _resumeReturnInvoiceHash) {
+          throw const FullWalletQaFailure('qa_resume_return_scope_invalid');
+        }
+        final registry = requireQaSuccess(
+          await repository.load(),
+          'resume_return_load',
+        );
+        final active = registry.activeProfile;
+        if (active == null ||
+            registry.profiles.length != 1 ||
+            registry.readyProfiles.length != 1 ||
+            await readQaNativeCohort(storage, active.id) != _resumeCohort) {
+          throw const FullWalletQaFailure('qa_resume_return_cohort_changed');
+        }
+        requireQaSuccess(await repository.sync(), 'resume_return_sync');
+        final snapshot = await _publicSnapshot(repository);
+        final pending = requireQaSuccess(
+          await repository.paymentSubmissionStatus(),
+          'resume_return_pending',
+        );
+        final btcFeed = requireQaSuccess(
+          await repository.activityFeed(WalletAssetKind.bitcoin),
+          'resume_return_btc_history',
+        );
+        final rgbFeed = requireQaSuccess(
+          await repository.activityFeed(WalletAssetKind.usdt),
+          'resume_return_rgb_history',
+        );
+        final btcSent = btcFeed.activities
+            .where((row) => row.direction == WalletActivityDirection.sent)
+            .toList();
+        final receivedRgb = rgbFeed.activities
+            .where(
+              (row) =>
+                  row.direction == WalletActivityDirection.received &&
+                  row.txid == _resumeRgbTxid &&
+                  row.amount?.units == 100 &&
+                  row.status == WalletActivityStatus.succeeded,
+            )
+            .toList();
+        if (snapshot['public_identity'] != _resumePublicIdentity ||
+            snapshot['bfa_settled_units'] != 100 ||
+            snapshot['bfa_spendable_units'] != 100 ||
+            pending?.requiresReconciliation == true ||
+            btcSent.length != 1 ||
+            btcSent.single.txid != _resumeBtcTxid ||
+            btcSent.single.amount?.units != 1000 ||
+            btcSent.single.status != WalletActivityStatus.succeeded ||
+            receivedRgb.length != 1 ||
+            rgbFeed.activities.any(
+              (row) => row.direction == WalletActivityDirection.sent,
+            )) {
+          throw const FullWalletQaFailure(
+            'qa_resume_return_checkpoint_changed',
+          );
+        }
+        await control.event('retained_return_checkpoint_verified', {
+          'storage_run_id': storage.runId,
+          'recovery_cohort': _resumeCohort,
+          'confirmed_btc_txid': _resumeBtcTxid,
+          'confirmed_rgb_receive_txid': _resumeRgbTxid,
+          ...snapshot,
+        });
+        await qualifyLocalRgbL1ReturnFlow(
+          tester: tester,
+          container: container,
+          repository: repository,
+          control: control,
+          invoice: _resumeReturnInvoice,
+          confirmedBtcTxid: _resumeBtcTxid,
+          receivedRgbTxid: _resumeRgbTxid,
+        );
+        final snapshotAfter = await _publicSnapshot(repository);
+        final checkpoint = await saveQaFundedCheckpoint(
+          storage: storage,
+          repository: repository,
+          snapshot: snapshotAfter,
+          assetId: services.usdtAsset!.contractId,
+        );
+        await control.event('funded_checkpoint_saved', checkpoint);
+        await control.event('test_passed', {'stage': _stage, ...snapshotAfter});
+        binding.reportData = {
+          'stage': _stage,
+          'wallet': snapshotAfter,
+          'checkpoint': checkpoint,
+        };
+        completed = true;
+        return;
+      }
+
+      if (resumeFunded) {
+        if (_storageRunId.isEmpty ||
+            _storageRunId == _runId ||
+            !RegExp(r'^[a-f0-9]{64}$').hasMatch(_resumePublicIdentity) ||
+            _resumeBtcDestination.isEmpty) {
+          throw const FullWalletQaFailure('qa_resume_scope_invalid');
+        }
+        final registry = requireQaSuccess(
+          await repository.load(),
+          'resume_funded_load',
+        );
+        if (registry.profiles.length != 1 ||
+            registry.readyProfiles.length != 1 ||
+            registry.activeProfile == null) {
+          throw const FullWalletQaFailure('qa_resume_registry_changed');
+        }
+        requireQaSuccess(await repository.sync(), 'resume_funded_sync');
+        final snapshot = await _publicSnapshot(repository);
+        if (snapshot['public_identity'] != _resumePublicIdentity ||
+            snapshot['btc_settled_sats'] != 100000 ||
+            snapshot['btc_spendable_sats'] != 100000 ||
+            snapshot['bfa_settled_units'] != 0 ||
+            snapshot['bfa_spendable_units'] != 0 ||
+            requireQaSuccess(
+                  await repository.paymentSubmissionStatus(),
+                  'resume_funded_submission',
+                ) !=
+                null) {
+          throw const FullWalletQaFailure('qa_resume_pre_send_state_changed');
+        }
+        for (final asset in [WalletAssetKind.bitcoin, WalletAssetKind.usdt]) {
+          final feed = requireQaSuccess(
+            await repository.activityFeed(asset),
+            'resume_funded_activity',
+          );
+          if (feed.activities.any(
+            (row) => row.direction == WalletActivityDirection.sent,
+          )) {
+            throw const FullWalletQaFailure('qa_resume_previous_send_present');
+          }
+        }
+        await control.event('retained_funded_checkpoint_verified', {
+          'storage_run_id': _storageRunId,
+          ...snapshot,
+        });
+        await qualifyLocalRgbL1FundedFlows(
+          tester: tester,
+          container: container,
+          repository: repository,
+          control: control,
+          retainedBtcDestination: _resumeBtcDestination,
+        );
+        final finalSnapshot = await _publicSnapshot(repository);
+        final checkpoint = await saveQaFundedCheckpoint(
+          storage: storage,
+          repository: repository,
+          snapshot: finalSnapshot,
+          assetId: services.usdtAsset!.contractId,
+        );
+        await control.event('funded_checkpoint_saved', checkpoint);
+        await control.event('test_passed', {'stage': _stage, ...finalSnapshot});
+        binding.reportData = {'stage': _stage, 'wallet': finalSnapshot};
+        completed = true;
+        return;
+      }
 
       if (_stage == 'reconcile-transfer') {
         final validation = await control.request(
@@ -327,11 +639,68 @@ void main() {
       );
       await control.event('secret_screen_active');
       secretScreen = true;
-      await _tap(tester, find.widgetWithText(CustomButton, 'Create Wallet'));
-      await _untilUi(
-        tester,
-        () => container!.read(createWalletViewModelProvider).value != null,
-      );
+      final createButton = find.widgetWithText(CustomButton, 'Create Wallet');
+      final initialSecurity = container.read(securityControllerProvider);
+      await control.event('onboarding_create_readiness', {
+        'security_initialized': initialSecurity.initialized,
+        'security_can_access_wallet': initialSecurity.canAccessWallet,
+        'security_authenticating': initialSecurity.isAuthenticating,
+        'security_captured': initialSecurity.isCaptured,
+        'device_security_status': initialSecurity.deviceStatus?.name,
+        'binding_lifecycle': tester.binding.lifecycleState?.name,
+      });
+      for (var attempt = 1; attempt <= 3; attempt += 1) {
+        await _untilUi(tester, () {
+          if (createButton.evaluate().length != 1) return false;
+          final element = createButton.evaluate().single;
+          final button = element.widget as CustomButton;
+          final security = container!.read(securityControllerProvider);
+          return security.canAccessWallet &&
+              !security.isAuthenticating &&
+              !security.isCaptured &&
+              button.enabled &&
+              !button.loading &&
+              (ModalRoute.of(element)?.isCurrent ?? true) &&
+              TickerMode.valuesOf(element).enabled &&
+              AsterNavigationScope.maybeOf(element)?.inFlight != true;
+        });
+        await _tap(tester, createButton);
+        final security = container.read(securityControllerProvider);
+        final exists = container.exists(createWalletViewModelProvider);
+        await control.event('onboarding_create_action_observed', {
+          'attempt': attempt,
+          'security_initialized': security.initialized,
+          'security_authenticating': security.isAuthenticating,
+          'security_locked': security.isLocked,
+          'security_obscured': security.isObscured,
+          'security_captured': security.isCaptured,
+          'security_generation': security.generation,
+          'device_security_status': security.deviceStatus?.name,
+          'phrase_provider_exists': exists,
+          'create_button_present': createButton.evaluate().length == 1,
+        });
+        if (exists ||
+            security.isAuthenticating ||
+            createButton.evaluate().length != 1 ||
+            tester.widget<CustomButton>(createButton).loading) {
+          break;
+        }
+        // This is the nonfinancial entry action only. A transition can have
+        // exposed a button before its interaction owner settled. Retry solely
+        // while no phrase provider exists and the same idle button remains;
+        // never repeat provisioning or a payment action.
+        await tester.pump(const Duration(milliseconds: 500));
+      }
+      await _untilUi(tester, () {
+        // A read would create this auto-dispose provider if the tap was ignored.
+        // Only observe the provider after the real protected journey owns it.
+        if (!container!.exists(createWalletViewModelProvider)) return false;
+        final state = container.read(createWalletViewModelProvider);
+        if (state.error case final AppFailureException error) {
+          throw qaAppFailure('onboarding_phrase', error.failure);
+        }
+        return state.value != null;
+      });
       await control.event('onboarding_create_opened');
       // Only the quiz answers are held in memory. No recovery phrase is copied,
       // logged, serialized to a receipt, or included in screenshot evidence.
@@ -449,6 +818,7 @@ void main() {
       container = null;
       cleanupRepository = null;
       container = await storage.bootstrap(
+        qualifiedLocalL1Services: qualifiedServices,
         onFailureLogs: (evidence) =>
             control.event('native_failure_logs_copied', evidence),
       );
@@ -469,7 +839,10 @@ void main() {
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
-          child: const AsterApp(),
+          child: FullWalletQaSecurityLifecycle(
+            security: container.read(securityControllerProvider),
+            child: const AsterApp(),
+          ),
         ),
       );
       await control.event(
@@ -477,6 +850,14 @@ void main() {
         await _publicSnapshot(repository),
       );
       Map<String, Object?>? pairCheckpoint;
+      if (_stage == 'rgb-l1-full') {
+        await qualifyLocalRgbL1FundedFlows(
+          tester: tester,
+          container: container,
+          repository: repository,
+          control: control,
+        );
+      }
       if (_stage == 'full') {
         await _fundedFlows(tester, container, repository, control);
         await qualifyImportedWalletTransfer(
@@ -489,6 +870,15 @@ void main() {
         pairCheckpoint = await _publicWalletPair(repository);
       }
       final finalSnapshot = await _publicSnapshot(repository);
+      if (_stage == 'rgb-l1-full') {
+        final checkpoint = await saveQaFundedCheckpoint(
+          storage: storage,
+          repository: repository,
+          snapshot: finalSnapshot,
+          assetId: services.usdtAsset!.contractId,
+        );
+        await control.event('funded_checkpoint_saved', checkpoint);
+      }
       await control.event('test_passed', {
         'stage': _stage,
         ...finalSnapshot,
@@ -647,7 +1037,11 @@ Future<Map<String, Object?>> _publicSnapshot(
   final portfolio = requireQaSuccess(await repository.portfolio(), 'portfolio');
   final network = requireQaSuccess(await repository.networkStatus(), 'network');
   return {
-    'node_public_key': network.publicIdentity,
+    'public_identity': network.publicIdentity,
+    'identity_kind': network.nodePublicKey == null
+        ? 'native-wallet'
+        : 'lightning-node',
+    if (network.nodePublicKey != null) 'node_public_key': network.nodePublicKey,
     'block_height': network.blockHeight,
     'btc_settled_sats': portfolio.bitcoin.onchainSettled.units,
     'btc_spendable_sats': portfolio.bitcoin.onchainSpendable.units,
@@ -725,6 +1119,10 @@ Future<Map<String, Object?>> _publicWalletPair(
 
 Future<void> _tap(WidgetTester tester, Finder finder) async {
   await _untilUi(tester, () => finder.evaluate().length == 1);
+  await _untilUi(tester, () {
+    final widget = tester.widget(finder);
+    return widget is! CustomButton || (widget.enabled && !widget.loading);
+  });
   await tester.ensureVisible(finder);
   await tester.pump(const Duration(milliseconds: 800));
   final visible = finder.hitTestable();

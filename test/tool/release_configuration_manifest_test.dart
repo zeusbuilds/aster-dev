@@ -98,7 +98,7 @@ void main() {
       ReleaseConfigurationManifest parse(String backend) =>
           ReleaseConfigurationManifest.parse(
             _manifest({
-              ..._baseValues,
+              ...(backend == 'rgb-l1' ? _rgbL1BaseValues : _baseValues),
               ReleaseConfigurationKey.walletBackend: backend,
             }),
             audience: ReleaseAudience.internalBeta,
@@ -115,6 +115,124 @@ void main() {
         ),
       );
       expect(() => parse('RGB_L1'), throwsFormatException);
+    });
+
+    test(
+      'RGB_L1 internal BTC configuration has no contradictory VSS requirement',
+      () {
+        expect(
+          () => ReleaseConfigurationManifest.parse(
+            _manifest(_rgbL1BaseValues),
+            audience: ReleaseAudience.internalBeta,
+          ),
+          throwsA(
+            isA<FormatException>().having(
+              (error) => error.message,
+              'closed admission',
+              contains('verified durable payment recovery'),
+            ),
+          ),
+        );
+        for (final key in [
+          ReleaseConfigurationKey.vssUrl,
+          ReleaseConfigurationKey.lspUrl,
+        ]) {
+          expect(
+            () => ReleaseConfigurationManifest.parse(
+              _manifest({
+                ..._rgbL1BaseValues,
+                key: 'https://unused.aster-wallet.com',
+              }),
+              audience: ReleaseAudience.internalBeta,
+            ),
+            throwsA(
+              isA<FormatException>().having(
+                (error) => error.message,
+                'unsupported service',
+                contains('does not support LSP or VSS'),
+              ),
+            ),
+          );
+        }
+      },
+    );
+
+    test('RGB_L1 BFA candidate requires exact contract and complete EVM policy before admission', () {
+      final contract = base64Encode(List<int>.generate(64, (index) => index));
+      final asset = <String, String>{
+        ReleaseConfigurationKey.usdtAssetId: 'rgb:2cV8xYz123',
+        ReleaseConfigurationKey.usdtPrecision: '6',
+        ReleaseConfigurationKey.usdtContractBase64: contract,
+        ReleaseConfigurationKey.usdtContractSha256: sha256
+            .convert(base64Decode(contract))
+            .toString(),
+        ReleaseConfigurationKey.usdtNativeName: 'Fixture BFA',
+        ReleaseConfigurationKey.usdtNativeTicker: 'QBFA',
+      };
+      final evm = <String, String>{
+        ReleaseConfigurationKey.ethRpcUrl: 'https://rpc.aster-wallet.com',
+        ReleaseConfigurationKey.ethChainId: '42161',
+        ReleaseConfigurationKey.bfaMinMintLockBlocks: '2',
+        ReleaseConfigurationKey.bfaMaxMintLockBlocks: '512',
+      };
+      ReleaseConfigurationManifest parse(Map<String, String> fields) =>
+          ReleaseConfigurationManifest.parse(
+            _manifest({..._rgbL1BaseValues, ...fields}),
+            audience: ReleaseAudience.internalBeta,
+          );
+      expect(
+        () => parse({...asset, ...evm}),
+        throwsA(
+          isA<FormatException>().having(
+            (error) => error.message,
+            'closed admission',
+            contains('verified durable payment recovery'),
+          ),
+        ),
+      );
+      for (final key in {...asset.keys, ...evm.keys}) {
+        final fields = {...asset, ...evm}..remove(key);
+        expect(() => parse(fields), throwsFormatException, reason: key);
+      }
+      expect(
+        () => parse({
+          ...asset,
+          ...evm,
+          ReleaseConfigurationKey.ethChainId: (BigInt.one << 64).toString(),
+        }),
+        throwsA(
+          isA<FormatException>().having(
+            (error) => error.message,
+            'native EVM bound',
+            contains('uint64'),
+          ),
+        ),
+      );
+    });
+
+    test('RGB_L1 public product still requires approved USDT deployment', () {
+      expect(
+        () => ReleaseConfigurationManifest.parse(
+          _manifest({
+            ..._rgbL1BaseValues,
+            ReleaseConfigurationKey.marketApiBaseUrl:
+                'https://market.aster-wallet.com',
+            ReleaseConfigurationKey.privacyUrl:
+                'https://aster-wallet.com/privacy',
+            ReleaseConfigurationKey.supportUrl:
+                'https://aster-wallet.com/support',
+            ReleaseConfigurationKey.termsUrl: 'https://aster-wallet.com/terms',
+          }),
+          audience: ReleaseAudience.publicDistribution,
+        ),
+        throwsA(
+          isA<FormatException>().having(
+            (error) => error.message,
+            'mandatory public USDT',
+            contains('missing required keys'),
+          ),
+        ),
+      );
     });
 
     test('BFA release fails without RPC or an explicit canonical chain ID', () {
@@ -460,4 +578,12 @@ const _baseValues = <String, String>{
   ReleaseConfigurationKey.usdtAssetId: 'rgb:2cV8xYz123',
   ReleaseConfigurationKey.usdtPrecision: '8',
   ReleaseConfigurationKey.vssUrl: 'https://vss.aster-wallet.com',
+};
+
+const _rgbL1BaseValues = <String, String>{
+  ReleaseConfigurationKey.walletBackend: 'rgb-l1',
+  ReleaseConfigurationKey.network: 'mainnet',
+  ReleaseConfigurationKey.explorerUrl: 'https://explorer.aster-wallet.com',
+  ReleaseConfigurationKey.indexerUrl: 'ssl://indexer.aster-wallet.com:50002',
+  ReleaseConfigurationKey.rgbProxyUrl: 'rpcs://rgb.aster-wallet.com:443',
 };

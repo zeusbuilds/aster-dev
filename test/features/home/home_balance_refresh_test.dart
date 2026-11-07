@@ -5,6 +5,7 @@ import 'package:aster/core/core.dart';
 import 'package:aster/features/home/presentation/screens/screens.dart';
 import 'package:aster/features/home/presentation/view_model/view_models.dart';
 import 'package:aster/features/home/presentation/widgets/widgets.dart';
+import 'package:aster/features/send/presentation/widgets/widgets.dart';
 import 'package:aster/features/transaction/presentation/screens/screens.dart';
 import 'package:aster/features/transaction/presentation/view_model/view_models.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
@@ -130,6 +131,76 @@ void main() {
     expect(h.syncCount, 1);
   });
 
+  testWidgets(
+    'Home naturally publishes later confirmation after success Continue',
+    (tester) async {
+      final h = await _Harness.create(tester, rgb: true);
+      h.engine.balance = _balance(99561);
+      h.engine.balances[testRgbRoute.asset.id] = testRgbBalance(100);
+      final router = GoRouter(
+        initialLocation: '/test-home',
+        routes: [
+          GoRoute(path: '/test-home', builder: (_, _) => const HomeScreen()),
+          GoRoute(
+            path: '/submitted',
+            builder: (context, _) => Scaffold(
+              body: SendSuccessView(
+                result: WalletSendResult(
+                  route: testRgbRoute,
+                  amount: WalletAmount.onchain(
+                    assetId: testRgbRoute.asset.id,
+                    units: 50,
+                  ),
+                  referenceId: List.filled(64, 'a').join(),
+                  status: WalletPaymentStatus.pending,
+                ),
+                bitcoinUnit: BitcoinUnit.sats,
+                onContinue: () => context.go('/test-home'),
+              ),
+            ),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      await h.pump(tester, router: router);
+      await _until(tester, () => h.homeUnits == 99561 && h.rgbUnits == 100);
+      unawaited(router.push<void>('/submitted'));
+      await _until(
+        tester,
+        () => find.text('Payment sent').evaluate().isNotEmpty,
+      );
+      await tester.tap(find.widgetWithText(CustomButton, 'Continue'));
+      await _until(
+        tester,
+        () =>
+            find.text('Payment sent').evaluate().isEmpty &&
+            h.container.read(homeViewModelProvider).value?.refreshing == false,
+      );
+      // Acceptance can precede recipient acknowledgement/broadcast and mining.
+      expect(h.rgbUnits, 100);
+      h.engine.balance = _balance(98305);
+      h.engine.balances[testRgbRoute.asset.id] = testRgbBalance(50);
+      expect(await h.harness.repository.sync(), isA<AppSuccess<void>>());
+      expect(h.rgbUnits, 100, reason: 'Native reads do not mutate Home state.');
+
+      await tester.pump(const Duration(seconds: 31));
+      await _until(tester, () => h.homeUnits == 98305 && h.rgbUnits == 50);
+      final rows = tester.widgetList<AssetRow>(find.byType(AssetRow)).toList();
+      expect(
+        rows
+            .singleWhere((row) => row.kind == WalletAssetKind.bitcoin)
+            .totalText,
+        '98,305 sats',
+      );
+      expect(
+        rows.singleWhere((row) => row.kind == WalletAssetKind.usdt).totalText,
+        '0.00005 USDT',
+      );
+      expect(h.harness.toasts.messages, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('retained inactive tabs stop polling and refresh once on entry', (
     tester,
   ) async {
@@ -227,42 +298,68 @@ void main() {
     },
   );
 
-  testWidgets(
-    'automatic failures silently retain amounts and keep retrying until recovery',
-    (tester) async {
-      final h = await _Harness.create(tester);
-      h.engine.balance = _balance(10000000);
-      await h.pump(tester);
-      await _until(tester, () => h.homeUnits == 10000000);
-      h.engine.syncError = TimeoutException('private endpoint credential');
-      await tester.pump();
-      await tester.pump(const Duration(seconds: 31));
-      await _until(
-        tester,
-        () =>
-            h.container.read(homeViewModelProvider).value?.refreshFailure !=
-            null,
-      );
-      expect(h.homeUnits, 10000000);
-      expect(find.textContaining('Balances may be out of date.'), findsNothing);
-      expect(find.textContaining('private endpoint'), findsNothing);
-      expect(
-        h.harness.toasts.messages,
-        isEmpty,
-        reason: 'No automatic toast spam.',
-      );
-      await tester.pump(const Duration(seconds: 31));
-      await _until(tester, () => h.syncCount == 2);
-      expect(h.homeUnits, 10000000);
-      expect(h.harness.toasts.messages, isEmpty);
+  for (final (label, syncFailure) in [
+    ('transport', TimeoutException('private endpoint credential')),
+    (
+      'partial RGB witness refresh',
+      const AppFailureException(
+        AppFailure(
+          code: 'wallet_sync_incomplete',
+          kind: AppFailureKind.unavailable,
+          userMessage: 'Wallet updates are unavailable. Try again.',
+          retryable: true,
+        ),
+      ),
+    ),
+  ]) {
+    testWidgets(
+      'automatic $label failures silently retain amounts and recover',
+      (tester) async {
+        final h = await _Harness.create(tester);
+        h.engine.balance = _balance(10000000);
+        await h.pump(tester);
+        await _until(tester, () => h.homeUnits == 10000000);
+        h.engine.syncError = syncFailure;
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 31));
+        await _until(
+          tester,
+          () =>
+              h.container.read(homeViewModelProvider).value?.refreshFailure !=
+              null,
+        );
+        expect(h.homeUnits, 10000000);
+        expect(
+          find.textContaining('Balances may be out of date.'),
+          findsNothing,
+        );
+        expect(find.textContaining('private endpoint'), findsNothing);
+        expect(
+          find.text('Wallet updates are unavailable. Try again.'),
+          findsNothing,
+        );
+        expect(
+          h.harness.toasts.messages,
+          isEmpty,
+          reason: 'No automatic toast spam.',
+        );
+        await tester.pump(const Duration(seconds: 31));
+        await _until(tester, () => h.syncCount == 2);
+        expect(h.homeUnits, 10000000);
+        expect(h.harness.toasts.messages, isEmpty);
 
-      h.engine.syncError = null;
-      h.engine.balance = _balance(11000000);
-      await tester.pump(const Duration(seconds: 31));
-      await _until(tester, () => h.homeUnits == 11000000);
-      expect(find.textContaining('Balances may be out of date.'), findsNothing);
-    },
-  );
+        h.engine.syncError = null;
+        h.engine.balance = _balance(11000000);
+        await tester.pump(const Duration(seconds: 31));
+        await _until(tester, () => h.homeUnits == 11000000);
+        expect(
+          find.textContaining('Balances may be out of date.'),
+          findsNothing,
+        );
+        expect(h.harness.toasts.messages, isEmpty);
+      },
+    );
+  }
 
   testWidgets(
     'terminal initial errors expose no inert refresh command or poll',
@@ -407,8 +504,18 @@ final class _Harness {
       .bitcoin
       .onchainSettled
       .units;
+  int? get rgbUnits => container
+      .read(homeViewModelProvider)
+      .value
+      ?.portfolio
+      .usdt
+      ?.onchainSettled
+      .units;
 
-  static Future<_Harness> create(WidgetTester tester) async {
+  static Future<_Harness> create(
+    WidgetTester tester, {
+    bool rgb = false,
+  }) async {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(390, 844);
@@ -446,6 +553,12 @@ final class _Harness {
     );
     final harness = await PaymentFlowTestHarness.create(
       engine: FakeWalletEngine()..balance = _balance(0),
+      services: rgb
+          ? testRgbServices
+          : const WalletServiceConfiguration(
+              environment: BlockchainEnvironment.regtest,
+              sdkNetwork: 'regtest',
+            ),
       clock: () => _now,
       httpClient: client,
       preferenceValues: const {'aster.settings.v1.bitcoin_unit': 'sats'},

@@ -13,12 +13,14 @@ class AsterConfirmationDialog extends StatelessWidget {
     required this.title,
     required this.content,
     required this.confirmText,
+    this.cancelText = 'Cancel',
     this.confirmVariant = ButtonVariant.primary,
   });
 
   final String title;
   final Widget content;
   final String confirmText;
+  final String cancelText;
   final ButtonVariant confirmVariant;
 
   @override
@@ -44,7 +46,7 @@ class AsterConfirmationDialog extends StatelessWidget {
     final actionWidth = math.max(0.0, dialogWidth - innerPadding * 2);
     final cancelSize = unwrappedSpanSize(
       context,
-      TextSpan(text: 'Cancel', style: context.type.buttonLabel),
+      TextSpan(text: cancelText, style: context.type.buttonLabel),
     );
     final confirmSize = unwrappedSpanSize(
       context,
@@ -55,7 +57,7 @@ class AsterConfirmationDialog extends StatelessWidget {
         2 * (longestLabel + spacing.xxl * 2) + spacing.md;
     final stacked = actionWidth < minimumActionWidth;
     final cancel = CustomButton(
-      text: 'Cancel',
+      text: cancelText,
       variant: ButtonVariant.tonal,
       onTap: () => Navigator.of(context).pop(false),
     );

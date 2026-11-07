@@ -313,3 +313,14 @@ Use the repository owner's private security-reporting channel. Do not open a
 public issue containing a recovery phrase, credential, live invoice, wallet
 path, native payload, or other user data. A public release must configure and
 publish an owned security contact before distribution.
+
+### App privacy declarations and native release admission
+
+Aster has no app-owned disk-capacity check and does not claim DiskSpace reason
+`E174.1`. Its own privacy manifest retains the justified FileTimestamp `C617.1`
+category for app-owned files and disables tracking. The archive verifier rejects
+an unsupported extra category; adding a reason cannot approve an unreviewed
+native call path. SDK/native privacy and the exact signed app's API/aggregate
+manifest report remain separate release requirements. In particular, removal of
+an unused RGB_L1 filesystem probe does not resolve the legacy RLN dependency's
+independent privacy finding. RGB_L1 product/release admission remains closed.

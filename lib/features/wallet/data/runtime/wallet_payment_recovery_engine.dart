@@ -91,3 +91,14 @@ final class WalletDiscoveredPaymentOperation {
   final WalletSendCommand command;
   final WalletPaymentRecoveryStatus status;
 }
+
+/// Explicit, archive-verified support for revoking an already-dispatched RGB
+/// handoff. Presence of ordinary pre-commit Cancel is not this capability.
+abstract interface class WalletDispatchedRgbRevocationEngine {
+  Future<bool> supportsDispatchedRgbRevocation();
+
+  /// Explicit permission to revoke a handoff; ordinary Cancel never does this.
+  Future<WalletPaymentRecoveryStatus> revokeDispatchedRgbOperation(
+    String request,
+  );
+}

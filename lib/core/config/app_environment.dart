@@ -37,7 +37,8 @@ enum WalletBackend {
   final String wireName;
 
   /// Product activation gate; this does not certify release readiness.
-  /// RGB_L1 stays closed until native/mobile recovery qualification is complete.
+  /// RGB_L1 stays closed while native/app qualification and authoritative RGB
+  /// backup freshness remain unresolved.
   bool get activationAllowed => this == WalletBackend.rln;
 
   static WalletBackend parse(String value) => switch (value) {

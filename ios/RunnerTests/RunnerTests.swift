@@ -517,7 +517,6 @@ final class RunnerTests: XCTestCase {
     XCTAssertEqual(
       reasonsByCategory,
       [
-        "NSPrivacyAccessedAPICategoryDiskSpace": ["E174.1"],
         "NSPrivacyAccessedAPICategoryFileTimestamp": ["C617.1"],
       ]
     )
