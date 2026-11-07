@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:aster/core/config/signet_deployment.dart';
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../tool/release_configuration_manifest.dart';
@@ -9,6 +10,51 @@ import '../../tool/verify_release_configuration.dart';
 
 void main() {
   group('ReleaseConfigurationManifest', () {
+    test('approved public contract fields are atomic and digest checked', () {
+      final bytes = List<int>.generate(3072, (index) => index % 256);
+      final contract = <String, String>{
+        ReleaseConfigurationKey.usdtContractBase64: base64Encode(bytes),
+        ReleaseConfigurationKey.usdtContractSha256: sha256
+            .convert(bytes)
+            .toString(),
+        ReleaseConfigurationKey.usdtNativeName: 'Bridged USDT',
+        ReleaseConfigurationKey.usdtNativeTicker: 'BUSDT',
+      };
+      ReleaseConfigurationManifest parse(Map<String, String> extra) =>
+          ReleaseConfigurationManifest.parse(
+            _manifest({..._baseValues, ...extra}),
+            audience: ReleaseAudience.internalBeta,
+          );
+      expect(
+        parse(contract).values,
+        containsPair(ReleaseConfigurationKey.usdtNativeName, 'Bridged USDT'),
+      );
+      for (final key in contract.keys) {
+        final partial = {...contract}..remove(key);
+        expect(() => parse(partial), throwsFormatException);
+      }
+      expect(
+        () => parse({
+          ...contract,
+          ReleaseConfigurationKey.usdtContractSha256: '0' * 64,
+        }),
+        throwsFormatException,
+      );
+      expect(
+        () => parse({
+          ...contract,
+          ReleaseConfigurationKey.walletBackend: 'rgb-l1',
+        }),
+        throwsA(
+          isA<FormatException>().having(
+            (error) => error.message,
+            'message',
+            contains('RGB_L1'),
+          ),
+        ),
+      );
+    });
+
     test('Dev profile and mixed Dev evidence fail before a release build', () {
       ReleaseConfigurationManifest parse(Map<String, String> overrides) =>
           ReleaseConfigurationManifest.parse(

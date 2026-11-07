@@ -53,7 +53,8 @@ final class WalletPaymentSubmissions {
   Future<void> restoreFence() async {
     final profile = runtime.activeProfile;
     if (profile == null || store == null) return;
-    final record = await _read(profile, archiveAccepted: false);
+    var record = await _read(profile, archiveAccepted: false);
+    record = await _discoverNativeAttempt(profile, record) ?? record;
     final retained = _unconfirmedAttempt;
     if (retained != null &&
         (record == null ||
@@ -86,6 +87,78 @@ final class WalletPaymentSubmissions {
         failure: record.reconciliationFailure,
       );
     }
+  }
+
+  Future<WalletPaymentSubmission?> _discoverNativeAttempt(
+    WalletProfile profile,
+    WalletPaymentSubmission? existing,
+  ) async {
+    final result = await runtime.readPaymentState((engine) async {
+      if (engine is! WalletPaymentDiscoveryEngine) {
+        return const <WalletDiscoveredPaymentOperation>[];
+      }
+      return (engine as WalletPaymentDiscoveryEngine)
+          .discoverPendingPaymentOperations();
+    });
+    if (result case AppFailureResult<List<WalletDiscoveredPaymentOperation>>(
+      :final failure,
+    )) {
+      throw AppFailureException(failure);
+    }
+    final operations =
+        (result as AppSuccess<List<WalletDiscoveredPaymentOperation>>).value;
+    if (operations.isEmpty) return null;
+    // Product mutation serialization permits one unresolved native operation.
+    // Multiple entries cannot be silently selected or dropped.
+    if (operations.length != 1) throw const StoredDataCorruptionException();
+    final operation = operations.single;
+    if (existing?.requiresReconciliation == true) {
+      if (existing!.id != operation.operationId ||
+          existing.recoveryRequest != operation.request) {
+        throw const StoredDataCorruptionException();
+      }
+      return null;
+    }
+    if (existing?.id == operation.operationId) {
+      // A terminal app receipt cannot be downgraded by an older native copy.
+      throw const StoredDataCorruptionException();
+    }
+    if (existing?.phase == WalletPaymentSubmissionPhase.accepted) {
+      await _archive(existing!, profile);
+    }
+    if (operation.status.phase != WalletPaymentRecoveryPhase.preparing &&
+        operation.status.phase != WalletPaymentRecoveryPhase.prepared &&
+        operation.status.phase != WalletPaymentRecoveryPhase.committing) {
+      throw const StoredDataCorruptionException();
+    }
+    if (operation.status.endAuthorized !=
+        (operation.status.phase == WalletPaymentRecoveryPhase.committing)) {
+      throw const StoredDataCorruptionException();
+    }
+    final discovered = WalletPaymentSubmission(
+      id: operation.operationId,
+      walletId: profile.id,
+      command: operation.command,
+      submittedAt: clock().toUtc(),
+      phase: WalletPaymentSubmissionPhase.submitting,
+      recoveryRequest: operation.request,
+      commitAttempted: operation.status.endAuthorized,
+      journalVersion: 4,
+      nativeDiscovered: true,
+    );
+    // Validate the complete app-owned representation before retaining it or
+    // replacing a terminal journal. Discovery is evidence, never authorization.
+    if (_decode(_encode(discovered, profile), profile) != discovered) {
+      throw const StoredDataCorruptionException();
+    }
+    _unconfirmedAttempt = discovered;
+    await runtime.retainUnresolvedPayment(
+      failure: discovered.reconciliationFailure,
+    );
+    await _write(discovered, profile, WalletPaymentSubmissionPhase.submitting);
+    final persisted = await _read(profile, archiveAccepted: false);
+    if (persisted != discovered) throw const StoredDataCorruptionException();
+    return persisted;
   }
 
   Future<AppResult<void>> assertResolved() async {
@@ -207,13 +280,24 @@ final class WalletPaymentSubmissions {
       final recoveryRecord = record;
       if (engine is! WalletPaymentRecoveryEngine) return false;
       final recovery = engine as WalletPaymentRecoveryEngine;
-      await recovery.validatePaymentOperationRequest(
-        request,
-        record.id,
-        record.command,
-      );
+      if (record.nativeDiscovered) {
+        if (engine is! WalletPaymentDiscoveryEngine) return false;
+        await (engine as WalletPaymentDiscoveryEngine)
+            .validateDiscoveredPaymentOperation(
+              request,
+              record.id,
+              record.command,
+            );
+      } else {
+        await recovery.validatePaymentOperationRequest(
+          request,
+          record.id,
+          record.command,
+        );
+      }
       var status = await recovery.inspectPaymentOperation(request);
       if (resumeAuthorizedCommit &&
+          !record.nativeDiscovered &&
           status.phase == WalletPaymentRecoveryPhase.committing &&
           status.endAuthorized) {
         final referenceId = status.referenceId;
@@ -234,7 +318,7 @@ final class WalletPaymentSubmissions {
             ),
           );
         }
-      } else if (!resumeAuthorizedCommit &&
+      } else if ((!resumeAuthorizedCommit || record.nativeDiscovered) &&
           !status.endAuthorized &&
           (status.phase == WalletPaymentRecoveryPhase.absent ||
               status.phase == WalletPaymentRecoveryPhase.preparing ||
@@ -836,7 +920,7 @@ final class WalletPaymentSubmissions {
               activity.batchTransferIndex == result.batchTransferIndex;
   }
 
-  /// A lost Commit reply is inspected once in the same explicit Send action.
+  /// A thrown or returned unknown Commit outcome is inspected once in Send.
   /// This only reads the exact saved native operation; it never repeats Prepare,
   /// Commit, proxy upload, broadcast or cancellation. If inspection is blocked
   /// by the engine's lifecycle or cannot establish an outcome, preserve the
@@ -845,8 +929,9 @@ final class WalletPaymentSubmissions {
     WalletPaymentRecoveryEngine recovery,
     String request,
   ) async {
+    final WalletPaymentRecoveryStatus committed;
     try {
-      return await recovery.commitPaymentOperation(request);
+      committed = await recovery.commitPaymentOperation(request);
     } catch (error, stack) {
       try {
         final status = await recovery.inspectPaymentOperation(request);
@@ -865,6 +950,24 @@ final class WalletPaymentSubmissions {
       }
       Error.throwWithStackTrace(error, stack);
     }
+    if (committed.phase != WalletPaymentRecoveryPhase.committing) {
+      return committed;
+    }
+    // Native may return a durable unknown status instead of throwing after a
+    // lost external reply. Observe that same operation once in this Send action;
+    // unavailable/partial evidence cannot authorize another financial call or
+    // downgrade the original Committing fence.
+    try {
+      final status = await recovery.inspectPaymentOperation(request);
+      if (status.phase == WalletPaymentRecoveryPhase.accepted ||
+          (status.phase == WalletPaymentRecoveryPhase.rejected &&
+              !status.endAuthorized)) {
+        return status;
+      }
+    } catch (_) {
+      // The original native status remains authoritative when observation fails.
+    }
+    return committed;
   }
 
   static WalletPaymentSubmission _updated(
@@ -882,6 +985,7 @@ final class WalletPaymentSubmissions {
     recoveryRequest: original.recoveryRequest,
     commitAttempted: commitAttempted ?? original.commitAttempted,
     journalVersion: original.journalVersion,
+    nativeDiscovered: original.nativeDiscovered,
   );
 
   /// Only called after a matching permanent native rejection certificate. Raw
@@ -964,6 +1068,7 @@ final class WalletPaymentSubmissions {
         recoveryRequest: intent.recoveryRequest,
         commitAttempted: intent.commitAttempted,
         journalVersion: intent.journalVersion,
+        nativeDiscovered: intent.nativeDiscovered,
       ),
       profile,
     ),
@@ -1041,7 +1146,8 @@ final class WalletPaymentSubmissions {
     final result = value.result;
     return jsonEncode({
       'version': value.recoveryRequest == null ? 1 : value.journalVersion,
-      if (value.recoveryRequest != null && value.journalVersion == 3)
+      if (value.nativeDiscovered) 'nativeDiscovered': true,
+      if (value.recoveryRequest != null && value.journalVersion >= 3)
         'commitAttempted': value.commitAttempted,
       if (value.recoveryRequest != null)
         'recoveryRequest': value.recoveryRequest,
@@ -1092,12 +1198,15 @@ final class WalletPaymentSubmissions {
             'phase',
             'command',
             'result',
-            if (version == 2 || version == 3) 'recoveryRequest',
-            if (version == 3) 'commitAttempted',
+            if (version == 2 || version == 3 || version == 4) 'recoveryRequest',
+            if (version == 3 || version == 4) 'commitAttempted',
+            if (version == 4) 'nativeDiscovered',
           }) ||
-          (version != 1 && version != 2 && version != 3) ||
-          (version == 3 && value['commitAttempted'] is! bool) ||
-          ((version == 2 || version == 3) &&
+          (version != 1 && version != 2 && version != 3 && version != 4) ||
+          ((version == 3 || version == 4) &&
+              value['commitAttempted'] is! bool) ||
+          (version == 4 && value['nativeDiscovered'] != true) ||
+          ((version == 2 || version == 3 || version == 4) &&
               (value['recoveryRequest'] is! String ||
                   (value['recoveryRequest']! as String).isEmpty ||
                   (value['recoveryRequest']! as String).length > 100000)) ||
@@ -1130,7 +1239,9 @@ final class WalletPaymentSubmissions {
           data['precision'] is! int ||
           data['destination'] is! String ||
           data['amount'] is! int ||
-          data['feeTarget'] is! int ||
+          (version == 4
+              ? data['feeTarget'] != null
+              : data['feeTarget'] is! int) ||
           data['feeRate'] is! int ||
           data['feeSource'] is! String ||
           (data['rgbRecipientType'] != null &&
@@ -1148,11 +1259,15 @@ final class WalletPaymentSubmissions {
       if (asset.precision != data['precision']) throw const FormatException();
       final route = PaymentRoute(asset: asset, rail: PaymentRail.onchain);
       final fee = WalletFeeRateEstimate(
-        targetBlocks: data['feeTarget']! as int,
+        targetBlocks: data['feeTarget'] as int?,
         satsPerVbyte: data['feeRate']! as int,
         observedAt: _utcDate(data['feeObservedAt']),
         source: WalletFeeRateSource.values.byName(data['feeSource']! as String),
       );
+      if ((version == 4) !=
+          (fee.source == WalletFeeRateSource.nativeRecovery)) {
+        throw const FormatException();
+      }
       if (fee.source == WalletFeeRateSource.localRegtestPolicy &&
           profile.environment != BlockchainEnvironment.regtest) {
         throw const FormatException();
@@ -1213,10 +1328,11 @@ final class WalletPaymentSubmissions {
         phase: phase,
         result: result,
         recoveryRequest: value['recoveryRequest'] as String?,
-        commitAttempted: version == 3
+        commitAttempted: version == 3 || version == 4
             ? value['commitAttempted']! as bool
             : true,
         journalVersion: version! as int,
+        nativeDiscovered: version == 4,
       );
     } catch (_) {
       throw const StoredDataCorruptionException();

@@ -13,29 +13,53 @@ final class WalletNetworkStatus {
     required this.channelCount,
     required this.usableChannelCount,
     required this.peerCount,
+    this.walletIdentity,
   }) {
-    if (blockHeight < 0 ||
-        channelCount < 0 ||
-        usableChannelCount < 0 ||
-        usableChannelCount > channelCount ||
-        peerCount < 0) {
+    if ((blockHeight != null && blockHeight! < 0) ||
+        (channelCount != null && channelCount! < 0) ||
+        (usableChannelCount != null && usableChannelCount! < 0) ||
+        (usableChannelCount != null &&
+            channelCount != null &&
+            usableChannelCount! > channelCount!) ||
+        (peerCount != null && peerCount! < 0)) {
       throw ArgumentError('Wallet network counters are invalid.');
     }
-    if (!RegExp(r'^(02|03)[0-9a-fA-F]{64}$').hasMatch(nodePublicKey)) {
+    if (nodePublicKey != null &&
+        !RegExp(r'^(02|03)[0-9a-fA-F]{64}$').hasMatch(nodePublicKey!)) {
       throw ArgumentError.value(
         nodePublicKey,
         'nodePublicKey',
         'Must be a compressed secp256k1 public key.',
       );
     }
+    if (walletIdentity != null &&
+        !WalletProtocolText.isIdentifier(
+          walletIdentity!,
+          maximumCharacters: 512,
+        )) {
+      throw ArgumentError('Native wallet identity is invalid.');
+    }
+    if (nodePublicKey == null && walletIdentity == null) {
+      throw ArgumentError('A native wallet identity is required.');
+    }
   }
 
   final BlockchainEnvironment environment;
-  final int blockHeight;
-  final String nodePublicKey;
-  final int channelCount;
-  final int usableChannelCount;
-  final int peerCount;
+
+  /// Absent until the backend has authoritatively observed a chain tip.
+  final int? blockHeight;
+
+  /// Lightning-only observations are absent for the on-chain backend.
+  final String? nodePublicKey;
+  final int? channelCount;
+  final int? usableChannelCount;
+  final int? peerCount;
+
+  /// Stable native profile identity for a backend without a Lightning node.
+  final String? walletIdentity;
+
+  /// Stable identity for comparisons and diagnostics across either backend.
+  String get publicIdentity => walletIdentity ?? nodePublicKey!;
 
   @override
   bool operator ==(Object other) =>
@@ -45,7 +69,8 @@ final class WalletNetworkStatus {
       other.nodePublicKey == nodePublicKey &&
       other.channelCount == channelCount &&
       other.usableChannelCount == usableChannelCount &&
-      other.peerCount == peerCount;
+      other.peerCount == peerCount &&
+      other.walletIdentity == walletIdentity;
 
   @override
   int get hashCode => Object.hash(
@@ -55,6 +80,7 @@ final class WalletNetworkStatus {
     channelCount,
     usableChannelCount,
     peerCount,
+    walletIdentity,
   );
 }
 

@@ -110,16 +110,20 @@ class _NetworkConfigurationContent extends ConsumerWidget {
               if (status != null) ...[
                 _ConfigurationRow(
                   label: 'Block height',
-                  value: status.blockHeight.toString(),
+                  value: status.blockHeight?.toString() ?? '—',
                 ),
-                _ConfigurationRow(
-                  label: 'Channels',
-                  value: '${status.usableChannelCount}/${status.channelCount}',
-                ),
-                _ConfigurationRow(
-                  label: 'Peers',
-                  value: status.peerCount.toString(),
-                ),
+                if (status.channelCount != null &&
+                    status.usableChannelCount != null)
+                  _ConfigurationRow(
+                    label: 'Channels',
+                    value:
+                        '${status.usableChannelCount}/${status.channelCount}',
+                  ),
+                if (status.peerCount != null)
+                  _ConfigurationRow(
+                    label: 'Peers',
+                    value: status.peerCount.toString(),
+                  ),
               ],
             ],
           ),

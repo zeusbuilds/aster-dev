@@ -45,6 +45,16 @@ abstract interface class WalletEngine {
   Future<WalletPublicKeys> getPublicKeys();
 }
 
+/// Optional engine boundary for a native format that requires its signing
+/// material on every reopen. Runtime reads it from the wallet-owned secure
+/// record and supplies it only for this activation; engines must not retain it.
+abstract interface class WalletMnemonicOpenEngine {
+  Future<void> openPersistedWithMnemonic({
+    required String databasePassword,
+    required String mnemonic,
+  });
+}
+
 abstract interface class WalletEngineFactory {
   WalletEngine create(WalletEngineConfiguration configuration);
 }

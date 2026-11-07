@@ -56,7 +56,7 @@ public final class ZipFixtureWriter {
     final result = await extract(archive, output);
 
     expect(result.exitCode, 0, reason: result.stderr);
-    expect(result.stdout, contains('EXTRACTED_NATIVE_LIBRARIES=4'));
+    expect(result.stdout, contains('EXTRACTED_NATIVE_LIBRARIES=5'));
     expect(
       File('${output.path}/arm64-v8a/librgb_lightning_node.so')
           .readAsStringSync(),
@@ -119,6 +119,42 @@ public final class ZipFixtureWriter {
     expect(output.listSync(), isEmpty);
   });
 
+  test('rejects an absent RGB_L1 runtime even with Flutter and RLN', () async {
+    final archive = await _createArchive(
+      root,
+      zipWriter,
+      'missing-l1.aab',
+      _requiredLibraries
+          .where((name) => !name.endsWith('librgblibuniffi.so'))
+          .toList(),
+    );
+    final output = Directory('${root.path}/missing-l1-output')..createSync();
+    final result = await extract(archive, output);
+    expect(result.exitCode, isNot(0));
+    expect(result.stderr, contains('librgblibuniffi.so'));
+    expect(output.listSync(), isEmpty);
+  });
+
+  test(
+    'rejects a partial 32-bit directory from transitive native libraries',
+    () async {
+      final archive = await _createArchive(
+        root,
+        zipWriter,
+        'partial32.aab',
+        <String>[
+          ..._requiredLibraries,
+          'base/lib/armeabi-v7a/librgb_lightning_node.so',
+        ],
+      );
+      final output = Directory('${root.path}/partial32-output')..createSync();
+      final result = await extract(archive, output);
+      expect(result.exitCode, isNot(0));
+      expect(result.stderr, contains('malformed native-library path'));
+      expect(output.listSync(), isEmpty);
+    },
+  );
+
   test('rejects an ABI outside the exact expected set', () async {
     final archive = await _createArchive(
       root,
@@ -140,6 +176,7 @@ const _requiredLibraries = <String>[
   'base/lib/arm64-v8a/libapp.so',
   'base/lib/arm64-v8a/libflutter.so',
   'base/lib/arm64-v8a/librgb_lightning_node.so',
+  'base/lib/arm64-v8a/librgblibuniffi.so',
 ];
 
 Future<File> _createArchive(

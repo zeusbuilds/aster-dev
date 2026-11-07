@@ -179,7 +179,8 @@ final class WalletPaymentOperations {
         while (activities.any(
           (activity) =>
               activity.confirmationHeight != null &&
-              activity.confirmationHeight! > networkStatus.blockHeight,
+              networkStatus.blockHeight != null &&
+              activity.confirmationHeight! > networkStatus.blockHeight!,
         )) {
           if (revalidations == _activityTipRevalidationAttempts) {
             throw const AppFailureException(walletActivityConsistencyFailure);
@@ -190,7 +191,8 @@ final class WalletPaymentOperations {
           await Future<void>.delayed(_activityTipRevalidationDelay);
           networkStatus = await engine.getNetworkStatus();
           if (networkStatus.environment != originalStatus.environment ||
-              networkStatus.nodePublicKey != originalStatus.nodePublicKey) {
+              networkStatus.nodePublicKey != originalStatus.nodePublicKey ||
+              networkStatus.walletIdentity != originalStatus.walletIdentity) {
             throw const AppFailureException(walletActivityConsistencyFailure);
           }
         }
@@ -391,7 +393,7 @@ final class WalletPaymentOperations {
             throw const AppFailureException(walletFeeReviewRequiredFailure);
           }
           final reviewed = reviewedFeeRate!;
-          final fresh = await engine.estimateFeeRate(reviewed.targetBlocks);
+          final fresh = await engine.estimateFeeRate(reviewed.targetBlocks!);
           // One native lease covers revalidation and dispatch. The quote the
           // user reviewed is never silently replaced, even by a lower rate.
           if (!_isValidReview(reviewed) || !_isValidReview(fresh)) {

@@ -2,6 +2,19 @@ import '../../../../core/config/app_environment.dart';
 import '../../../../core/errors/errors.dart';
 import 'wallet_fee.dart';
 
+/// Identifies the native owner bound into one reviewed preparation.
+enum RgbSetupIdentityKind { lightningNode, nativeWallet }
+
+bool _validSetupIdentity(String value, RgbSetupIdentityKind kind) =>
+    switch (kind) {
+      RgbSetupIdentityKind.lightningNode => RegExp(
+        r'^(02|03)[a-f0-9]{64}$',
+      ).hasMatch(value),
+      RgbSetupIdentityKind.nativeWallet => RegExp(
+        r'^[a-f0-9]{64}$',
+      ).hasMatch(value),
+    };
+
 /// Reviewed wallet-owned outputs. The rate is authorized, not a total fee cap.
 final class RgbWalletSetupReview {
   RgbWalletSetupReview({
@@ -10,6 +23,7 @@ final class RgbWalletSetupReview {
     required this.network,
     required this.runtimeFingerprint,
     required this.nodePublicKey,
+    this.identityKind = RgbSetupIdentityKind.lightningNode,
     required this.feeRateSatPerVbyte,
     required this.expiresAt,
     this.feeSource = WalletFeeRateSource.networkEstimate,
@@ -17,10 +31,11 @@ final class RgbWalletSetupReview {
     if (!RegExp(r'^[a-f0-9]{32}$').hasMatch(id) ||
         !RegExp(r'^[a-f0-9]{32}$').hasMatch(walletId) ||
         !RegExp(r'^[a-f0-9]{64}$').hasMatch(runtimeFingerprint) ||
-        !RegExp(r'^(02|03)[a-f0-9]{64}$').hasMatch(nodePublicKey) ||
+        !_validSetupIdentity(nodePublicKey, identityKind) ||
         feeRateSatPerVbyte < 1 ||
         feeRateSatPerVbyte > 1000000 ||
         !expiresAt.isUtc ||
+        feeSource == WalletFeeRateSource.nativeRecovery ||
         (feeSource == WalletFeeRateSource.localRegtestPolicy &&
             (network != BlockchainEnvironment.regtest ||
                 feeRateSatPerVbyte != 1))) {
@@ -35,7 +50,10 @@ final class RgbWalletSetupReview {
   final String walletId;
   final BlockchainEnvironment network;
   final String runtimeFingerprint;
+
+  /// Legacy JSON field name; interpreted only with [identityKind].
   final String nodePublicKey;
+  final RgbSetupIdentityKind identityKind;
   final int feeRateSatPerVbyte;
   final DateTime expiresAt;
   final WalletFeeRateSource feeSource;
@@ -46,6 +64,8 @@ final class RgbWalletSetupReview {
     'network': network.name,
     'runtimeFingerprint': runtimeFingerprint,
     'nodePublicKey': nodePublicKey,
+    if (identityKind != RgbSetupIdentityKind.lightningNode)
+      'identityKind': identityKind.name,
     'feeRate': feeRateSatPerVbyte,
     'feeSource': feeSource.name,
     'expiresAt': expiresAt.millisecondsSinceEpoch,
@@ -60,13 +80,16 @@ final class RgbWalletSetupReview {
           'network',
           'runtimeFingerprint',
           'nodePublicKey',
+          'identityKind',
           'feeRate',
           'feeSource',
           'expiresAt',
           'count',
           'size',
         }).isNotEmpty ||
-        json.length != 10 ||
+        json.length != (json.containsKey('identityKind') ? 11 : 10) ||
+        (json.containsKey('identityKind') &&
+            json['identityKind'] != 'nativeWallet') ||
         json['count'] != outputCount ||
         json['size'] != outputValueSats ||
         json['id'] is! String ||
@@ -85,6 +108,9 @@ final class RgbWalletSetupReview {
       network: BlockchainEnvironment.parse(json['network']! as String),
       runtimeFingerprint: json['runtimeFingerprint']! as String,
       nodePublicKey: json['nodePublicKey']! as String,
+      identityKind: json.containsKey('identityKind')
+          ? RgbSetupIdentityKind.nativeWallet
+          : RgbSetupIdentityKind.lightningNode,
       feeRateSatPerVbyte: json['feeRate']! as int,
       feeSource: WalletFeeRateSource.values.byName(
         json['feeSource']! as String,
@@ -112,12 +138,13 @@ final class RgbWalletSetupInventory {
     required this.vanillaSpendableSats,
     required this.runtimeFingerprint,
     required this.nodePublicKey,
+    this.identityKind = RgbSetupIdentityKind.lightningNode,
   }) {
     if (freeAllocationCount < 0 ||
         freeAllocationCount > 10000 ||
         vanillaSpendableSats < 0 ||
         !RegExp(r'^[a-f0-9]{64}$').hasMatch(runtimeFingerprint) ||
-        !RegExp(r'^(02|03)[a-f0-9]{64}$').hasMatch(nodePublicKey)) {
+        !_validSetupIdentity(nodePublicKey, identityKind)) {
       throw const StoredDataCorruptionException();
     }
   }
@@ -127,7 +154,10 @@ final class RgbWalletSetupInventory {
   final int freeAllocationCount;
   final int vanillaSpendableSats;
   final String runtimeFingerprint;
+
+  /// Legacy field name retained for stored RLN reviews.
   final String nodePublicKey;
+  final RgbSetupIdentityKind identityKind;
 }
 
 final class RgbWalletSetupTransaction {

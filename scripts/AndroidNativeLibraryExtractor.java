@@ -28,9 +28,9 @@ public final class AndroidNativeLibraryExtractor {
   private static final int MAX_ENTRY_COUNT = 100_000;
   private static final int MAX_ENTRY_NAME_LENGTH = 4096;
   private static final Set<String> SUPPORTED_ABIS =
-      Set.of("arm64-v8a", "armeabi-v7a", "x86_64");
+      Set.of("arm64-v8a", "x86_64");
   private static final Set<String> REQUIRED_LIBRARIES =
-      Set.of("libapp.so", "libflutter.so", "librgb_lightning_node.so");
+      Set.of("libapp.so", "libflutter.so", "librgb_lightning_node.so", "librgblibuniffi.so");
 
   private AndroidNativeLibraryExtractor() {}
 

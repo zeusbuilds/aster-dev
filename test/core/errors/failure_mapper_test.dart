@@ -28,6 +28,44 @@ void main() {
     },
   );
 
+  test(
+    'native durable state fences cannot become ordinary retryable errors',
+    () {
+      for (final code in const [
+        'RECOVERY_STORAGE_INVALID',
+        'RECOVERY_IDENTITY_MISMATCH',
+        'RECOVERY_REQUEST_MISMATCH',
+        'RECOVERY_REQUEST_INVALID',
+        'RECOVERY_PENDING',
+        'RECOVERY_CAPACITY',
+        'RECOVERY_REJECTED',
+        'RECOVERY_BUSY',
+        'RECOVERY_OBSERVATION_INVALID',
+        'RECOVERY_RESTORE_UNCERTAIN',
+      ]) {
+        final failure = FailureMapper.from(
+          RgbLibWalletException(
+            'private payload /wallet/seed-fixture',
+            code: code,
+          ),
+          StackTrace.current,
+        );
+        expect(failure.requiresReconciliation, isTrue);
+        expect(failure.retryable, isFalse);
+        expect(failure.outcomeUnknown, isFalse);
+        expect(failure.userMessage, isNot(contains('Nothing was sent')));
+        expect(failure.userMessage, isNot(contains('private payload')));
+        expect(failure.userMessage, isNot(contains('/wallet/')));
+        expect(
+          failure.code,
+          code == 'RECOVERY_RESTORE_UNCERTAIN'
+              ? 'wallet_native_restore_uncertain'
+              : 'wallet_native_recovery_required',
+        );
+      }
+    },
+  );
+
   test('local network denial is actionable before any wallet mutation', () {
     final failure = FailureMapper.from(
       const LocalNetworkAccessException(LocalNetworkAccessFailure.denied),

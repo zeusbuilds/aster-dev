@@ -191,14 +191,14 @@ prepare-android-release: verify-release-configuration
 # Google Play performs device-specific delivery from this bundle. Signing and
 # application identity still have to be supplied by the release owner.
 android-release-bundle: prepare-android-release
-	fvm flutter build appbundle --release --no-pub --dart-define-from-file="$(RELEASE_CONFIG)"
+	fvm flutter build appbundle --release --target-platform android-arm64,android-x64 --no-pub --dart-define-from-file="$(RELEASE_CONFIG)"
 	./scripts/verify-android-release-bundle.sh
 
 # The pinned wallet SDK AAR contains multiple native ABIs. Direct APK delivery
 # must therefore use Flutter's ABI splits; --target-platform alone does not
 # remove foreign JNI libraries from transitive Android archives.
 android-release-apks: prepare-android-release
-	fvm flutter build apk --release --split-per-abi --no-pub --dart-define-from-file="$(RELEASE_CONFIG)"
+	fvm flutter build apk --release --split-per-abi --target-platform android-arm64,android-x64 --no-pub --dart-define-from-file="$(RELEASE_CONFIG)"
 	./scripts/verify-android-release-apks.sh
 
 verify-android-release-bundle: dependencies

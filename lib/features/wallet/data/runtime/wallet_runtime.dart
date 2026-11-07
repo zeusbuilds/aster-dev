@@ -442,9 +442,9 @@ final class WalletRuntime {
       if (secret case AppFailureResult<WalletSecret>(:final failure)) {
         throw AppFailureException(failure);
       }
-      await engine.openPersisted(
-        databasePassword:
-            (secret as AppSuccess<WalletSecret>).value.databasePassword,
+      await _openPersistedEngine(
+        engine,
+        (secret as AppSuccess<WalletSecret>).value,
       );
     } catch (error, stack) {
       final mapped = FailureMapper.from(error, stack);
@@ -549,9 +549,9 @@ final class WalletRuntime {
         if (secret case AppFailureResult<WalletSecret>(:final failure)) {
           return AppResult.failure(failure);
         }
-        await _engine!.openPersisted(
-          databasePassword:
-              (secret as AppSuccess<WalletSecret>).value.databasePassword,
+        await _openPersistedEngine(
+          _engine!,
+          (secret as AppSuccess<WalletSecret>).value,
         );
         _paymentAuditSuspended = false;
         return const AppResult.success(null);
@@ -605,7 +605,7 @@ final class WalletRuntime {
         ),
       );
       try {
-        await engine.openPersisted(databasePassword: secret.databasePassword);
+        await _openPersistedEngine(engine, secret);
         _emit(
           WalletRuntimeSnapshot(
             phase: WalletRuntimePhase.active,
@@ -1066,9 +1066,7 @@ final class WalletRuntime {
             mnemonic: mnemonic,
           );
         case _OpenPersistedWalletActivation():
-          await candidate.openPersisted(
-            databasePassword: secret.databasePassword,
-          );
+          await _openPersistedEngine(candidate, secret);
       }
       _engine = candidate;
       _activeProfile = profile.state == WalletProfileState.provisioning
@@ -1180,6 +1178,19 @@ final class WalletRuntime {
     return AppResult.failure(failure);
   }
 
+  static Future<void> _openPersistedEngine(
+    WalletEngine engine,
+    WalletSecret secret,
+  ) {
+    if (engine case final WalletMnemonicOpenEngine mnemonicEngine) {
+      return mnemonicEngine.openPersistedWithMnemonic(
+        databasePassword: secret.databasePassword,
+        mnemonic: secret.mnemonic,
+      );
+    }
+    return engine.openPersisted(databasePassword: secret.databasePassword);
+  }
+
   static AppFailure _profileStateFailure(WalletProfile profile) {
     return AppFailure(
       code: 'wallet_profile_state_invalid',
@@ -1191,6 +1202,14 @@ final class WalletRuntime {
   }
 
   AppFailure? _profileConfigurationFailure(WalletProfile profile) {
+    if (!_services.backend.activationAllowed) {
+      return const AppFailure(
+        code: 'wallet_backend_unqualified',
+        kind: AppFailureKind.configuration,
+        userMessage: 'This build cannot safely open this wallet format.',
+        retryable: false,
+      );
+    }
     try {
       _services.validate();
     } on AppConfigurationException {

@@ -116,7 +116,7 @@ Future<void> qualifyImportedWalletTransfer({
   if (imported == null ||
       importedRegistry.readyProfiles.length != 2 ||
       imported.id == original.id ||
-      importedIdentity.nodePublicKey == originalIdentity.nodePublicKey) {
+      importedIdentity.publicIdentity == originalIdentity.publicIdentity) {
     throw const FullWalletQaFailure('qa_import_identity_invalid');
   }
   final importedZero = await _snapshot(repository);
@@ -161,7 +161,7 @@ Future<void> qualifyImportedWalletTransfer({
     await repository.networkStatus(),
     'switch_original_identity',
   );
-  if (switchedIdentity.nodePublicKey != originalIdentity.nodePublicKey) {
+  if (switchedIdentity.publicIdentity != originalIdentity.publicIdentity) {
     throw const FullWalletQaFailure('qa_switch_original_identity_changed');
   }
   final originalBalance = requireQaSuccess(
@@ -203,9 +203,9 @@ Future<void> qualifyImportedWalletTransfer({
     tester: tester,
     repository: repository,
     senderId: original.id,
-    senderPublicKey: originalIdentity.nodePublicKey,
+    senderPublicKey: originalIdentity.publicIdentity,
     receiverId: imported.id,
-    receiverPublicKey: importedIdentity.nodePublicKey,
+    receiverPublicKey: importedIdentity.publicIdentity,
     txid: sent.referenceId,
     amountUnits: 1000000,
     senderUnits: 4000000,
@@ -285,9 +285,9 @@ Future<void> qualifyImportedWalletTransfer({
     tester: tester,
     repository: repository,
     senderId: imported.id,
-    senderPublicKey: importedIdentity.nodePublicKey,
+    senderPublicKey: importedIdentity.publicIdentity,
     receiverId: original.id,
-    receiverPublicKey: originalIdentity.nodePublicKey,
+    receiverPublicKey: originalIdentity.publicIdentity,
     txid: witnessSent.referenceId,
     amountUnits: 100000,
     senderUnits: 900000,
@@ -476,7 +476,7 @@ Future<void> qualifyExistingTransferPair({
           .where((item) => item.txid == txid)
           .toList();
       requireQaOriginalTransferCheckpoint(
-        identityMatches: identity.nodePublicKey == senderPublicKey,
+        identityMatches: identity.publicIdentity == senderPublicKey,
         matches: matches,
         amountUnits: amountUnits,
       );
@@ -509,7 +509,7 @@ Future<void> qualifyExistingTransferPair({
           await repository.networkStatus(),
           'peer_identity',
         );
-        if (identity.nodePublicKey != peer.$2) {
+        if (identity.publicIdentity != peer.$2) {
           throw const FullWalletQaFailure('qa_transfer_pair_identity_changed');
         }
         final balance = requireQaSuccess(
@@ -603,7 +603,7 @@ Future<Map<String, Object?>> _snapshot(WalletRepository repository) async {
   final portfolio = requireQaSuccess(await repository.portfolio(), 'portfolio');
   final network = requireQaSuccess(await repository.networkStatus(), 'network');
   return {
-    'node_public_key': network.nodePublicKey,
+    'node_public_key': network.publicIdentity,
     'block_height': network.blockHeight,
     'btc_settled_sats': portfolio.bitcoin.onchainSettled.units,
     'btc_spendable_sats': portfolio.bitcoin.onchainSpendable.units,

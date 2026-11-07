@@ -11,6 +11,8 @@ import 'package:aster/features/send/presentation/models/models.dart';
 import 'package:aster/features/send/presentation/screens/screens.dart';
 import 'package:aster/features/send/presentation/view_model/view_models.dart';
 import 'package:aster/features/send/presentation/widgets/widgets.dart';
+import 'package:aster/features/wallet/data/runtime/runtime.dart';
+import 'package:aster/features/wallet/data/storage/storage.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:aster/features/wallet/domain/validation/validation.dart';
 import 'package:aster/features/wallet/presentation/view_model/view_models.dart';
@@ -30,6 +32,99 @@ import '../../support/wallet_fakes.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets(
+    'L1 Send explicitly reviews output preparation and never auto-sends',
+    (tester) async {
+      final now = DateTime.utc(2026, 11, 7);
+      final store = _SendSetupStore();
+      final engine = _SendSetupEngine()
+        ..balances[testRgbRoute.asset.id] = testRgbBalance(2000000)
+        ..decodedInvoice = WalletPaymentPreview(
+          route: testRgbRoute,
+          encodedDestination: 'rgb:witness',
+          displayDestination: 'rgb:witness',
+          rgbRecipientType: RgbRecipientType.witness,
+        )
+        ..feeEstimate = WalletFeeRateEstimate(
+          targetBlocks: 6,
+          satsPerVbyte: 1,
+          observedAt: now,
+          source: WalletFeeRateSource.localRegtestPolicy,
+        );
+      final transport = ResilientHttpClient(
+        client: MockClient((_) async => http.Response('{}', 503)),
+        retryPolicy: RetryPolicy(maxAttempts: 1),
+      );
+      addTearDown(transport.close);
+      // Only the presentation policy is mocked. The actual L1 factory remains
+      // closed; an isolated fake runtime exercises the existing real journal.
+      final harness = await PaymentFlowTestHarness.create(
+        engine: engine,
+        services: testRgbServices,
+        rgbSetupStore: store,
+        presentationServices: const WalletServiceConfiguration(
+          environment: BlockchainEnvironment.regtest,
+          sdkNetwork: 'regtest',
+          backend: WalletBackend.rgbL1,
+        ),
+        clock: () => now,
+        httpClient: transport,
+      );
+      addTearDown(() => _disposeHarness(tester, harness));
+      const target = WalletPaymentTarget.usdtOnchain;
+      final provider = sendFlowViewModelProvider(target);
+      await _pumpWidget(
+        tester,
+        harness,
+        const SendAmountScreen(target: target),
+      );
+      await _pumpUntil(tester, () => harness.container.read(provider).hasValue);
+      final notifier = harness.container.read(provider.notifier);
+      notifier.updateDestination('rgb:witness');
+      final validated = notifier.validateDestination();
+      await _pumpFrames(tester);
+      expect(await validated, isTrue);
+      notifier.updateAmount('1');
+      await _pumpWidget(
+        tester,
+        harness,
+        const SendAmountScreen(target: target),
+      );
+      final send = find.widgetWithText(CustomButton, 'Send');
+      await _pumpUntil(tester, () => send.evaluate().isNotEmpty);
+      await tester.tap(send);
+      await _pumpUntil(
+        tester,
+        () => find.text('Prepare wallet for USDT?').evaluate().isNotEmpty,
+      );
+      expect(
+        find.textContaining('total fee cap is unavailable'),
+        findsOneWidget,
+      );
+      expect(engine.setupDispatches, 0);
+      expect(engine.sentPaymentCommand, isNull);
+      await tester.tap(find.widgetWithText(CustomButton, 'Cancel'));
+      await _pumpFrames(tester);
+      expect(engine.setupDispatches, 0);
+      await tester.tap(send);
+      await _pumpUntil(
+        tester,
+        () => find.text('Prepare wallet for USDT?').evaluate().isNotEmpty,
+      );
+      await tester.tap(find.widgetWithText(CustomButton, 'Prepare'));
+      await _pumpUntil(tester, () => engine.setupDispatches == 1);
+      await _pumpFrames(tester);
+      expect(engine.sentPaymentCommand, isNull);
+      expect(harness.toasts.messages.single.title, 'Preparation pending');
+      // The durable marker survives subsequent taps. Only a status read occurs.
+      await tester.tap(send);
+      await _pumpFrames(tester);
+      expect(engine.setupDispatches, 1);
+      expect(find.text('Prepare wallet for USDT?'), findsNothing);
+      expect(engine.sentPaymentCommand, isNull);
+    },
+  );
 
   testWidgets('Paste reads once quietly and recovers after clipboard failure', (
     tester,
@@ -2753,6 +2848,39 @@ void main() {
       expect(engine.calls, isNot(contains('sendPayment:start')));
     },
   );
+}
+
+final class _SendSetupStore implements RgbWalletSetupStore {
+  final documents = <String, String>{};
+  @override
+  Future<String?> read(String walletId) async => documents[walletId];
+  @override
+  Future<void> write(String walletId, String document) async {
+    documents[walletId] = document;
+  }
+}
+
+final class _SendSetupEngine extends FakeWalletEngine
+    implements RgbSetupWalletEngine {
+  int setupDispatches = 0;
+  @override
+  Future<RgbWalletSetupInventory> rgbSetupInventory() async =>
+      RgbWalletSetupInventory(
+        freeAllocationCount: 0,
+        vanillaSpendableSats: 2000000,
+        runtimeFingerprint: 'a' * 64,
+        nodePublicKey: 'b' * 64,
+        identityKind: RgbSetupIdentityKind.nativeWallet,
+      );
+  @override
+  Future<List<RgbWalletSetupTransaction>> rgbSetupTransactions() async =>
+      setupDispatches == 0
+      ? []
+      : [RgbWalletSetupTransaction(txid: 'c' * 64, confirmed: false)];
+  @override
+  Future<void> createRgbSetupOutputs(int rate) async {
+    setupDispatches++;
+  }
 }
 
 final class _SecretNavigationError implements Exception {

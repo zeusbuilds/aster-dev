@@ -72,6 +72,7 @@ exec /usr/bin/find "$@"
       'libapp.so',
       'libflutter.so',
       'librgb_lightning_node.so',
+      'librgblibuniffi.so',
     ]) {
       final content = File('${root.path}/content/base/lib/arm64-v8a/$library');
       content.createSync(recursive: true);

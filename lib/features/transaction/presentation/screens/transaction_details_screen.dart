@@ -523,9 +523,16 @@ class _SubmissionDetails extends StatelessWidget {
     final submission = display.submission;
     final entries = <(String, String)>[
       ('Status', display.status),
-      ('Date', formatter.dateTimeLabel(submission.submittedAt)),
+      if (submission.paymentSubmittedAt case final submittedAt?)
+        ('Date', formatter.dateTimeLabel(submittedAt)),
       ('Network', formatter.networkLabel(state.feed.networkStatus.environment)),
-      ('Address', valuesVisible ? submission.command.destination : 'Hidden'),
+      (
+        submission.nativeDiscovered &&
+                submission.command.route.asset.kind == WalletAssetKind.usdt
+            ? 'Recipient'
+            : 'Address',
+        valuesVisible ? submission.command.destination : 'Hidden',
+      ),
       if (submission.result case final receipt?)
         ('Transaction ID', formatter.compactIdentifier(receipt.referenceId)),
       if (submission.outcome == WalletPaymentSubmissionOutcome.accepted &&

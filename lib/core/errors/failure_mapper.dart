@@ -142,6 +142,20 @@ abstract final class FailureMapper {
         stackTrace: stackTrace,
       );
     }
+    if (error is RgbLibWalletException && error.code.startsWith('RECOVERY_')) {
+      // These are native state/identity fences, never nonexecution certificates
+      // or permission to repeat a financial operation. Keep raw details private.
+      return _failure(
+        code: error.code == 'RECOVERY_RESTORE_UNCERTAIN'
+            ? 'wallet_native_restore_uncertain'
+            : 'wallet_native_recovery_required',
+        kind: AppFailureKind.storage,
+        message: 'Wallet recovery is required before making changes.',
+        requiresReconciliation: true,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
     if (error is RecoverableSendStorageException) {
       return _failure(
         code: 'payment_recovery_state_lost',

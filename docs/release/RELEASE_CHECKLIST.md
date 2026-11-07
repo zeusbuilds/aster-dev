@@ -42,6 +42,9 @@ from a clean worktree and record commands/results in the production tracker.
       guarded preparation reports unchanged lock/graph and no dev plugins
 - [ ] APK/AAB application ID and version name match committed source; AAB uses
       the base build number and each split APK uses Flutter's verified ABI code
+- [ ] Android bundles contain exactly arm64-v8a and x86_64, with complete Flutter,
+      RLN and RGB_L1 native runtimes in both. Each split contains the corresponding
+      complete runtime; no 32-bit or partial unselected JNI directory is present.
 - [ ] direct APK artifacts contain exactly one ABI; never distribute the
       universal `app-release.apk`
 - [ ] `make android-native-test` and

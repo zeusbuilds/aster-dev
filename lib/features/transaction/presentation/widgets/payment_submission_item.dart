@@ -25,13 +25,15 @@ class PaymentSubmissionItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final amount = valuesVisible ? display.amount(bitcoinUnit) : '••••';
-    final time = formatter.timeLabel(display.submission.submittedAt);
+    final submittedAt = display.submission.paymentSubmittedAt;
+    final time = submittedAt == null ? null : formatter.timeLabel(submittedAt);
+    final status = time == null ? display.status : '$time, ${display.status}';
     return Semantics(
       button: true,
       enabled: onTap != null,
       label:
           'Send, ${valuesVisible ? amount : 'Amount hidden'}, '
-          '${display.status}, $time',
+          '$status',
       excludeSemantics: true,
       onTap: onTap,
       child: Material(
@@ -65,10 +67,7 @@ class PaymentSubmissionItem extends StatelessWidget {
                     children: [
                       Text('Send', style: context.type.rowTitle),
                       SizedBox(height: context.spacing.xxs),
-                      NumericText(
-                        '$time, ${display.status}',
-                        style: context.type.rowMeta,
-                      ),
+                      NumericText(status, style: context.type.rowMeta),
                     ],
                   ),
                 ),

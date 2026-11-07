@@ -14,6 +14,7 @@ import '../../../wallet/presentation/formatting/formatting.dart';
 import '../../../wallet/presentation/models/models.dart';
 import '../../../wallet/presentation/view_model/view_models.dart';
 import '../models/models.dart';
+import '../view_model/rgb_send_preparation.dart';
 import '../view_model/view_models.dart';
 import '../widgets/widgets.dart';
 
@@ -209,7 +210,33 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
         try {
           // Submit immediately. Only the accepted receipt's presentation waits
           // for the minimum interval; slower payments incur no extra delay.
-          final submitted = await ref.read(provider.notifier).submit();
+          final submitted = await ref
+              .read(provider.notifier)
+              .submit(
+                confirmRgbSetup: _confirmRgbSetup,
+                onRgbSetupResult: (result) {
+                  if (!_canPresentFeedback) return;
+                  final (title, message) = switch (result) {
+                    RgbSendPreparationResult.prepared => (
+                      'Wallet prepared',
+                      'Tap Send again to continue.',
+                    ),
+                    RgbSendPreparationResult.pending => (
+                      'Preparation pending',
+                      'Wait for the Bitcoin transaction to confirm, then tap Send.',
+                    ),
+                    _ => (
+                      'Preparation needs checking',
+                      'Tap Send to check its status. Preparation will not be repeated.',
+                    ),
+                  };
+                  toasts.show(
+                    title: title,
+                    message: message,
+                    variant: ToastVariant.warning,
+                  );
+                },
+              );
           if (submitted) await minimumDelay.future;
           if (!mounted || submitted) return;
           final state = ref.read(provider).value;
@@ -236,6 +263,30 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
       hapticIntent: null,
       blocksRoutePop: true,
     );
+  }
+
+  Future<bool> _confirmRgbSetup(RgbWalletSetupReview review) async {
+    if (!_canPresentFeedback) return false;
+    final sats = BitcoinAmountFormatter(
+      unit: BitcoinUnit.sats,
+      locale: 'en_US',
+    );
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AsterConfirmationDialog(
+        title: 'Prepare wallet for USDT?',
+        content: Text(
+          'Create ${RgbWalletSetupReview.outputCount} wallet outputs of '
+          '${sats.format(RgbWalletSetupReview.outputValueSats)} each '
+          '(${sats.format(RgbWalletSetupReview.outputCount * RgbWalletSetupReview.outputValueSats)} total). This moves BTC '
+          'within your wallet. A Bitcoin network fee also applies at '
+          '${review.feeRateSatPerVbyte} sat/vB; a total fee cap is unavailable. '
+          'Your USDT payment will not be sent.',
+        ),
+        confirmText: 'Prepare',
+      ),
+    );
+    return mounted && confirmed == true;
   }
 
   Widget _missingRecipient() {

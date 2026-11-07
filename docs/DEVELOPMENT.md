@@ -236,8 +236,8 @@ registration. Artifact compilation resumes with `--no-pub`.
 
 The package verifiers compare the APK/AAB application ID, version name, and
 version code with `android/gradle.properties` and `pubspec.yaml`. Flutter
-intentionally encodes the ABI in split APK version codes (`1000 + base` for
-armeabi-v7a, `2000 + base` for arm64-v8a, and `4000 + base` for x86_64); the
+intentionally encodes the ABI in split APK version codes (`2000 + base` for
+arm64-v8a and `4000 + base` for x86_64); the
 AAB retains the base code. The toolchain gate verifies this mapping against the
 executing pinned Flutter source. Do not replace this sequence with a direct
 `flutter build` command or interpret a valid split code as the source build
@@ -245,11 +245,22 @@ number.
 
 Each AAB and split APK must also remain below its reviewed regression budget.
 Verification prints the exact artifact byte count and streamed SHA-256 digest.
-The current SDK `0.2.0-beta.2` Git pin reuses the derived 16 KiB RLN
+Aster's dual wallet-engine Android integration supports arm64-v8a and x86_64.
+Its Gradle policy reads Flutter's `target-platform`; a single-target build
+filters and excludes all other JNI ABIs, including transitive 64-bit libraries.
+The usual mixed Flutter default target list keeps only the complete supported
+64-bit intersection. Unknown, empty and 32-bit-only target requests fail before
+packaging. Release Make targets request both supported 64-bit platforms and
+release verifiers require both wallet native runtimes alongside Flutter in
+every selected ABI. The SDK's separate legacy RLN capability does not establish
+Aster or RGB_L1 support for 32-bit Android.
+
+The historical SDK `0.2.0-beta.2` Git pin reused the derived 16 KiB RLN
 artifact published in `0.2.0-beta.1`. The published RLN 0.17 AAR passes
 SDK-level ELF, APK ZIP alignment and native signer checks.
-Aster's Debug APK now passes all 25 native ELF checks and 16 KiB ZIP alignment,
-and launches on Android 17 with 16 KiB pages and compatibility fallback disabled.
+Aster's Debug APK from that qualification passed all 25 native ELF checks and
+16 KiB ZIP alignment, and launched on Android 17 with 16 KiB pages and
+compatibility fallback disabled.
 A direct load/health check of the RLN library extracted from that same APK also
 passes. SDK-004's exact release AAB/split-APK qualification and PKG-006
 provenance remain open; local funded results are recorded in
@@ -259,6 +270,18 @@ downloads the published AAR over HTTPS and verifies its pinned size and SHA-256.
 See the [beta release](https://github.com/UTEXO-Protocol/flutter-sdk/releases/tag/v0.2.0-beta.1).
 Dependency restoration and a size/digest pass do not satisfy these separate
 release gates.
+
+The current `0.2.0-beta.3` SDK pin is
+`6cd33f9db355f202979c09ad59ebb938e06d9cb6`, including the separately sealed
+BFA.7 Flutter native integration. Its current arm64 Debug APK passes all ten
+packaged native ELF checks and 16 KiB ZIP alignment. The exact pinned graph
+also builds the iOS Simulator Debug app. These are compilation and packaging
+results, not a fresh Aster device launch or signed-release qualification.
+Both builds used checksum-verified local BFA.7 archives while their public
+native-beta publication is awaiting explicit approval. Fresh default mobile
+builds require those pinned archives to be published. RGB_L1 and Dev activation
+remain closed; the SDK's `doc/BFA7_QUALIFICATION.md` distinguishes real isolated
+native/mobile transfer evidence from the remaining product/deployment gates.
 
 ### iOS Release Archives
 

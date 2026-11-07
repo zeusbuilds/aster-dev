@@ -304,7 +304,7 @@ final class _FakeWalletPaymentOperation {
   WalletPaymentRecoveryStatus status;
 }
 
-final class FakeWalletEngine
+class FakeWalletEngine
     implements
         WalletEngine,
         WalletDeletionSafetyEngine,

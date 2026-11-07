@@ -77,6 +77,8 @@ final class PaymentFlowTestHarness {
       environment: BlockchainEnvironment.regtest,
       sdkNetwork: 'regtest',
     ),
+    WalletServiceConfiguration? presentationServices,
+    RgbWalletSetupStore? rgbSetupStore,
     Map<String, Object> preferenceValues = const {},
     PreferencesService Function(SharedPreferences preferences)?
     preferenceServiceBuilder,
@@ -138,6 +140,7 @@ final class PaymentFlowTestHarness {
       services,
       clock: effectiveClock,
       paymentJournalStore: MemoryWalletPaymentJournalStore(),
+      rgbSetupStore: rgbSetupStore,
     );
     final settings = SettingsRepository(
       preferenceService,
@@ -157,7 +160,9 @@ final class PaymentFlowTestHarness {
         clipboardServiceProvider.overrideWithValue(clipboard),
         shareServiceProvider.overrideWithValue(share),
         externalUriServiceProvider.overrideWithValue(externalUris),
-        walletServiceConfigurationProvider.overrideWithValue(services),
+        walletServiceConfigurationProvider.overrideWithValue(
+          presentationServices ?? services,
+        ),
         utcClockProvider.overrideWithValue(effectiveClock),
         bitcoinMarketBackgroundRetryPolicyProvider.overrideWithValue(null),
         if (httpClient != null)

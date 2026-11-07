@@ -205,7 +205,7 @@ class _ActivityBody extends StatelessWidget {
     final entries =
         <(WalletActivity?, PaymentSubmissionDisplay?, DateTime?)>[
           for (final record in records) (record, null, record.occurredAt),
-          if (showSubmission) (null, display, submission!.submittedAt),
+          if (showSubmission) (null, display, submission!.paymentSubmittedAt),
         ]..sort((left, right) {
           final a = left.$3;
           final b = right.$3;

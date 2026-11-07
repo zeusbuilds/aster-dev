@@ -61,3 +61,33 @@ final class WalletPaymentRecoveryStatus {
   /// a matching rejected status before the app's mutation fence can be cleared.
   final String? failureCode;
 }
+
+/// Optional authoritative discovery when the app's own marker is missing.
+/// Implementations return only native-authenticated exact commands for the
+/// currently opened wallet/source/cohort. Discovery never grants Commit.
+abstract interface class WalletPaymentDiscoveryEngine {
+  Future<List<WalletDiscoveredPaymentOperation>>
+  discoverPendingPaymentOperations();
+
+  /// Validates a reconstructed app record against its exact native request.
+  /// This compares reviewed native fields without inventing an original invoice.
+  Future<void> validateDiscoveredPaymentOperation(
+    String request,
+    String operationId,
+    WalletSendCommand command,
+  );
+}
+
+final class WalletDiscoveredPaymentOperation {
+  const WalletDiscoveredPaymentOperation({
+    required this.operationId,
+    required this.request,
+    required this.command,
+    required this.status,
+  });
+
+  final String operationId;
+  final String request;
+  final WalletSendCommand command;
+  final WalletPaymentRecoveryStatus status;
+}

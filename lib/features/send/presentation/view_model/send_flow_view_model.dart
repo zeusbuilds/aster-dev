@@ -9,6 +9,7 @@ import '../../../wallet/data/repository/repository.dart';
 import '../../../wallet/domain/models/models.dart';
 import '../../../wallet/presentation/view_model/view_models.dart';
 import '../models/models.dart';
+import 'rgb_send_preparation.dart';
 import 'send_destination_handoff.dart';
 
 part 'send_flow_view_model.g.dart';
@@ -405,7 +406,10 @@ class SendFlowViewModel extends _$SendFlowViewModel {
   }
 
   /// Submits exactly once and leaves navigation to the observing screen.
-  Future<bool> submit() async {
+  Future<bool> submit({
+    Future<bool> Function(RgbWalletSetupReview)? confirmRgbSetup,
+    void Function(RgbSendPreparationResult)? onRgbSetupResult,
+  }) async {
     final generation = _generation;
     final current = state.value;
     if (state.isLoading ||
@@ -482,6 +486,58 @@ class SendFlowViewModel extends _$SendFlowViewModel {
         retainedFailure: null,
       ),
     );
+    final foreground = ref
+        .read(walletLifecycleViewModelProvider)
+        .foregroundGeneration;
+    bool ownsAction() =>
+        ref.mounted &&
+        generation == _generation &&
+        state.value?.walletId == walletId &&
+        ref.read(walletViewModelProvider).value?.activeWallet?.id == walletId &&
+        ref.read(walletViewModelProvider).value?.isChangingWallet != true &&
+        !ref.read(walletLifecycleViewModelProvider).blocksInteraction &&
+        ref.read(walletLifecycleViewModelProvider).foregroundGeneration ==
+            foreground;
+    try {
+      final repository = await ref.read(walletRepositoryProvider.future);
+      final preparation = await prepareRgbSend(
+        backend: ref.read(walletServiceConfigurationProvider).backend,
+        target: _target,
+        walletId: walletId,
+        isCurrent: ownsAction,
+        clock: ref.read(utcClockProvider),
+        status: repository.rgbWalletSetupStatus,
+        review: repository.prepareRgbWalletSetup,
+        cancel: repository.cancelRgbWalletSetup,
+        prepare: repository.confirmRgbWalletSetup,
+        confirm: confirmRgbSetup ?? (_) async => false,
+      );
+      if (!ownsAction()) {
+        if (ref.mounted && generation == _generation) {
+          state = AsyncData(
+            current.copyWith(operation: null, retainedFailure: null),
+          );
+        }
+        return false;
+      }
+      if (preparation != RgbSendPreparationResult.ready) {
+        state = AsyncData(
+          current.copyWith(operation: null, retainedFailure: null),
+        );
+        if (preparation != RgbSendPreparationResult.cancelled) {
+          onRgbSetupResult?.call(preparation);
+        }
+        return false;
+      }
+    } catch (error, stack) {
+      if (!ref.mounted || generation != _generation) return false;
+      return _fail(
+        current,
+        FailureMapper.from(error, stack),
+        failedOperation: SendFlowOperation.submitting,
+        emitErrorHaptic: true,
+      );
+    }
     final result = await _walletOperation(
       (repository) => repository.sendPayment(
         target: _target,

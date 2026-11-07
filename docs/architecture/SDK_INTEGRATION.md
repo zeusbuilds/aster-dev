@@ -8,11 +8,15 @@ architecture boundaries.
 
 Aster pins the SDK in the private repository
 `https://github.com/zeusbuilds/rgb-sdk-flutter.git` at immutable commit
-`b969118f3e506191d1e4a718189a5bb0d2b586d7`. The manifest and portable Git lock
+`6cd33f9db355f202979c09ad59ebb938e06d9cb6`. The manifest and portable Git lock
 name the same full commit. This candidate adds the explicit RGB_L1 backend
-and React Native beta.40 compatibility. Aster defaults to RLN and rejects
-RGB_L1 before opening wallet storage. Its activation requires qualified durable
-payment recovery and backup.
+and React Native beta.40 compatibility. The BFA.7 follow-up implements native
+standalone contract registration, durable payment discovery/receipts and the
+gated app adapter. Aster defaults to RLN and rejects RGB_L1 before opening
+wallet storage. Its activation still requires exact-artifact funded/mobile,
+reorg, backup-freshness and deployment qualification. See
+[the adapter contract](RGB_L1_ADAPTER.md) and
+[current Dev team inputs](DEV_USDT_TEAM_INPUTS.md).
 
 Verification resolves the pushed Git commit with authenticated access and no
 local SDK override. The earlier restoration of `68a6909` matched 74 SDK Dart
@@ -37,12 +41,14 @@ and global/system Git configuration disabled. Credential mode was `0600`, and
 cleanup removed its runner directory. Eight offline helper tests and 23 focused
 governance tests pass. These local checks do not claim a remote workflow result.
 
-This source pin exposes the durable-send Dart and bridge API. It does not
-publish the matching native binaries. The official older native artifacts
-remain unchanged and fail closed with unsupported durable sends; they never
-fall back to a one-shot payment. A verified ignored binary fixture is still
-required for local native protocol qualification. Authenticated Git restoration
-and host tests do not establish a usable native payment release.
+The legacy RLN and new RGB_L1 native pins are independent. The BFA.7 candidate
+uses a separately versioned Flutter integration built from a sealed source,
+overlay and lock with exact archive digests; it never relabels official RN
+BFA.5 bytes. Runtime metadata is checked before key access. Authenticated Git
+restoration and host tests alone do not establish funded production readiness.
+Any local artifact-directory override qualifies only that machine; a portable
+SDK install also requires the exact pinned archives to be published and
+reachable. Product activation remains gated independently of distribution.
 
 Historical published baseline: public SDK beta.2 commit
 `992b86ee528d0811bd17cedca901de08561c1982` added typed public-contract import,

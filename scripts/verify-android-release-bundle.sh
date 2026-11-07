@@ -84,7 +84,7 @@ aster_run_inspector \
   "${bundle_path}" \
   base/lib \
   aab \
-  arm64-v8a,armeabi-v7a,x86_64
+  arm64-v8a,x86_64
 
 signature_output="$(
   aster_capture_inspector \

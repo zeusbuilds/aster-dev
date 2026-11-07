@@ -188,6 +188,171 @@ void main() {
       expect(h.runtime.snapshot.phase, WalletRuntimePhase.active);
     });
 
+    test(
+      'returned Committing inspects once and presents exact accepted success',
+      () async {
+        final h = await _Harness.create();
+        addTearDown(h.dispose);
+        h.engine
+          ..commitPaymentOperationResult = WalletPaymentRecoveryStatus(
+            phase: WalletPaymentRecoveryPhase.committing,
+            endAuthorized: true,
+            referenceId: _txid,
+          )
+          ..inspectPaymentOperationResult = WalletPaymentRecoveryStatus(
+            phase: WalletPaymentRecoveryPhase.accepted,
+            endAuthorized: true,
+            referenceId: _txid,
+          );
+        final result = await h.send() as AppSuccess<WalletSendResult>;
+        expect(result.value.referenceId, _txid);
+        expect(h.runtime.hasPaymentSubmissionFence, isFalse);
+        expect(
+          h.engine.calls.where((c) => c == 'preparePaymentOperation'),
+          hasLength(1),
+        );
+        expect(
+          h.engine.calls.where((c) => c == 'commitPaymentOperation'),
+          hasLength(1),
+        );
+        expect(
+          h.engine.calls.where((c) => c == 'inspectPaymentOperation'),
+          hasLength(1),
+        );
+        expect(h.engine.calls, isNot(contains('cancelPaymentOperation')));
+        expect(h.engine.legacySendPaymentCalls, 0);
+        expect(h.paymentOperations.commitAttemptCount, 1);
+        final record =
+            (await h.repository.paymentSubmissionStatus()
+                    as AppSuccess<WalletPaymentSubmission?>)
+                .value!;
+        expect(record.phase, WalletPaymentSubmissionPhase.accepted);
+        expect(record.result!.referenceId, _txid);
+      },
+    );
+
+    test(
+      'returned Committing accepts only an authoritative permanent rejection',
+      () async {
+        final h = await _Harness.create();
+        addTearDown(h.dispose);
+        h.engine
+          ..commitPaymentOperationResult = WalletPaymentRecoveryStatus(
+            phase: WalletPaymentRecoveryPhase.committing,
+            endAuthorized: true,
+            referenceId: _txid,
+          )
+          ..inspectPaymentOperationResult = const WalletPaymentRecoveryStatus(
+            phase: WalletPaymentRecoveryPhase.rejected,
+            endAuthorized: false,
+            failureCode: 'insufficient_bitcoins',
+          );
+        final result = await h.send() as AppFailureResult<WalletSendResult>;
+        expect(result.failure.code, 'payment_not_dispatched');
+        expect(result.failure.outcomeUnknown, isFalse);
+        expect(h.runtime.hasPaymentSubmissionFence, isFalse);
+        final record =
+            (await h.repository.paymentSubmissionStatus()
+                    as AppSuccess<WalletPaymentSubmission?>)
+                .value!;
+        expect(record.phase, WalletPaymentSubmissionPhase.rejected);
+        expect(
+          h.engine.calls.where((c) => c == 'preparePaymentOperation'),
+          hasLength(1),
+        );
+        expect(
+          h.engine.calls.where((c) => c == 'commitPaymentOperation'),
+          hasLength(1),
+        );
+        expect(
+          h.engine.calls.where((c) => c == 'inspectPaymentOperation'),
+          hasLength(1),
+        );
+        expect(h.engine.calls, isNot(contains('cancelPaymentOperation')));
+      },
+    );
+
+    test('returned Committing preserves its original unknown fence for inconclusive reads', () async {
+      for (final phase in [
+        WalletPaymentRecoveryPhase.absent,
+        WalletPaymentRecoveryPhase.preparing,
+        WalletPaymentRecoveryPhase.prepared,
+        WalletPaymentRecoveryPhase.committing,
+        WalletPaymentRecoveryPhase.rejected,
+      ]) {
+        final h = await _Harness.create();
+        addTearDown(h.dispose);
+        h.engine
+          ..commitPaymentOperationResult = WalletPaymentRecoveryStatus(
+            phase: WalletPaymentRecoveryPhase.committing,
+            endAuthorized: true,
+            referenceId: _txid,
+          )
+          ..inspectPaymentOperationResult = WalletPaymentRecoveryStatus(
+            phase: phase,
+            endAuthorized:
+                phase == WalletPaymentRecoveryPhase.committing ||
+                phase == WalletPaymentRecoveryPhase.rejected,
+            referenceId: _txid,
+          );
+        _expectPending(await h.send());
+        final record =
+            (await h.repository.paymentSubmissionStatus()
+                    as AppSuccess<WalletPaymentSubmission?>)
+                .value!;
+        expect(record.outcome, WalletPaymentSubmissionOutcome.unknown);
+        expect(record.commitAttempted, isTrue);
+        expect(h.runtime.hasPaymentSubmissionFence, isTrue);
+        expect(
+          h.engine.calls.where((c) => c == 'preparePaymentOperation'),
+          hasLength(1),
+        );
+        expect(
+          h.engine.calls.where((c) => c == 'commitPaymentOperation'),
+          hasLength(1),
+        );
+        expect(
+          h.engine.calls.where((c) => c == 'inspectPaymentOperation'),
+          hasLength(1),
+        );
+        expect(h.engine.calls, isNot(contains('cancelPaymentOperation')));
+      }
+    });
+
+    test('returned Committing read failure never repeats Commit or clears its fence', () async {
+      final h = await _Harness.create();
+      addTearDown(h.dispose);
+      h.engine
+        ..commitPaymentOperationResult = WalletPaymentRecoveryStatus(
+          phase: WalletPaymentRecoveryPhase.committing,
+          endAuthorized: true,
+          referenceId: _txid,
+        )
+        ..inspectPaymentOperationError = StateError('Observation unavailable');
+      _expectPending(await h.send());
+      final record =
+          (await h.repository.paymentSubmissionStatus()
+                  as AppSuccess<WalletPaymentSubmission?>)
+              .value!;
+      expect(record.outcome, WalletPaymentSubmissionOutcome.unknown);
+      expect(record.commitAttempted, isTrue);
+      expect(h.runtime.hasPaymentSubmissionFence, isTrue);
+      expect(
+        h.engine.calls.where((c) => c == 'preparePaymentOperation'),
+        hasLength(1),
+      );
+      expect(
+        h.engine.calls.where((c) => c == 'commitPaymentOperation'),
+        hasLength(1),
+      );
+      expect(
+        h.engine.calls.where((c) => c == 'inspectPaymentOperation'),
+        hasLength(1),
+      );
+      expect(h.engine.calls, isNot(contains('cancelPaymentOperation')));
+      expect(h.paymentOperations.commitAttemptCount, 1);
+    });
+
     test('exact accepted outcome survives required receipt failure without hiding its mutation fence', () async {
       for (final committed in [false, true]) {
         final h = await _Harness.create();

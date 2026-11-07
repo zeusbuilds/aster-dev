@@ -17,6 +17,9 @@ void main() {
         backend: WalletBackend.rgbL1,
         ethRpcUrl: rpc,
         ethChainId: chain,
+        bfaMintLockPolicy: rpc == null
+            ? null
+            : const BfaMintLockPolicy(minimumBlocks: 2, maximumBlocks: 7200),
         lspBaseUrl: lsp,
         vssUrl: vss,
       );

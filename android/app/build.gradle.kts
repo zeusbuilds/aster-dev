@@ -7,6 +7,33 @@ plugins {
 
 val asterApplicationId = providers.gradleProperty("aster.applicationId").get()
 
+// Both shipped wallet engines and Flutter must support every advertised ABI.
+// Flutter's default target list includes 32-bit ARM; only the complete 64-bit
+// intersection is distributable. A single-target build must exclude the other
+// 64-bit transitive JNI libraries as well as all 32-bit libraries.
+fun selectAsterNativeAbis(targetPlatforms: String): Set<String> {
+    val platformAbis = mapOf(
+        "android-arm" to "armeabi-v7a",
+        "android-arm64" to "arm64-v8a",
+        "android-x64" to "x86_64",
+    )
+    val platforms = targetPlatforms.split(",")
+    require(platforms.all { it in platformAbis }) {
+        "Aster received an unsupported Flutter target-platform."
+    }
+    val selected = platforms.map { platformAbis.getValue(it) }
+        .filter { it in setOf("arm64-v8a", "x86_64") }.toSet()
+    require(selected.isNotEmpty()) {
+        "Aster requires android-arm64 or android-x64; RGB_L1 has no 32-bit runtime."
+    }
+    return selected
+}
+
+val asterSelectedNativeAbis = selectAsterNativeAbis(
+    providers.gradleProperty("target-platform").orElse("android-arm64,android-x64").get(),
+)
+val asterExcludedNativeAbis = setOf("armeabi-v7a", "x86", "arm64-v8a", "x86_64") - asterSelectedNativeAbis
+
 android {
     // Final package identity is release-owned and remains blocked by DEC-006.
     namespace = asterApplicationId
@@ -26,6 +53,13 @@ android {
         targetSdk = 37
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        ndk {
+            abiFilters.addAll(asterSelectedNativeAbis)
+        }
+    }
+
+    packaging {
+        jniLibs.excludes.addAll(asterExcludedNativeAbis.map { "**/$it/**" })
     }
 
     buildTypes {

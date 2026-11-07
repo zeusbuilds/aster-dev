@@ -21,6 +21,8 @@ import 'wallet_deletion_safety_engine.dart';
 import 'wallet_engine.dart';
 import 'wallet_payment_recovery_engine.dart';
 
+part 'rgb_lib_wallet_engine.dart';
+
 /// Resolves explicit deployment overrides and immutable-SDK endpoint defaults.
 ///
 /// Composition must use the returned object for both runtime creation and
@@ -42,7 +44,9 @@ abstract final class RgbWalletServiceConfigurationResolver {
     // The RLN `utexo` carrier is a native enum alias, not proof of chain
     // deployment. Its legacy defaults point at Dev and must never select the
     // services for a public Bitcoin Signet wallet.
-    final defaults = configured.environment == BlockchainEnvironment.signet
+    final defaults = configured.backend == WalletBackend.rgbL1
+        ? getRgbLibNetworkDefaults(configured.sdkNetwork)
+        : configured.environment == BlockchainEnvironment.signet
         ? const NetworkEndpoints(
             indexerUrl: 'https://mempool.space/signet/api',
             proxyEndpoint: 'rpcs://proxy.iriswallet.com/0.2/json-rpc',
@@ -63,12 +67,16 @@ abstract final class RgbWalletServiceConfigurationResolver {
       ldkPeerListeningPort: configured.ldkPeerListeningPort,
       indexerUrl: indexerUrl,
       rgbTransportProxy: rgbTransportProxy,
-      lspBaseUrl:
-          configured.lspBaseUrl ??
-          (configured.sdkNetwork == 'utexo' ? _utexoSignetLspBaseUrl : null),
+      lspBaseUrl: configured.backend == WalletBackend.rgbL1
+          ? null
+          : configured.lspBaseUrl ??
+                (configured.sdkNetwork == 'utexo'
+                    ? _utexoSignetLspBaseUrl
+                    : null),
       vssUrl: configured.vssUrl,
       ethRpcUrl: configured.ethRpcUrl,
       ethChainId: configured.ethChainId,
+      bfaMintLockPolicy: configured.bfaMintLockPolicy,
       explorerBaseUrl: configured.explorerBaseUrl,
       usdtAsset: configured.usdtAsset,
     );
@@ -79,9 +87,10 @@ abstract final class RgbWalletServiceConfigurationResolver {
   }
 
   static void _requireQualifiedBackend(WalletBackend backend) {
-    if (backend == WalletBackend.rgbL1) {
-      // This backend cannot use RLN's prepare/commit/status/cancel journal.
-      // Reject before provisioning or resolving RLN fallback endpoints.
+    if (!backend.activationAllowed) {
+      // The BFA.7 adapter has its own durable native contract. Keep activation
+      // closed until matching mobile artifacts and recovery/backup acceptance
+      // are qualified; never fall back to the RLN engine or its wallet store.
       throw const AppFailureException(
         AppFailure(
           code: 'wallet_backend_unqualified',
@@ -135,6 +144,16 @@ final class RgbWalletEngineFactory implements WalletEngineFactory {
     );
     if (services.indexerUrl == null || services.rgbTransportProxy == null) {
       throw const AppConfigurationException();
+    }
+    if (services.backend == WalletBackend.rgbL1) {
+      return RgbLibWalletEngine(
+        services,
+        storageDirectory: configuration.storageDirectory,
+        clock: utcClock,
+        bitcoinAddresses: _bitcoinAddresses,
+        localNetworkAccess: _localNetworkAccess,
+        evmChainValidator: _evmChainValidator,
+      );
     }
     final wallet = _sdk.wallet(
       config: UtexoWalletConfig(

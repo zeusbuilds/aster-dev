@@ -3,7 +3,13 @@ import 'package:flutter/foundation.dart';
 import '../../../../core/errors/app_failure.dart';
 
 /// Provenance of the selected rate; local test policy is never a network quote.
-enum WalletFeeRateSource { networkEstimate, localRegtestPolicy }
+enum WalletFeeRateSource {
+  networkEstimate,
+  localRegtestPolicy,
+
+  /// A rate observed in an authenticated native record, never a live quote.
+  nativeRecovery,
+}
 
 /// Known pre-dispatch failures: refreshing a quote never submits a payment.
 const walletFeeReviewRequiredFailure = AppFailure(
@@ -37,8 +43,11 @@ final class WalletFeeRateEstimate {
     required this.observedAt,
     this.source = WalletFeeRateSource.networkEstimate,
   }) {
-    if (targetBlocks < minimumTargetBlocks ||
-        targetBlocks > maximumTargetBlocks) {
+    if (source == WalletFeeRateSource.nativeRecovery
+        ? targetBlocks != null
+        : (targetBlocks == null ||
+              targetBlocks! < minimumTargetBlocks ||
+              targetBlocks! > maximumTargetBlocks)) {
       throw ArgumentError.value(targetBlocks, 'targetBlocks');
     }
     if (satsPerVbyte <= 0 || satsPerVbyte > maximumSatsPerVbyte) {
@@ -61,12 +70,14 @@ final class WalletFeeRateEstimate {
   static const maximumSatsPerVbyte = 1000000;
   static const maximumAge = Duration(minutes: 2);
 
-  final int targetBlocks;
+  /// Unknown for a recovered native rate; never invent a quote target.
+  final int? targetBlocks;
   final int satsPerVbyte;
   final DateTime observedAt;
   final WalletFeeRateSource source;
 
   bool isStaleAt(DateTime now) {
+    if (source == WalletFeeRateSource.nativeRecovery) return true;
     final age = now.toUtc().difference(observedAt);
     return age.isNegative || age > maximumAge;
   }

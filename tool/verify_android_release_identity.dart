@@ -111,9 +111,9 @@ AndroidReleaseIdentity parseAapt2Badging(String output) {
       .map((match) => match.group(1)!)
       .toList();
   if (packagedAbis.length != 1 ||
-      !_flutterSplitAbiVersions.containsKey(packagedAbis.single)) {
+      !_asterReleaseAbis.contains(packagedAbis.single)) {
     throw const FormatException(
-      'Release APK must contain exactly one supported Flutter ABI.',
+      'Release APK must contain exactly one supported Aster ABI.',
     );
   }
   return _identityFromValues(
@@ -171,8 +171,8 @@ List<String> compareAndroidReleaseIdentity({
   final splitPrefix = actual.splitAbi == null
       ? 0
       : _flutterSplitAbiVersions[actual.splitAbi];
-  if (actual.splitAbi != null && splitPrefix == null) {
-    failures.add('split ABI ${actual.splitAbi} is not supported by Flutter');
+  if (actual.splitAbi != null && !_asterReleaseAbis.contains(actual.splitAbi)) {
+    failures.add('split ABI ${actual.splitAbi} is not supported by Aster');
   }
   final expectedVersionCode = splitPrefix == null
       ? expected.versionCode
@@ -376,8 +376,12 @@ bool _sameSet(Set<String> left, Set<String> right) =>
 
 // Mirrors Flutter 3.47.7 FlutterPluginConstants.ABI_VERSION. The toolchain
 // gate pins Flutter; artifact tests fail if a later approved SDK changes it.
+// This upstream version map does not admit its 32-bit ABI into Aster delivery.
 const _flutterSplitAbiVersions = <String, int>{
   'armeabi-v7a': 1,
   'arm64-v8a': 2,
   'x86_64': 4,
 };
+
+// Both wallet engines and Flutter have complete runtimes only for these ABIs.
+const _asterReleaseAbis = <String>{'arm64-v8a', 'x86_64'};

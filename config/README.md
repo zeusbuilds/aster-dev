@@ -59,9 +59,30 @@ accepts only an App Store Connect method. Manual signing must name the app's
 single provisioning profile; automatic signing must not carry a manual profile
 map, and new plist keys require a source-policy review.
 
+The RGB_L1 adapter also requires the issuer-approved public genesis and exact
+native metadata before it admits USDT. Supply all four fields together:
+`ASTER_USDT_CONTRACT_BASE64` (canonical standard Base64),
+`ASTER_USDT_CONTRACT_SHA256` (lowercase SHA-256 of the decoded bytes),
+`ASTER_USDT_NATIVE_NAME` and `ASTER_USDT_NATIVE_TICKER`. These are public
+contract data, never a seed or backup. Runtime and release tooling share the
+bounded canonical-encoding/digest checks. The adapter then imports with the
+expected asset ID and verifies BFA schema, native name, ticker and precision
+before it connects or generates the first asset-bound witness invoice.
+A checksum confirms reviewed bytes; issuer approval and native validation
+remain separate requirements. Missing current Dev bytes must not be filled
+with the historical BFA.5 export. RGB_L1 and Dev gates remain closed.
+
 `ASTER_USDT_PRECISION` is the asset's canonical decimal precision from `0`
 through `18`. Negative, signed, padded, or out-of-range values fail before any
 release build starts.
+
+BFA.7 also requires deployment-approved external-chain mint-lock bounds for each EVM
+service: `ASTER_BFA_MIN_MINT_LOCK_BLOCKS` and
+`ASTER_BFA_MAX_MINT_LOCK_BLOCKS`. Supply both canonical decimal counts of backing EVM blocks,
+with `2 <= minimum <= maximum`. There is no default. Aster forwards the explicit
+range together with the RPC and expected chain ID to the RGB_L1 native runtime.
+The previous Iris candidate's test bounds do not approve the current Dev policy;
+the issuer/bridge team must confirm it. RLN rejects these unused RGB_L1 fields.
 
 `ASTER_ETH_RPC_URL` is required, credential-free HTTPS configuration for native
 BFA validation. `ASTER_ETH_CHAIN_ID` is the deployment-approved EVM backing

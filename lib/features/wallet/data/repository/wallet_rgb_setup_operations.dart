@@ -132,6 +132,7 @@ final class WalletRgbSetupOperations {
       network: profile.environment,
       runtimeFingerprint: inventory.runtimeFingerprint,
       nodePublicKey: inventory.nodePublicKey,
+      identityKind: inventory.identityKind,
       feeRateSatPerVbyte: rate.satsPerVbyte,
       feeSource: rate.source,
       expiresAt: clock().toUtc().add(RgbWalletSetupReview.lifetime),
@@ -438,7 +439,8 @@ final class WalletRgbSetupOperations {
     RgbWalletSetupInventory inventory,
   ) {
     if (journal.review.runtimeFingerprint != inventory.runtimeFingerprint ||
-        journal.review.nodePublicKey != inventory.nodePublicKey) {
+        journal.review.nodePublicKey != inventory.nodePublicKey ||
+        journal.review.identityKind != inventory.identityKind) {
       throw const StoredDataCorruptionException();
     }
   }

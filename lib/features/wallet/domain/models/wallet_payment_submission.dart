@@ -41,12 +41,18 @@ final class WalletPaymentSubmission {
     this.acknowledgementUncertain = false,
     this.commitAttempted = true,
     this.journalVersion = 3,
+    this.nativeDiscovered = false,
   });
 
   final String id;
   final String walletId;
   final WalletSendCommand command;
+
+  /// Local intent time, or discovery time when [nativeDiscovered] is true.
+  /// Discovery time must not be presented as the original payment time.
   final DateTime submittedAt;
+
+  DateTime? get paymentSubmittedAt => nativeDiscovered ? null : submittedAt;
   final WalletPaymentSubmissionPhase phase;
   final WalletSendResult? result;
 
@@ -62,6 +68,11 @@ final class WalletPaymentSubmission {
 
   /// Preserve immutable receipt bytes written by an older journal schema.
   final int journalVersion;
+
+  /// Reconstructed from authenticated native inventory after app marker loss.
+  /// Its destination may be a native RGB recipient reference, not the original
+  /// invoice text. This record never authorizes Commit, even on explicit Resume.
+  final bool nativeDiscovered;
 
   WalletPaymentSubmissionOutcome get outcome => switch (phase) {
     WalletPaymentSubmissionPhase.accepted =>
@@ -111,6 +122,7 @@ final class WalletPaymentSubmission {
         acknowledgementUncertain: true,
         commitAttempted: commitAttempted,
         journalVersion: journalVersion,
+        nativeDiscovered: nativeDiscovered,
       );
 
   @override
@@ -125,7 +137,8 @@ final class WalletPaymentSubmission {
       other.recoveryRequest == recoveryRequest &&
       other.acknowledgementUncertain == acknowledgementUncertain &&
       other.commitAttempted == commitAttempted &&
-      other.journalVersion == journalVersion;
+      other.journalVersion == journalVersion &&
+      other.nativeDiscovered == nativeDiscovered;
 
   @override
   int get hashCode => Object.hash(
@@ -139,6 +152,7 @@ final class WalletPaymentSubmission {
     acknowledgementUncertain,
     commitAttempted,
     journalVersion,
+    nativeDiscovered,
   );
 
   @override

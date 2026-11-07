@@ -2,7 +2,9 @@ import 'package:flutter/foundation.dart';
 
 import '../errors/app_failure.dart';
 import '../validation/validation.dart';
+import 'bfa_mint_lock_policy.dart';
 import 'host_address_policy.dart';
+import 'rgb_contract_configuration.dart';
 import 'signet_deployment.dart';
 
 /// Bitcoin chain environment, independent from asset and payment rail.
@@ -34,14 +36,23 @@ enum WalletBackend {
 
   final String wireName;
 
+  /// Product activation gate; this does not certify release readiness.
+  /// RGB_L1 stays closed until native/mobile recovery qualification is complete.
+  bool get activationAllowed => this == WalletBackend.rln;
+
   static WalletBackend parse(String value) => switch (value) {
     'rln' => WalletBackend.rln,
     'rgb-l1' => WalletBackend.rgbL1,
     _ => throw const AppConfigurationException(),
   };
 
-  String sdkNetwork(BlockchainEnvironment environment) =>
-      this == WalletBackend.rln && environment == BlockchainEnvironment.signet
+  String sdkNetwork(
+    BlockchainEnvironment environment, {
+    SignetDeployment signetDeployment = SignetDeployment.publicBitcoin,
+  }) =>
+      environment == BlockchainEnvironment.signet &&
+          (this == WalletBackend.rln ||
+              signetDeployment == SignetDeployment.utexoDev)
       ? 'utexo'
       : environment.name;
 }
@@ -56,6 +67,7 @@ final class RgbAssetConfiguration {
     required this.contractId,
     required this.precision,
     this.requiresEvmValidation = true,
+    this.canonicalContract,
   });
 
   final String contractId;
@@ -69,15 +81,24 @@ final class RgbAssetConfiguration {
   /// fixture may opt out; a ticker or precision cannot establish its schema.
   final bool requiresEvmValidation;
 
+  /// Approved genesis definition; required by the RGB_L1 adapter before use.
+  final RgbContractConfiguration? canonicalContract;
+
   @override
   bool operator ==(Object other) =>
       other is RgbAssetConfiguration &&
       other.contractId == contractId &&
       other.precision == precision &&
-      other.requiresEvmValidation == requiresEvmValidation;
+      other.requiresEvmValidation == requiresEvmValidation &&
+      other.canonicalContract == canonicalContract;
 
   @override
-  int get hashCode => Object.hash(contractId, precision, requiresEvmValidation);
+  int get hashCode => Object.hash(
+    contractId,
+    precision,
+    requiresEvmValidation,
+    canonicalContract,
+  );
 
   void validate() {
     if (!ProtocolTextPolicy.isVisibleAscii(
@@ -89,6 +110,7 @@ final class RgbAssetConfiguration {
     if (precision < 0 || precision > 18) {
       throw const AppConfigurationException();
     }
+    canonicalContract?.validate();
   }
 }
 
@@ -106,6 +128,7 @@ final class WalletServiceConfiguration {
     this.vssUrl,
     this.ethRpcUrl,
     this.ethChainId,
+    this.bfaMintLockPolicy,
     this.explorerBaseUrl,
     this.usdtAsset,
     this.daemonListeningPort = 9735,
@@ -144,7 +167,10 @@ final class WalletServiceConfiguration {
     }
     return WalletServiceConfiguration(
       environment: environment,
-      sdkNetwork: backend.sdkNetwork(environment),
+      sdkNetwork: backend.sdkNetwork(
+        environment,
+        signetDeployment: signetDeployment,
+      ),
       backend: backend,
       signetDeployment: signetDeployment,
       daemonListeningPort: _listenerPort(
@@ -162,6 +188,7 @@ final class WalletServiceConfiguration {
       vssUrl: _optionalEnvironment('ASTER_VSS_URL'),
       ethRpcUrl: _optionalEnvironment('ASTER_ETH_RPC_URL'),
       ethChainId: _optionalEnvironment('ASTER_ETH_CHAIN_ID'),
+      bfaMintLockPolicy: _mintLockEnvironment(),
       explorerBaseUrl:
           _optionalEnvironment('ASTER_EXPLORER_URL') ??
           switch (environment) {
@@ -175,6 +202,14 @@ final class WalletServiceConfiguration {
           'ASTER_USDT_PRECISION',
           defaultValue: -1,
         ),
+        contractBase64: const String.fromEnvironment(
+          'ASTER_USDT_CONTRACT_BASE64',
+        ),
+        contractSha256: const String.fromEnvironment(
+          'ASTER_USDT_CONTRACT_SHA256',
+        ),
+        nativeName: const String.fromEnvironment('ASTER_USDT_NATIVE_NAME'),
+        nativeTicker: const String.fromEnvironment('ASTER_USDT_NATIVE_TICKER'),
       ),
     );
   }
@@ -212,6 +247,9 @@ final class WalletServiceConfiguration {
   /// Bitcoin's network name does not identify the BFA backing chain. No chain
   /// is inferred from mainnet, an RPC URL, or an asset's display ticker.
   final String? ethChainId;
+
+  /// Required explicit BFA.7 mint validation bounds for an RGB_L1 EVM service.
+  final BfaMintLockPolicy? bfaMintLockPolicy;
   final String? explorerBaseUrl;
 
   /// RGB USDT identity for this exact blockchain environment.
@@ -235,6 +273,7 @@ final class WalletServiceConfiguration {
       other.vssUrl == vssUrl &&
       other.ethRpcUrl == ethRpcUrl &&
       other.ethChainId == ethChainId &&
+      other.bfaMintLockPolicy == bfaMintLockPolicy &&
       other.explorerBaseUrl == explorerBaseUrl &&
       other.usdtAsset == usdtAsset;
 
@@ -252,6 +291,7 @@ final class WalletServiceConfiguration {
     vssUrl,
     ethRpcUrl,
     ethChainId,
+    bfaMintLockPolicy,
     explorerBaseUrl,
     usdtAsset,
   );
@@ -298,7 +338,10 @@ final class WalletServiceConfiguration {
     }
     final permitsInsecureDevelopmentEndpoints =
         !kReleaseMode && allowInsecureDevelopmentEndpoints;
-    final expectedSdkNetwork = backend.sdkNetwork(environment);
+    final expectedSdkNetwork = backend.sdkNetwork(
+      environment,
+      signetDeployment: signetDeployment,
+    );
     if (sdkNetwork != expectedSdkNetwork ||
         daemonListeningPort < 1 ||
         daemonListeningPort > 65535 ||
@@ -344,7 +387,28 @@ final class WalletServiceConfiguration {
       permitsInsecureDevelopmentEndpoints,
     );
     usdtAsset?.validate();
+    if (backend == WalletBackend.rgbL1 &&
+        usdtAsset != null &&
+        (usdtAsset!.canonicalContract == null ||
+            !usdtAsset!.requiresEvmValidation)) {
+      throw const AppConfigurationException();
+    }
     final expectedChain = ethChainId;
+    final mintPolicy = bfaMintLockPolicy;
+    try {
+      mintPolicy?.validate();
+    } on FormatException {
+      throw const AppConfigurationException();
+    }
+    if ((mintPolicy != null &&
+            (backend != WalletBackend.rgbL1 ||
+                ethRpcUrl == null ||
+                expectedChain == null)) ||
+        (backend == WalletBackend.rgbL1 &&
+            ethRpcUrl != null &&
+            mintPolicy == null)) {
+      throw const AppConfigurationException();
+    }
     if (expectedChain != null &&
         (!isCanonicalEvmChainId(expectedChain) || ethRpcUrl == null)) {
       throw const AppConfigurationException();
@@ -490,6 +554,17 @@ String? _optionalEnvironment(String name) {
 
 final _transactionId = RegExp(r'^[0-9a-fA-F]{64}$');
 
+BfaMintLockPolicy? _mintLockEnvironment() {
+  try {
+    return BfaMintLockPolicy.parse(
+      const String.fromEnvironment('ASTER_BFA_MIN_MINT_LOCK_BLOCKS'),
+      const String.fromEnvironment('ASTER_BFA_MAX_MINT_LOCK_BLOCKS'),
+    );
+  } on FormatException {
+    throw const AppConfigurationException();
+  }
+}
+
 /// EIP-155 chain identities are positive integers with at most 256 bits.
 bool isCanonicalEvmChainId(String value) {
   if (value.length > 78 || !RegExp(r'^[1-9][0-9]*$').hasMatch(value)) {
@@ -502,16 +577,38 @@ bool isCanonicalEvmChainId(String value) {
 RgbAssetConfiguration? _rgbAssetEnvironment({
   required String contractId,
   required int precision,
+  required String contractBase64,
+  required String contractSha256,
+  required String nativeName,
+  required String nativeTicker,
 }) {
   final hasContractId = contractId.isNotEmpty;
   final hasPrecision = precision >= 0;
-  if (!hasContractId && !hasPrecision) return null;
+  final contractFields = [
+    contractBase64,
+    contractSha256,
+    nativeName,
+    nativeTicker,
+  ];
+  final hasContract = contractFields.any((value) => value.isNotEmpty);
+  if (!hasContractId && !hasPrecision && !hasContract) return null;
   if (!hasContractId || !hasPrecision) {
+    throw const AppConfigurationException();
+  }
+  if (hasContract && contractFields.any((value) => value.isEmpty)) {
     throw const AppConfigurationException();
   }
   return RgbAssetConfiguration(
     contractId: contractId,
     precision: precision,
     requiresEvmValidation: true,
+    canonicalContract: hasContract
+        ? RgbContractConfiguration(
+            contractBase64: contractBase64,
+            sha256Digest: contractSha256,
+            nativeName: nativeName,
+            nativeTicker: nativeTicker,
+          )
+        : null,
   );
 }

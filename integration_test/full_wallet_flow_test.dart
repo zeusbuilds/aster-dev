@@ -147,7 +147,7 @@ void main() {
               await repository.networkStatus(),
               'transfer_reconcile_identity',
             );
-            byPublicKey[identity.nodePublicKey] = id;
+            byPublicKey[identity.publicIdentity] = id;
           }
         } finally {
           if (activeId != null) {
@@ -228,7 +228,7 @@ void main() {
         if (registry.profiles.length != 1 ||
             registry.readyProfiles.length != 1 ||
             registry.activeProfile == null ||
-            network.nodePublicKey != expected['node_public_key']) {
+            network.publicIdentity != expected['node_public_key']) {
           throw const FullWalletQaFailure(
             'qa_reconcile_original_wallet_changed',
           );
@@ -435,7 +435,7 @@ void main() {
           await repository.networkStatus(),
           'reopen_identity',
         );
-        if (reopened.nodePublicKey != identity.nodePublicKey) {
+        if (reopened.publicIdentity != identity.publicIdentity) {
           throw const FullWalletQaFailure('qa_reopen_identity_changed');
         }
         await control.event('lifecycle_cycle_passed', {'cycle': cycle});
@@ -463,7 +463,7 @@ void main() {
         'persisted_identity',
       );
       if (persisted.activeWalletId != active.id ||
-          persistedIdentity.nodePublicKey != identity.nodePublicKey) {
+          persistedIdentity.publicIdentity != identity.publicIdentity) {
         throw const FullWalletQaFailure('qa_persisted_identity_changed');
       }
       await tester.pumpWidget(
@@ -647,7 +647,7 @@ Future<Map<String, Object?>> _publicSnapshot(
   final portfolio = requireQaSuccess(await repository.portfolio(), 'portfolio');
   final network = requireQaSuccess(await repository.networkStatus(), 'network');
   return {
-    'node_public_key': network.nodePublicKey,
+    'node_public_key': network.publicIdentity,
     'block_height': network.blockHeight,
     'btc_settled_sats': portfolio.bitcoin.onchainSettled.units,
     'btc_spendable_sats': portfolio.bitcoin.onchainSpendable.units,

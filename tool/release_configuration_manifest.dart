@@ -1,6 +1,8 @@
 import 'dart:collection';
 import 'dart:convert';
 
+import 'package:aster/core/config/bfa_mint_lock_policy.dart';
+import 'package:aster/core/config/rgb_contract_policy.dart';
 import 'package:aster/core/config/signet_deployment.dart';
 
 /// Maximum accepted byte length of one release-configuration manifest.
@@ -37,9 +39,15 @@ abstract final class ReleaseConfigurationKey {
   static const vssUrl = 'ASTER_VSS_URL';
   static const ethRpcUrl = 'ASTER_ETH_RPC_URL';
   static const ethChainId = 'ASTER_ETH_CHAIN_ID';
+  static const bfaMinMintLockBlocks = 'ASTER_BFA_MIN_MINT_LOCK_BLOCKS';
+  static const bfaMaxMintLockBlocks = 'ASTER_BFA_MAX_MINT_LOCK_BLOCKS';
   static const explorerUrl = 'ASTER_EXPLORER_URL';
   static const usdtAssetId = 'ASTER_USDT_ASSET_ID';
   static const usdtPrecision = 'ASTER_USDT_PRECISION';
+  static const usdtContractBase64 = 'ASTER_USDT_CONTRACT_BASE64';
+  static const usdtContractSha256 = 'ASTER_USDT_CONTRACT_SHA256';
+  static const usdtNativeName = 'ASTER_USDT_NATIVE_NAME';
+  static const usdtNativeTicker = 'ASTER_USDT_NATIVE_TICKER';
   static const marketApiBaseUrl = 'ASTER_MARKET_API_BASE_URL';
   static const supportUrl = 'ASTER_SUPPORT_URL';
   static const termsUrl = 'ASTER_TERMS_URL';
@@ -49,6 +57,8 @@ abstract final class ReleaseConfigurationKey {
   static const instagramUrl = 'ASTER_INSTAGRAM_URL';
 
   static const all = <String>{
+    bfaMinMintLockBlocks,
+    bfaMaxMintLockBlocks,
     daemonPort,
     ethChainId,
     ethRpcUrl,
@@ -68,6 +78,10 @@ abstract final class ReleaseConfigurationKey {
     twitterUrl,
     usdtAssetId,
     usdtPrecision,
+    usdtContractBase64,
+    usdtContractSha256,
+    usdtNativeName,
+    usdtNativeTicker,
     vssUrl,
     walletBackend,
   };
@@ -134,7 +148,17 @@ final class ReleaseConfigurationManifest {
       if (value.isEmpty || value != value.trim()) {
         throw FormatException('$key must be a non-empty trimmed string.');
       }
-      if (!_isVisibleAscii(value, maximumCharacters: 2048)) {
+      final supportedText = key == ReleaseConfigurationKey.usdtNativeName
+          ? value.length <= 256 &&
+                value.codeUnits.every((unit) => unit >= 0x20 && unit <= 0x7e)
+          : _isVisibleAscii(
+              value,
+              maximumCharacters:
+                  key == ReleaseConfigurationKey.usdtContractBase64
+                  ? RgbContractPolicy.maximumEncodedCharacters
+                  : 2048,
+            );
+      if (!supportedText) {
         throw FormatException('$key contains unsupported characters.');
       }
       if (_looksLikePlaceholder(value)) {
@@ -163,6 +187,40 @@ final class ReleaseConfigurationManifest {
       throw const FormatException(
         'UTEXO Dev Signet is unqualified; its endpoints and assets '
         'cannot be used by a public Signet or RLN build.',
+      );
+    }
+
+    const contractKeys = {
+      ReleaseConfigurationKey.usdtContractBase64,
+      ReleaseConfigurationKey.usdtContractSha256,
+      ReleaseConfigurationKey.usdtNativeName,
+      ReleaseConfigurationKey.usdtNativeTicker,
+    };
+    final configuredContractKeys = contractKeys.intersection(
+      values.keys.toSet(),
+    );
+    if (configuredContractKeys.isNotEmpty) {
+      if (configuredContractKeys.length != contractKeys.length) {
+        throw const FormatException(
+          'Approved RGB contract fields must be supplied together.',
+        );
+      }
+      RgbContractPolicy.validate(
+        contractBase64: values[ReleaseConfigurationKey.usdtContractBase64]!,
+        sha256Digest: values[ReleaseConfigurationKey.usdtContractSha256]!,
+        nativeName: values[ReleaseConfigurationKey.usdtNativeName]!,
+        nativeTicker: values[ReleaseConfigurationKey.usdtNativeTicker]!,
+      );
+    }
+
+    final mintPolicy = BfaMintLockPolicy.parse(
+      values[ReleaseConfigurationKey.bfaMinMintLockBlocks] ?? '',
+      values[ReleaseConfigurationKey.bfaMaxMintLockBlocks] ?? '',
+    );
+    if (mintPolicy != null &&
+        (values[ReleaseConfigurationKey.walletBackend] ?? 'rln') != 'rgb-l1') {
+      throw const FormatException(
+        'BFA mint lock bounds require the RGB_L1 backend.',
       );
     }
 

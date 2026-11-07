@@ -145,12 +145,24 @@ void main() {
     expect(failures, contains(contains('version code')));
   });
 
+  test(
+    'rejects an unsupported 32-bit release even with a valid Flutter code',
+    () {
+      final failures = compareAndroidReleaseIdentity(
+        expected: expected,
+        actual: AndroidReleaseIdentity(
+          applicationId: expected.applicationId,
+          versionName: expected.versionName,
+          versionCode: 1047,
+          splitAbi: 'armeabi-v7a',
+        ),
+      );
+      expect(failures, contains(contains('not supported by Aster')));
+    },
+  );
+
   test('accepts Flutter split-ABI version-code encoding', () {
-    for (final entry in const {
-      'armeabi-v7a': 1047,
-      'arm64-v8a': 2047,
-      'x86_64': 4047,
-    }.entries) {
+    for (final entry in const {'arm64-v8a': 2047, 'x86_64': 4047}.entries) {
       final failures = compareAndroidReleaseIdentity(
         expected: expected,
         actual: AndroidReleaseIdentity(

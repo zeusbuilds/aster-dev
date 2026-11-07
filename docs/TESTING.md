@@ -135,7 +135,7 @@ resolution, so prior build-mode output cannot become candidate evidence.
 
 Every release package verifier also compares packaged application ID, version
 name, and version code with committed source. Split APK codes include Flutter's
-ABI prefix (`1xxx` armeabi-v7a, `2xxx` arm64-v8a, `4xxx` x86_64); the AAB uses
+ABI prefix (`2xxx` arm64-v8a and `4xxx` x86_64); the AAB uses
 the base code from `pubspec.yaml`. The executable toolchain policy verifies
 that mapping against the pinned Flutter Gradle plugin before accepting it.
 
@@ -157,12 +157,19 @@ A passing package gate therefore requires a power-of-two ELF alignment,
 congruent LOAD file/virtual addresses, 16 KiB alignment in both packaging and
 every 64-bit native dependency, plus GNU RELRO where dynamic relocations exist.
 Before ELF inspection, the native archive boundary proves the exact expected
-ABI set, requires `libapp.so`, `libflutter.so`, and
-`librgb_lightning_node.so` in every ABI, rejects unsafe or nested paths, and
+ABI set, requires `libapp.so`, `libflutter.so`, `librgb_lightning_node.so` and
+`librgblibuniffi.so` in every ABI, rejects unsafe or nested paths, and
 transactionally extracts only validated `.so` basenames beneath an owned empty
 directory. Additional plugin libraries are allowed only in that same exact
 `<native-root>/<abi>/<basename>.so` shape.
-The current pinned wallet SDK fails this gate at `librgb_lightning_node.so`;
+Aster advertises only the complete arm64-v8a/x86_64 integration. Gradle derives
+selected ABIs from Flutter's actual `target-platform`, intersects the supported
+64-bit set, and rejects unknown or 32-bit-only requests. A single-target build
+also excludes the other 64-bit transitive JNI directory, rather than relying on
+NDK filters alone. A bundle contains both complete ABIs; each direct-delivery
+split contains exactly its one declared ABI. Partial 32-bit or unselected ABI
+directories fail the archive gate even if contributed by a dependency.
+Historical evidence for the old SDK failed this gate at `librgb_lightning_node.so`;
 see `SDK-004`. After an immutable compatible SDK revision is approved, rerun
 both artifact gates and a real 16 KiB emulator or device smoke before
 qualification.

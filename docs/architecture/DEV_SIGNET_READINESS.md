@@ -22,8 +22,8 @@ against Dev merely because both profiles say `signet`.
 | BFA backing chain | Arbitrum One, chain `42161`, reference RPC `https://arb1.arbitrum.io/rpc` | Separate from the Bitcoin chain identity; require explicit RPC and expected chain ID. |
 | Deployed Dev generation | BFA.6, source `5010eefa355beb9c42a4c1b69883f7651241a111`, connector `0.1.0-207` | [DevOps 217](https://github.com/UTEXO-Protocol/devops/pull/217), [readiness correction 218](https://github.com/UTEXO-Protocol/devops/pull/218). |
 | Iris/WDK candidate generation | BFA.7, source `9ec49c08be2e68f08521281e3efbd760ec989cb9`, WDK `2.1.0-alpha.12` | BFA.7 retains BFA.6's schema. Its Bare addon cannot replace Flutter's UniFFI libraries. |
-| Flutter RGB_L1 generation | BFA.5, source `0a9d352f2690902df2b6fae9bca1a6c13c3354d4` | Incompatible with the newly issued Dev asset. Aster's RGB_L1 runtime and release gates remain closed. |
-| Mobile distribution | Android Maven still lists BFA.5; Swift published BFA.6 on November 6 | No qualified matching Android/iOS pair is wired into this SDK. Do not advance just one platform or relabel BFA.5 bytes. |
+| Flutter RGB_L1 candidate | BFA.7, source `9ec49c08be2e68f08521281e3efbd760ec989cb9`, separately versioned Flutter native overlay and UniFFI bridge 5 | Matching source implements standalone registration and durable recovery. Aster's RGB_L1 runtime and release gates remain closed pending exact-artifact and deployment qualification. |
+| Mobile distribution | The candidate builds its matching Android/iOS libraries from one sealed source/lock/overlay; original RN BFA.5 archive identities remain frozen | Platform and archive-specific evidence is required. An upstream Bare addon or one newer mobile archive cannot replace this pair. |
 | Current Dev asset | `rgb:A6k89KtR-e3oXqRP-uH3jUrz-LU_sYL3-hMZ0k3O-6u8DXbE`, Bridged USDT / BUSDT | Issuance reported in DevOps 217. Approved standalone contract bytes, digest and independently validated precision are missing. Not an admitted wallet asset. |
 | Historical asset | `rgb:fbkO6B_i-qyLXa6d-x3sAOaX-cx~vZB9-rxNSUle-9lXBTf8`, Bridged USDT / BUSDT, 6 decimals | Historical BFA.5 export SHA-256 `a678ebf73f3a0523b307cd2fe8019a321ac938eaf547c2c65a7ac079948332ce`; Iris marks it unadmitted. Never substitute it for the new asset. |
 | Latest referenced Dev E2E | [Run 42261217049](https://github.com/UTEXO-Protocol/bridge/actions/runs/42261217049) failed while waiting for the UI mint-confirmation button | This is not evidence of a native mint or chain-settlement defect, and does not qualify a wallet round trip. |
@@ -35,15 +35,19 @@ against Dev merely because both profiles say `signet`.
    precision, backing chain and contract metadata. A display ticker is never
    asset identity. Re-exporting an old schema cannot preserve an ID committed to
    a different schema.
-2. Supply matching, verified Android and iOS native bindings with standalone
-   genesis registration. Import must be idempotent and verify the expected ID
-   without crediting funds. The current Flutter RGB_L1 UniFFI API lacks this
-   operation; a Dart stub cannot implement it safely.
+2. Qualify the candidate's matching Android and iOS native bindings and
+   standalone genesis registration against the approved Dev export. Native
+   implementation and zero-balance/idempotent exact-ID tests are complete;
+   these do not authenticate an export that the issuer has not approved.
 3. Qualify Dev checkpoint enforcement through both native sync and RGB
    validation, guarded network access, and exact EVM chain binding. Availability
    checks alone do not establish deployment identity.
-4. Implement and qualify RGB_L1 durable send and backup recovery before lifting
-   Aster's gate. Bind a fresh wallet's immutable deployment identity to its
+4. Qualify the implemented RGB_L1 native outbox, exact payment identity,
+   restart/reconciliation and backup recovery before lifting Aster's gate.
+   Restored snapshots remain fenced: a coherent backup can predate a later
+   payment, and its absent journal cannot authorize spending or cancellation.
+   A freshness authority remains required for unrestricted restored-wallet
+   spending. Bind each fresh wallet's immutable deployment identity to its
    storage. Never reuse public Signet or legacy BFA.5 state for this test.
 5. Bootstrap the approved metadata before generating an asset-bound first
    witness invoice. Verify receive, balances, send, history and restart using
@@ -59,6 +63,9 @@ an activation prerequisite. Merely supplying
 `ASTER_USDT_ASSET_ID` cannot authorize Dev. Public Signet BTC-only testing can
 use `config/signet-public.debug.json` with a fresh wallet and no USDT definition.
 This is a Debug test configuration, not a release manifest. Hosted
-Dev USDT testing remains blocked by the requirements above. No stack reset,
-container creation, wallet migration or funded operation forms part of this
-readiness review. Lightning remains outside the release scope.
+Dev USDT testing remains blocked by the requirements above. See
+[the exact team request](DEV_USDT_TEAM_INPUTS.md) and
+[the gated adapter](RGB_L1_ADAPTER.md). The BFA.7 qualification work uses only
+the existing isolated fixture with separate test-wallet storage; it does not
+reset shared services or migrate existing wallets. Lightning remains outside
+the release scope.

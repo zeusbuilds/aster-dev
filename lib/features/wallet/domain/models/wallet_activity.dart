@@ -402,8 +402,10 @@ final class WalletActivityFeed {
         throw ArgumentError.value(activities, 'activities');
       }
       final confirmationHeight = activity.confirmationHeight;
+      final observedTip = networkStatus.blockHeight;
       if (confirmationHeight != null &&
-          confirmationHeight > networkStatus.blockHeight) {
+          observedTip != null &&
+          confirmationHeight > observedTip) {
         throw ArgumentError.value(
           confirmationHeight,
           'activities',
@@ -450,8 +452,9 @@ final class WalletActivityFeed {
 
   int? confirmationsFor(WalletActivity activity) {
     final height = activity.confirmationHeight;
-    if (height == null) return null;
-    return networkStatus.blockHeight - height + 1;
+    final tip = networkStatus.blockHeight;
+    if (height == null || tip == null) return null;
+    return tip - height + 1;
   }
 
   @override

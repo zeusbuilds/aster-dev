@@ -49,23 +49,7 @@ void main() {
     _write(
       repository,
       'android/app/build.gradle.kts',
-      'plugins {\n'
-          '  id("com.android.application")\n'
-          '  id("com.android.built-in-kotlin")\n'
-          '}\n'
-          'val asterApplicationId = '
-          'providers.gradleProperty("aster.applicationId").get()\n'
-          'android {\n'
-          '  namespace = asterApplicationId\n'
-          '  compileSdk = 37\n'
-          '  buildToolsVersion = "36.0.0"\n'
-          '  ndkVersion = flutter.ndkVersion\n'
-          '  defaultConfig {\n'
-          '    applicationId = asterApplicationId\n'
-          '    minSdk = flutter.minSdkVersion\n'
-          '    targetSdk = 37\n'
-          '  }\n'
-          '}',
+      File('android/app/build.gradle.kts').readAsStringSync(),
     );
     _write(
       repository,
@@ -433,7 +417,7 @@ fail "the isolated debug bundle was not installed"''',
           '  "\${bundle_path}" \\\n'
           '  base/lib \\\n'
           '  aab \\\n'
-          '  arm64-v8a,armeabi-v7a,x86_64',
+          '  arm64-v8a,x86_64',
     );
     _write(
       repository,
@@ -1167,6 +1151,48 @@ library_count=1
         contains('must apply AGP built-in Kotlin'),
         contains('must not apply the legacy Kotlin Gradle plugin'),
       ]),
+    );
+  });
+
+  test('rejects native ABI filters without transitive JNI exclusions', () {
+    final appBuild = File('${repository.path}/android/app/build.gradle.kts');
+    appBuild.writeAsStringSync(
+      appBuild.readAsStringSync().replaceFirst(
+        'jniLibs.excludes.addAll(asterExcludedNativeAbis.map { "**/\$it/**" })',
+        '// Removed JNI exclusion',
+      ),
+    );
+    final result = _verify(
+      repository,
+      flutterVersionMetadata,
+      flutterExtension,
+      flutterGradleUtils,
+    );
+    expect(
+      result.failures,
+      contains(
+        contains('must remove transitive libraries for unselected ABIs'),
+      ),
+    );
+  });
+
+  test('rejects ABI selection that admits incomplete 32-bit runtimes', () {
+    final appBuild = File('${repository.path}/android/app/build.gradle.kts');
+    appBuild.writeAsStringSync(
+      appBuild.readAsStringSync().replaceFirst(
+        '.filter { it in setOf("arm64-v8a", "x86_64") }',
+        '.filter { it in setOf("armeabi-v7a", "arm64-v8a", "x86_64") }',
+      ),
+    );
+    final result = _verify(
+      repository,
+      flutterVersionMetadata,
+      flutterExtension,
+      flutterGradleUtils,
+    );
+    expect(
+      result.failures,
+      contains(contains('must keep only complete 64-bit runtimes')),
     );
   });
 
@@ -1998,7 +2024,7 @@ esac''');
           '  "\${bundle_path}" \\\n'
           '  base/lib \\\n'
           '  aab \\\n'
-          '  arm64-v8a,armeabi-v7a,x86_64',
+          '  arm64-v8a,x86_64',
     );
     _write(
       repository,

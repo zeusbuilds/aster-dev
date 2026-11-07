@@ -53,7 +53,6 @@ verify_apk() {
 }
 
 verify_apk "${output_dir}/app-arm64-v8a-release.apk" "arm64-v8a"
-verify_apk "${output_dir}/app-armeabi-v7a-release.apk" "armeabi-v7a"
 verify_apk "${output_dir}/app-x86_64-release.apk" "x86_64"
 
 printf 'All Android release APK slices are ABI-safe.\n'

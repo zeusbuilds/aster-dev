@@ -329,6 +329,63 @@ ToolchainVerification verifyToolchain({
       'android/app/build.gradle.kts must delegate ndkVersion to Flutter.',
       failures,
     );
+    _requireSinglePattern(
+      android,
+      RegExp(
+        r'val asterSelectedNativeAbis = selectAsterNativeAbis\(\s*'
+        r'providers\.gradleProperty\("target-platform"\)'
+        r'\.orElse\("android-arm64,android-x64"\)\.get\(\),?\s*\)',
+      ),
+      'Android native ABIs must derive from the actual Flutter target-platform.',
+      failures,
+    );
+    _requireSinglePattern(
+      android,
+      RegExp(
+        r'val selected = platforms\.map \{ platformAbis\.getValue\(it\) \}'
+        r'\s*\.filter \{ it in setOf\("arm64-v8a", "x86_64"\) \}'
+        r'\.toSet\(\)',
+      ),
+      'Android native ABI selection must keep only complete 64-bit runtimes.',
+      failures,
+    );
+    _requireSinglePattern(
+      android,
+      RegExp(r'require\(platforms\.all \{ it in platformAbis \}\)'),
+      'Android native ABI policy must reject unknown Flutter targets.',
+      failures,
+    );
+    _requireSinglePattern(
+      android,
+      RegExp(r'require\(selected\.isNotEmpty\(\)\)'),
+      'Android native ABI policy must reject an empty supported intersection.',
+      failures,
+    );
+    _requireSinglePattern(
+      android,
+      RegExp(r'abiFilters\.addAll\(asterSelectedNativeAbis\)'),
+      'Android NDK filters must use the selected complete native ABIs.',
+      failures,
+    );
+    _requireSinglePattern(
+      android,
+      RegExp(
+        r'val asterExcludedNativeAbis = '
+        r'setOf\("armeabi-v7a", "x86", "arm64-v8a", "x86_64"\) '
+        r'- asterSelectedNativeAbis',
+      ),
+      'Android JNI exclusions must include every unselected native ABI.',
+      failures,
+    );
+    _requireSinglePattern(
+      android,
+      RegExp(
+        r'jniLibs\.excludes\.addAll\(asterExcludedNativeAbis\.map '
+        r'\{ "\*\*/\$it/\*\*" \}\)',
+      ),
+      'Android packaging must remove transitive libraries for unselected ABIs.',
+      failures,
+    );
     buildToolsVersion = _readSingleCapture(
       android,
       RegExp(r'\bbuildToolsVersion\s*=\s*"([0-9]+\.[0-9]+\.[0-9]+)"'),
@@ -1460,7 +1517,7 @@ ToolchainVerification verifyToolchain({
         r'\s*"\$\{bundle_path\}"\s*\\\s*\n'
         r'\s*base/lib\s*\\\s*\n'
         r'\s*aab\s*\\\s*\n'
-        r'\s*arm64-v8a,armeabi-v7a,x86_64',
+        r'\s*arm64-v8a,x86_64',
         multiLine: true,
       ),
       'Bundle verification must delegate its exact ABI matrix to the native '
