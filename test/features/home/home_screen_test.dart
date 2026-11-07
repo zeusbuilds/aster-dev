@@ -121,6 +121,47 @@ void main() {
     expect(find.bySemanticsLabel(RegExp('Bitcoin total')), findsNothing);
   });
 
+  for (final direction in TextDirection.values) {
+    testWidgets('Home visibility glyph follows the $direction content edge', (
+      tester,
+    ) async {
+      final harness = await PaymentFlowTestHarness.create();
+      addTearDown(() => _disposeHarness(tester, harness));
+      await _pump(
+        tester,
+        harness,
+        Directionality(
+          textDirection: direction,
+          child: const Scaffold(body: AssetsSection(home: AsyncLoading())),
+        ),
+      );
+      await _pumpUntil(
+        tester,
+        () => find.byTooltip('Hide balances').evaluate().isNotEmpty,
+      );
+      final button = find.byWidgetPredicate(
+        (widget) =>
+            widget is AsterIconButton && widget.tooltip == 'Hide balances',
+      );
+      final glyph = find.descendant(of: button, matching: find.byType(Icon));
+      final hitRect = tester.getRect(button);
+      final glyphRect = tester.getRect(glyph);
+      final assetRect = tester.getRect(find.byType(AssetRow).first);
+      expect(hitRect.size, const Size(48, 48));
+      expect(hitRect.contains(glyphRect.topLeft), isTrue);
+      expect(hitRect.contains(glyphRect.center), isTrue);
+      expect(hitRect.left, greaterThanOrEqualTo(assetRect.left));
+      expect(hitRect.right, lessThanOrEqualTo(assetRect.right));
+      expect(
+        direction == TextDirection.ltr ? glyphRect.right : glyphRect.left,
+        moreOrLessEquals(
+          direction == TextDirection.ltr ? assetRect.right : assetRect.left,
+          epsilon: 0.01,
+        ),
+      );
+    });
+  }
+
   testWidgets('Home renders totals, persists visibility, and hides semantics', (
     tester,
   ) async {

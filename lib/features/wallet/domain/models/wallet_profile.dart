@@ -28,6 +28,7 @@ final class WalletProfile {
     required this.createdAt,
     required this.updatedAt,
     required this.environment,
+    this.backend = WalletBackend.rln,
     required this.state,
     required this.storageToken,
   }) {
@@ -68,6 +69,9 @@ final class WalletProfile {
   /// Chain on which this wallet's native store was initialized.
   final BlockchainEnvironment environment;
 
+  /// Native store format that owns this profile's directory.
+  final WalletBackend backend;
+
   /// Transaction state used to recover interrupted wallet provisioning.
   final WalletProfileState state;
 
@@ -95,6 +99,7 @@ final class WalletProfile {
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       environment: environment,
+      backend: backend,
       state: state ?? this.state,
       storageToken: storageToken,
     );
@@ -108,6 +113,7 @@ final class WalletProfile {
       other.createdAt == createdAt &&
       other.updatedAt == updatedAt &&
       other.environment == environment &&
+      other.backend == backend &&
       other.state == state &&
       other.storageToken == storageToken;
 
@@ -118,6 +124,7 @@ final class WalletProfile {
     createdAt,
     updatedAt,
     environment,
+    backend,
     state,
     storageToken,
   );

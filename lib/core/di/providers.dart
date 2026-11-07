@@ -8,6 +8,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../features/onboarding/data/repository/repository.dart';
+import '../../features/scan/data/services/scan_payment_validator.dart';
 import '../../features/scan/data/services/services.dart';
 import '../../features/scan/domain/models/models.dart';
 import '../../features/settings/data/repository/repository.dart';
@@ -15,6 +16,7 @@ import '../../features/wallet/data/repository/repository.dart';
 import '../../features/wallet/data/runtime/runtime.dart';
 import '../../features/wallet/data/storage/storage.dart';
 import '../../features/wallet/data/validation/validation.dart';
+import '../../features/wallet/domain/models/models.dart';
 import '../config/config.dart';
 import '../errors/errors.dart';
 import '../network/network.dart';
@@ -104,7 +106,28 @@ ExternalUriService externalUriService(Ref ref) {
 /// Injectable factory for native camera/gallery scan sessions.
 @Riverpod(keepAlive: true)
 ScanSessionFactory scanSessionFactory(Ref ref) {
-  return MobileScanSessionFactory();
+  final services = ref.watch(walletServiceConfigurationProvider);
+  final security = ref.watch(securityControllerProvider);
+  final validator = ScanPaymentValidator(
+    environment: services.environment,
+    now: ref.read(utcClockProvider),
+    previewRgb: (value) async {
+      final repository = await ref.read(walletRepositoryProvider.future);
+      return repository.previewPayment(WalletPaymentTarget.usdtOnchain, value);
+    },
+  );
+  return MobileScanSessionFactory(
+    contextToken: () => (security.generation, security.canAccessWallet),
+    validatePayload: (payload) async {
+      if (!ref.mounted || !security.canAccessWallet) return false;
+      final generation = security.generation;
+      final accepted = await validator.accepts(payload);
+      return ref.mounted &&
+          security.canAccessWallet &&
+          security.generation == generation &&
+          accepted;
+    },
+  );
 }
 
 /// One isolated native scan session for each presentation purpose.

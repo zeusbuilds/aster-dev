@@ -119,7 +119,7 @@ void main() {
     expect(find.bySemanticsLabel('Loading region'), findsNothing);
   });
 
-  testWidgets('app-information loading has one live semantic owner', (
+  testWidgets('app-information loading keeps rows quiet and disabled', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -131,30 +131,42 @@ void main() {
       ),
     );
 
-    final loading = find.bySemanticsLabel('Loading app information');
-    expect(loading, findsOneWidget);
-    expect(tester.getSemantics(loading).flagsCollection.isLiveRegion, isTrue);
-    expect(find.bySemanticsLabel(RegExp('Contact Support')), findsNothing);
-    expect(find.bySemanticsLabel(RegExp('Privacy Policy')), findsNothing);
-  });
-
-  testWidgets('settings preference loading is a live non-fabricated status', (
-    tester,
-  ) async {
-    final pending = Completer<SettingsState>();
-    await _pumpSettingsScreen(
-      tester,
-      walletFuture: Future.value(WalletState(activeWallet: _walletProfile)),
-      appRepository: _appRepository(),
-      settingsViewModelFactory: () => _PendingSettingsViewModel(pending.future),
+    expect(find.bySemanticsLabel('Loading app information'), findsNothing);
+    expect(find.text('Loading'), findsNothing);
+    expect(find.text('Terms of Service'), findsOneWidget);
+    expect(find.text('Privacy Policy'), findsOneWidget);
+    expect(
+      tester
+          .getSemantics(
+            find.byKey(const ValueKey('settings-link-privacyPolicy')),
+          )
+          .flagsCollection
+          .isEnabled,
+      ui.Tristate.isFalse,
     );
-    await tester.pump();
-
-    final loading = find.bySemanticsLabel('Loading app settings');
-    expect(loading, findsOneWidget);
-    expect(tester.getSemantics(loading).flagsCollection.isLiveRegion, isTrue);
-    expect(find.bySemanticsLabel(RegExp('Currency,')), findsNothing);
   });
+
+  testWidgets(
+    'settings uses display defaults quietly during preference loading',
+    (tester) async {
+      final pending = Completer<SettingsState>();
+      await _pumpSettingsScreen(
+        tester,
+        walletFuture: Future.value(WalletState(activeWallet: _walletProfile)),
+        appRepository: _appRepository(),
+        settingsViewModelFactory: () =>
+            _PendingSettingsViewModel(pending.future),
+      );
+      await tester.pump();
+
+      expect(find.bySemanticsLabel('Loading app settings'), findsNothing);
+      expect(find.byType(AppSkeletonizer), findsNothing);
+      expect(find.text('USD'), findsOneWidget);
+      expect(find.text(BitcoinUnit.bitcoin.label), findsOneWidget);
+      expect(find.text('English'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
 
   for (final screen in const [
     CountrySelectionScreen(),
@@ -1020,7 +1032,7 @@ void main() {
       final semantics = tester.getSemantics(find.byKey(ValueKey(key)));
       expect(semantics.flagsCollection.isEnabled, ui.Tristate.isFalse);
     }
-    expect(find.text('Unavailable'), findsWidgets);
+    expect(find.text('Unavailable'), findsNothing);
     expect(externalUris.opened, isEmpty);
   });
 
@@ -1034,13 +1046,9 @@ void main() {
       appRepository: _appRepository(),
     );
 
-    expect(find.text('Loading wallet'), findsWidgets);
-    final walletLoading = find.bySemanticsLabel('Loading wallet');
-    expect(walletLoading, findsOneWidget);
-    expect(
-      tester.getSemantics(walletLoading).flagsCollection.isLiveRegion,
-      isTrue,
-    );
+    expect(find.text('Wallet'), findsWidgets);
+    expect(find.text('Loading wallet'), findsNothing);
+    expect(find.byType(AppSkeletonizer), findsNothing);
     expect(find.text('Main'), findsNothing);
     wallet.completeError(
       const AppFailureException(
@@ -1055,10 +1063,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Wallet unavailable'), findsOneWidget);
-    expect(find.text('Wallet information is unavailable.'), findsOneWidget);
-    expect(find.text('Retry wallet'), findsOneWidget);
+    expect(find.text('Wallet unavailable'), findsNothing);
+    expect(find.text('Wallet information is unavailable.'), findsNothing);
+    expect(find.text('Retry wallet'), findsNothing);
     expect(find.text('Main'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets('terminal wallet and settings failures expose no retry action', (
@@ -1090,13 +1099,15 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text(walletFailure.userMessage), findsOneWidget);
-    expect(find.text(settingsFailure.userMessage), findsOneWidget);
+    expect(find.text(walletFailure.userMessage), findsNothing);
+    expect(find.text(settingsFailure.userMessage), findsNothing);
+    expect(find.text(BitcoinUnit.bitcoin.label), findsOneWidget);
+    expect(find.byType(AppSkeletonizer), findsNothing);
     expect(find.text('Retry wallet'), findsNothing);
     expect(find.text('Retry settings'), findsNothing);
   });
 
-  testWidgets('malformed public links expose a persistent release failure', (
+  testWidgets('malformed public links stay disabled without build prose', (
     tester,
   ) async {
     await _pumpSettingsScreen(
@@ -1108,11 +1119,14 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    final failure = find.text('Public links are unavailable in this build.');
-    await tester.scrollUntilVisible(failure, 300);
+    final termsRow = find.byKey(const ValueKey('settings-link-termsOfService'));
+    await tester.scrollUntilVisible(termsRow, 300);
     await tester.pump();
 
-    expect(failure, findsOneWidget);
+    expect(
+      find.text('Public links are unavailable in this build.'),
+      findsNothing,
+    );
     expect(find.text('Retry'), findsNothing);
     final terms = tester.getSemantics(
       find.byKey(const ValueKey('settings-link-termsOfService')),
@@ -1167,44 +1181,254 @@ void main() {
     expect(toasts.messages, ['Link not opened']);
   });
 
-  testWidgets('version failure is explicit and independently retryable', (
-    tester,
-  ) async {
-    final retry = Completer<AppResult<AppBuildMetadata>>();
-    final metadata = _QueuedMetadataService([
-      Future.value(
-        const AppResult.failure(
-          AppFailure(
-            code: 'metadata_unavailable',
-            kind: AppFailureKind.unavailable,
-            userMessage: 'The app version could not be loaded.',
-            retryable: true,
+  testWidgets(
+    'version failure recovers quietly without loader or retry control',
+    (tester) async {
+      final retry = Completer<AppResult<AppBuildMetadata>>();
+      final metadata = _QueuedMetadataService([
+        Future.value(
+          const AppResult.failure(
+            AppFailure(
+              code: 'metadata_unavailable',
+              kind: AppFailureKind.unavailable,
+              userMessage: 'The app version could not be loaded.',
+              retryable: true,
+            ),
           ),
         ),
-      ),
-      retry.future,
-    ]);
+        retry.future,
+      ]);
+      await _pumpSettingsScreen(
+        tester,
+        walletFuture: Future.value(WalletState(activeWallet: _walletProfile)),
+        appRepository: SettingsAppRepository(metadata, _ExternalUriService()),
+      );
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('settings-version-label')),
+        300,
+      );
+
+      expect(find.text('Aster • Version —'), findsOneWidget);
+      expect(find.text('Retry version'), findsNothing);
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pump();
+      expect(find.text('Aster • Version —'), findsOneWidget);
+      expect(find.text('Aster • Version loading'), findsNothing);
+      expect(find.byType(AppSkeletonizer), findsNothing);
+      retry.complete(
+        const AppResult.success(
+          AppBuildMetadata(version: '3.0.0', buildNumber: ''),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Aster • Version 3.0.0'), findsOneWidget);
+      expect(find.text('Retry version'), findsNothing);
+    },
+  );
+
+  testWidgets('wallet reads retry with capped backoff and stop on recovery', (
+    tester,
+  ) async {
+    final wallet = _RecoveringWalletViewModel(recoverAt: 5);
+    final toasts = _RecordingToasts();
     await _pumpSettingsScreen(
       tester,
       walletFuture: Future.value(WalletState(activeWallet: _walletProfile)),
-      appRepository: SettingsAppRepository(metadata, _ExternalUriService()),
+      walletViewModelFactory: () => wallet,
+      appRepository: _appRepository(),
+      toasts: toasts,
     );
     await tester.pumpAndSettle();
-    final retryButton = find.text('Retry version');
-    await tester.scrollUntilVisible(retryButton, 300);
+    expect(wallet.retries, 0);
+    for (final delay in [2, 5, 15, 30, 30]) {
+      await tester.pump(Duration(seconds: delay - 1));
+      final previous = wallet.retries;
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+      expect(wallet.retries, previous + 1);
+      expect(find.byType(AppSkeletonizer), findsNothing);
+      expect(toasts.messages, isEmpty);
+    }
+    expect(find.text(_walletProfile.name), findsOneWidget);
+    await tester.pump(const Duration(minutes: 1));
+    expect(wallet.retries, 5);
+  });
 
-    expect(find.text('Aster • Version unavailable'), findsOneWidget);
-    await tester.tap(retryButton);
-    await tester.pump();
-    expect(find.text('Aster • Version loading'), findsOneWidget);
-    retry.complete(
-      const AppResult.success(
-        AppBuildMetadata(version: '3.0.0', buildNumber: ''),
+  testWidgets(
+    'quiet wallet recovery pauses in background and stops on dispose',
+    (tester) async {
+      final wallet = _RecoveringWalletViewModel();
+      await _pumpSettingsScreen(
+        tester,
+        walletFuture: Future.value(WalletState(activeWallet: _walletProfile)),
+        walletViewModelFactory: () => wallet,
+        appRepository: _appRepository(),
+      );
+      await tester.pumpAndSettle();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump(const Duration(minutes: 1));
+      expect(wallet.retries, 0);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pumpAndSettle();
+      expect(wallet.retries, 1);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(minutes: 1));
+      expect(wallet.retries, 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('covered Settings never refreshes a child flow', (tester) async {
+    final wallet = _RecoveringWalletViewModel(recoverAt: 1);
+    await _pumpSettingsScreen(
+      tester,
+      walletFuture: Future.value(WalletState(activeWallet: _walletProfile)),
+      walletViewModelFactory: () => wallet,
+      appRepository: _appRepository(),
+    );
+    await tester.pumpAndSettle();
+    final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+    unawaited(
+      navigator.push<void>(
+        MaterialPageRoute(
+          builder: (_) => const Scaffold(body: Text('Child flow')),
+        ),
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Aster • Version 3.0.0'), findsOneWidget);
-    expect(find.text('Retry version'), findsNothing);
+    await tester.pump(const Duration(seconds: 2));
+    expect(wallet.retries, 0);
+    navigator.pop();
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+    expect(wallet.retries, 1);
+  });
+
+  testWidgets('inactive retained Settings tab stops recovery until visible', (
+    tester,
+  ) async {
+    final visible = ValueNotifier(true);
+    addTearDown(visible.dispose);
+    final wallet = _RecoveringWalletViewModel(recoverAt: 1);
+    await _pumpSettingsScreen(
+      tester,
+      walletFuture: Future.value(WalletState(activeWallet: _walletProfile)),
+      walletViewModelFactory: () => wallet,
+      settingsVisible: visible,
+      appRepository: _appRepository(),
+    );
+    await tester.pumpAndSettle();
+    visible.value = false;
+    await tester.pump();
+    await tester.pump(const Duration(minutes: 1));
+    expect(wallet.retries, 0);
+    visible.value = true;
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+    expect(wallet.retries, 1);
+  });
+
+  testWidgets('unexpected recovery exception remains quiet and retries later', (
+    tester,
+  ) async {
+    final wallet = _RecoveringWalletViewModel(recoverAt: 2, throwAt: 1);
+    final toasts = _RecordingToasts();
+    await _pumpSettingsScreen(
+      tester,
+      walletFuture: Future.value(WalletState(activeWallet: _walletProfile)),
+      walletViewModelFactory: () => wallet,
+      appRepository: _appRepository(),
+      toasts: toasts,
+    );
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+    expect(wallet.retries, 1);
+    expect(tester.takeException(), isNull);
+    expect(toasts.messages, isEmpty);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(SettingsScreen)),
+    );
+    expect(
+      container.read(settingsRecoveryViewModelProvider),
+      isA<AppFailure>(),
+    );
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    expect(wallet.retries, 2);
+    expect(find.text(_walletProfile.name), findsOneWidget);
+    expect(container.read(settingsRecoveryViewModelProvider), isNull);
+  });
+
+  testWidgets('quiet recovery never resumes wallet deletion automatically', (
+    tester,
+  ) async {
+    final wallet = _RecoveringWalletViewModel(
+      failure: const AppFailure(
+        code: 'wallet_deletion_incomplete',
+        kind: AppFailureKind.storage,
+        userMessage: 'Wallet deletion is incomplete.',
+        retryable: false,
+        requiresReconciliation: true,
+      ),
+    );
+    await _pumpSettingsScreen(
+      tester,
+      walletFuture: Future.value(WalletState(activeWallet: _walletProfile)),
+      walletViewModelFactory: () => wallet,
+      appRepository: _appRepository(),
+    );
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(minutes: 2));
+    expect(wallet.retries, 0);
+    expect(find.text(wallet.failure.userMessage), findsNothing);
+  });
+
+  testWidgets('preference fallback never writes defaults over unread storage', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = _RecoveringReadPreferences(
+      await SharedPreferences.getInstance(),
+    );
+    final toasts = _RecordingToasts();
+    await _pumpSettingsScreen(
+      tester,
+      walletFuture: Future.value(WalletState(activeWallet: _walletProfile)),
+      appRepository: _appRepository(),
+      settingsRepository: SettingsRepository(
+        preferences,
+        _CatalogAssetBundle(),
+      ),
+      toasts: toasts,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text(BitcoinUnit.bitcoin.label), findsOneWidget);
+    expect(preferences.writes, isEmpty);
+    expect(toasts.messages, isEmpty);
+    preferences.failReads = false;
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+    expect(find.text(BitcoinUnit.sats.label), findsOneWidget);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(SettingsScreen)),
+    );
+    expect(
+      container
+          .read(settingsViewModelProvider)
+          .requireValue
+          .snapshot
+          .preferences
+          .balancesVisible,
+      isFalse,
+    );
+    expect(preferences.writes, isEmpty);
+    expect(toasts.messages, isEmpty);
+    expect(find.byType(AppSkeletonizer), findsNothing);
   });
 
   testWidgets('settings remains accessible at compact width and 2x text', (
@@ -1267,24 +1491,28 @@ Future<void> _pumpSettingsScreen(
   TextScaler textScaler = TextScaler.noScaling,
   PublicLinkConfiguration linkConfiguration = const PublicLinkConfiguration(),
   SettingsViewModel Function()? settingsViewModelFactory,
+  WalletViewModel Function()? walletViewModelFactory,
+  SettingsRepository? settingsRepository,
+  ValueNotifier<bool>? settingsVisible,
 }) async {
   SharedPreferences.setMockInitialValues({});
-  final settingsRepository = SettingsRepository(
-    PreferencesService(await SharedPreferences.getInstance()),
-    _CatalogAssetBundle(),
-  );
+  final repository =
+      settingsRepository ??
+      SettingsRepository(
+        PreferencesService(await SharedPreferences.getInstance()),
+        _CatalogAssetBundle(),
+      );
   await tester.pumpWidget(
     ProviderScope(
+      retry: applicationProviderRetryPolicy,
       overrides: [
         walletViewModelProvider.overrideWith(
-          () => _TestWalletViewModel(walletFuture),
+          walletViewModelFactory ?? () => _TestWalletViewModel(walletFuture),
         ),
         if (settingsViewModelFactory case final factory?)
           settingsViewModelProvider.overrideWith(factory)
         else
-          settingsRepositoryProvider.overrideWith(
-            (ref) async => settingsRepository,
-          ),
+          settingsRepositoryProvider.overrideWith((ref) async => repository),
         settingsAppRepositoryProvider.overrideWithValue(appRepository),
         publicLinkConfigurationProvider.overrideWithValue(linkConfiguration),
       ],
@@ -1298,7 +1526,14 @@ Future<void> _pumpSettingsScreen(
             child: child!,
           ),
         ),
-        home: const SettingsScreen(),
+        home: settingsVisible == null
+            ? const SettingsScreen()
+            : ValueListenableBuilder<bool>(
+                valueListenable: settingsVisible,
+                builder: (_, visible, child) =>
+                    TickerMode(enabled: visible, child: child!),
+                child: const SettingsScreen(),
+              ),
       ),
     ),
   );
@@ -1539,4 +1774,69 @@ final class _RecordingToasts implements ToastPresentationService {
     messages.add(title);
     return true;
   }
+}
+
+final class _RecoveringWalletViewModel extends WalletViewModel {
+  _RecoveringWalletViewModel({
+    this.recoverAt,
+    this.throwAt,
+    this.failure = const AppFailure(
+      code: 'wallet_read_unavailable',
+      kind: AppFailureKind.storage,
+      userMessage: 'Wallet information is unavailable.',
+      retryable: true,
+    ),
+  });
+
+  final int? recoverAt;
+  final int? throwAt;
+  final AppFailure failure;
+  var retries = 0;
+
+  @override
+  Future<WalletState> build() async => throw AppFailureException(failure);
+
+  @override
+  Future<void> reload() async {
+    retries += 1;
+    if (retries == throwAt) throw StateError('Injected provider failure.');
+    if (recoverAt != null && retries >= recoverAt!) {
+      state = AsyncData(WalletState(activeWallet: _walletProfile));
+    }
+  }
+}
+
+final class _RecoveringReadPreferences extends PreferencesService {
+  _RecoveringReadPreferences(super.preferences);
+
+  var failReads = true;
+  final writes = <String>[];
+
+  @override
+  Future<String?> getString(String key) async {
+    if (failReads) {
+      throw const AppFailureException(
+        AppFailure(
+          code: 'preferences_temporarily_unavailable',
+          kind: AppFailureKind.storage,
+          userMessage: 'Preferences are temporarily unavailable.',
+          retryable: true,
+        ),
+      );
+    }
+    return {
+      'aster.settings.v1.currency': 'USD',
+      'aster.settings.v1.region': 'US',
+      'aster.settings.v1.bitcoin_unit': 'sats',
+    }[key];
+  }
+
+  @override
+  Future<bool?> getBool(String key) async => false;
+
+  @override
+  Future<void> setString(String key, String value) async => writes.add(key);
+
+  @override
+  Future<void> setBool(String key, bool value) async => writes.add(key);
 }

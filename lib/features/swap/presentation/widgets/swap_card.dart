@@ -22,46 +22,87 @@ class SwapCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        Squircle(
-          color: context.colorScheme.surface,
-          borderColor: context.appColors.borderSubtle,
-          borderRadius: context.radii.card,
-          padding: EdgeInsets.zero,
-          child: Column(
-            children: [
-              SwapPair(label: 'From', target: state.from, onTap: onSelectFrom),
-              const AsterDivider(),
-              ColoredBox(
-                color: context.appColors.surfaceSubtle,
-                child: SwapPair(
-                  label: 'To',
-                  target: state.to,
-                  onTap: onSelectTo,
-                ),
-              ),
-            ],
-          ),
-        ),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: context.appColors.surfaceSubtle,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: context.colorScheme.surface,
-              width: context.strokes.focusRing,
+    // Reserve the reverse control's complete touch target in the layout. This
+    // keeps it centred on the divider when either asset label wraps, and puts
+    // 32px between each asset row and the divider (8px here + half the 48px
+    // control), rather than the previous 24px.
+    final pairPadding = context.spacing.sm;
+    final controlExtent = context.metrics.minTouchTarget;
+    return Squircle(
+      color: context.colorScheme.surface,
+      borderColor: context.appColors.borderSubtle,
+      borderRadius: context.radii.card,
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SwapPair(
+            label: 'From',
+            target: state.from,
+            onTap: onSelectFrom,
+            padding: EdgeInsets.fromLTRB(
+              context.spacing.screenPadding,
+              context.spacing.xxl,
+              context.spacing.screenPadding,
+              pairPadding,
             ),
           ),
-          child: AsterIconButton(
-            icon: RemixIcons.arrow_up_down_line,
-            tooltip: 'Reverse swap direction',
-            hapticIntent: HapticIntent.selection,
-            onPressed: state.canReverse ? onReverse : null,
+          SizedBox(
+            height: controlExtent + context.strokes.divider,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Positioned.fill(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: ColoredBox(color: context.colorScheme.surface),
+                      ),
+                      const AsterDivider(),
+                      Expanded(
+                        child: ColoredBox(
+                          color: context.appColors.surfaceSubtle,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: context.appColors.surfaceSubtle,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: context.colorScheme.surface,
+                      width: context.strokes.focusRing,
+                    ),
+                  ),
+                  child: AsterIconButton(
+                    icon: RemixIcons.arrow_up_down_line,
+                    tooltip: 'Reverse swap direction',
+                    hapticIntent: HapticIntent.selection,
+                    onPressed: state.canReverse ? onReverse : null,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+          ColoredBox(
+            color: context.appColors.surfaceSubtle,
+            child: SwapPair(
+              label: 'To',
+              target: state.to,
+              onTap: onSelectTo,
+              padding: EdgeInsets.fromLTRB(
+                context.spacing.screenPadding,
+                pairPadding,
+                context.spacing.screenPadding,
+                context.spacing.xxl,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

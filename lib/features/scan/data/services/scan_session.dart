@@ -29,12 +29,20 @@ final class ScanSessionCommandQueue {
 }
 
 /// Lifecycle-safe implementation shared by production and deterministic tests.
-final class ManagedScanSession extends ChangeNotifier implements ScanSession {
+final class ManagedScanSession extends ChangeNotifier
+    implements ScanSession, ScanSessionContext {
   ManagedScanSession(
     this._driver,
     this._gallery, {
     ScanSessionCommandQueue? commandQueue,
-  }) : _commandQueue = commandQueue ?? ScanSessionCommandQueue() {
+    Future<bool> Function(ScanPayload)? validatePayload,
+    Object? Function()? contextToken,
+    // Public option names stay independent of private implementation fields.
+    // ignore: prefer_initializing_formals
+  }) : _contextToken = contextToken,
+       // ignore: prefer_initializing_formals
+       _validatePayload = validatePayload,
+       _commandQueue = commandQueue ?? ScanSessionCommandQueue() {
     _driver.addListener(_synchronizeDriverState);
     _synchronizeDriverState();
   }
@@ -42,6 +50,16 @@ final class ManagedScanSession extends ChangeNotifier implements ScanSession {
   final ScanCameraDriver _driver;
   final ScanGallerySource _gallery;
   final ScanSessionCommandQueue _commandQueue;
+  final Future<bool> Function(ScanPayload)? _validatePayload;
+  final Object? Function()? _contextToken;
+  final Stopwatch _clock = Stopwatch()..start();
+  final Map<String, Duration> _rejectedUntil = <String, Duration>{};
+  Timer? _recoveryTimer;
+  int _recoveryAttempt = 0;
+  int _captureRevision = 0;
+  int _viewRevision = 0;
+  bool _validatingCamera = false;
+  bool _needsRestart = false;
   ScanSessionSnapshot _snapshot = const ScanSessionSnapshot();
   bool _viewAttached = false;
   bool _requestedActive = true;
@@ -54,6 +72,9 @@ final class ManagedScanSession extends ChangeNotifier implements ScanSession {
 
   @override
   ScanSessionSnapshot get snapshot => _snapshot;
+
+  @override
+  Object? get contextToken => _contextToken?.call();
 
   @override
   Widget buildCameraSurface({
@@ -79,6 +100,10 @@ final class ManagedScanSession extends ChangeNotifier implements ScanSession {
   Future<AppResult<void>> setActive(bool active) {
     if (_disposeRequested) return Future.value(_unavailableResult());
     _requestedActive = active;
+    if (!active) {
+      _captureRevision++;
+      _cancelRecovery();
+    }
     return _runDriverCommand(_reconcileRunningUnsafe);
   }
 
@@ -95,16 +120,17 @@ final class ManagedScanSession extends ChangeNotifier implements ScanSession {
   }
 
   @override
-  Future<AppResult<void>> setZoomScale(double scale) {
+  Future<AppResult<void>> setZoomRatio(double ratio) {
     if (_disposeRequested ||
         !_snapshot.isReady ||
-        !scale.isFinite ||
-        scale < 0 ||
-        scale > 1) {
+        !ratio.isFinite ||
+        _snapshot.zoom?.isValid != true ||
+        ratio < _snapshot.zoom!.minimum ||
+        ratio > _snapshot.zoom!.maximum) {
       return Future.value(_unavailableResult());
     }
     return _runDriverCommand(
-      () => _driver.setZoomScale(scale),
+      () => _driver.setZoomRatio(ratio),
       action: _ScanDriverAction.zoom,
       persistFailure: false,
     );
@@ -117,6 +143,8 @@ final class ManagedScanSession extends ChangeNotifier implements ScanSession {
       return AppResult.failure(_operationInProgressFailure());
     }
     final completion = Completer<void>();
+    final contextToken = _contextToken?.call();
+    final viewRevision = _viewRevision;
     _galleryInFlight = true;
     _galleryCompletion = completion;
     _replaceSnapshot(
@@ -124,12 +152,16 @@ final class ManagedScanSession extends ChangeNotifier implements ScanSession {
     );
     try {
       final path = await _gallery.selectImagePath();
-      if (_disposeRequested) {
+      if (_disposeRequested ||
+          viewRevision != _viewRevision ||
+          contextToken != _contextToken?.call() ||
+          !_appActive) {
         return AppResult.failure(_operationInProgressFailure());
       }
       if (path == null) {
         return const AppResult.success(ScanGalleryCancelled());
       }
+      final analysisRevision = _captureRevision;
       final values = await _serialize(() async {
         if (_disposeRequested) return const <String?>[];
         _replaceSnapshot(
@@ -137,10 +169,25 @@ final class ManagedScanSession extends ChangeNotifier implements ScanSession {
         );
         return _driver.analyzeImage(path);
       });
-      if (_disposeRequested) {
+      if (_disposeRequested ||
+          viewRevision != _viewRevision ||
+          analysisRevision != _captureRevision ||
+          contextToken != _contextToken?.call() ||
+          !_appActive) {
         return AppResult.failure(_operationInProgressFailure());
       }
-      final selected = _selectPayload(values, ScanCaptureSource.gallery);
+      final selected = await _selectPayload(
+        values,
+        ScanCaptureSource.gallery,
+        isCurrent: () =>
+            !_disposeRequested && analysisRevision == _captureRevision,
+      );
+      if (_disposeRequested ||
+          analysisRevision != _captureRevision ||
+          contextToken != _contextToken?.call() ||
+          !_appActive) {
+        return AppResult.failure(_operationInProgressFailure());
+      }
       switch (selected) {
         case AppFailureResult<ScanPayload?>(:final failure):
           return AppResult.failure(failure);
@@ -173,6 +220,8 @@ final class ManagedScanSession extends ChangeNotifier implements ScanSession {
   @override
   Future<AppResult<void>> restart() async {
     if (_disposeRequested) return _unavailableResult();
+    _captureRevision++;
+    _cancelRecovery();
     _captureLocked = false;
     _publishCaptureLock();
     _setFailure(null);
@@ -186,6 +235,7 @@ final class ManagedScanSession extends ChangeNotifier implements ScanSession {
   @override
   void resetCapture() {
     if (_disposeRequested) return;
+    _captureRevision++;
     _captureLocked = false;
     _publishCaptureLock();
     _setFailure(null);
@@ -194,12 +244,17 @@ final class ManagedScanSession extends ChangeNotifier implements ScanSession {
   void _attachView() {
     if (_disposeRequested || _viewAttached) return;
     _viewAttached = true;
+    _viewRevision++;
+    _recoveryAttempt = 0;
     unawaited(_runDriverCommand(_reconcileRunningUnsafe));
   }
 
   void _detachView() {
     if (_disposeRequested || !_viewAttached) return;
     _viewAttached = false;
+    _viewRevision++;
+    _captureRevision++;
+    _cancelRecovery();
     unawaited(_runDriverCommand(_reconcileRunningUnsafe));
   }
 
@@ -208,72 +263,132 @@ final class ManagedScanSession extends ChangeNotifier implements ScanSession {
     final active = lifecycle == AppLifecycleState.resumed;
     if (active == _appActive) return;
     _appActive = active;
+    _captureRevision++;
+    _cancelRecovery();
+    if (active) _recoveryAttempt = 0;
     unawaited(_runDriverCommand(_reconcileRunningUnsafe));
   }
 
+  bool get _wantsCamera =>
+      !_disposeRequested &&
+      _viewAttached &&
+      _requestedActive &&
+      _appActive &&
+      !_captureLocked &&
+      !_galleryInFlight;
+
   Future<void> _reconcileRunningUnsafe() async {
-    final shouldRun =
-        _viewAttached && _requestedActive && _appActive && !_captureLocked;
-    if (shouldRun && !_driver.state.isRunning) {
-      await _driver.start();
+    if (_wantsCamera) {
+      if (_needsRestart && _driver.state.isRunning) await _driver.stop();
+      if (!_driver.state.isRunning) await _driver.start();
+      // A permission sheet can change lifecycle while start is in flight. Its
+      // serialized follow-up owns stopping; never accept a late camera frame.
+      _needsRestart = false;
+      _recoveryAttempt = 0;
+      _cancelRecovery();
       _setFailure(null);
       return;
     }
-    if (!shouldRun && _driver.state.isRunning) {
-      await _driver.stop();
-    }
+    if (_driver.state.isRunning) await _driver.stop();
   }
 
   void _acceptDetected(
     Iterable<String?> values,
     ValueChanged<ScanPayload> onCaptured,
   ) {
-    if (_disposeRequested ||
-        _captureLocked ||
-        !_viewAttached ||
-        !_requestedActive ||
-        !_appActive ||
-        _galleryInFlight ||
-        !_driver.state.isRunning) {
-      return;
-    }
-    final selected = _selectPayload(values, ScanCaptureSource.camera);
-    switch (selected) {
-      case AppSuccess<ScanPayload?>(value: null):
-        return;
-      case AppSuccess<ScanPayload?>(value: final payload?):
-        _captureLocked = true;
-        _requestedActive = false;
-        unawaited(_runDriverCommand(_reconcileRunningUnsafe));
-        onCaptured(payload);
-        _publishCaptureLock();
-      case AppFailureResult<ScanPayload?>(:final failure):
-        _captureLocked = true;
-        _publishCaptureLock();
-        _requestedActive = false;
-        _setFailure(failure);
-        unawaited(_runDriverCommand(_reconcileRunningUnsafe));
-    }
+    if (!_wantsCamera || _validatingCamera || !_driver.state.isRunning) return;
+    final revision = _captureRevision;
+    _validatingCamera = true;
+    // A bounded snapshot preserves detector order without keeping camera/plugin
+    // buffers alive while a read-only native RGB decode is pending.
+    final candidates = values.take(16).toList(growable: false);
+    unawaited(() async {
+      try {
+        final selected = await _selectPayload(
+          candidates,
+          ScanCaptureSource.camera,
+          isCurrent: () => _wantsCamera && revision == _captureRevision,
+        );
+        if (!_wantsCamera || revision != _captureRevision) return;
+        if (selected case AppSuccess<ScanPayload?>(value: final payload?)) {
+          _captureLocked = true;
+          _setFailure(null);
+          _requestedActive = false;
+          _cancelRecovery();
+          unawaited(_runDriverCommand(_reconcileRunningUnsafe));
+          onCaptured(payload);
+          _publishCaptureLock();
+        }
+        // Invalid/unsupported QR values do not pause capture or create status.
+      } finally {
+        _validatingCamera = false;
+      }
+    }());
   }
 
-  AppResult<ScanPayload?> _selectPayload(
+  Future<AppResult<ScanPayload?>> _selectPayload(
     Iterable<String?> values,
-    ScanCaptureSource source,
-  ) {
-    ScanPayload? selected;
-    for (final raw in values) {
+    ScanCaptureSource source, {
+    bool Function()? isCurrent,
+  }) async {
+    for (final raw in values.take(16)) {
+      if (isCurrent != null && !isCurrent()) {
+        return const AppResult.success(null);
+      }
       if (raw == null || raw.trim().isEmpty) continue;
       final parsed = _parsePayload(raw, source);
-      if (parsed case AppFailureResult<ScanPayload>(:final failure)) {
-        return AppResult.failure(failure);
+      if (parsed is! AppSuccess<ScanPayload>) continue;
+      final candidate = parsed.value;
+      final isCamera = source == ScanCaptureSource.camera;
+      if (isCamera) {
+        final now = _clock.elapsed;
+        _rejectedUntil.removeWhere((_, until) => until <= now);
+        if (_rejectedUntil.containsKey(candidate.value)) continue;
       }
-      final candidate = (parsed as AppSuccess<ScanPayload>).value;
-      if (selected != null && selected.value != candidate.value) {
-        return AppResult.failure(_ambiguousPayloadFailure());
+      bool accepted;
+      try {
+        accepted =
+            await (_validatePayload?.call(candidate) ?? Future.value(true))
+                .timeout(const Duration(seconds: 5), onTimeout: () => false);
+      } catch (_) {
+        accepted = false;
       }
-      selected = candidate;
+      if (_disposeRequested || (isCurrent != null && !isCurrent())) {
+        return const AppResult.success(null);
+      }
+      if (accepted) return AppResult.success(candidate);
+      if (isCamera) {
+        if (_rejectedUntil.length >= 32) {
+          _rejectedUntil.remove(_rejectedUntil.keys.first);
+        }
+        _rejectedUntil[candidate.value] =
+            _clock.elapsed + const Duration(seconds: 2);
+      }
     }
-    return AppResult.success(selected);
+    return const AppResult.success(null);
+  }
+
+  void _cancelRecovery() {
+    _recoveryTimer?.cancel();
+    _recoveryTimer = null;
+  }
+
+  void _scheduleRecovery(AppFailure failure) {
+    if (!failure.retryable) {
+      _cancelRecovery();
+      return;
+    }
+    if (!_wantsCamera || _recoveryTimer != null) return;
+    // There is no scanner-session expiry. Transient camera recovery stays quiet
+    // while visible, backs off to 30 seconds, and stops on hide/dispose/capture.
+    final seconds = _recoveryAttempt < 5 ? 1 << _recoveryAttempt : 30;
+    _recoveryAttempt++;
+    _recoveryTimer = Timer(Duration(seconds: seconds), () {
+      _recoveryTimer = null;
+      if (!_wantsCamera) return;
+      _needsRestart = true;
+      unawaited(_runDriverCommand(_reconcileRunningUnsafe));
+    });
   }
 
   AppResult<ScanPayload> _parsePayload(String raw, ScanCaptureSource source) {
@@ -302,19 +417,22 @@ final class ManagedScanSession extends ChangeNotifier implements ScanSession {
         isRunning: driver.isRunning,
         torchAvailable: driver.torchAvailable,
         torchOn: driver.torchOn,
-        zoomScale: driver.zoomScale,
+        zoom:
+            driver.isInitialized &&
+                driver.isRunning &&
+                (driver.zoom?.isValid ?? false)
+            ? driver.zoom
+            : null,
       ),
     );
   }
 
   void _recordDriverFailure(ScanDriverException error) {
-    if (_disposeRequested) return;
-    if (_captureLocked && _snapshot.failure == null) return;
-    _captureLocked = true;
-    _publishCaptureLock();
-    _requestedActive = false;
-    _setFailure(_mapDriverFailure(error));
-    unawaited(_runDriverCommand(_reconcileRunningUnsafe));
+    if (_disposeRequested || _captureLocked || !_requestedActive) return;
+    final failure = _mapDriverFailure(error);
+    _needsRestart = true;
+    _setFailure(failure);
+    _scheduleRecovery(failure);
   }
 
   void _setFailure(AppFailure? failure) {
@@ -343,11 +461,17 @@ final class ManagedScanSession extends ChangeNotifier implements ScanSession {
         return const AppResult.success(null);
       } on ScanDriverException catch (error) {
         final failure = _mapDriverFailure(error, action: action);
-        if (persistFailure) _setFailure(failure);
+        if (persistFailure) {
+          _setFailure(failure);
+          _scheduleRecovery(failure);
+        }
         return AppResult.failure(failure);
       } catch (error, stackTrace) {
         final failure = _unexpectedFailure(error, stackTrace, action: action);
-        if (persistFailure) _setFailure(failure);
+        if (persistFailure) {
+          _setFailure(failure);
+          _scheduleRecovery(failure);
+        }
         return AppResult.failure(failure);
       }
     });
@@ -362,6 +486,10 @@ final class ManagedScanSession extends ChangeNotifier implements ScanSession {
     final existing = _closeFuture;
     if (existing != null) return existing;
     _disposeRequested = true;
+    _captureRevision++;
+    _cancelRecovery();
+    _rejectedUntil.clear();
+    _clock.stop();
     final completer = Completer<AppResult<void>>();
     _closeFuture = completer.future;
     final galleryCompletion = _galleryCompletion;
@@ -426,13 +554,6 @@ final class ManagedScanSession extends ChangeNotifier implements ScanSession {
     kind: AppFailureKind.conflict,
     userMessage: 'Wait for the current scan action to finish.',
     retryable: false,
-  );
-
-  static AppFailure _ambiguousPayloadFailure() => const AppFailure(
-    code: 'scan_payload_ambiguous',
-    kind: AppFailureKind.validation,
-    userMessage: 'More than one payment code was detected. Scan one at a time.',
-    retryable: true,
   );
 
   static AppFailure _mapDriverFailure(

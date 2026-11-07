@@ -310,7 +310,11 @@ class AsterTypeRoles extends ThemeExtension<AsterTypeRoles> {
         FontWeight.w600,
         colors.onMarketTile,
       ),
-      scanControl: role(textTheme.bodyMedium, FontWeight.w600, colors.onScan),
+      scanControl: role(
+        textTheme.bodyMedium,
+        FontWeight.w600,
+        colors.onScan,
+      ).copyWith(fontSize: 16, height: 1),
       scanCta: role(textTheme.bodyMedium, FontWeight.w500, scanSecondary),
       scanHeaderTitle: role(
         textTheme.bodyMedium,

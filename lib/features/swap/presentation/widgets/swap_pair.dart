@@ -13,11 +13,13 @@ class SwapPair extends StatelessWidget {
     required this.label,
     required this.target,
     required this.onTap,
+    this.padding,
   });
 
   final String label;
   final WalletPaymentTarget target;
   final VoidCallback onTap;
+  final EdgeInsetsGeometry? padding;
 
   @override
   Widget build(BuildContext context) {
@@ -35,10 +37,12 @@ class SwapPair extends StatelessWidget {
               minHeight: context.metrics.minTouchTarget,
             ),
             child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: context.spacing.screenPadding,
-                vertical: context.spacing.xxl,
-              ),
+              padding:
+                  padding ??
+                  EdgeInsets.symmetric(
+                    horizontal: context.spacing.screenPadding,
+                    vertical: context.spacing.xxl,
+                  ),
               child: Row(
                 children: [
                   Text(label, style: context.type.rowMeta),

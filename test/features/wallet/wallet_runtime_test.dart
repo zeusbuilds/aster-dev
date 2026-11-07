@@ -23,12 +23,14 @@ void main() {
     String id, {
     WalletProfileState state = WalletProfileState.provisioning,
     BlockchainEnvironment environment = BlockchainEnvironment.regtest,
+    WalletBackend backend = WalletBackend.rln,
   }) => WalletProfile(
     id: id,
     name: 'Wallet',
     createdAt: DateTime.utc(2026, 8, 8),
     updatedAt: DateTime.utc(2026, 8, 8),
     environment: environment,
+    backend: backend,
     state: state,
     storageToken: id == firstId ? firstToken : secondToken,
   );
@@ -119,6 +121,42 @@ void main() {
     expect(directories.created, isEmpty);
     expect(secrets.values, isEmpty);
   });
+
+  test(
+    'wallet format mismatch fails before touching owned resources',
+    () async {
+      final secrets = MemorySecureStore();
+      final directories = FakeWalletDirectoryManager();
+      final factory = FakeWalletEngineFactory([]);
+      final runtime = WalletRuntime(
+        factory,
+        directories,
+        WalletSecretStore(secrets),
+        services,
+      );
+      addTearDown(runtime.dispose);
+      final foreign = profile(firstId, backend: WalletBackend.rgbL1);
+      final ready = foreign.copyWith(state: WalletProfileState.ready);
+
+      for (final result in [
+        await runtime.provision(
+          profile: foreign,
+          mnemonic: 'mnemonic words',
+          databasePassword: 'password',
+        ),
+        await runtime.restore(ready),
+        await runtime.switchTo(ready),
+      ]) {
+        final failure = (result as AppFailureResult<void>).failure;
+        expect(failure.code, 'wallet_backend_mismatch');
+        expect(failure.retryable, isFalse);
+      }
+      expect(factory.configurations, isEmpty);
+      expect(directories.created, isEmpty);
+      expect(directories.opened, isEmpty);
+      expect(secrets.values, isEmpty);
+    },
+  );
 
   test('serializes regular operations ahead of suspension', () async {
     final rawSecrets = MemorySecureStore();

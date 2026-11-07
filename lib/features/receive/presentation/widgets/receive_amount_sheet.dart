@@ -28,8 +28,8 @@ class ReceiveAmountSheet extends ConsumerWidget {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      isDismissible: false,
-      enableDrag: false,
+      isDismissible: true,
+      enableDrag: true,
       backgroundColor: context.appColors.transparentSurface,
       builder: (context) {
         final sheet = ReceiveAmountSheet(target: target);
@@ -51,6 +51,7 @@ class ReceiveAmountSheet extends ConsumerWidget {
     AsterNavigationCommandOwner navigation,
   ) async {
     final toasts = context.toasts;
+    final route = ModalRoute.of(context);
     final current = ref.read(receiveFlowViewModelProvider(target)).value;
     if (current == null) return;
     final validationMessage = _amountValidationMessage(current);
@@ -66,7 +67,7 @@ class ReceiveAmountSheet extends ConsumerWidget {
     final accepted = await navigation.run(
       command: () async {
         applied = await notifier.applyAmount();
-        if (!context.mounted || applied) return;
+        if (!context.mounted || route?.isCurrent != true || applied) return;
         final failure = ref
             .read(receiveFlowViewModelProvider(target))
             .value
@@ -81,16 +82,21 @@ class ReceiveAmountSheet extends ConsumerWidget {
       },
       failureTitle: 'Amount could not be applied',
       hapticIntent: null,
-      blocksRoutePop: true,
     );
-    if (!accepted || !applied || !context.mounted) return;
+    // Generating a receive request does not send funds. The editor may close
+    // while it completes; its parent still owns the resulting request. Never
+    // let a late result pop that parent or a subsequently opened editor.
+    if (!accepted || !applied || !context.mounted || route?.isCurrent != true) {
+      return;
+    }
     Navigator.of(context).pop();
   }
 
   Future<void> _retry(BuildContext context, WidgetRef ref) async {
     final toasts = context.toasts;
+    final route = ModalRoute.of(context);
     await ref.read(receiveFlowViewModelProvider(target).notifier).retry();
-    if (!context.mounted) return;
+    if (!context.mounted || route?.isCurrent != true) return;
     final next = ref.read(receiveFlowViewModelProvider(target));
     if (next case AsyncError(:final error, :final stackTrace)) {
       final failure = FailureMapper.from(error, stackTrace);
@@ -102,14 +108,9 @@ class ReceiveAmountSheet extends ConsumerWidget {
     }
   }
 
-  void _close(BuildContext context, AsterNavigationCommandOwner navigation) {
-    unawaited(
-      navigation.run(
-        command: () => Navigator.of(context).pop(),
-        failureTitle: 'Amount editor could not close',
-        hapticIntent: null,
-      ),
-    );
+  void _close(BuildContext context) {
+    if (ModalRoute.of(context)?.isCurrent != true) return;
+    Navigator.of(context).pop();
   }
 
   @override
@@ -124,70 +125,61 @@ class ReceiveAmountSheet extends ConsumerWidget {
       child: Builder(
         builder: (context) {
           final navigation = AsterNavigationScope.of(context);
-          final generationOwnsRoute =
-              (flow.value?.isGenerating ?? false) || navigation.inFlight;
-          return PopScope(
-            canPop: !generationOwnsRoute,
-            child: Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.viewInsetsOf(context).bottom,
-              ),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxHeight: maxHeight),
-                child: Squircle(
-                  color: context.colorScheme.surface,
-                  border: BorderRadius.vertical(
-                    top: Radius.circular(context.radii.sheet),
-                  ),
-                  borderColor: context.appColors.transparentSurface,
-                  borderWidth: 0,
-                  padding: EdgeInsets.zero,
-                  child: SafeArea(
-                    top: false,
-                    minimum: EdgeInsets.only(bottom: context.spacing.lg),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AsterSheetHeader(
-                          title: 'Set amount',
-                          closeLabel: 'Close amount editor',
-                          onClose: generationOwnsRoute
-                              ? null
-                              : () => _close(context, navigation),
-                        ),
-                        Flexible(
-                          child: flow.when(
-                            skipLoadingOnRefresh: false,
-                            data: (value) => _AmountSheetBody(
-                              state: value,
-                              commandsEnabled: !navigation.inFlight,
-                              onChanged: ref
-                                  .read(provider.notifier)
-                                  .updateAmount,
-                              onApply: () => unawaited(
-                                _apply(
-                                  context,
-                                  ref,
-                                  ref.read(provider.notifier),
-                                  navigation,
-                                ),
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(context).bottom,
+            ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: maxHeight),
+              child: Squircle(
+                color: context.colorScheme.surface,
+                border: BorderRadius.vertical(
+                  top: Radius.circular(context.radii.sheet),
+                ),
+                borderColor: context.appColors.transparentSurface,
+                borderWidth: 0,
+                padding: EdgeInsets.zero,
+                child: SafeArea(
+                  top: false,
+                  minimum: EdgeInsets.only(bottom: context.spacing.lg),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AsterSheetHeader(
+                        title: 'Set amount',
+                        closeLabel: 'Close amount editor',
+                        onClose: () => _close(context),
+                      ),
+                      Flexible(
+                        child: flow.when(
+                          skipLoadingOnRefresh: false,
+                          data: (value) => _AmountSheetBody(
+                            state: value,
+                            commandsEnabled: !navigation.inFlight,
+                            onChanged: ref.read(provider.notifier).updateAmount,
+                            onApply: () => unawaited(
+                              _apply(
+                                context,
+                                ref,
+                                ref.read(provider.notifier),
+                                navigation,
                               ),
-                            ),
-                            loading: () => const Center(
-                              child: GridLoader(
-                                semanticLabel: 'Loading amount editor',
-                              ),
-                            ),
-                            error: (error, stackTrace) => _SheetFailure(
-                              failure: error is AppFailureException
-                                  ? error.failure
-                                  : FailureMapper.from(error, stackTrace),
-                              onRetry: () => unawaited(_retry(context, ref)),
                             ),
                           ),
+                          loading: () => const Center(
+                            child: GridLoader(
+                              semanticLabel: 'Loading amount editor',
+                            ),
+                          ),
+                          error: (error, stackTrace) => _SheetFailure(
+                            failure: error is AppFailureException
+                                ? error.failure
+                                : FailureMapper.from(error, stackTrace),
+                            onRetry: () => unawaited(_retry(context, ref)),
+                          ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -225,7 +217,7 @@ final class _AmountSheetBody extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(height: context.spacing.lg),
+          SizedBox(height: context.spacing.xs),
           Squircle(
             borderRadius: context.radii.card,
             padding: EdgeInsets.all(context.spacing.lg),

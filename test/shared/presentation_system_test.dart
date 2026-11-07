@@ -79,41 +79,6 @@ void main() {
     expect(() => context.spacing, throwsFlutterError);
   });
 
-  testWidgets('status messages own one intentional semantics announcement', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _themedHarness(
-        const Column(
-          children: [
-            AsterStatusMessage(
-              'Payment failed safely.',
-              tone: AsterStatusTone.danger,
-              announce: true,
-            ),
-            AsterStatusMessage(
-              'Enter a valid amount.',
-              tone: AsterStatusTone.danger,
-            ),
-          ],
-        ),
-      ),
-    );
-
-    final operationFailure = find.bySemanticsLabel('Payment failed safely.');
-    final validation = find.bySemanticsLabel('Enter a valid amount.');
-    expect(operationFailure, findsOneWidget);
-    expect(validation, findsOneWidget);
-    expect(
-      tester.getSemantics(operationFailure).flagsCollection.isLiveRegion,
-      isTrue,
-    );
-    expect(
-      tester.getSemantics(validation).flagsCollection.isLiveRegion,
-      isFalse,
-    );
-  });
-
   testWidgets('window insets preserve safe, system, and keyboard spaces', (
     tester,
   ) async {

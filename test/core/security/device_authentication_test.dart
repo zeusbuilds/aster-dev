@@ -208,19 +208,22 @@ void main() {
   );
 
   test(
-    'cancel and capture protection use exact narrow platform commands',
+    'cancel, presentation cleanup and capture use narrow platform commands',
     () async {
       await device.cancel();
+      await device.finishAuthenticationPresentation();
       await device.setSensitive(true);
       await device.setSensitive(false);
       expect(calls.map((call) => call.method), [
         'cancel',
+        'finishAuthenticationPresentation',
         'setSensitive',
         'setSensitive',
       ]);
       expect(calls[0].arguments, isNull);
-      expect(calls[1].arguments, {'sensitive': true});
-      expect(calls[2].arguments, {'sensitive': false});
+      expect(calls[1].arguments, isNull);
+      expect(calls[2].arguments, {'sensitive': true});
+      expect(calls[3].arguments, {'sensitive': false});
     },
   );
 }

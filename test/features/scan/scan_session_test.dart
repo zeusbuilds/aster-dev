@@ -74,6 +74,33 @@ void main() {
     expect(await session.close(), isA<AppSuccess<void>>());
   });
 
+  testWidgets('zoom commands respect current hardware bounds and suspension', (
+    tester,
+  ) async {
+    final driver = FakeScanCameraDriver();
+    final session = ManagedScanSession(driver, FakeScanGallerySource());
+    await tester.pumpWidget(_cameraApp(session));
+    await tester.pump();
+
+    expect(session.snapshot.zoom?.current, 1);
+    expect(await session.setZoomRatio(2), isA<AppSuccess<void>>());
+    expect(session.snapshot.zoom?.current, 2);
+    for (final ratio in [0.0, 4.0, double.nan, double.infinity]) {
+      expect(await session.setZoomRatio(ratio), isA<AppFailureResult<void>>());
+    }
+    expect(driver.commandLog, ['start', 'zoom:2.0']);
+    expect(session.snapshot.failure, isNull);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.idle();
+    expect(session.snapshot.zoom, isNull);
+    expect(await session.setZoomRatio(2), isA<AppFailureResult<void>>());
+    expect(driver.commandLog, ['start', 'zoom:2.0', 'stop']);
+    expect(session.snapshot.failure, isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    expect(await session.close(), isA<AppSuccess<void>>());
+  });
+
   testWidgets('replacement session inherits the current inactive lifecycle', (
     tester,
   ) async {
@@ -225,7 +252,7 @@ void main() {
     expect(await session.close(), isA<AppSuccess<void>>());
   });
 
-  testWidgets('unsafe camera payload fails closed and stops detection', (
+  testWidgets('unsafe camera payload is ignored without pausing detection', (
     tester,
   ) async {
     final driver = FakeScanCameraDriver();
@@ -238,53 +265,59 @@ void main() {
     await tester.idle();
 
     expect(captures, isEmpty);
-    expect(session.snapshot.failure?.code, 'scan_payload_invalid');
-    expect(session.snapshot.failure?.retryable, isFalse);
-    expect(session.snapshot.captureLocked, isTrue);
-    expect(driver.commandLog, ['start', 'stop']);
-
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.idle();
-    expect(await session.close(), isA<AppSuccess<void>>());
-  });
-
-  testWidgets('driver detection failures lock and stop the active camera', (
-    tester,
-  ) async {
-    final driver = FakeScanCameraDriver();
-    final gallery = FakeScanGallerySource()..paths.add('payment-code');
-    final session = ManagedScanSession(driver, gallery);
-
-    await tester.pumpWidget(_cameraApp(session));
-    await tester.pump();
-    driver.emitFailure(
-      const ScanDriverException(
-        code: 'scan_detection_failed',
-        kind: ScanDriverFailureKind.unavailable,
-      ),
-    );
-    await tester.idle();
-
-    expect(session.snapshot.captureLocked, isTrue);
-    expect(session.snapshot.failure?.code, 'scan_detection_failed');
-    expect(driver.commandLog, ['start', 'stop']);
-
-    driver.analyzedValues = const ['bitcoin:bc1qgallery'];
-    expect(
-      await session.pickAndAnalyzeGallery(),
-      isA<AppSuccess<ScanGalleryOutcome>>().having(
-        (result) => (result.value as ScanGalleryCaptured).payload.value,
-        'gallery payload',
-        'bitcoin:bc1qgallery',
-      ),
-    );
     expect(session.snapshot.failure, isNull);
-    expect(session.snapshot.captureLocked, isTrue);
+    expect(session.snapshot.captureLocked, isFalse);
+    expect(driver.commandLog, ['start']);
+    driver.emit(['bitcoin:bc1qnext']);
+    await tester.idle();
+    expect(captures, hasLength(1));
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.idle();
     expect(await session.close(), isA<AppSuccess<void>>());
   });
+
+  testWidgets(
+    'driver detection failures recover quietly without locking capture',
+    (tester) async {
+      final driver = FakeScanCameraDriver();
+      final gallery = FakeScanGallerySource()..paths.add('payment-code');
+      final session = ManagedScanSession(driver, gallery);
+
+      await tester.pumpWidget(_cameraApp(session));
+      await tester.pump();
+      driver.emitFailure(
+        const ScanDriverException(
+          code: 'scan_detection_failed',
+          kind: ScanDriverFailureKind.unavailable,
+        ),
+      );
+      await tester.idle();
+
+      expect(session.snapshot.captureLocked, isFalse);
+      expect(session.snapshot.failure?.code, 'scan_detection_failed');
+      expect(driver.commandLog, ['start']);
+      await tester.pump(const Duration(seconds: 1));
+      expect(driver.commandLog, ['start', 'stop', 'start']);
+      expect(session.snapshot.failure, isNull);
+
+      driver.analyzedValues = const ['bitcoin:bc1qgallery'];
+      expect(
+        await session.pickAndAnalyzeGallery(),
+        isA<AppSuccess<ScanGalleryOutcome>>().having(
+          (result) => (result.value as ScanGalleryCaptured).payload.value,
+          'gallery payload',
+          'bitcoin:bc1qgallery',
+        ),
+      );
+      expect(session.snapshot.failure, isNull);
+      expect(session.snapshot.captureLocked, isTrue);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.idle();
+      expect(await session.close(), isA<AppSuccess<void>>());
+    },
+  );
 
   testWidgets('detections racing a requested pause are ignored', (
     tester,
@@ -309,7 +342,7 @@ void main() {
     expect(await session.close(), isA<AppSuccess<void>>());
   });
 
-  testWidgets('distinct simultaneous camera payloads fail closed', (
+  testWidgets('distinct simultaneous camera payloads choose the first', (
     tester,
   ) async {
     final driver = FakeScanCameraDriver();
@@ -321,9 +354,8 @@ void main() {
     driver.emit(['first', 'second', 'first']);
     await tester.idle();
 
-    expect(captures, isEmpty);
-    expect(session.snapshot.failure?.code, 'scan_payload_ambiguous');
-    expect(session.snapshot.failure?.retryable, isTrue);
+    expect(captures.map((value) => value.value), ['first']);
+    expect(session.snapshot.failure, isNull);
     expect(session.snapshot.captureLocked, isTrue);
     expect(driver.commandLog, ['start', 'stop']);
 
@@ -352,12 +384,13 @@ void main() {
     driver.analyzedValues = const ['first', 'second', 'first'];
     expect(
       await session.pickAndAnalyzeGallery(),
-      isA<AppFailureResult<ScanGalleryOutcome>>().having(
-        (value) => value.failure.code,
-        'code',
-        'scan_payload_ambiguous',
+      isA<AppSuccess<ScanGalleryOutcome>>().having(
+        (value) => (value.value as ScanGalleryCaptured).payload.value,
+        'first QR',
+        'first',
       ),
     );
+    session.resetCapture();
 
     driver.analyzedValues = const ['lightning:invoice'];
     final captured = await session.pickAndAnalyzeGallery();
@@ -388,6 +421,190 @@ void main() {
     );
     expect(session.snapshot.failure, isNull);
     expect(await session.close(), isA<AppSuccess<void>>());
+  });
+
+  testWidgets(
+    'invalid first candidate is skipped before first usable capture',
+    (tester) async {
+      final driver = FakeScanCameraDriver();
+      final checked = <String>[];
+      final session = ManagedScanSession(
+        driver,
+        FakeScanGallerySource(),
+        validatePayload: (payload) async {
+          checked.add(payload.value);
+          return payload.value.startsWith('bitcoin:');
+        },
+      );
+      final captures = <ScanPayload>[];
+      await tester.pumpWidget(_cameraApp(session, onCaptured: captures.add));
+      await tester.pump();
+      driver.emit(['https://example.com', 'bitcoin:first', 'bitcoin:second']);
+      driver.emit(['bitcoin:racing']);
+      await tester.idle();
+      expect(checked, ['https://example.com', 'bitcoin:first']);
+      expect(captures.map((value) => value.value), ['bitcoin:first']);
+      expect(session.snapshot.failure, isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await session.close();
+    },
+  );
+
+  testWidgets('background revokes an in-flight read-only validation', (
+    tester,
+  ) async {
+    final driver = FakeScanCameraDriver();
+    final decode = Completer<bool>();
+    final session = ManagedScanSession(
+      driver,
+      FakeScanGallerySource(),
+      validatePayload: (_) => decode.future,
+    );
+    final captures = <ScanPayload>[];
+    await tester.pumpWidget(_cameraApp(session, onCaptured: captures.add));
+    await tester.pump();
+    driver.emit(['rgb:pending']);
+    await tester.idle();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    decode.complete(true);
+    await tester.idle();
+    expect(captures, isEmpty);
+    expect(session.snapshot.captureLocked, isFalse);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.idle();
+    driver.emit(['rgb:fresh']);
+    await tester.idle();
+    expect(captures.map((value) => value.value), ['rgb:fresh']);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await session.close();
+  });
+
+  testWidgets('a stale batch stops before validating its next candidate', (
+    tester,
+  ) async {
+    final driver = FakeScanCameraDriver();
+    final first = Completer<bool>();
+    final checked = <String>[];
+    final session = ManagedScanSession(
+      driver,
+      FakeScanGallerySource(),
+      validatePayload: (payload) {
+        checked.add(payload.value);
+        return checked.length == 1 ? first.future : Future.value(true);
+      },
+    );
+    final captures = <ScanPayload>[];
+    await tester.pumpWidget(_cameraApp(session, onCaptured: captures.add));
+    await tester.pump();
+    driver.emit(['rgb:slow', 'rgb:stale-next']);
+    await tester.idle();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    first.complete(false);
+    await tester.idle();
+    expect(checked, ['rgb:slow']);
+    expect(captures, isEmpty);
+    driver.emit(['bitcoin:fresh']);
+    await tester.idle();
+    expect(checked, ['rgb:slow', 'bitcoin:fresh']);
+    expect(captures.map((value) => value.value), ['bitcoin:fresh']);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await session.close();
+  });
+
+  testWidgets('hung validation times out without a message or capture lock', (
+    tester,
+  ) async {
+    final driver = FakeScanCameraDriver();
+    var calls = 0;
+    final session = ManagedScanSession(
+      driver,
+      FakeScanGallerySource(),
+      validatePayload: (_) {
+        calls++;
+        return calls == 1 ? Completer<bool>().future : Future.value(true);
+      },
+    );
+    final captures = <ScanPayload>[];
+    await tester.pumpWidget(_cameraApp(session, onCaptured: captures.add));
+    await tester.pump();
+    driver.emit(['rgb:hung']);
+    await tester.pump(const Duration(seconds: 5));
+    expect(session.snapshot.captureLocked, isFalse);
+    expect(session.snapshot.failure, isNull);
+    driver.emit(['bitcoin:next']);
+    await tester.idle();
+    expect(captures.map((value) => value.value), ['bitcoin:next']);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await session.close();
+  });
+
+  testWidgets('quiet camera recovery backs off and stops while detached', (
+    tester,
+  ) async {
+    final driver = FakeScanCameraDriver()
+      ..startFailure = const ScanDriverException(
+        code: 'camera_busy',
+        kind: ScanDriverFailureKind.unavailable,
+      );
+    final session = ManagedScanSession(driver, FakeScanGallerySource());
+    await tester.pumpWidget(_cameraApp(session));
+    await tester.pump();
+    expect(driver.commandLog, ['start']);
+    await tester.pump(const Duration(seconds: 1));
+    expect(driver.commandLog, ['start', 'start']);
+    await tester.pump(const Duration(seconds: 1));
+    expect(driver.commandLog, ['start', 'start']);
+    await tester.pump(const Duration(seconds: 1));
+    expect(driver.commandLog, ['start', 'start', 'start']);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(minutes: 1));
+    expect(driver.commandLog, ['start', 'start', 'start']);
+    await session.close();
+  });
+
+  testWidgets('denied camera permissions do not automatically re-prompt', (
+    tester,
+  ) async {
+    final driver = FakeScanCameraDriver()
+      ..startFailure = const ScanDriverException(
+        code: 'permission_denied',
+        kind: ScanDriverFailureKind.permissionDenied,
+      );
+    final session = ManagedScanSession(driver, FakeScanGallerySource());
+    await tester.pumpWidget(_cameraApp(session));
+    await tester.pump();
+    await tester.pump(const Duration(minutes: 5));
+    expect(driver.commandLog, ['start']);
+    expect(session.snapshot.captureLocked, isFalse);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await session.close();
+  });
+
+  test('gallery selection is discarded after wallet context changes', () async {
+    final driver = FakeScanCameraDriver();
+    final gallery = FakeScanGallerySource()
+      ..selectionGate = Completer<String?>();
+    var generation = 1;
+    final session = ManagedScanSession(
+      driver,
+      gallery,
+      contextToken: () => generation,
+    );
+    final result = session.pickAndAnalyzeGallery();
+    generation++;
+    gallery.selectionGate!.complete('selected-image');
+    expect(
+      await result,
+      isA<AppFailureResult<ScanGalleryOutcome>>().having(
+        (value) => value.failure.code,
+        'discarded',
+        'scan_operation_unavailable',
+      ),
+    );
+    expect(driver.commandLog, isEmpty);
+    expect(session.snapshot.captureLocked, isFalse);
+    await session.close();
   });
 
   testWidgets('close drains an in-flight start before stop and disposal', (

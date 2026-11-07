@@ -338,6 +338,7 @@ final class WalletRepository implements WalletLifecycleRepository {
         createdAt: now,
         updatedAt: now,
         environment: _services.environment,
+        backend: _services.backend,
         state: WalletProfileState.provisioning,
         storageToken: storageToken,
       );

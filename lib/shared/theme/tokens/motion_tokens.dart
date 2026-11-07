@@ -22,6 +22,7 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
     this.toastTransitionDuration = const Duration(milliseconds: 300),
     this.toastVisibleDuration = const Duration(seconds: 3),
     this.bootstrapRevealDelay = const Duration(milliseconds: 500),
+    this.splashColorTransitionDuration = const Duration(milliseconds: 400),
     this.splashRevealDuration = const Duration(milliseconds: 1250),
     this.skeletonShimmerDuration = const Duration(milliseconds: 1200),
     this.loadingCycleDuration = const Duration(milliseconds: 1200),
@@ -101,6 +102,7 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
   final Duration toastTransitionDuration;
   final Duration toastVisibleDuration;
   final Duration bootstrapRevealDelay;
+  final Duration splashColorTransitionDuration;
   final Duration splashRevealDuration;
   final Duration skeletonShimmerDuration;
   final Duration loadingCycleDuration;
@@ -146,6 +148,7 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
     Duration? toastTransitionDuration,
     Duration? toastVisibleDuration,
     Duration? bootstrapRevealDelay,
+    Duration? splashColorTransitionDuration,
     Duration? splashRevealDuration,
     Duration? skeletonShimmerDuration,
     Duration? loadingCycleDuration,
@@ -204,6 +207,8 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
           toastTransitionDuration ?? this.toastTransitionDuration,
       toastVisibleDuration: toastVisibleDuration ?? this.toastVisibleDuration,
       bootstrapRevealDelay: bootstrapRevealDelay ?? this.bootstrapRevealDelay,
+      splashColorTransitionDuration:
+          splashColorTransitionDuration ?? this.splashColorTransitionDuration,
       splashRevealDuration: splashRevealDuration ?? this.splashRevealDuration,
       skeletonShimmerDuration:
           skeletonShimmerDuration ?? this.skeletonShimmerDuration,
@@ -325,6 +330,11 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
       bootstrapRevealDelay: _lerpDuration(
         bootstrapRevealDelay,
         other.bootstrapRevealDelay,
+        t,
+      ),
+      splashColorTransitionDuration: _lerpDuration(
+        splashColorTransitionDuration,
+        other.splashColorTransitionDuration,
         t,
       ),
       splashRevealDuration: _lerpDuration(

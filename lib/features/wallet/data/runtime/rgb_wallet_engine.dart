@@ -38,6 +38,7 @@ abstract final class RgbWalletServiceConfigurationResolver {
     configured.validate(
       allowInsecureDevelopmentEndpoints: allowInsecureDevelopmentEndpoints,
     );
+    _requireQualifiedBackend(configured.backend);
     final defaults = getNetworkDefaults(configured.sdkNetwork);
     final indexerUrl = configured.indexerUrl ?? defaults?.indexerUrl;
     final rgbTransportProxy =
@@ -48,6 +49,7 @@ abstract final class RgbWalletServiceConfigurationResolver {
     final resolved = WalletServiceConfiguration(
       environment: configured.environment,
       sdkNetwork: configured.sdkNetwork,
+      backend: configured.backend,
       daemonListeningPort: configured.daemonListeningPort,
       ldkPeerListeningPort: configured.ldkPeerListeningPort,
       indexerUrl: indexerUrl,
@@ -65,6 +67,21 @@ abstract final class RgbWalletServiceConfigurationResolver {
       allowInsecureDevelopmentEndpoints: allowInsecureDevelopmentEndpoints,
     );
     return resolved;
+  }
+
+  static void _requireQualifiedBackend(WalletBackend backend) {
+    if (backend == WalletBackend.rgbL1) {
+      // This backend cannot use RLN's prepare/commit/status/cancel journal.
+      // Reject before provisioning or resolving RLN fallback endpoints.
+      throw const AppFailureException(
+        AppFailure(
+          code: 'wallet_backend_unqualified',
+          kind: AppFailureKind.configuration,
+          userMessage: 'This build cannot safely open this wallet format.',
+          retryable: false,
+        ),
+      );
+    }
   }
 }
 
@@ -104,6 +121,9 @@ final class RgbWalletEngineFactory implements WalletEngineFactory {
   @override
   WalletEngine create(WalletEngineConfiguration configuration) {
     final services = configuration.services..validate();
+    RgbWalletServiceConfigurationResolver._requireQualifiedBackend(
+      services.backend,
+    );
     if (services.indexerUrl == null || services.rgbTransportProxy == null) {
       throw const AppConfigurationException();
     }

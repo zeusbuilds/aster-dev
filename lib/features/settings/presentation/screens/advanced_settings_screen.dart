@@ -1,30 +1,66 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
+import 'package:remixicon/remixicon.dart';
 
-import '../../../../core/errors/errors.dart';
+import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
+import '../controllers/wallet_disclosure_handoff.dart';
 
 /// Advanced wallet options, with per-action authentication for disclosures.
-class AdvancedSettingsScreen extends StatelessWidget {
+class AdvancedSettingsScreen extends ConsumerStatefulWidget {
   const AdvancedSettingsScreen({super.key});
 
-  Future<void> _openDisclosure(BuildContext context, String route) async {
-    final failure = await context.pushNamed<AppFailure>(route);
-    if (failure == null ||
-        !context.mounted ||
-        ModalRoute.of(context)?.isCurrent != true) {
-      return;
+  @override
+  ConsumerState<AdvancedSettingsScreen> createState() =>
+      _AdvancedSettingsScreenState();
+}
+
+class _AdvancedSettingsScreenState
+    extends ConsumerState<AdvancedSettingsScreen> {
+  bool _openingDisclosure = false;
+
+  Future<void> _openDisclosure(
+    BuildContext context,
+    SecurityPurpose purpose,
+  ) async {
+    if (_openingDisclosure) return;
+    setState(() => _openingDisclosure = true);
+    final handoff = ref.read(walletDisclosureHandoffProvider);
+    WalletDisclosureSession? session;
+    bool sourceCurrent() =>
+        mounted && context.mounted && ModalRoute.of(context)?.isCurrent == true;
+    try {
+      session = await handoff.prepare(purpose, sourceCurrent: sourceCurrent);
+      if (session == null ||
+          !context.mounted ||
+          !sourceCurrent() ||
+          !session.valid) {
+        return;
+      }
+      // The ready screen claims this process-local handoff. No grant or wallet
+      // material enters navigation arguments, and no loading route is pushed.
+      await context.pushNamed<void>(
+        purpose == SecurityPurpose.revealSeed
+            ? RouteNames.revealSeed
+            : RouteNames.exportXpubs,
+      );
+    } catch (error, stackTrace) {
+      if (context.mounted && sourceCurrent()) {
+        final failure = FailureMapper.from(error, stackTrace);
+        context.toasts.show(
+          title: 'Wallet information unavailable',
+          message: failure.userMessage,
+          variant: ToastVariant.failure,
+        );
+      }
+    } finally {
+      if (session != null) handoff.discard(session);
+      if (mounted) setState(() => _openingDisclosure = false);
     }
-    // The disclosure route owns its error result. Capture feedback only after
-    // it returns: pushing/popping deliberately invalidates older toast scopes.
-    context.toasts.show(
-      title: 'Wallet information unavailable',
-      message: failure.userMessage,
-      variant: ToastVariant.failure,
-    );
   }
 
   @override
@@ -59,14 +95,15 @@ class AdvancedSettingsScreen extends StatelessWidget {
                         AsterOptionRow(
                           title: 'Export xpubs',
                           prefixIcon: MingCuteIcons.mgc_key_2_line,
+                          suffixIcon: RemixIcons.arrow_right_s_line,
                           hapticIntent: null,
-                          onTap: navigation.inFlight
+                          onTap: navigation.inFlight || _openingDisclosure
                               ? null
                               : () => unawaited(
                                   navigation.openRoute(
                                     command: () => _openDisclosure(
                                       context,
-                                      RouteNames.exportXpubs,
+                                      SecurityPurpose.exportXpubs,
                                     ),
                                     failureTitle: 'Export could not open',
                                   ),
@@ -76,14 +113,15 @@ class AdvancedSettingsScreen extends StatelessWidget {
                         AsterOptionRow(
                           title: 'Reveal seed phrase',
                           prefixIcon: MingCuteIcons.mgc_shield_line,
+                          suffixIcon: RemixIcons.arrow_right_s_line,
                           hapticIntent: null,
-                          onTap: navigation.inFlight
+                          onTap: navigation.inFlight || _openingDisclosure
                               ? null
                               : () => unawaited(
                                   navigation.openRoute(
                                     command: () => _openDisclosure(
                                       context,
-                                      RouteNames.revealSeed,
+                                      SecurityPurpose.revealSeed,
                                     ),
                                     failureTitle: 'Seed phrase could not open',
                                   ),
@@ -93,8 +131,9 @@ class AdvancedSettingsScreen extends StatelessWidget {
                         AsterOptionRow(
                           title: 'Network configuration',
                           prefixIcon: MingCuteIcons.mgc_route_line,
+                          suffixIcon: RemixIcons.arrow_right_s_line,
                           hapticIntent: null,
-                          onTap: navigation.inFlight
+                          onTap: navigation.inFlight || _openingDisclosure
                               ? null
                               : () => unawaited(
                                   navigation.openRoute(

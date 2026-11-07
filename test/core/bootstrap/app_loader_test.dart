@@ -13,6 +13,239 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('launch holds the initial artwork, then completes colour before '
+      'starting the original reveal', (tester) async {
+    final bootstrap = Completer<ProviderContainer>();
+    await tester.pumpWidget(
+      AppLoader(
+        initialize: () => bootstrap.future,
+        child: const MaterialApp(
+          home: AnnotatedRegion<SystemUiOverlayStyle>(
+            value: SystemUiOverlayStyle.light,
+            child: Text('Ready'),
+          ),
+        ),
+      ),
+    );
+    final splash = tester.widget<AnimatedSplashScreen>(_runningSplash);
+    expect(splash.colorTransition.value, 0);
+    expect(splash.controller.value, 0);
+    void expectDarkStartupBars() {
+      final style = _launchSystemStyle(tester);
+      expect(style.statusBarIconBrightness, Brightness.dark);
+      expect(style.statusBarBrightness, Brightness.light);
+      expect(style.systemNavigationBarIconBrightness, Brightness.dark);
+    }
+
+    expectDarkStartupBars();
+    await tester.pump(const Duration(seconds: 5));
+    expect(splash.colorTransition.value, 0);
+    expect(splash.controller.value, 0);
+
+    bootstrap.complete(ProviderContainer());
+    await tester.pump();
+    await tester.pump();
+    const motion = AsterMotion();
+    await tester.pump(motion.bootstrapRevealDelay);
+    await tester.pump();
+    await tester.pump(motion.splashColorTransitionDuration ~/ 2);
+    expect(splash.colorTransition.value, closeTo(0.5, 0.0001));
+    expect(splash.controller.value, 0);
+    expectDarkStartupBars();
+    expect(find.bySemanticsLabel('Ready'), findsNothing);
+    await tester.pump(motion.splashColorTransitionDuration ~/ 2);
+    expect(splash.colorTransition.value, 1);
+    expect(splash.controller.value, 0);
+    expectDarkStartupBars();
+    await tester.pump(const Duration(milliseconds: 1));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 125));
+    expect(splash.controller.value, closeTo(0.1, 0.0001));
+    expectDarkStartupBars();
+    await tester.pumpAndSettle();
+    expect(_runningSplash, findsNothing);
+    expect(find.bySemanticsLabel('Ready'), findsOneWidget);
+    expect(_launchSystemStyle(tester), SystemUiOverlayStyle.light);
+  });
+
+  testWidgets('background during colour transition cancels both phases and '
+      'restarts from the initial artwork after authentication', (tester) async {
+    final device = _LoaderDevice();
+    final security = SecurityController(device);
+    addTearDown(security.dispose);
+    await security.initialize(hasWallet: false);
+    security.updateWallet('wallet-a');
+    await tester.pumpWidget(
+      AppLoader(
+        security: security,
+        initialize: () async => ProviderContainer(),
+        child: const MaterialApp(home: Text('Ready')),
+      ),
+    );
+    await tester.pump();
+    const motion = AsterMotion();
+    await tester.pump(motion.bootstrapRevealDelay);
+    await tester.pump();
+    await tester.pump(motion.splashColorTransitionDuration ~/ 2);
+    final before = tester.widget<AnimatedSplashScreen>(_runningSplash);
+    expect(before.colorTransition.value, greaterThan(0));
+    expect(before.controller.value, 0);
+    security.handleLifecycle(AppLifecycleState.paused);
+    await tester.pump();
+    expect(_runningSplash, findsNothing);
+    expect(before.colorTransition.value, 0);
+    expect(before.controller.value, 0);
+    final held = tester.widget<AnimatedSplashScreen>(
+      find.descendant(
+        of: find.byType(AsterLockScreen),
+        matching: find.byType(AnimatedSplashScreen),
+      ),
+    );
+    expect(held.controller.value, 0);
+    expect(held.colorTransition.value, 0);
+    await tester.pump(const Duration(seconds: 5));
+    expect(before.colorTransition.value, 0);
+    expect(before.controller.value, 0);
+    expect(find.bySemanticsLabel('Ready'), findsNothing);
+
+    security.handleLifecycle(AppLifecycleState.resumed);
+    expect(await security.unlock(), isTrue);
+    await tester.pump();
+    final resumed = tester.widget<AnimatedSplashScreen>(_runningSplash);
+    expect(resumed.colorTransition.value, 0);
+    expect(resumed.controller.value, 0);
+    await tester.pump(motion.bootstrapRevealDelay);
+    await tester.pump();
+    await tester.pump(motion.splashColorTransitionDuration);
+    expect(resumed.colorTransition.value, 1);
+    expect(resumed.controller.value, 0);
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('Ready'), findsOneWidget);
+  });
+
+  testWidgets('repeated security updates do not restart the colour phase', (
+    tester,
+  ) async {
+    final security = SecurityController(_LoaderDevice());
+    addTearDown(security.dispose);
+    await security.initialize(hasWallet: false);
+    await tester.pumpWidget(
+      AppLoader(
+        security: security,
+        initialize: () async => ProviderContainer(),
+        child: const MaterialApp(home: Text('Ready')),
+      ),
+    );
+    await tester.pump();
+    const motion = AsterMotion();
+    await tester.pump(motion.bootstrapRevealDelay);
+    await tester.pump();
+    await tester.pump(motion.splashColorTransitionDuration ~/ 2);
+    final splash = tester.widget<AnimatedSplashScreen>(_runningSplash);
+    await security.refreshStatus();
+    await tester.pump(motion.splashColorTransitionDuration ~/ 2);
+    expect(splash.colorTransition.value, 1);
+    expect(splash.controller.value, 0);
+    await tester.pump(const Duration(milliseconds: 1));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 125));
+    expect(splash.controller.value, closeTo(0.1, 0.0001));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('reduced motion skips the delay and both decorative phases', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(disableAnimations: true),
+        child: AppLoader(
+          initialize: () async => ProviderContainer(),
+          child: const MaterialApp(home: Text('Ready')),
+        ),
+      ),
+    );
+    final splash = tester.widget<AnimatedSplashScreen>(_runningSplash);
+    await tester.pump();
+    await tester.pump();
+    expect(splash.colorTransition.value, 1);
+    expect(splash.controller.value, 1);
+    expect(_runningSplash, findsNothing);
+    expect(find.bySemanticsLabel('Ready'), findsOneWidget);
+  });
+
+  testWidgets('disposing during the colour phase cancels pending reveal work', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      AppLoader(
+        initialize: () async => ProviderContainer(),
+        child: const MaterialApp(home: Text('Ready')),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const AsterMotion().bootstrapRevealDelay);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    final splash = tester.widget<AnimatedSplashScreen>(_runningSplash);
+    expect(splash.colorTransition.value, greaterThan(0));
+    expect(splash.controller.value, 0);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 3));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('cold and warm lock hold the same initial appearance without '
+      'replaying startup after a warm unlock', (tester) async {
+    final device = _LoaderDevice();
+    final security = SecurityController(device);
+    addTearDown(security.dispose);
+    await security.initialize(hasWallet: true);
+    final prompt = device.nextPrompt();
+    await tester.pumpWidget(
+      AppLoader(
+        security: security,
+        initialize: () async {
+          await security.waitForUnlock();
+          return ProviderContainer();
+        },
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: SecurityGate(controller: security, child: const Text('Ready')),
+        ),
+      ),
+    );
+    expect(security.canAccessWallet, isFalse);
+    expect(find.text('Ready'), findsNothing);
+    AnimatedSplashScreen heldCover() => tester.widget<AnimatedSplashScreen>(
+      find.descendant(
+        of: find.byType(AsterLockScreen),
+        matching: find.byType(AnimatedSplashScreen),
+      ),
+    );
+    expect(heldCover().controller.value, 0);
+    expect(heldCover().colorTransition.value, 0);
+    prompt.complete(DeviceAuthenticationResult.authenticated);
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const AsterMotion().bootstrapRevealDelay);
+    await tester.pump();
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('Ready'), findsOneWidget);
+    expect(security.canAccessWallet, isTrue);
+    security.lock();
+    await tester.pump();
+    expect(find.bySemanticsLabel('Ready'), findsNothing);
+    expect(heldCover().controller.value, 0);
+    expect(heldCover().colorTransition.value, 0);
+    expect(_runningSplash, findsNothing);
+    await tester.tap(find.text('Unlock'));
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('Ready'), findsOneWidget);
+    expect(_runningSplash, findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('real launch ordering never paints manual unlock controls before '
       'or during the automatic prompt', (tester) async {
     final device = _LoaderDevice();
@@ -59,7 +292,7 @@ void main() {
       expect(find.text('Aster locked'), findsNothing);
       expect(find.text('Unlock'), findsNothing);
       expect(find.text('Authenticated wallet'), findsNothing);
-      expect(find.byType(AnimatedSplashScreen), findsNothing);
+      expect(_runningSplash, findsNothing);
     }
     expect(paintedFrames.where((frame) => frame.prompts == 0), isNotEmpty);
     expect(
@@ -95,10 +328,13 @@ void main() {
     await tester.pump();
     expect(walletOpenCount, 1);
     final reveal = tester
-        .widget<AnimatedSplashScreen>(find.byType(AnimatedSplashScreen))
+        .widget<AnimatedSplashScreen>(_runningSplash)
         .controller;
     expect(reveal.value, 0);
     await tester.pump(const AsterMotion().bootstrapRevealDelay);
+    await tester.pump();
+    await tester.pump(const AsterMotion().splashColorTransitionDuration);
+    await tester.pump(const Duration(milliseconds: 1));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     expect(reveal.value, greaterThan(0));
@@ -221,10 +457,7 @@ void main() {
     await tester.pump();
     expect(walletOpenCount, 1);
     expect(
-      tester
-          .widget<AnimatedSplashScreen>(find.byType(AnimatedSplashScreen))
-          .controller
-          .value,
+      tester.widget<AnimatedSplashScreen>(_runningSplash).controller.value,
       0,
     );
     await tester.pump(const AsterMotion().bootstrapRevealDelay);
@@ -275,7 +508,7 @@ void main() {
     bootstrap.complete(ProviderContainer());
     await tester.pump();
     await tester.pump();
-    expect(find.byType(AnimatedSplashScreen), findsNothing);
+    expect(_runningSplash, findsNothing);
     expect(find.text('Unlock'), findsOneWidget);
     await tester.tap(find.text('Unlock'));
     await _pumpForPrompt(tester, device, 2);
@@ -287,10 +520,7 @@ void main() {
     await tester.pump();
     await tester.pump();
     expect(
-      tester
-          .widget<AnimatedSplashScreen>(find.byType(AnimatedSplashScreen))
-          .controller
-          .value,
+      tester.widget<AnimatedSplashScreen>(_runningSplash).controller.value,
       0,
     );
     await tester.pump(const AsterMotion().bootstrapRevealDelay);
@@ -324,7 +554,7 @@ void main() {
     await tester.pump(const Duration(seconds: 4));
     expect(device.prompts, 1);
     expect(walletOpenCount, 0);
-    expect(find.byType(AnimatedSplashScreen), findsNothing);
+    expect(_runningSplash, findsNothing);
     expect(find.text('Authenticated wallet'), findsNothing);
     expect(find.text('Unlock'), findsNothing);
 
@@ -333,7 +563,7 @@ void main() {
     await tester.pump();
     expect(walletOpenCount, 1);
     final animation = tester
-        .widget<AnimatedSplashScreen>(find.byType(AnimatedSplashScreen))
+        .widget<AnimatedSplashScreen>(_runningSplash)
         .controller;
     expect(animation.value, 0);
     expect(find.bySemanticsLabel('Authenticated wallet'), findsNothing);
@@ -341,6 +571,9 @@ void main() {
     await tester.pump(motion.bootstrapRevealDelay);
     await tester.pump();
     expect(animation.value, 0);
+    await tester.pump(motion.splashColorTransitionDuration);
+    await tester.pump(const Duration(milliseconds: 1));
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     expect(animation.value, greaterThan(0));
     expect(animation.value, lessThan(1));
@@ -415,23 +648,23 @@ void main() {
       const motion = AsterMotion();
       await tester.pump(motion.bootstrapRevealDelay);
       await tester.pump();
+      await tester.pump(motion.splashColorTransitionDuration);
+      await tester.pump(const Duration(milliseconds: 1));
+      await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
       expect(
-        tester
-            .widget<AnimatedSplashScreen>(find.byType(AnimatedSplashScreen))
-            .controller
-            .value,
+        tester.widget<AnimatedSplashScreen>(_runningSplash).controller.value,
         greaterThan(0),
       );
       security.handleLifecycle(AppLifecycleState.paused);
       await tester.pump();
-      expect(find.byType(AnimatedSplashScreen), findsNothing);
+      expect(_runningSplash, findsNothing);
       expect(find.bySemanticsLabel('Wallet settings'), findsNothing);
       security.handleLifecycle(AppLifecycleState.resumed);
       expect(await security.unlock(), isTrue);
       await tester.pump();
       final restarted = tester
-          .widget<AnimatedSplashScreen>(find.byType(AnimatedSplashScreen))
+          .widget<AnimatedSplashScreen>(_runningSplash)
           .controller;
       expect(restarted.value, 0);
       await tester.pump(motion.bootstrapRevealDelay);
@@ -445,7 +678,7 @@ void main() {
       security.handleLifecycle(AppLifecycleState.resumed);
       expect(await security.unlock(), isTrue);
       await tester.pump();
-      expect(find.byType(AnimatedSplashScreen), findsNothing);
+      expect(_runningSplash, findsNothing);
       expect(find.bySemanticsLabel('Wallet settings'), findsOneWidget);
     },
   );
@@ -617,7 +850,6 @@ final class _LoaderDevice
   Completer<DeviceAuthenticationResult>? _prompt;
   Completer<DeviceSecurityStatus>? _status;
   final _backgroundEvents = StreamController<void>.broadcast(sync: true);
-
   Completer<DeviceAuthenticationResult> nextPrompt() =>
       _prompt = Completer<DeviceAuthenticationResult>();
 
@@ -661,6 +893,13 @@ final class _LoaderDevice
   void background() => _backgroundEvents.add(null);
 }
 
+SystemUiOverlayStyle _launchSystemStyle(WidgetTester tester) => tester
+    .widgetList<AnnotatedRegion<SystemUiOverlayStyle>>(
+      find.byType(AnnotatedRegion<SystemUiOverlayStyle>),
+    )
+    .last
+    .value;
+
 Future<void> _pumpForPrompt(
   WidgetTester tester,
   _LoaderDevice device,
@@ -694,3 +933,9 @@ void _foreground(WidgetTester tester) {
     tester.binding.handleAppLifecycleStateChanged(state);
   }
 }
+
+Finder get _runningSplash => find.byWidgetPredicate(
+  (widget) =>
+      widget is AnimatedSplashScreen &&
+      widget.controller is AnimationController,
+);

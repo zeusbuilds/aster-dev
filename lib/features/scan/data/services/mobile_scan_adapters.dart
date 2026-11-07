@@ -6,12 +6,16 @@ import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../../core/errors/errors.dart';
+import '../../domain/models/models.dart';
 import 'scan_session.dart';
 import 'scan_session_contract.dart';
 
 /// Production factory for isolated `mobile_scanner` / `image_picker` sessions.
 final class MobileScanSessionFactory implements ScanSessionFactory {
-  MobileScanSessionFactory();
+  MobileScanSessionFactory({required this.validatePayload, this.contextToken});
+
+  final Future<bool> Function(ScanPayload) validatePayload;
+  final Object? Function()? contextToken;
 
   final ScanSessionCommandQueue _commandQueue = ScanSessionCommandQueue();
 
@@ -19,7 +23,7 @@ final class MobileScanSessionFactory implements ScanSessionFactory {
   ScanSession create() {
     final controller = MobileScannerController(
       autoStart: false,
-      detectionSpeed: DetectionSpeed.noDuplicates,
+      detectionSpeed: DetectionSpeed.normal,
       formats: const [BarcodeFormat.qrCode],
       returnImage: false,
       initialZoom: 0,
@@ -28,6 +32,8 @@ final class MobileScanSessionFactory implements ScanSessionFactory {
       MobileScannerCameraDriver(controller),
       ImagePickerScanGallery(ImagePicker()),
       commandQueue: _commandQueue,
+      validatePayload: validatePayload,
+      contextToken: contextToken,
     );
   }
 }
@@ -41,20 +47,18 @@ final class MobileScannerCameraDriver extends ChangeNotifier
 
   final MobileScannerController _controller;
   bool _disposed = false;
+  ScanZoomRange? _zoom;
+  double? _preferredZoomRatio;
 
   @override
   ScanDriverState get state {
     final value = _controller.value;
-    final reportedZoom = value.zoomScale;
-    final zoomScale = value.isInitialized && reportedZoom.isFinite
-        ? reportedZoom.clamp(0.0, 1.0)
-        : 0.0;
     return ScanDriverState(
       isInitialized: value.isInitialized,
       isRunning: value.isRunning,
       torchAvailable: value.torchState != TorchState.unavailable,
       torchOn: value.torchState == TorchState.on,
-      zoomScale: zoomScale,
+      zoom: value.isInitialized && value.isRunning ? _zoom : null,
     );
   }
 
@@ -88,6 +92,7 @@ final class MobileScannerCameraDriver extends ChangeNotifier
 
   @override
   Future<void> start() async {
+    _zoom = null;
     await _guard('scan_camera_start_failed', _controller.start);
     final state = _controller.value;
     final error = state.error;
@@ -100,6 +105,29 @@ final class MobileScannerCameraDriver extends ChangeNotifier
         kind: ScanDriverFailureKind.invalidState,
       );
     }
+    // Zoom is optional. An unsupported capability read must never prevent QR
+    // capture, trigger camera restarts, or fabricate a magnification label.
+    try {
+      var zoom = _cameraZoom(await _controller.getZoomState());
+      final desired = (_preferredZoomRatio ?? 1).clamp(
+        zoom.minimum,
+        zoom.maximum,
+      );
+      if ((zoom.current - desired).abs() > 0.001) {
+        try {
+          zoom = _cameraZoom(await _controller.setZoomRatio(desired));
+        } catch (_) {
+          // A failed default leaves the camera's last confirmed ratio intact.
+        }
+      }
+      if (!_disposed && _controller.value.isRunning) {
+        _zoom = zoom;
+        _preferredZoomRatio = zoom.current;
+      }
+    } catch (_) {
+      _zoom = null;
+    }
+    _notifyControllerState();
   }
 
   @override
@@ -128,8 +156,29 @@ final class MobileScannerCameraDriver extends ChangeNotifier
   }
 
   @override
-  Future<void> setZoomScale(double scale) {
-    return _guard('scan_zoom_failed', () => _controller.setZoomScale(scale));
+  Future<void> setZoomRatio(double ratio) async {
+    await _guard('scan_zoom_failed', () async {
+      final applied = _cameraZoom(await _controller.setZoomRatio(ratio));
+      if (_disposed || !_controller.value.isRunning) return;
+      _zoom = applied;
+      _preferredZoomRatio = applied.current;
+      notifyListeners();
+    });
+  }
+
+  static ScanZoomRange _cameraZoom(CameraZoomState state) {
+    final zoom = ScanZoomRange(
+      minimum: state.minZoomRatio,
+      maximum: state.maxZoomRatio,
+      current: state.zoomRatio,
+    );
+    if (!zoom.isValid) {
+      throw const ScanDriverException(
+        code: 'scan_zoom_state_invalid',
+        kind: ScanDriverFailureKind.invalidState,
+      );
+    }
+    return zoom;
   }
 
   @override
@@ -168,7 +217,11 @@ final class MobileScannerCameraDriver extends ChangeNotifier
   }
 
   void _notifyControllerState() {
-    if (!_disposed) notifyListeners();
+    if (_disposed) return;
+    if (!_controller.value.isInitialized || !_controller.value.isRunning) {
+      _zoom = null;
+    }
+    notifyListeners();
   }
 
   @override

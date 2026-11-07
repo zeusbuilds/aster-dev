@@ -45,6 +45,38 @@ void main() {
     registerFallbackValue(const LightningAsset(assetId: 'fallback', amount: 1));
   });
 
+  test('unqualified RGB_L1 selection never calls the RLN wallet factory', () {
+    final sdk = MockRgbSdkFlutter();
+    const configured = WalletServiceConfiguration(
+      environment: BlockchainEnvironment.regtest,
+      sdkNetwork: 'regtest',
+      backend: WalletBackend.rgbL1,
+      indexerUrl: 'http://127.0.0.1:50002',
+      rgbTransportProxy: 'rpc://127.0.0.1:3001',
+    );
+    final rejected = throwsA(
+      isA<AppFailureException>().having(
+        (error) => error.failure.code,
+        'code',
+        'wallet_backend_unqualified',
+      ),
+    );
+    expect(
+      () => RgbWalletServiceConfigurationResolver.resolve(configured),
+      rejected,
+    );
+    expect(
+      () => RgbWalletEngineFactory.withSdk(sdk).create(
+        const WalletEngineConfiguration(
+          storageDirectory: '/wallet',
+          services: configured,
+        ),
+      ),
+      rejected,
+    );
+    verifyZeroInteractions(sdk);
+  });
+
   test('forwards validated local VSS transport policy to the SDK', () {
     final sdk = MockRgbSdkFlutter();
     final wallet = MockUtexoWallet();
@@ -2345,6 +2377,54 @@ void main() {
     );
     verifyNever(() => wallet.listPayments());
   });
+
+  test(
+    'BFA history distinguishes mints, links and rights from wallet value',
+    () async {
+      final wallet = MockUtexoWallet();
+      final asset = WalletAsset.rgbUsdt(assetId: 'rgb-usdt', precision: 6);
+      CoreTransfer transfer(
+        int idx,
+        String kind,
+        List<Assignment> assignments, {
+        Assignment? requested,
+      }) => CoreTransfer(
+        idx: idx,
+        status: CoreTransferStatuses.settled,
+        kind: kind,
+        assignments: assignments,
+        requestedAssignment: requested,
+        transportEndpoints: [],
+      );
+      final change = Assignment(type: 'Fungible', amount: BigInt.from(900));
+      final received = Assignment(type: 'Fungible', amount: BigInt.from(42));
+      const mintRight = Assignment(type: 'MintRight');
+      const linkRight = Assignment(type: 'LinkRight');
+      when(() => wallet.listTransfers(assetId: asset.id.value)).thenAnswer(
+        (_) async => [
+          transfer(1, 'Mint', [change, mintRight], requested: received),
+          transfer(2, 'Link', [change], requested: linkRight),
+          transfer(3, 'ReceiveWitness', [received, mintRight]),
+          transfer(4, 'Issuance', [mintRight, linkRight]),
+          transfer(5, 'Mint', [change]),
+        ],
+      );
+      when(() => wallet.listPayments()).thenAnswer((_) async => []);
+      final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
+      final activities = {
+        for (final item in await engine.listActivity(asset))
+          item.transferIndex: item,
+      };
+      expect(activities[1]!.operation, WalletActivityOperation.rgbMint);
+      expect(activities[1]!.direction, WalletActivityDirection.internal);
+      expect(activities[1]!.amount!.units, 42);
+      expect(activities[2]!.operation, WalletActivityOperation.rgbLink);
+      expect(activities[2]!.amount, isNull);
+      expect(activities[3]!.amount!.units, 42);
+      expect(activities[4]!.amount, isNull);
+      expect(activities[5]!.amount, isNull);
+    },
+  );
 
   group('SDK 734f5ae exact-value and history contract', () {
     final asset = WalletAsset.rgbUsdt(assetId: 'rgb-usdt', precision: 6);

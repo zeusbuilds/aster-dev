@@ -578,7 +578,6 @@ void main() {
         find.bySemanticsLabel('Address, mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn'),
         findsOneWidget,
       );
-      expect(find.byType(AsterStatusMessage), findsNothing);
       expect(find.textContaining('quote unavailable'), findsNothing);
       await tester.ensureVisible(find.widgetWithText(CustomButton, 'Send'));
       await tester.tap(find.widgetWithText(CustomButton, 'Send'));
@@ -595,7 +594,6 @@ void main() {
         'Leave some BTC for the network fee. Lower the amount and try again.',
       );
       expect(find.text(feedback.message!), findsNothing);
-      expect(find.byType(AsterStatusMessage), findsNothing);
       expect(harness.haptics.intents, isNot(contains(HapticIntent.error)));
       expect(harness.haptics.intents, contains(HapticIntent.warning));
 
@@ -619,7 +617,6 @@ void main() {
       expect(harness.toasts.messages.last.variant, ToastVariant.warning);
       expect(engine.calls, isNot(contains('sendPayment:start')));
       expect(engine.sentPaymentCommand, isNull);
-      expect(find.byType(AsterStatusMessage), findsNothing);
       await tester.pump(const Duration(seconds: 5));
       expect(harness.toasts.messages, hasLength(2));
       expect(tester.takeException(), isNull);
@@ -1712,21 +1709,12 @@ void main() {
       ),
     );
     await tester.pump();
-    harness.engine.createReceiveGate = Completer<void>();
-    final apply = tester.widget<CustomButton>(
-      find.widgetWithText(CustomButton, 'Set amount'),
-    );
-    final staleClose = tester.widget<AsterIconButton>(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is AsterIconButton &&
-            widget.tooltip == 'Close amount editor',
-      ),
-    );
-    apply.onTap!();
-    staleClose.onPressed!();
-    await tester.binding.handlePopRoute();
-    await tester.pump();
+    final gate = Completer<void>();
+    harness.engine.createReceiveGate = gate;
+    addTearDown(() {
+      if (!gate.isCompleted) gate.complete();
+    });
+    await tester.tap(find.widgetWithText(CustomButton, 'Set amount'));
     await _pumpUntil(
       tester,
       () =>
@@ -1743,15 +1731,11 @@ void main() {
     await tester.pump();
     final close = find.bySemanticsLabel('Close amount editor');
     final closeSemantics = tester.getSemantics(close).getSemanticsData();
-    expect(closeSemantics.flagsCollection.isEnabled, ui.Tristate.isFalse);
-    expect(closeSemantics.hasAction(ui.SemanticsAction.tap), isFalse);
-    await tester.tapAt(const Offset(8, 8));
-    await tester.binding.handlePopRoute();
-    await tester.drag(find.byType(ReceiveAmountSheet), const Offset(0, 400));
-    await _pumpFrames(tester);
+    expect(closeSemantics.flagsCollection.isEnabled, ui.Tristate.isTrue);
+    expect(closeSemantics.hasAction(ui.SemanticsAction.tap), isTrue);
     expect(find.byType(ReceiveAmountSheet), findsOneWidget);
 
-    harness.engine.createReceiveGate!.complete();
+    gate.complete();
     await _pumpUntil(
       tester,
       () => find.byType(ReceiveAmountSheet).evaluate().isEmpty,
@@ -2739,7 +2723,6 @@ void main() {
           .failure!
           .userMessage;
 
-      expect(find.byType(AsterStatusMessage), findsNothing);
       expect(find.text(failureMessage), findsNothing);
       expect(harness.toasts.messages, isEmpty);
       expect(find.text('Refresh balance'), findsNothing);

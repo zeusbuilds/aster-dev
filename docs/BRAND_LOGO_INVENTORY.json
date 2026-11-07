@@ -1,5 +1,5 @@
 {
-  "reviewedAt": "2026-10-26",
+  "reviewedAt": "2026-10-27",
   "canonical": {
     "path": "assets/brand/aster-mark.svg",
     "sha256": "936ac7f9191ade2877ea3ceff899e1b0f5b006d3a749cb7e8664b2fc3ff8a517",
@@ -12,7 +12,7 @@
     ],
     "fill": "white"
   },
-  "scope": "Every active Aster product mark is updated except native launch artwork, explicitly reserved for the user. Historical screenshots and ignored build artifacts are not current assets. Bitcoin and USDT token icons are separate marks.",
+  "scope": "All in-app logo-only startup, loading, lock and privacy covers share white with the gradient blue mark and shadows. iOS native launch is generated from that unchanged Flutter opening treatment; iOS Icon Composer artwork and Android native splash artwork remain user-managed. Home and onboarding branded page layouts are separate from these covers.",
   "uses": [
     {
       "id": "flutter-home",
@@ -50,17 +50,17 @@
     {
       "id": "flutter-static-cover",
       "where": "Flutter static splash, lock and privacy cover",
-      "kind": "SVG",
+      "kind": "Fixed drawn opening frame",
       "source": {
         "path": "lib/shared/screens/splash_screen.dart",
-        "line": 32
+        "line": 10
       },
-      "artwork": "assets/brand/aster-mark.svg",
+      "artwork": "lib/shared/branding/aster_launch_logo.dart",
       "status": "Updated",
       "consumers": [
         {
           "path": "lib/core/security/security_gate.dart",
-          "line": 56
+          "line": 57
         },
         {
           "path": "lib/features/wallet/presentation/widgets/wallet_lifecycle_gate.dart",
@@ -74,7 +74,8 @@
           "path": "lib/features/onboarding/presentation/screens/onboarding_welcome_screen.dart",
           "line": 189
         }
-      ]
+      ],
+      "note": "Every consumer uses the same opaque white surface, blue gradient mark, outside shadows and dark system-bar icons. No cold/warm appearance branch remains."
     },
     {
       "id": "flutter-animation",
@@ -82,17 +83,18 @@
       "kind": "Drawn path",
       "source": {
         "path": "lib/shared/screens/animated_splash_screen.dart",
-        "line": 336
+        "line": 329
       },
       "artwork": "lib/shared/branding/aster_logo_geometry.dart",
       "status": "Updated",
       "consumers": [
         {
           "path": "lib/core/bootstrap/app_loader.dart",
-          "line": 208
+          "line": 281
         }
       ],
-      "verification": "test/shared/animated_splash_logo_test.dart compares drawn opening frame with canonical SVG at displayed and source widths; rotation, reveal handoff and settled frame are checked."
+      "verification": "Raster tests compare the initial drawn mark with canonical SVG/Figma export, check blue hue and alpha/shadow endpoints, keep white background, and preserve the gap-free reveal geometry with blue strokes. Bootstrap/security tests cover authentication and lifecycle sequencing.",
+      "effects": "lib/shared/branding/aster_launch_logo.dart"
     },
     {
       "id": "ios-icon",
@@ -102,90 +104,97 @@
         "path": "ios/Runner/AsterIcon.icon/icon.json",
         "line": 29
       },
-      "artwork": "ios/Runner/AsterIcon.icon/Assets/aster_mark.svg",
-      "status": "Updated",
-      "note": "Preserves prior 360-unit intrinsic width and layer scale; proportional height is 190.468085106383."
+      "artwork": "ios/Runner/AsterIcon.icon/Assets/app_icon_logo.svg",
+      "status": "User-managed artwork",
+      "note": "User changed the Icon Composer artwork and sizing during the splash work. Do not restore the prior icon layout."
+    },
+    {
+      "id": "ios-launch",
+      "where": "iOS native launch screen",
+      "kind": "Generated native compatibility SVG: source-blue vector logo, alpha-gradient mask and embedded Flutter-rendered shadow",
+      "source": {
+        "path": "ios/Runner/Launch Screen.storyboard",
+        "line": 17
+      },
+      "artwork": "ios/Runner/Assets.xcassets/splash_logo.imageset/splash_logo.svg",
+      "pureVectorMaster": "assets/brand/aster-launch-opening.svg",
+      "generator": "tool/export_aster_launch_logo.py",
+      "status": "Generated from unchanged Flutter opening sources under user authorization on 2026-10-27",
+      "note": "The balanced transparent 765x473 viewport centers the visible 705x373 mark. The image view is centered on the root view with 173.617021276596x107.347517730496 point constraints, producing the same 160-point visible width as Flutter. CoreSVG omits SVG filter effects, so only the shadow is embedded as an actual-Flutter-rendered transparent PNG. Its color-gradient hue drift is avoided by the mathematically equivalent solid source-blue vector fill and white alpha-gradient mask; the source color is not compensated or changed. Native compiled-asset comparisons remain separate from source/export checks."
     },
     {
       "id": "ios-privacy",
       "where": "iOS native privacy cover",
-      "kind": "Native SVG image",
+      "kind": "Programmatic opaque native cover",
       "source": {
         "path": "ios/Runner/AppDelegate.swift",
-        "line": 326
+        "line": 455
       },
-      "artwork": "ios/Runner/Assets.xcassets/aster-privacy-mark.imageset/aster-privacy-mark.svg",
+      "artwork": "ios/Runner/AppDelegate.swift: WalletPrivacyView",
       "status": "Updated",
-      "note": "Separate imageset prevents changes to the native launch screen."
+      "note": "Opaque white/effect cover for genuine background, unowned inactivity and protected capture. Action-owned foreground OS authentication stays over its source screen; native/Dart presentation cleanup is synchronized. The separately generated native launch asset does not change this privacy-cover policy."
     },
     {
       "id": "android-legacy-icon",
       "where": "Android legacy launcher icon",
-      "kind": "Vector drawable",
+      "kind": "User-exported density PNGs",
       "source": {
-        "path": "android/app/src/main/res/mipmap-anydpi-v24/ic_launcher.xml",
-        "line": 7
+        "path": "android/app/src/main/AndroidManifest.xml",
+        "line": 11
       },
-      "artwork": "android/app/src/main/res/drawable/aster_brand_mark.xml",
-      "status": "Updated",
-      "note": "Preserves 72dp width; height follows the canonical aspect ratio."
+      "artwork": "android/app/src/main/res/mipmap-mdpi/ic_launcher.png",
+      "status": "Updated from user-supplied EasyAppIcon export",
+      "note": "Legacy and round PNGs are copied byte-for-byte. The superseded anydpi-v24 launcher override is removed so Android 7 uses the exported density assets. Native splash resources remain independent and unchanged.",
+      "roundArtwork": "android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png",
+      "densityDirectories": [
+        "mipmap-ldpi",
+        "mipmap-mdpi",
+        "mipmap-hdpi",
+        "mipmap-xhdpi",
+        "mipmap-xxhdpi",
+        "mipmap-xxxhdpi"
+      ]
     },
     {
       "id": "android-adaptive-icon",
       "where": "Android adaptive launcher icon",
-      "kind": "Vector drawable",
+      "kind": "User-exported adaptive XML and density foreground PNGs",
       "source": {
         "path": "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml",
-        "line": 4
+        "line": 3
       },
-      "artwork": "android/app/src/main/res/drawable/aster_launcher_foreground.xml",
-      "status": "Updated",
-      "note": "Preserves existing mark width of 63.45 in a 108-unit foreground; centered at (54,54)."
+      "artwork": "android/app/src/main/res/mipmap-mdpi/ic_launcher_foreground.png",
+      "status": "Updated from user-supplied EasyAppIcon export",
+      "note": "Both adaptive definitions use the exported opaque blue foreground and white color background without regenerating artwork. Foreground PNGs exist at mdpi through xxxhdpi. Native splash uses separate Flutter-rendered aster_launch_opening density resources.",
+      "roundSource": "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml",
+      "background": "android/app/src/main/res/values/ic_launcher_background.xml"
     },
     {
       "id": "android-privacy",
       "where": "Android native privacy cover",
-      "kind": "Vector drawable",
+      "kind": "Programmatic opaque native cover with a bounded cached logo bitmap",
       "source": {
         "path": "android/app/src/main/kotlin/com/example/asterdev/DeviceAuthenticationBridge.kt",
-        "line": 206
+        "line": 321
       },
-      "artwork": "android/app/src/main/res/drawable/aster_privacy_background.xml",
+      "artwork": "android/app/src/main/kotlin/com/example/asterdev/DeviceAuthenticationBridge.kt: WalletPrivacyView",
       "status": "Updated",
-      "dependencies": [
-        "android/app/src/main/res/drawable/aster_brand_mark.xml",
-        "android/app/src/main/res/drawable/aster_launch_gradient.xml"
-      ]
+      "note": "Opaque white/effect cover for genuine background/unowned pause. Owned OS prompts retain source content with temporary FLAG_SECURE snapshot protection. Source reviewed; Android builds/runtime deferred by user instruction."
+    },
+    {
+      "id": "android-launch",
+      "where": "Android native launch, legacy and Android12+ in light/dark mode",
+      "kind": "Density-specific PNG rendered directly by unchanged Flutter painter",
+      "source": {
+        "path": "android/app/src/main/res/values-v33/styles.xml",
+        "line": 3
+      },
+      "artwork": "android/app/src/main/res/drawable-*/aster_launch_opening.png",
+      "status": "White background and centred 160dp gradient blue mark with actual Flutter outside shadows; direct matching first-frame handoff",
+      "provenance": "tool/launch_artwork/android-launch-opening.json",
+      "generator": "tool/export_android_launch_logo.py"
     }
   ],
-  "nativeSplashReservedForUser": {
-    "status": "Unchanged by user instruction",
-    "ios": {
-      "storyboard": "ios/Runner/Launch Screen.storyboard",
-      "artwork": "ios/Runner/Assets.xcassets/aster-mark.imageset/aster-mark.svg"
-    },
-    "androidBefore12": {
-      "layout": "android/app/src/main/res/drawable/launch_background.xml",
-      "artwork": "android/app/src/main/res/drawable/aster_mark_white.xml"
-    },
-    "android12AndLater": {
-      "styles": [
-        "android/app/src/main/res/values-v31/styles.xml",
-        "android/app/src/main/res/values-night-v31/styles.xml"
-      ],
-      "artwork": "android/app/src/main/res/drawable/aster_icon_foreground.xml"
-    },
-    "preservedHashes": {
-      "ios/Runner/Assets.xcassets/aster-mark.imageset/Contents.json": "308a5af56129eb707e495ad977a0919512db31ea27dc00cecc2a9bb63a31743b",
-      "ios/Runner/Assets.xcassets/aster-mark.imageset/aster-mark.svg": "75048dbe84db8665b7fb6b3e70f762e38f322f98abd08fce0bc4c9732423e15c",
-      "ios/Runner/Launch Screen.storyboard": "3e33e5fe94411568a7aa4ded965500f63fa44dd556dd0d7c77317a0a29c542d8",
-      "android/app/src/main/res/drawable/launch_background.xml": "92796ce0e17935828a9fb34c16e653f1da3ca074c8f3dac2719c5420fe57d236",
-      "android/app/src/main/res/drawable/aster_mark_white.xml": "d46d879624dd3a18e2a5ee92fe9d358fe18c303410100d1f6d2d1279891ca423",
-      "android/app/src/main/res/drawable/aster_icon_foreground.xml": "7b011a128d1908d42d47f87dad2b04c34626a8138c3d359601fd6ff9f5dd6eb2",
-      "android/app/src/main/res/values-v31/styles.xml": "182fe29fe5971e32550a46d4892e92fecef9e0da434c52d938bf6d9bf9bcd908",
-      "android/app/src/main/res/values-night-v31/styles.xml": "bd92f9bb5aef0391a20f924be191dfd54130bf462210e96bedc513c21d4ac8b6"
-    }
-  },
   "registration": {
     "flutter": {
       "path": "pubspec.yaml",
@@ -204,6 +213,477 @@
     "assetManifest": "assets/README.md",
     "animationTests": "test/shared/animated_splash_logo_test.dart",
     "nativeAssetTests": "test/shared/native_brand_assets_test.dart",
-    "runtimeRasterAsterLogoAssets": []
+    "runtimeRasterAsterLogoAssets": [
+      "tool/launch_artwork/aster-launch-opening-shadow.png",
+      "android/app/src/main/res/drawable-mdpi/aster_launch_opening.png",
+      "android/app/src/main/res/drawable-hdpi/aster_launch_opening.png",
+      "android/app/src/main/res/drawable-xhdpi/aster_launch_opening.png",
+      "android/app/src/main/res/drawable-xxhdpi/aster_launch_opening.png",
+      "android/app/src/main/res/drawable-xxxhdpi/aster_launch_opening.png"
+    ],
+    "nativeLaunchExportTests": "test/tool/export_aster_launch_logo_test.py",
+    "nativeLaunchRenderer": "tool/render_aster_launch_shadow_test.dart",
+    "nativeLaunchSourceCheck": "python3 tool/export_aster_launch_logo.py --check",
+    "runtimeRasterAsterLogoNote": "The shadow PNG is embedded in the iOS native compatibility SVG; Android packages dedicated Flutter-rendered density PNGs. No raster logo or generated SVG master is declared in the Flutter runtime bundle; Flutter continues drawing the unchanged opening and reveal.",
+    "androidNativeLaunchTests": "test/shared/android_native_launch_test.dart",
+    "androidNativeLaunchExportTests": "test/tool/export_android_launch_logo_test.py",
+    "androidNativeLaunchRenderer": "tool/render_android_launch_logo_test.dart",
+    "androidNativeLaunchSourceCheck": "python3 tool/export_android_launch_logo.py --check"
+  },
+  "launchEffects": {
+    "reference": "assets/brand/aster-launch-opening.svg",
+    "visibleMarkWidthLogicalPixels": 160,
+    "referenceMarkSize": [
+      705,
+      373
+    ],
+    "referenceCanvasSize": [
+      765,
+      473
+    ],
+    "gradientDirection": "top to bottom",
+    "gradientStops": [
+      0.346154,
+      1
+    ],
+    "gradientColors": [
+      "#001AFF at 100% alpha",
+      "#001AFF at 30% alpha"
+    ],
+    "shadowSourceUnits": [
+      {
+        "offset": [
+          0,
+          10
+        ],
+        "sigma": 15,
+        "opacity": 0.06
+      },
+      {
+        "offset": [
+          0,
+          2
+        ],
+        "sigma": 3,
+        "opacity": 0.1
+      }
+    ],
+    "shadowMask": "Actual Flutter hard-alpha matrix (alpha x127), outside-only shadows, clipped to the unchanged painter filter bounds",
+    "colorTransitionMilliseconds": 400,
+    "existingRevealMilliseconds": 1250,
+    "authentication": "Hold cold opening until bootstrap and device authentication permit reveal; reduced motion skips decorative timing.",
+    "nativeImageLayoutAt160PixelMark": {
+      "fullCanvasSizeLogicalPixels": [
+        173.617021276596,
+        107.347517730496
+      ],
+      "centerXOffsetLogicalPixels": 0,
+      "centerYOffsetLogicalPixels": 0,
+      "explanation": "The generated 765x473 viewport uses balanced 50-unit vertical margins, so its 705x373 visible mark and image share the same center. Root-view centerX/centerY constraints match Flutter full-window centering without a safe-area offset or asymmetric-image compensation."
+    },
+    "background": "White throughout the stationary opacity/shadow phase and reveal; the reveal opens a transparent gap onto the real app.",
+    "settledLogoColor": "#001AFF, 100% opaque, no shadows",
+    "revealStrokeColor": "#001AFF",
+    "statusAndNavigationIcons": "Dark during the white launch overlay; the revealed app owns its style afterward.",
+    "sharedStaticAppearance": "The fixed initial white/gradient/shadow frame is used for every in-app and native privacy cover. There is no appearance-phase synchronization channel.",
+    "historicalFigmaFixture": "test/fixtures/branding/aster-launch-figma.svg",
+    "historicalFigmaCanvasSize": [
+      765,
+      433
+    ],
+    "visibleMarkBoundsSourceUnits": [
+      30,
+      50,
+      735,
+      423
+    ],
+    "shadowFilterBoundsSourceUnits": [
+      0,
+      30,
+      765,
+      433
+    ]
+  },
+  "coverConsumers": [
+    {
+      "id": "startup",
+      "place": "Startup and startup authentication",
+      "source": {
+        "path": "lib/core/bootstrap/app_loader.dart",
+        "line": 281
+      },
+      "when": "App initialization; authentication holds the same static initial artwork, then the existing opaque-blue reveal runs.",
+      "status": "Updated"
+    },
+    {
+      "id": "app-lock",
+      "place": "Global app lock / privacy gate",
+      "source": {
+        "path": "lib/core/security/security_gate.dart",
+        "line": 9
+      },
+      "when": "Locked or obscured app, foreground security checks, Settings > Security > Lock now, and cancelled/failed unlock. Manual Unlock uses dark copy and the primary blue button. Action-owned foreground prompts keep the source visible and inert without this cover.",
+      "status": "Updated"
+    },
+    {
+      "id": "wallet-lifecycle",
+      "place": "Native wallet lifecycle wait",
+      "source": {
+        "path": "lib/features/wallet/presentation/widgets/wallet_lifecycle_gate.dart",
+        "line": 39
+      },
+      "when": "Wallet obscured or transitioning without a failure while native resources suspend/resume/dispose; does not add a healthy wallet-switch loading screen.",
+      "status": "Updated"
+    },
+    {
+      "id": "wallet-access",
+      "place": "Wallet access loading gate",
+      "source": {
+        "path": "lib/features/wallet/presentation/pages/wallet_access_screen.dart",
+        "line": 28
+      },
+      "when": "Wallet registry/session loading, including an explicit reload/retry. Blocking errors retain their separate recovery screen.",
+      "status": "Updated"
+    },
+    {
+      "id": "onboarding-capture",
+      "place": "Create / Import sensitive capture cover",
+      "source": {
+        "path": "lib/features/onboarding/presentation/screens/onboarding_welcome_screen.dart",
+        "line": 189
+      },
+      "when": "Screen capture while a sensitive onboarding lease is active, including recovery phrase, quiz and subsequent protected create/import steps.",
+      "status": "Updated"
+    },
+    {
+      "id": "native-ios",
+      "place": "iOS native privacy window",
+      "source": {
+        "path": "ios/Runner/AppDelegate.swift",
+        "line": 333
+      },
+      "when": "Genuine scene background, unowned inactivity, app-switcher snapshots, or active capture while sensitive. No cover for an owned foreground action prompt; startup/app unlock still uses its Flutter lock cover.",
+      "relatedAuthenticationActions": [
+        "Create / Import preflight",
+        "Reveal seed phrase",
+        "Export extended public keys",
+        "Change app lock",
+        "Delete wallet after confirmation"
+      ],
+      "status": "Updated; native UIKit opacity, gradient, shadow and cache-reuse test passed"
+    },
+    {
+      "id": "native-android",
+      "place": "Android native privacy view",
+      "source": {
+        "path": "android/app/src/main/kotlin/com/example/asterdev/DeviceAuthenticationBridge.kt",
+        "line": 243
+      },
+      "when": "Genuine Activity background/user-leave or unowned pause. Owned biometric/credential handoffs keep source painted with temporary OS snapshot protection; protected-content blanking is controlled by Android.",
+      "status": "Updated source; build/runtime deferred"
+    }
+  ],
+  "unusedLegacyToken": {
+    "path": "lib/shared/theme/tokens/gradient_tokens.dart",
+    "name": "splashBackdrop",
+    "note": "Declaration only; no active production renderer uses this gradient after cover unification."
+  },
+  "androidLauncherExport": {
+    "receivedAt": "2026-10-27",
+    "sourceDirectory": "easyappicon-icons-1793097303787/android",
+    "instructions": "https://easyappicon.com/",
+    "resourceCount": 20,
+    "resources": [
+      {
+        "path": "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml",
+        "sha256": "f1b1cc9d6526f97fdbf8c461d6c39488af087ec56d914f882dc95d0bad56e643"
+      },
+      {
+        "path": "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml",
+        "sha256": "f1b1cc9d6526f97fdbf8c461d6c39488af087ec56d914f882dc95d0bad56e643"
+      },
+      {
+        "path": "android/app/src/main/res/mipmap-hdpi/ic_launcher.png",
+        "sha256": "5d664aef8ce3d6516f7cb8cd3d26005a6ff3880420a6245fb220a901fe0e5643",
+        "pixels": [
+          72,
+          72
+        ]
+      },
+      {
+        "path": "android/app/src/main/res/mipmap-hdpi/ic_launcher_foreground.png",
+        "sha256": "e090d12389f13ba8821a99754b3d738093d034a12ccbfb2c0c79430713cc822d",
+        "pixels": [
+          162,
+          162
+        ]
+      },
+      {
+        "path": "android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png",
+        "sha256": "4ce3700a9ad66090221764f7cfa36597e7095ced59e1f9da4cfd2482f851acb4",
+        "pixels": [
+          72,
+          72
+        ]
+      },
+      {
+        "path": "android/app/src/main/res/mipmap-ldpi/ic_launcher.png",
+        "sha256": "74ccf717d1ec35b116963a3900ecf94af8db770dbd9254f5c9f438ec0c80958e",
+        "pixels": [
+          36,
+          36
+        ]
+      },
+      {
+        "path": "android/app/src/main/res/mipmap-ldpi/ic_launcher_round.png",
+        "sha256": "d479944d2927ab81f5ded063cb7a931376a01927b18bf92c832e876c4f5a7492",
+        "pixels": [
+          36,
+          36
+        ]
+      },
+      {
+        "path": "android/app/src/main/res/mipmap-mdpi/ic_launcher.png",
+        "sha256": "ad42d3654b1a8daabc9fa49e1e7868f21321aeb4ba996f0d530ac389fdc13844",
+        "pixels": [
+          48,
+          48
+        ]
+      },
+      {
+        "path": "android/app/src/main/res/mipmap-mdpi/ic_launcher_foreground.png",
+        "sha256": "b43a153e68acfd6dcdf6664910f90f4ba0943e7c2e3cc8cd1a1cf4db58434459",
+        "pixels": [
+          108,
+          108
+        ]
+      },
+      {
+        "path": "android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png",
+        "sha256": "bbe98e13acb2ea24d92005c232b4b380995ac34e38397504e9b1f9c029764ff6",
+        "pixels": [
+          48,
+          48
+        ]
+      },
+      {
+        "path": "android/app/src/main/res/mipmap-xhdpi/ic_launcher.png",
+        "sha256": "4de16508d606db04846eff07ccc3743314b8dd232b8d1f1f84805205e2ad7f1e",
+        "pixels": [
+          96,
+          96
+        ]
+      },
+      {
+        "path": "android/app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.png",
+        "sha256": "d107e9fc45bde4d3674e47bcea846f3bc784575ee3c406f2e9f0bfc4342c8e51",
+        "pixels": [
+          216,
+          216
+        ]
+      },
+      {
+        "path": "android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png",
+        "sha256": "a764c71f3a911ebebe74e31becfc5dd772d1e907ee399364198c8706bac7bb1b",
+        "pixels": [
+          96,
+          96
+        ]
+      },
+      {
+        "path": "android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png",
+        "sha256": "f806f0b5671e731d05cc00fcaa04f9bc70253f643189b614aeeb69a0abf870d3",
+        "pixels": [
+          144,
+          144
+        ]
+      },
+      {
+        "path": "android/app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png",
+        "sha256": "86dfa5262f96a434a8b0df035509a8dce1424c337e180bf41635f1beb4bd7c57",
+        "pixels": [
+          324,
+          324
+        ]
+      },
+      {
+        "path": "android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png",
+        "sha256": "8c0cbb35dc2228468ae514546a5c8d134a2e3b5c8b7cb8cd7be34a0d8440ad7a",
+        "pixels": [
+          144,
+          144
+        ]
+      },
+      {
+        "path": "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png",
+        "sha256": "2fe5f2e4c3a738253ef4cacd31ec8675e37721900c3ba76ae9444e34ea4da4c7",
+        "pixels": [
+          192,
+          192
+        ]
+      },
+      {
+        "path": "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png",
+        "sha256": "f9cf7a0306893c2c57555d44f59d309bfd944109ed44d4cf2fe130ec86981848",
+        "pixels": [
+          432,
+          432
+        ]
+      },
+      {
+        "path": "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png",
+        "sha256": "3708bdd9e400f72526f4f59f302100b0355cc48e4bea9fa3c05bd380eaac08e5",
+        "pixels": [
+          192,
+          192
+        ]
+      },
+      {
+        "path": "android/app/src/main/res/values/ic_launcher_background.xml",
+        "sha256": "5f9c0f7e8a7fd03315105a3f238276d5949bd0c4a5d03f573026a61c10e76ddf"
+      }
+    ],
+    "excludedStoreArtwork": [
+      "ic_launcher-web.png",
+      "playstore-icon.png"
+    ],
+    "note": "ic_launcher-web.png and playstore-icon.png are store/publication artwork, not app resource entries. Android launcher integration does not alter iOS or native launch artwork."
+  },
+  "nativeSplashOwnership": {
+    "status": "User authorized source-derived iOS and Android native launch artwork on 2026-10-27; the production Flutter animation is unchanged.",
+    "ios": {
+      "storyboard": "ios/Runner/Launch Screen.storyboard",
+      "artwork": "ios/Runner/Assets.xcassets/splash_logo.imageset/splash_logo.svg",
+      "status": "Generated from unchanged Flutter opening code; native SVG compatibility art and root-view centering constraints",
+      "pureVectorMaster": "assets/brand/aster-launch-opening.svg",
+      "generator": "tool/export_aster_launch_logo.py"
+    },
+    "androidBefore12": {
+      "layout": "android/app/src/main/res/drawable/launch_background.xml",
+      "artwork": "android/app/src/main/res/drawable-*/aster_launch_opening.png",
+      "currentPresentation": "White background, centred 160dp blue gradient mark and actual Flutter-rendered outside shadows; dedicated 288dp transparent bitmap artboard."
+    },
+    "android12AndLater": {
+      "styles": [
+        "android/app/src/main/res/values/styles.xml",
+        "android/app/src/main/res/values-v27/styles.xml",
+        "android/app/src/main/res/values-v29/styles.xml",
+        "android/app/src/main/res/values-v31/styles.xml",
+        "android/app/src/main/res/values-v33/styles.xml"
+      ],
+      "artwork": "android/app/src/main/res/drawable-*/aster_launch_opening.png",
+      "currentPresentation": "White background and dedicated 288dp transparent splash icon with 160dp mark, inside the 192dp system safe circle; shared explicitly light themes keep both system appearances identical."
+    }
+  },
+  "iosNativeLaunchExport": {
+    "authorizedAt": "2026-10-27",
+    "generator": "tool/export_aster_launch_logo.py",
+    "shadowRenderer": "tool/render_aster_launch_shadow_test.dart",
+    "renderProvenance": "tool/launch_artwork/aster-launch-opening-shadow.json",
+    "productionFlutterAnimationChanged": false,
+    "nativeRepresentation": "Hybrid SVG: solid source-blue vector silhouette with equivalent white alpha-gradient mask, plus actual Flutter shadow pixels; no native SVG filters or color-gradient hue compensation",
+    "pureVectorMaster": {
+      "path": "assets/brand/aster-launch-opening.svg",
+      "sha256": "2d2acca405c8b3426bfb1ba346357893745e4752eeb859e165b05cee70a99d35",
+      "flutterRuntimeAsset": false
+    },
+    "nativeAsset": {
+      "path": "ios/Runner/Assets.xcassets/splash_logo.imageset/splash_logo.svg",
+      "sha256": "454780fb5ed80ab0111ec41acb422a3d739be67ef455386c2379072ebbb7b8d0",
+      "imageset": "ios/Runner/Assets.xcassets/splash_logo.imageset/Contents.json"
+    },
+    "shadowRaster": {
+      "path": "tool/launch_artwork/aster-launch-opening-shadow.png",
+      "sha256": "586b86c3d9a73c6aa639911bec6c0928bcddfad325fbcdce94a1917325ea4de3",
+      "pixelSize": [
+        2295,
+        1419
+      ],
+      "pixelsPerSourceUnit": 3,
+      "colorSpace": "sRGB",
+      "containsColoredFill": false,
+      "flutterRuntimeAsset": false
+    },
+    "artworkInputs": "Five production Dart source files and the unchanged actual Flutter painter; no existing SVG or Figma export is an artwork input",
+    "reproduction": "python3 tool/export_aster_launch_logo.py --render-shadow --flutter /path/to/flutter",
+    "verification": "python3 tool/export_aster_launch_logo.py --check"
+  },
+  "androidNativeLaunchExport": {
+    "authorizedAt": "2026-10-27",
+    "generator": "tool/export_android_launch_logo.py",
+    "renderer": "tool/render_android_launch_logo_test.dart",
+    "renderProvenance": "tool/launch_artwork/android-launch-opening.json",
+    "productionFlutterAnimationChanged": false,
+    "launcherArtworkChanged": false,
+    "nativeRepresentation": "Density-specific transparent sRGB PNGs, rendered directly by the unchanged Flutter painter; no SVG conversion or Android gradient/shadow approximation",
+    "resource": "android/app/src/main/res/drawable-*/aster_launch_opening.png",
+    "densities": {
+      "mdpi": 1,
+      "hdpi": 1.5,
+      "xhdpi": 2,
+      "xxhdpi": 3,
+      "xxxhdpi": 4
+    },
+    "viewportDp": [
+      288,
+      288
+    ],
+    "visibleMarkWidthDp": 160,
+    "safeCircleDiameterDp": 192,
+    "handoff": "Full-window centring and immediate native splash removal when Flutter produces its first frame; no additional Activity, overlay or timer",
+    "reproduction": "python3 tool/export_android_launch_logo.py --render --flutter /path/to/flutter",
+    "verification": "python3 tool/export_android_launch_logo.py --check",
+    "outputs": [
+      {
+        "density": "mdpi",
+        "path": "android/app/src/main/res/drawable-mdpi/aster_launch_opening.png",
+        "pixelSize": [
+          288,
+          288
+        ],
+        "scale": 1,
+        "pngSha256": "3a875f08948a45856c8c14ee9c23bbbfab9882e626c291de506e5deda3281d01"
+      },
+      {
+        "density": "hdpi",
+        "path": "android/app/src/main/res/drawable-hdpi/aster_launch_opening.png",
+        "pixelSize": [
+          432,
+          432
+        ],
+        "scale": 1.5,
+        "pngSha256": "5d463f8f8ce49d6b40692cd72881625ceb495e9a4b063b6a6e93ee947c20ed5d"
+      },
+      {
+        "density": "xhdpi",
+        "path": "android/app/src/main/res/drawable-xhdpi/aster_launch_opening.png",
+        "pixelSize": [
+          576,
+          576
+        ],
+        "scale": 2,
+        "pngSha256": "b5a3903e62ae126c08b90cbb9b2ca78491d304f4091ab09a570dbcfd46d116cc"
+      },
+      {
+        "density": "xxhdpi",
+        "path": "android/app/src/main/res/drawable-xxhdpi/aster_launch_opening.png",
+        "pixelSize": [
+          864,
+          864
+        ],
+        "scale": 3,
+        "pngSha256": "71ac69696c85f4ad145004b7b51bb2b974426f6667189e998638a35f4a975d28"
+      },
+      {
+        "density": "xxxhdpi",
+        "path": "android/app/src/main/res/drawable-xxxhdpi/aster_launch_opening.png",
+        "pixelSize": [
+          1152,
+          1152
+        ],
+        "scale": 4,
+        "pngSha256": "bc6922b4c87ba046c6b2f2a7c20277356e1e8059b55418ccbb2f36866569f1f9"
+      }
+    ]
   }
 }

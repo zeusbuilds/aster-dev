@@ -25,6 +25,7 @@ ReleaseAudience parseReleaseAudience(String value) => switch (value) {
 /// Canonical compile-time keys accepted by Aster release builds.
 abstract final class ReleaseConfigurationKey {
   static const network = 'ASTER_NETWORK';
+  static const walletBackend = 'ASTER_WALLET_BACKEND';
   static const daemonPort = 'ASTER_DAEMON_PORT';
   static const ldkPeerPort = 'ASTER_LDK_PEER_PORT';
   static const indexerUrl = 'ASTER_INDEXER_URL';
@@ -64,6 +65,7 @@ abstract final class ReleaseConfigurationKey {
     usdtAssetId,
     usdtPrecision,
     vssUrl,
+    walletBackend,
   };
 
   static const internalRequired = <String>{
@@ -135,6 +137,19 @@ final class ReleaseConfigurationManifest {
         throw FormatException('$key still contains a placeholder value.');
       }
       values[key] = value;
+    }
+
+    switch (values[ReleaseConfigurationKey.walletBackend] ?? 'rln') {
+      case 'rln':
+        break;
+      case 'rgb-l1':
+        throw const FormatException(
+          'RGB_L1 requires verified durable payment recovery before release.',
+        );
+      default:
+        throw const FormatException(
+          'ASTER_WALLET_BACKEND must be rln or rgb-l1.',
+        );
     }
 
     final required = audience == ReleaseAudience.publicDistribution
@@ -221,6 +236,16 @@ final class ReleaseConfigurationManifest {
       if (value != null) _validatePublicHttps(value, key: key);
     }
 
+    if (audience == ReleaseAudience.publicDistribution &&
+        values.containsKey(ReleaseConfigurationKey.vssUrl)) {
+      // Current RLN VSS restore omits the durable on-chain outbox, and the SDK
+      // refuses recoverable sends when VSS is enabled. Keep the backup gate
+      // until one qualified deployment can satisfy both requirements.
+      throw const FormatException(
+        'Public distribution requires backup and restore that preserve '
+        'durable on-chain payment recovery. Current RLN VSS is incompatible.',
+      );
+    }
     return ReleaseConfigurationManifest._(audience, values);
   }
 

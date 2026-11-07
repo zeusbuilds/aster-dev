@@ -129,6 +129,8 @@ class _AssetsSectionState extends ConsumerState<AssetsSection> {
                       ? 'Show balances'
                       : 'Hide balances',
                   hapticIntent: null,
+                  alignment: AlignmentDirectional.centerEnd,
+                  padding: EdgeInsets.zero,
                   color: context.appColors.textSecondary,
                   onPressed: balancesVisible == null ? null : toggleVisibility,
                 ),

@@ -316,7 +316,6 @@ void main() {
       expect(harness.toasts.messages.last.message, feedback.message);
       expect(harness.toasts.messages.last.variant, feedback.variant);
       expect(find.text(feedback.message!), findsNothing);
-      expect(find.byType(AsterStatusMessage), findsNothing);
       if (name == 'confirmed rejection') {
         expect(feedback.title, 'Unable to send');
         expect(feedback.variant, ToastVariant.failure);

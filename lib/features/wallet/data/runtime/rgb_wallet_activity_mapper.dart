@@ -117,6 +117,14 @@ final class RgbWalletActivityMapper {
         WalletActivityDirection.received,
       ),
       'Burn' => (WalletActivityOperation.rgbBurn, WalletActivityDirection.sent),
+      'Mint' => (
+        WalletActivityOperation.rgbMint,
+        WalletActivityDirection.internal,
+      ),
+      'Link' => (
+        WalletActivityOperation.rgbLink,
+        WalletActivityDirection.internal,
+      ),
       _ => throw const NativeProtocolException(
         'Native wallet returned an unknown RGB transfer kind.',
         field: 'CoreTransfer.kind',
@@ -304,12 +312,20 @@ final class RgbWalletActivityMapper {
   }
 
   int? _transferAmount(CoreTransfer transfer) {
+    // A link spends a right. A mint creates supply for a beneficiary and is
+    // separate from the recipient's incoming transfer. Neither is a debit.
+    if (transfer.kind == 'Link') return null;
     // Outgoing allocations can be change. Use the SDK's exact recipient amount,
     // and preserve an absent request as unknown, never as wallet change.
     if (transfer.kind == 'Send' ||
         transfer.kind == 'Burn' ||
-        transfer.kind == 'Inflation') {
-      final amount = transfer.amount;
+        transfer.kind == 'Inflation' ||
+        transfer.kind == 'Mint') {
+      final amount = switch ((transfer.kind, transfer.requestedAssignment)) {
+        ('Mint', Assignment(type: 'Fungible', :final amount)) => amount,
+        ('Mint', _) => null,
+        _ => transfer.amount,
+      };
       if (amount == null) return null;
       if (amount.isNegative ||
           amount > BigInt.from(WalletAmount.maxNativeUnits)) {
@@ -331,8 +347,19 @@ final class RgbWalletActivityMapper {
     }
     var total = BigInt.zero;
     var foundAmount = false;
+    var foundRight = false;
     for (final assignment in assignments) {
       final amount = assignment.amount;
+      final isRight = switch (assignment.type) {
+        'LinkRight' || 'ReplaceRight' || 'MintRight' => amount == null,
+        'InflationRight' =>
+          amount != null && !amount.isNegative && amount.bitLength <= 64,
+        _ => false,
+      };
+      if (isRight) {
+        foundRight = true;
+        continue;
+      }
       if (assignment.type != 'Fungible' || amount == null) {
         throw const NativeProtocolException(
           'Native fungible transfer has an invalid assignment.',
@@ -354,6 +381,7 @@ final class RgbWalletActivityMapper {
         );
       }
     }
+    if (!foundAmount && foundRight) return null;
     if (!foundAmount || total == BigInt.zero) {
       throw const NativeProtocolException(
         'Native fungible RGB transfer has no positive amount.',

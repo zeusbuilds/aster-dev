@@ -374,7 +374,8 @@ fail "the isolated debug bundle was not installed"''',
       repository,
       'Gemfile',
       'source "https://rubygems.org"\n\n'
-          'gem "cocoapods", "1.16.2"',
+          'gem "cocoapods", "1.16.2"\n'
+          'gem "nkf", "0.3.0"',
     );
     _write(
       repository,
@@ -382,16 +383,20 @@ fail "the isolated debug bundle was not installed"''',
       'GEM\n'
           '  remote: https://rubygems.org/\n'
           '  specs:\n'
-          '    cocoapods (1.16.2)\n\n'
+          '    cocoapods (1.16.2)\n'
+          '    nkf (0.3.0)\n\n'
           'PLATFORMS\n'
           '  arm64-darwin\n'
           '  ruby\n'
           '  x86_64-darwin\n\n'
           'DEPENDENCIES\n'
-          '  cocoapods (= 1.16.2)\n\n'
+          '  cocoapods (= 1.16.2)\n'
+          '  nkf (= 0.3.0)\n\n'
           'CHECKSUMS\n'
           '  cocoapods (1.16.2) sha256='
-          '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n\n'
+          '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n'
+          '  nkf (0.3.0) sha256='
+          '357a8dbeba38b727b75930f665146546076a394a1c243faf634ff176e3588895\n\n'
           'BUNDLED WITH\n'
           '  4.0.10',
     );
@@ -1319,6 +1324,62 @@ library_count=1
         contains('Gemfile must contain only the reviewed RubyGems source'),
         contains('Every locked Ruby gem must carry one SHA-256 checksum'),
       ]),
+    );
+  });
+
+  test('rejects missing Ruby 4 kconv dependency', () {
+    final gemfile = File('${repository.path}/Gemfile');
+    gemfile.writeAsStringSync(
+      gemfile.readAsStringSync().replaceFirst('gem "nkf", "0.3.0"', ''),
+    );
+    final result = _verify(
+      repository,
+      flutterVersionMetadata,
+      flutterExtension,
+      flutterGradleUtils,
+    );
+    expect(result.failures, contains(contains('Gemfile must pin NKF 0.3.0')));
+  });
+
+  test('rejects NKF version or reviewed checksum drift', () {
+    final lock = File('${repository.path}/Gemfile.lock');
+    lock.writeAsStringSync(
+      lock.readAsStringSync().replaceAll('nkf (0.3.0)', 'nkf (0.3.1)'),
+    );
+    final result = _verify(
+      repository,
+      flutterVersionMetadata,
+      flutterExtension,
+      flutterGradleUtils,
+    );
+    expect(
+      result.failures,
+      containsAll(<Matcher>[
+        contains('Gemfile.lock must resolve NKF 0.3.0 exactly'),
+        contains('Gemfile.lock must use the reviewed NKF 0.3.0 checksum'),
+      ]),
+    );
+  });
+
+  test('rejects a substituted NKF artifact with a well-formed digest', () {
+    final lock = File('${repository.path}/Gemfile.lock');
+    lock.writeAsStringSync(
+      lock.readAsStringSync().replaceFirst(
+        '357a8dbeba38b727b75930f665146546076a394a1c243faf634ff176e3588895',
+        'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
+      ),
+    );
+    final result = _verify(
+      repository,
+      flutterVersionMetadata,
+      flutterExtension,
+      flutterGradleUtils,
+    );
+    expect(
+      result.failures,
+      contains(
+        contains('Gemfile.lock must use the reviewed NKF 0.3.0 checksum'),
+      ),
     );
   });
 

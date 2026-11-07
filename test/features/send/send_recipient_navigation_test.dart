@@ -66,7 +66,6 @@ void main() {
         );
         expect(find.byType(SendAmountScreen), findsNothing);
         expect(find.byType(SendAddressCard), findsOneWidget);
-        expect(find.byType(AsterStatusMessage), findsNothing);
         expect(find.text(message), findsNothing);
         expect(harness.toasts.messages, hasLength(1));
         expect(harness.toasts.messages.single.title, 'Check recipient');
@@ -187,7 +186,6 @@ void main() {
       );
       expect(pending.loading, isTrue);
       expect(pending.enabled, isFalse);
-      expect(find.byType(AsterStatusMessage), findsNothing);
       expect(harness.toasts.messages, isEmpty);
 
       balanceGate.complete();
@@ -253,7 +251,6 @@ void main() {
       await _waitForRecipient(tester);
 
       expect(find.byType(SendAmountScreen), findsNothing);
-      expect(find.byType(AsterStatusMessage), findsNothing);
       expect(harness.toasts.messages, hasLength(1));
       expect(harness.toasts.messages.single.title, 'Invoice expired');
       expect(
@@ -304,7 +301,6 @@ void main() {
         RoutePaths.sendAddressFor(_bitcoinTarget.slug),
       );
       expect(find.byType(SendAmountScreen), findsNothing);
-      expect(find.byType(AsterStatusMessage), findsNothing);
       expect(find.text(balanceFailure.userMessage), findsNothing);
       expect(harness.toasts.messages, hasLength(1));
       expect(harness.toasts.messages.single.title, 'Balance unavailable');
@@ -554,7 +550,6 @@ void main() {
     );
     expect(find.byType(SendAmountScreen), findsNothing);
     expect(find.text('Enter a valid payment destination.'), findsNothing);
-    expect(find.byType(AsterStatusMessage), findsNothing);
     expect(harness.toasts.messages, isEmpty);
     expect(engine.sentPaymentCommand, isNull);
     await tester.pump(const Duration(milliseconds: 1));

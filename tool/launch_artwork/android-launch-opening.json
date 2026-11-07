@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "sourceSha256": {
+    "lib/shared/branding/aster_launch_logo.dart": "ce423b056b1446f25fb11f505ac8d10259693fd079b7499a6a54eaf1b8ffdee7",
+    "lib/shared/branding/aster_logo_geometry.dart": "e7e542c23924e978eb5e7ac035ef53fabbccd4acb3961bdf1c61e99f183b3271",
+    "lib/shared/screens/animated_splash_screen.dart": "54988d3c71d5933e96682445bc61651a2afc3859885a12a256ddad742c0668ab",
+    "lib/shared/theme/tokens/color_tokens.dart": "63d1bd30bf4cd1b35f230166240b970b515e870cfcb77aeec5673a1f454de61d",
+    "lib/shared/theme/tokens/component_metrics_tokens.dart": "269e6926fe4b3298780c60dc745d5b992f90f0efeb343c3812867d17a314b8a5"
+  },
+  "rendererTool": "tool/render_android_launch_logo_test.dart",
+  "rendererToolSha256": "b683d07eb0300baa22e579f02243001da9538b068e7e728efdf754ef17f1fadd",
+  "viewportDp": 288,
+  "safeDiameterDp": 192,
+  "visibleMarkWidthDp": 160.0,
+  "markSourceUnits": [
+    705.0,
+    373.0
+  ],
+  "blueArgb": "FF001AFF",
+  "sourcePose": {
+    "colorProgress": 0,
+    "expansion": 0,
+    "rotation": 0
+  },
+  "renderSpecSha256": "d950aadcdfca5921899e262bdb2d1e07e29e460b0d700f6a1b685905d39ed4aa",
+  "colorSpace": "sRGB",
+  "outputs": [
+    {
+      "density": "mdpi",
+      "path": "android/app/src/main/res/drawable-mdpi/aster_launch_opening.png",
+      "pixelSize": [
+        288,
+        288
+      ],
+      "scale": 1,
+      "pngSha256": "3a875f08948a45856c8c14ee9c23bbbfab9882e626c291de506e5deda3281d01"
+    },
+    {
+      "density": "hdpi",
+      "path": "android/app/src/main/res/drawable-hdpi/aster_launch_opening.png",
+      "pixelSize": [
+        432,
+        432
+      ],
+      "scale": 1.5,
+      "pngSha256": "5d463f8f8ce49d6b40692cd72881625ceb495e9a4b063b6a6e93ee947c20ed5d"
+    },
+    {
+      "density": "xhdpi",
+      "path": "android/app/src/main/res/drawable-xhdpi/aster_launch_opening.png",
+      "pixelSize": [
+        576,
+        576
+      ],
+      "scale": 2,
+      "pngSha256": "b5a3903e62ae126c08b90cbb9b2ca78491d304f4091ab09a570dbcfd46d116cc"
+    },
+    {
+      "density": "xxhdpi",
+      "path": "android/app/src/main/res/drawable-xxhdpi/aster_launch_opening.png",
+      "pixelSize": [
+        864,
+        864
+      ],
+      "scale": 3,
+      "pngSha256": "71ac69696c85f4ad145004b7b51bb2b974426f6667189e998638a35f4a975d28"
+    },
+    {
+      "density": "xxxhdpi",
+      "path": "android/app/src/main/res/drawable-xxxhdpi/aster_launch_opening.png",
+      "pixelSize": [
+        1152,
+        1152
+      ],
+      "scale": 4,
+      "pngSha256": "bc6922b4c87ba046c6b2f2a7c20277356e1e8059b55418ccbb2f36866569f1f9"
+    }
+  ],
+  "dartVersion": "3.13.5 (stable) (Tue Sep 29 01:00:52 2026 -0700) on \"macos_arm64\"",
+  "renderer": "Actual AsterLaunchLogo.paint at colorProgress zero; unchanged geometry, mask and effects"
+}

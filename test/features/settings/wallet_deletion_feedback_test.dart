@@ -355,6 +355,7 @@ final class _FeedbackHarness {
           h._deleteReplied = true;
           return result;
         case 'cancel':
+        case 'finishAuthenticationPresentation':
         case 'setSensitive':
           return null;
         default:

@@ -6,8 +6,10 @@ import android.system.OsConstants
 import android.os.Handler
 import android.os.Looper
 import android.os.Build
+import android.os.Bundle
 import android.content.pm.PackageManager
 import android.content.Intent
+import androidx.core.view.WindowCompat
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.plugin.common.MethodCall
@@ -29,6 +31,17 @@ class MainActivity : FlutterActivity() {
     private var localNetworkChannel: MethodChannel? = null
     private var localNetworkRequest: LocalNetworkPermissionRequest? = null
     private var localNetworkTimeout: Runnable? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        // Native and Flutter opening artwork share the full window centre.
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // The embedding waits for Flutter's first frame. Remove the native
+            // surface then, without Android fading the matching logo twice.
+            splashScreen.setOnExitAnimationListener { it.remove() }
+        }
+        super.onCreate(savedInstanceState)
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -97,7 +110,7 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onPause() {
-        deviceAuthentication.coverForBackground()
+        deviceAuthentication.onHostPaused()
         super.onPause()
     }
 

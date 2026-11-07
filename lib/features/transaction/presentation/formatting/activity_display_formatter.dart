@@ -30,6 +30,8 @@ final class ActivityDisplayFormatter {
       WalletActivityOperation.bitcoinSelfTransfer => 'Transfer to self',
       WalletActivityOperation.bitcoinUtxoCreation => 'UTXO preparation',
       WalletActivityOperation.rgbAnchor => 'RGB anchor',
+      WalletActivityOperation.rgbMint => 'RGB mint',
+      WalletActivityOperation.rgbLink => 'RGB asset link',
       _ => 'Wallet operation',
     },
     WalletActivityDirection.unknown => 'Lightning payment',
@@ -48,6 +50,8 @@ final class ActivityDisplayFormatter {
         WalletActivityOperation.rgbIssuance => 'RGB issuance',
         WalletActivityOperation.rgbInflation => 'RGB inflation',
         WalletActivityOperation.rgbBurn => 'RGB burn',
+        WalletActivityOperation.rgbMint => 'RGB mint',
+        WalletActivityOperation.rgbLink => 'RGB asset link',
         WalletActivityOperation.lightningPayment => 'Lightning payment',
       };
 

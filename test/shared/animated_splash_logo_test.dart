@@ -105,22 +105,20 @@ void main() {
     }
 
     final opening = await frame(0);
-    final bounds = _whiteBounds(opening, 390);
+    final bounds = _blueBounds(opening, 390);
     final reference = (await tester.runAsync(() async {
       final svg = await vg.loadPicture(
-        SvgStringLoader(File('assets/brand/aster-mark.svg').readAsStringSync()),
+        SvgStringLoader(
+          File('assets/brand/aster-mark.svg')
+              .readAsStringSync()
+              .replaceFirst('fill="white"', 'fill="#001AFF"'),
+        ),
         null,
       );
       try {
         return await _raster(390, 844, (canvas) {
           const viewport = Rect.fromLTWH(0, 0, 390, 844);
-          canvas.drawRect(
-            viewport,
-            Paint()
-              ..shader = AsterGradients.light.splashBackdrop
-                  .toLinearGradient()
-                  .createShader(viewport),
-          );
+          canvas.drawRect(viewport, Paint()..color = Colors.white);
           final scale =
               const AsterComponentMetrics().splashLogoWidth / svg.size.width;
           canvas
@@ -135,26 +133,26 @@ void main() {
         svg.picture.dispose();
       }
     }))!;
-    // Anti-aliased tips blend into the gradient; compare against the actual
+    // Anti-aliased tips blend into white; compare against the actual
     // shipped SVG on the same viewport/background rather than rounded bounds.
-    expect(bounds, _whiteBounds(reference, 390));
+    expect(bounds, _blueBounds(reference, 390));
 
     final rotating = await frame(0.096);
-    expect(_whiteBounds(rotating, 390).height, lessThan(bounds.height));
+    expect(_blueBounds(rotating, 390).height, lessThan(bounds.height));
 
     final motion = const AsterMotion();
     final beforeHandoff = await frame(motion.splashLinesLengthStart);
     final afterHandoff = await frame(motion.splashLinesLengthStart + 0.0001);
     // The full-width middle line remains solid when reveal bars take over.
     for (final pixels in [beforeHandoff, afterHandoff]) {
-      expect(_whiteBounds(pixels, 390).width, 390);
+      expect(_blueBounds(pixels, 390).width, 390);
       for (var x = 0; x < 390; x += 1) {
-        expect(_isWhite(pixels, (422 * 390 + x) * 4), isTrue);
+        expect(_isBlue(pixels, (422 * 390 + x) * 4), isTrue);
       }
     }
 
     final settled = await frame(1);
-    expect(_whiteBounds(settled, 390), Rect.zero);
+    expect(_blueBounds(settled, 390), Rect.zero);
     var fullyCleared = true;
     for (var i = 0; i < settled.length; i += 4) {
       if (settled[i] != 233 ||
@@ -188,16 +186,16 @@ Future<Uint8List> _raster(
   }
 }
 
-bool _isWhite(Uint8List pixels, int index) =>
-    pixels[index] > 245 && pixels[index + 1] > 245 && pixels[index + 2] > 245;
+bool _isBlue(Uint8List pixels, int index) =>
+    pixels[index] < 10 && pixels[index + 1] < 40 && pixels[index + 2] > 245;
 
-Rect _whiteBounds(Uint8List pixels, int width) {
+Rect _blueBounds(Uint8List pixels, int width) {
   var left = width;
   var right = -1;
   var top = pixels.length ~/ (width * 4);
   var bottom = -1;
   for (var i = 0; i < pixels.length; i += 4) {
-    if (!_isWhite(pixels, i)) continue;
+    if (!_isBlue(pixels, i)) continue;
     final x = i ~/ 4 % width;
     final y = i ~/ 4 ~/ width;
     if (x < left) left = x;

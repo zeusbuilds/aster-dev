@@ -2,6 +2,43 @@ import 'package:aster/core/core.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    'RGB_L1 configuration uses its own network and backing chain policy',
+    () {
+      WalletServiceConfiguration configuration({
+        String network = 'signet',
+        String? rpc,
+        String? chain,
+        String? lsp,
+        String? vss,
+      }) => WalletServiceConfiguration(
+        environment: BlockchainEnvironment.signet,
+        sdkNetwork: network,
+        backend: WalletBackend.rgbL1,
+        ethRpcUrl: rpc,
+        ethChainId: chain,
+        lspBaseUrl: lsp,
+        vssUrl: vss,
+      );
+
+      const rpc = 'https://rpc.aster-wallet.com';
+      expect(configuration().validate, returnsNormally);
+      expect(
+        configuration(rpc: rpc, chain: '18446744073709551615').validate,
+        returnsNormally,
+      );
+      for (final invalid in [
+        configuration(network: 'utexo'),
+        configuration(rpc: rpc),
+        configuration(rpc: rpc, chain: '18446744073709551616'),
+        configuration(lsp: 'https://lsp.aster-wallet.com'),
+        configuration(vss: 'https://vss.aster-wallet.com'),
+      ]) {
+        expect(invalid.validate, throwsA(isA<AppConfigurationException>()));
+      }
+    },
+  );
+
   test('mainnet USDT requires explicit BFA RPC and chain binding', () {
     WalletServiceConfiguration configuration({String? rpc, String? chain}) =>
         WalletServiceConfiguration(

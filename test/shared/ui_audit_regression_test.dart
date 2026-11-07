@@ -281,7 +281,11 @@ void main() {
           )
           .first;
       final before = tester.state<ScrollableState>(scrollFinder);
-      before.position.jumpTo(150);
+      // Use a reachable offset as Settings sections change; overscrolling is
+      // corrected by physics and does not test tab-state preservation.
+      final offset = before.position.maxScrollExtent / 2;
+      expect(offset, greaterThan(0));
+      before.position.jumpTo(offset);
       for (var i = 0; i < 4; i++) {
         h.container.read(appShellIndexProvider.notifier).setIndex(2);
         await tester.pump();
@@ -289,7 +293,7 @@ void main() {
         await tester.pump();
         final after = tester.state<ScrollableState>(scrollFinder);
         expect(identical(before, after), isTrue);
-        expect(after.position.pixels, 150);
+        expect(after.position.pixels, offset);
       }
     },
   );

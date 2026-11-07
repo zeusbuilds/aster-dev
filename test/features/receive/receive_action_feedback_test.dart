@@ -126,7 +126,6 @@ void main() {
           initialQr.encodedRequest,
         );
         expect(find.text('Generating'), findsNothing);
-        expect(find.byType(AsterStatusMessage), findsNothing);
         for (final title in ['Set amount', 'Generate new request', 'Share']) {
           expect(
             tester
@@ -182,7 +181,6 @@ void main() {
       expect(harness.container.read(provider).requireValue.request, initial);
       expect(find.text(initial.displayValue), findsOneWidget);
       expect(find.text(_generationFailure.userMessage), findsNothing);
-      expect(find.byType(AsterStatusMessage), findsNothing);
       expect(harness.toasts.messages, hasLength(1));
       expect(
         harness.toasts.messages.single.title,
@@ -255,7 +253,6 @@ void main() {
       expect(find.byType(ReceiveAmountSheet), findsOneWidget);
       expect(harness.container.read(provider).requireValue.request, initial);
       expect(find.text(_generationFailure.userMessage), findsNothing);
-      expect(find.byType(AsterStatusMessage), findsNothing);
       expect(harness.toasts.messages, hasLength(1));
       expect(harness.toasts.messages.single.title, 'Amount not applied');
       expect(

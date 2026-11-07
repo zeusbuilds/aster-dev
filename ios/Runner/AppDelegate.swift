@@ -2,6 +2,7 @@ import Flutter
 import Darwin
 import UIKit
 import LocalAuthentication
+import CoreImage
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
@@ -81,6 +82,7 @@ import LocalAuthentication
   private var monitoringPrivacy = false
   private var privacyWindows: [String: UIWindow] = [:]
   private var monitoredScenes = Set<String>()
+  private var authenticationPrivacy = ForegroundAuthenticationPrivacy()
 
   private override init() { super.init() }
 
@@ -113,6 +115,18 @@ import LocalAuthentication
         self.authenticate(reason: reason, result: result)
       case "cancel":
         self.cancelAuthentication()
+        result(nil)
+      case "finishAuthenticationPresentation":
+        guard self.pending == nil else {
+          result(self.failure("busy"))
+          return
+        }
+        let owner = self.authenticationPrivacy.ownerSceneID
+        let active = UIApplication.shared.connectedScenes.contains {
+          $0.session.persistentIdentifier == owner && $0.activationState == .foregroundActive
+        }
+        self.authenticationPrivacy.finishPresentation(sceneIsActive: active)
+        self.updateAllPrivacyWindows()
         result(nil)
       case "setSensitive":
         guard let arguments = call.arguments as? [String: Any],
@@ -160,9 +174,11 @@ import LocalAuthentication
       result(failure("unavailable"))
       return
     }
-    guard UIApplication.shared.connectedScenes.contains(where: {
-      $0.activationState == .foregroundActive
-    }) else {
+    // Bind this exemption to the scene presenting our own OS prompt. Another
+    // window becoming inactive must never inherit its privacy exemption.
+    guard let scene = UIApplication.shared.connectedScenes
+      .compactMap({ $0 as? UIWindowScene })
+      .first(where: { $0.activationState == .foregroundActive }) else {
       result(failure("not_active"))
       return
     }
@@ -174,12 +190,13 @@ import LocalAuthentication
     context = nextContext
     pending = result
     requestID = id
+    authenticationPrivacy.begin(in: scene.session.persistentIdentifier)
     nextContext.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason) {
       [weak self] success, error in
       DispatchQueue.main.async {
         guard let self, self.requestID == id else { return }
         if success {
-          self.completeAuthentication("authenticated")
+          self.completeAuthentication("authenticated", returningFromOwnedPrompt: true)
           return
         }
         let nativeError = error as NSError?
@@ -190,14 +207,18 @@ import LocalAuthentication
           return
         }
         switch code {
-        case .userCancel, .systemCancel, .appCancel:
+        case .userCancel:
+          self.completeAuthentication("cancelled", returningFromOwnedPrompt: true)
+        case .systemCancel, .appCancel:
+          // Calls, Home/Recents and other interruptions must not inherit the
+          // exemption merely because a local authentication request existed.
           self.completeAuthentication("cancelled")
         case .passcodeNotSet:
-          self.completeAuthentication("unsecured")
+          self.completeAuthentication("unsecured", returningFromOwnedPrompt: true)
         case .authenticationFailed:
-          self.completeAuthentication(self.failure("failed"))
+          self.completeAuthentication(self.failure("failed"), returningFromOwnedPrompt: true)
         case .biometryLockout:
-          self.completeAuthentication(self.failure("locked_out"))
+          self.completeAuthentication(self.failure("locked_out"), returningFromOwnedPrompt: true)
         default:
           self.completeAuthentication(self.failure("unavailable"))
         }
@@ -205,17 +226,23 @@ import LocalAuthentication
     }
   }
 
-  private func completeAuthentication(_ response: Any) {
+  private func completeAuthentication(
+    _ response: Any,
+    returningFromOwnedPrompt: Bool = false
+  ) {
+    authenticationPrivacy.finish(returningFromOwnedPrompt: returningFromOwnedPrompt)
     let reply = pending
     pending = nil
     requestID = nil
     context?.invalidate()
     context = nil
+    updateAllPrivacyWindows()
     reply?(response)
   }
 
   private func cancelAuthentication() {
-    guard pending != nil else { return }
+    // A result may already have been delivered while UIKit is dismissing the
+    // prompt. Cancellation/engine cleanup must revoke that presentation too.
     completeAuthentication("cancelled")
   }
 
@@ -246,23 +273,35 @@ import LocalAuthentication
     let id = scene.session.persistentIdentifier
     let name = notification.name
     if name == UIScene.didDisconnectNotification {
+      if authenticationPrivacy.revoke(in: id) {
+        channel?.invokeMethod("backgrounded", arguments: nil)
+        cancelAuthentication()
+      }
       privacyWindows.removeValue(forKey: id)?.isHidden = true
       monitoredScenes.remove(id)
+      authenticationPrivacy.didDisconnect(in: id)
       refreshCaptureState()
       return
     }
     monitorCapture(scene)
-    if name == UIScene.willDeactivateNotification ||
-      name == UIScene.didEnterBackgroundNotification {
-      // Synchronous native cover precedes UIKit's app-switcher snapshot.
-      // Do not cancel on inactivity: the system auth prompt causes it too.
-      showPrivacyWindow(scene)
-    } else {
-      updatePrivacyWindow(scene)
-    }
     if name == UIScene.didEnterBackgroundNotification {
+      // This notification precedes UIKit's task snapshot. Cover synchronously,
+      // even if our prompt was still pending when the user left the app.
+      showPrivacyWindow(scene)
+      authenticationPrivacy.didEnterBackground(in: id)
       channel?.invokeMethod("backgrounded", arguments: nil)
       cancelAuthentication()
+    } else {
+      if name == UIScene.didActivateNotification {
+        authenticationPrivacy.didActivate(in: id)
+      }
+      // willDeactivate may arrive before activationState is updated. Supply
+      // the event's state rather than briefly uncovering an unknown interruption.
+      updatePrivacyWindow(
+        scene,
+        activationState: name == UIScene.willDeactivateNotification
+          ? .foregroundInactive : scene.activationState
+      )
     }
     refreshCaptureState()
   }
@@ -291,9 +330,16 @@ import LocalAuthentication
     }
   }
 
-  private func updatePrivacyWindow(_ scene: UIWindowScene) {
-    if scene.activationState != .foregroundActive ||
-      (sensitive && scene.traitCollection.sceneCaptureState == .active) {
+  private func updatePrivacyWindow(
+    _ scene: UIWindowScene,
+    activationState: UIScene.ActivationState? = nil
+  ) {
+    if authenticationPrivacy.shouldCover(
+      sceneID: scene.session.persistentIdentifier,
+      activationState: activationState ?? scene.activationState,
+      sensitive: sensitive,
+      captured: scene.traitCollection.sceneCaptureState == .active
+    ) {
       showPrivacyWindow(scene)
     } else {
       privacyWindows.removeValue(forKey: scene.session.persistentIdentifier)?.isHidden = true
@@ -315,31 +361,218 @@ import LocalAuthentication
   private enum AuthenticationFailure: Error { case unavailable }
 }
 
+/// An authentication-owned inactive interval is not a background transition.
+/// Keep the source page below the system prompt, without granting access until
+/// Flutter has independently observed a resumed foreground. Background and
+/// capture protection always take precedence, including during prompt dismissal.
+struct ForegroundAuthenticationPrivacy {
+  private(set) var ownerSceneID: String?
+  private var evaluating = false
+  private var releaseRequested = false
+  private var backgroundScenes = Set<String>()
+
+  mutating func begin(in sceneID: String) {
+    ownerSceneID = sceneID
+    evaluating = true
+    releaseRequested = false
+  }
+
+  mutating func finish(returningFromOwnedPrompt: Bool) {
+    evaluating = false
+    // A result can precede UIKit's last inactive/active notifications. The
+    // caller acknowledges resumed foreground before releasing presentation.
+    if !returningFromOwnedPrompt {
+      ownerSceneID = nil
+      releaseRequested = false
+    }
+  }
+
+  mutating func finishPresentation(sceneIsActive: Bool) {
+    guard !evaluating else { return }
+    releaseRequested = true
+    if sceneIsActive {
+      ownerSceneID = nil
+    }
+  }
+
+  mutating func didActivate(in sceneID: String) {
+    backgroundScenes.remove(sceneID)
+    if ownerSceneID == sceneID && releaseRequested && !evaluating {
+      ownerSceneID = nil
+    }
+  }
+
+  mutating func didEnterBackground(in sceneID: String) {
+    backgroundScenes.insert(sceneID)
+    revoke(in: sceneID)
+  }
+
+  mutating func didDisconnect(in sceneID: String) {
+    backgroundScenes.remove(sceneID)
+    revoke(in: sceneID)
+  }
+
+  @discardableResult
+  mutating func revoke(in sceneID: String) -> Bool {
+    guard ownerSceneID == sceneID else { return false }
+    ownerSceneID = nil
+    evaluating = false
+    releaseRequested = false
+    return true
+  }
+
+  func shouldCover(
+    sceneID: String,
+    activationState: UIScene.ActivationState,
+    sensitive: Bool,
+    captured: Bool
+  ) -> Bool {
+    if backgroundScenes.contains(sceneID) || (sensitive && captured) { return true }
+    switch activationState {
+    case .foregroundActive:
+      return false
+    case .foregroundInactive:
+      return ownerSceneID != sceneID
+    case .background, .unattached:
+      return true
+    @unknown default:
+      return true
+    }
+  }
+}
+
 private final class WalletPrivacyViewController: UIViewController {
+  override var preferredStatusBarStyle: UIStatusBarStyle { .darkContent }
+
   override func loadView() {
-    let root = UIView()
-    root.backgroundColor = .black
-    let background = UIImageView(image: UIImage(named: "aster-launch-background"))
-    background.contentMode = .scaleAspectFill
-    background.clipsToBounds = true
-    background.translatesAutoresizingMaskIntoConstraints = false
-    let mark = UIImageView(image: UIImage(named: "aster-privacy-mark"))
-    mark.contentMode = .scaleAspectFit
-    mark.translatesAutoresizingMaskIntoConstraints = false
-    root.addSubview(background)
-    root.addSubview(mark)
-    NSLayoutConstraint.activate([
-      background.leadingAnchor.constraint(equalTo: root.leadingAnchor),
-      background.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-      background.topAnchor.constraint(equalTo: root.topAnchor),
-      background.bottomAnchor.constraint(equalTo: root.bottomAnchor),
-      mark.centerXAnchor.constraint(equalTo: root.centerXAnchor),
-      mark.centerYAnchor.constraint(equalTo: root.centerYAnchor),
-      mark.widthAnchor.constraint(equalToConstant: 160),
-      mark.heightAnchor.constraint(equalToConstant: 128),
+    view = WalletPrivacyView()
+  }
+}
+
+/// Independent from the user-owned launch storyboard and app-icon artwork.
+/// All privacy states share the initial launch artwork. It is rendered once
+/// per display scale, never sampled from wallet UI.
+final class WalletPrivacyView: UIView {
+  private let mark = UIImageView()
+  private var renderedScale: CGFloat = 0
+  private static let logoWidth: CGFloat = 160
+  private static let logoHeight = logoWidth * 373 / 705
+  // The supplied Figma export is 765 × 433 with the mark at (30, 20).
+  // Preserve its filter clipping and scale effects with the 705-wide artwork.
+  private static let artworkScale = logoWidth / 705
+  private static let leftPadding = 30 * artworkScale
+  private static let topPadding = 20 * artworkScale
+  private static let canvasSize = CGSize(width: 765 * artworkScale, height: 433 * artworkScale)
+  private static let imageContext = CIContext(options: [.cacheIntermediates: false])
+
+  override init(frame: CGRect = .zero) {
+    super.init(frame: frame)
+    isOpaque = true
+    backgroundColor = .white
+    accessibilityElementsHidden = true
+    addSubview(mark)
+    mark.isAccessibilityElement = false
+  }
+
+  required init?(coder: NSCoder) { fatalError("init(coder:) is unsupported") }
+
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    CATransaction.begin()
+    CATransaction.setDisableActions(true)
+    mark.frame = CGRect(
+      x: (bounds.width - Self.logoWidth) / 2 - Self.leftPadding,
+      y: (bounds.height - Self.logoHeight) / 2 - Self.topPadding,
+      width: Self.canvasSize.width,
+      height: Self.canvasSize.height
+    )
+    CATransaction.commit()
+    let scale = max(traitCollection.displayScale, 1)
+    if renderedScale != scale {
+      mark.image = Self.renderLogo(scale: scale)
+      renderedScale = scale
+    }
+  }
+
+  private static func renderLogo(scale: CGFloat) -> UIImage {
+    let format = UIGraphicsImageRendererFormat()
+    format.opaque = false
+    format.scale = scale
+    let source = UIGraphicsImageRenderer(size: canvasSize, format: format).image { renderer in
+      let context = renderer.cgContext
+      context.saveGState()
+      context.translateBy(x: leftPadding, y: topPadding)
+      context.scaleBy(x: artworkScale, y: artworkScale)
+      context.addPath(logoPath())
+      context.clip()
+      let blue = UIColor(red: 0, green: 26 / 255, blue: 1, alpha: 1)
+      let colors = [blue.cgColor, blue.withAlphaComponent(0.3).cgColor] as CFArray
+      let gradient = CGGradient(
+        colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0.346154, 1]
+      )!
+      context.drawLinearGradient(
+        gradient, start: .zero, end: CGPoint(x: 0, y: 373),
+        options: [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+      )
+      context.restoreGState()
+    }
+    guard let original = source.cgImage else { return source }
+    let image = CIImage(cgImage: original)
+    // Figma's exported filter creates a hard silhouette, then removes the
+    // interior from each shadow. A translucent gradient must not show a
+    // shadow underneath the logo itself.
+    let hardAlpha = image.applyingFilter("CIColorMatrix", parameters: [
+      "inputRVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+      "inputGVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+      "inputBVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+      "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 127),
+    ]).applyingFilter("CIColorClamp", parameters: [
+      "inputMinComponents": CIVector(x: 0, y: 0, z: 0, w: 0),
+      "inputMaxComponents": CIVector(x: 1, y: 1, z: 1, w: 1),
     ])
-    root.accessibilityElementsHidden = true
-    view = root
+    func shadow(opacity: CGFloat, offset: CGFloat, sigma: CGFloat) -> CIImage {
+      // Core Image uses a bottom-left origin: negative Y moves the shadow down.
+      hardAlpha.transformed(by: CGAffineTransform(
+        translationX: 0, y: -offset * artworkScale * scale
+      )).applyingFilter("CIGaussianBlur", parameters: [
+        "inputRadius": sigma * artworkScale * scale,
+      ]).applyingFilter("CISourceOutCompositing", parameters: [
+        kCIInputBackgroundImageKey: hardAlpha,
+      ]).applyingFilter("CIColorMatrix", parameters: [
+        "inputRVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+        "inputGVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+        "inputBVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+        "inputAVector": CIVector(x: 0, y: 0, z: 0, w: opacity),
+      ])
+    }
+    // Blur 30/6 is sigma 15/3 in source units, matching the supplied SVG.
+    let lower = shadow(opacity: 0.06, offset: 10, sigma: 15)
+    let upper = shadow(opacity: 0.1, offset: 2, sigma: 3)
+    let output = image.composited(over: lower.composited(over: upper))
+    guard let rendered = imageContext.createCGImage(output, from: image.extent) else {
+      return source
+    }
+    return UIImage(cgImage: rendered, scale: scale, orientation: .up)
+  }
+
+  private static func logoPath() -> CGPath {
+    // Exact outline of assets/brand/aster-mark.svg, including export asymmetry.
+    let vertices: [CGPoint] = [
+      CGPoint(x: 539.285, y: 28.6915), CGPoint(x: 401.285, y: 166.366),
+      CGPoint(x: 705, y: 166.366), CGPoint(x: 705, y: 206.944),
+      CGPoint(x: 401.596, y: 206.944), CGPoint(x: 539.285, y: 344.308),
+      CGPoint(x: 510.526, y: 373), CGPoint(x: 352.343, y: 215.19),
+      CGPoint(x: 194.163, y: 373), CGPoint(x: 165.403, y: 344.308),
+      CGPoint(x: 303.093, y: 206.944), CGPoint(x: 151.546, y: 206.944),
+      CGPoint(x: 0, y: 206.944), CGPoint(x: 0, y: 166.366),
+      CGPoint(x: 303.404, y: 166.366), CGPoint(x: 165.403, y: 28.6915),
+      CGPoint(x: 194.165, y: 0), CGPoint(x: 352.343, y: 157.807),
+      CGPoint(x: 510.526, y: 0),
+    ]
+    let path = CGMutablePath()
+    path.addLines(between: vertices)
+    path.closeSubpath()
+    return path
   }
 }
 

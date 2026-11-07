@@ -52,6 +52,8 @@ enum WalletActivityOperation {
   rgbIssuance,
   rgbInflation,
   rgbBurn,
+  rgbMint,
+  rgbLink,
   lightningPayment,
 }
 
@@ -296,6 +298,8 @@ final class WalletActivity {
     WalletActivityOperation.rgbIssuance ||
     WalletActivityOperation.rgbInflation ||
     WalletActivityOperation.rgbBurn ||
+    WalletActivityOperation.rgbMint ||
+    WalletActivityOperation.rgbLink ||
     WalletActivityOperation.lightningPayment => false,
   };
 
@@ -306,6 +310,8 @@ final class WalletActivity {
     WalletActivityOperation.rgbIssuance ||
     WalletActivityOperation.rgbInflation =>
       direction == WalletActivityDirection.received,
+    WalletActivityOperation.rgbMint || WalletActivityOperation.rgbLink =>
+      direction == WalletActivityDirection.internal,
     WalletActivityOperation.bitcoinSend ||
     WalletActivityOperation.bitcoinSelfTransfer ||
     WalletActivityOperation.bitcoinReceive ||

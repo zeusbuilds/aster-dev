@@ -85,18 +85,10 @@ class _SecuritySettingsScreenState
                 padding: EdgeInsets.symmetric(vertical: context.spacing.xs),
                 child: Column(
                   children: [
-                    SwitchListTile.adaptive(
+                    AsterOptionRow.toggle(
                       key: const ValueKey('security-app-lock-switch'),
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: context.spacing.screenPadding,
-                        vertical: context.spacing.sm,
-                      ),
-                      title: Text('App lock', style: context.type.rowTitle),
-                      secondary: Icon(
-                        MingCuteIcons.mgc_lock_line,
-                        size: context.icons.sm,
-                        color: context.appColors.textSecondary,
-                      ),
+                      title: 'App lock',
+                      prefixIcon: MingCuteIcons.mgc_lock_line,
                       value: enabled,
                       onChanged: secured && !busy
                           ? (value) => unawaited(_changeLock(value))

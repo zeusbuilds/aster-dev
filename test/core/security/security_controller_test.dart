@@ -694,6 +694,185 @@ void main() {
   });
 
   group('lifecycle and preferences', () {
+    for (final unlocking in [false, true]) {
+      test(
+        'revocation at auth completion cannot ${unlocking ? 'unlock' : 'mint a grant'} '
+        'even when app lock is disabled',
+        () async {
+          final controller = _controller(_Device(), appLockEnabled: false);
+          await controller.initialize(hasWallet: true);
+          var armed = false;
+          controller.addListener(() {
+            if (controller.isAuthenticating) {
+              armed = true;
+            } else if (armed) {
+              armed = false;
+              controller.lock();
+            }
+          });
+          if (unlocking) {
+            expect(await controller.unlock(), isFalse);
+          } else {
+            expect(
+              await controller.authorize(SecurityPurpose.walletSetup),
+              isNull,
+            );
+          }
+          expect(controller.isAuthenticating, isFalse);
+        },
+      );
+    }
+
+    for (final purpose in SecurityPurpose.values) {
+      test('owned $purpose keeps source visible without issuing authority '
+          'until resume', () async {
+        final device = _Device();
+        final controller = _controller(device, appLockEnabled: false);
+        await controller.initialize(hasWallet: true);
+        controller.updateWallet('wallet-a');
+        final generation = controller.generation;
+        final prompt = device.nextPrompt();
+        final pending = controller.authorize(purpose, walletId: 'wallet-a');
+        await _flush();
+        controller.handleLifecycle(AppLifecycleState.inactive);
+        expect(controller.isObscured, isFalse);
+        expect(controller.canAccessWallet, isFalse);
+        expect(controller.sensitiveVisible, isFalse);
+        expect(controller.generation, generation);
+        prompt.complete(DeviceAuthenticationResult.authenticated);
+        await _flush();
+        expect(controller.isAuthenticating, isTrue);
+        controller.handleLifecycle(AppLifecycleState.resumed);
+        final grant = await pending;
+        expect(
+          controller.consume(grant, purpose, walletId: 'wallet-a'),
+          isTrue,
+        );
+        expect(device.presentationFinishes, 1);
+        expect(device.reasons, hasLength(1));
+      });
+    }
+
+    test('unowned inactivity still obscures the route', () async {
+      final controller = _controller(_Device());
+      await controller.initialize(hasWallet: false);
+      controller.handleLifecycle(AppLifecycleState.inactive);
+      expect(controller.isObscured, isTrue);
+      expect(controller.canAccessWallet, isFalse);
+      expect(await controller.authorize(SecurityPurpose.walletSetup), isNull);
+    });
+
+    test('unrelated inactivity during capability RPC cannot acquire prompt '
+        'ownership', () async {
+      final device = _Device();
+      final controller = _controller(device);
+      await controller.initialize(hasWallet: false);
+      final status = device.nextStatus();
+      final pending = controller.authorize(SecurityPurpose.walletSetup);
+      controller.handleLifecycle(AppLifecycleState.inactive);
+      status.complete(DeviceSecurityStatus.secured);
+      expect(await pending, isNull);
+      expect(controller.isObscured, isTrue);
+      expect(device.reasons, isEmpty);
+      expect(device.presentationFinishes, 0);
+    });
+
+    test(
+      'a failed OS prompt restores cover if host remains inactive',
+      () async {
+        final device = _Device();
+        final controller = _controller(device);
+        await controller.initialize(hasWallet: false);
+        final prompt = device.nextPrompt();
+        final pending = controller.authorize(SecurityPurpose.walletSetup);
+        final checked = expectLater(
+          pending,
+          throwsA(isA<AppFailureException>()),
+        );
+        await _flush();
+        controller.handleLifecycle(AppLifecycleState.inactive);
+        prompt.completeError(StateError('OS interruption'));
+        await checked;
+        expect(controller.isAuthenticating, isFalse);
+        expect(controller.isObscured, isTrue);
+        expect(controller.canAccessWallet, isFalse);
+        expect(device.presentationFinishes, 1);
+      },
+    );
+
+    test('capture during prompt revokes its result even if capture ends '
+        'before success', () async {
+      final device = _Device();
+      final controller = _controller(device);
+      await controller.initialize(hasWallet: false);
+      controller.updateWallet('wallet-a');
+      final prompt = device.nextPrompt();
+      final pending = controller.authorize(
+        SecurityPurpose.revealSeed,
+        walletId: 'wallet-a',
+      );
+      await _flush();
+      device.capture(true);
+      device.capture(false);
+      prompt.complete(DeviceAuthenticationResult.authenticated);
+      expect(await pending, isNull);
+      expect(device.cancelCount, 1);
+      expect(device.presentationFinishes, 1);
+    });
+
+    test('late inactivity during native presentation cleanup waits for '
+        'resume before granting', () async {
+      final device = _Device()..presentationGate = Completer<void>();
+      final controller = _controller(device);
+      await controller.initialize(hasWallet: false);
+      final pending = controller.authorize(SecurityPurpose.walletSetup);
+      await _flush();
+      expect(device.presentationFinishes, 1);
+      controller.handleLifecycle(AppLifecycleState.inactive);
+      device.presentationGate!.complete();
+      await _flush();
+      expect(controller.isAuthenticating, isTrue);
+      expect(controller.isObscured, isFalse);
+      controller.handleLifecycle(AppLifecycleState.resumed);
+      expect(await pending, isNotNull);
+    });
+
+    test(
+      'native cleanup failure never grants access or strands input',
+      () async {
+        final device = _Device()
+          ..presentationError = StateError('cleanup failed');
+        final controller = _controller(device);
+        await controller.initialize(hasWallet: false);
+        await expectLater(
+          controller.authorize(SecurityPurpose.walletSetup),
+          throwsA(isA<AppFailureException>()),
+        );
+        expect(controller.isAuthenticating, isFalse);
+        expect(controller.isObscured, isFalse);
+        expect(device.presentationFinishes, 1);
+      },
+    );
+
+    test('native background overrides owned credential activity with app '
+        'lock disabled', () async {
+      final device = _Device();
+      final controller = _controller(device, appLockEnabled: false);
+      await controller.initialize(hasWallet: true);
+      final prompt = device.nextPrompt();
+      final pending = controller.authorize(SecurityPurpose.exportXpubs);
+      await _flush();
+      controller.handleLifecycle(AppLifecycleState.paused);
+      expect(controller.isObscured, isFalse);
+      device.background();
+      expect(controller.isObscured, isTrue);
+      controller.handleLifecycle(AppLifecycleState.resumed);
+      prompt.complete(DeviceAuthenticationResult.authenticated);
+      expect(await pending, isNull);
+      expect(controller.isLocked, isFalse);
+      expect(device.cancelCount, 1);
+    });
+
     test('newly enabled device credential requires auth on foreground before access', () async {
       final device = _Device()..security = DeviceSecurityStatus.unsecured;
       final controller = _controller(device);
@@ -1069,7 +1248,10 @@ SecurityController _controller(
 Future<void> _flush() => Future<void>.delayed(Duration.zero);
 
 final class _Device
-    implements DeviceAuthentication, DeviceAuthenticationBackgroundEvents {
+    implements
+        DeviceAuthentication,
+        DeviceAuthenticationBackgroundEvents,
+        DeviceAuthenticationPresentation {
   DeviceSecurityStatus security = DeviceSecurityStatus.secured;
   DeviceAuthenticationResult result = DeviceAuthenticationResult.authenticated;
   Object? statusError;
@@ -1077,6 +1259,9 @@ final class _Device
   final reasons = <String>[];
   final sensitiveValues = <bool>[];
   int cancelCount = 0;
+  int presentationFinishes = 0;
+  Completer<void>? presentationGate;
+  Object? presentationError;
   bool _captured = false;
   Completer<DeviceAuthenticationResult>? _nextPrompt;
   Completer<DeviceSecurityStatus>? _nextStatus;
@@ -1114,6 +1299,13 @@ final class _Device
   @override
   Future<void> cancel() async {
     cancelCount += 1;
+  }
+
+  @override
+  Future<void> finishAuthenticationPresentation() async {
+    presentationFinishes++;
+    if (presentationError case final error?) throw error;
+    await presentationGate?.future;
   }
 
   @override

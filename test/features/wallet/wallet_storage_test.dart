@@ -311,6 +311,59 @@ void main() {
     expect(profile.updatedAt, committedAt);
   });
 
+  test('registry records backend only in the format-aware schema', () async {
+    final documents = MemoryWalletRegistryDocumentStore();
+    final store = WalletProfileStore(documents);
+    final now = DateTime.utc(2026, 8, 8);
+    WalletProfile profile(String id, String token, WalletBackend backend) =>
+        WalletProfile(
+          id: id,
+          name: 'Wallet',
+          createdAt: now,
+          updatedAt: now,
+          environment: BlockchainEnvironment.regtest,
+          backend: backend,
+          state: WalletProfileState.provisioning,
+          storageToken: token,
+        );
+    final rln = profile(firstId, firstToken, WalletBackend.rln);
+    final l1 = profile(secondId, secondToken, WalletBackend.rgbL1);
+
+    expect(await store.stageProvision(rln), isA<AppSuccess<WalletRegistry>>());
+    final legacy = jsonDecode(documents.document!) as Map<String, Object?>;
+    expect(legacy['version'], 1);
+    expect(
+      (legacy['profiles'] as List<Object?>).single,
+      isNot(contains('backend')),
+    );
+    expect((await store.read() as AppSuccess<WalletRegistry>).value.profiles, [
+      rln,
+    ]);
+
+    expect(await store.stageProvision(l1), isA<AppSuccess<WalletRegistry>>());
+    final encoded = documents.document!;
+    final upgraded = jsonDecode(encoded) as Map<String, Object?>;
+    expect(upgraded['version'], 2);
+    expect(upgraded['profiles'], [
+      containsPair('backend', 'rln'),
+      containsPair('backend', 'rgb-l1'),
+    ]);
+    expect((await store.read() as AppSuccess<WalletRegistry>).value.profiles, [
+      rln,
+      l1,
+    ]);
+
+    for (final malformed in [
+      encoded.replaceFirst('"version":2', '"version":1'),
+      encoded.replaceFirst('"backend":"rgb-l1",', ''),
+      encoded.replaceFirst('"backend":"rgb-l1"', '"backend":null'),
+      encoded.replaceFirst('"backend":"rgb-l1"', '"backend":"unknown"'),
+    ]) {
+      documents.document = malformed;
+      expect(await store.read(), isA<AppFailureResult<WalletRegistry>>());
+    }
+  });
+
   test('profile state races return explicit redacted conflicts', () async {
     final store = WalletProfileStore(MemoryWalletRegistryDocumentStore());
     final now = DateTime.utc(2026, 8, 8);
@@ -389,9 +442,9 @@ void main() {
     expect(documents.document, '{corrupt');
   });
 
-  test('profile store rejects every non-current schema', () async {
+  test('profile store rejects an unknown schema', () async {
     final encoded = jsonEncode({
-      'version': 2,
+      'version': 3,
       'activeWalletId': null,
       'profiles': <Object?>[],
     });

@@ -762,11 +762,10 @@ packages:
   mobile_scanner:
     dependency: "direct main"
     description:
-      name: mobile_scanner
-      sha256: ce3f059ebd6dbfab7292bba0e893e354b46730636820d3c9ef69005ce2d55bce
-      url: "https://pub.dev"
-    source: hosted
-    version: "7.4.0"
+      path: "packages/mobile_scanner"
+      relative: true
+    source: path
+    version: "7.4.0+aster.1"
   mockito:
     dependency: transitive
     description:
@@ -995,8 +994,8 @@ packages:
     dependency: "direct main"
     description:
       path: "."
-      ref: 68a690916eabe96407c03669d569bf86babb8e72
-      resolved-ref: 68a690916eabe96407c03669d569bf86babb8e72
+      ref: "3e6fb46171e21f02581d752080edd6f2fb8c0116"
+      resolved-ref: "3e6fb46171e21f02581d752080edd6f2fb8c0116"
       url: "https://github.com/zeusbuilds/rgb-sdk-flutter.git"
     source: git
     version: "0.2.0-beta.3"
@@ -1381,6 +1380,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.4.2"
+  very_good_analysis:
+    dependency: "direct dev"
+    description:
+      name: very_good_analysis
+      sha256: "481af67ab5877af20325251dc215a4ebac7666a1c8cf09198ffd457bc612b33d"
+      url: "https://pub.dev"
+    source: hosted
+    version: "10.3.0"
   vm_service:
     dependency: transitive
     description:

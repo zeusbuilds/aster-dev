@@ -1,13 +1,21 @@
 import 'package:flutter/material.dart';
 
+import '../branding/aster_launch_logo.dart';
 import '../branding/aster_logo_geometry.dart';
 import '../theme/theme.dart';
 
 /// Animated splash screen used during app startup.
 class AnimatedSplashScreen extends StatelessWidget {
-  const AnimatedSplashScreen({required this.controller, super.key});
+  const AnimatedSplashScreen({
+    required this.controller,
+    this.colorTransition = const AlwaysStoppedAnimation(1),
+    super.key,
+  });
 
-  final AnimationController controller;
+  final Animation<double> controller;
+
+  /// Runs while the mark is stationary, before the existing reveal begins.
+  final Animation<double> colorTransition;
 
   static AnimationController createController(TickerProvider vsync) {
     return AnimationController(
@@ -15,6 +23,13 @@ class AnimatedSplashScreen extends StatelessWidget {
       duration: const AsterMotion().splashRevealDuration,
     );
   }
+
+  static AnimationController createColorTransitionController(
+    TickerProvider vsync,
+  ) => AnimationController(
+    vsync: vsync,
+    duration: const AsterMotion().splashColorTransitionDuration,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +44,10 @@ class AnimatedSplashScreen extends StatelessWidget {
             alignment: Alignment.center,
             children: [
               _Background(controller: controller),
-              _Foreground(controller: controller),
+              _Foreground(
+                controller: controller,
+                colorTransition: colorTransition,
+              ),
             ],
           ),
         ),
@@ -41,7 +59,7 @@ class AnimatedSplashScreen extends StatelessWidget {
 class _Background extends StatefulWidget {
   const _Background({required this.controller});
 
-  final AnimationController controller;
+  final Animation<double> controller;
 
   @override
   State<_Background> createState() => _BackgroundState();
@@ -81,12 +99,10 @@ class _BackgroundState extends State<_Background> {
 
   @override
   Widget build(BuildContext context) {
-    final gradients = context.gradients;
     return CustomPaint(
       painter: _BackgroundPainter(
         linesLength: _linesLength,
         linesGap: _linesGap,
-        gradient: gradients.splashBackdrop,
         initialLineHeight: AsterLogoGeometry.horizontalThicknessForWidth(
           context.metrics.splashLogoWidth,
         ),
@@ -101,24 +117,23 @@ class _BackgroundPainter extends CustomPainter {
   _BackgroundPainter({
     required this.linesLength,
     required this.linesGap,
-    required this.gradient,
     required this.initialLineHeight,
     required this.maximumLineHeight,
   }) : super(repaint: Listenable.merge([linesLength, linesGap]));
 
   final Animation<double> linesLength;
   final Animation<double> linesGap;
-  final AsterGradientSpec gradient;
   final double initialLineHeight;
   final double maximumLineHeight;
 
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
-    final gradientPaint = Paint()
-      ..shader = gradient.toLinearGradient().createShader(rect);
+    // The opening surface stays white through the fill transition and reveal.
+    // Only the reveal geometry uncovers the app underneath.
+    final backgroundPaint = Paint()..color = AsterColors.launchSurface;
     if (linesLength.value <= 0) {
-      canvas.drawRect(rect, gradientPaint);
+      canvas.drawRect(rect, backgroundPaint);
       return;
     }
 
@@ -134,14 +149,14 @@ class _BackgroundPainter extends CustomPainter {
     final clearBottom = bottomY;
 
     if (clearBottom <= clearTop) {
-      canvas.drawRect(rect, gradientPaint);
+      canvas.drawRect(rect, backgroundPaint);
       return;
     }
     canvas
-      ..drawRect(Rect.fromLTRB(0, 0, size.width, clearTop), gradientPaint)
+      ..drawRect(Rect.fromLTRB(0, 0, size.width, clearTop), backgroundPaint)
       ..drawRect(
         Rect.fromLTRB(0, clearBottom, size.width, size.height),
-        gradientPaint,
+        backgroundPaint,
       );
   }
 
@@ -149,16 +164,16 @@ class _BackgroundPainter extends CustomPainter {
   bool shouldRepaint(_BackgroundPainter oldDelegate) {
     return linesLength != oldDelegate.linesLength ||
         linesGap != oldDelegate.linesGap ||
-        gradient != oldDelegate.gradient ||
         initialLineHeight != oldDelegate.initialLineHeight ||
         maximumLineHeight != oldDelegate.maximumLineHeight;
   }
 }
 
 class _Foreground extends StatefulWidget {
-  const _Foreground({required this.controller});
+  const _Foreground({required this.controller, required this.colorTransition});
 
-  final AnimationController controller;
+  final Animation<double> controller;
+  final Animation<double> colorTransition;
 
   @override
   State<_Foreground> createState() => _ForegroundState();
@@ -214,7 +229,7 @@ class _ForegroundState extends State<_Foreground> {
 
   @override
   Widget build(BuildContext context) {
-    final foregroundColor = context.appColors.onBrandArt;
+    final foregroundColor = context.appColors.brandArtMain;
     final art = context.art;
     return CustomMultiChildLayout(
       delegate: _ForegroundLayoutDelegate(
@@ -231,6 +246,7 @@ class _ForegroundState extends State<_Foreground> {
           child: CustomPaint(
             painter: _LogoPainter(
               color: foregroundColor,
+              colorTransition: widget.colorTransition,
               rotation: _rotation,
               expansion: _expansion,
               linesLength: _linesLength,
@@ -313,15 +329,24 @@ class _ForegroundLayoutDelegate extends MultiChildLayoutDelegate {
 class _LogoPainter extends CustomPainter {
   _LogoPainter({
     required this.color,
+    required this.colorTransition,
     required this.rotation,
     required this.expansion,
     required this.linesLength,
     required this.logoWidth,
     required this.handoffProgress,
     required this.diagonalExitProgress,
-  }) : super(repaint: Listenable.merge([rotation, expansion, linesLength]));
+  }) : super(
+         repaint: Listenable.merge([
+           rotation,
+           expansion,
+           linesLength,
+           colorTransition,
+         ]),
+       );
 
   final Color color;
+  final Animation<double> colorTransition;
   final Animation<double> rotation;
   final Animation<double> expansion;
   final Animation<double> linesLength;
@@ -343,14 +368,29 @@ class _LogoPainter extends CustomPainter {
     );
     canvas
       ..save()
-      ..translate(size.width / 2, size.height / 2)
-      ..drawPath(path, Paint()..color = color)
-      ..restore();
+      ..translate(size.width / 2, size.height / 2);
+    AsterLaunchLogo.paint(
+      canvas,
+      path: path,
+      logoBounds: Rect.fromCenter(
+        center: Offset.zero,
+        width: logoWidth,
+        height:
+            logoWidth *
+            AsterLogoGeometry.size.height /
+            AsterLogoGeometry.size.width,
+      ),
+      blueColor: color,
+      finalColor: color,
+      colorProgress: colorTransition.value,
+    );
+    canvas.restore();
   }
 
   @override
   bool shouldRepaint(_LogoPainter oldDelegate) {
     return color != oldDelegate.color ||
+        colorTransition != oldDelegate.colorTransition ||
         rotation != oldDelegate.rotation ||
         expansion != oldDelegate.expansion ||
         linesLength != oldDelegate.linesLength ||

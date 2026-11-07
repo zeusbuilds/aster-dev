@@ -90,15 +90,17 @@ void main() {
       expect(driver.state.isRunning, isTrue);
       expect(driver.state.torchAvailable, isTrue);
       expect(driver.state.torchOn, isFalse);
-      expect(driver.state.zoomScale, 1);
+      expect(driver.state.zoom, isNull);
+      await driver.start();
+      expect(driver.state.zoom?.current, 1);
 
       await driver.setTorchEnabled(true);
-      await driver.setZoomScale(0.5);
+      await driver.setZoomRatio(2);
 
       expect(controller.toggleCalls, 1);
-      expect(controller.zoomScales, [0.5]);
+      expect(controller.zoomRatios, [2]);
       expect(driver.state.torchOn, isTrue);
-      expect(driver.state.zoomScale, 0.5);
+      expect(driver.state.zoom?.current, 2);
       await driver.close();
       expect(controller.disposeCalls, 1);
     },
@@ -108,8 +110,88 @@ void main() {
     final driver = MobileScannerCameraDriver(_FakeMobileScannerController());
 
     expect(driver.state.isInitialized, isFalse);
-    expect(driver.state.zoomScale, 0);
+    expect(driver.state.zoom, isNull);
   });
+
+  test('initial ultrawide camera uses confirmed standard 1x instead of slider zero', () async {
+    final controller = _FakeMobileScannerController()
+      ..zoomState = CameraZoomState(
+        minZoomRatio: 0.5,
+        maxZoomRatio: 5,
+        zoomRatio: 0.5,
+      );
+    final driver = MobileScannerCameraDriver(controller);
+
+    await driver.start();
+
+    expect(controller.zoomRatios, [1]);
+    expect(driver.state.zoom?.minimum, 0.5);
+    expect(driver.state.zoom?.maximum, 5);
+    expect(driver.state.zoom?.current, 1);
+    await driver.close();
+  });
+
+  test(
+    'unavailable zoom does not fail camera startup or fabricate a ratio',
+    () async {
+      final controller = _FakeMobileScannerController()
+        ..zoomReadError = UnsupportedError('zoom unavailable');
+      final driver = MobileScannerCameraDriver(controller);
+
+      await driver.start();
+
+      expect(driver.state.isRunning, isTrue);
+      expect(driver.state.zoom, isNull);
+      expect(controller.zoomRatios, isEmpty);
+      await driver.close();
+    },
+  );
+
+  test(
+    'magnification follows applied native readback and survives resume',
+    () async {
+      final controller = _FakeMobileScannerController();
+      final driver = MobileScannerCameraDriver(controller);
+      await driver.start();
+      controller.reportedZoomRatio = 1.75;
+
+      await driver.setZoomRatio(2);
+      expect(driver.state.zoom?.current, 1.75);
+      await driver.stop();
+      expect(driver.state.zoom, isNull);
+      controller.zoomState = CameraZoomState(
+        minZoomRatio: 1,
+        maxZoomRatio: 3,
+        zoomRatio: 1,
+      );
+      controller.reportedZoomRatio = null;
+      await driver.start();
+
+      expect(controller.zoomRatios, [2, 1.75]);
+      expect(driver.state.zoom?.current, 1.75);
+      expect(controller.zoomReadCalls, 2);
+      await driver.close();
+    },
+  );
+
+  test(
+    'failed zoom keeps last confirmed magnification and running camera',
+    () async {
+      final controller = _FakeMobileScannerController();
+      final driver = MobileScannerCameraDriver(controller);
+      await driver.start();
+      controller.zoomSetError = PlatformException(code: 'setZoomFailed');
+
+      await expectLater(
+        driver.setZoomRatio(2),
+        throwsA(isA<ScanDriverException>()),
+      );
+
+      expect(driver.state.zoom?.current, 1);
+      expect(driver.state.isRunning, isTrue);
+      await driver.close();
+    },
+  );
 
   test('mobile scanner permission errors map without raw details', () async {
     final controller = _FakeMobileScannerController()
@@ -263,7 +345,16 @@ final class _FakeMobileScannerController extends MobileScannerController {
   MobileScannerException? reportedStartError;
   bool leaveRunningOnStop = false;
   Object? analyzeError;
-  final zoomScales = <double>[];
+  final zoomRatios = <double>[];
+  CameraZoomState zoomState = CameraZoomState(
+    minZoomRatio: 1,
+    maxZoomRatio: 3,
+    zoomRatio: 1,
+  );
+  Object? zoomReadError;
+  Object? zoomSetError;
+  double? reportedZoomRatio;
+  var zoomReadCalls = 0;
   var toggleCalls = 0;
   var disposeCalls = 0;
 
@@ -307,9 +398,24 @@ final class _FakeMobileScannerController extends MobileScannerController {
   }
 
   @override
-  Future<void> setZoomScale(double zoomScale) async {
-    zoomScales.add(zoomScale);
-    value = value.copyWith(zoomScale: zoomScale);
+  Future<CameraZoomState> getZoomState() async {
+    zoomReadCalls++;
+    final error = zoomReadError;
+    if (error != null) throw error;
+    return zoomState;
+  }
+
+  @override
+  Future<CameraZoomState> setZoomRatio(double ratio) async {
+    zoomRatios.add(ratio);
+    final error = zoomSetError;
+    if (error != null) throw error;
+    zoomState = CameraZoomState(
+      minZoomRatio: zoomState.minZoomRatio,
+      maxZoomRatio: zoomState.maxZoomRatio,
+      zoomRatio: reportedZoomRatio ?? ratio,
+    );
+    return zoomState;
   }
 
   @override

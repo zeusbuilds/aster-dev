@@ -25,7 +25,7 @@ dependencies:
   rgb_sdk_flutter:
     git:
       url: https://github.com/zeusbuilds/rgb-sdk-flutter.git
-      ref: 68a690916eabe96407c03669d569bf86babb8e72
+      ref: 3e6fb46171e21f02581d752080edd6f2fb8c0116
 
   # Storage
   # Keep the reviewed secure-storage release while upgrading the host platforms.
@@ -56,7 +56,9 @@ dependencies:
 
   # Camera & barcode scanning
   image_picker: ^1.2.3
-  mobile_scanner: ^7.4.0
+  # Source-pinned camera ratio API; upstream provenance is in ASTER_FORK.md.
+  mobile_scanner:
+    path: packages/mobile_scanner
 
   # Core
   circle_flags: ^5.0.1
@@ -73,6 +75,8 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  # Resolves the vendored scanner analyzer configuration on fresh checkouts.
+  very_good_analysis: 10.3.0
 
   # Code generation and repository policy tooling.
   analyzer: 13.3.0

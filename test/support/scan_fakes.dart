@@ -6,11 +6,16 @@ import 'package:aster/features/scan/data/services/scan_session_contract.dart';
 import 'package:aster/features/scan/domain/models/models.dart';
 import 'package:flutter/material.dart';
 
-final class FakeScanSession extends ChangeNotifier implements ScanSession {
+final class FakeScanSession extends ChangeNotifier
+    implements ScanSession, ScanSessionContext {
+  @override
+  Object? contextToken;
+
   ScanSessionSnapshot current = const ScanSessionSnapshot(
     isInitialized: true,
     isRunning: true,
     torchAvailable: true,
+    zoom: ScanZoomRange(minimum: 1, maximum: 3, current: 1),
   );
   AppResult<void>? activeResult;
   AppResult<void>? torchResult;
@@ -21,7 +26,7 @@ final class FakeScanSession extends ChangeNotifier implements ScanSession {
   Completer<AppResult<void>>? activeGate;
   Completer<AppResult<void>>? zoomGate;
   Completer<AppResult<void>>? restartGate;
-  double? reportedZoomScale;
+  double? reportedZoomRatio;
   AppResult<ScanGalleryOutcome> galleryResult = const AppResult.success(
     ScanGalleryCancelled(),
   );
@@ -100,13 +105,23 @@ final class FakeScanSession extends ChangeNotifier implements ScanSession {
   }
 
   @override
-  Future<AppResult<void>> setZoomScale(double scale) async {
-    zoomValues.add(scale);
+  Future<AppResult<void>> setZoomRatio(double ratio) async {
+    zoomValues.add(ratio);
     final result =
         await (zoomGate?.future ??
             Future.value(zoomResult ?? const AppResult.success(null)));
-    if (result is AppSuccess<void>) {
-      replaceSnapshot(current.copyWith(zoomScale: reportedZoomScale ?? scale));
+    if (result is AppSuccess<void> &&
+        current.zoom != null &&
+        current.isRunning) {
+      replaceSnapshot(
+        current.copyWith(
+          zoom: ScanZoomRange(
+            minimum: current.zoom!.minimum,
+            maximum: current.zoom!.maximum,
+            current: reportedZoomRatio ?? ratio,
+          ),
+        ),
+      );
     }
     return result;
   }
@@ -204,6 +219,7 @@ final class FakeScanCameraDriver extends ChangeNotifier
       isInitialized: true,
       isRunning: true,
       torchAvailable: true,
+      zoom: ScanZoomRange(minimum: 1, maximum: 3, current: 1),
     );
     notifyListeners();
   }
@@ -216,7 +232,7 @@ final class FakeScanCameraDriver extends ChangeNotifier
     current = ScanDriverState(
       isInitialized: current.isInitialized,
       torchAvailable: current.torchAvailable,
-      zoomScale: current.zoomScale,
+      zoom: current.zoom,
     );
     notifyListeners();
   }
@@ -231,14 +247,14 @@ final class FakeScanCameraDriver extends ChangeNotifier
       isRunning: current.isRunning,
       torchAvailable: current.torchAvailable,
       torchOn: enabled,
-      zoomScale: current.zoomScale,
+      zoom: current.zoom,
     );
     notifyListeners();
   }
 
   @override
-  Future<void> setZoomScale(double scale) async {
-    commandLog.add('zoom:$scale');
+  Future<void> setZoomRatio(double ratio) async {
+    commandLog.add('zoom:$ratio');
     final failure = zoomFailure;
     if (failure != null) throw failure;
     current = ScanDriverState(
@@ -246,7 +262,11 @@ final class FakeScanCameraDriver extends ChangeNotifier
       isRunning: current.isRunning,
       torchAvailable: current.torchAvailable,
       torchOn: current.torchOn,
-      zoomScale: scale,
+      zoom: ScanZoomRange(
+        minimum: current.zoom!.minimum,
+        maximum: current.zoom!.maximum,
+        current: ratio,
+      ),
     );
     notifyListeners();
   }

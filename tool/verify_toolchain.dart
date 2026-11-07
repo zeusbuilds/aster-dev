@@ -19,6 +19,9 @@ const _reviewedAndroidSdk = 37;
 const _reviewedAndroidSdkPlatform = '37.0';
 const _reviewedAndroidAgp = '9.1.1';
 const _reviewedAndroidBuildTools = '36.0.0';
+const _reviewedNkfVersion = '0.3.0';
+const _reviewedNkfSha256 =
+    '357a8dbeba38b727b75930f665146546076a394a1c243faf634ff176e3588895';
 
 /// Result of checking the repository's cross-toolchain version contract.
 final class ToolchainVerification {
@@ -2256,6 +2259,15 @@ void _verifyGemfile(
     'Gemfile must pin CocoaPods $cocoaPodsVersion exactly',
     failures,
   );
+  _requireSinglePattern(
+    gemfile,
+    RegExp(
+      '^gem "nkf", "${RegExp.escape(_reviewedNkfVersion)}"\\s*\$',
+      multiLine: true,
+    ),
+    'Gemfile must pin NKF $_reviewedNkfVersion exactly for Ruby 4 kconv.',
+    failures,
+  );
   final activeLines = gemfile
       .split('\n')
       .map((line) => line.trim())
@@ -2264,12 +2276,13 @@ void _verifyGemfile(
   final expectedLines = <String>[
     'source "https://rubygems.org"',
     'gem "cocoapods", "$cocoaPodsVersion"',
+    'gem "nkf", "$_reviewedNkfVersion"',
   ];
   if (activeLines.length != expectedLines.length ||
       activeLines.indexed.any((entry) => entry.$2 != expectedLines[entry.$1])) {
     failures.add(
       'Gemfile must contain only the reviewed RubyGems source and exact '
-      'CocoaPods dependency.',
+      'CocoaPods and NKF dependencies.',
     );
   }
 }
@@ -2335,6 +2348,33 @@ String? _verifyBundlerLock(
       'Gemfile.lock must checksum CocoaPods $cocoaPodsVersion.',
       failures,
     );
+  }
+
+  for (final (pattern, failure) in <(RegExp, String)>[
+    (
+      RegExp(
+        '^    nkf \\(${RegExp.escape(_reviewedNkfVersion)}\\)\\s*\$',
+        multiLine: true,
+      ),
+      'Gemfile.lock must resolve NKF $_reviewedNkfVersion exactly.',
+    ),
+    (
+      RegExp(
+        '^  nkf \\(= ${RegExp.escape(_reviewedNkfVersion)}\\)\\s*\$',
+        multiLine: true,
+      ),
+      'Gemfile.lock must retain the exact NKF dependency constraint.',
+    ),
+    (
+      RegExp(
+        '^  nkf \\(${RegExp.escape(_reviewedNkfVersion)}\\) '
+        'sha256=$_reviewedNkfSha256\\s*\$',
+        multiLine: true,
+      ),
+      'Gemfile.lock must use the reviewed NKF $_reviewedNkfVersion checksum.',
+    ),
+  ]) {
+    _requireSinglePattern(lock, pattern, failure, failures);
   }
 
   final platformSection = RegExp(
@@ -2409,14 +2449,21 @@ String? _verifyBundlerLock(
       .map((line) => line.trim())
       .where((line) => line.isNotEmpty)
       .toList();
-  final expectedDependency = cocoaPodsVersion == null
+  final expectedDependencies = cocoaPodsVersion == null
       ? null
-      : 'cocoapods (= $cocoaPodsVersion)';
-  if (expectedDependency != null &&
+      : <String>[
+          'cocoapods (= $cocoaPodsVersion)',
+          'nkf (= $_reviewedNkfVersion)',
+        ];
+  if (expectedDependencies != null &&
       (dependencies == null ||
-          dependencies.length != 1 ||
-          dependencies.single != expectedDependency)) {
-    failures.add('Gemfile.lock must contain only the CocoaPods dependency.');
+          dependencies.length != expectedDependencies.length ||
+          dependencies.indexed.any(
+            (entry) => entry.$2 != expectedDependencies[entry.$1],
+          ))) {
+    failures.add(
+      'Gemfile.lock must contain only the exact CocoaPods and NKF dependencies.',
+    );
   }
 
   return _readSingleCapture(

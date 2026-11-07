@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../../../shared/shared.dart';
@@ -11,8 +13,8 @@ class ScanControlButton extends StatelessWidget {
     this.onTap,
     this.selected,
     this.value,
-    this.loading = false,
     this.busy = false,
+    this.contentDiameter = 32,
   });
 
   final Widget child;
@@ -20,21 +22,29 @@ class ScanControlButton extends StatelessWidget {
   final String semanticLabel;
   final bool? selected;
   final String? value;
-  final bool loading;
 
   /// Silently guards a command without replacing or dimming its content.
   final bool busy;
 
+  /// Shared visible diameter for all commands in the control pill.
+  final double contentDiameter;
+
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final icons = context.icons;
     final metrics = context.metrics;
     final stateLayers = context.stateLayers;
+    final diameter = contentDiameter;
+    // Keep 48 px tap targets around compact circles. Larger accessibility
+    // circles retain at least 4 px per side so adjacent controls never touch.
+    final touchExtent = math.max(
+      metrics.minTouchTarget,
+      diameter + context.spacing.sm,
+    );
 
     void activate() => onTap?.call();
 
-    final enabled = onTap != null && !loading && !busy;
+    final enabled = onTap != null && !busy;
 
     return Semantics(
       button: true,
@@ -50,14 +60,14 @@ class ScanControlButton extends StatelessWidget {
           onTap: enabled ? activate : null,
           containedInkWell: true,
           highlightShape: BoxShape.circle,
-          radius: metrics.minTouchTarget / 2,
+          radius: touchExtent / 2,
           child: Opacity(
-            opacity: enabled || loading || busy
+            opacity: enabled || busy
                 ? stateLayers.visible
                 : stateLayers.disabled,
             child: SizedBox(
-              width: metrics.minTouchTarget,
-              height: metrics.minTouchTarget,
+              width: touchExtent,
+              height: touchExtent,
               child: Center(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
@@ -65,17 +75,9 @@ class ScanControlButton extends StatelessWidget {
                     color: colors.scanControlSurface,
                   ),
                   child: SizedBox(
-                    width: icons.md,
-                    height: icons.md,
-                    child: Center(
-                      child: loading
-                          ? GridLoader(
-                              size: GridLoaderSize.small,
-                              colorStyle: GridLoaderColorStyle.custom,
-                              color: colors.onScan,
-                            )
-                          : child,
-                    ),
+                    width: diameter,
+                    height: diameter,
+                    child: Center(child: child),
                   ),
                 ),
               ),

@@ -126,8 +126,8 @@ final class WalletRuntime {
       if (profile.state != WalletProfileState.ready) {
         return AppResult.failure(_profileStateFailure(profile));
       }
-      if (profile.environment != _services.environment) {
-        return AppResult.failure(_networkMismatchFailure());
+      if (_profileConfigurationFailure(profile) case final failure?) {
+        return AppResult.failure(failure);
       }
       final secretResult = await _secrets.read(
         profile.id,
@@ -156,8 +156,8 @@ final class WalletRuntime {
         if (profile.state != WalletProfileState.provisioning) {
           return AppResult.failure(_profileStateFailure(profile));
         }
-        if (profile.environment != _services.environment) {
-          return AppResult.failure(_networkMismatchFailure());
+        if (_profileConfigurationFailure(profile) case final failure?) {
+          return AppResult.failure(failure);
         }
         final storageToken = profile.storageToken;
         late final String storageDirectory;
@@ -293,8 +293,8 @@ final class WalletRuntime {
         if (profile.state != WalletProfileState.ready) {
           return AppResult.failure(_profileStateFailure(profile));
         }
-        if (profile.environment != _services.environment) {
-          return AppResult.failure(_networkMismatchFailure());
+        if (_profileConfigurationFailure(profile) case final failure?) {
+          return AppResult.failure(failure);
         }
         if ((_snapshot.phase == WalletRuntimePhase.active ||
                 _hasPaymentQuarantine) &&
@@ -958,8 +958,8 @@ final class WalletRuntime {
     WalletSecret secret, {
     required _WalletActivation activation,
   }) async {
-    if (profile.environment != _services.environment) {
-      return AppResult.failure(_networkMismatchFailure());
+    if (_profileConfigurationFailure(profile) case final failure?) {
+      return AppResult.failure(failure);
     }
 
     final previousProfile = _activeProfile;
@@ -1190,12 +1190,25 @@ final class WalletRuntime {
     );
   }
 
-  static AppFailure _networkMismatchFailure() => const AppFailure(
-    code: 'wallet_network_mismatch',
-    kind: AppFailureKind.configuration,
-    userMessage: 'This wallet belongs to a different network.',
-    retryable: false,
-  );
+  AppFailure? _profileConfigurationFailure(WalletProfile profile) {
+    if (profile.environment != _services.environment) {
+      return const AppFailure(
+        code: 'wallet_network_mismatch',
+        kind: AppFailureKind.configuration,
+        userMessage: 'This wallet belongs to a different network.',
+        retryable: false,
+      );
+    }
+    if (profile.backend != _services.backend) {
+      return const AppFailure(
+        code: 'wallet_backend_mismatch',
+        kind: AppFailureKind.configuration,
+        userMessage: 'This wallet uses a different wallet format.',
+        retryable: false,
+      );
+    }
+    return null;
+  }
 
   static bool _sameIds(Set<String> expected, Set<String> actual) =>
       expected.length == actual.length && expected.containsAll(actual);

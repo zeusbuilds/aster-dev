@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Generated from Flutter Dart source. Do not edit; run tool/export_aster_launch_logo.py.
+{
+  "generator": "tool/export_aster_launch_logo.py",
+  "nativeImageHeightLogicalPixels": "107.3475177304964539007092199",
+  "nativeImageWidthLogicalPixels": "173.6170212765957446808510638",
+  "nativeViewportPolicy": "Centered visible mark; balanced transparent vertical margins",
+  "sourcePose": {
+    "colorProgress": 0,
+    "expansion": 0,
+    "rotation": 0
+  },
+  "sourceSha256": {
+    "lib/shared/branding/aster_launch_logo.dart": "ce423b056b1446f25fb11f505ac8d10259693fd079b7499a6a54eaf1b8ffdee7",
+    "lib/shared/branding/aster_logo_geometry.dart": "e7e542c23924e978eb5e7ac035ef53fabbccd4acb3961bdf1c61e99f183b3271",
+    "lib/shared/screens/animated_splash_screen.dart": "54988d3c71d5933e96682445bc61651a2afc3859885a12a256ddad742c0668ab",
+    "lib/shared/theme/tokens/color_tokens.dart": "63d1bd30bf4cd1b35f230166240b970b515e870cfcb77aeec5673a1f454de61d",
+    "lib/shared/theme/tokens/component_metrics_tokens.dart": "269e6926fe4b3298780c60dc745d5b992f90f0efeb343c3812867d17a314b8a5"
+  },
+  "visibleMarkWidthLogicalPixels": "160"
+}
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="765" height="473" viewBox="0 0 765 473" fill="none">
+  <defs>
+    <linearGradient id="aster-opening-fill" x1="382.5" y1="50" x2="382.5" y2="423" gradientUnits="userSpaceOnUse">
+      <stop offset="0.346154" stop-color="#001AFF" stop-opacity="1"/>
+      <stop offset="1" stop-color="#001AFF" stop-opacity="0.3"/>
+    </linearGradient>
+    <filter id="aster-opening-shadows" x="0" y="30" width="765" height="433" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="transparent"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset in="hardAlpha" dx="0" dy="2" result="offset0"/>
+      <feGaussianBlur in="offset0" stdDeviation="3" result="blur0"/>
+      <feComposite in="blur0" in2="hardAlpha" operator="out" result="outside0"/>
+      <feColorMatrix in="outside0" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.1 0" result="shadow0"/>
+      <feBlend in="shadow0" in2="transparent" mode="normal" result="stack0"/>
+      <feOffset in="hardAlpha" dx="0" dy="10" result="offset1"/>
+      <feGaussianBlur in="offset1" stdDeviation="15" result="blur1"/>
+      <feComposite in="blur1" in2="hardAlpha" operator="out" result="outside1"/>
+      <feColorMatrix in="outside1" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.06 0" result="shadow1"/>
+      <feBlend in="shadow1" in2="stack0" mode="normal" result="stack1"/>
+      <feBlend in="SourceGraphic" in2="stack1" mode="normal"/>
+    </filter>
+  </defs>
+  <g filter="url(#aster-opening-shadows)">
+    <path d="M30 216.366L735 216.366L735 256.944L30 256.944Z M224.165 50L569.285 394.308L540.526 423L195.403 78.6915Z M195.403 394.308L540.526 50L569.285 78.6915L224.163 423Z" fill="url(#aster-opening-fill)" fill-rule="nonzero"/>
+  </g>
+</svg>

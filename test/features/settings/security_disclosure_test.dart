@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:aster/core/core.dart';
 import 'package:aster/core/security/security_gate.dart';
+import 'package:aster/features/settings/presentation/controllers/wallet_disclosure_handoff.dart';
 import 'package:aster/features/settings/presentation/screens/screens.dart';
+import 'package:aster/features/settings/presentation/view_model/view_models.dart';
 import 'package:aster/features/wallet/data/repository/repository.dart';
 import 'package:aster/features/wallet/data/runtime/runtime.dart';
 import 'package:aster/features/wallet/data/storage/storage.dart';
@@ -19,6 +21,47 @@ import '../../support/presentation_fakes.dart';
 import '../../support/wallet_fakes.dart';
 
 void main() {
+  for (final current in [false, true]) {
+    test(
+      'disclosure platform actions ${current ? 'map unexpected provider failure' : 'reject revoked authority before dispatch'}',
+      () async {
+        var dispatches = 0;
+        final container = ProviderContainer(
+          overrides: [
+            clipboardServiceProvider.overrideWith((ref) {
+              dispatches += 1;
+              throw StateError('fixture platform provider unavailable');
+            }),
+            shareServiceProvider.overrideWith((ref) {
+              dispatches += 1;
+              throw StateError('fixture platform provider unavailable');
+            }),
+          ],
+        );
+        addTearDown(container.dispose);
+        final viewModel = container.read(walletDisclosureViewModelProvider);
+        final copied = await viewModel.copyPublicKeys(
+          'fixture public keys',
+          current: () => current,
+        );
+        final shared = await viewModel.sharePublicKeys(
+          'fixture public keys',
+          origin: const ShareOrigin(left: 0, top: 0, width: 40, height: 40),
+          current: () => current,
+        );
+        expect(copied, isA<AppFailureResult<void>>());
+        expect(shared, isA<AppFailureResult<ShareDisposition>>());
+        expect(dispatches, current ? 2 : 0);
+        if (!current) {
+          expect(
+            (copied as AppFailureResult<void>).failure.code,
+            'wallet_disclosure_context_changed',
+          );
+        }
+      },
+    );
+  }
+
   test(
     'disclosures require one fresh purpose-bound wallet grant per read',
     () async {
@@ -169,10 +212,10 @@ void main() {
     final h = await _Harness.create(secured: false);
     addTearDown(() => _cleanup(tester, h));
     await h.pump(tester, securitySettings: true);
-    final toggle = tester.widget<SwitchListTile>(
+    final toggle = tester.widget<AsterOptionRow>(
       find.byKey(const ValueKey('security-app-lock-switch')),
     );
-    expect(toggle.value, isFalse);
+    expect(toggle.toggleValue, isFalse);
     expect(toggle.onChanged, isNull);
     final lock = tester.widget<AsterOptionRow>(
       find.byKey(const ValueKey('security-lock-now')),
@@ -194,6 +237,9 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('tpub-btc'), findsNothing);
+    expect(find.text('Advanced'), findsOneWidget);
+    expect(find.byType(WalletDisclosureScreen), findsNothing);
+    expect(find.byType(GridLoader), findsNothing);
     expect(h.engine.calls, isNot(contains('publicKeys')));
     h.device.nextPrompt!.complete(DeviceAuthenticationResult.authenticated);
     await tester.pumpAndSettle();
@@ -233,6 +279,230 @@ void main() {
     expect(h.share.sharedOrigin?.isValid, isTrue);
   });
 
+  testWidgets(
+    'repeated disclosure taps keep one prompt and stable source layout',
+    (tester) async {
+      final h = await _Harness.create();
+      addTearDown(() => _cleanup(tester, h));
+      h.device.nextPrompt = Completer<DeviceAuthenticationResult>();
+      await h.pump(tester);
+      final before = tester.getRect(find.text('Export xpubs'));
+      final row = tester.widget<AsterOptionRow>(
+        find.widgetWithText(AsterOptionRow, 'Export xpubs'),
+      );
+      row.onTap!();
+      row.onTap!();
+      await tester.pumpAndSettle();
+      expect(find.text('Advanced'), findsOneWidget);
+      expect(find.byType(WalletDisclosureScreen), findsNothing);
+      expect(find.byType(GridLoader), findsNothing);
+      expect(tester.getRect(find.text('Export xpubs')), before);
+      final busyRow = tester.widget<AsterOptionRow>(
+        find.widgetWithText(AsterOptionRow, 'Export xpubs'),
+      );
+      expect(busyRow.onTap, isNull);
+      expect(busyRow.suffixIcon, row.suffixIcon);
+      expect(h.device.prompts, 1);
+      h.device.nextPrompt!.complete(DeviceAuthenticationResult.authenticated);
+      await tester.pumpAndSettle();
+      expect(find.text('tpub-btc'), findsOneWidget);
+      expect(
+        h.engine.calls.where((call) => call == 'publicKeys'),
+        hasLength(1),
+      );
+    },
+  );
+
+  testWidgets(
+    'prepared data waits on the source and destination is ready on entry',
+    (tester) async {
+      final h = await _Harness.create();
+      addTearDown(() => _cleanup(tester, h));
+      h.engine.publicKeysGate = Completer<void>();
+      await h.pump(tester);
+      await tester.tap(find.text('Export xpubs'));
+      await tester.pumpAndSettle();
+      expect(h.device.prompts, 1);
+      expect(find.text('Advanced'), findsOneWidget);
+      expect(find.byType(GridLoader), findsNothing);
+      expect(find.byType(WalletDisclosureScreen), findsNothing);
+      h.engine.publicKeysGate!.complete();
+      await tester.pump();
+      await tester.pumpAndSettle();
+      expect(find.text('tpub-btc'), findsOneWidget);
+      expect(find.byType(GridLoader), findsNothing);
+      expect(h.device.protections, [true]);
+      h.router!.pop();
+      await tester.pumpAndSettle();
+      expect(h.device.protections, [true, false]);
+    },
+  );
+
+  testWidgets('failed prepared read stays at Advanced with one action toast', (
+    tester,
+  ) async {
+    final h = await _Harness.create();
+    addTearDown(() => _cleanup(tester, h));
+    h.engine.publicKeysError = StateError('fixture unavailable');
+    await h.pump(tester);
+    await tester.tap(find.text('Export xpubs'));
+    await tester.pumpAndSettle();
+    expect(find.text('Advanced'), findsOneWidget);
+    expect(find.byType(WalletDisclosureScreen), findsNothing);
+    expect(h.toasts.messages, hasLength(1));
+    expect(h.device.protections, [true, false]);
+    expect(find.byType(GridLoader), findsNothing);
+  });
+
+  for (final disruption in ['wallet', 'capture', 'background']) {
+    testWidgets(
+      '$disruption during a read discards prepared data before navigation',
+      (tester) async {
+        final h = await _Harness.create();
+        addTearDown(() => _cleanup(tester, h));
+        h.engine.publicKeysGate = Completer<void>();
+        await h.pump(tester);
+        await tester.tap(find.text('Export xpubs'));
+        await tester.pumpAndSettle();
+        if (disruption == 'wallet') {
+          h.wallet.publish(WalletState());
+        } else if (disruption == 'capture') {
+          h.device.capture(true);
+        } else {
+          h.security.handleLifecycle(AppLifecycleState.paused);
+        }
+        h.engine.publicKeysGate!.complete();
+        await tester.pumpAndSettle();
+        expect(find.text('Advanced'), findsOneWidget);
+        expect(find.byType(WalletDisclosureScreen), findsNothing);
+        expect(find.text('tpub-btc'), findsNothing);
+        expect(h.device.protections, [true, false]);
+        expect(h.toasts.messages, isEmpty);
+      },
+    );
+  }
+
+  for (final route in ['/seed', '/xpubs']) {
+    testWidgets('direct entry to $route cannot authenticate or disclose', (
+      tester,
+    ) async {
+      final h = await _Harness.create();
+      addTearDown(() => _cleanup(tester, h));
+      await h.pump(tester);
+      final settings = RouteConfig.getRoutes().whereType<GoRoute>().singleWhere(
+        (route) => route.name == RouteNames.settings,
+      );
+      final advanced = settings.routes.whereType<GoRoute>().singleWhere(
+        (route) => route.name == RouteNames.advancedSettings,
+      );
+      final guardedRoute = advanced.routes.whereType<GoRoute>().singleWhere(
+        (candidate) =>
+            candidate.name ==
+            (route == '/seed' ? RouteNames.revealSeed : RouteNames.exportXpubs),
+      );
+      expect(
+        await guardedRoute.redirect!(
+          tester.element(find.byType(AdvancedSettingsScreen)),
+          h.router!.state,
+        ),
+        RoutePaths.advancedSettingsLocation,
+      );
+      unawaited(h.router!.push<void>(route));
+      await tester.pumpAndSettle();
+      expect(find.text('Advanced'), findsOneWidget);
+      expect(find.byType(WalletDisclosureScreen), findsNothing);
+      expect(h.device.prompts, 0);
+      expect(h.device.protections, isEmpty);
+      expect(h.engine.calls, isNot(contains('publicKeys')));
+      expect(h.toasts.messages, isEmpty);
+    });
+  }
+
+  testWidgets('ready handoff is purpose-bound, single-use and clears on lock', (
+    tester,
+  ) async {
+    final h = await _Harness.create();
+    addTearDown(() => _cleanup(tester, h));
+    await h.pump(tester);
+    final handoff = h.container!.read(walletDisclosureHandoffProvider);
+    final preparation = handoff.prepare(
+      SecurityPurpose.exportXpubs,
+      sourceCurrent: () => true,
+    );
+    await tester.pumpAndSettle();
+    final session = (await preparation)!;
+    expect(handoff.claim(SecurityPurpose.revealSeed), isNull);
+    expect(handoff.claim(SecurityPurpose.exportXpubs), same(session));
+    expect(handoff.claim(SecurityPurpose.exportXpubs), isNull);
+    expect(session.keys, isNotNull);
+    h.security.lock();
+    expect(session.valid, isFalse);
+    expect(session.keys, isNull);
+    expect(session.mnemonic, isNull);
+    expect(handoff.allows(SecurityPurpose.exportXpubs), isFalse);
+    await tester.pumpAndSettle();
+    expect(h.device.protections, [true, false]);
+  });
+
+  for (final disruption in ['capture', 'background']) {
+    testWidgets(
+      '$disruption protection outlives the old seed frame until invalidation paints',
+      (tester) async {
+        final h = await _Harness.create();
+        addTearDown(() => _cleanup(tester, h));
+        await h.pump(tester);
+        await tester.tap(find.text('Reveal seed phrase'));
+        await tester.pumpAndSettle();
+        expect(find.text('alpha'), findsOneWidget);
+        expect(h.device.protections, [true]);
+
+        if (disruption == 'capture') {
+          h.device.capture(true);
+        } else {
+          h.security.handleLifecycle(AppLifecycleState.paused);
+        }
+        // Let queued platform calls run without producing another Flutter frame.
+        // Clearing model data alone must not uncover the old painted Text tree.
+        for (var turn = 0; turn < 16; turn++) {
+          await Future<void>.value();
+        }
+        expect(find.text('alpha'), findsOneWidget);
+        expect(h.device.protections, [true]);
+
+        await tester.pump();
+        expect(find.text('alpha'), findsNothing);
+        await tester.pumpAndSettle();
+        expect(h.device.protections, [true, false]);
+        expect(find.text('Advanced'), findsOneWidget);
+      },
+    );
+  }
+
+  testWidgets(
+    'discarding an unclaimed handoff releases its protection quietly',
+    (tester) async {
+      final h = await _Harness.create();
+      addTearDown(() => _cleanup(tester, h));
+      await h.pump(tester);
+      final handoff = h.container!.read(walletDisclosureHandoffProvider);
+      final preparation = handoff.prepare(
+        SecurityPurpose.exportXpubs,
+        sourceCurrent: () => true,
+      );
+      await tester.pumpAndSettle();
+      final session = (await preparation)!;
+      expect(h.device.protections, [true]);
+      handoff.discard(session);
+      for (var turn = 0; turn < 16; turn++) {
+        await Future<void>.value();
+      }
+      expect(session.keys, isNull);
+      expect(h.device.protections, [true, false]);
+      expect(find.byType(WalletDisclosureScreen), findsNothing);
+      expect(h.toasts.messages, isEmpty);
+    },
+  );
+
   for (final revealSeed in [false, true]) {
     testWidgets(
       '${revealSeed ? 'seed' : 'xpub'} own-auth success continues before SecurityGate rebuilds after resume',
@@ -250,7 +520,7 @@ void main() {
         await _completeOwnPromptBeforeGateFrame(
           tester,
           h,
-          route: find.byType(WalletDisclosureScreen, skipOffstage: false),
+          route: find.byType(AdvancedSettingsScreen, skipOffstage: false),
         );
         if (!revealSeed) expect(h.engine.calls, contains('publicKeys'));
         await tester.pumpAndSettle();
@@ -282,7 +552,7 @@ void main() {
       );
       expect(h.security.appLockEnabled, isFalse);
       await tester.pumpAndSettle();
-      expect(tester.widget<SwitchListTile>(toggle).value, isFalse);
+      expect(tester.widget<AsterOptionRow>(toggle).toggleValue, isFalse);
       h.device.nextPrompt = Completer<DeviceAuthenticationResult>();
       await tester.tap(toggle);
       await tester.pumpAndSettle();
@@ -294,7 +564,7 @@ void main() {
       );
       expect(h.security.appLockEnabled, isTrue);
       await tester.pumpAndSettle();
-      expect(tester.widget<SwitchListTile>(toggle).value, isTrue);
+      expect(tester.widget<AsterOptionRow>(toggle).toggleValue, isTrue);
       expect(h.toasts.messages, isEmpty);
     },
   );
@@ -321,7 +591,7 @@ void main() {
   );
 
   testWidgets(
-    'a disclosure opened while locked waits for unlock and then reauthenticates',
+    'a blocked disclosure action is not replayed automatically after unlock',
     (tester) async {
       final h = await _Harness.create();
       addTearDown(() => _cleanup(tester, h));
@@ -335,6 +605,11 @@ void main() {
       expect(find.text('tpub-btc'), findsNothing);
       expect(await h.security.unlock(), isTrue);
       await tester.pumpAndSettle();
+      expect(find.text('Advanced'), findsOneWidget);
+      expect(find.text('tpub-btc'), findsNothing);
+      expect(h.device.prompts, 1);
+      await tester.tap(find.text('Export xpubs'));
+      await tester.pumpAndSettle();
       expect(find.text('tpub-btc'), findsOneWidget);
       expect(h.device.prompts, 2);
       expect(h.toasts.messages, isEmpty);
@@ -342,22 +617,26 @@ void main() {
   );
 
   testWidgets(
-    'leaving a deferred disclosure cancels its wait without late reads',
+    'leaving the source during authentication prevents a late disclosure',
     (tester) async {
       final h = await _Harness.create();
       addTearDown(() => _cleanup(tester, h));
-      h.security.lock();
+      h.device.nextPrompt = Completer<DeviceAuthenticationResult>();
       await h.pump(tester);
       await tester.tap(find.text('Export xpubs'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      expect(h.device.prompts, 1);
+      unawaited(h.router!.push<void>('/other'));
+      await tester.pumpAndSettle();
+      h.device.nextPrompt!.complete(DeviceAuthenticationResult.authenticated);
+      await tester.pumpAndSettle();
+      expect(find.text('Other page'), findsOneWidget);
+      expect(h.engine.calls, isNot(contains('publicKeys')));
+      expect(h.device.protections, [true, false]);
+      expect(h.toasts.messages, isEmpty);
       h.router!.pop();
       await tester.pumpAndSettle();
-      expect(await h.security.unlock(), isTrue);
-      await tester.pumpAndSettle();
       expect(find.text('Advanced'), findsOneWidget);
-      expect(h.device.prompts, 1);
-      expect(h.engine.calls, isNot(contains('publicKeys')));
     },
   );
 
@@ -479,9 +758,8 @@ void main() {
 }
 
 /// Deliberately complete the native response after the controller is resumed
-/// while the rendered gate still has Offstage/TickerMode from the inactive
-/// frame. A successful action may not treat that stale widget value as a
-/// departure, return silently, or ask for another native prompt.
+/// before the next rendered gate frame. Owned authentication keeps its source
+/// painted, and successful completion must not lose authority or ask twice.
 Future<void> _completeOwnPromptBeforeGateFrame(
   WidgetTester tester,
   _Harness harness, {
@@ -490,7 +768,7 @@ Future<void> _completeOwnPromptBeforeGateFrame(
   harness.security.handleLifecycle(AppLifecycleState.inactive);
   await tester.pump();
   final element = route.evaluate().single;
-  expect(TickerMode.valuesOf(element).enabled, isFalse);
+  expect(TickerMode.valuesOf(element).enabled, isTrue);
   harness.security.handleLifecycle(AppLifecycleState.resumed);
   harness.device.nextPrompt!.complete(DeviceAuthenticationResult.authenticated);
   for (var turn = 0; turn < 64; turn++) {
@@ -498,9 +776,8 @@ Future<void> _completeOwnPromptBeforeGateFrame(
   }
   expect(harness.security.isAuthenticating, isFalse);
   expect(harness.security.canAccessWallet, isTrue);
-  // No pump has happened since resume. The gate's rendered inherited state
-  // must still be disabled when the continuation has already completed.
-  expect(TickerMode.valuesOf(element).enabled, isFalse);
+  // No extra route or privacy cover is introduced by our own system prompt.
+  expect(TickerMode.valuesOf(element).enabled, isTrue);
 }
 
 Future<void> _cleanup(WidgetTester tester, _Harness harness) async {

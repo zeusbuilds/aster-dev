@@ -50,7 +50,14 @@ class SecurityController extends ChangeNotifier {
        _appLockEnabled = appLockEnabled {
     _captureSubscription = _device.captureChanges.listen((captured) {
       _captured = captured;
-      if (captured) _generation++;
+      if (captured) {
+        _generation++;
+        _requestRevision++;
+        if (_authenticating) {
+          _obscured = _lifecycle != AppLifecycleState.resumed;
+          unawaited(_device.cancel().catchError((Object _) {}));
+        }
+      }
       _notify();
     });
     if (_device case final DeviceAuthenticationBackgroundEvents events) {
@@ -79,6 +86,7 @@ class SecurityController extends ChangeNotifier {
   bool _savingLock = false;
   int _generation = 0;
   int _requestRevision = 0;
+  int? _ownedPromptRevision;
   int _sensitiveLeases = 0;
   Future<void> _sensitiveTail = Future<void>.value();
   String? _walletId;
@@ -100,8 +108,20 @@ class SecurityController extends ChangeNotifier {
   String? get unlockError => _unlockError;
   DeviceSecurityStatus? get deviceStatus => _status;
   int get generation => _generation;
-  bool get sensitiveVisible => !_locked && !_obscured && !_captured;
-  bool get canAccessWallet => _initialized && !_locked && !_obscured;
+  bool get sensitiveVisible =>
+      _lifecycle == AppLifecycleState.resumed &&
+      !_authenticating &&
+      !_locked &&
+      !_obscured &&
+      !_captured;
+  bool get canAccessWallet =>
+      _initialized &&
+      _lifecycle == AppLifecycleState.resumed &&
+      !_locked &&
+      !_obscured;
+
+  bool get _ownsSystemPrompt =>
+      _authenticating && _ownedPromptRevision == _requestRevision;
 
   void loadAppLockPreference(bool enabled) {
     if (_initialized) throw StateError('Security is already initialized');
@@ -189,12 +209,18 @@ class SecurityController extends ChangeNotifier {
 
   Future<bool> unlock() async {
     if (_authenticating || _disposed) return false;
+    final generation = _generation;
     _unlockActionRequired = false;
     _needsForegroundAuthentication = false;
     _unlockError = null;
     try {
       final result = await _authenticate('Unlock Aster');
-      if (_disposed) return false;
+      if (_disposed ||
+          generation != _generation ||
+          _lifecycle != AppLifecycleState.resumed ||
+          _obscured) {
+        return false;
+      }
       if (!result) {
         _unlockActionRequired = _locked;
         _notify();
@@ -219,8 +245,9 @@ class SecurityController extends ChangeNotifier {
     SecurityPurpose purpose, {
     String? walletId,
   }) async {
-    if (_authenticating || _disposed || _locked || _obscured) return null;
+    if (_authenticating || _disposed || !canAccessWallet) return null;
     final currentWallet = _walletId;
+    final generation = _generation;
     final success = await _authenticate(switch (purpose) {
       SecurityPurpose.revealSeed => 'Reveal your recovery phrase',
       SecurityPurpose.exportXpubs => 'Export your wallet public keys',
@@ -230,8 +257,8 @@ class SecurityController extends ChangeNotifier {
     });
     if (!success ||
         _disposed ||
-        _locked ||
-        _obscured ||
+        !canAccessWallet ||
+        generation != _generation ||
         currentWallet != _walletId ||
         (walletId != null && walletId != _walletId)) {
       return null;
@@ -264,12 +291,32 @@ class SecurityController extends ChangeNotifier {
 
   Future<bool> _authenticate(String reason) async {
     final request = ++_requestRevision;
+    var presentationFinished = false;
+    Future<void> finishPresentation() async {
+      if (presentationFinished || _ownedPromptRevision == null) return;
+      presentationFinished = true;
+      if (_device case final DeviceAuthenticationPresentation presentation) {
+        try {
+          await presentation.finishAuthenticationPresentation();
+        } catch (_) {
+          // A lost acknowledgement must not leave a native visual exemption
+          // alive. Cancel also revokes completed presentation ownership.
+          await _device.cancel().catchError((Object _) {});
+          rethrow;
+        }
+      }
+    }
+
     _authenticating = true;
     _notify();
     try {
       await refreshStatus();
       if (_disposed || request != _requestRevision) return false;
+      // A capability RPC must not turn unrelated inactivity into ownership of
+      // a system prompt, or start a prompt after the user has left the app.
+      if (_lifecycle != AppLifecycleState.resumed || _obscured) return false;
       if (_status == DeviceSecurityStatus.unsecured) return true;
+      _ownedPromptRevision = request;
       final result = await _device.authenticate(reason);
       if (_disposed || request != _requestRevision) {
         return false;
@@ -277,7 +324,11 @@ class SecurityController extends ChangeNotifier {
       // A system credential activity may finish just before Flutter resumes.
       // No grant is issued while the application is still in the background.
       if (!await _authenticationForeground(request)) return false;
-      if (result == DeviceAuthenticationResult.cancelled) return false;
+      if (result == DeviceAuthenticationResult.cancelled) {
+        await finishPresentation();
+        await _authenticationForeground(request);
+        return false;
+      }
       // Recheck removal/addition while the system sheet was open. Only the OS
       // can classify an unsecured device; a generic prompt error never can.
       await refreshStatus();
@@ -285,6 +336,8 @@ class SecurityController extends ChangeNotifier {
       // inactivity. That event can arrive during the status RPC above. Keep
       // ownership of the prompt until its final check is foreground again;
       // otherwise a successful authentication silently loses its grant.
+      if (!await _authenticationForeground(request)) return false;
+      await finishPresentation();
       if (!await _authenticationForeground(request)) return false;
       if (result == DeviceAuthenticationResult.unsecured &&
           _status != DeviceSecurityStatus.unsecured) {
@@ -301,7 +354,17 @@ class SecurityController extends ChangeNotifier {
         ),
       );
     } finally {
+      // Also release native ownership after cancellation, error and revocation.
+      // Cleanup failure cannot turn any of those paths into authorization.
+      if (!presentationFinished && _ownedPromptRevision != null) {
+        await finishPresentation().catchError((Object _) {});
+      }
+      _ownedPromptRevision = null;
       _authenticating = false;
+      // Cancellation, platform failure or a foreground timeout can finish
+      // while the host is still inactive. The visual exemption ends with the
+      // owned prompt; never leave a route exposed to an unrelated interruption.
+      if (_lifecycle != AppLifecycleState.resumed) _obscured = true;
       _notify();
     }
   }
@@ -316,7 +379,10 @@ class SecurityController extends ChangeNotifier {
         return false;
       }
     }
-    return !_disposed && request == _requestRevision && !_obscured;
+    return !_disposed &&
+        request == _requestRevision &&
+        _lifecycle == AppLifecycleState.resumed &&
+        !_obscured;
   }
 
   Future<bool> setAppLockEnabled(bool enabled) async {
@@ -372,6 +438,7 @@ class SecurityController extends ChangeNotifier {
     _generation++;
     if (_authenticating) {
       _requestRevision++;
+      if (_lifecycle != AppLifecycleState.resumed) _obscured = true;
       unawaited(_device.cancel().catchError((Object _) {}));
     }
     _notify();
@@ -413,17 +480,30 @@ class SecurityController extends ChangeNotifier {
     _notify();
   }
 
-  /// System prompts obscure content but must not trigger another prompt. A
-  /// genuine background revokes existing grants immediately, even with lock off.
+  /// Keep the source route painted beneath our own OS prompt, while authority
+  /// remains foreground-only. Native background events override this exemption
+  /// immediately. Older Android credential activities pause the host as part
+  /// of authentication, so only bridges with authoritative background events
+  /// may retain the route through hidden/paused states.
   void handleLifecycle(AppLifecycleState state) {
     _lifecycle = state;
-    _obscured = state != AppLifecycleState.resumed;
-    if (state == AppLifecycleState.hidden ||
+    final stopped =
+        state == AppLifecycleState.hidden ||
         state == AppLifecycleState.paused ||
-        state == AppLifecycleState.detached) {
+        state == AppLifecycleState.detached;
+    final ownedInterruption =
+        _ownsSystemPrompt &&
+        state != AppLifecycleState.detached &&
+        (!stopped || _device is DeviceAuthenticationBackgroundEvents);
+    _obscured = state != AppLifecycleState.resumed && !ownedInterruption;
+    if (stopped && !ownedInterruption) {
       _generation++;
+      _requestRevision++;
       _needsForegroundAuthentication = true;
-      if (!_authenticating) _locked = _requiresAppLock;
+      _locked = _requiresAppLock;
+      if (_authenticating) {
+        unawaited(_device.cancel().catchError((Object _) {}));
+      }
       // Before the root app mounts, startup owns only a manual resume path.
       // Retain that fallback behind the opaque cover. The mounted app clears
       // it in prepareForeground before its automatic prompt is painted.

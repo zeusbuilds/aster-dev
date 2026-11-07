@@ -26,15 +26,15 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>NSCameraUsageDescription</key>
-	<string>Aster uses the camera to scan payment QR codes.</string>
-	<key>NSFaceIDUsageDescription</key>
-	<string>Use Face ID to unlock Aster and approve access to your recovery phrase and public keys.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Aster uses the camera to scan payment QR codes.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Use Face ID to unlock Aster and approve access to your recovery phrase and public keys.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Aster uses a selected photo to scan a payment QR code.</string>
 	<key>UIApplicationSceneManifest</key>

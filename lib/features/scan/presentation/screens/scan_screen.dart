@@ -27,6 +27,15 @@ class ScanScreen extends ConsumerStatefulWidget {
 class _ScanScreenState extends ConsumerState<ScanScreen> {
   bool _navigationInFlight = false;
 
+  bool get _isCurrentSurface =>
+      mounted &&
+      (WidgetsBinding.instance.lifecycleState == null ||
+          WidgetsBinding.instance.lifecycleState ==
+              AppLifecycleState.resumed) &&
+      (ModalRoute.of(context)?.isCurrent ?? false) &&
+      (widget.purpose == ScanPurpose.destinationPicker ||
+          ref.read(appShellIndexProvider) == appShellScanTabIndex);
+
   Future<void> _handleCameraPayload(ScanPayload payload) async {
     final viewModel = ref.read(scanViewModelProvider(widget.purpose).notifier);
     if (!viewModel.acceptCameraPayload(payload)) return;
@@ -37,7 +46,12 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     final toasts = context.toasts;
     final viewModel = ref.read(scanViewModelProvider(widget.purpose).notifier);
     final result = await viewModel.scanGallery();
-    if (!mounted) return;
+    if (!_isCurrentSurface) {
+      // Release a gallery capture even when its caller has since been covered.
+      // Native attachment/lifecycle still gates any actual camera start.
+      await viewModel.resumeAfterNavigation();
+      return;
+    }
     switch (result) {
       case AppSuccess<ScanGalleryOutcome>(:final value):
         switch (value) {
@@ -45,8 +59,9 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
             await _completePayload(payload);
           case ScanGalleryNoCode():
             toasts.show(
-              title: 'No QR code found',
-              message: 'Choose another image and try again.',
+              title: 'No payment QR found',
+              message:
+                  'Choose an image with a valid Bitcoin or USDT payment QR.',
               variant: ToastVariant.warning,
             );
           case ScanGalleryCancelled():
@@ -55,81 +70,54 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       case AppFailureResult<ScanGalleryOutcome>(:final failure):
         if (failure.code == 'scan_operation_unavailable') return;
         toasts.show(
-          title: failure.kind == AppFailureKind.unsupported
-              ? 'Image scanning unavailable'
-              : 'Image could not be scanned',
-          message: failure.userMessage,
-          variant:
-              failure.kind == AppFailureKind.unsupported ||
-                  failure.kind == AppFailureKind.authentication
-              ? ToastVariant.warning
-              : ToastVariant.failure,
+          title: switch (failure.kind) {
+            AppFailureKind.authentication => 'Photo access unavailable',
+            AppFailureKind.unsupported => 'Image scanning unavailable',
+            _ => 'Image could not be scanned',
+          },
+          message: switch (failure.kind) {
+            AppFailureKind.authentication =>
+              'Allow photo access in system settings, or scan with the camera.',
+            AppFailureKind.unsupported =>
+              'Use the camera or enter the payment details manually.',
+            _ =>
+              'A valid payment QR could not be read. Choose a clearer image.',
+          },
+          variant: ToastVariant.warning,
         );
     }
   }
 
   Future<void> _toggleFlash() async {
-    final toasts = context.toasts;
-    final result = await ref
+    await ref
         .read(scanViewModelProvider(widget.purpose).notifier)
         .toggleFlash();
-    if (!mounted || result is AppSuccess<void>) return;
-    _showControlFailure(
-      title: 'Flashlight unavailable',
-      failure: (result as AppFailureResult<void>).failure,
-      toasts: toasts,
-    );
   }
 
   Future<void> _cycleZoom() async {
-    final toasts = context.toasts;
-    final result = await ref
-        .read(scanViewModelProvider(widget.purpose).notifier)
-        .cycleZoom();
-    if (!mounted || result is AppSuccess<void>) return;
-    _showControlFailure(
-      title: 'Zoom unavailable',
-      failure: (result as AppFailureResult<void>).failure,
-      toasts: toasts,
-    );
-  }
-
-  void _showControlFailure({
-    required String title,
-    required AppFailure failure,
-    required ToastPresentationService toasts,
-  }) {
-    if (failure.code == 'scan_operation_unavailable') return;
-    toasts.show(
-      title: title,
-      message: failure.userMessage,
-      variant:
-          failure.kind == AppFailureKind.unsupported ||
-              failure.kind == AppFailureKind.authentication
-          ? ToastVariant.warning
-          : ToastVariant.failure,
-    );
+    await ref.read(scanViewModelProvider(widget.purpose).notifier).cycleZoom();
   }
 
   Future<void> _completePayload(ScanPayload payload) async {
+    if (!_isCurrentSurface) {
+      await ref
+          .read(scanViewModelProvider(widget.purpose).notifier)
+          .resumeAfterNavigation();
+      return;
+    }
     if (_navigationInFlight) return;
     if (widget.purpose == ScanPurpose.destinationPicker) {
       if (context.canPop()) {
         context.pop(payload.value);
-      } else {
-        await _reportMissingPickerCaller();
+        return;
       }
-      return;
+      // A directly opened picker has no caller to return to. Complete through
+      // the normal Send launcher; the camera itself never expires.
     }
     final staged = ref
         .read(sendDestinationHandoffProvider.notifier)
         .stage(payload.value);
-    if (staged case AppFailureResult<void>(:final failure)) {
-      context.toasts.show(
-        title: 'Code could not be used',
-        message: failure.userMessage,
-        variant: ToastVariant.failure,
-      );
+    if (staged is AppFailureResult<void>) {
       await ref
           .read(scanViewModelProvider(widget.purpose).notifier)
           .resumeAfterNavigation();
@@ -144,29 +132,15 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     if (widget.purpose == ScanPurpose.destinationPicker) {
       if (context.canPop()) {
         context.pop<void>();
-      } else {
-        await _reportMissingPickerCaller();
+        return;
       }
-      return;
     }
     ref.read(sendDestinationHandoffProvider.notifier).clear();
     await _openSend();
   }
 
-  Future<void> _reportMissingPickerCaller() async {
-    context.toasts.show(
-      title: 'Scan session expired',
-      message: 'Return to Send and open the scanner again.',
-      variant: ToastVariant.failure,
-    );
-    await ref
-        .read(scanViewModelProvider(widget.purpose).notifier)
-        .resumeAfterNavigation();
-  }
-
   Future<void> _openSend() async {
     if (_navigationInFlight) return;
-    final toasts = context.toasts;
     setState(() => _navigationInFlight = true);
     final viewModel = ref.read(scanViewModelProvider(widget.purpose).notifier);
     final destinationHandoff = ref.read(
@@ -177,29 +151,19 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       destinationHandoff.clear();
       return;
     }
-    if (paused case AppFailureResult<void>(:final failure)) {
+    if (!_isCurrentSurface ||
+        !viewModel.navigationContextCurrent ||
+        paused is AppFailureResult<void>) {
       destinationHandoff.clear();
-      setState(() => _navigationInFlight = false);
-      toasts.show(
-        title: 'Scanner could not pause',
-        message: failure.userMessage,
-        variant: ToastVariant.failure,
-      );
+      await viewModel.resumeAfterNavigation();
+      if (mounted) setState(() => _navigationInFlight = false);
       return;
     }
     try {
       await context.pushNamed<void>(RouteNames.send);
     } catch (error, stackTrace) {
-      final failure = FailureMapper.from(error, stackTrace);
       destinationHandoff.clear();
-      if (mounted) {
-        unawaited(context.haptics.trigger(HapticIntent.error));
-        toasts.show(
-          title: 'Send could not be opened',
-          message: failure.userMessage,
-          variant: ToastVariant.failure,
-        );
-      }
+      viewModel.navigationFailed(error, stackTrace);
     } finally {
       if (mounted) {
         await viewModel.resumeAfterNavigation();
@@ -211,20 +175,15 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
   @override
   Widget build(BuildContext context) {
     final scanState = ref.watch(scanViewModelProvider(widget.purpose));
-    final viewModel = ref.read(scanViewModelProvider(widget.purpose).notifier);
     final shellIndex = ref.watch(appShellIndexProvider);
     final shouldShowCamera =
-        widget.purpose == ScanPurpose.destinationPicker ||
-        shellIndex == appShellScanTabIndex;
+        (ModalRoute.of(context)?.isCurrent ?? false) &&
+        (widget.purpose == ScanPurpose.destinationPicker ||
+            shellIndex == appShellScanTabIndex);
     final walletIdentity = ref.watch(scanWalletIdentityViewModelProvider);
-    final activeWallet = walletIdentity.value;
-    final walletFailure = switch (walletIdentity) {
-      AsyncError(:final error, :final stackTrace) =>
-        error is AppFailureException
-            ? error.failure
-            : FailureMapper.from(error, stackTrace),
-      _ => null,
-    };
+    final activeWallet = walletIdentity.isLoading || walletIdentity.hasError
+        ? null
+        : walletIdentity.value;
     final spacing = context.spacing;
     final colors = context.appColors;
     final metrics = context.metrics;
@@ -297,20 +256,6 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                       child: ScanWalletHeader(
                         walletName: activeWallet?.name,
                         walletId: activeWallet?.displayId,
-                        loading: walletIdentity.isLoading,
-                        failureMessage: walletFailure?.userMessage,
-                        onRetry:
-                            !walletIdentity.isLoading &&
-                                walletFailure?.retryable == true
-                            ? () => unawaited(
-                                ref
-                                    .read(
-                                      scanWalletIdentityViewModelProvider
-                                          .notifier,
-                                    )
-                                    .retry(),
-                              )
-                            : null,
                       ),
                     ),
                   ),
@@ -328,9 +273,6 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                           : null,
                       onZoomTap: scanState.canChangeZoom
                           ? () => unawaited(_cycleZoom())
-                          : null,
-                      onRetry: scanState.canRetry
-                          ? () => unawaited(viewModel.retryCamera())
                           : null,
                     ),
                   ),

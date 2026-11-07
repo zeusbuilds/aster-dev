@@ -8,6 +8,9 @@ from a clean worktree and record commands/results in the production tracker.
 - [ ] repository-local Zeus identity is configured; global identity unchanged
 - [ ] `git status --short` is clean
 - [ ] immutable SDK `resolved-ref` matches the approved commit
+- [ ] selected wallet backend matches the approved native store format. Record
+      the SDK revision, both native artifact hashes, and the running library
+      version and source revision on iOS and Android
 - [ ] `fvm flutter --version` matches `.fvmrc`
 - [ ] Gradle wrapper distribution checksum matches the reviewed official digest
 - [ ] Gradle dependency verification passes without trust exceptions and covers
@@ -50,6 +53,10 @@ from a clean worktree and record commands/results in the production tracker.
       match that documented legal classification
 - [ ] every Release wallet service endpoint is TLS-protected; no HTTP, `tcp`,
       or `rpc` loopback development transport survives composition
+- [ ] mainnet indexer, RGB proxy protocol, and EVM chain match the approved
+      deployment. For RGB_L1 qualify proxy 1.0 and the issuer-approved CON V1
+      USDT contract ID, schema, precision, and BFA backing before accepting
+      deposits
 - [ ] public app version/build number and upgrade policy are approved
 - [ ] Android APK/AAB artifacts are unsigned candidates or match the approved
       `ASTER_RELEASE_CERT_SHA256`; debug-signed artifacts are rejected
@@ -78,6 +85,13 @@ from a clean worktree and record commands/results in the production tracker.
 
 - [ ] create/import and process-restart proof
 - [ ] all configured payment rails: validate, receive, send, failure, retry
+- [ ] funded BTC and RGB sends retain their exact identity through process
+      interruption, lost responses, and wallet reopen on both platforms.
+      Qualification verifies that retries cannot create a second transaction
+      and that an unresolved payment retains its mutation fence
+- [ ] backup and restore recover the same wallet's keys, RGB ownership, and
+      durable payment records as one consistent state. Run restored-wallet
+      qualification with a completed send and with an interrupted send
 - [ ] activity normalization and details
 - [ ] screen-reader traversal, text scaling, contrast, keyboard, touch targets
 - [ ] physical haptics, camera/gallery, background capture policy

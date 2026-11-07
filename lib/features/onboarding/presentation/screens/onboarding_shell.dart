@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../shared/shared.dart';
 import '../widgets/widgets.dart';
@@ -60,24 +61,35 @@ class _OnboardingShellState extends State<OnboardingShell> {
       _maximumBackgroundSnapshotPixelRatio,
     );
 
-    return ColoredBox(
-      color: colors.brandArtDark,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          MediaQuery(
-            data: mediaQuery.copyWith(devicePixelRatio: snapshotPixelRatio),
-            child: SnapshotWidget(
-              controller: _backgroundSnapshot,
-              painter: _backgroundSnapshotPainter,
-              autoresize: true,
-              child: OnboardingWelcomeMeshBackground(
-                onCompositionReady: _enableBackgroundSnapshot,
+    // The retained blue artwork owns its system bars, including after a white
+    // launch/privacy cover is removed or an OS authentication sheet returns.
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: colors.transparentSurface,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+        systemNavigationBarColor: colors.transparentSurface,
+        systemNavigationBarIconBrightness: Brightness.light,
+      ),
+      child: ColoredBox(
+        color: colors.brandArtDark,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            MediaQuery(
+              data: mediaQuery.copyWith(devicePixelRatio: snapshotPixelRatio),
+              child: SnapshotWidget(
+                controller: _backgroundSnapshot,
+                painter: _backgroundSnapshotPainter,
+                autoresize: true,
+                child: OnboardingWelcomeMeshBackground(
+                  onCompositionReady: _enableBackgroundSnapshot,
+                ),
               ),
             ),
-          ),
-          widget.child,
-        ],
+            widget.child,
+          ],
+        ),
       ),
     );
   }

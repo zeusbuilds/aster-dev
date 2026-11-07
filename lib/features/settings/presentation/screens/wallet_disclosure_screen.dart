@@ -9,10 +9,11 @@ import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
 import '../../../onboarding/presentation/widgets/onboarding_recovery_phrase_grid.dart';
 import '../../../wallet/domain/models/models.dart';
-import '../../../wallet/presentation/view_model/view_models.dart';
+import '../controllers/wallet_disclosure_handoff.dart';
+import '../view_model/view_models.dart';
 
-/// Sensitive values never enter route arguments or persistent presentation state.
-/// A direct route entry must authorize itself, just like a Settings tap.
+/// Displays only a ready, single-use handoff prepared on Advanced Settings.
+/// A direct route entry has no authority and returns to Advanced Settings.
 class WalletDisclosureScreen extends ConsumerStatefulWidget {
   const WalletDisclosureScreen.seed({super.key})
     : purpose = SecurityPurpose.revealSeed;
@@ -28,17 +29,11 @@ class WalletDisclosureScreen extends ConsumerStatefulWidget {
 
 class _WalletDisclosureScreenState
     extends ConsumerState<WalletDisclosureScreen> {
-  SecurityController? _security;
-  Completer<bool>? _accessWaiter;
-  String? _walletId;
-  String? _mnemonic;
-  WalletPublicKeys? _keys;
-  int? _authorizedGeneration;
-  bool _armed = false;
-  bool _sensitiveLease = false;
+  WalletDisclosureSession? _session;
+  String? get _mnemonic => _session?.mnemonic;
+  WalletPublicKeys? get _keys => _session?.keys;
   bool _closing = false;
   bool _closeScheduled = false;
-  AppFailure? _closeFailure;
   bool _sharing = false;
   bool _copying = false;
 
@@ -47,154 +42,27 @@ class _WalletDisclosureScreenState
       mounted &&
       !_closing &&
       ModalRoute.of(context)?.isCurrent == true &&
-      _security?.sensitiveVisible == true &&
-      _security?.generation == _authorizedGeneration &&
-      ref.read(walletViewModelProvider).value?.activeWallet?.id == _walletId &&
-      ref.read(walletViewModelProvider).value?.isChangingWallet != true;
+      _session?.valid == true;
 
   @override
   void initState() {
     super.initState();
-    _security = ref.read(securityControllerProvider);
-    _security!.addListener(_securityChanged);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) unawaited(_open());
-    });
-  }
-
-  Future<void> _open() async {
-    try {
-      if (!_security!.canAccessWallet) {
-        final waiter = _accessWaiter ??= Completer<bool>();
-        if (!await waiter.future) return;
-      }
-      if (!mounted || _closing) return;
-      if (ModalRoute.of(context)?.isCurrent != true) {
-        _close();
-        return;
-      }
-      if (ref.read(walletViewModelProvider).isLoading) {
-        await ref.read(walletViewModelProvider.future);
-      }
-      if (!mounted || _closing) return;
-      final walletState = ref.read(walletViewModelProvider);
-      final profile =
-          !walletState.isLoading &&
-              !walletState.hasError &&
-              walletState.value?.isChangingWallet != true
-          ? walletState.value?.activeWallet
-          : null;
-      if (profile == null || profile.state != WalletProfileState.ready) {
-        _close(
-          const AppFailure(
-            code: 'wallet_disclosure_wallet_unavailable',
-            kind: AppFailureKind.unavailable,
-            userMessage: 'This wallet is unavailable. Try again.',
-            retryable: true,
-          ),
-        );
-        return;
-      }
-      _walletId = profile.id;
-      if (_security!.isCaptured) {
-        _close(_captureFailure);
-        return;
-      }
-      _sensitiveLease = true;
-      await _security!.setSensitive(true);
-      if (!mounted || _closing) return;
-      if (_security!.isCaptured) {
-        _close(_captureFailure);
-        return;
-      }
-      final authorization = await _security!.authorize(
-        widget.purpose,
-        walletId: profile.id,
-      );
-      if (!mounted || _closing) return;
-      if (authorization == null) {
-        _close();
-        return;
-      }
-      if (_security!.isCaptured) {
-        _close(_captureFailure);
-        return;
-      }
-      _authorizedGeneration = _security!.generation;
-      _armed = true;
-      if (!_current) {
-        _close();
-        return;
-      }
-      final repository = await ref.read(walletRepositoryProvider.future);
-      if (!_current) return _close();
-      if (_isSeed) {
-        final result = await repository.recoveryMnemonic(
-          profile.id,
-          authorization: authorization,
-        );
-        if (!_current) return _close();
-        switch (result) {
-          case AppSuccess<String>(:final value):
-            // Stored wallets currently use twelve words. Reject a malformed
-            // credential rather than partially rendering secret material.
-            if (value.trim().split(RegExp(r'\s+')).length != 12) {
-              _close(
-                const AppFailure(
-                  code: 'wallet_disclosure_phrase_invalid',
-                  kind: AppFailureKind.storage,
-                  userMessage: 'The seed phrase could not be opened safely.',
-                  retryable: false,
-                ),
-              );
-              return;
-            }
-            setState(() => _mnemonic = value);
-          case AppFailureResult<String>(:final failure):
-            _close(failure);
-        }
-      } else {
-        final result = await repository.publicKeys(
-          authorization: authorization,
-          walletId: profile.id,
-        );
-        if (!_current) return _close();
-        switch (result) {
-          case AppSuccess<WalletPublicKeys>(:final value):
-            setState(() => _keys = value);
-          case AppFailureResult<WalletPublicKeys>(:final failure):
-            _close(failure);
-        }
-      }
-    } catch (error, stackTrace) {
-      if (mounted && !_closing) _close(FailureMapper.from(error, stackTrace));
+    _session = ref.read(walletDisclosureHandoffProvider).claim(widget.purpose);
+    _session?.addListener(_sessionChanged);
+    if (_session == null) {
+      _closing = true;
+      _scheduleClose();
     }
   }
 
-  void _securityChanged() {
-    // Keep an incoming disclosure destination behind the global unlock gate.
-    // The gate owns its prompt; this route requests its own fresh disclosure
-    // authorization only after wallet access has actually been restored.
-    final waiter = _accessWaiter;
-    if (waiter != null &&
-        !waiter.isCompleted &&
-        _security?.canAccessWallet == true) {
-      waiter.complete(true);
-      _accessWaiter = null;
-    }
-    // The native authentication sheet can transiently obscure its own route.
-    // Only an accepted disclosure session is subject to invalidation here.
-    if (!_armed || _closing) return;
-    if (!_current) _close();
+  void _sessionChanged() {
+    if (_session?.valid != true) _close();
   }
 
-  void _close([AppFailure? failure]) {
+  void _close() {
     if (_closing) return;
     _closing = true;
-    _closeFailure = failure;
-    _mnemonic = null;
-    _keys = null;
-    _armed = false;
+    _session?.close();
     if (mounted &&
         SchedulerBinding.instance.schedulerPhase !=
             SchedulerPhase.persistentCallbacks) {
@@ -214,20 +82,13 @@ class _WalletDisclosureScreenState
       _closeScheduled = false;
       if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
       if (context.canPop()) {
-        context.pop(_closeFailure);
+        context.pop();
       } else {
         context.goNamed(RouteNames.advancedSettings);
       }
     });
     WidgetsBinding.instance.ensureVisualUpdate();
   }
-
-  static const _captureFailure = AppFailure(
-    code: 'wallet_disclosure_capture_active',
-    kind: AppFailureKind.unavailable,
-    userMessage: 'Stop screen sharing to view wallet information.',
-    retryable: true,
-  );
 
   String get _exportText =>
       'Bitcoin account\n${_keys!.bitcoin}\n\nRGB account\n${_keys!.rgb}';
@@ -237,8 +98,8 @@ class _WalletDisclosureScreenState
     final toasts = context.toasts;
     setState(() => _copying = true);
     final result = await ref
-        .read(clipboardServiceProvider)
-        .writeText(_exportText);
+        .read(walletDisclosureViewModelProvider)
+        .copyPublicKeys(_exportText, current: () => _current);
     if (_current) {
       switch (result) {
         case AppSuccess<void>():
@@ -263,10 +124,10 @@ class _WalletDisclosureScreenState
     final text = _exportText;
     setState(() => _sharing = true);
     final result = await ref
-        .read(shareServiceProvider)
-        .shareText(
+        .read(walletDisclosureViewModelProvider)
+        .sharePublicKeys(
           text,
-          subject: 'Aster extended public keys',
+          current: () => _current,
           origin: ShareOrigin(
             left: offset.dx,
             top: offset.dy,
@@ -286,34 +147,17 @@ class _WalletDisclosureScreenState
 
   @override
   void dispose() {
-    _mnemonic = null;
-    _keys = null;
-    final waiter = _accessWaiter;
-    if (waiter != null && !waiter.isCompleted) waiter.complete(false);
-    _accessWaiter = null;
-    _security?.removeListener(_securityChanged);
-    if (_security != null && _sensitiveLease) {
-      _sensitiveLease = false;
-      unawaited(_security!.setSensitive(false).catchError((Object _) {}));
-    }
+    _session?.removeListener(_sessionChanged);
+    _session?.close();
+    _session = null;
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    ref.listen(walletViewModelProvider, (_, next) {
-      if (_walletId == null || _closing) return;
-      if (next.isLoading ||
-          next.hasError ||
-          next.value?.activeWallet?.id != _walletId ||
-          next.value?.isChangingWallet == true) {
-        _close();
-      }
-    });
-    if (_armed && ModalRoute.of(context)?.isCurrent != true) _close();
+    if (!_current && !_closing) _close();
     if (_closing) _scheduleClose();
-    final visible = _armed && _current;
-    final ready = visible && (_isSeed ? _mnemonic != null : _keys != null);
+    final ready = _current;
     return Scaffold(
       backgroundColor: context.colorScheme.surface,
       appBar: CustomAppBar(
@@ -322,9 +166,7 @@ class _WalletDisclosureScreenState
         fallbackLocation: RoutePaths.advancedSettingsLocation,
       ),
       body: !ready
-          ? const Center(
-              child: GridLoader(semanticLabel: 'Opening wallet information'),
-            )
+          ? const SizedBox.shrink()
           : _isSeed
           ? ListView(
               padding: EdgeInsets.fromLTRB(

@@ -38,24 +38,27 @@ void main() {
     await _pump(tester, harness, textScaler: const TextScaler.linear(2));
     await _pumpUntil(
       tester,
-      () => find
-          .text('Swap execution is not available in this build.')
-          .evaluate()
-          .isNotEmpty,
+      () => find.text('Coming soon').evaluate().isNotEmpty,
     );
 
+    expect(
+      find.text('Swap execution is not available in this build.'),
+      findsNothing,
+    );
+    expect(find.text('Swap unavailable'), findsNothing);
     expect(find.text('SideSwap service fee'), findsNothing);
     expect(find.text('Conversion rate'), findsNothing);
     expect(find.text(r'$160,000'), findsNothing);
     await tester.scrollUntilVisible(
-      find.widgetWithText(CustomButton, 'Swap unavailable'),
+      find.widgetWithText(CustomButton, 'Coming soon'),
       200,
       scrollable: find.byType(Scrollable).first,
     );
     final action = tester.widget<CustomButton>(
-      find.widgetWithText(CustomButton, 'Swap unavailable'),
+      find.widgetWithText(CustomButton, 'Coming soon'),
     );
     expect(action.enabled, isFalse);
+    expect(action.onTap, isNull);
 
     await tester.ensureVisible(find.text('Bitcoin · On-chain'));
     await tester.tap(find.text('Bitcoin · On-chain'));

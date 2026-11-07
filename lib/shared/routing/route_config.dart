@@ -1,11 +1,14 @@
 import 'package:flutter/widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/security/security_controller.dart';
 import '../../features/onboarding/presentation/screens/screens.dart';
 import '../../features/receive/presentation/screens/screens.dart';
 import '../../features/scan/domain/models/models.dart';
 import '../../features/scan/presentation/screens/screens.dart';
 import '../../features/send/presentation/screens/screens.dart';
+import '../../features/settings/presentation/controllers/wallet_disclosure_handoff.dart';
 import '../../features/settings/presentation/screens/screens.dart';
 import '../../features/shell/presentation/screens/screens.dart';
 import '../../features/swap/presentation/screens/screens.dart';
@@ -159,12 +162,16 @@ abstract final class RouteConfig {
               GoRoute(
                 path: RoutePaths.revealSeed,
                 name: RouteNames.revealSeed,
+                redirect: (context, state) =>
+                    _disclosureRedirect(context, SecurityPurpose.revealSeed),
                 builder: (context, state) =>
                     const WalletDisclosureScreen.seed(),
               ),
               GoRoute(
                 path: RoutePaths.exportXpubs,
                 name: RouteNames.exportXpubs,
+                redirect: (context, state) =>
+                    _disclosureRedirect(context, SecurityPurpose.exportXpubs),
                 builder: (context, state) =>
                     const WalletDisclosureScreen.xpubs(),
               ),
@@ -179,6 +186,17 @@ abstract final class RouteConfig {
       ),
     ];
   }
+
+  static String? _disclosureRedirect(
+    BuildContext context,
+    SecurityPurpose purpose,
+  ) =>
+      ProviderScope.containerOf(
+        context,
+        listen: false,
+      ).read(walletDisclosureHandoffProvider).allows(purpose)
+      ? null
+      : RoutePaths.advancedSettingsLocation;
 
   static WalletPaymentTarget _paymentTarget(GoRouterState state) {
     return WalletPaymentTarget.tryParse(

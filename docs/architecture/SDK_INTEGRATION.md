@@ -6,13 +6,19 @@ architecture boundaries.
 
 ## Reproducible Dependency
 
-Aster's source candidate pins the SDK in the private repository
+Aster pins the SDK in the private repository
 `https://github.com/zeusbuilds/rgb-sdk-flutter.git` at immutable commit
-`68a690916eabe96407c03669d569bf86babb8e72`. The manifest and portable Git lock
-name the same full commit. Authenticated restoration into an empty Git cache
-passed without a local path override; the hosted Pub cache was reused. All 74
-SDK Dart source files match the tested fixture. This does not claim a fully
-cold hosted-dependency restore or native artifact publication.
+`3e6fb46171e21f02581d752080edd6f2fb8c0116`. The manifest and portable Git lock
+name the same full commit. This candidate adds the explicit RGB_L1 backend
+and React Native beta.40 compatibility. Aster defaults to RLN and rejects
+RGB_L1 before opening wallet storage. Its activation requires qualified durable
+payment recovery and backup.
+
+Verification resolves the pushed Git commit with authenticated access and no
+local SDK override. The earlier restoration of `68a6909` matched 74 SDK Dart
+files to the October 24 fixture. That evidence belongs to the earlier source
+candidate. Current native artifact and funds-bearing release gates are recorded
+in the SDK's `doc/UPSTREAM_PARITY_BETA40.md`.
 The credential belongs in the developer's credential store or CI secret, never
 in the dependency URL, lockfile or repository.
 
@@ -397,10 +403,11 @@ manifest documented in `config/README.md` and consumes it through
 | Define | Purpose |
 | --- | --- |
 | `ASTER_NETWORK` | `regtest` (default), `signet`, or `mainnet` |
+| `ASTER_WALLET_BACKEND` | `rln` (default). `rgb-l1` selects an incompatible store format and is gated until durable BTC and RGB recovery are qualified. |
 | `ASTER_INDEXER_URL` | Optional Electrum/Esplora override |
 | `ASTER_RGB_PROXY_URL` | Optional RGB transport proxy override |
 | `ASTER_LSP_URL` | Optional LSP base URL |
-| `ASTER_VSS_URL` | Optional VSS base URL |
+| `ASTER_VSS_URL` | Optional for development. The current RLN release contract requires a backup, but VSS restore omits the on-chain outbox. Public distribution is blocked until a compatible backup and recovery strategy passes qualification. |
 | `ASTER_ETH_RPC_URL` | Required credential-free HTTPS BFA validation RPC for release manifests and mainnet USDT; not an Ethereum wallet or payout verifier |
 | `ASTER_ETH_CHAIN_ID` | Required deployment-approved decimal EVM chain identity for release manifests and mainnet USDT; checked through bounded `eth_chainId` before native initialization/unlock |
 | `ASTER_EXPLORER_URL` | Optional public transaction explorer base |

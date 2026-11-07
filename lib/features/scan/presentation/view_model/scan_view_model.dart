@@ -17,6 +17,19 @@ class ScanViewModel extends _$ScanViewModel {
   ScanSession? _listenedSession;
   void Function()? _sessionListener;
   var _operationRevision = 0;
+  ({ScanSession session, int revision, Object? token})? _navigationContext;
+
+  /// Rechecks wallet/security authority immediately before route dispatch.
+  bool get navigationContextCurrent {
+    final pending = _navigationContext;
+    if (pending == null ||
+        !_isCurrentOperation(pending.session, pending.revision)) {
+      return false;
+    }
+    final session = pending.session;
+    return session is! ScanSessionContext ||
+        (session as ScanSessionContext).contextToken == pending.token;
+  }
 
   @override
   ScanState build(ScanPurpose purpose) {
@@ -27,6 +40,7 @@ class ScanViewModel extends _$ScanViewModel {
       previousSession.removeListener(previousListener);
     }
     _operationRevision += 1;
+    _navigationContext = null;
     _session = session;
     void synchronizeSession() => _synchronizeSession(session);
     _listenedSession = session;
@@ -83,28 +97,25 @@ class ScanViewModel extends _$ScanViewModel {
     };
   }
 
-  /// Advances one normalized zoom level without claiming optical magnification.
+  /// Advances supported magnification; the label follows native readback.
   Future<AppResult<void>> cycleZoom() async {
     if (!state.canChangeZoom) {
       return AppResult.failure(_operationUnavailableFailure());
     }
     final session = _session;
     final revision = ++_operationRevision;
-    final next = state.zoomPreset.next;
+    final next = state.zoom!.nextRatio;
     state = state.copyWith(
       operation: ScanOperation.changingZoom,
       failure: null,
     );
-    final result = await session.setZoomScale(next.scale);
+    final result = await session.setZoomRatio(next);
     if (!_isCurrentOperation(session, revision)) {
       return AppResult.failure(_operationUnavailableFailure());
     }
     return switch (result) {
       AppSuccess<void>() => () {
-        state = state.copyWith(
-          zoomPreset: ScanZoomPreset.nearest(session.snapshot.zoomScale),
-          operation: null,
-        );
+        state = state.copyWith(zoom: session.snapshot.zoom, operation: null);
         unawaited(
           ref
               .read(hapticFeedbackServiceProvider)
@@ -136,7 +147,9 @@ class ScanViewModel extends _$ScanViewModel {
       if (ref.mounted) {
         _applyOperationFailure(failure);
       }
-      return AppResult.failure(failure);
+      unawaited(session.setActive(true));
+      // No image was selected: this is camera recovery, not a gallery error.
+      return AppResult.failure(_operationUnavailableFailure());
     }
     final result = await session.pickAndAnalyzeGallery();
     if (!_isCurrentOperation(session, revision)) {
@@ -168,12 +181,14 @@ class ScanViewModel extends _$ScanViewModel {
         }
       case AppFailureResult<ScanGalleryOutcome>(:final failure):
         state = state.copyWith(operation: null, failure: cameraFailure);
-        final intent =
-            failure.kind == AppFailureKind.authentication ||
-                failure.kind == AppFailureKind.unsupported
-            ? HapticIntent.warning
-            : HapticIntent.error;
-        unawaited(ref.read(hapticFeedbackServiceProvider).trigger(intent));
+        if (failure.code != 'scan_operation_unavailable') {
+          final intent =
+              failure.kind == AppFailureKind.authentication ||
+                  failure.kind == AppFailureKind.unsupported
+              ? HapticIntent.warning
+              : HapticIntent.error;
+          unawaited(ref.read(hapticFeedbackServiceProvider).trigger(intent));
+        }
         unawaited(session.setActive(true));
     }
     return result;
@@ -186,12 +201,20 @@ class ScanViewModel extends _$ScanViewModel {
     }
     final session = _session;
     final revision = ++_operationRevision;
+    final contextToken = session is ScanSessionContext
+        ? (session as ScanSessionContext).contextToken
+        : null;
+    _navigationContext = (
+      session: session,
+      revision: revision,
+      token: contextToken,
+    );
     state = state.copyWith(
       operation: ScanOperation.pausingForNavigation,
       failure: null,
     );
     final result = await session.setActive(false);
-    if (!_isCurrentOperation(session, revision)) {
+    if (!navigationContextCurrent) {
       return AppResult.failure(_operationUnavailableFailure());
     }
     switch (result) {
@@ -203,8 +226,15 @@ class ScanViewModel extends _$ScanViewModel {
     }
   }
 
+  /// Captures route failures without interrupting the quiet camera surface.
+  void navigationFailed(Object error, StackTrace stackTrace) {
+    if (!ref.mounted) return;
+    _applyOperationFailure(FailureMapper.from(error, stackTrace));
+  }
+
   /// Re-arms one-result detection after a covering route returns.
   Future<AppResult<void>> resumeAfterNavigation() async {
+    _navigationContext = null;
     final session = _session;
     final revision = ++_operationRevision;
     session.resetCapture();
@@ -225,65 +255,27 @@ class ScanViewModel extends _$ScanViewModel {
     return result;
   }
 
-  /// Retries a retryable camera startup failure through a full stop/start.
-  Future<bool> retryCamera() async {
-    if (state.isBusy || !state.canRetry) return false;
-    final session = _session;
-    final revision = ++_operationRevision;
-    state = state.copyWith(operation: ScanOperation.restarting, failure: null);
-    final result = await session.restart();
-    if (!_isCurrentOperation(session, revision)) return false;
-    return switch (result) {
-      AppSuccess<void>() => () {
-        state = state.copyWith(operation: null, failure: null);
-        return true;
-      }(),
-      AppFailureResult<void>(:final failure) => () {
-        _applyOperationFailure(failure);
-        return false;
-      }(),
-    };
-  }
-
   void _synchronizeSession(ScanSession session) {
     if (!ref.mounted || !identical(session, _session)) return;
     final snapshot = session.snapshot;
-    final previousFailure = state.failure;
     state = state.copyWith(
       cameraInitialized: snapshot.isInitialized,
       cameraRunning: snapshot.isRunning,
       torchAvailable: snapshot.torchAvailable,
       flashOn: snapshot.torchOn,
-      zoomPreset: ScanZoomPreset.nearest(snapshot.zoomScale),
+      zoom: snapshot.zoom,
       captureLocked: snapshot.captureLocked,
       galleryPhase: snapshot.galleryPhase,
       failure: snapshot.failure,
     );
-    final failure = snapshot.failure;
-    if (failure != null && failure != previousFailure) {
-      final intent = failure.kind == AppFailureKind.authentication
-          ? HapticIntent.warning
-          : HapticIntent.error;
-      unawaited(ref.read(hapticFeedbackServiceProvider).trigger(intent));
-    }
   }
 
   void _applyOperationFailure(AppFailure failure) {
-    final shouldTriggerFeedback = state.failure != failure;
     state = state.copyWith(operation: null, failure: failure);
-    if (!shouldTriggerFeedback) return;
-    final intent = failure.kind == AppFailureKind.authentication
-        ? HapticIntent.warning
-        : HapticIntent.error;
-    unawaited(ref.read(hapticFeedbackServiceProvider).trigger(intent));
   }
 
   void _applyControlFailure(AppFailure failure) {
     state = state.copyWith(operation: null);
-    final intent = failure.kind == AppFailureKind.authentication
-        ? HapticIntent.warning
-        : HapticIntent.error;
-    unawaited(ref.read(hapticFeedbackServiceProvider).trigger(intent));
   }
 
   bool _isCurrentOperation(ScanSession session, int revision) {
@@ -298,7 +290,7 @@ class ScanViewModel extends _$ScanViewModel {
       cameraRunning: snapshot.isRunning,
       torchAvailable: snapshot.torchAvailable,
       flashOn: snapshot.torchOn,
-      zoomPreset: ScanZoomPreset.nearest(snapshot.zoomScale),
+      zoom: snapshot.zoom,
       captureLocked: snapshot.captureLocked,
       galleryPhase: snapshot.galleryPhase,
       failure: snapshot.failure,

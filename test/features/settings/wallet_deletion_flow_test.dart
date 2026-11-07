@@ -201,7 +201,7 @@ void main() {
   });
 
   testWidgets(
-    'own-auth resume continues before the SecurityGate paints its next frame',
+    'owned authentication keeps Details painted and continues after resume',
     (tester) async {
       final h = await _Harness.create();
       addTearDown(() => h.dispose(tester));
@@ -215,7 +215,9 @@ void main() {
           .byType(WalletDetailsScreen, skipOffstage: false)
           .evaluate()
           .single;
-      expect(TickerMode.valuesOf(route).enabled, isFalse);
+      expect(TickerMode.valuesOf(route).enabled, isTrue);
+      expect(find.byType(SplashScreen), findsNothing);
+      expect(find.byType(WalletDetailsScreen), findsOneWidget);
 
       h.security.handleLifecycle(AppLifecycleState.resumed);
       h.device.promptGate!.complete(DeviceAuthenticationResult.authenticated);
@@ -224,8 +226,8 @@ void main() {
       }
       expect(h.wallet.deletions, [_firstId]);
       expect(h.device.prompts, 1);
-      // Native auth has completed while the inherited widget is still stale.
-      expect(TickerMode.valuesOf(route).enabled, isFalse);
+      // The source never depended on a replacement cover being repainted.
+      expect(TickerMode.valuesOf(route).enabled, isTrue);
       await tester.pumpAndSettle();
       expect(find.text('Home destination'), findsOneWidget);
       expect(h.toasts.messages, isEmpty);
@@ -718,6 +720,7 @@ final class _NativeHarness {
           h._deleteReplied = true;
           return result;
         case 'cancel':
+        case 'finishAuthenticationPresentation':
         case 'setSensitive':
           return null;
         default:

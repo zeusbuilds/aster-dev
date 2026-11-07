@@ -49,37 +49,31 @@ void main() {
     );
   });
 
-  test(
-    'a retained pre-deletion wallet never bypasses a terminal access error',
-    () {
-      final retained = AsyncError<WalletState>(
-        const AppFailureException(
-          AppFailure(
-            code: 'wallet_deletion_incomplete',
-            kind: AppFailureKind.storage,
-            userMessage: 'Wallet removal could not finish.',
-            retryable: false,
-            requiresReconciliation: true,
-          ),
+  test('a retained pre-deletion wallet never bypasses a terminal access error', () {
+    final retained = AsyncError<WalletState>(
+      const AppFailureException(
+        AppFailure(
+          code: 'wallet_deletion_incomplete',
+          kind: AppFailureKind.storage,
+          userMessage: 'Wallet removal could not finish.',
+          retryable: false,
+          requiresReconciliation: true,
         ),
-        StackTrace.empty,
-    // Model the retained value produced by AsyncNotifier's error transition.
-    // ignore: invalid_use_of_internal_member
+      ),
+      StackTrace.empty,
+      // Model the retained value produced by AsyncNotifier's error transition.
+      // ignore: invalid_use_of_internal_member
     ).copyWithPrevious(active);
-      expect(retained.value?.activeWallet, isNotNull);
-      expect(
-        RouteGuards.redirect(location: RoutePaths.home, walletState: retained),
-        RoutePaths.splash,
-      );
-      expect(
-        RouteGuards.redirect(
-          location: RoutePaths.splash,
-          walletState: retained,
-        ),
-        isNull,
-      );
-    },
-  );
+    expect(retained.value?.activeWallet, isNotNull);
+    expect(
+      RouteGuards.redirect(location: RoutePaths.home, walletState: retained),
+      RoutePaths.splash,
+    );
+    expect(
+      RouteGuards.redirect(location: RoutePaths.splash, walletState: retained),
+      isNull,
+    );
+  });
 
   test('active registry leaves wallet routes and rejects onboarding', () {
     expect(

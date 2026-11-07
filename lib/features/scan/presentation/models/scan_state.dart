@@ -8,39 +8,7 @@ enum ScanOperation {
   togglingTorch,
   changingZoom,
   selectingGallery,
-  restarting,
   pausingForNavigation,
-}
-
-/// App-owned normalized zoom presets.
-///
-/// `mobile_scanner` exposes a normalized 0...1 scale rather than physical lens
-/// magnification. Labels therefore describe relative levels and never claim a
-/// device-specific optical multiplier.
-enum ScanZoomPreset {
-  normal(scale: 0, displayLabel: '1/3'),
-  closer(scale: 0.5, displayLabel: '2/3'),
-  closest(scale: 1, displayLabel: '3/3');
-
-  const ScanZoomPreset({required this.scale, required this.displayLabel});
-
-  final double scale;
-  final String displayLabel;
-
-  String get semanticLabel =>
-      'Zoom level ${index + 1} of ${ScanZoomPreset.values.length}';
-
-  ScanZoomPreset get next =>
-      ScanZoomPreset.values[(index + 1) % ScanZoomPreset.values.length];
-
-  static ScanZoomPreset nearest(double scale) {
-    if (!scale.isFinite) return ScanZoomPreset.normal;
-    return ScanZoomPreset.values.reduce((closest, candidate) {
-      final closestDistance = (closest.scale - scale).abs();
-      final candidateDistance = (candidate.scale - scale).abs();
-      return candidateDistance < closestDistance ? candidate : closest;
-    });
-  }
 }
 
 /// Immutable presentation state for one isolated Scan purpose.
@@ -51,7 +19,7 @@ final class ScanState {
     this.cameraRunning = false,
     this.torchAvailable = false,
     this.flashOn = false,
-    this.zoomPreset = ScanZoomPreset.normal,
+    this.zoom,
     this.captureLocked = false,
     this.galleryPhase = ScanGalleryPhase.idle,
     this.operation,
@@ -62,7 +30,7 @@ final class ScanState {
   final bool cameraRunning;
   final bool torchAvailable;
   final bool flashOn;
-  final ScanZoomPreset zoomPreset;
+  final ScanZoomRange? zoom;
   final bool captureLocked;
   final ScanGalleryPhase galleryPhase;
   final ScanOperation? operation;
@@ -77,15 +45,15 @@ final class ScanState {
   bool get canEnterManually => !isBusy && !hasCommittedCapture;
   bool get canToggleFlash =>
       cameraReady && torchAvailable && !isBusy && !captureLocked;
-  bool get canChangeZoom => cameraReady && !isBusy && !captureLocked;
-  bool get canRetry => failure?.retryable ?? false;
+  bool get canChangeZoom =>
+      cameraReady && (zoom?.canChange ?? false) && !isBusy && !captureLocked;
 
   ScanState copyWith({
     bool? cameraInitialized,
     bool? cameraRunning,
     bool? torchAvailable,
     bool? flashOn,
-    ScanZoomPreset? zoomPreset,
+    Object? zoom = _unset,
     bool? captureLocked,
     ScanGalleryPhase? galleryPhase,
     Object? operation = _unset,
@@ -96,7 +64,7 @@ final class ScanState {
       cameraRunning: cameraRunning ?? this.cameraRunning,
       torchAvailable: torchAvailable ?? this.torchAvailable,
       flashOn: flashOn ?? this.flashOn,
-      zoomPreset: zoomPreset ?? this.zoomPreset,
+      zoom: identical(zoom, _unset) ? this.zoom : zoom as ScanZoomRange?,
       captureLocked: captureLocked ?? this.captureLocked,
       galleryPhase: galleryPhase ?? this.galleryPhase,
       operation: identical(operation, _unset)
@@ -115,7 +83,7 @@ final class ScanState {
       other.cameraRunning == cameraRunning &&
       other.torchAvailable == torchAvailable &&
       other.flashOn == flashOn &&
-      other.zoomPreset == zoomPreset &&
+      other.zoom == zoom &&
       other.captureLocked == captureLocked &&
       other.galleryPhase == galleryPhase &&
       other.operation == operation &&
@@ -127,7 +95,7 @@ final class ScanState {
     cameraRunning,
     torchAvailable,
     flashOn,
-    zoomPreset,
+    zoom,
     captureLocked,
     galleryPhase,
     operation,

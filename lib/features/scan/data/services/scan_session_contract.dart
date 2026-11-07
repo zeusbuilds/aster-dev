@@ -11,7 +11,7 @@ final class ScanSessionSnapshot {
     this.isRunning = false,
     this.torchAvailable = false,
     this.torchOn = false,
-    this.zoomScale = 0,
+    this.zoom,
     this.captureLocked = false,
     this.galleryPhase = ScanGalleryPhase.idle,
     this.failure,
@@ -21,7 +21,7 @@ final class ScanSessionSnapshot {
   final bool isRunning;
   final bool torchAvailable;
   final bool torchOn;
-  final double zoomScale;
+  final ScanZoomRange? zoom;
   final bool captureLocked;
   final ScanGalleryPhase galleryPhase;
   final AppFailure? failure;
@@ -33,7 +33,7 @@ final class ScanSessionSnapshot {
     bool? isRunning,
     bool? torchAvailable,
     bool? torchOn,
-    double? zoomScale,
+    Object? zoom = _unset,
     bool? captureLocked,
     ScanGalleryPhase? galleryPhase,
     Object? failure = _unset,
@@ -43,7 +43,7 @@ final class ScanSessionSnapshot {
       isRunning: isRunning ?? this.isRunning,
       torchAvailable: torchAvailable ?? this.torchAvailable,
       torchOn: torchOn ?? this.torchOn,
-      zoomScale: zoomScale ?? this.zoomScale,
+      zoom: identical(zoom, _unset) ? this.zoom : zoom as ScanZoomRange?,
       captureLocked: captureLocked ?? this.captureLocked,
       galleryPhase: galleryPhase ?? this.galleryPhase,
       failure: identical(failure, _unset)
@@ -59,7 +59,7 @@ final class ScanSessionSnapshot {
       other.isRunning == isRunning &&
       other.torchAvailable == torchAvailable &&
       other.torchOn == torchOn &&
-      other.zoomScale == zoomScale &&
+      other.zoom == zoom &&
       other.captureLocked == captureLocked &&
       other.galleryPhase == galleryPhase &&
       other.failure == failure;
@@ -70,11 +70,17 @@ final class ScanSessionSnapshot {
     isRunning,
     torchAvailable,
     torchOn,
-    zoomScale,
+    zoom,
     captureLocked,
     galleryPhase,
     failure,
   );
+}
+
+/// Optional non-secret scope token for delayed scanner navigation.
+/// Changes when the active wallet/security authority changes.
+abstract interface class ScanSessionContext {
+  Object? get contextToken;
 }
 
 /// Factory used by Riverpod to create one isolated session per Scan purpose.
@@ -107,8 +113,8 @@ abstract interface class ScanSession implements Listenable {
   /// Applies a torch state only when the native camera reports support.
   Future<AppResult<void>> setTorchEnabled(bool enabled);
 
-  /// Applies the plugin's normalized zoom scale in the inclusive 0...1 range.
-  Future<AppResult<void>> setZoomScale(double scale);
+  /// Applies supported magnification and reports only native-confirmed state.
+  Future<AppResult<void>> setZoomRatio(double ratio);
 
   /// Selects one image and distinguishes cancel, no-code, and capture outcomes.
   Future<AppResult<ScanGalleryOutcome>> pickAndAnalyzeGallery();
@@ -157,14 +163,14 @@ final class ScanDriverState {
     this.isRunning = false,
     this.torchAvailable = false,
     this.torchOn = false,
-    this.zoomScale = 0,
+    this.zoom,
   });
 
   final bool isInitialized;
   final bool isRunning;
   final bool torchAvailable;
   final bool torchOn;
-  final double zoomScale;
+  final ScanZoomRange? zoom;
 
   @override
   bool operator ==(Object other) =>
@@ -173,11 +179,11 @@ final class ScanDriverState {
       other.isRunning == isRunning &&
       other.torchAvailable == torchAvailable &&
       other.torchOn == torchOn &&
-      other.zoomScale == zoomScale;
+      other.zoom == zoom;
 
   @override
   int get hashCode =>
-      Object.hash(isInitialized, isRunning, torchAvailable, torchOn, zoomScale);
+      Object.hash(isInitialized, isRunning, torchAvailable, torchOn, zoom);
 }
 
 /// Low-level camera operations implemented only by the platform adapter.
@@ -202,8 +208,8 @@ abstract interface class ScanCameraDriver implements Listenable {
   /// Sets the physical torch when supported.
   Future<void> setTorchEnabled(bool enabled);
 
-  /// Sets the plugin-defined normalized zoom scale.
-  Future<void> setZoomScale(double scale);
+  /// Sets physical magnification, updating [state] with applied readback.
+  Future<void> setZoomRatio(double ratio);
 
   /// Analyzes a selected image and returns every decoded raw QR value.
   Future<Iterable<String?>> analyzeImage(String path);

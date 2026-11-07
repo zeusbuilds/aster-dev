@@ -29,7 +29,8 @@ final class WalletProfileStore
   final DateTime Function() _clock;
   Future<void> _tail = Future<void>.value();
 
-  static const _schemaVersion = 1;
+  static const _rlnSchemaVersion = 1;
+  static const _backendSchemaVersion = 2;
 
   @override
   Future<AppResult<WalletRegistry>> read() {
@@ -189,10 +190,15 @@ final class WalletProfileStore
     } on FormatException {
       throw const StoredDataCorruptionException();
     }
-    if (decoded is! Map<String, Object?> ||
-        decoded['version'] != _schemaVersion) {
+    if (decoded is! Map<String, Object?>) {
       throw const StoredDataCorruptionException();
     }
+    final version = decoded['version'];
+    if (version is! int ||
+        (version != _rlnSchemaVersion && version != _backendSchemaVersion)) {
+      throw const StoredDataCorruptionException();
+    }
+    final storesBackend = version == _backendSchemaVersion;
     final rawProfiles = decoded['profiles'];
     final activeWalletId = decoded['activeWalletId'];
     if (rawProfiles is! List<Object?> ||
@@ -200,16 +206,23 @@ final class WalletProfileStore
       throw const StoredDataCorruptionException();
     }
     try {
-      return WalletRegistry(
+      final registry = WalletRegistry(
         profiles: [
           for (final item in rawProfiles)
             if (item case final Map<String, Object?> profile)
-              _profileFromJson(profile)
+              _profileFromJson(profile, storesBackend: storesBackend)
             else
               throw const StoredDataCorruptionException(),
         ],
         activeWalletId: activeWalletId as String?,
       );
+      if (storesBackend &&
+          registry.profiles.every(
+            (profile) => profile.backend == WalletBackend.rln,
+          )) {
+        throw const StoredDataCorruptionException();
+      }
+      return registry;
     } on StoredDataCorruptionException {
       rethrow;
     } on ArgumentError {
@@ -218,24 +231,34 @@ final class WalletProfileStore
   }
 
   Future<void> _writeUnsafe(WalletRegistry snapshot) async {
+    // Older app builds reject the new schema instead of opening RGB_L1
+    // profiles as RLN. Keep the historical encoding for RLN-only registries.
+    final storesBackend = snapshot.profiles.any(
+      (profile) => profile.backend != WalletBackend.rln,
+    );
     await _documents.write(
       jsonEncode({
-        'version': _schemaVersion,
+        'version': storesBackend ? _backendSchemaVersion : _rlnSchemaVersion,
         'activeWalletId': snapshot.activeWalletId,
         'profiles': [
-          for (final profile in snapshot.profiles) _profileToJson(profile),
+          for (final profile in snapshot.profiles)
+            _profileToJson(profile, storesBackend: storesBackend),
         ],
       }),
     );
   }
 
-  static WalletProfile _profileFromJson(Map<String, Object?> json) {
+  static WalletProfile _profileFromJson(
+    Map<String, Object?> json, {
+    required bool storesBackend,
+  }) {
     try {
       final id = json['id'];
       final name = json['name'];
       final createdAtValue = json['createdAt'];
       final updatedAtValue = json['updatedAt'];
       final environmentValue = json['environment'];
+      final backendValue = json['backend'];
       final stateValue = json['state'];
       final storageTokenValue = json['storageToken'];
       if (id is! String ||
@@ -243,6 +266,9 @@ final class WalletProfileStore
           createdAtValue is! String ||
           updatedAtValue is! String ||
           environmentValue is! String ||
+          (storesBackend
+              ? backendValue is! String
+              : json.containsKey('backend')) ||
           stateValue is! String ||
           storageTokenValue is! String) {
         throw const StoredDataCorruptionException();
@@ -268,6 +294,9 @@ final class WalletProfileStore
         createdAt: createdAt,
         updatedAt: updatedAt,
         environment: BlockchainEnvironment.parse(environmentValue),
+        backend: storesBackend
+            ? WalletBackend.parse(backendValue as String)
+            : WalletBackend.rln,
         state: state,
         storageToken: storageTokenValue,
       );
@@ -280,12 +309,16 @@ final class WalletProfileStore
     }
   }
 
-  static Map<String, Object?> _profileToJson(WalletProfile profile) => {
+  static Map<String, Object?> _profileToJson(
+    WalletProfile profile, {
+    required bool storesBackend,
+  }) => {
     'id': profile.id,
     'name': profile.name,
     'createdAt': profile.createdAt.toUtc().toIso8601String(),
     'updatedAt': profile.updatedAt.toUtc().toIso8601String(),
     'environment': profile.environment.name,
+    if (storesBackend) 'backend': profile.backend.wireName,
     'state': profile.state.name,
     'storageToken': profile.storageToken,
   };

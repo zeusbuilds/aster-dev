@@ -58,12 +58,33 @@ wallet reset.
 
 The first-run Welcome animation does not require an empty-wallet unlock.
 Create/import authenticates before recovery words are generated or accepted.
-For an existing wallet, cold launch holds the original gradient/logo at its
+For an existing wallet, cold launch holds the white opening/logo artwork at its
 initial frame until authentication and wallet bootstrap complete, then plays
-the reveal once. Cancellation stays on the locked gradient with Unlock.
+the reveal once. Cancellation stays on the lock cover with Unlock.
 Genuine background/device-lock transitions hide the complete UI immediately;
 a warm return unlocks the prior ordinary screen without replaying launch.
 The native authentication sheet's own lifecycle cannot recursively relock it.
+
+An action-owned system prompt appears above its originating screen. Create and
+Import stay on Welcome; Delete stays on Wallet details; App lock changes stay
+on Security. Advanced authenticates and prepares seed/xpub disclosure before
+pushing a ready destination. Cancel stays on the source; a failed action has
+one source-owned toast and no intermediate loading page. Direct disclosure URLs
+have no authority and return to Advanced.
+
+Visual prompt ownership is separate from wallet authority. Source content
+remains painted but input, focus and accessibility actions are blocked while
+authentication is pending. Wallet access and grants still require a resumed
+host. Native and Dart prompt ownership last through final capability and
+foreground checks, with an explicit presentation-cleanup acknowledgment. Real
+background, capture, wallet changes and explicit revocation invalidate late
+results, including when App lock is off. Unrelated inactivity still covers the
+app, and a failed/abandoned prompt cannot leave an inactive source exposed.
+
+iOS scopes its visual exemption to the scene presenting the LAContext; genuine
+background snapshots and sensitive capture always override it. Android keeps
+temporary FLAG_SECURE protection through its owned credential/prompt handoff,
+then clears only that temporary protection after cleanup and host resume.
 
 Settings > Security offers App lock, immediate automatic locking and Lock now.
 Disabling App lock requires confirmation plus fresh device authentication.
@@ -74,10 +95,16 @@ lock, capture, wallet/session change or route departure. New queued wallet
 work cannot begin while locked; already-dispatched payments retain their
 existing journal/outcome protection and are never resent by unlocking.
 
-Seed words remain in the protected route only, with no Copy or Share action.
+Prepared disclosures use one process-local, one-use session bound to purpose,
+wallet and security generation. No secret, grant or prepared session enters
+route arguments, URLs, persistence or restoration state. Seed words remain in
+that protected session only, with no Copy or Share action.
 Xpub export explicitly labels Bitcoin and RGB account keys and offers Copy
 and Share; public keys still reveal sensitive wallet activity. Backgrounding,
 capture or wallet changes remove disclosed values and require a new reveal.
+Native capture protection remains active until the cleared disclosure frame
+is submitted; clearing in-memory values alone cannot expose a still-painted
+secret frame.
 Create/import holds a native sensitive-view lease throughout its private
 steps. Capture covers its entire content and accessibility tree without
 resetting an in-flight provisioning attempt or replaying its operation.

@@ -104,7 +104,7 @@ void main() {
         expect(runtimeAccesses, 0);
 
         nativePath.complete(support.path);
-      await tester.pump();
+        await tester.pump();
         final profiles = await tester.runAsync(() => pending);
         expect(
           compositionErrors,

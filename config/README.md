@@ -11,12 +11,18 @@ make verify-release-configuration \
   RELEASE_AUDIENCE=internal-beta
 ```
 
-Public distribution requires `ASTER_NETWORK=mainnet`; non-mainnet service
-qualification remains an `internal-beta` activity. Use `public-distribution`
-only after release ownership has supplied the market
-proxy, support, terms, and privacy destinations. The validator accepts no
+The `public-distribution` audience requires `ASTER_NETWORK=mainnet`. Use
+`internal-beta` for other networks. Public distribution also
+requires release-owned market, support, terms, and privacy destinations and a
+qualified backup and restore process that preserves the wallet's durable
+payment state. The validator accepts no
 unknown keys and no credentials, tokens, API keys, mnemonics, passwords, or
 other secrets. Compile-time values are recoverable from a mobile binary.
+
+`ASTER_WALLET_BACKEND` identifies the on-disk wallet format. Existing
+manifests default to `rln`. The validator rejects `rgb-l1` until Aster can
+recover an interrupted BTC or RGB send using durable, authoritative transaction
+identity on that backend. An RLN wallet directory cannot be opened as RGB_L1.
 
 The example deliberately fails validation until all `REPLACE_ME` values are
 replaced with deployment-owned values. Local manifests and iOS export options
@@ -43,9 +49,12 @@ mainnet RGB asset ID, precision, BFA contract identities, and backing policy.
 This check does not authenticate contracts or establish bridge payout proof.
 The mainnet USDT route fails configuration validation if either EVM setting is
 missing. `ASTER_LSP_URL` is optional for the onchain-only release and cannot enable
-Lightning payment actions. Both are validated when supplied; `ASTER_VSS_URL`
-remains required by the existing release deployment contract. None of these
-endpoints may contain credentials or API keys.
+Lightning payment actions. `ASTER_VSS_URL` remains required by the RLN release
+configuration contract. Current RLN VSS does not back up the durable on-chain
+outbox, so enabling it prevents recoverable BTC and RGB sends. Public
+distribution fails validation until the backup and send-recovery requirements
+can be qualified together. None of these endpoints may contain credentials or
+API keys.
 
 `ASTER_DAEMON_PORT` and `ASTER_LDK_PEER_PORT` are optional native listener
 ports, defaulting to `9735` and `9736`. They must be distinct canonical decimal

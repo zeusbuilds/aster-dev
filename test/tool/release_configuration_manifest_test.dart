@@ -8,6 +8,29 @@ import '../../tool/verify_release_configuration.dart';
 
 void main() {
   group('ReleaseConfigurationManifest', () {
+    test('RGB_L1 deployment is blocked until durable sends are qualified', () {
+      ReleaseConfigurationManifest parse(String backend) =>
+          ReleaseConfigurationManifest.parse(
+            _manifest({
+              ..._baseValues,
+              ReleaseConfigurationKey.walletBackend: backend,
+            }),
+            audience: ReleaseAudience.internalBeta,
+          );
+      expect(parse('rln').values[ReleaseConfigurationKey.walletBackend], 'rln');
+      expect(
+        () => parse('rgb-l1'),
+        throwsA(
+          isA<FormatException>().having(
+            (error) => error.message,
+            'message',
+            contains('durable payment recovery'),
+          ),
+        ),
+      );
+      expect(() => parse('RGB_L1'), throwsFormatException);
+    });
+
     test('BFA release fails without RPC or an explicit canonical chain ID', () {
       for (final key in [
         ReleaseConfigurationKey.ethRpcUrl,
@@ -142,7 +165,7 @@ void main() {
       );
     });
 
-    test('public distribution requires release-owned public surfaces', () {
+    test('public distribution checks its services before the backup gate', () {
       expect(
         () => ReleaseConfigurationManifest.parse(
           _manifest(),
@@ -161,11 +184,17 @@ void main() {
         ReleaseConfigurationKey.termsUrl: 'https://aster-wallet.com/terms',
       };
       expect(
-        ReleaseConfigurationManifest.parse(
+        () => ReleaseConfigurationManifest.parse(
           _manifest(values),
           audience: ReleaseAudience.publicDistribution,
-        ).values,
-        hasLength(values.length),
+        ),
+        throwsA(
+          isA<FormatException>().having(
+            (error) => error.message,
+            'message',
+            contains('backup and restore that preserve durable'),
+          ),
+        ),
       );
       for (final network in ['signet', 'regtest']) {
         expect(

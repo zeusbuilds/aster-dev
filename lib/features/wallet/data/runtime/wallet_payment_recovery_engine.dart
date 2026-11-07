@@ -40,7 +40,7 @@ enum WalletPaymentRecoveryPhase {
   rejected,
 }
 
-/// Identity is established before commit. Only [accepted] is a receipt;
+/// Identity is established before commit. Only [WalletPaymentRecoveryPhase.accepted] is a receipt;
 /// prepared/committing identity must never be presented as payment success.
 final class WalletPaymentRecoveryStatus {
   const WalletPaymentRecoveryStatus({

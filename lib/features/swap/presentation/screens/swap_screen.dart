@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:ming_cute_icons/ming_cute_icons.dart';
 
 import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
@@ -80,31 +79,10 @@ class _SwapContent extends ConsumerWidget {
             onSelectTo: () => select(from: false),
             onReverse: () => ref.read(swapViewModelProvider.notifier).reverse(),
           ),
-          SizedBox(height: context.spacing.xl),
-          Padding(
-            padding: EdgeInsets.symmetric(vertical: context.spacing.sm),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  MingCuteIcons.mgc_information_line,
-                  size: context.icons.sm,
-                  color: context.colorScheme.primary,
-                ),
-                SizedBox(width: context.spacing.md),
-                Expanded(
-                  child: Text(
-                    'Swap execution is not available in this build.',
-                    style: context.type.statusMessage,
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
       actions: [
-        const CustomButton(text: 'Swap unavailable', enabled: false),
+        const CustomButton(text: 'Coming soon', enabled: false),
         SizedBox(height: context.spacing.lg),
       ],
     );

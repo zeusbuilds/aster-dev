@@ -13,6 +13,7 @@ class AsterIconography extends ThemeExtension<AsterIconography> {
     this.md = 24,
     this.lg = 36,
     this.xl = 44,
+    this.scanControlGlyph = 16,
   });
 
   final double xxs;
@@ -21,6 +22,7 @@ class AsterIconography extends ThemeExtension<AsterIconography> {
   final double md;
   final double lg;
   final double xl;
+  final double scanControlGlyph;
 
   @override
   AsterIconography copyWith({
@@ -30,6 +32,7 @@ class AsterIconography extends ThemeExtension<AsterIconography> {
     double? md,
     double? lg,
     double? xl,
+    double? scanControlGlyph,
   }) {
     return AsterIconography(
       xxs: xxs ?? this.xxs,
@@ -38,6 +41,7 @@ class AsterIconography extends ThemeExtension<AsterIconography> {
       md: md ?? this.md,
       lg: lg ?? this.lg,
       xl: xl ?? this.xl,
+      scanControlGlyph: scanControlGlyph ?? this.scanControlGlyph,
     );
   }
 
@@ -51,6 +55,7 @@ class AsterIconography extends ThemeExtension<AsterIconography> {
       md: _lerp(md, other.md, t),
       lg: _lerp(lg, other.lg, t),
       xl: _lerp(xl, other.xl, t),
+      scanControlGlyph: _lerp(scanControlGlyph, other.scanControlGlyph, t),
     );
   }
 

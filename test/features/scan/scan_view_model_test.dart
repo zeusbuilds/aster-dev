@@ -39,15 +39,20 @@ void main() {
       expect(await viewModel.toggleFlash(), isA<AppSuccess<void>>());
       expect(session.torchValues, [true]);
       expect(await viewModel.cycleZoom(), isA<AppSuccess<void>>());
-      expect(session.zoomValues, [ScanZoomPreset.closer.scale]);
+      expect(session.zoomValues, [2]);
       expect(haptics.intents, [HapticIntent.selection, HapticIntent.selection]);
 
-      session.replaceSnapshot(session.current.copyWith(zoomScale: 1));
+      session.replaceSnapshot(
+        session.current.copyWith(
+          zoom: const ScanZoomRange(minimum: 1, maximum: 3, current: 3),
+        ),
+      );
       expect(
         container
             .read(scanViewModelProvider(ScanPurpose.sendLauncher))
-            .zoomPreset,
-        ScanZoomPreset.closest,
+            .zoom
+            ?.current,
+        3,
       );
 
       session.replaceSnapshot(
@@ -97,21 +102,21 @@ void main() {
       expect(container.read(provider).failure, isNull);
       expect(container.read(provider).cameraReady, isTrue);
       expect(container.read(provider).operation, isNull);
-      expect(haptics.intents, [HapticIntent.error]);
+      expect(haptics.intents, isEmpty);
     },
   );
 
   test(
-    'zoom display follows the native applied scale, not the request',
+    'zoom display follows the native applied ratio, not the request',
     () async {
       final session = FakeScanSession()
         ..current = const ScanSessionSnapshot(
           isInitialized: true,
           isRunning: true,
           torchAvailable: true,
-          zoomScale: 0.5,
+          zoom: ScanZoomRange(minimum: 1, maximum: 3, current: 2),
         )
-        ..reportedZoomScale = 0.5;
+        ..reportedZoomRatio = 2;
       final container = ProviderContainer(
         overrides: [
           scanSessionProvider(ScanPurpose.sendLauncher)
@@ -135,8 +140,8 @@ void main() {
         isA<AppSuccess<void>>(),
       );
 
-      expect(session.zoomValues, [1]);
-      expect(container.read(provider).zoomPreset, ScanZoomPreset.closer);
+      expect(session.zoomValues, [3]);
+      expect(container.read(provider).zoom?.current, 2);
     },
   );
 
@@ -229,7 +234,7 @@ void main() {
     },
   );
 
-  test('camera failures are persistent, redacted, and haptic once', () async {
+  test('background camera failures are retained internally without haptic feedback', () async {
     final session = FakeScanSession();
     final haptics = RecordingHapticFeedbackService();
     final container = ProviderContainer(
@@ -259,13 +264,13 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     expect(container.read(provider).failure, failure);
-    expect(haptics.intents, [HapticIntent.warning]);
+    expect(haptics.intents, isEmpty);
     expect(failure.toString(), isNot(contains('system settings')));
 
     session.galleryResult = const AppResult.success(ScanGalleryCancelled());
     await container.read(provider.notifier).scanGallery();
     expect(container.read(provider).failure, failure);
-    expect(haptics.intents, [HapticIntent.warning]);
+    expect(haptics.intents, isEmpty);
   });
 
   test('camera failure leaves gallery and manual fallbacks available', () {
@@ -442,64 +447,42 @@ void main() {
     expect(haptics.intents, isEmpty);
   });
 
-  test('session replacement invalidates native command completions', () async {
-    final first = FakeScanSession();
-    final second = FakeScanSession();
-    var session = first;
-    final purpose = ScanPurpose.sendLauncher;
-    final container = ProviderContainer(
-      overrides: [
-        scanSessionProvider(purpose).overrideWith((ref) => session),
-        hapticFeedbackServiceProvider.overrideWithValue(
-          RecordingHapticFeedbackService(),
-        ),
-      ],
+  for (final duringPause in [true, false]) {
+    test(
+      'navigation authority changes ${duringPause ? 'during' : 'after'} camera pause reject handoff',
+      () async {
+        final session = FakeScanSession()..contextToken = 1;
+        final container = ProviderContainer(
+          overrides: [
+            scanSessionProvider(ScanPurpose.sendLauncher)
+                .overrideWithValue(session),
+          ],
+        );
+        addTearDown(container.dispose);
+        final provider = scanViewModelProvider(ScanPurpose.sendLauncher);
+        final subscription = container.listen(provider, (_, _) {});
+        addTearDown(subscription.close);
+        final viewModel = container.read(provider.notifier);
+        final gate = Completer<AppResult<void>>();
+        if (duringPause) session.activeGate = gate;
+        final pending = viewModel.pauseForNavigation();
+        if (duringPause) {
+          session.contextToken = 2;
+          gate.complete(const AppResult.success(null));
+          expect(await pending, isA<AppFailureResult<void>>());
+        } else {
+          expect(await pending, isA<AppSuccess<void>>());
+          expect(viewModel.navigationContextCurrent, isTrue);
+          session.contextToken = 2;
+        }
+        expect(viewModel.navigationContextCurrent, isFalse);
+        session.activeGate = null;
+        await viewModel.resumeAfterNavigation();
+        expect(container.read(provider).captureLocked, isFalse);
+        expect(container.read(provider).failure, isNull);
+      },
     );
-    addTearDown(container.dispose);
-    final provider = scanViewModelProvider(purpose);
-    final subscription = container.listen(
-      provider,
-      (_, _) {},
-      fireImmediately: true,
-    );
-    addTearDown(subscription.close);
-
-    first.activeGate = Completer<AppResult<void>>();
-    final paused = container.read(provider.notifier).pauseForNavigation();
-    await Future<void>.delayed(Duration.zero);
-    session = second;
-    container.invalidate(scanSessionProvider(purpose));
-    await _waitFor(() => first.listenerCount == 0 && second.listenerCount == 1);
-    first.activeGate!.complete(const AppResult.success(null));
-    expect(
-      await paused,
-      isA<AppFailureResult<void>>().having(
-        (value) => value.failure.code,
-        'code',
-        'scan_operation_unavailable',
-      ),
-    );
-
-    second.current = second.current.copyWith(
-      failure: const AppFailure(
-        code: 'scan_camera_failed',
-        kind: AppFailureKind.unavailable,
-        userMessage: 'The camera could not be started.',
-        retryable: true,
-      ),
-    );
-    second.replaceSnapshot(second.current);
-    second.restartGate = Completer<AppResult<void>>();
-    final restarted = container.read(provider.notifier).retryCamera();
-    await Future<void>.delayed(Duration.zero);
-    final third = FakeScanSession();
-    session = third;
-    container.invalidate(scanSessionProvider(purpose));
-    await _waitFor(() => second.listenerCount == 0 && third.listenerCount == 1);
-    second.restartGate!.complete(const AppResult.success(null));
-    expect(await restarted, isFalse);
-    expect(container.read(provider).failure, isNull);
-  });
+  }
 
   test('navigation pause blocks controls and reports stop failure', () async {
     final session = FakeScanSession();
@@ -542,7 +525,7 @@ void main() {
     expect(failed, isA<AppFailureResult<void>>());
     expect(container.read(provider).isBusy, isFalse);
     expect(container.read(provider).failure?.code, 'scan_camera_stop_failed');
-    expect(haptics.intents.last, HapticIntent.error);
+    expect(haptics.intents, isEmpty);
   });
 }
 

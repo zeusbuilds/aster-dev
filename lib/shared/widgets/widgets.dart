@@ -12,7 +12,6 @@ export 'aster_pill.dart';
 export 'aster_selection_indicator.dart';
 export 'aster_sheet_header.dart';
 export 'aster_split_card.dart';
-export 'aster_status_message.dart';
 export 'custom_app_bar.dart';
 export 'custom_button.dart';
 export 'custom_toast.dart';

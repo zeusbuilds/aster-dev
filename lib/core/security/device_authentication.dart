@@ -23,10 +23,20 @@ abstract interface class DeviceAuthenticationBackgroundEvents {
   Stream<void> get backgroundEvents;
 }
 
+/// Ends only the visual ownership of a completed OS prompt. The native result
+/// may precede lifecycle delivery; keep both layers in agreement until Dart has
+/// observed the host return. This method never authorizes wallet access.
+abstract interface class DeviceAuthenticationPresentation {
+  Future<void> finishAuthenticationPresentation();
+}
+
 /// Uses the operating system's credential prompt; Aster never receives a PIN,
 /// passcode, biometric sample or authentication error description.
 final class PlatformDeviceAuthentication
-    implements DeviceAuthentication, DeviceAuthenticationBackgroundEvents {
+    implements
+        DeviceAuthentication,
+        DeviceAuthenticationBackgroundEvents,
+        DeviceAuthenticationPresentation {
   PlatformDeviceAuthentication({MethodChannel? channel})
     : _channel =
           channel ??
@@ -81,6 +91,10 @@ final class PlatformDeviceAuthentication
 
   @override
   Future<void> cancel() => _channel.invokeMethod<void>('cancel');
+
+  @override
+  Future<void> finishAuthenticationPresentation() =>
+      _channel.invokeMethod<void>('finishAuthenticationPresentation');
 
   @override
   Future<void> setSensitive(bool sensitive) =>

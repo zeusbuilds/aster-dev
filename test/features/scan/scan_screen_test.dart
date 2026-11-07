@@ -26,101 +26,97 @@ import '../../support/presentation_fakes.dart';
 import '../../support/scan_fakes.dart';
 
 void main() {
-  testWidgets(
-    'gallery keeps its icon during selection and loads only during decoding',
-    (tester) async {
-      final driver = FakeScanCameraDriver()
-        ..analyzeGate = Completer<Iterable<String?>>();
-      final gallery = FakeScanGallerySource()
-        ..selectionGate = Completer<String?>();
-      final session = ManagedScanSession(driver, gallery);
-      final router = _launcherRouter();
-      addTearDown(router.dispose);
-      final harness = _ScanWidgetHarness(
-        session: session,
-        router: router,
-        purpose: ScanPurpose.sendLauncher,
-      );
-      addTearDown(harness.dispose);
+  testWidgets('gallery keeps its icon throughout selection and decoding', (
+    tester,
+  ) async {
+    final driver = FakeScanCameraDriver()
+      ..analyzeGate = Completer<Iterable<String?>>();
+    final gallery = FakeScanGallerySource()
+      ..selectionGate = Completer<String?>();
+    final session = ManagedScanSession(driver, gallery);
+    final router = _launcherRouter();
+    addTearDown(router.dispose);
+    final harness = _ScanWidgetHarness(
+      session: session,
+      router: router,
+      purpose: ScanPurpose.sendLauncher,
+    );
+    addTearDown(harness.dispose);
 
-      await tester.pumpWidget(harness.app);
-      harness.activateScanTab();
-      await tester.pumpAndSettle();
-      final control = find.byWidgetPredicate(
-        (widget) =>
-            widget is ScanControlButton &&
-            widget.semanticLabel == 'Choose a QR image',
-      );
-      final originalOpacity = tester
+    await tester.pumpWidget(harness.app);
+    harness.activateScanTab();
+    await tester.pumpAndSettle();
+    final control = find.byWidgetPredicate(
+      (widget) =>
+          widget is ScanControlButton &&
+          widget.semanticLabel == 'Choose a QR image',
+    );
+    final originalOpacity = tester
+        .widget<Opacity>(
+          find.descendant(of: control, matching: find.byType(Opacity)),
+        )
+        .opacity;
+
+    await tester.tap(find.bySemanticsLabel('Choose a QR image'));
+    await tester.pump();
+
+    expect(session.snapshot.galleryPhase, ScanGalleryPhase.selecting);
+    expect(tester.widget<ScanControlButton>(control).busy, isTrue);
+    expect(
+      find.descendant(of: control, matching: find.byType(Icon)),
+      findsOneWidget,
+    );
+    expect(
+      tester
           .widget<Opacity>(
             find.descendant(of: control, matching: find.byType(Opacity)),
           )
-          .opacity;
+          .opacity,
+      originalOpacity,
+    );
+    expect(find.byType(GridLoader), findsNothing);
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('Choose a QR image'))
+          .getSemanticsData()
+          .hasAction(ui.SemanticsAction.tap),
+      isFalse,
+    );
+    final duplicate = await harness.container
+        .read(scanViewModelProvider(ScanPurpose.sendLauncher).notifier)
+        .scanGallery();
+    expect(duplicate, isA<AppFailureResult<ScanGalleryOutcome>>());
+    expect(gallery.calls, 1);
 
-      await tester.tap(find.bySemanticsLabel('Choose a QR image'));
-      await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    expect(driver.commandLog, ['start', 'stop']);
 
-      expect(session.snapshot.galleryPhase, ScanGalleryPhase.selecting);
-      expect(tester.widget<ScanControlButton>(control).loading, isFalse);
-      expect(tester.widget<ScanControlButton>(control).busy, isTrue);
-      expect(
-        find.descendant(of: control, matching: find.byType(Icon)),
-        findsOneWidget,
-      );
-      expect(
-        tester
-            .widget<Opacity>(
-              find.descendant(of: control, matching: find.byType(Opacity)),
-            )
-            .opacity,
-        originalOpacity,
-      );
-      expect(find.byType(GridLoader), findsNothing);
-      expect(
-        tester
-            .getSemantics(find.bySemanticsLabel('Choose a QR image'))
-            .getSemanticsData()
-            .hasAction(ui.SemanticsAction.tap),
-        isFalse,
-      );
-      final duplicate = await harness.container
-          .read(scanViewModelProvider(ScanPurpose.sendLauncher).notifier)
-          .scanGallery();
-      expect(duplicate, isA<AppFailureResult<ScanGalleryOutcome>>());
-      expect(gallery.calls, 1);
+    gallery.selectionGate!.complete('temporary-selected-image');
+    await tester.pump();
+    await tester.pump();
+    expect(session.snapshot.galleryPhase, ScanGalleryPhase.analyzing);
+    expect(
+      find.descendant(of: control, matching: find.byType(GridLoader)),
+      findsNothing,
+    );
+    expect(find.byType(GridLoader), findsNothing);
+    expect(harness.toasts.messages, isEmpty);
 
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-      await tester.pump();
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-      await tester.pump();
-      expect(driver.commandLog, ['start', 'stop']);
+    driver.analyzeGate!.complete(const []);
+    await tester.pumpAndSettle();
+    expect(session.snapshot.galleryPhase, ScanGalleryPhase.idle);
+    expect(tester.widget<ScanControlButton>(control).busy, isFalse);
+    expect(harness.toasts.messages, hasLength(1));
+    expect(harness.toasts.messages.single.title, 'No payment QR found');
+    expect(driver.commandLog, ['start', 'stop', 'analyze', 'start']);
 
-      gallery.selectionGate!.complete('temporary-selected-image');
-      await tester.pump();
-      await tester.pump();
-      expect(session.snapshot.galleryPhase, ScanGalleryPhase.analyzing);
-      expect(tester.widget<ScanControlButton>(control).loading, isTrue);
-      expect(
-        find.descendant(of: control, matching: find.byType(GridLoader)),
-        findsOneWidget,
-      );
-      expect(find.byType(GridLoader), findsOneWidget);
-      expect(harness.toasts.messages, isEmpty);
-
-      driver.analyzeGate!.complete(const []);
-      await tester.pumpAndSettle();
-      expect(session.snapshot.galleryPhase, ScanGalleryPhase.idle);
-      expect(tester.widget<ScanControlButton>(control).loading, isFalse);
-      expect(tester.widget<ScanControlButton>(control).busy, isFalse);
-      expect(harness.toasts.messages, hasLength(1));
-      expect(harness.toasts.messages.single.title, 'No QR code found');
-      expect(driver.commandLog, ['start', 'stop', 'analyze', 'start']);
-
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pump();
-      expect(await session.close(), isA<AppSuccess<void>>());
-    },
-  );
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    expect(await session.close(), isA<AppSuccess<void>>());
+  });
 
   for (final pickerFailure in [true, false]) {
     testWidgets(
@@ -157,12 +153,11 @@ void main() {
         expect(harness.toasts.messages, hasLength(1));
         expect(
           harness.toasts.messages.single.title,
-          'Image could not be scanned',
+          pickerFailure
+              ? 'Photo access unavailable'
+              : 'Image could not be scanned',
         );
-        expect(
-          harness.toasts.messages.single.variant,
-          pickerFailure ? ToastVariant.warning : ToastVariant.failure,
-        );
+        expect(harness.toasts.messages.single.variant, ToastVariant.warning);
         expect(session.snapshot.galleryPhase, ScanGalleryPhase.idle);
         expect(session.snapshot.isRunning, isTrue);
         expect(session.snapshot.failure, isNull);
@@ -222,97 +217,86 @@ void main() {
     },
   );
 
-  testWidgets('loading wallet header is one live non-fabricated status', (
+  testWidgets('missing wallet identity renders neither loader nor status', (
     tester,
   ) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light(),
-        home: const Scaffold(body: ScanWalletHeader(loading: true)),
+        home: const Scaffold(body: ScanWalletHeader()),
       ),
     );
-
-    final loading = find.bySemanticsLabel('Loading active wallet');
-    expect(loading, findsOneWidget);
-    expect(tester.getSemantics(loading).flagsCollection.isLiveRegion, isTrue);
-    expect(find.bySemanticsLabel(RegExp('Wallet unavailable')), findsNothing);
+    expect(find.byType(GridLoader), findsNothing);
+    expect(find.byType(AppSkeletonizer), findsNothing);
+    expect(find.textContaining('wallet'), findsNothing);
   });
 
-  testWidgets('wallet identity failure stays visible and retries its owner', (
-    tester,
-  ) async {
-    const failure = AppFailure(
-      code: 'wallet_temporarily_unavailable',
-      kind: AppFailureKind.unavailable,
-      userMessage: 'Active wallet details are temporarily unavailable.',
-      retryable: true,
-    );
-    final walletViewModel = _RecoveringWalletViewModel(failure);
-    final session = FakeScanSession();
-    final router = _launcherRouter();
-    addTearDown(router.dispose);
-    final harness = _ScanWidgetHarness(
-      session: session,
-      router: router,
-      purpose: ScanPurpose.sendLauncher,
-      walletViewModel: walletViewModel,
-    );
-    addTearDown(harness.dispose);
+  for (final retryable in [true, false]) {
+    testWidgets('wallet identity failure is silent (retryable: $retryable)', (
+      tester,
+    ) async {
+      final failure = AppFailure(
+        code: 'wallet_unavailable',
+        kind: AppFailureKind.unavailable,
+        userMessage: 'Private operational failure.',
+        retryable: retryable,
+      );
+      final session = FakeScanSession();
+      final router = _launcherRouter();
+      addTearDown(router.dispose);
+      final wallet = _RecoveringWalletViewModel(failure);
+      final harness = _ScanWidgetHarness(
+        session: session,
+        router: router,
+        purpose: ScanPurpose.sendLauncher,
+        walletViewModel: wallet,
+      );
+      addTearDown(harness.dispose);
+      await tester.pumpWidget(harness.app);
+      harness.activateScanTab();
+      await tester.pumpAndSettle();
+      expect(find.text(failure.userMessage), findsNothing);
+      expect(find.text('Wallet unavailable'), findsNothing);
+      expect(find.bySemanticsLabel('Retry active wallet'), findsNothing);
+      expect(find.byType(GridLoader), findsNothing);
+      expect(find.byKey(const ValueKey('fake-scan-camera')), findsOneWidget);
+      expect(harness.toasts.messages, isEmpty);
+      expect(wallet.retryAttempts, 0);
+    });
+  }
 
-    await tester.pumpWidget(harness.app);
-    harness.activateScanTab();
-    await tester.pumpAndSettle();
-
-    final status = find.bySemanticsLabel(
-      'Active wallet unavailable, ${failure.userMessage}',
-    );
-    expect(status, findsOneWidget);
-    expect(tester.getSemantics(status).flagsCollection.isLiveRegion, isTrue);
-    expect(find.byKey(const ValueKey('fake-scan-camera')), findsOneWidget);
-    expect(
-      tester
-          .getSemantics(find.bySemanticsLabel('Retry active wallet'))
-          .getSemanticsData()
-          .hasAction(ui.SemanticsAction.tap),
-      isTrue,
-    );
-
-    await tester.tap(find.bySemanticsLabel('Retry active wallet'));
-    await tester.pumpAndSettle();
-
-    expect(walletViewModel.retryAttempts, 1);
-    expect(find.text('Primary wallet'), findsOneWidget);
-    expect(find.text(failure.userMessage), findsNothing);
-  });
-
-  testWidgets('terminal wallet identity failure exposes no false retry', (
-    tester,
-  ) async {
-    const failure = AppFailure(
-      code: 'wallet_configuration_invalid',
-      kind: AppFailureKind.configuration,
-      userMessage: 'Active wallet details cannot be loaded.',
-      retryable: false,
-    );
-    final session = FakeScanSession();
-    final router = _launcherRouter();
-    addTearDown(router.dispose);
-    final harness = _ScanWidgetHarness(
-      session: session,
-      router: router,
-      purpose: ScanPurpose.sendLauncher,
-      walletViewModel: _RecoveringWalletViewModel(failure),
-    );
-    addTearDown(harness.dispose);
-
-    await tester.pumpWidget(harness.app);
-    harness.activateScanTab();
-    await tester.pumpAndSettle();
-
-    expect(find.text(failure.userMessage), findsOneWidget);
-    expect(find.bySemanticsLabel('Retry active wallet'), findsNothing);
-    expect(find.byKey(const ValueKey('fake-scan-camera')), findsOneWidget);
-  });
+  testWidgets(
+    'retained old wallet identity is hidden during loading and failure',
+    (tester) async {
+      final identity = _MutableScanWalletIdentityViewModel();
+      final session = FakeScanSession();
+      final router = _launcherRouter();
+      addTearDown(router.dispose);
+      final harness = _ScanWidgetHarness(
+        session: session,
+        router: router,
+        purpose: ScanPurpose.sendLauncher,
+        identityViewModel: identity,
+      );
+      addTearDown(harness.dispose);
+      await tester.pumpWidget(harness.app);
+      harness.activateScanTab();
+      await tester.pumpAndSettle();
+      expect(find.text('Primary wallet'), findsOneWidget);
+      identity.pending();
+      await tester.pump();
+      expect(find.text('Primary wallet'), findsNothing);
+      expect(find.byType(GridLoader), findsNothing);
+      identity.failed();
+      await tester.pump();
+      expect(find.text('Primary wallet'), findsNothing);
+      expect(find.textContaining('unavailable'), findsNothing);
+      identity.ready();
+      await tester.pump();
+      expect(find.text('Next wallet'), findsOneWidget);
+      expect(find.text('Primary wallet'), findsNothing);
+    },
+  );
 
   testWidgets('disabled Scan controls expose a visible disabled state', (
     tester,
@@ -481,50 +465,43 @@ void main() {
     expect(session.activeValues.last, isTrue);
   });
 
-  testWidgets('launcher route failure is mapped, cleared, and resumed', (
-    tester,
-  ) async {
-    final session = FakeScanSession();
-    final router = GoRouter(
-      initialLocation: RoutePaths.scan,
-      routes: [
-        GoRoute(
-          path: RoutePaths.scan,
-          name: RouteNames.scan,
-          builder: (context, state) =>
-              const ScanScreen(purpose: ScanPurpose.sendLauncher),
-        ),
-      ],
-    );
-    addTearDown(router.dispose);
-    final harness = _ScanWidgetHarness(
-      session: session,
-      router: router,
-      purpose: ScanPurpose.sendLauncher,
-    );
-    addTearDown(harness.dispose);
+  testWidgets(
+    'launcher route failure is cleared and resumed without feedback',
+    (tester) async {
+      final session = FakeScanSession();
+      final router = GoRouter(
+        initialLocation: RoutePaths.scan,
+        routes: [
+          GoRoute(
+            path: RoutePaths.scan,
+            name: RouteNames.scan,
+            builder: (context, state) =>
+                const ScanScreen(purpose: ScanPurpose.sendLauncher),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      final harness = _ScanWidgetHarness(
+        session: session,
+        router: router,
+        purpose: ScanPurpose.sendLauncher,
+      );
+      addTearDown(harness.dispose);
 
-    await tester.pumpWidget(harness.app);
-    harness.activateScanTab();
-    await tester.pump();
-    session.emitCamera('lightning:invoice');
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(harness.app);
+      harness.activateScanTab();
+      await tester.pump();
+      session.emitCamera('lightning:invoice');
+      await tester.pumpAndSettle();
 
-    expect(harness.container.read(sendDestinationHandoffProvider), isNull);
-    expect(harness.toasts.messages, hasLength(1));
-    expect(harness.toasts.messages.single.title, 'Send could not be opened');
-    expect(
-      harness.toasts.messages.single.message,
-      isNot(contains(RouteNames.send)),
-    );
-    expect(session.activeValues, contains(false));
-    expect(session.activeValues.last, isTrue);
-    expect(session.resetCaptureCalls, 1);
-    expect(harness.haptics.intents, [
-      HapticIntent.lightImpact,
-      HapticIntent.error,
-    ]);
-  });
+      expect(harness.container.read(sendDestinationHandoffProvider), isNull);
+      expect(harness.toasts.messages, isEmpty);
+      expect(session.activeValues, contains(false));
+      expect(session.activeValues.last, isTrue);
+      expect(session.resetCaptureCalls, 1);
+      expect(harness.haptics.intents, [HapticIntent.lightImpact]);
+    },
+  );
 
   testWidgets('manual launcher opens Send without carrying a stale payload', (
     tester,
@@ -648,7 +625,7 @@ void main() {
     );
     expect(flash.getSemanticsData().hasAction(ui.SemanticsAction.tap), isTrue);
     expect(zoom.getSemanticsData().hasAction(ui.SemanticsAction.tap), isTrue);
-    expect(zoom.value, 'Zoom level 1 of 3');
+    expect(zoom.value, 'Zoom 1 times');
     expect(tester.takeException(), isNull);
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
@@ -660,67 +637,66 @@ void main() {
     expect(session.galleryCalls, 1);
   });
 
-  testWidgets(
-    'camera failure stays on-screen while gallery remains available',
-    (tester) async {
-      final session = FakeScanSession();
-      final router = _launcherRouter();
-      addTearDown(router.dispose);
-      final harness = _ScanWidgetHarness(
-        session: session,
-        router: router,
-        purpose: ScanPurpose.sendLauncher,
-      );
-      addTearDown(harness.dispose);
-      session.current = const ScanSessionSnapshot(
-        failure: AppFailure(
-          code: 'scan_camera_permission_denied',
-          kind: AppFailureKind.authentication,
-          userMessage: 'Allow camera access in system settings to scan a code.',
-          retryable: false,
-        ),
-      );
+  testWidgets('camera failure is silent while gallery remains available', (
+    tester,
+  ) async {
+    final session = FakeScanSession();
+    final router = _launcherRouter();
+    addTearDown(router.dispose);
+    final harness = _ScanWidgetHarness(
+      session: session,
+      router: router,
+      purpose: ScanPurpose.sendLauncher,
+    );
+    addTearDown(harness.dispose);
+    session.current = const ScanSessionSnapshot(
+      failure: AppFailure(
+        code: 'scan_camera_permission_denied',
+        kind: AppFailureKind.authentication,
+        userMessage: 'Allow camera access in system settings to scan a code.',
+        retryable: false,
+      ),
+    );
 
-      await tester.pumpWidget(harness.app);
-      harness.activateScanTab();
-      await tester.pump();
+    await tester.pumpWidget(harness.app);
+    harness.activateScanTab();
+    await tester.pump();
 
-      expect(
-        find.text('Allow camera access in system settings to scan a code.'),
-        findsOneWidget,
-      );
-      expect(
-        tester
-            .getSemantics(find.bySemanticsLabel('Choose a QR image'))
-            .getSemanticsData()
-            .hasAction(ui.SemanticsAction.tap),
-        isTrue,
-      );
-      expect(
-        tester
-            .getSemantics(find.bySemanticsLabel('Choose a QR image'))
-            .getSemanticsData()
-            .flagsCollection
-            .isSelected,
-        ui.Tristate.none,
-      );
-      expect(
-        tester
-            .getSemantics(find.bySemanticsLabel('Turn flashlight on'))
-            .getSemanticsData()
-            .flagsCollection
-            .isSelected,
-        ui.Tristate.isFalse,
-      );
-      expect(
-        tester
-            .getSemantics(find.bySemanticsLabel('Turn flashlight on'))
-            .getSemanticsData()
-            .hasAction(ui.SemanticsAction.tap),
-        isFalse,
-      );
-    },
-  );
+    expect(
+      find.text('Allow camera access in system settings to scan a code.'),
+      findsNothing,
+    );
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('Choose a QR image'))
+          .getSemanticsData()
+          .hasAction(ui.SemanticsAction.tap),
+      isTrue,
+    );
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('Choose a QR image'))
+          .getSemanticsData()
+          .flagsCollection
+          .isSelected,
+      ui.Tristate.none,
+    );
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('Turn flashlight on'))
+          .getSemanticsData()
+          .flagsCollection
+          .isSelected,
+      ui.Tristate.isFalse,
+    );
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('Turn flashlight on'))
+          .getSemanticsData()
+          .hasAction(ui.SemanticsAction.tap),
+      isFalse,
+    );
+  });
 
   testWidgets('Send stays closed when the scanner cannot pause', (
     tester,
@@ -751,13 +727,10 @@ void main() {
 
     expect(find.text('Send target selection'), findsNothing);
     expect(harness.container.read(sendDestinationHandoffProvider), isNull);
-    expect(harness.toasts.messages, hasLength(1));
-    expect(harness.toasts.messages.single.title, 'Scanner could not pause');
-    expect(harness.toasts.messages.single.variant, ToastVariant.failure);
-    expect(harness.haptics.intents, [
-      HapticIntent.lightImpact,
-      HapticIntent.error,
-    ]);
+    expect(harness.toasts.messages, isEmpty);
+    expect(session.resetCaptureCalls, 1);
+    expect(session.activeValues.last, isTrue);
+    expect(harness.haptics.intents, [HapticIntent.lightImpact]);
   });
 
   testWidgets('discarded launcher clears its staged destination', (
@@ -791,6 +764,118 @@ void main() {
 
     expect(harness.container.read(sendDestinationHandoffProvider), isNull);
     expect(find.text('Send target selection'), findsNothing);
+  });
+
+  for (final changeWallet in [false, true]) {
+    testWidgets(
+      'late camera pause cannot navigate after ${changeWallet ? 'wallet change' : 'tab change'}',
+      (tester) async {
+        final session = FakeScanSession()..contextToken = 1;
+        final router = _launcherRouter();
+        addTearDown(router.dispose);
+        final harness = _ScanWidgetHarness(
+          session: session,
+          router: router,
+          purpose: ScanPurpose.sendLauncher,
+        );
+        addTearDown(harness.dispose);
+        await tester.pumpWidget(harness.app);
+        harness.activateScanTab();
+        await tester.pumpAndSettle();
+        final gate = Completer<AppResult<void>>();
+        session.activeGate = gate;
+        session.emitCamera('bitcoin:accepted');
+        await tester.pump();
+        if (changeWallet) {
+          session.contextToken = 2;
+        } else {
+          harness.container.read(appShellIndexProvider.notifier).setIndex(0);
+          await tester.pump();
+        }
+        session.activeGate = null;
+        gate.complete(const AppResult.success(null));
+        await tester.pumpAndSettle();
+        expect(find.text('Send target selection'), findsNothing);
+        expect(harness.container.read(sendDestinationHandoffProvider), isNull);
+        expect(harness.toasts.messages, isEmpty);
+        expect(session.resetCaptureCalls, 1);
+      },
+    );
+  }
+
+  testWidgets(
+    'gallery completion on a hidden tab is discarded and scanner rearmed',
+    (tester) async {
+      final session = FakeScanSession()
+        ..galleryGate = Completer<AppResult<ScanGalleryOutcome>>();
+      final router = _launcherRouter();
+      addTearDown(router.dispose);
+      final harness = _ScanWidgetHarness(
+        session: session,
+        router: router,
+        purpose: ScanPurpose.sendLauncher,
+      );
+      addTearDown(harness.dispose);
+      await tester.pumpWidget(harness.app);
+      harness.activateScanTab();
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsLabel('Choose a QR image'));
+      await tester.pump();
+      harness.container.read(appShellIndexProvider.notifier).setIndex(0);
+      await tester.pump();
+      session.galleryGate!.complete(
+        AppResult.success(
+          ScanGalleryCaptured(
+            ScanPayload.parse('bitcoin:old', source: ScanCaptureSource.gallery),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(harness.toasts.messages, isEmpty);
+      expect(harness.container.read(sendDestinationHandoffProvider), isNull);
+      expect(session.resetCaptureCalls, 1);
+      harness.activateScanTab();
+      await tester.pumpAndSettle();
+      session.emitCamera('bitcoin:fresh');
+      await tester.pumpAndSettle();
+      expect(find.text('Send target selection'), findsOneWidget);
+      expect(
+        harness.container.read(sendDestinationHandoffProvider)?.value,
+        'bitcoin:fresh',
+      );
+    },
+  );
+
+  testWidgets('gallery camera pause failure never claims an image failed', (
+    tester,
+  ) async {
+    final session = FakeScanSession()
+      ..activeResult = const AppResult.failure(
+        AppFailure(
+          code: 'camera_stop_failed',
+          kind: AppFailureKind.unavailable,
+          userMessage: 'Camera could not be paused.',
+          retryable: true,
+        ),
+      );
+    final router = _launcherRouter();
+    addTearDown(router.dispose);
+    final harness = _ScanWidgetHarness(
+      session: session,
+      router: router,
+      purpose: ScanPurpose.sendLauncher,
+    );
+    addTearDown(harness.dispose);
+    await tester.pumpWidget(harness.app);
+    harness.activateScanTab();
+    await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsLabel('Choose a QR image'));
+    await tester.pumpAndSettle();
+    expect(session.galleryCalls, 0);
+    expect(session.activeValues, [false, true]);
+    expect(harness.toasts.messages, isEmpty);
+    expect(find.byType(GridLoader), findsNothing);
+    expect(find.text('Retry'), findsNothing);
   });
 
   testWidgets('replaced gallery session cannot navigate with stale data', (
@@ -836,7 +921,7 @@ void main() {
     expect(harness.toasts.messages, isEmpty);
   });
 
-  testWidgets('retryable camera failure remains usable on a compact phone', (
+  testWidgets('retryable camera failure remains quiet on a compact phone', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(320, 568);
@@ -868,46 +953,48 @@ void main() {
     harness.activateScanTab();
     await tester.pump();
 
-    expect(find.text('Retry'), findsOneWidget);
+    expect(find.text('Retry'), findsNothing);
+    expect(find.byType(GridLoader), findsNothing);
     expect(find.bySemanticsLabel('Choose a QR image'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
   });
 
-  testWidgets('orphaned picker fails closed without staging Send data', (
-    tester,
-  ) async {
-    final session = FakeScanSession();
-    final router = GoRouter(
-      routes: [
-        GoRoute(
-          path: '/',
-          builder: (context, state) =>
-              const ScanScreen(purpose: ScanPurpose.destinationPicker),
-        ),
-      ],
-    );
-    addTearDown(router.dispose);
-    final harness = _ScanWidgetHarness(
-      session: session,
-      router: router,
-      purpose: ScanPurpose.destinationPicker,
-    );
-    addTearDown(harness.dispose);
+  testWidgets(
+    'orphaned picker falls back quietly without claiming session expiry',
+    (tester) async {
+      final session = FakeScanSession();
+      final router = GoRouter(
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (context, state) =>
+                const ScanScreen(purpose: ScanPurpose.destinationPicker),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      final harness = _ScanWidgetHarness(
+        session: session,
+        router: router,
+        purpose: ScanPurpose.destinationPicker,
+      );
+      addTearDown(harness.dispose);
 
-    await tester.pumpWidget(harness.app);
-    await tester.pump();
-    session.emitCamera('lightning:invoice');
-    await tester.pump();
+      await tester.pumpWidget(harness.app);
+      await tester.pump();
+      session.emitCamera('lightning:invoice');
+      await tester.pump();
 
-    expect(harness.container.read(sendDestinationHandoffProvider), isNull);
-    expect(harness.toasts.messages, hasLength(1));
-    expect(harness.toasts.messages.single.title, 'Scan session expired');
-    expect(session.resetCaptureCalls, 1);
-    expect(session.activeValues.last, isTrue);
-    expect(harness.haptics.intents, [HapticIntent.lightImpact]);
-  });
+      expect(harness.container.read(sendDestinationHandoffProvider), isNull);
+      expect(harness.toasts.messages, isEmpty);
+      expect(find.text('Scan session expired'), findsNothing);
+      expect(session.resetCaptureCalls, 1);
+      expect(session.activeValues.last, isTrue);
+      expect(harness.haptics.intents, [HapticIntent.lightImpact]);
+    },
+  );
 }
 
 GoRoute _configuredScanRoute() {
@@ -941,6 +1028,7 @@ final class _ScanWidgetHarness {
     ScanPurpose purpose = ScanPurpose.destinationPicker,
     ScanSession Function()? sessionBuilder,
     WalletViewModel? walletViewModel,
+    ScanWalletIdentityViewModel? identityViewModel,
   }) {
     final haptics = RecordingHapticFeedbackService();
     return _ScanWidgetHarness._(
@@ -949,6 +1037,7 @@ final class _ScanWidgetHarness {
       purpose: purpose,
       sessionBuilder: sessionBuilder,
       walletViewModel: walletViewModel,
+      identityViewModel: identityViewModel,
       haptics: haptics,
       toasts: RecordingToastPresentationService(),
     );
@@ -960,6 +1049,7 @@ final class _ScanWidgetHarness {
     required this.purpose,
     ScanSession Function()? sessionBuilder,
     WalletViewModel? walletViewModel,
+    ScanWalletIdentityViewModel? identityViewModel,
     required this.haptics,
     required this.toasts,
   }) : container = ProviderContainer(
@@ -969,7 +1059,7 @@ final class _ScanWidgetHarness {
                .overrideWith((ref) => sessionBuilder?.call() ?? session),
            if (walletViewModel == null)
              scanWalletIdentityViewModelProvider.overrideWith(
-               _FixedScanWalletIdentityViewModel.new,
+               () => identityViewModel ?? _FixedScanWalletIdentityViewModel(),
              )
            else
              walletViewModelProvider.overrideWith(() => walletViewModel),
@@ -1008,6 +1098,29 @@ final class _FixedScanWalletIdentityViewModel
   Future<ScanWalletIdentity?> build() async => const ScanWalletIdentity(
     name: 'Primary wallet',
     displayId: 'ABCDEF 123456',
+  );
+}
+
+final class _MutableScanWalletIdentityViewModel
+    extends ScanWalletIdentityViewModel {
+  static const previous = ScanWalletIdentity(
+    name: 'Primary wallet',
+    displayId: 'ABCDEF 123456',
+  );
+  @override
+  Future<ScanWalletIdentity?> build() async => previous;
+  void pending() => state = const AsyncLoading<ScanWalletIdentity?>()
+      // Model Riverpod's real retained-value refresh state explicitly.
+      // ignore: invalid_use_of_internal_member
+      .copyWithPrevious(const AsyncData(previous));
+  void failed() => state = AsyncError<ScanWalletIdentity?>(
+    StateError('private failure'),
+    StackTrace.current,
+    // Model Riverpod's real retained-value error state explicitly.
+    // ignore: invalid_use_of_internal_member
+  ).copyWithPrevious(const AsyncData(previous));
+  void ready() => state = const AsyncData(
+    ScanWalletIdentity(name: 'Next wallet', displayId: '987654 ABCDEF'),
   );
 }
 

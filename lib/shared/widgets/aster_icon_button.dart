@@ -15,6 +15,7 @@ class AsterIconButton extends StatelessWidget {
     this.color,
     this.iconSize,
     this.alignment = Alignment.center,
+    this.padding,
     this.hapticIntent = HapticIntent.lightImpact,
     this.loading = false,
     this.showTooltip = true,
@@ -31,6 +32,10 @@ class AsterIconButton extends StatelessWidget {
   /// Edge-anchored navigation controls use an inward alignment so their glyphs
   /// follow the page content edge without shrinking or shifting the tap area.
   final AlignmentGeometry alignment;
+
+  /// Optional internal spacing for glyphs aligned to a page content edge.
+  /// The minimum touch target remains unchanged.
+  final EdgeInsetsGeometry? padding;
 
   /// Set to `null` when feedback belongs to a confirmed async result.
   final HapticIntent? hapticIntent;
@@ -59,6 +64,7 @@ class AsterIconButton extends StatelessWidget {
         onPressed: enabled ? activate : null,
         tooltip: showTooltip ? tooltip : null,
         alignment: alignment,
+        padding: padding,
         constraints: BoxConstraints.tightFor(
           width: context.metrics.minTouchTarget,
           height: context.metrics.minTouchTarget,

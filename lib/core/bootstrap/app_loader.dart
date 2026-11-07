@@ -42,7 +42,7 @@ class AppLoader extends StatefulWidget {
 }
 
 class _AppLoaderState extends State<AppLoader>
-    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   final _isSplashScreenVisible = ValueNotifier(true);
   final _container = ValueNotifier<ProviderContainer?>(null);
   final _failure = ValueNotifier<AppFailure?>(null);
@@ -50,13 +50,21 @@ class _AppLoaderState extends State<AppLoader>
 
   late final AnimationController _controller =
       AnimatedSplashScreen.createController(this);
+  late final AnimationController _colorController =
+      AnimatedSplashScreen.createColorTransitionController(this);
 
   Future<void>? _loader;
   Timer? _revealTimer;
+  int _revealRevision = 0;
+  bool _revealScheduled = false;
+  bool _revealRunning = false;
+  AppLifecycleState _lifecycle = AppLifecycleState.resumed;
 
   @override
   void initState() {
     super.initState();
+    _lifecycle =
+        WidgetsBinding.instance.lifecycleState ?? AppLifecycleState.resumed;
     WidgetsBinding.instance.addObserver(this);
     widget.security?.addListener(_securityChanged);
     _controller.addStatusListener((status) {
@@ -69,6 +77,9 @@ class _AppLoaderState extends State<AppLoader>
     super.didChangeDependencies();
     _controller.duration = context.motionPolicy.duration(
       _bootstrapMotion.splashRevealDuration,
+    );
+    _colorController.duration = context.motionPolicy.duration(
+      _bootstrapMotion.splashColorTransitionDuration,
     );
     _loader ??= _load();
   }
@@ -84,41 +95,100 @@ class _AppLoaderState extends State<AppLoader>
     _container.value?.dispose();
     _container.dispose();
     _controller.dispose();
+    _colorController.dispose();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _lifecycle = state;
     widget.security?.handleLifecycle(state);
-  }
-
-  bool get _canReveal =>
-      widget.security == null ||
-      (!widget.security!.isLocked &&
-          !widget.security!.isObscured &&
-          !widget.security!.isAuthenticating);
-
-  void _securityChanged() {
-    if (!mounted || !_isSplashScreenVisible.value) return;
+    if (!_isSplashScreenVisible.value) return;
     if (!_canReveal) {
-      _revealTimer?.cancel();
-      _controller.reset();
+      _resetReveal();
     } else if (_container.value != null) {
       _scheduleReveal();
     }
   }
 
+  bool get _canReveal =>
+      _lifecycle == AppLifecycleState.resumed &&
+      (widget.security == null ||
+          (!widget.security!.isLocked &&
+              !widget.security!.isObscured &&
+              !widget.security!.isAuthenticating));
+
+  void _securityChanged() {
+    if (!mounted || !_isSplashScreenVisible.value) return;
+    if (!_canReveal) {
+      _resetReveal();
+    } else if (_container.value != null) {
+      _scheduleReveal();
+    }
+  }
+
+  void _resetReveal() {
+    _revealRevision += 1;
+    _revealTimer?.cancel();
+    _revealTimer = null;
+    _revealScheduled = false;
+    _revealRunning = false;
+    _controller.reset();
+    _colorController.reset();
+  }
+
+  bool _canPlayReveal(int revision) =>
+      mounted &&
+      revision == _revealRevision &&
+      _canReveal &&
+      _container.value != null &&
+      _failure.value == null &&
+      _isSplashScreenVisible.value;
+
   void _scheduleReveal() {
+    if (_revealScheduled ||
+        _revealRunning ||
+        !_canPlayReveal(_revealRevision)) {
+      return;
+    }
+    _revealScheduled = true;
+    final revision = _revealRevision;
     SchedulerBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_canReveal || !_isSplashScreenVisible.value) return;
-      _revealTimer?.cancel();
+      if (!_canPlayReveal(revision)) return;
+      if (context.motionPolicy.reduceMotion) {
+        _revealScheduled = false;
+        _revealRunning = true;
+        unawaited(_playReveal(revision));
+        return;
+      }
       _revealTimer = Timer(
         context.motionPolicy.duration(_bootstrapMotion.bootstrapRevealDelay),
         () {
-          if (mounted && _canReveal) _controller.forward().ignore();
+          _revealTimer = null;
+          if (!_canPlayReveal(revision)) return;
+          _revealScheduled = false;
+          _revealRunning = true;
+          unawaited(_playReveal(revision));
         },
       );
     });
+  }
+
+  Future<void> _playReveal(int revision) async {
+    try {
+      if (context.motionPolicy.reduceMotion) {
+        _colorController.value = 1;
+        _controller.value = 1;
+        return;
+      }
+      await _colorController.forward().orCancel;
+      if (!_canPlayReveal(revision)) return;
+      await _controller.forward().orCancel;
+    } on TickerCanceled {
+      // Locking, backgrounding and disposal cancel both phases deliberately.
+    } finally {
+      if (revision == _revealRevision) _revealRunning = false;
+    }
   }
 
   Future<void> _load() async {
@@ -153,7 +223,7 @@ class _AppLoaderState extends State<AppLoader>
 
   void _retry() {
     if (_isRetrying.value || _failure.value?.retryable != true) return;
-    _controller.reset();
+    _resetReveal();
     _isSplashScreenVisible.value = true;
     _loader = _load();
   }
@@ -164,48 +234,54 @@ class _AppLoaderState extends State<AppLoader>
       data: AppTheme.light(),
       child: Builder(
         builder: (context) {
-          final colors = context.appColors;
-          return AnnotatedRegion<SystemUiOverlayStyle>(
-            value: SystemUiOverlayStyle(
-              systemNavigationBarColor: colors.transparentSurface,
-              systemNavigationBarIconBrightness: Brightness.light,
-            ),
-            child: Directionality(
-              textDirection: TextDirection.ltr,
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  ValueListenableBuilder<ProviderContainer?>(
-                    valueListenable: _container,
-                    builder: (context, container, _) {
-                      if (container == null) {
-                        return const SizedBox.expand();
-                      }
+          return Directionality(
+            textDirection: TextDirection.ltr,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                ValueListenableBuilder<ProviderContainer?>(
+                  valueListenable: _container,
+                  builder: (context, container, _) {
+                    if (container == null) {
+                      return const SizedBox.expand();
+                    }
 
-                      return UncontrolledProviderScope(
-                        container: container,
-                        child: widget.child,
+                    return UncontrolledProviderScope(
+                      container: container,
+                      child: widget.child,
+                    );
+                  },
+                ),
+                ValueListenableBuilder<AppFailure?>(
+                  valueListenable: _failure,
+                  builder: (context, failure, _) {
+                    if (failure != null) {
+                      return _BootstrapFailureView(
+                        failure: failure,
+                        retrying: _isRetrying,
+                        onRetry: _retry,
                       );
-                    },
-                  ),
-                  ValueListenableBuilder<AppFailure?>(
-                    valueListenable: _failure,
-                    builder: (context, failure, _) {
-                      if (failure != null) {
-                        return _BootstrapFailureView(
-                          failure: failure,
-                          retrying: _isRetrying,
-                          onRetry: _retry,
-                        );
-                      }
-                      return ValueListenableBuilder<bool>(
-                        valueListenable: _isSplashScreenVisible,
-                        builder: (context, isVisible, splash) {
-                          if (!isVisible) return const SizedBox.shrink();
-                          return splash!;
-                        },
+                    }
+                    return ValueListenableBuilder<bool>(
+                      valueListenable: _isSplashScreenVisible,
+                      builder: (context, isVisible, splash) {
+                        if (!isVisible) return const SizedBox.shrink();
+                        return splash!;
+                      },
+                      child: AnnotatedRegion<SystemUiOverlayStyle>(
+                        value: SystemUiOverlayStyle(
+                          statusBarColor: context.appColors.transparentSurface,
+                          statusBarIconBrightness: Brightness.dark,
+                          statusBarBrightness: Brightness.light,
+                          systemNavigationBarColor:
+                              context.appColors.transparentSurface,
+                          systemNavigationBarIconBrightness: Brightness.dark,
+                        ),
                         child: widget.security == null
-                            ? AnimatedSplashScreen(controller: _controller)
+                            ? AnimatedSplashScreen(
+                                controller: _controller,
+                                colorTransition: _colorController,
+                              )
                             : ListenableBuilder(
                                 listenable: widget.security!,
                                 builder: (context, _) =>
@@ -216,13 +292,14 @@ class _AppLoaderState extends State<AppLoader>
                                       )
                                     : AnimatedSplashScreen(
                                         controller: _controller,
+                                        colorTransition: _colorController,
                                       ),
                               ),
-                      );
-                    },
-                  ),
-                ],
-              ),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
           );
         },
@@ -281,7 +358,17 @@ class _BootstrapFailureView extends StatelessWidget {
                     textAlign: TextAlign.center,
                   ),
                   SizedBox(height: themedSpacing.sm),
-                  AsterStatusMessage(failure.userMessage, announce: true),
+                  Semantics(
+                    container: true,
+                    liveRegion: true,
+                    label: failure.userMessage,
+                    excludeSemantics: true,
+                    child: Text(
+                      failure.userMessage,
+                      style: context.type.errorMessage,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
                   if (failure.retryable) ...[
                     SizedBox(height: themedSpacing.xxl),
                     ValueListenableBuilder<bool>(

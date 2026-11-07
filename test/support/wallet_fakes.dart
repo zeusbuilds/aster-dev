@@ -776,9 +776,14 @@ final class FakeWalletEngine
         );
   }
 
+  Completer<void>? publicKeysGate;
+  Object? publicKeysError;
+
   @override
   Future<WalletPublicKeys> getPublicKeys() async {
     calls.add('publicKeys');
+    await publicKeysGate?.future;
+    if (publicKeysError case final error?) throw error;
     return WalletPublicKeys(bitcoin: 'tpub-btc', rgb: 'tpub-rgb');
   }
 }

@@ -41,6 +41,9 @@ class _AsterPalette {
 /// financial/status/brand-art meaning should use this extension.
 @immutable
 class AsterColors extends ThemeExtension<AsterColors> {
+  /// Opaque startup and privacy-cover surface, matched to native launch art.
+  static const launchSurface = _AsterPalette.white;
+
   const AsterColors({
     required this.textSecondary,
     required this.textTertiary,

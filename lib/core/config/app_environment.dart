@@ -24,6 +24,27 @@ enum BlockchainEnvironment {
   }
 }
 
+/// Identifies the native wallet format as well as the runtime implementation.
+enum WalletBackend {
+  rln('rln'),
+  rgbL1('rgb-l1');
+
+  const WalletBackend(this.wireName);
+
+  final String wireName;
+
+  static WalletBackend parse(String value) => switch (value) {
+    'rln' => WalletBackend.rln,
+    'rgb-l1' => WalletBackend.rgbL1,
+    _ => throw const AppConfigurationException(),
+  };
+
+  String sdkNetwork(BlockchainEnvironment environment) =>
+      this == WalletBackend.rln && environment == BlockchainEnvironment.signet
+      ? 'utexo'
+      : environment.name;
+}
+
 /// Deployment-owned identity for one RGB fungible asset.
 ///
 /// Contract identity and precision are release configuration, not values that
@@ -68,6 +89,7 @@ final class WalletServiceConfiguration {
   const WalletServiceConfiguration({
     required this.environment,
     required this.sdkNetwork,
+    this.backend = WalletBackend.rln,
     this.indexerUrl,
     this.rgbTransportProxy,
     this.lspBaseUrl,
@@ -96,11 +118,13 @@ final class WalletServiceConfiguration {
       throw const AppConfigurationException();
     }
     final environment = BlockchainEnvironment.parse(networkValue);
+    final backend = WalletBackend.parse(
+      const String.fromEnvironment('ASTER_WALLET_BACKEND', defaultValue: 'rln'),
+    );
     return WalletServiceConfiguration(
       environment: environment,
-      sdkNetwork: environment == BlockchainEnvironment.signet
-          ? 'utexo'
-          : environment.name,
+      sdkNetwork: backend.sdkNetwork(environment),
+      backend: backend,
       daemonListeningPort: _listenerPort(
         const String.fromEnvironment('ASTER_DAEMON_PORT', defaultValue: '9735'),
       ),
@@ -134,6 +158,9 @@ final class WalletServiceConfiguration {
   }
 
   final BlockchainEnvironment environment;
+
+  /// Engine and on-disk wallet format selected at build time.
+  final WalletBackend backend;
 
   /// Stable SDK network carrier. UTEXO protocol signet uses the SDK's `utexo`
   /// service profile while Aster still reports the chain as `signet`.
@@ -172,6 +199,7 @@ final class WalletServiceConfiguration {
   bool operator ==(Object other) =>
       other is WalletServiceConfiguration &&
       other.environment == environment &&
+      other.backend == backend &&
       other.sdkNetwork == sdkNetwork &&
       other.daemonListeningPort == daemonListeningPort &&
       other.ldkPeerListeningPort == ldkPeerListeningPort &&
@@ -187,6 +215,7 @@ final class WalletServiceConfiguration {
   @override
   int get hashCode => Object.hash(
     environment,
+    backend,
     sdkNetwork,
     daemonListeningPort,
     ldkPeerListeningPort,
@@ -225,9 +254,7 @@ final class WalletServiceConfiguration {
   void validate({bool allowInsecureDevelopmentEndpoints = !kReleaseMode}) {
     final permitsInsecureDevelopmentEndpoints =
         !kReleaseMode && allowInsecureDevelopmentEndpoints;
-    final expectedSdkNetwork = environment == BlockchainEnvironment.signet
-        ? 'utexo'
-        : environment.name;
+    final expectedSdkNetwork = backend.sdkNetwork(environment);
     if (sdkNetwork != expectedSdkNetwork ||
         daemonListeningPort < 1 ||
         daemonListeningPort > 65535 ||
@@ -276,6 +303,14 @@ final class WalletServiceConfiguration {
     final expectedChain = ethChainId;
     if (expectedChain != null &&
         (!isCanonicalEvmChainId(expectedChain) || ethRpcUrl == null)) {
+      throw const AppConfigurationException();
+    }
+    if (backend == WalletBackend.rgbL1 &&
+        (lspBaseUrl != null ||
+            vssUrl != null ||
+            (ethRpcUrl != null && expectedChain == null) ||
+            (expectedChain != null &&
+                BigInt.parse(expectedChain).bitLength > 64))) {
       throw const AppConfigurationException();
     }
     // Native RLN enables BFA schemas only with an EVM RPC. A mainnet USDT

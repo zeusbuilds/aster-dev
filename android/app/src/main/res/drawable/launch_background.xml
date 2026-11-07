@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@drawable/aster_launch_gradient" />
-    <item
-        android:width="160dp"
-        android:height="82dp"
-        android:drawable="@drawable/aster_mark_white"
-        android:gravity="center" />
+    <item android:drawable="@android:color/white" />
+    <!-- The transparent 288dp artboard centres the visible 160dp mark, including
+         balanced space for its shadows. Bitmap gravity prevents stretching. -->
+    <item>
+        <bitmap android:src="@drawable/aster_launch_opening" android:gravity="center" />
+    </item>
 </layer-list>

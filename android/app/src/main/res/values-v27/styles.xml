@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="AsterLaunchChrome" parent="AsterLaunchBase">
+        <item name="android:navigationBarColor">@android:color/white</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+
+    <style name="AsterNormalChrome" parent="AsterNormalBase">
+        <item name="android:navigationBarColor">@color/aster_surface</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+</resources>

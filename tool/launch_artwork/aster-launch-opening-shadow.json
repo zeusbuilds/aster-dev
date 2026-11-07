@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "renderer": "Actual AsterLaunchLogo.paint with shadow-only Canvas forwarding",
+  "rendererTool": "tool/render_aster_launch_shadow_test.dart",
+  "rendererToolSha256": "a067538d3e7fbeef01477a5cbb1d402405d73cc67c027c9bf01a6c577a36f68b",
+  "sourceSha256": {
+    "lib/shared/branding/aster_launch_logo.dart": "ce423b056b1446f25fb11f505ac8d10259693fd079b7499a6a54eaf1b8ffdee7",
+    "lib/shared/branding/aster_logo_geometry.dart": "e7e542c23924e978eb5e7ac035ef53fabbccd4acb3961bdf1c61e99f183b3271",
+    "lib/shared/screens/animated_splash_screen.dart": "54988d3c71d5933e96682445bc61651a2afc3859885a12a256ddad742c0668ab",
+    "lib/shared/theme/tokens/color_tokens.dart": "63d1bd30bf4cd1b35f230166240b970b515e870cfcb77aeec5673a1f454de61d",
+    "lib/shared/theme/tokens/component_metrics_tokens.dart": "269e6926fe4b3298780c60dc745d5b992f90f0efeb343c3812867d17a314b8a5"
+  },
+  "renderSpecSha256": "e18bd02ddbf9385f1394256d269e9b514fc3225480396cf2deecebbf8e2d267b",
+  "pngSha256": "586b86c3d9a73c6aa639911bec6c0928bcddfad325fbcdce94a1917325ea4de3",
+  "viewportSourceUnits": [
+    765.0,
+    473.0
+  ],
+  "rasterScale": 3.0,
+  "pixelSize": [
+    2295,
+    1419
+  ],
+  "colorSpace": "sRGB",
+  "nonTransparentPixels": 686547,
+  "coloredPixels": 0,
+  "maximumAlpha": 36,
+  "forwardedShadowPaths": 4,
+  "suppressedForegroundPaths": 1,
+  "dartVersion": "3.13.5 (stable) (Tue Sep 29 01:00:52 2026 -0700) on \"macos_arm64\""
+}

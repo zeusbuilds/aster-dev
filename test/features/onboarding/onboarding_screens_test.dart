@@ -562,8 +562,9 @@ void main() {
           AppLifecycleState.inactive,
         );
         await tester.pump();
-        expect(security.isObscured, isTrue);
-        expect(TickerMode.valuesOf(welcome).enabled, isFalse);
+        expect(security.isObscured, isFalse);
+        expect(TickerMode.valuesOf(welcome).enabled, isTrue);
+        expect(find.byType(SplashScreen), findsNothing);
 
         // The native resumed event and result can arrive in one platform turn.
         // Deliberately do not render the SecurityGate between these callbacks.
@@ -573,8 +574,8 @@ void main() {
         device.prompt.complete(DeviceAuthenticationResult.authenticated);
         expect(
           TickerMode.valuesOf(welcome).enabled,
-          isFalse,
-          reason: 'This test must retain the previously painted inactive gate.',
+          isTrue,
+          reason: 'The source stays painted throughout owned authentication.',
         );
         await _pumpUntil(
           tester,

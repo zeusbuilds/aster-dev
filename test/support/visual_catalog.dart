@@ -321,7 +321,8 @@ void registerVisualCatalog({required VisualCapture capture}) {
         if (unavailable) {
           session.replaceSnapshot(const ScanSessionSnapshot(failure: _failure));
           await _settle(tester);
-          expect(find.text(_failure.userMessage), findsOneWidget);
+          expect(find.text(_failure.userMessage), findsNothing);
+          expect(find.text('Retry'), findsNothing);
         }
         await _shot(
           tester,
