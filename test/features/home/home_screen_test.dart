@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:aster/core/bootstrap/app_loader.dart';
 import 'package:aster/core/core.dart';
 import 'package:aster/features/home/presentation/screens/screens.dart';
 import 'package:aster/features/home/presentation/widgets/candle_chart.dart';
@@ -718,9 +719,14 @@ void main() {
     );
     expect(find.bySemanticsLabel(RegExp('000,000')), findsNothing);
 
+    final chart = find.byType(CandleChart);
+    expect(tester.widget<CandleChart>(chart).data, isNull);
     historyGate.complete(
       _historyResponse(now: now, firstPrice: 99000, lastPrice: 100000),
     );
+    await tester.pump();
+    expect(find.bySemanticsLabel('Bitcoin price loading.'), findsOneWidget);
+    expect(tester.widget<CandleChart>(chart).data, isNull);
     currentGate.complete(
       _currentResponse(observedAt: observed, bitcoinPrice: 100000),
     );
@@ -1011,6 +1017,95 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsNothing);
     expect(find.byType(LinearProgressIndicator), findsNothing);
   });
+
+  for (final reduceMotion in [false, true]) {
+    testWidgets(
+      reduceMotion
+          ? 'a ready startup chart settles immediately with Reduce Motion'
+          : 'a ready startup chart waves after the splash has cleared',
+      (tester) async {
+        _configurePhone(tester);
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        final dispatcher = tester.platformDispatcher;
+        dispatcher.accessibilityFeaturesTestValue = FakeAccessibilityFeatures(
+          disableAnimations: reduceMotion,
+        );
+        addTearDown(dispatcher.clearAccessibilityFeaturesTestValue);
+        final now = DateTime.utc(2026, 8, 11, 12);
+        final httpClient = _marketClient(now);
+        addTearDown(httpClient.close);
+        final container = _priceContainer(httpClient, () => now);
+        final bootstrap = Completer<ProviderContainer>();
+        await tester.pumpWidget(
+          AppLoader(
+            initialize: () => bootstrap.future,
+            child: MaterialApp(
+              theme: AppTheme.light(),
+              home: const Scaffold(body: PriceCard()),
+            ),
+          ),
+        );
+        // Complete this launch's first market request before the chart builds.
+        container.listen(bitcoinMarketViewModelProvider, (_, _) {});
+        await container.read(bitcoinMarketViewModelProvider.future);
+        bootstrap.complete(container);
+        await tester.pump();
+        await tester.pump();
+
+        final chart = find.byType(CandleChart);
+        final splash = find.byType(AnimatedSplashScreen);
+        final candles = find.descendant(
+          of: chart,
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is SizedBox &&
+                (widget.width ?? 0) > 0 &&
+                (widget.height ?? 0) > 0,
+          ),
+        );
+        expect(tester.widget<CandleChart>(chart).data, hasLength(2));
+        if (reduceMotion) {
+          await _pumpUntil(tester, () => splash.evaluate().isEmpty);
+          expect(candles, findsNWidgets(2));
+          expect(tester.widget<CandleChart>(chart).isSkeleton, isFalse);
+          return;
+        }
+
+        const motion = AsterMotion();
+        expect(splash, findsOneWidget);
+        await tester.pump(motion.bootstrapRevealDelay);
+        await tester.pump();
+        await tester.pump(motion.splashColorTransitionDuration);
+        await _pumpUntil(
+          tester,
+          () => splash.evaluate().isEmpty,
+          frameBudget: 300,
+        );
+        expect(splash, findsNothing);
+        expect(candles, findsNWidgets(24));
+        expect(find.text(r'$100,000'), findsOneWidget);
+
+        final firstWaveHeight = tester.getSize(candles.first).height;
+        final halfWave = motion.chartStartupWaveDuration ~/ 2;
+        await tester.pump(halfWave);
+        expect(candles, findsNWidgets(24));
+        expect(tester.getSize(candles.first).height, isNot(firstWaveHeight));
+
+        await tester.pump(halfWave);
+        await tester.pump();
+        expect(tester.widget<CandleChart>(chart).isSkeleton, isFalse);
+        expect(candles, findsNWidgets(2));
+        final firstTransitionHeight = tester.getSize(candles.first).height;
+        await tester.pump(motion.chartTransitionDuration);
+        expect(
+          tester.getSize(candles.first).height,
+          isNot(firstTransitionHeight),
+        );
+      },
+    );
+  }
 
   testWidgets('offline chart shimmers quietly and recovers without a tap', (
     tester,
@@ -1596,8 +1691,12 @@ void _configurePhone(WidgetTester tester) {
   addTearDown(tester.view.resetPhysicalSize);
 }
 
-Future<void> _pumpUntil(WidgetTester tester, bool Function() predicate) async {
-  for (var frame = 0; frame < 200; frame += 1) {
+Future<void> _pumpUntil(
+  WidgetTester tester,
+  bool Function() predicate, {
+  int frameBudget = 200,
+}) async {
+  for (var frame = 0; frame < frameBudget; frame += 1) {
     if (predicate()) return;
     await tester.pump(const Duration(milliseconds: 5));
   }

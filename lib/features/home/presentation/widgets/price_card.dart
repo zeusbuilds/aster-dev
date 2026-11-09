@@ -23,6 +23,8 @@ class PriceCard extends ConsumerStatefulWidget {
 class _PriceCardState extends ConsumerState<PriceCard> {
   static final _fiatFormatter = FiatAmountFormatter();
   Timer? _expiryTimer;
+  Timer? _startupWaveTimer;
+  bool _showStartupWave = false;
   BitcoinMarketSnapshot? _lastChartSnapshot;
 
   @override
@@ -38,7 +40,27 @@ class _PriceCardState extends ConsumerState<PriceCard> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final splashVisible = StartupRevealScope.splashVisibleOf(context);
+    final waveDuration = context.motionPolicy.duration(
+      context.motion.chartStartupWaveDuration,
+    );
+    if (waveDuration == Duration.zero || splashVisible) {
+      _startupWaveTimer?.cancel();
+      _startupWaveTimer = null;
+      _showStartupWave = splashVisible && waveDuration > Duration.zero;
+    } else if (_showStartupWave && TickerMode.valuesOf(context).enabled) {
+      _startupWaveTimer ??= Timer(waveDuration, () {
+        _startupWaveTimer = null;
+        setState(() => _showStartupWave = false);
+      });
+    }
+  }
+
+  @override
   void dispose() {
+    _startupWaveTimer?.cancel();
     _expiryTimer?.cancel();
     super.dispose();
   }
@@ -102,7 +124,10 @@ class _PriceCardState extends ConsumerState<PriceCard> {
         children: NumericTextSpans.build(context, r'$0', type.brandAmount),
       ),
     ).height;
-    final chart = CandleChart(data: chartData, isSkeleton: chartUnavailable);
+    final chart = CandleChart(
+      data: chartData,
+      isSkeleton: chartUnavailable || _showStartupWave,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

@@ -27,6 +27,7 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
     this.skeletonShimmerDuration = const Duration(milliseconds: 1200),
     this.loadingCycleDuration = const Duration(milliseconds: 1200),
     this.chartLoadingCycleDuration = const Duration(milliseconds: 1500),
+    this.chartStartupWaveDuration = const Duration(seconds: 1),
     this.chartTransitionDuration = const Duration(milliseconds: 800),
     this.buttonPressedScale = 0.95,
     this.settledLoopProgress = 0.25,
@@ -107,6 +108,7 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
   final Duration skeletonShimmerDuration;
   final Duration loadingCycleDuration;
   final Duration chartLoadingCycleDuration;
+  final Duration chartStartupWaveDuration;
   final Duration chartTransitionDuration;
   final double buttonPressedScale;
   final double settledLoopProgress;
@@ -153,6 +155,7 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
     Duration? skeletonShimmerDuration,
     Duration? loadingCycleDuration,
     Duration? chartLoadingCycleDuration,
+    Duration? chartStartupWaveDuration,
     Duration? chartTransitionDuration,
     double? buttonPressedScale,
     double? settledLoopProgress,
@@ -215,6 +218,8 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
       loadingCycleDuration: loadingCycleDuration ?? this.loadingCycleDuration,
       chartLoadingCycleDuration:
           chartLoadingCycleDuration ?? this.chartLoadingCycleDuration,
+      chartStartupWaveDuration:
+          chartStartupWaveDuration ?? this.chartStartupWaveDuration,
       chartTransitionDuration:
           chartTransitionDuration ?? this.chartTransitionDuration,
       buttonPressedScale: buttonPressedScale ?? this.buttonPressedScale,
@@ -355,6 +360,11 @@ class AsterMotion extends ThemeExtension<AsterMotion> {
       chartLoadingCycleDuration: _lerpDuration(
         chartLoadingCycleDuration,
         other.chartLoadingCycleDuration,
+        t,
+      ),
+      chartStartupWaveDuration: _lerpDuration(
+        chartStartupWaveDuration,
+        other.chartStartupWaveDuration,
         t,
       ),
       chartTransitionDuration: _lerpDuration(

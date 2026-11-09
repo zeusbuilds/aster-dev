@@ -248,7 +248,10 @@ class _AppLoaderState extends State<AppLoader>
 
                     return UncontrolledProviderScope(
                       container: container,
-                      child: widget.child,
+                      child: StartupRevealScope(
+                        splashVisible: _isSplashScreenVisible,
+                        child: widget.child,
+                      ),
                     );
                   },
                 ),
