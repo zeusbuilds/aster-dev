@@ -10,6 +10,16 @@ import '../../tool/verify_release_configuration.dart';
 
 void main() {
   group('ReleaseConfigurationManifest', () {
+    test('the hosted Dev preset is rejected by every release audience', () {
+      final preset = File('config/dev-signet.debug.json').readAsStringSync();
+      for (final audience in ReleaseAudience.values) {
+        expect(
+          () => ReleaseConfigurationManifest.parse(preset, audience: audience),
+          throwsFormatException,
+        );
+      }
+    });
+
     test('approved public contract fields are atomic and digest checked', () {
       final bytes = List<int>.generate(3072, (index) => index % 256);
       final contract = <String, String>{

@@ -36,9 +36,7 @@ enum WalletBackend {
 
   final String wireName;
 
-  /// Product activation gate; this does not certify release readiness.
-  /// RGB_L1 stays closed while native/app qualification and authoritative RGB
-  /// backup freshness remain unresolved.
+  /// Product activation gate; the dedicated Dev test profile is independent.
   bool get activationAllowed => this == WalletBackend.rln;
 
   static WalletBackend parse(String value) => switch (value) {
@@ -123,6 +121,7 @@ final class WalletServiceConfiguration {
     required this.sdkNetwork,
     this.backend = WalletBackend.rln,
     this.signetDeployment = SignetDeployment.publicBitcoin,
+    this.devBridgeEnabled = false,
     this.indexerUrl,
     this.rgbTransportProxy,
     this.lspBaseUrl,
@@ -166,6 +165,13 @@ final class WalletServiceConfiguration {
     } on FormatException {
       throw const AppConfigurationException();
     }
+    const devBridge = String.fromEnvironment(
+      UtexoDevSignetPolicy.buildFlag,
+      defaultValue: 'false',
+    );
+    if (devBridge != 'true' && devBridge != 'false') {
+      throw const AppConfigurationException();
+    }
     return WalletServiceConfiguration(
       environment: environment,
       sdkNetwork: backend.sdkNetwork(
@@ -174,6 +180,7 @@ final class WalletServiceConfiguration {
       ),
       backend: backend,
       signetDeployment: signetDeployment,
+      devBridgeEnabled: devBridge == 'true',
       daemonListeningPort: _listenerPort(
         const String.fromEnvironment('ASTER_DAEMON_PORT', defaultValue: '9735'),
       ),
@@ -194,7 +201,10 @@ final class WalletServiceConfiguration {
           _optionalEnvironment('ASTER_EXPLORER_URL') ??
           switch (environment) {
             BlockchainEnvironment.mainnet => 'https://mempool.space',
-            BlockchainEnvironment.signet => 'https://mempool.space/signet',
+            BlockchainEnvironment.signet =>
+              signetDeployment == SignetDeployment.publicBitcoin
+                  ? 'https://mempool.space/signet'
+                  : null,
             BlockchainEnvironment.regtest => null,
           },
       usdtAsset: _rgbAssetEnvironment(
@@ -220,8 +230,19 @@ final class WalletServiceConfiguration {
   /// Engine and on-disk wallet format selected at build time.
   final WalletBackend backend;
 
-  /// Explicit chain deployment; UTEXO Dev is currently quarantined.
+  /// Explicit chain deployment; UTEXO Dev has its own chain and test build.
   final SignetDeployment signetDeployment;
+
+  /// Explicit opt-in, validated together with the exact Dev profile.
+  final bool devBridgeEnabled;
+
+  /// Product backends and the dedicated Debug Dev Bridge profile are separate.
+  bool get activationAllowed =>
+      backend.activationAllowed ||
+      (kDebugMode &&
+          devBridgeEnabled &&
+          environment == BlockchainEnvironment.signet &&
+          signetDeployment == SignetDeployment.utexoDev);
 
   /// Stable SDK network carrier. UTEXO protocol signet uses the SDK's `utexo`
   /// service profile while Aster still reports the chain as `signet`.
@@ -265,6 +286,7 @@ final class WalletServiceConfiguration {
       other.environment == environment &&
       other.backend == backend &&
       other.signetDeployment == signetDeployment &&
+      other.devBridgeEnabled == devBridgeEnabled &&
       other.sdkNetwork == sdkNetwork &&
       other.daemonListeningPort == daemonListeningPort &&
       other.ldkPeerListeningPort == ldkPeerListeningPort &&
@@ -283,6 +305,7 @@ final class WalletServiceConfiguration {
     environment,
     backend,
     signetDeployment,
+    devBridgeEnabled,
     sdkNetwork,
     daemonListeningPort,
     ldkPeerListeningPort,
@@ -320,10 +343,11 @@ final class WalletServiceConfiguration {
   /// property of regtest itself. The explicit parameter is a deterministic
   /// test seam; it cannot weaken the Release-mode policy.
   void validate({bool allowInsecureDevelopmentEndpoints = !kReleaseMode}) {
-    // Fail before resolving native defaults, wallet storage or credentials.
-    // Current Dev requires a compatible runtime, checkpoint-bound identity and
-    // an approved current contract export; none can be inferred from Signet.
-    if (signetDeployment != SignetDeployment.publicBitcoin ||
+    // Hosted Dev and public Signet have different chain histories. An exact
+    // opt-in is required before selecting native defaults or opening storage.
+    if (devBridgeEnabled) {
+      _validateDevBridgeProfile();
+    } else if (signetDeployment != SignetDeployment.publicBitcoin ||
         UtexoDevSignetPolicy.quarantinedAssetIds.contains(
           usdtAsset?.contractId,
         ) ||
@@ -429,6 +453,34 @@ final class WalletServiceConfiguration {
         (environment != BlockchainEnvironment.regtest ||
             usdtAsset!.requiresEvmValidation) &&
         (ethRpcUrl == null || expectedChain == null)) {
+      throw const AppConfigurationException();
+    }
+  }
+
+  void _validateDevBridgeProfile() {
+    final asset = usdtAsset;
+    final contract = asset?.canonicalContract;
+    if (!kDebugMode ||
+        environment != BlockchainEnvironment.signet ||
+        backend != WalletBackend.rgbL1 ||
+        signetDeployment != SignetDeployment.utexoDev ||
+        indexerUrl != UtexoDevSignetPolicy.indexerUrl ||
+        rgbTransportProxy != UtexoDevSignetPolicy.rgbTransportProxy ||
+        ethRpcUrl != UtexoDevSignetPolicy.evmRpcUrl ||
+        ethChainId != UtexoDevSignetPolicy.evmChainId ||
+        lspBaseUrl != null ||
+        vssUrl != null ||
+        explorerBaseUrl != null ||
+        bfaMintLockPolicy?.minimumBlocks !=
+            UtexoDevSignetPolicy.minimumMintLockBlocks ||
+        bfaMintLockPolicy?.maximumBlocks !=
+            UtexoDevSignetPolicy.maximumMintLockBlocks ||
+        asset?.contractId != UtexoDevSignetPolicy.currentAssetId ||
+        asset?.precision != UtexoDevSignetPolicy.assetPrecision ||
+        asset?.requiresEvmValidation != true ||
+        contract?.nativeName != UtexoDevSignetPolicy.nativeAssetName ||
+        contract?.nativeTicker != UtexoDevSignetPolicy.nativeAssetTicker ||
+        contract?.sha256Digest != UtexoDevSignetPolicy.currentContractSha256) {
       throw const AppConfigurationException();
     }
   }

@@ -1,14 +1,24 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../../core/config/config.dart';
 import '../../../../core/errors/app_failure.dart';
 
-/// Provenance of the selected rate; local test policy is never a network quote.
+/// Provenance of the selected rate. Test policies are separate from estimates.
 enum WalletFeeRateSource {
   networkEstimate,
   localRegtestPolicy,
 
+  /// Used in the dedicated Dev build after the indexer returns no estimate.
+  devSignetPolicy,
+
   /// A rate observed in an authenticated native record, never a live quote.
-  nativeRecovery,
+  nativeRecovery;
+
+  bool appliesTo(WalletServiceConfiguration services) => switch (this) {
+    localRegtestPolicy => services.environment == BlockchainEnvironment.regtest,
+    devSignetPolicy => services.devBridgeEnabled,
+    networkEstimate || nativeRecovery => true,
+  };
 }
 
 /// Known pre-dispatch failures: refreshing a quote never submits a payment.
@@ -59,6 +69,10 @@ final class WalletFeeRateEstimate {
         'satsPerVbyte',
         'Local regtest policy is one sat/vbyte.',
       );
+    }
+    if (source == WalletFeeRateSource.devSignetPolicy &&
+        satsPerVbyte != UtexoDevSignetPolicy.fallbackFeeSatsPerVbyte) {
+      throw ArgumentError.value(satsPerVbyte, 'satsPerVbyte');
     }
     if (!observedAt.isUtc) {
       throw ArgumentError.value(observedAt, 'observedAt', 'Must use UTC.');

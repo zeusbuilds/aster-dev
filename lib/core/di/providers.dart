@@ -42,7 +42,9 @@ Future<SharedPreferences> sharedPreferences(Ref ref) {
 
 @riverpod
 SecureKeyValueStore secureStorageService(Ref ref) {
-  return SecureStorageService();
+  return SecureStorageService(
+    devBridge: ref.watch(walletServiceConfigurationProvider).devBridgeEnabled,
+  );
 }
 
 @riverpod
@@ -209,9 +211,18 @@ WalletStorageSecurity walletStorageSecurity(Ref ref) {
 @riverpod
 Future<WalletDirectoryManager> walletDirectoryManager(Ref ref) async {
   final security = ref.watch(walletStorageSecurityProvider);
+  final devBridge = ref
+      .watch(walletServiceConfigurationProvider)
+      .devBridgeEnabled;
+  if (devBridge) {
+    await PlatformAppMetadataService.requirePackageName(
+      UtexoDevSignetPolicy.applicationId,
+    );
+  }
   final support = await getApplicationSupportDirectory();
   return IoWalletDirectoryManager(
-    '${support.path}${Platform.pathSeparator}aster_wallets',
+    '${support.path}${Platform.pathSeparator}'
+    '${devBridge ? 'aster_devbridge_wallets' : 'aster_wallets'}',
     security,
   );
 }
@@ -219,9 +230,18 @@ Future<WalletDirectoryManager> walletDirectoryManager(Ref ref) async {
 @riverpod
 Future<WalletRegistryDocumentStore> walletRegistryDocumentStore(Ref ref) async {
   final security = ref.watch(walletStorageSecurityProvider);
+  final devBridge = ref
+      .watch(walletServiceConfigurationProvider)
+      .devBridgeEnabled;
+  if (devBridge) {
+    await PlatformAppMetadataService.requirePackageName(
+      UtexoDevSignetPolicy.applicationId,
+    );
+  }
   final support = await getApplicationSupportDirectory();
   return IoWalletRegistryDocumentStore(
-    '${support.path}${Platform.pathSeparator}aster_wallet_metadata',
+    '${support.path}${Platform.pathSeparator}'
+    '${devBridge ? 'aster_devbridge_wallet_metadata' : 'aster_wallet_metadata'}',
     security,
   );
 }

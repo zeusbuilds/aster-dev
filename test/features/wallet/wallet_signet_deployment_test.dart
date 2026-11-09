@@ -7,6 +7,7 @@ import 'package:aster/features/wallet/data/storage/storage.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/dev_bridge_fixture.dart';
 import '../../support/wallet_fakes.dart';
 
 const _id = '11111111111111111111111111111111';
@@ -192,6 +193,45 @@ void main() {
         (jsonDecode(documents.document!) as Map<String, dynamic>)['version'],
         3,
       );
+    },
+  );
+
+  test(
+    'Dev creates with its own backend and persists its deployment',
+    () async {
+      final services = devBridgeServices();
+      final profiles = WalletProfileStore(MemoryWalletRegistryDocumentStore());
+      final directories = FakeWalletDirectoryManager();
+      final factory = FakeWalletEngineFactory([FakeWalletEngine()]);
+      final runtime = WalletRuntime(
+        factory,
+        directories,
+        WalletSecretStore(MemorySecureStore()),
+        services,
+      );
+      addTearDown(runtime.dispose);
+      final keys = FakeWalletKeyGenerator();
+      final repository = WalletRepository(
+        profiles,
+        runtime,
+        keys,
+        FakeWalletIdentityGenerator(walletId: _id),
+        services,
+      );
+      final result = await repository.createFromMnemonic(
+        name: 'Dev Signet',
+        mnemonic: keys.generatedMnemonic,
+      );
+      expect(result, isA<AppSuccess<WalletRegistry>>());
+      final registry =
+          (await profiles.read() as AppSuccess<WalletRegistry>).value;
+      expect(
+        registry.activeProfile!.signetDeployment,
+        SignetDeployment.utexoDev,
+      );
+      expect(registry.activeProfile!.backend, WalletBackend.rgbL1);
+      expect(factory.configurations.single.services, services);
+      expect(directories.created, hasLength(1));
     },
   );
 }

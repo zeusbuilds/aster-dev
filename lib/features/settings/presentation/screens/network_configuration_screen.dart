@@ -64,7 +64,9 @@ class _NetworkConfigurationContent extends ConsumerWidget {
             children: [
               _ConfigurationRow(
                 label: 'Network',
-                value: configuration.environment.name,
+                value: configuration.devBridgeEnabled
+                    ? 'Dev Signet'
+                    : configuration.environment.name,
               ),
               _ConfigurationRow(
                 label: 'Indexer',

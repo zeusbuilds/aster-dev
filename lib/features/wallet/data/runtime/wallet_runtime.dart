@@ -1255,7 +1255,7 @@ final class WalletRuntime {
   }
 
   AppFailure? _profileConfigurationFailure(WalletProfile profile) {
-    if (!_services.backend.activationAllowed && !_localQualification) {
+    if (!_services.activationAllowed && !_localQualification) {
       return const AppFailure(
         code: 'wallet_backend_unqualified',
         kind: AppFailureKind.configuration,

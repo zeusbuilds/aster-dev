@@ -1,4 +1,5 @@
 import '../../../../core/config/app_environment.dart';
+import '../../../../core/config/signet_deployment.dart';
 import '../../../../core/errors/errors.dart';
 import 'wallet_fee.dart';
 
@@ -38,7 +39,12 @@ final class RgbWalletSetupReview {
         feeSource == WalletFeeRateSource.nativeRecovery ||
         (feeSource == WalletFeeRateSource.localRegtestPolicy &&
             (network != BlockchainEnvironment.regtest ||
-                feeRateSatPerVbyte != 1))) {
+                feeRateSatPerVbyte != 1)) ||
+        (feeSource == WalletFeeRateSource.devSignetPolicy &&
+            (network != BlockchainEnvironment.signet ||
+                identityKind != RgbSetupIdentityKind.nativeWallet ||
+                feeRateSatPerVbyte !=
+                    UtexoDevSignetPolicy.fallbackFeeSatsPerVbyte))) {
       throw const StoredDataCorruptionException();
     }
   }

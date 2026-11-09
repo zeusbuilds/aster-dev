@@ -17,31 +17,45 @@ abstract interface class SecureKeyValueStore {
 /// one Aster-owned namespace and are never imported from an earlier app schema
 /// or namespace. Corruption is surfaced instead of deleting data.
 final class SecureStorageService implements SecureKeyValueStore {
-  SecureStorageService({FlutterSecureStorage? storage})
+  SecureStorageService({FlutterSecureStorage? storage, bool devBridge = false})
     : _storage =
           storage ??
-          const FlutterSecureStorage(
-            iOptions: IOSOptions(
-              accountName: 'com.aster.wallet.secrets',
-              accessibility: KeychainAccessibility.unlocked_this_device,
-              synchronizable: false,
-            ),
-            aOptions: AndroidOptions(
-              resetOnError: false,
-              // Version 10.3.1 treats absent cipher markers as its historical
-              // defaults, including in a fresh namespace. This initializes the
-              // selected OAEP/GCM markers inside Aster's isolated namespace; it
-              // does not import an earlier app-owned wallet contract.
-              migrateOnAlgorithmChange: true,
-              // The plugin's backup path still addresses compatibility data.
-              // Aster has no released Android storage contract to recover.
-              migrateWithBackup: false,
-              keyCipherAlgorithm:
-                  KeyCipherAlgorithm.RSA_ECB_OAEPwithSHA_256andMGF1Padding,
-              storageCipherAlgorithm: StorageCipherAlgorithm.AES_GCM_NoPadding,
-              storageNamespace: 'aster_wallet_secrets',
-            ),
+          FlutterSecureStorage(
+            iOptions: devBridge ? _devIosOptions : _iosOptions,
+            aOptions: devBridge
+                ? _androidOptions.copyWith(
+                    storageNamespace: 'aster_devbridge_wallet_secrets',
+                  )
+                : _androidOptions,
           );
+
+  static const _iosOptions = IOSOptions(
+    accountName: 'com.aster.wallet.secrets',
+    accessibility: KeychainAccessibility.unlocked_this_device,
+    synchronizable: false,
+  );
+
+  static const _devIosOptions = IOSOptions(
+    accountName: 'com.aster.wallet.devbridge.secrets',
+    accessibility: KeychainAccessibility.unlocked_this_device,
+    synchronizable: false,
+  );
+
+  static const _androidOptions = AndroidOptions(
+    resetOnError: false,
+    // Version 10.3.1 treats absent cipher markers as its historical
+    // defaults, including in a fresh namespace. This initializes the
+    // selected OAEP/GCM markers inside Aster's isolated namespace; it
+    // does not import an earlier app-owned wallet contract.
+    migrateOnAlgorithmChange: true,
+    // The plugin's backup path still addresses compatibility data.
+    // Aster has no released Android storage contract to recover.
+    migrateWithBackup: false,
+    keyCipherAlgorithm:
+        KeyCipherAlgorithm.RSA_ECB_OAEPwithSHA_256andMGF1Padding,
+    storageCipherAlgorithm: StorageCipherAlgorithm.AES_GCM_NoPadding,
+    storageNamespace: 'aster_wallet_secrets',
+  );
 
   final FlutterSecureStorage _storage;
 

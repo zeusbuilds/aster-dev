@@ -15,14 +15,45 @@ release manifest. Aster's public Signet defaults select these public services
 rather than the native `utexo` carrier's historical Dev defaults.
 
 `ASTER_SIGNET_DEPLOYMENT` accepts `public` (the default) or `dev-signet`.
-The latter is explicitly blocked before wallet/native access. Known Dev service
-hosts and current/historical Dev asset IDs are also blocked if mixed into an
-ordinary profile. `dev-signet.evidence.json` records quarantined deployment
-evidence, including missing current contract bytes, checksum and verified
-precision. It is not a Flutter defines preset or an asset registry. The
-historical BFA.5 export cannot substitute for the current BFA.6 asset. RGB_L1
-remains gated separately; neither profile selection nor a debug build enables
-it.
+For hosted Dev wallet tests, use `config/dev-signet.debug.json` and the
+dedicated installed package `com.aster.devbridge.debug`. The preset sets
+`ASTER_DEV_BRIDGE_ENABLED=true` and pins RGB_L1, the Dev Signet endpoints,
+the Arbitrum One RPC and mint lock bounds, and the approved six-decimal BUSDT
+contract. Aster requires Debug mode and validates the exact preset and
+installed package identity before opening Dev storage. The test build uses
+its own wallet registry, native directories and secure-storage namespace.
+
+On Android, use JDK 17 and pass the dedicated application ID to the
+Flutter-launched Gradle process.
+
+```sh
+GRADLE_OPTS="-Dorg.gradle.java.home=$JAVA_HOME -Dorg.gradle.project.aster.applicationId=com.aster.devbridge" \
+  fvm flutter build apk --debug --target-platform android-arm64 \
+  --dart-define-from-file=config/dev-signet.debug.json
+```
+
+On iOS, generate the Debug configuration from the same preset, then build
+the simulator app with the dedicated bundle identifier.
+
+```sh
+fvm flutter build ios --debug --simulator --config-only \
+  --dart-define-from-file=config/dev-signet.debug.json
+xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner \
+  -configuration Debug -sdk iphonesimulator \
+  -derivedDataPath .buildlog/dev-bridge-ios \
+  ASTER_SIMULATOR_DEBUG_BUNDLE_IDENTIFIER=com.aster.devbridge.debug \
+  ARCHS=arm64 ONLY_ACTIVE_ARCH=YES build
+```
+
+On systems that need the scoped Xcode command wrapper, use the environment
+documented in the [development guide](../docs/DEVELOPMENT.md). Install the
+built app on the chosen simulator or Android test device and verify the
+installed identifier before first launch. See the
+[Dev Signet qualification record](../docs/architecture/DEV_SIGNET_READINESS.md).
+The hosted test preset is rejected by release configuration tooling. Known Dev
+service hosts and current or historical Dev asset IDs are also blocked in
+ordinary profiles. `dev-signet.evidence.json` preserves the older deployment
+record.
 
 Aster release artifacts consume one non-secret JSON manifest through Flutter's
 `--dart-define-from-file` option. Copy `release.example.json` to an ignored
@@ -44,9 +75,9 @@ unknown keys and no credentials, tokens, API keys, mnemonics, passwords, or
 other secrets. Compile-time values are recoverable from a mobile binary.
 
 `ASTER_WALLET_BACKEND` identifies the on-disk wallet format. Existing
-manifests default to `rln`. The validator rejects `rgb-l1` until Aster can
-recover an interrupted BTC or RGB send using durable, authoritative transaction
-identity on that backend. An RLN wallet directory cannot be opened as RGB_L1.
+manifests default to `rln`. Release configuration keeps `rgb-l1` gated pending
+approved restoration and signed deployment qualification. The separate Debug
+Dev wallet profile uses its own RGB_L1 storage.
 
 The example deliberately fails validation until all `REPLACE_ME` values are
 replaced with deployment-owned values. Local manifests and iOS export options
@@ -69,8 +100,8 @@ bounded canonical-encoding/digest checks. The adapter then imports with the
 expected asset ID and verifies BFA schema, native name, ticker and precision
 before it connects or generates the first asset-bound witness invoice.
 A checksum confirms reviewed bytes; issuer approval and native validation
-remain separate requirements. Missing current Dev bytes must not be filled
-with the historical BFA.5 export. RGB_L1 and Dev gates remain closed.
+remain separate requirements. The dedicated Dev preset pins the current export
+and excludes the historical BFA.5 asset. Production RGB_L1 remains gated.
 
 `ASTER_USDT_PRECISION` is the asset's canonical decimal precision from `0`
 through `18`. Negative, signed, padded, or out-of-range values fail before any
@@ -81,8 +112,8 @@ service: `ASTER_BFA_MIN_MINT_LOCK_BLOCKS` and
 `ASTER_BFA_MAX_MINT_LOCK_BLOCKS`. Supply both canonical decimal counts of backing EVM blocks,
 with `2 <= minimum <= maximum`. There is no default. Aster forwards the explicit
 range together with the RPC and expected chain ID to the RGB_L1 native runtime.
-The previous Iris candidate's test bounds do not approve the current Dev policy;
-the issuer/bridge team must confirm it. RLN rejects these unused RGB_L1 fields.
+The hosted Dev test preset matches the current Iris candidate's Arbitrum
+policy of 2–7,200 blocks. RLN rejects these unused RGB_L1 fields.
 
 `ASTER_ETH_RPC_URL` is required, credential-free HTTPS configuration for native
 BFA validation. `ASTER_ETH_CHAIN_ID` is the deployment-approved EVM backing
@@ -117,7 +148,7 @@ rather than requiring incompatible VSS. An internal BTC-only candidate may omit
 USDT/EVM settings; supplying USDT requires the complete approved contract plus
 RPC, canonical positive uint64 chain ID and both mint-lock bounds. Public
 Aster's BTC/USDT product still requires that complete USDT deployment. Structural
-validation does not lift the final RGB_L1 release gate, and no compile-time flag
-can approve backend activation or RGB backup freshness. The separate Debug-only
-local qualification entrypoint is documented in
+validation does not lift the final RGB_L1 release gate. Dev is a separate Debug
+test build, and restored RGB backups remain inspection-only. The separate
+Debug-only local qualification entrypoint is documented in
 [RGB_L1_ACTIVATION_QUALIFICATION.md](../docs/architecture/RGB_L1_ACTIVATION_QUALIFICATION.md).

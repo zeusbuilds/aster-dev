@@ -435,8 +435,7 @@ final class WalletPaymentOperations {
   bool _isValidReview(WalletFeeRateEstimate? review) =>
       review != null &&
       !review.isStaleAt(_clock()) &&
-      (review.source != WalletFeeRateSource.localRegtestPolicy ||
-          _services.environment == BlockchainEnvironment.regtest);
+      review.source.appliesTo(_services);
 
   static AppResult<WalletAmount?> _amountForRoute(
     PaymentRoute route,

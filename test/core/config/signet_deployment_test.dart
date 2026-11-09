@@ -2,7 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:aster/core/core.dart';
+import 'package:aster/features/wallet/data/runtime/runtime.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../../support/dev_bridge_fixture.dart';
 
 void main() {
   test('USDT validation defaults fail closed for BFA and public preset is BTC only', () {
@@ -50,7 +53,7 @@ void main() {
     expect(public.signetDeployment, SignetDeployment.publicBitcoin);
   });
 
-  test('Dev remains blocked for every network and backend combination', () {
+  test('Dev remains blocked without explicit opt-in', () {
     for (final network in BlockchainEnvironment.values) {
       for (final backend in WalletBackend.values) {
         final configuration = WalletServiceConfiguration(
@@ -65,6 +68,42 @@ void main() {
           reason: '${network.name}/${backend.wireName}',
         );
       }
+    }
+  });
+
+  test('only the exact hosted Dev profile admits RGB_L1', () {
+    final exact = devBridgeServices();
+    expect(exact.validate, returnsNormally);
+    expect(exact.activationAllowed, isTrue);
+    expect(RgbWalletServiceConfigurationResolver.resolve(exact), exact);
+    expect(exact.transactionExplorerUri('a' * 64), isNull);
+
+    final base64 = readDevBridgeFixture()['ASTER_USDT_CONTRACT_BASE64']!;
+    final changedBytes = 'A${base64.substring(1)}';
+    final replacements = {
+      UtexoDevSignetPolicy.buildFlag: 'false',
+      'ASTER_NETWORK': 'mainnet',
+      'ASTER_WALLET_BACKEND': 'rln',
+      'ASTER_SIGNET_DEPLOYMENT': 'public',
+      'ASTER_INDEXER_URL': 'https://mempool.space/signet/api',
+      'ASTER_RGB_PROXY_URL': 'rpcs://proxy.iriswallet.com/0.2/json-rpc',
+      'ASTER_ETH_RPC_URL': 'https://arbitrum.example/rpc',
+      'ASTER_ETH_CHAIN_ID': '31337',
+      'ASTER_BFA_MAX_MINT_LOCK_BLOCKS': '7201',
+      'ASTER_EXPLORER_URL': 'https://mempool.space/signet',
+      'ASTER_USDT_ASSET_ID': UtexoDevSignetPolicy.historicalBfa5AssetId,
+      'ASTER_USDT_PRECISION': '8',
+      'ASTER_USDT_NATIVE_NAME': 'USDT',
+      'ASTER_USDT_NATIVE_TICKER': 'USDT',
+      'ASTER_USDT_CONTRACT_BASE64': changedBytes,
+      'ASTER_USDT_CONTRACT_SHA256': 'a' * 64,
+    };
+    for (final MapEntry(:key, :value) in replacements.entries) {
+      expect(
+        devBridgeServices({key: value}).validate,
+        throwsA(isA<AppConfigurationException>()),
+        reason: key,
+      );
     }
   });
 

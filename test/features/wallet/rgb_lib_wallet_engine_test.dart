@@ -12,6 +12,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rgb_sdk_flutter/rgb_sdk_flutter.dart';
 
+import '../../support/dev_bridge_fixture.dart';
 import '../../support/wallet_fakes.dart';
 
 const _channel = MethodChannel('com.utexo.rgb_sdk_flutter/rgb_lib');
@@ -413,6 +414,110 @@ void main() {
     databasePassword: 'database-password-fixture',
     mnemonic: _mnemonic,
   );
+
+  test('Dev preview and fee fallback enforce the exact profile', () async {
+    final dev = devBridgeServices();
+    final contractId = dev.usdtAsset!.contractId;
+    final route = PaymentRoute(
+      asset: WalletAsset.rgbUsdt(assetId: contractId, precision: 6),
+      rail: PaymentRail.onchain,
+    );
+    String? invoiceAssetId = contractId;
+    var endpoints = [UtexoDevSignetPolicy.rgbTransportProxy];
+    var feeResponse = 3.5;
+    String? feeError;
+    dispatch = (call) {
+      switch (call.method) {
+        case 'getRuntimeInfo':
+          return {
+            ...reply(call)! as Map<String, Object?>,
+            'supportsHostedDevSignet': true,
+          };
+        case 'getWalletIdentity':
+          return {...reply(call)! as Map<String, Object?>, 'network': 'utexo'};
+        case 'importContract':
+          return {
+            ...reply(call)! as Map<String, Object?>,
+            'assetId': contractId,
+          };
+        case 'decodeInvoice':
+          return {
+            ...reply(call)! as Map<String, Object?>,
+            'network': 'signet',
+            'assetId': invoiceAssetId,
+            'transportEndpoints': endpoints,
+          };
+        case 'estimateFeeRate':
+          if (feeError case final code?) throw PlatformException(code: code);
+          return feeResponse;
+        default:
+          return reply(call);
+      }
+    };
+    final devEngine = RgbLibWalletEngine(
+      dev,
+      storageDirectory: storage.path,
+      localNetworkAccess: _NetworkAccess(),
+      evmChainValidator: _ChainValidator(),
+      walletFactory: (keys) {
+        signingReader = keys;
+        return RgbLibWallet(
+          params: RgbLibWalletParams(
+            network: 'utexo',
+            storageDirPath: '${storage.path}/rgb-l1',
+            allowUtexoDevSignet: true,
+          ),
+          keys: keys,
+        );
+      },
+    );
+    addTearDown(devEngine.destroy);
+    await devEngine.provision(
+      databasePassword: 'database-password-fixture',
+      mnemonic: _mnemonic,
+    );
+
+    final accepted = await devEngine.decodeInvoice(route, 'rgb:dev-fixture');
+    expect(accepted.route.asset.id.value, contractId);
+    expect(accepted.amount?.units, 1000000);
+    invoiceAssetId = null;
+    await expectLater(
+      devEngine.decodeInvoice(route, 'rgb:assetless-fixed-fixture'),
+      throwsA(isA<WalletValidationException>()),
+    );
+    decodedAmount = null;
+    final neutral = await devEngine.decodeInvoice(route, 'rgb:neutral-fixture');
+    expect(neutral.route.asset.id.value, contractId);
+    expect(neutral.amount, isNull);
+    invoiceAssetId = contractId;
+    endpoints = [
+      UtexoDevSignetPolicy.rgbTransportProxy,
+      'rpcs://proxy.example/json-rpc',
+    ];
+    await expectLater(
+      devEngine.decodeInvoice(route, 'rgb:proxy-substitution-fixture'),
+      throwsA(isA<WalletValidationException>()),
+    );
+
+    final live = await devEngine.estimateFeeRate(6);
+    expect(live.satsPerVbyte, 4);
+    expect(live.source, WalletFeeRateSource.networkEstimate);
+
+    feeError = 'RGB_LIB_CannotEstimateFees';
+    final fallback = await devEngine.estimateFeeRate(6);
+    expect(fallback.satsPerVbyte, 1);
+    expect(fallback.source, WalletFeeRateSource.devSignetPolicy);
+    expect(fallback.source.appliesTo(services), isFalse);
+
+    feeError = 'RGB_LIB_Indexer';
+    await expectLater(
+      devEngine.estimateFeeRate(6),
+      throwsA(isA<RgbLibWalletException>()),
+    );
+    feeError = null;
+    feeResponse = double.nan;
+    await expectLater(devEngine.estimateFeeRate(6), throwsA(isA<Exception>()));
+  });
 
   test('fresh creation rejects a wrapper unable to reopen existing-only before signing', () async {
     existingOnlyOpen = false;

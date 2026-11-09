@@ -1,8 +1,9 @@
 # RGB_L1 activation qualification
 
-The product backend gate remains closed. Dev Signet remains quarantined. A
-passing local mechanism campaign is not approval of a public contract,
-mainnet services, portable RGB recovery or a signed store release.
+The product backend gate remains closed. This record covers the local BFA.7
+mechanism campaign. The hosted Dev test profile has a separate
+[qualification record](DEV_SIGNET_READINESS.md). Public deployment, portable
+RGB recovery and signed store release still require their own qualification.
 
 ## Current boundaries
 
@@ -10,10 +11,10 @@ mainnet services, portable RGB recovery or a signed store release.
 | --- | --- | --- |
 | Native consumer | Final `.2` / `8ac556ee…` has separate host, 20 funded mobile case and 14 existing-only-open mobile case evidence in the SDK. | Requalify affected behavior on any successor archive. An older source's execution is historical evidence only. |
 | Aster runtime | Actual iOS 27 and Android 17 flows passed registration, Create/quiz/naming, lifecycle, BTC/RGB receive/send, exact history and intact-store process reopen. Android proved the app's one-confirmation receive policy from an unconfirmed receipt. | Preserve exact source/artifact/proof admission. These Debug regtest campaigns do not qualify a signed store binary or public deployment. |
-| Qualification entrypoint | A Debug-only regtest constructor uses an actual IO manager below `aster_full_wallet_qa/<run>/native`. Ordinary factory, resolver and runtime admission remain closed. | A uniquely named retained run, admitted existing fixture and sequential financial window. Release/Profile and public/Dev chains cannot use this constructor. |
+| Qualification entrypoint | A Debug-only regtest constructor uses an actual IO manager below `aster_full_wallet_qa/<run>/native`. Product factory, resolver and runtime admission remain closed. | A uniquely named retained run, admitted existing fixture and sequential financial window. Release/Profile and public/Dev chains cannot use this constructor. |
 | Partial RGB cancellation | Details-only reviewed action uses the distinct native revocation API and verified archive capability. The final SDK records sealed signed-revocation and both mobile ABI proofs; Aster's action ownership has targeted tests. Check never gains this external mutation permission. | Retain archive/capability admission. Controlled Aster UI screenshots are fixtures, not an additional real revocation execution. |
 | Backup freshness | Stale coherent backups retain quarantine. Seed import does not reconstruct RGB state. | No approved freshness service exists. Portable full-RGB restore and unrestricted restored-wallet spending cannot be claimed or enabled. |
-| Public deployment | Contract bytes/digest, identity, metadata and EVM lock policy are explicit. | Approve and fund the actual public deployment. Local QBFA is not public USDT. Dev remains blocked independently. |
+| Public deployment | Contract bytes/digest, identity, metadata and EVM lock policy are explicit. | Approve and fund the actual public deployment. Local QBFA and hosted Dev BUSDT use separate deployment identities. |
 | Release configuration | L1 rejects LSP/VSS. Internal BTC-only validation no longer requires incompatible VSS; public BTC/USDT still requires complete approved USDT metadata and EVM policy. | Final release admission remains closed after structural validation. |
 | iOS privacy | App-owned FileTimestamp C617.1 is declared. The unsupported app-owned DiskSpace E174.1 claim was removed. | Native call-path disposition and final signed-app required-API/aggregate privacy evidence. Legacy RLN's independent finding remains unresolved. |
 | Delivery | Complete 64-bit Android ABI selection and bounded package gates exist. | Exact final Aster signed release, ABI/ELF/ZIP, privacy and distribution-identity evidence; no simulator/debug success substitutes for these. |

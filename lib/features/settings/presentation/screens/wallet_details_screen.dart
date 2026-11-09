@@ -238,7 +238,10 @@ final class _WalletDetails extends StatelessWidget {
         label: 'Network',
         value: switch (profile.environment) {
           BlockchainEnvironment.mainnet => 'Mainnet',
-          BlockchainEnvironment.signet => 'Signet',
+          BlockchainEnvironment.signet =>
+            profile.signetDeployment == SignetDeployment.utexoDev
+                ? 'Dev Signet'
+                : 'Signet',
           BlockchainEnvironment.regtest => 'Regtest',
         },
       ),

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 
 import '../../../../core/config/app_environment.dart';
+import '../../../../core/config/signet_deployment.dart';
 import '../../../../core/errors/errors.dart';
 import '../../domain/models/models.dart';
 import '../runtime/runtime.dart';
@@ -1370,8 +1371,11 @@ final class WalletPaymentSubmissions {
           (fee.source == WalletFeeRateSource.nativeRecovery)) {
         throw const FormatException();
       }
-      if (fee.source == WalletFeeRateSource.localRegtestPolicy &&
-          profile.environment != BlockchainEnvironment.regtest) {
+      if ((fee.source == WalletFeeRateSource.localRegtestPolicy &&
+              profile.environment != BlockchainEnvironment.regtest) ||
+          (fee.source == WalletFeeRateSource.devSignetPolicy &&
+              (profile.signetDeployment != SignetDeployment.utexoDev ||
+                  profile.backend != WalletBackend.rgbL1))) {
         throw const FormatException();
       }
       final command = WalletSendCommand(

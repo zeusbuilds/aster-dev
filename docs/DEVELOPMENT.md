@@ -284,9 +284,11 @@ Fresh native-cache acquisition passed through the actual SDK Android Gradle
 verification task and the iOS installer, including all Apple framework slices,
 with no local archive overrides or authentication. Public downloads match the
 same immutable sizes and SHA-256 values; no SDK pin change is needed.
-RGB_L1 and Dev activation remain closed. The release's qualification record and
-the SDK's `doc/BFA7_QUALIFICATION.md` distinguish distribution and isolated
-native/mobile transfer evidence from the remaining product/deployment gates.
+Production RGB_L1 activation remains closed. The release's qualification
+record and the SDK's `doc/BFA7_QUALIFICATION.md` document distribution and
+isolated transfer evidence. See the
+[Dev Signet build instructions](../config/README.md) for the separate hosted
+test build.
 
 ### iOS Release Archives
 

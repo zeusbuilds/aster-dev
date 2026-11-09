@@ -41,6 +41,7 @@ final class RgbLibWalletEngine
           params: RgbLibWalletParams(
             network: _services.sdkNetwork,
             storageDirPath: _nativeStorageDirectory,
+            allowUtexoDevSignet: _services.devBridgeEnabled,
           ),
           keys: keys,
         );
@@ -510,15 +511,27 @@ final class RgbLibWalletEngine
         field: 'targetBlocks',
       );
     }
-    final local = _services.environment == BlockchainEnvironment.regtest;
-    final rate = local ? 1 : await _wallet.estimateFeeRate(targetBlocks);
+    int rate;
+    var source = WalletFeeRateSource.networkEstimate;
+    if (_services.environment == BlockchainEnvironment.regtest) {
+      rate = 1;
+      source = WalletFeeRateSource.localRegtestPolicy;
+    } else {
+      try {
+        rate = await _wallet.estimateFeeRate(targetBlocks);
+      } on RgbLibWalletException catch (error) {
+        if (!_services.devBridgeEnabled || error.code != 'FEE_UNAVAILABLE') {
+          rethrow;
+        }
+        rate = UtexoDevSignetPolicy.fallbackFeeSatsPerVbyte;
+        source = WalletFeeRateSource.devSignetPolicy;
+      }
+    }
     return WalletFeeRateEstimate(
       targetBlocks: targetBlocks,
       satsPerVbyte: rate,
       observedAt: _clock().toUtc(),
-      source: local
-          ? WalletFeeRateSource.localRegtestPolicy
-          : WalletFeeRateSource.networkEstimate,
+      source: source,
     );
   }
 
@@ -567,6 +580,14 @@ final class RgbLibWalletEngine
       throw const WalletValidationException(
         'Invoice does not match the selected asset.',
         field: 'assetId',
+      );
+    }
+    if (_services.devBridgeEnabled &&
+        (decoded.transportEndpoints.length != 1 ||
+            decoded.transportEndpoints.single != _services.rgbTransportProxy)) {
+      throw const WalletValidationException(
+        'Invoice does not use the Dev Signet RGB proxy.',
+        field: 'invoice',
       );
     }
     final recipientType = switch (decoded.recipientType) {
@@ -689,8 +710,7 @@ final class RgbLibWalletEngine
     final fee = command.feeRate;
     if (fee == null ||
         (fresh && fee.isStaleAt(_clock())) ||
-        (fee.source == WalletFeeRateSource.localRegtestPolicy &&
-            _services.environment != BlockchainEnvironment.regtest)) {
+        !fee.source.appliesTo(_services)) {
       throw const AppFailureException(walletFeeReviewRequiredFailure);
     }
     if (command.route.asset.kind == WalletAssetKind.bitcoin) {

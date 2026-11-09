@@ -466,9 +466,13 @@ final class _AmountBody extends StatelessWidget {
               children: [
                 DetailRow(
                   title: state.route.rail == PaymentRail.onchain
-                      ? fee?.source == WalletFeeRateSource.localRegtestPolicy
-                            ? 'Local test fee rate'
-                            : 'Network fee rate'
+                      ? switch (fee?.source) {
+                          WalletFeeRateSource.localRegtestPolicy =>
+                            'Local test fee rate',
+                          WalletFeeRateSource.devSignetPolicy =>
+                            'Dev Signet fee rate',
+                          _ => 'Network fee rate',
+                        }
                       : 'Payment rail',
                   value: state.route.rail == PaymentRail.onchain
                       ? fee == null || fee.isStaleAt(now)

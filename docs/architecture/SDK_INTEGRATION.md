@@ -469,8 +469,8 @@ signet services and is never treated as a fourth blockchain.
 
 Public Signet and UTEXO Dev Signet are different chain histories. The legacy
 RLN SDK's `utexo` carrier does not authorize Dev access. Known Dev service
-hosts and its historical/current BUSDT identifiers are quarantined while Dev
-is unqualified. See [Dev Signet readiness](DEV_SIGNET_READINESS.md) for the exact
+hosts and BUSDT identifiers are rejected outside the dedicated Debug Dev
+profile. See [Dev Signet readiness](DEV_SIGNET_READINESS.md) for the exact
 checkpoint, native generation, metadata and remaining qualification work.
 
 ## Credential Ownership

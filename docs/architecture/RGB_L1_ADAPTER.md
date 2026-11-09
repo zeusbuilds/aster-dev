@@ -3,10 +3,11 @@
 The RGB_L1 adapter is implemented behind Aster's existing activation and release
 gates. `WalletBackend.activationAllowed` remains false for RGB_L1. The resolver,
 factory and runtime reject product activation; runtime does so before creating
-directories, persisting credentials or constructing a native engine. There is
-no compile-time override that enables this gate. Native adapter tests construct
-their isolated boundary directly and do not enable a product wallet. The separate
-integration entrypoint additionally uses a typed Debug-only regtest constructor
+directories, persisting credentials or constructing a native engine. The
+[dedicated Dev Signet Debug build](DEV_SIGNET_READINESS.md) uses the adapter
+under its own exact deployment and app identity checks. Native adapter tests
+construct their isolated boundary directly. The local integration entrypoint
+uses a separate typed Debug-only regtest constructor
 with owned `aster_full_wallet_qa/<run>/native` storage and explicit loopback
 services. Profile/Release, public chains, Dev and ordinary storage are rejected;
 normal app composition cannot select that constructor.
@@ -17,8 +18,8 @@ RGB_L1 USDT configuration requires the exact contract ID and precision plus the
 issuer-approved public genesis Base64, its SHA-256, and the native name/ticker.
 Runtime and release tooling share bounded canonical encoding/digest validation.
 The digest identifies approved bytes; it does not independently authenticate an
-issuer or approve a deployment. Dev remains blocked and its historical BFA.5
-export is not used as the newly issued asset.
+issuer or approve a deployment. The Dev test profile uses the current canonical
+export and excludes the historical BFA.5 asset.
 
 Activation first verifies the backing EVM chain and required native capabilities.
 For an already imported asset, it reads and verifies the existing native

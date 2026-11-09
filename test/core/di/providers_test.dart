@@ -4,14 +4,17 @@ import 'dart:io';
 import 'package:aster/core/bootstrap/app_bootstrap.dart';
 import 'package:aster/core/core.dart';
 import 'package:aster/features/scan/domain/models/models.dart';
+import 'package:aster/features/wallet/data/runtime/runtime.dart';
 import 'package:aster/features/wallet/data/storage/storage.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../support/dev_bridge_fixture.dart';
 import '../../support/scan_fakes.dart';
 import '../../support/wallet_fakes.dart';
 
@@ -152,6 +155,69 @@ void main() {
       'rpcs://proxy.iriswallet.com/0.2/json-rpc',
     );
   });
+
+  for (final dedicated in [false, true]) {
+    test(
+      'Dev wallet storage requires its dedicated application ID ($dedicated)',
+      () async {
+        final support = await Directory.systemTemp.createTemp(
+          'aster-dev-test-',
+        );
+        addTearDown(() => support.delete(recursive: true));
+        final messenger = TestWidgetsFlutterBinding.ensureInitialized()
+            .defaultBinaryMessenger;
+        const paths = MethodChannel('plugins.flutter.io/path_provider');
+        var pathRequests = 0;
+        messenger.setMockMethodCallHandler(paths, (call) async {
+          expect(call.method, 'getApplicationSupportDirectory');
+          pathRequests += 1;
+          return support.path;
+        });
+        addTearDown(() => messenger.setMockMethodCallHandler(paths, null));
+        PackageInfo.setMockInitialValues(
+          appName: 'Aster',
+          packageName: dedicated
+              ? UtexoDevSignetPolicy.applicationId
+              : 'com.example.asterdev.debug',
+          version: '1.0.0',
+          buildNumber: '1',
+          buildSignature: '',
+        );
+        final container = ProviderContainer(
+          retry: applicationProviderRetryPolicy,
+          overrides: [
+            walletServiceConfigurationProvider.overrideWithValue(
+              devBridgeServices(),
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+        final documents = container.read(
+          walletRegistryDocumentStoreProvider.future,
+        );
+        final directories = container.read(
+          walletDirectoryManagerProvider.future,
+        );
+        if (dedicated) {
+          expect(
+            (await documents as IoWalletRegistryDocumentStore).rootPath,
+            '${support.path}/aster_devbridge_wallet_metadata',
+          );
+          expect(
+            (await directories as IoWalletDirectoryManager).rootPath,
+            '${support.path}/aster_devbridge_wallets',
+          );
+          expect(pathRequests, 2);
+        } else {
+          await Future.wait([
+            expectLater(documents, throwsA(isA<AppConfigurationException>())),
+            expectLater(directories, throwsA(isA<AppConfigurationException>())),
+          ]);
+          expect(pathRequests, 0);
+        }
+      },
+    );
+  }
 
   test('wallet repository remains mounted across async composition', () async {
     SharedPreferences.setMockInitialValues({});

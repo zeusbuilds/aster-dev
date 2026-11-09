@@ -17,14 +17,25 @@ enum SignetDeployment {
   };
 }
 
-/// Quarantine for deployment evidence that is not a usable wallet profile.
-///
-/// The current Dev contract export is missing, the recorded BFA.5 contract is
-/// historical, and Aster's RGB_L1 runtime remains unqualified. Merely supplying
-/// these service URLs or asset IDs must not bypass the explicit profile gate.
+/// Exact deployment binding for the dedicated Dev Bridge test build.
+/// Mainnet and public Signet must reject these service hosts and assets.
 abstract final class UtexoDevSignetPolicy {
+  static const buildFlag = 'ASTER_DEV_BRIDGE_ENABLED';
+  static const applicationId = 'com.aster.devbridge.debug';
+  static const indexerUrl = 'https://dev.esplora-01.mint.utexo.com';
+  static const rgbTransportProxy = 'rpcs://dev.rgb-proxy.utexo.com/json-rpc';
+  static const evmRpcUrl = 'https://arb1.arbitrum.io/rpc';
+  static const evmChainId = '42161';
+  static const minimumMintLockBlocks = 2;
+  static const maximumMintLockBlocks = 7200;
+  static const fallbackFeeSatsPerVbyte = 1;
+  static const nativeAssetName = 'Bridged USDT';
+  static const nativeAssetTicker = 'BUSDT';
+  static const assetPrecision = 6;
   static const currentAssetId =
       'rgb:A6k89KtR-e3oXqRP-uH3jUrz-LU_sYL3-hMZ0k3O-6u8DXbE';
+  static const currentContractSha256 =
+      '60a1b4f0d79706a7a51c6388fa14b951e119bae1ceffd811f4ebc62249817c4c';
   static const historicalBfa5AssetId =
       'rgb:fbkO6B_i-qyLXa6d-x3sAOaX-cx~vZB9-rxNSUle-9lXBTf8';
   static const historicalDevAssetId =

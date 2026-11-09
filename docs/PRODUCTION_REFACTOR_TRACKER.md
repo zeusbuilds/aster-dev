@@ -43,24 +43,16 @@ TEST-019 and PERF-015 remain blocked.
 
 ## Scope And Status
 
-### November 7 Dev Signet compatibility review
+### November 9 hosted Dev Signet candidate
 
-The Iris/WDK chat and current primary deployment records distinguish public
-Signet from UTEXO Dev Signet, and historical BFA.5 BUSDT from Dev's newly issued
-BFA.6 asset. Flutter's new candidate uses matching BFA.7 source with native
-standalone registration and durable recovery; Iris's Bare candidate is a
-separate BFA.7 integration. The old export cannot configure the new asset. The explicit
-Dev profile, known Dev service hosts and both asset identifiers remain blocked
-before native wallet access; Aster's existing RGB_L1 factory/release gates stay
-closed. Public-network USDT requires its backing RPC and explicit EVM chain.
-See `docs/architecture/DEV_SIGNET_READINESS.md` for exact identities, missing
-contract approval, exact-artifact/deployment qualification and acceptance criteria.
-Source checks and host tests do not establish funded Signet qualification.
-The app adapter can discover authenticated native pending operations and
-accepted receipts after app-record loss, without replaying Commit. Restored
-native snapshots remain fenced until freshness can be established; their
-absence of a send does not prove nonexecution. See `RGB_L1_ADAPTER.md` and
-`DEV_USDT_TEAM_INPUTS.md` in `docs/architecture`.
+The dedicated Debug build pins the Dev Signet checkpoint and the current
+six-decimal BUSDT export used by Iris alpha.14. It requires a separate installed
+package, wallet registry, native directory and credential namespace. Mainnet
+and public Signet reject Dev service and asset substitutions. Funded hosted
+transfers and bridge settlement remain separate checks. See
+\`docs/architecture/DEV_SIGNET_READINESS.md\` for deployment identity and build
+scope. Restored RGB snapshots remain inspection-only until freshness can be
+established. See \`docs/architecture/RGB_L1_ADAPTER.md\`.
 
 ### October 24 durable payment recovery candidate
 
@@ -1237,9 +1229,9 @@ Baseline screenshots are stored in `docs/release/evidence/baseline/`.
 | ID | Severity | Area | Status | Finding | Evidence | Fix commit | Verification |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 
-| DEV-001 | P1 | Dev Signet compatibility | blocked | Dev uses a distinct Signet checkpoint and BFA.6 BUSDT. The Flutter candidate now uses compatible BFA.7 source with separately versioned matching native libraries, but exact-artifact, backup-freshness and hosted deployment qualification remain. Historical BFA.5 contracts and public Signet endpoints are incompatible substitutes. | November 7 Iris chat/config review, WDK PR 23, DevOps 217/218, BFA7_LOCAL_QUALIFICATION_REFERENCE.md and DEV_SIGNET_READINESS.md | November 7 BFA.7 candidate | Explicit Dev selection, known service hosts and asset IDs still fail before native wallet access. Keep RGB_L1 gated until approved current contract/hash/metadata, backing deployment, checkpoint enforcement, durable recovery and funded mobile acceptance are established. |
-| DEV-002 | P1 | Dev asset metadata bootstrap | blocked | Native standalone genesis registration and Aster exact-ID/schema/name/ticker/precision bootstrap are implemented. The current Dev export, digest and verified precision remain unapproved, so the hosted asset cannot be admitted. | Native zero-balance/idempotent registration tests, app adapter/bootstrap tests, Iris reference and Dev issuance record | November 7 BFA.7 candidate | Obtain the issuer-approved current export and metadata; qualify asset-bound first witness receive and exact funded transfer/restart on both mobile platforms. Registration never credits a balance. Historical metadata remains evidence only. |
-| DEV-003 | P1 | Saved Signet deployment identity | verified | A saved Signet wallet previously recorded only network and backend, allowing a change from former Dev defaults to public services to reopen the same storage against another chain. | Profile persistence, provisioning and runtime configuration regression tests; independent source review | November 7 working tree | New create/import records explicitly persist Signet deployment. Old records remain readable with unknown identity and fail activation before secret reads or native opening; rename, mixed-registry writes and restarts do not assign them public identity. Full Dev checkpoint/native qualification remains DEV-001. |
+| DEV-001 | P1 | Dev Signet compatibility | blocked | Hosted Dev uses a distinct Signet checkpoint, RGB proxy 1.0, and BFA.7-compatible BUSDT. Its exact Debug test profile has a separate package and wallet. | Iris alpha.14, hosted Dev configuration and DEV_SIGNET_READINESS.md | November 9 hosted Dev candidate | Exact profile admission, package isolation and Dev-only fee behavior have focused tests. Funded hosted transfer, bridge settlement and release approval remain separate. |
+| DEV-002 | P1 | Dev asset metadata bootstrap | blocked | The approved current BUSDT export, digest and precision are pinned. Aster verifies native ID, schema, name, ticker and precision before admitting the asset. | Iris alpha.14 public contract, exact configuration tests and native standalone registration tests | November 9 hosted Dev candidate | Verify funded transfer, balance and restart for the exact hosted contract. Metadata registration never credits a balance. |
+| DEV-003 | P1 | Saved Signet deployment identity | verified | A saved Signet wallet previously recorded only network and backend, allowing a change from former Dev defaults to public services to reopen the same storage against another chain. | Profile persistence, provisioning and runtime configuration regression tests; independent source review | November 7 working tree | New create/import records explicitly persist Signet deployment. Old records remain readable with unknown identity and fail activation before secret reads or native opening; rename, mixed-registry writes and restarts do not assign them public identity. Hosted deployment qualification remains DEV-001. |
 
 | ONCHAIN-001 | P1 | Ordinary Send lost-response restart safety | verified | Ordinary Send previously retained an unknown outcome only in RAM, so restart lost its mutation fence and Activity was blocked. | Durable crash/storage fault matrix, exact-ack/restart tests, Activity/VM widgets, consolidated 283-test focused run | October 16 working tree | October 24 local candidate: version 3 intent distinguishes pre-Commit non-send from authorized unknown; one exact status read can recover a lost Commit reply. Durable native Accepted returns success even if required App receipt persistence needs fenced repair. Read-only Activity/status remain available; legacy unidentified records and publication/platform gates remain open. |
 | ONCHAIN-002 | P1 | Recovery phrase clipboard expiry guarantee | verified | Ordinary clipboard copy and Dart timers could not protect preview/history or guarantee erasure after termination. | No-platform-call adapter/command tests, onboarding widget regression and independent review | October 16 working tree | Recovery phrase copying is disabled at command/platform boundaries and the Copy affordance is removed; offline record and confirmation remain. No claim is made that this clears an older process clipboard. |
@@ -1906,6 +1898,7 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `assets/texture/noise.jpg` | Asset | blocked | ASSET-002, PERF-003 | Source is reduced to 1600x1066 and runtime decode is viewport-bounded; checksum/dimensions pass, but authored-art clearance remains unevidenced | `31b5264` |
 | `assets/texture/shape.png` | Asset | blocked | ASSET-002, PERF-003 | Source is reduced to 600x600 with alpha and its market consumer is bounded; checksum/dimensions pass, but authored-art clearance remains unevidenced | `31b5264` |
 | `config/README.md` | Project configuration | verified | BUILD-042, CONFIG-010, CONFIG-011, CONFIG-013, SDK-014 | Non-secret manifests and optional bounded/distinct native listeners match runtime, release parser, and policy tests; October 13 upgrade: changed file reviewed against SDK 7c44506, strict source gates and 975 tests pass; platform compilation and remaining qualification boundaries recorded above | `1a7ca65` |
+| `config/dev-signet.debug.json` | Project configuration | verified | DEV-001, DEV-002 | Current Iris BUSDT bytes, explicit Dev opt-in and exact profile; negative substitution and release-exclusion tests. | November 9 hosted Dev candidate |
 | `config/dev-signet.evidence.json` | Project configuration | unreviewed | - | - | - |
 | `config/release.example.json` | Project configuration | verified | BUILD-042 | Sorted deliberately invalid public template fails closed until every release-owned value is supplied | - |
 | `config/signet-public.debug.json` | Project configuration | unreviewed | - | - | - |
@@ -1951,6 +1944,7 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `flake.lock` | Project configuration | blocked | BUILD-003 | Version-7 graph is valid JSON with immutable 40-character revisions and nar hashes matching `flake.nix`; executable Nix evaluation remains unavailable on this host | - |
 | `flake.nix` | Project configuration | blocked | BUILD-003, BUILD-010, BUILD-016, BUILD-021, BUILD-049 | Common development inputs explicitly include Python 3; pinned Android SDK/NDK and macOS Ruby/Bundler contracts remain. Static cross-file policy is verified; executable Nix evaluation remains independently blocked | `3398545`, `de928a8`, `60cc8ad`, working tree |
 | `integration_test/full_wallet_flow_test.dart` | Test | reviewed-clean | SDK-010, TEST-019 | The binding retains framework failures through consumed exception slots. Final iOS J/Android K full configured onchain and cold-process restore runs pass with unchanged source/SDK/configuration and verified closed backups; earlier failed reports remain failed. | working tree |
+| `integration_test/hosted_dev_wallet_smoke_test.dart` | Test | verified | DEV-001, DEV-002 | Dedicated installed identity; hosted fresh wallet, BTC and BUSDT receive smoke on Android and iOS. No funded transfer. | November 9 hosted Dev candidate |
 | `integration_test/presentation_performance_test.dart` | Test | verified | PERF-001, PERF-004, PERF-006, PERF-007, TEST-004, TEST-008, PERF-012, TOOL-005, MOTION-003 | The benchmark fails closed outside its isolated wrapper, proves the mounted Import painter is the retained painted snapshot, preserves split frame/retention budgets, and passes twice on exact `59cba0a` with a verified host renderer. | `a2530ff`, `7a2ca03`, `ba34011`, `59cba0a` |
 | `integration_test/rgb_l1_home_observation_test.dart` | Test | verified | SDK-010, DEV-001 | Source review, final immutable-SDK 2053-test App suite, 17 focused Home/revocation tests, fatal analyzer and final 8ac iOS/Android funded/cold proof; qualification-only and product/Dev gates remain closed | Working tree; BFA.7 qualification 2026-11-08 |
 | `integration_test/rgb_l1_wallet_flow_test.dart` | Test | verified | SDK-010, DEV-001 | Source review, final immutable-SDK 2053-test App suite, 17 focused Home/revocation tests, fatal analyzer and final 8ac iOS/Android funded/cold proof; qualification-only and product/Dev gates remain closed | Working tree; BFA.7 qualification 2026-11-08 |
@@ -2677,6 +2671,7 @@ line-by-line review; inventory synchronization is not evidence of correctness.
 | `test/shared/ui_audit_regression_test.dart` | Test | verified | UXA-001, UXA-002, UXA-003, UXA-004, UXA-005, UXA-006, UXA-007, UXA-008, UXA-012, UXA-014, SDK-013 | Bundled-font semantic dispatch, traversal, geometry, state retention, hydration, rendered contrast and touch-target regressions pass.; October 13 upgrade: changed file reviewed against SDK 7c44506, strict source gates and 975 tests pass; platform compilation and remaining qualification boundaries recorded above | `1a7ca65` |
 | `test/support/backdrop_text_contrast.dart` | Test | verified | - | Resolves actual foreground, composites straight-RGBA pixels and checks worst-case 4.5 contrast; disposes native image; all other labels retain standard checks | `7798642` |
 | `test/support/bounded_test_process.dart` | Test | verified | TEST-015, CODE-012 | One lint-clean test-only adapter owns real fixture process trees, deadlines, stream ceilings, executable permissions, and platform-correct repository Dart resolution | `de09b2c` |
+| `test/support/dev_bridge_fixture.dart` | Test | verified | DEV-001, DEV-002 | Reads the committed preset into exact-profile admission and wallet-runtime tests. | November 9 hosted Dev candidate |
 | `test/support/onboarding_harness.dart` | Test | verified | TEST-001, ONB-001, ONB-011, WALLET-004, UX-007, NET-004 | Seeded quiz randomness, deterministic identities, and three independent fake engines prove secure-choice invariants and multi-wallet creation through the real repository/runtime composition without repeated IDs or shared native state | working tree |
 | `test/support/payment_flow_harness.dart` | Test | verified | TEST-001, TEST-010, TX-001, DEC-037, DEC-047, HOME-005, MARKET-013, SDK-013 | Teardown releases Riverpod consumers before external ownership; deterministic widget composition disables only the scheduled market timer while dedicated ViewModel tests execute real automatic recovery; October 13 upgrade: changed file reviewed against SDK 7c44506, strict source gates and 975 tests pass; platform compilation and remaining qualification boundaries recorded above | `1a7ca65` |
 | `test/support/presentation_fakes.dart` | Test | verified | TEST-001, UX-001, UX-002, ARCH-005, DEC-037 | Test-only recorders include external URI observation without entering release code | `715e671`, `db844ac`, `e9d7fab` |

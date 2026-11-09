@@ -47,6 +47,14 @@ final class PlatformAppMetadataService implements AppMetadataService {
 
   final AppMetadataLoader _loader;
 
+  /// Confirms that a deployment is running under its dedicated app identity.
+  static Future<void> requirePackageName(String expectedName) async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    if (packageInfo.packageName != expectedName) {
+      throw const AppConfigurationException();
+    }
+  }
+
   @override
   Future<AppResult<AppBuildMetadata>> load() async {
     try {

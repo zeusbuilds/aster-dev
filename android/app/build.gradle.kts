@@ -66,6 +66,8 @@ android {
         getByName("debug") {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            manifestPlaceholders["asterDebugCleartext"] =
+                (asterApplicationId != "com.aster.devbridge").toString()
         }
         getByName("profile") {
             applicationIdSuffix = ".profile"

@@ -120,7 +120,7 @@ final class WalletRgbSetupOperations {
     }
     _requireFunding(inventory);
     final rate = await engine.estimateFeeRate(6);
-    if (rate.isStaleAt(clock())) {
+    if (rate.isStaleAt(clock()) || !rate.source.appliesTo(services)) {
       throw _failure(
         'rgb_wallet_setup_fee_stale',
         'The network fee rate is unavailable. Try preparing again.',
@@ -417,7 +417,8 @@ final class WalletRgbSetupOperations {
     final journal = await _readId(profile.id);
     if (journal != null &&
         (journal.review.walletId != profile.id ||
-            journal.review.network != profile.environment)) {
+            journal.review.network != profile.environment ||
+            !journal.review.feeSource.appliesTo(services))) {
       throw const StoredDataCorruptionException();
     }
     return journal;

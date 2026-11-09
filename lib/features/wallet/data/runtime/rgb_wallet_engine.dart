@@ -5,8 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:rgb_sdk_flutter/rgb_sdk_flutter.dart';
 
-import '../../../../core/config/app_environment.dart';
-import '../../../../core/config/evm_chain_validator.dart';
+import '../../../../core/config/config.dart';
 import '../../../../core/errors/app_failure.dart';
 import '../../../../core/errors/failure_mapper.dart';
 import '../../../../core/network/http_evm_chain_validator.dart';
@@ -41,11 +40,13 @@ abstract final class RgbWalletServiceConfigurationResolver {
     configured.validate(
       allowInsecureDevelopmentEndpoints: allowInsecureDevelopmentEndpoints,
     );
-    _requireQualifiedBackend(configured.backend);
+    _requireQualifiedBackend(configured);
     // The RLN `utexo` carrier is a native enum alias, not proof of chain
     // deployment. Its legacy defaults point at Dev and must never select the
     // services for a public Bitcoin Signet wallet.
-    final defaults = configured.backend == WalletBackend.rgbL1
+    final defaults = configured.devBridgeEnabled
+        ? null
+        : configured.backend == WalletBackend.rgbL1
         ? getRgbLibNetworkDefaults(configured.sdkNetwork)
         : configured.environment == BlockchainEnvironment.signet
         ? const NetworkEndpoints(
@@ -64,6 +65,7 @@ abstract final class RgbWalletServiceConfigurationResolver {
       sdkNetwork: configured.sdkNetwork,
       backend: configured.backend,
       signetDeployment: configured.signetDeployment,
+      devBridgeEnabled: configured.devBridgeEnabled,
       daemonListeningPort: configured.daemonListeningPort,
       ldkPeerListeningPort: configured.ldkPeerListeningPort,
       indexerUrl: indexerUrl,
@@ -87,11 +89,9 @@ abstract final class RgbWalletServiceConfigurationResolver {
     return resolved;
   }
 
-  static void _requireQualifiedBackend(WalletBackend backend) {
-    if (!backend.activationAllowed) {
-      // The BFA.7 adapter has its own durable native contract. Keep activation
-      // closed until matching mobile artifacts and recovery/backup acceptance
-      // are qualified; never fall back to the RLN engine or its wallet store.
+  static void _requireQualifiedBackend(WalletServiceConfiguration services) {
+    if (!services.activationAllowed) {
+      // Never fall back to the RLN engine or its wallet store.
       throw const AppFailureException(
         AppFailure(
           code: 'wallet_backend_unqualified',
@@ -140,9 +140,7 @@ final class RgbWalletEngineFactory implements WalletEngineFactory {
   @override
   WalletEngine create(WalletEngineConfiguration configuration) {
     final services = configuration.services..validate();
-    RgbWalletServiceConfigurationResolver._requireQualifiedBackend(
-      services.backend,
-    );
+    RgbWalletServiceConfigurationResolver._requireQualifiedBackend(services);
     if (services.indexerUrl == null || services.rgbTransportProxy == null) {
       throw const AppConfigurationException();
     }
@@ -1259,8 +1257,7 @@ final class RgbWalletEngine
     final fee = command.feeRate;
     if (fee == null ||
         fee.isStaleAt(_clock()) ||
-        (fee.source == WalletFeeRateSource.localRegtestPolicy &&
-            _services.environment != BlockchainEnvironment.regtest)) {
+        !fee.source.appliesTo(_services)) {
       throw const AppFailureException(walletFeeReviewRequiredFailure);
     }
   }

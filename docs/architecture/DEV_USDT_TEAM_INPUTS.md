@@ -1,64 +1,58 @@
-# Team inputs for the current Dev BUSDT
+# Hosted Dev BUSDT wallet profile
 
-These inputs are required before admitting the hosted Dev asset. They do not
-lift the RGB_L1 runtime or release gates. Reviewed on 2026-11-07.
+The dedicated Debug profile uses Aster’s RGB_L1 wallet on UTEXO’s custom
+Bitcoin Signet. It requires the `com.aster.devbridge.debug` application ID
+and uses separate wallet metadata, native databases and credential namespaces.
+Public Signet and production RGB_L1 retain their existing admission policies.
 
-## Message to send
+## Verified configuration
 
-Please provide the issuer-approved **standalone RGB genesis contract export**
-for the current Dev BUSDT and its SHA-256. The expected current asset ID is:
-
-`rgb:A6k89KtR-e3oXqRP-uH3jUrz-LU_sYL3-hMZ0k3O-6u8DXbE`
-
-Please confirm:
-
-1. This export is the asset currently deployed by the Dev bridge, using the
-   BFA.6 schema that is compatible with BFA.7. If the deployment has changed,
-   supply the replacement asset ID, export, digest and deployment revision
-   together. The old BFA.5 asset and a burn-proof/transfer consignment are not a
-   standalone genesis export for this asset.
-2. Its exact native metadata: **Bridged USDT / BUSDT**, precision, schema, and
-   reject-list configuration. We will decode and validate these against the
-   approved file; the historical asset's six decimals are not evidence for the
-   new asset.
-3. The backing deployment: **Arbitrum One, chain 42161**, the exact token
-   contract, BFA locking/backing contract addresses, and the bridge/connector
-   revision associated with this RGB asset. Identify the approved RPC endpoint.
-   A Bitcoin Signet network name does not identify the EVM backing chain.
-4. The approved BFA.7 `min_mint_lock_blocks` and `max_mint_lock_blocks` policy
-   for that backing chain. These are **Arbitrum blocks**, not Bitcoin blocks.
-   The earlier Iris candidate's 2/7200 settings are reference values, not an
-   approval of the current deployment's risk policy.
-
-For the subsequent hosted test, please also confirm the device's NetBird/VPN
-access and whether either service requires wallet-specific authentication.
-Provide credentials through the approved secret channel, never a source file
-or build define. We will need confirmed **Dev-chain** BTC at a new test-wallet
-address and either a small transfer of this exact BUSDT from an existing wallet
-or a funded, authorized Dev bridge account for mint testing. If testing mint and
-burn, confirm the supported Arbitrum token, minimum amounts after fees, gas and
-payout capacity.
-
-## Inputs already known
-
-| Item | Recorded value |
+| Input | Value |
 | --- | --- |
-| Bitcoin deployment | Custom Dev Signet, distinct from public Signet |
-| Block-one checkpoint | `0000001b808e4ece11c0cd922eaf9eee8d7dfba7e23e90b4f9614248daaf72cb` |
-| Esplora | `https://dev.esplora-01.mint.utexo.com` |
-| RGB proxy | `rpcs://dev.rgb-proxy.utexo.com/json-rpc`, protocol 1.0 |
-| Bridge origin | `https://dev.mint.utexo.com` |
-| Reference EVM RPC | `https://arb1.arbitrum.io/rpc` |
-| Last reviewed deployed native source | BFA.6 `5010eefa355beb9c42a4c1b69883f7651241a111` |
-| Flutter candidate source | BFA.7 `9ec49c08be2e68f08521281e3efbd760ec989cb9` plus recorded Flutter integration patches |
+| Bitcoin block-one checkpoint | `0000001b808e4ece11c0cd922eaf9eee8d7dfba7e23e90b4f9614248daaf72cb` |
+| Dev Esplora | `https://dev.esplora-01.mint.utexo.com` |
+| Dev RGB proxy | `rpcs://dev.rgb-proxy.utexo.com/json-rpc`, protocol 1.0 |
+| Arbitrum One RPC | `https://arb1.arbitrum.io/rpc`, chain `42161` |
+| Mint lock limits | 2–7,200 Arbitrum blocks, matching the Iris Dev candidate |
+| Bridge proxy | `0x6372ee2f86c3a551290635736b25855124932eed` |
+| Backing USDT0 token | `0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9` |
+| RGB asset | `rgb:A6k89KtR-e3oXqRP-uH3jUrz-LU_sYL3-hMZ0k3O-6u8DXbE` |
+| Native metadata | BFA, Bridged USDT, BUSDT, six decimals |
+| Issuer export SHA-256 | `9307e39016e6373bd0ee1ea9fa5d6a4130120513d48da9268777893e150344e9` |
+| Canonical wallet contract SHA-256 | `60a1b4f0d79706a7a51c6388fa14b951e119bae1ceffd811f4ebc62249817c4c` |
+| Wallet native engine | BFA.7 `9ec49c08be2e68f08521281e3efbd760ec989cb9` with Flutter’s published native overlay |
 
-The former asset `rgb:fbkO6B_i-qyLXa6d-x3sAOaX-cx~vZB9-rxNSUle-9lXBTf8`
-and export digest
-`a678ebf73f3a0523b307cd2fe8019a321ac938eaf547c2c65a7ac079948332ce`
-remain historical BFA.5 evidence and are not admitted as current Dev USDT.
+The issuer supplied a 691-byte export. The WDK qualification extracted the
+648-byte wallet genesis contract and confirmed that its asset ID and native
+metadata matched the issuer export. Aster pins those canonical bytes and
+verifies native metadata during wallet activation. Registration credits zero
+funds. The previous BFA.5 contract remains historical.
 
-Sources: [Dev issuance](https://github.com/UTEXO-Protocol/devops/pull/217),
-[deployed revision correction](https://github.com/UTEXO-Protocol/devops/pull/218),
-[BFA.7 WDK candidate](https://github.com/UTEXO-Protocol/wdk-wallet-rgb/pull/23).
-The approved current export and digest were absent from the reviewed Iris
-profile and candidate records; they must come from the issuer/deployment owner.
+Sources include the [issuer confirmation](https://utexo.slack.com/archives/C0A6286169J/p1794208420561419),
+the [WDK candidate](https://github.com/UTEXO-Protocol/wdk-wallet-rgb/pull/23)
+and the Iris Dev candidate identified in the [readiness record](DEV_SIGNET_READINESS.md).
+
+## Browser bridge qualification
+
+Iris uses `https://dev.mint.utexo.com`, WalletConnect project ID
+`f8087f367176ba407873e1c9e33051d7`, and WebRGB chain `rgb:utexo`. The deployed
+frontend requires `rgb_blindReceive` and Iris requires a confirmed usable RGB
+output before approving a session with that capability. Aster’s ordinary
+on-chain Receive screen continues to create witness invoices.
+
+The Aster profile qualifies wallet access, registration and ordinary on-chain
+operations. It does not advertise a browser connection. Completing that flow
+requires a wallet-owned session transport with explicit consent and scope
+checks, a request-bound durable blind invoice, and durable V1 burn and proof
+recovery. The current Flutter SDK native journal covers BTC and RGB sends.
+The optional Flutter WebRGB router does not negotiate or persist WalletConnect
+sessions. It cannot establish the outcome of a native burn that lost its
+response before the durable result was recorded.
+
+Live bridge qualification also needs access to the hosted frontend and an
+authorized disposable wallet with confirmed Dev Signet BTC, plus team-owned
+Arbitrum USDT0 and gas for mint and payout testing. The hosted frontend returned
+HTTP 403 during this qualification. Read-only RPC checks found a live
+Arbitrum One backing pool. The bridge’s
+[recorded end-to-end run](https://github.com/UTEXO-Protocol/bridge/actions/runs/42261217049)
+stopped before broadcast, so it does not establish mint, burn or payout.
