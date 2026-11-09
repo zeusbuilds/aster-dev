@@ -9,6 +9,7 @@ import 'device_authentication.dart';
 enum SecurityPurpose {
   revealSeed,
   exportXpubs,
+  exportBurnProof,
   changeAppLock,
   walletSetup,
   deleteWallet,
@@ -251,6 +252,7 @@ class SecurityController extends ChangeNotifier {
     final success = await _authenticate(switch (purpose) {
       SecurityPurpose.revealSeed => 'Reveal your recovery phrase',
       SecurityPurpose.exportXpubs => 'Export your wallet public keys',
+      SecurityPurpose.exportBurnProof => 'Export your USDT burn proof',
       SecurityPurpose.changeAppLock => 'Change Aster app lock',
       SecurityPurpose.walletSetup => 'Set up your wallet',
       SecurityPurpose.deleteWallet => 'Delete this wallet',

@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/security/security_controller.dart';
+import '../../features/bridge/presentation/hosted_bridge_screen.dart';
+import '../../features/bridge/presentation/view_model/hosted_bridge_controller.dart';
 import '../../features/onboarding/presentation/screens/screens.dart';
 import '../../features/receive/presentation/screens/screens.dart';
 import '../../features/scan/domain/models/models.dart';
@@ -106,11 +108,23 @@ abstract final class RouteConfig {
       GoRoute(
         path: RoutePaths.scan,
         name: RouteNames.scan,
-        builder: (context, state) => ScanScreen(
-          purpose: state.extra == ScanPurpose.destinationPicker
-              ? ScanPurpose.destinationPicker
-              : ScanPurpose.sendLauncher,
-        ),
+        builder: (context, state) {
+          final purpose = state.extra;
+          final bridge =
+              purpose == ScanPurpose.bridgePairing &&
+              ProviderScope.containerOf(
+                    context,
+                    listen: false,
+                  ).read(hostedBridgeControllerProvider)?.available ==
+                  true;
+          return ScanScreen(
+            purpose: bridge
+                ? ScanPurpose.bridgePairing
+                : purpose == ScanPurpose.destinationPicker
+                ? ScanPurpose.destinationPicker
+                : ScanPurpose.sendLauncher,
+          );
+        },
       ),
       GoRoute(
         path: RoutePaths.walletSelectionLocation,
@@ -129,6 +143,19 @@ abstract final class RouteConfig {
         name: RouteNames.settings,
         builder: (context, state) => const SettingsScreen(),
         routes: [
+          GoRoute(
+            path: RoutePaths.hostedBridge,
+            name: RouteNames.hostedBridge,
+            redirect: (context, state) =>
+                ProviderScope.containerOf(
+                      context,
+                      listen: false,
+                    ).read(hostedBridgeControllerProvider)?.available ==
+                    true
+                ? null
+                : RoutePaths.settings,
+            builder: (context, state) => const HostedBridgeScreen(),
+          ),
           GoRoute(
             path: RoutePaths.walletDetails,
             name: RouteNames.walletDetails,

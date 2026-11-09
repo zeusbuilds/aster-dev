@@ -33,6 +33,7 @@ class RoutePaths {
   static const String exportXpubs = 'export-xpubs';
   static const String advancedSettings = 'advanced';
   static const String networkConfiguration = 'network-configuration';
+  static const String hostedBridge = 'dev-bridge';
 
   /// Concrete parent location for nested Advanced Settings routes.
   static const String advancedSettingsLocation = '$settings/$advancedSettings';

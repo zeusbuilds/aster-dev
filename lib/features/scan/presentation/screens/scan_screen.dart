@@ -26,6 +26,7 @@ class ScanScreen extends ConsumerStatefulWidget {
 
 class _ScanScreenState extends ConsumerState<ScanScreen> {
   bool _navigationInFlight = false;
+  bool get _bridge => widget.purpose == ScanPurpose.bridgePairing;
 
   bool get _isCurrentSurface =>
       mounted &&
@@ -33,7 +34,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
           WidgetsBinding.instance.lifecycleState ==
               AppLifecycleState.resumed) &&
       (ModalRoute.of(context)?.isCurrent ?? false) &&
-      (widget.purpose == ScanPurpose.destinationPicker ||
+      (widget.purpose != ScanPurpose.sendLauncher ||
           ref.read(appShellIndexProvider) == appShellScanTabIndex);
 
   Future<void> _handleCameraPayload(ScanPayload payload) async {
@@ -59,9 +60,10 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
             await _completePayload(payload);
           case ScanGalleryNoCode():
             toasts.show(
-              title: 'No payment QR found',
-              message:
-                  'Choose an image with a valid Bitcoin or USDT payment QR.',
+              title: _bridge ? 'No connection QR found' : 'No payment QR found',
+              message: _bridge
+                  ? 'Choose an image with a Dev Bridge connection QR.'
+                  : 'Choose an image with a valid Bitcoin or USDT payment QR.',
               variant: ToastVariant.warning,
             );
           case ScanGalleryCancelled():
@@ -106,11 +108,12 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       return;
     }
     if (_navigationInFlight) return;
-    if (widget.purpose == ScanPurpose.destinationPicker) {
+    if (widget.purpose != ScanPurpose.sendLauncher) {
       if (context.canPop()) {
         context.pop(payload.value);
         return;
       }
+      if (_bridge) return;
       // A directly opened picker has no caller to return to. Complete through
       // the normal Send launcher; the camera itself never expires.
     }
@@ -129,11 +132,12 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
   Future<void> _enterManually() async {
     if (_navigationInFlight) return;
     unawaited(context.haptics.trigger(HapticIntent.lightImpact));
-    if (widget.purpose == ScanPurpose.destinationPicker) {
+    if (widget.purpose != ScanPurpose.sendLauncher) {
       if (context.canPop()) {
         context.pop<void>();
         return;
       }
+      if (_bridge) return;
     }
     ref.read(sendDestinationHandoffProvider.notifier).clear();
     await _openSend();
@@ -178,7 +182,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     final shellIndex = ref.watch(appShellIndexProvider);
     final shouldShowCamera =
         (ModalRoute.of(context)?.isCurrent ?? false) &&
-        (widget.purpose == ScanPurpose.destinationPicker ||
+        (widget.purpose != ScanPurpose.sendLauncher ||
             shellIndex == appShellScanTabIndex);
     final walletIdentity = ref.watch(scanWalletIdentityViewModelProvider);
     final activeWallet = walletIdentity.isLoading || walletIdentity.hasError
@@ -283,7 +287,9 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                     child: FocusTraversalOrder(
                       order: const NumericFocusOrder(4),
                       child: ScanEnterAddressButton(
-                        label: widget.purpose == ScanPurpose.destinationPicker
+                        label: _bridge
+                            ? 'Enter connection link manually'
+                            : widget.purpose == ScanPurpose.destinationPicker
                             ? 'Enter payment details manually'
                             : 'Enter payment details to send',
                         onTap:

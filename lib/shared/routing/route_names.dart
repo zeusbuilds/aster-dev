@@ -29,4 +29,5 @@ class RouteNames {
   static const String exportXpubs = 'exportXpubs';
   static const String advancedSettings = 'advancedSettings';
   static const String networkConfiguration = 'networkConfiguration';
+  static const String hostedBridge = 'hostedBridge';
 }

@@ -59,6 +59,16 @@ final class RgbLibWalletEngine
   bool _assetReady = false;
   bool _activating = false;
 
+  /// Run only inside the repository's authorized, serialized Dev lease.
+  Future<T> withHostedBridgeWallet<T>(
+    Future<T> Function(RgbLibWallet wallet) operation,
+  ) async {
+    if (!_services.devBridgeEnabled || !_assetReady || _activating) {
+      throw StateError('The hosted Dev wallet is not ready.');
+    }
+    return operation(_wallet);
+  }
+
   @override
   Future<void> provision({
     required String databasePassword,
@@ -1058,6 +1068,11 @@ final class RgbLibWalletEngine
       final value = await read();
       budget();
       return value;
+    }
+
+    if (_wallet.supportsHostedDevBridge &&
+        await checked(_wallet.hasPendingHostedDevBridgeBurn)) {
+      return true;
     }
 
     bool terminal(String? status) =>

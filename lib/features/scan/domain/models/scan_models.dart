@@ -6,7 +6,7 @@ import '../../../../core/validation/validation.dart';
 ///
 /// A persistent launcher cannot return a value to a caller, while a destination
 /// picker is expected to complete exactly one pushed route.
-enum ScanPurpose { sendLauncher, destinationPicker }
+enum ScanPurpose { sendLauncher, destinationPicker, bridgePairing }
 
 /// Where a bounded scan payload originated.
 enum ScanCaptureSource { camera, gallery }

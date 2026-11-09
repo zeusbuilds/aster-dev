@@ -886,6 +886,40 @@ final class WalletRepository implements WalletLifecycleRepository {
     () => _runtime.readPaymentState((engine) => engine.getNetworkStatus()),
   );
 
+  /// Owns the same wallet and operation queue used by Send, wallet switching,
+  /// native shutdown, and RGB-output preparation.
+  Future<AppResult<T>> withHostedBridgeLease<T>(
+    String walletId,
+    Future<T> Function(RgbLibWalletEngine engine) operation,
+    void Function() authorize, {
+    required bool allowMutation,
+  }) => _enqueueOperation(() async {
+    final appAuthority = _captureAccessGuard();
+    void guard() {
+      appAuthority?.call();
+      authorize();
+      if (!_services.devBridgeEnabled ||
+          _runtime.activeProfile?.id != walletId) {
+        throw StateError('The active Dev wallet changed.');
+      }
+    }
+
+    guard();
+    if (allowMutation) {
+      final pending = await _assertOnchainMutationResolved();
+      if (pending case AppFailureResult<void>(:final failure)) {
+        return AppResult.failure(failure);
+      }
+    }
+    return _runtime.run((engine) {
+      guard();
+      if (engine is! RgbLibWalletEngine) {
+        throw StateError('The Dev wallet is unavailable.');
+      }
+      return operation(engine);
+    }, authorize: guard);
+  });
+
   /// Each disclosure consumes a fresh authorization inside the serialized
   /// operation, after earlier wallet/lifecycle changes have settled.
   Future<AppResult<WalletPublicKeys>> publicKeys({

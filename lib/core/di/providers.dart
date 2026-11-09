@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../features/bridge/data/hosted_bridge_protocol.dart';
 import '../../features/onboarding/data/repository/repository.dart';
 import '../../features/scan/data/services/scan_payment_validator.dart';
 import '../../features/scan/data/services/services.dart';
@@ -135,7 +136,26 @@ ScanSessionFactory scanSessionFactory(Ref ref) {
 /// One isolated native scan session for each presentation purpose.
 @riverpod
 ScanSession scanSession(Ref ref, ScanPurpose purpose) {
-  final session = ref.watch(scanSessionFactoryProvider).create();
+  final ScanSessionFactory factory;
+  if (purpose == ScanPurpose.bridgePairing) {
+    final security = ref.watch(securityControllerProvider);
+    final services = ref.watch(walletServiceConfigurationProvider);
+    final clock = ref.read(utcClockProvider);
+    factory = MobileScanSessionFactory(
+      contextToken: () => (security.generation, security.canAccessWallet),
+      validatePayload: (payload) async =>
+          services.devBridgeEnabled &&
+          security.canAccessWallet &&
+          HostedBridgeProtocol.pairingLink(
+                payload.value,
+                now: clock().millisecondsSinceEpoch ~/ 1000,
+              ) !=
+              null,
+    );
+  } else {
+    factory = ref.watch(scanSessionFactoryProvider);
+  }
+  final session = factory.create();
   ref.onDispose(() => unawaited(_closeScanSession(session)));
   return session;
 }

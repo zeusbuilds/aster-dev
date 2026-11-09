@@ -40,19 +40,14 @@ frontend requires `rgb_blindReceive` and Iris requires a confirmed usable RGB
 output before approving a session with that capability. Aster’s ordinary
 on-chain Receive screen continues to create witness invoices.
 
-The Aster profile qualifies wallet access, registration and ordinary on-chain
-operations. It does not advertise a browser connection. Completing that flow
-requires a wallet-owned session transport with explicit consent and scope
-checks, a request-bound durable blind invoice, and durable V1 burn and proof
-recovery. The current Flutter SDK native journal covers BTC and RGB sends.
-The optional Flutter WebRGB router does not negotiate or persist WalletConnect
-sessions. It cannot establish the outcome of a native burn that lost its
-response before the durable result was recorded.
+The verified local iOS candidate exposes **Settings → Dev Bridge**. It uses
+an encrypted wallet-owned WalletConnect grant and native request-bound
+receipts for blind invoices, V1 burns and proof. The existing session can
+recover an accepted burn. The wallet's local proof export also works after
+the session expires or is disconnected. The published ABI 5 native artifact
+does not advertise this bridge capability.
 
 Live bridge qualification also needs access to the hosted frontend and an
-authorized disposable wallet with confirmed Dev Signet BTC, plus team-owned
-Arbitrum USDT0 and gas for mint and payout testing. The hosted frontend returned
-HTTP 403 during this qualification. Read-only RPC checks found a live
-Arbitrum One backing pool. The bridge’s
-[recorded end-to-end run](https://github.com/UTEXO-Protocol/bridge/actions/runs/42261217049)
-stopped before broadcast, so it does not establish mint, burn or payout.
+authorized test wallet with confirmed Dev Signet BTC, plus approved Arbitrum
+USDT0 and gas. Hosted verification is a manual handoff. This build does not
+establish a completed hosted mint, burn or payout.

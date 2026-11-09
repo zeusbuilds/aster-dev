@@ -23,6 +23,13 @@ contract. Aster requires Debug mode and validates the exact preset and
 installed package identity before opening Dev storage. The test build uses
 its own wallet registry, native directories and secure-storage namespace.
 
+The wallet-only preset works with the published native artifact. To expose
+**Settings → Dev Bridge** on the arm64 iOS Simulator, stage the ABI 6
+simulator SDK using the Flutter SDK's `native/rgb_l1/README.md` instructions
+and point an ignored `pubspec_overrides.yaml` at the staged package. Include
+the two dependency overrides from `pubspec.yaml` in that local file. Keep the
+committed SDK pin and lockfile on the Git dependency.
+
 On Android, use JDK 17 and pass the dedicated application ID to the
 Flutter-launched Gradle process.
 

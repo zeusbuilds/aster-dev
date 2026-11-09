@@ -8,6 +8,7 @@ import 'package:ming_cute_icons/ming_cute_icons.dart';
 
 import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
+import '../../../bridge/presentation/view_model/hosted_bridge_controller.dart';
 import '../../../wallet/domain/models/models.dart';
 import '../../../wallet/presentation/view_model/view_models.dart';
 import '../../domain/models/models.dart';
@@ -157,6 +158,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     final walletState = ref.watch(walletViewModelProvider);
     final settings = ref.watch(settingsViewModelProvider);
     final appInfo = ref.watch(settingsAppViewModelProvider);
+    final hostedBridge = ref.watch(hostedBridgeControllerProvider);
     final activeWallet = switch (walletState) {
       AsyncData(:final value) => value.activeWallet,
       _ => null,
@@ -267,6 +269,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                             'Advanced settings could not open',
                           ),
                         ),
+                        if (hostedBridge != null)
+                          ListenableBuilder(
+                            listenable: hostedBridge,
+                            builder: (context, _) => hostedBridge.available
+                                ? Column(
+                                    children: [
+                                      const AsterDivider.inset(),
+                                      AsterOptionRow(
+                                        title: 'Dev Bridge',
+                                        prefixIcon: Icons.link,
+                                        onTap: openNamed(
+                                          RouteNames.hostedBridge,
+                                          'Dev Bridge could not open',
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
                       ],
                     ),
                   ),

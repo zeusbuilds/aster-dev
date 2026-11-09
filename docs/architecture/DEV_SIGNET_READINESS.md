@@ -47,7 +47,20 @@ guest with the dedicated APK's cleartext traffic disabled. iOS reopen went
 through the app lock with simulator Face ID. An earlier Android fixture that
 predated the Dev marker was preserved after the current SDK rejected it.
 
-Funded transfers, browser pairing, live mint, burn and payout need separate
-qualification. The Iris hosted profile was enabled for manual testing after a
-previous bridge automation stopped at mint confirmation. Production RGB_L1,
-Lightning and spending from restored snapshots remain gated.
+## Hosted bridge
+
+The Dev-only **Settings → Dev Bridge** screen uses WalletConnect to approve
+the pinned `dev.mint.utexo.com` origin. A usable confirmed RGB output is
+required for the hosted frontend's blind-invoice capability. The wallet
+requests separate consent for the invoice, burn and proof. An accepted burn
+can be found under the website's Existing Burn flow in the approved session.
+**Saved burns** in Aster can export an authenticated `.utexoburn` file for
+upload after the browser session is lost. Restart recovery reads existing
+receipts. It can release an exact unsubmitted burn reservation without
+broadcasting a payment.
+
+The current local iOS simulator candidate uses the verified ABI 6 BFA.7
+native fixture. The distributed ABI 5 SDK still supports the dedicated Dev
+wallet and leaves the bridge screen gated. The hosted pairing and funded
+mint, burn and payout round trip are pending manual verification. Production
+RGB_L1, Lightning and spending from restored snapshots remain gated.

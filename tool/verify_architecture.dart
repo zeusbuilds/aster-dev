@@ -6,7 +6,10 @@ import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 
 const _infrastructureOwners = <String, Set<String>>{
-  'flutter_secure_storage': {'lib/core/storage/secure_storage_service.dart'},
+  'flutter_secure_storage': {
+    'lib/core/storage/secure_storage_service.dart',
+    'lib/features/bridge/data/hosted_bridge_store.dart',
+  },
   'haptic_feedback': {'lib/shared/feedback/haptic_feedback_service.dart'},
   // The EVM adapter performs one non-retrying, bounded eth_chainId POST;
   // ResilientHttpClient owns the separate GET-with-retry policy.
@@ -19,7 +22,21 @@ const _infrastructureOwners = <String, Set<String>>{
     'lib/features/scan/data/services/mobile_scan_adapters.dart',
   },
   'package_info_plus': {'lib/core/platform/app_metadata_service.dart'},
-  'path_provider': {'lib/core/di/providers.dart'},
+  'path_provider': {
+    'lib/core/di/providers.dart',
+    'lib/core/platform/share_service.dart',
+  },
+  'reown_core': {
+    'lib/features/bridge/presentation/view_model/hosted_bridge_controller.dart',
+    'lib/features/bridge/data/hosted_bridge_protocol.dart',
+    'lib/features/bridge/data/hosted_bridge_relay.dart',
+    'lib/features/bridge/data/hosted_bridge_store.dart',
+  },
+  'reown_sign': {
+    'lib/features/bridge/presentation/view_model/hosted_bridge_controller.dart',
+    'lib/features/bridge/data/hosted_bridge_protocol.dart',
+    'lib/features/bridge/data/hosted_bridge_relay.dart',
+  },
   'share_plus': {'lib/core/platform/share_service.dart'},
   'shared_preferences': {
     'lib/core/bootstrap/app_bootstrap.dart',
@@ -32,6 +49,7 @@ const _infrastructureOwners = <String, Set<String>>{
 
 const _sdkOwners = {
   'lib/core/errors/failure_mapper.dart',
+  'lib/features/bridge/presentation/view_model/hosted_bridge_controller.dart',
   'lib/features/wallet/data/runtime/rgb_wallet_activity_mapper.dart',
   'lib/features/wallet/data/runtime/rgb_wallet_balance_mapper.dart',
   'lib/features/wallet/data/runtime/rgb_wallet_engine.dart',

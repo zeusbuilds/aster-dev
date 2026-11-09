@@ -9,6 +9,7 @@ import 'core/bootstrap/app_bootstrap.dart';
 import 'core/bootstrap/app_loader.dart';
 import 'core/core.dart';
 import 'core/security/security_gate.dart';
+import 'features/bridge/presentation/hosted_bridge_scope.dart';
 import 'features/wallet/presentation/view_model/view_models.dart';
 import 'features/wallet/presentation/widgets/widgets.dart';
 import 'shared/shared.dart';
@@ -176,7 +177,10 @@ class _AsterAppState extends ConsumerState<AsterApp>
               onRetry: () => unawaited(
                 ref.read(walletLifecycleViewModelProvider.notifier).retry(),
               ),
-              child: ToastHost(child: child ?? const SizedBox.shrink()),
+              child: HostedBridgeScope(
+                navigatorKey: router.routerDelegate.navigatorKey,
+                child: ToastHost(child: child ?? const SizedBox.shrink()),
+              ),
             ),
           ),
         );

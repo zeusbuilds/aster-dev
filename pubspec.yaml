@@ -20,17 +20,19 @@ dependencies:
 
   # Networking
   http: ^1.6.0
+  reown_core: 1.5.1
+  reown_sign: 1.4.1
 
   # Wallet SDK. Keep this immutable; see docs/architecture/SDK_INTEGRATION.md.
   rgb_sdk_flutter:
     git:
       url: https://github.com/zeusbuilds/rgb-sdk-flutter.git
-      ref: 59d681319bbdefd3339c5e44d41e53b57edbf3d3
+      ref: f0603b5d4b1b6898ec8b4deb3dff098adeb5b29c
 
   # Storage
   # Keep the reviewed secure-storage release while upgrading the host platforms.
   flutter_secure_storage: 10.3.1
-  package_info_plus: ^10.2.1
+  package_info_plus: 10.2.1
   path_provider: ^2.1.5
   share_plus: ^13.3.0
   shared_preferences: ^2.5.5
@@ -91,6 +93,14 @@ dev_dependencies:
   integration_test:
     sdk: flutter
   mocktail: ^1.0.5
+
+dependency_overrides:
+  # WalletConnect Core uses PackageInfo.fromPlatform, which is available
+  # in the version already shared with Aster's mobile and Windows plugins.
+  package_info_plus: 10.2.1
+  # Reown Sign requires 4.0. The SDK's BIP32/BIP39 dependencies use the same
+  # digest and key derivation APIs with this version.
+  pointycastle: 4.0.0
 
 flutter:
   # Keep native plugins on the locked CocoaPods path until RGB SDK supports SPM.

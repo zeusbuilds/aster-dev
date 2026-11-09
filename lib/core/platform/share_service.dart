@@ -1,6 +1,9 @@
+import 'dart:convert';
+import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../errors/errors.dart';
@@ -60,6 +63,49 @@ final class PlatformShareService implements ShareService {
   static const maximumTextCharacters = 8192;
   static const maximumSubjectCharacters = 160;
   final ShareTextInvoker _invoker;
+
+  static Future<void> shareDevBurnProof({
+    required String txid,
+    required Map<String, Object?> package,
+    required ShareOrigin origin,
+    required bool Function() canShare,
+  }) async {
+    if (!RegExp(r'^[a-f0-9]{64}$').hasMatch(txid) || !origin.isValid) {
+      throw const FormatException('Invalid burn proof share.');
+    }
+    final bytes = utf8.encode(jsonEncode(package));
+    if (bytes.length > 14047576) {
+      throw const FormatException('Burn proof share exceeds the size limit.');
+    }
+    final cache = await getTemporaryDirectory();
+    if (!canShare()) return;
+    final folder = await cache.createTemp('aster-dev-burn-');
+    try {
+      final file = await File('${folder.path}/burn-$txid.utexoburn')
+          .writeAsBytes(bytes, flush: true);
+      if (!canShare()) return;
+      final result = await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path, mimeType: 'application/json')],
+          sharePositionOrigin: Rect.fromLTWH(
+            origin.left,
+            origin.top,
+            origin.width,
+            origin.height,
+          ),
+        ),
+      );
+      if (result.status == ShareResultStatus.unavailable) {
+        throw StateError('Sharing is unavailable.');
+      }
+    } finally {
+      try {
+        await folder.delete(recursive: true);
+      } on FileSystemException {
+        // The copy is in app-private temporary storage.
+      }
+    }
+  }
 
   @override
   Future<AppResult<ShareDisposition>> shareText(
