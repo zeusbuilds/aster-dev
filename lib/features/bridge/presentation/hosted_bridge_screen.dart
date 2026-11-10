@@ -12,7 +12,9 @@ import '../../wallet/domain/models/models.dart';
 import 'view_model/hosted_bridge_controller.dart';
 
 class HostedBridgeScreen extends ConsumerStatefulWidget {
-  const HostedBridgeScreen({super.key});
+  const HostedBridgeScreen({super.key, this.embedded = false});
+
+  final bool embedded;
 
   @override
   ConsumerState<HostedBridgeScreen> createState() => _HostedBridgeScreenState();
@@ -34,8 +36,15 @@ class _HostedBridgeScreenState extends ConsumerState<HostedBridgeScreen> {
     super.dispose();
   }
 
+  bool _ownsSurface(ModalRoute<dynamic>? source) =>
+      mounted &&
+      TickerMode.valuesOf(context).enabled &&
+      (source?.isCurrent ?? true) &&
+      identical(ModalRoute.of(context), source);
+
   Future<void> _pair(HostedBridgeController bridge, String input) async {
-    if (_pairing || !bridge.available) return;
+    final source = ModalRoute.of(context);
+    if (_pairing || !_ownsSurface(source) || !bridge.available) return;
     final toasts = context.toasts;
     FocusScope.of(context).unfocus();
     setState(() => _pairing = true);
@@ -43,7 +52,7 @@ class _HostedBridgeScreenState extends ConsumerState<HostedBridgeScreen> {
     try {
       await bridge.pair(input);
     } on FormatException {
-      if (mounted) {
+      if (_ownsSurface(source)) {
         toasts.show(
           title: 'Connection link unavailable',
           message:
@@ -52,7 +61,7 @@ class _HostedBridgeScreenState extends ConsumerState<HostedBridgeScreen> {
         );
       }
     } on HostedBridgeOutputsRequired {
-      if (mounted) {
+      if (_ownsSurface(source)) {
         toasts.show(
           title: 'Prepare RGB outputs',
           message: 'A confirmed RGB output is required to connect.',
@@ -60,7 +69,7 @@ class _HostedBridgeScreenState extends ConsumerState<HostedBridgeScreen> {
         );
       }
     } on Object {
-      if (mounted) {
+      if (_ownsSurface(source)) {
         toasts.show(
           title: 'Could not connect',
           message: 'Open Dev Bridge and try a new connection link.',
@@ -73,27 +82,33 @@ class _HostedBridgeScreenState extends ConsumerState<HostedBridgeScreen> {
   }
 
   Future<void> _scan(HostedBridgeController bridge) async {
-    if (_scanning) return;
+    final source = ModalRoute.of(context);
+    if (_scanning || !_ownsSurface(source)) return;
     setState(() => _scanning = true);
     try {
       final link = await context.pushNamed<String>(
         RouteNames.scan,
         extra: ScanPurpose.bridgePairing,
       );
-      if (mounted && link != null) await _pair(bridge, link);
+      if (link != null &&
+          _ownsSurface(source) &&
+          identical(ref.read(hostedBridgeControllerProvider), bridge)) {
+        await _pair(bridge, link);
+      }
     } finally {
       if (mounted) setState(() => _scanning = false);
     }
   }
 
   Future<void> _prepare() async {
-    if (_preparing) return;
+    final source = ModalRoute.of(context);
+    if (_preparing || !_ownsSurface(source)) return;
     final toasts = context.toasts;
     setState(() => _preparing = true);
     try {
       final setup = ref.read(hostedBridgeSetupActionsProvider);
       final status = await setup.status();
-      if (!mounted) return;
+      if (!_ownsSurface(source)) return;
       if (status case AppSuccess<RgbWalletSetupStatus>(:final value)) {
         if (value.phase != RgbWalletSetupPhase.required) {
           _setupFeedback(value.phase);
@@ -110,48 +125,55 @@ class _HostedBridgeScreenState extends ConsumerState<HostedBridgeScreen> {
         return;
       }
       final prepared = await setup.prepare();
-      if (!mounted) return;
       if (prepared case AppFailureResult<RgbWalletSetupReview>(
         :final failure,
       )) {
-        toasts.show(
-          title: 'Could not prepare outputs',
-          message: failure.userMessage,
-          variant: ToastVariant.warning,
-        );
-        return;
-      }
-      final review = (prepared as AppSuccess<RgbWalletSetupReview>).value;
-      final approved = await showDialog<bool>(
-        context: context,
-        builder: (context) => AsterConfirmationDialog(
-          title: 'Prepare RGB outputs?',
-          content: Text(
-            'Create ${RgbWalletSetupReview.outputCount} outputs of ${RgbWalletSetupReview.outputValueSats} sats. '
-            'Bitcoin fee rate ${review.feeRateSatPerVbyte} sat/vB. '
-            'The total Bitcoin fee is determined when the transaction is built.',
-          ),
-          confirmText: 'Prepare',
-        ),
-      );
-      if (approved != true || !mounted) {
-        await setup.cancel(review);
-        return;
-      }
-      final result = await setup.confirm(review);
-      if (!mounted) return;
-      switch (result) {
-        case AppSuccess<RgbWalletSetupStatus>(:final value):
-          _setupFeedback(value.phase);
-        case AppFailureResult<RgbWalletSetupStatus>(:final failure):
+        if (_ownsSurface(source)) {
           toasts.show(
             title: 'Could not prepare outputs',
             message: failure.userMessage,
             variant: ToastVariant.warning,
           );
+        }
+        return;
+      }
+      final review = (prepared as AppSuccess<RgbWalletSetupReview>).value;
+      var confirmStarted = false;
+      try {
+        if (!mounted || !_ownsSurface(source)) return;
+        final approved = await showDialog<bool>(
+          context: context,
+          builder: (context) => AsterConfirmationDialog(
+            title: 'Prepare RGB outputs?',
+            content: Text(
+              'Create ${RgbWalletSetupReview.outputCount} outputs of ${RgbWalletSetupReview.outputValueSats} sats. '
+              'Bitcoin fee rate ${review.feeRateSatPerVbyte} sat/vB. '
+              'The total Bitcoin fee is determined when the transaction is built.',
+            ),
+            confirmText: 'Prepare',
+          ),
+        );
+        if (approved != true || !_ownsSurface(source)) return;
+
+        confirmStarted = true;
+        final result = await setup.confirm(review);
+        if (!_ownsSurface(source)) return;
+        switch (result) {
+          case AppSuccess<RgbWalletSetupStatus>(:final value):
+            _setupFeedback(value.phase);
+          case AppFailureResult<RgbWalletSetupStatus>(:final failure):
+            toasts.show(
+              title: 'Could not prepare outputs',
+              message: failure.userMessage,
+              variant: ToastVariant.warning,
+            );
+        }
+      } finally {
+        // Release a review even when the pane disappears before the dialog.
+        if (!confirmStarted) await setup.cancel(review);
       }
     } on Object {
-      if (mounted) {
+      if (_ownsSurface(source)) {
         toasts.show(
           title: 'Could not check outputs',
           message: 'Try again after the wallet has synced.',
@@ -192,13 +214,14 @@ class _HostedBridgeScreenState extends ConsumerState<HostedBridgeScreen> {
   }
 
   Future<void> _disconnect(HostedBridgeController bridge) async {
-    if (_disconnecting) return;
+    final source = ModalRoute.of(context);
+    if (_disconnecting || !_ownsSurface(source)) return;
     final toasts = context.toasts;
     setState(() => _disconnecting = true);
     try {
       await bridge.disconnect();
     } on Object {
-      if (mounted) {
+      if (_ownsSurface(source)) {
         toasts.show(
           title: 'Could not finish disconnecting',
           message: 'Try again when the relay is available.',
@@ -211,12 +234,13 @@ class _HostedBridgeScreenState extends ConsumerState<HostedBridgeScreen> {
   }
 
   Future<void> _showBurns(HostedBridgeController bridge) async {
-    if (_loadingBurns || _sharingBurn) return;
+    final source = ModalRoute.of(context);
+    if (_loadingBurns || _sharingBurn || !_ownsSurface(source)) return;
     final toasts = context.toasts;
     setState(() => _loadingBurns = true);
     try {
       final burns = await bridge.savedBurns();
-      if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+      if (!_ownsSurface(source)) return;
       setState(() => _burns = burns);
       if (burns.isEmpty) {
         toasts.show(
@@ -226,7 +250,7 @@ class _HostedBridgeScreenState extends ConsumerState<HostedBridgeScreen> {
         );
       }
     } on Object {
-      if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+      if (!_ownsSurface(source)) return;
       toasts.show(
         title: 'Could not open saved burns',
         message: 'Try again after the wallet has synced.',
@@ -242,7 +266,8 @@ class _HostedBridgeScreenState extends ConsumerState<HostedBridgeScreen> {
     HostedBridgeBurn burn,
     BuildContext rowContext,
   ) async {
-    if (_sharingBurn || !bridge.ownsBurn(burn)) return;
+    final source = ModalRoute.of(context);
+    if (_sharingBurn || !_ownsSurface(source) || !bridge.ownsBurn(burn)) return;
     final box = rowContext.findRenderObject();
     if (box is! RenderBox || !box.hasSize) return;
     final offset = box.localToGlobal(Offset.zero);
@@ -262,13 +287,10 @@ class _HostedBridgeScreenState extends ConsumerState<HostedBridgeScreen> {
         txid: export.txid,
         package: export.package,
         origin: origin,
-        canShare: () =>
-            mounted &&
-            ModalRoute.of(context)?.isCurrent == true &&
-            bridge.canShare(export),
+        canShare: () => _ownsSurface(source) && bridge.canShare(export),
       );
     } on Object {
-      if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+      if (!_ownsSurface(source)) return;
       toasts.show(
         title: 'Could not export burn proof',
         message: 'Open saved burns and try again.',
@@ -283,10 +305,28 @@ class _HostedBridgeScreenState extends ConsumerState<HostedBridgeScreen> {
   Widget build(BuildContext context) {
     final bridge = ref.watch(hostedBridgeControllerProvider);
     final spacing = context.spacing;
+    final navigation = widget.embedded
+        ? AsterNavigationScope.of(context)
+        : null;
+
+    VoidCallback? action(Future<void> Function() command, String failureTitle) {
+      if (navigation == null) return () => unawaited(command());
+      if (navigation.inFlight) return null;
+      return () => unawaited(
+        navigation.run(
+          command: command,
+          failureTitle: failureTitle,
+          hapticIntent: null,
+          blocksRoutePop: true,
+        ),
+      );
+    }
+
     return Scaffold(
-      appBar: const CustomAppBar(
+      appBar: CustomAppBar(
         title: 'Dev Bridge',
-        leadingIcon: true,
+        leadingIcon: !widget.embedded,
+        automaticallyImplyLeading: !widget.embedded,
         fallbackLocation: RoutePaths.settings,
       ),
       body: AsterHorizontalSafeArea(
@@ -327,21 +367,31 @@ class _HostedBridgeScreenState extends ConsumerState<HostedBridgeScreen> {
                               HostedBridgeController.maxLinkLength,
                             ),
                           ],
-                          onSubmitted: (value) =>
-                              unawaited(_pair(bridge, value)),
+                          onSubmitted: navigation?.inFlight == true
+                              ? null
+                              : (value) => action(
+                                  () => _pair(bridge, value),
+                                  'Could not connect',
+                                )?.call(),
                         ),
                         SizedBox(height: spacing.lg),
                         CustomButton(
                           text: 'Connect',
                           loading: _pairing,
-                          onTap: () => unawaited(_pair(bridge, _link.text)),
+                          onTap: action(
+                            () => _pair(bridge, _link.text),
+                            'Could not connect',
+                          ),
                         ),
                         SizedBox(height: spacing.md),
                         CustomButton(
                           text: 'Scan connection QR',
                           variant: ButtonVariant.secondary,
                           enabled: !_pairing && !_scanning,
-                          onTap: () => unawaited(_scan(bridge)),
+                          onTap: action(
+                            () => _scan(bridge),
+                            'Scanner could not open',
+                          ),
                         ),
                       ],
                       SizedBox(height: spacing.xl),
@@ -350,21 +400,27 @@ class _HostedBridgeScreenState extends ConsumerState<HostedBridgeScreen> {
                           text: 'Disconnect',
                           variant: ButtonVariant.secondary,
                           loading: _disconnecting,
-                          onTap: () => unawaited(_disconnect(bridge)),
+                          onTap: action(
+                            () => _disconnect(bridge),
+                            'Could not finish disconnecting',
+                          ),
                         )
                       else
                         CustomButton(
                           text: 'Prepare RGB outputs',
                           variant: ButtonVariant.secondary,
                           loading: _preparing,
-                          onTap: () => unawaited(_prepare()),
+                          onTap: action(_prepare, 'Could not check outputs'),
                         ),
                       SizedBox(height: spacing.md),
                       CustomButton(
                         text: 'Saved burns',
                         variant: ButtonVariant.secondary,
                         loading: _loadingBurns,
-                        onTap: () => unawaited(_showBurns(bridge)),
+                        onTap: action(
+                          () => _showBurns(bridge),
+                          'Could not open saved burns',
+                        ),
                       ),
                       for (final burn in _burns.where(bridge.ownsBurn))
                         Builder(
@@ -372,8 +428,10 @@ class _HostedBridgeScreenState extends ConsumerState<HostedBridgeScreen> {
                             title: 'Export burn proof',
                             details: '${burn.txid.substring(0, 12)}…',
                             prefixIcon: Icons.ios_share,
-                            onTap: () =>
-                                unawaited(_shareBurn(bridge, burn, rowContext)),
+                            onTap: action(
+                              () => _shareBurn(bridge, burn, rowContext),
+                              'Could not export burn proof',
+                            ),
                           ),
                         ),
                     ],

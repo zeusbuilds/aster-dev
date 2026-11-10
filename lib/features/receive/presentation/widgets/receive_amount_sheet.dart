@@ -121,7 +121,8 @@ class ReceiveAmountSheet extends ConsumerWidget {
     final maxHeight = viewport.height * context.metrics.sheetMaxHeightFactor;
     final isDuoCover =
         ref.watch(duoCoverLayoutProvider).value?.appliesTo(viewport) == true;
-    final coverBottomPadding = isDuoCover
+    final scrollsToBottom = isDuoCover || context.isOpenDuoLandscape;
+    final scrollBottomPadding = scrollsToBottom
         ? context.windowInsets.bottomSafe + context.spacing.lg
         : null;
 
@@ -143,10 +144,9 @@ class ReceiveAmountSheet extends ConsumerWidget {
                 borderColor: context.appColors.transparentSurface,
                 borderWidth: 0,
                 padding: EdgeInsets.zero,
-                child: SafeArea(
-                  top: false,
-                  bottom: !isDuoCover,
-                  minimum: isDuoCover
+                child: AsterSheetSafeArea(
+                  bottom: !scrollsToBottom,
+                  minimum: scrollsToBottom
                       ? EdgeInsets.zero
                       : EdgeInsets.only(bottom: context.spacing.lg),
                   child: Column(
@@ -162,7 +162,7 @@ class ReceiveAmountSheet extends ConsumerWidget {
                           skipLoadingOnRefresh: false,
                           data: (value) => _AmountSheetBody(
                             state: value,
-                            bottomPadding: coverBottomPadding ?? 0,
+                            bottomPadding: scrollBottomPadding ?? 0,
                             commandsEnabled: !navigation.inFlight,
                             onChanged: ref.read(provider.notifier).updateAmount,
                             onApply: () => unawaited(
@@ -176,7 +176,7 @@ class ReceiveAmountSheet extends ConsumerWidget {
                           ),
                           loading: () => Padding(
                             padding: EdgeInsets.only(
-                              bottom: coverBottomPadding ?? 0,
+                              bottom: scrollBottomPadding ?? 0,
                             ),
                             child: const Center(
                               child: GridLoader(
@@ -189,7 +189,7 @@ class ReceiveAmountSheet extends ConsumerWidget {
                                 ? error.failure
                                 : FailureMapper.from(error, stackTrace),
                             onRetry: () => unawaited(_retry(context, ref)),
-                            coverBottomPadding: coverBottomPadding,
+                            scrollBottomPadding: scrollBottomPadding,
                           ),
                         ),
                       ),
@@ -281,12 +281,12 @@ final class _SheetFailure extends StatelessWidget {
   const _SheetFailure({
     required this.failure,
     required this.onRetry,
-    required this.coverBottomPadding,
+    required this.scrollBottomPadding,
   });
 
   final AppFailure failure;
   final VoidCallback onRetry;
-  final double? coverBottomPadding;
+  final double? scrollBottomPadding;
 
   @override
   Widget build(BuildContext context) {
@@ -308,7 +308,7 @@ final class _SheetFailure extends StatelessWidget {
         ],
       ],
     );
-    if (coverBottomPadding case final bottom?) {
+    if (scrollBottomPadding case final bottom?) {
       return SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(padding, padding, padding, bottom),
         child: content,

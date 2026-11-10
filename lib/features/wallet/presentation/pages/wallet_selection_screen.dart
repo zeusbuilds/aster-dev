@@ -13,88 +13,93 @@ import '../widgets/widgets.dart';
 
 /// Selects a wallet and leaves only after its native switch commits.
 class WalletSelectionScreen extends ConsumerWidget {
-  const WalletSelectionScreen({super.key});
+  const WalletSelectionScreen({super.key, this.onClose});
+
+  /// Returns an embedded chooser to its Settings panel.
+  final VoidCallback? onClose;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final walletState = ref.watch(walletViewModelProvider);
     final viewModel = ref.read(walletViewModelProvider.notifier);
 
-    return AsterNavigationScope(
-      child: Builder(
-        builder: (context) {
-          final navigation = AsterNavigationScope.of(context);
-          final spacing = context.spacing;
-          return walletState.when(
-            loading: () => const _WalletSelectionScaffold(
-              child: AsterHorizontalSafeArea(
-                child: Center(
-                  child: GridLoader(semanticLabel: 'Loading wallets'),
-                ),
+    final content = Builder(
+      builder: (context) {
+        final navigation = AsterNavigationScope.of(context);
+        final spacing = context.spacing;
+        return walletState.when(
+          loading: () => _WalletSelectionScaffold(
+            onClose: onClose,
+            child: const AsterHorizontalSafeArea(
+              child: Center(
+                child: GridLoader(semanticLabel: 'Loading wallets'),
               ),
             ),
-            error: (error, stackTrace) {
-              final failure = error is AppFailureException
-                  ? error.failure
-                  : FailureMapper.from(error, stackTrace);
-              return _WalletSelectionScaffold(
-                navigationLocked: navigation.inFlight,
-                child: _WalletLoadFailure(
-                  failure: failure,
-                  onRetry: viewModel.reload,
-                ),
-              );
-            },
-            data: (data) {
-              final switchingWalletId = data.switchingWalletId;
-              final navigationLocked =
-                  data.isChangingWallet || navigation.inFlight;
-              return _WalletSelectionScaffold(
-                navigationLocked: navigationLocked,
-                onAddWallet: navigationLocked
-                    ? null
-                    : () => _openAddWallet(context, navigation),
-                child: SafeArea(
-                  top: false,
-                  bottom: false,
-                  child: ListView.separated(
-                    padding: EdgeInsets.only(
-                      bottom: spacing.lg + context.windowInsets.bottomSafe,
-                    ),
-                    itemCount: data.wallets.length,
-                    separatorBuilder: (context, index) =>
-                        const AsterDivider.inset(),
-                    itemBuilder: (context, index) {
-                      final wallet = data.wallets[index];
-                      final isSelected = data.activeWallet?.id == wallet.id;
-                      final isSwitching = switchingWalletId == wallet.id;
-
-                      return WalletSelectOptionRow(
-                        key: ValueKey('wallet-${wallet.id}'),
-                        wallet: wallet,
-                        selected: isSelected,
-                        enabled: !navigationLocked,
-                        loading: isSwitching,
-                        onTap: isSelected || navigationLocked
-                            ? null
-                            : () => unawaited(
-                                _switchWallet(
-                                  context,
-                                  ref,
-                                  navigation,
-                                  wallet.id,
-                                ),
-                              ),
-                      );
-                    },
+          ),
+          error: (error, stackTrace) {
+            final failure = error is AppFailureException
+                ? error.failure
+                : FailureMapper.from(error, stackTrace);
+            return _WalletSelectionScaffold(
+              navigationLocked: navigation.inFlight,
+              onClose: onClose,
+              child: _WalletLoadFailure(
+                failure: failure,
+                onRetry: viewModel.reload,
+              ),
+            );
+          },
+          data: (data) {
+            final switchingWalletId = data.switchingWalletId;
+            final navigationLocked =
+                data.isChangingWallet || navigation.inFlight;
+            return _WalletSelectionScaffold(
+              navigationLocked: navigationLocked,
+              onClose: onClose,
+              onAddWallet: navigationLocked
+                  ? null
+                  : () => _openAddWallet(context, navigation),
+              child: SafeArea(
+                top: false,
+                bottom: false,
+                child: ListView.separated(
+                  padding: EdgeInsets.only(
+                    bottom: spacing.lg + context.windowInsets.bottomSafe,
                   ),
+                  itemCount: data.wallets.length,
+                  separatorBuilder: (context, index) =>
+                      const AsterDivider.inset(),
+                  itemBuilder: (context, index) {
+                    final wallet = data.wallets[index];
+                    final isSelected = data.activeWallet?.id == wallet.id;
+                    final isSwitching = switchingWalletId == wallet.id;
+
+                    return WalletSelectOptionRow(
+                      key: ValueKey('wallet-${wallet.id}'),
+                      wallet: wallet,
+                      selected: isSelected,
+                      enabled: !navigationLocked,
+                      loading: isSwitching,
+                      onTap: isSelected || navigationLocked
+                          ? null
+                          : () => unawaited(
+                              _switchWallet(
+                                context,
+                                ref,
+                                navigation,
+                                wallet.id,
+                              ),
+                            ),
+                    );
+                  },
                 ),
-              );
-            },
-          );
-        },
-      ),
+              ),
+            );
+          },
+        );
+      },
     );
+    return onClose == null ? AsterNavigationScope(child: content) : content;
   }
 
   void _openAddWallet(
@@ -151,7 +156,11 @@ class WalletSelectionScreen extends ConsumerWidget {
       blocksRoutePop: true,
     );
     if (!accepted || !switched || !context.mounted) return;
-    context.pop();
+    if (onClose case final close?) {
+      close();
+    } else {
+      context.pop();
+    }
   }
 }
 
@@ -195,11 +204,13 @@ class _WalletSelectionScaffold extends StatelessWidget {
     required this.child,
     this.navigationLocked = false,
     this.onAddWallet,
+    this.onClose,
   });
 
   final Widget child;
   final bool navigationLocked;
   final VoidCallback? onAddWallet;
+  final VoidCallback? onClose;
 
   @override
   Widget build(BuildContext context) {
@@ -211,6 +222,7 @@ class _WalletSelectionScaffold extends StatelessWidget {
           title: 'Select Wallet',
           leadingIcon: true,
           leadingEnabled: !navigationLocked,
+          onBack: onClose,
           fallbackLocation: RoutePaths.settings,
           action: AsterIconButton(
             icon: RemixIcons.add_line,

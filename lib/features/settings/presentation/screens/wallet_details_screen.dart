@@ -15,7 +15,9 @@ import '../../../wallet/presentation/view_model/view_models.dart';
 
 /// Reads only the active wallet's non-secret application profile.
 class WalletDetailsScreen extends ConsumerStatefulWidget {
-  const WalletDetailsScreen({super.key});
+  const WalletDetailsScreen({super.key, this.embedded = false});
+
+  final bool embedded;
 
   @override
   ConsumerState<WalletDetailsScreen> createState() =>
@@ -28,11 +30,25 @@ class _WalletDetailsScreenState extends ConsumerState<WalletDetailsScreen> {
 
   bool _ownsWallet(String id) {
     if (!mounted || ModalRoute.of(context)?.isCurrent != true) return false;
+    if (widget.embedded && !TickerMode.valuesOf(context).enabled) return false;
     final wallet = ref.read(walletViewModelProvider);
     return !wallet.isLoading &&
         !wallet.hasError &&
         wallet.value?.activeWallet?.id == id &&
         wallet.value?.isChangingWallet != true;
+  }
+
+  Future<void> _requestDelete(WalletProfile profile, bool lastWallet) async {
+    if (!widget.embedded) {
+      await _delete(profile, lastWallet);
+      return;
+    }
+    await AsterNavigationScope.of(context).run(
+      command: () => _delete(profile, lastWallet),
+      failureTitle: 'Wallet not deleted',
+      hapticIntent: null,
+      blocksRoutePop: true,
+    );
   }
 
   Future<void> _delete(WalletProfile profile, bool lastWallet) async {
@@ -131,7 +147,8 @@ class _WalletDetailsScreenState extends ConsumerState<WalletDetailsScreen> {
         backgroundColor: context.colorScheme.surface,
         appBar: CustomAppBar(
           title: 'Wallet details',
-          leadingIcon: true,
+          leadingIcon: !widget.embedded,
+          automaticallyImplyLeading: !widget.embedded,
           leadingEnabled: !_deleting,
           fallbackLocation: RoutePaths.settings,
         ),
@@ -158,7 +175,8 @@ class _WalletDetailsScreenState extends ConsumerState<WalletDetailsScreen> {
                     Expanded(
                       child: _WalletDetails(
                         profile: profile,
-                        footerOwnsBottomInset: isDuoCover,
+                        footerOwnsBottomInset:
+                            isDuoCover || context.isOpenDuoLandscape,
                       ),
                     ),
                     Padding(
@@ -220,7 +238,7 @@ class _WalletDetailsScreenState extends ConsumerState<WalletDetailsScreen> {
                                   !_confirming &&
                                   wallet.value?.isChangingWallet != true,
                               onTap: () => unawaited(
-                                _delete(
+                                _requestDelete(
                                   profile,
                                   wallet.value!.wallets.length == 1,
                                 ),

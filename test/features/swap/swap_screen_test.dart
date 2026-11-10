@@ -6,6 +6,7 @@ import 'package:aster/features/swap/presentation/screens/screens.dart';
 import 'package:aster/features/swap/presentation/widgets/widgets.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:aster/features/wallet/presentation/view_model/view_models.dart';
+import 'package:aster/features/wallet/presentation/widgets/widgets.dart';
 import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -114,41 +115,85 @@ void main() {
     expect(tester, meetsGuideline(textContrastGuideline));
   });
 
-  testWidgets('Duo cover Swap scrolls through the bottom inset', (
-    tester,
-  ) async {
-    const channel = EventChannel('com.aster.wallet/cover_navigation');
-    final messenger = tester.binding.defaultBinaryMessenger;
-    messenger.setMockStreamHandler(
-      channel,
-      MockStreamHandler.inline(
-        onListen: (_, events) =>
-            events.success({'width': 466.0, 'height': 678.0}),
-      ),
-    );
-    addTearDown(() => messenger.setMockStreamHandler(channel, null));
-    const padding = FakeViewPadding(right: 84, bottom: 34);
-    tester.view.padding = padding;
-    tester.view.viewPadding = padding;
-    addTearDown(tester.view.resetPadding);
-    addTearDown(tester.view.resetViewPadding);
-    final harness = await PaymentFlowTestHarness.create(
-      services: testRgbServices,
-    );
-    addTearDown(() => _disposeHarness(tester, harness));
-    await _pump(tester, harness, viewport: const Size(466, 678));
-    final action = find.widgetWithText(CustomButton, 'Coming soon');
-    await _pumpUntil(tester, () => action.evaluate().isNotEmpty);
-    final scrollable = tester.state<ScrollableState>(find.byType(Scrollable));
-    scrollable.position.jumpTo(scrollable.position.maxScrollExtent);
-    await tester.pumpAndSettle();
-    expect(
-      tester.getRect(find.byType(CustomScrollView)).bottom,
-      closeTo(678, 0.5),
-    );
-    expect(tester.getRect(action).bottom, closeTo(628, 0.5));
-    expect(tester.takeException(), isNull);
-  }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
+  for (final (label, open, viewport, contentLeft, contentRight) in [
+    ('Duo cover', false, const Size(466, 678), 0.0, 382.0),
+    ('open Duo landscape', true, const Size(951, 669), 155.5, 795.5),
+    ('narrow Duo landscape', true, const Size(700, 500), 30.0, 616.0),
+  ]) {
+    testWidgets('$label Swap clears only overlapping sheet insets', (
+      tester,
+    ) async {
+      const channel = EventChannel('com.aster.wallet/cover_navigation');
+      final messenger = tester.binding.defaultBinaryMessenger;
+      messenger.setMockStreamHandler(
+        channel,
+        MockStreamHandler.inline(
+          onListen: (_, events) => events.success({
+            'width': viewport.width,
+            'height': viewport.height,
+            if (open) 'inner': true,
+          }),
+        ),
+      );
+      addTearDown(() => messenger.setMockStreamHandler(channel, null));
+      const padding = FakeViewPadding(right: 84, bottom: 34);
+      tester.view.padding = padding;
+      tester.view.viewPadding = padding;
+      addTearDown(tester.view.resetPadding);
+      addTearDown(tester.view.resetViewPadding);
+      final harness = await PaymentFlowTestHarness.create(
+        services: testRgbServices,
+      );
+      addTearDown(() => _disposeHarness(tester, harness));
+      await _pump(tester, harness, viewport: viewport, openDuoLandscape: open);
+      final action = find.widgetWithText(CustomButton, 'Coming soon');
+      await _pumpUntil(tester, () => action.evaluate().isNotEmpty);
+      final scrollable = tester.state<ScrollableState>(find.byType(Scrollable));
+      scrollable.position.jumpTo(scrollable.position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      expect(
+        tester.getRect(find.byType(CustomScrollView)).bottom,
+        closeTo(viewport.height, 0.5),
+      );
+      expect(
+        tester.getRect(action).bottom,
+        closeTo(viewport.height - 34 - 16, 0.5),
+      );
+
+      final bitcoin = find.text('Bitcoin · On-chain');
+      await tester.ensureVisible(bitcoin);
+      await tester.pumpAndSettle();
+      await tester.tap(bitcoin);
+      await tester.pumpAndSettle();
+      final sheet = find.byType(AssetSelectorSheet);
+      final sheetBounds = tester.getRect(sheet);
+      expect(sheetBounds.width, closeTo(open ? 640 : 466, 0.5));
+      expect(sheetBounds.center.dx, closeTo(viewport.width / 2, 0.5));
+      final header = find.descendant(
+        of: sheet,
+        matching: find.byType(AsterSheetHeader),
+      );
+      final options = find.descendant(
+        of: sheet,
+        matching: find.byType(ListView),
+      );
+      for (final content in [header, options]) {
+        final bounds = tester.getRect(content);
+        expect(bounds.left, closeTo(contentLeft, 0.5));
+        expect(bounds.right, closeTo(contentRight, 0.5));
+      }
+      final firstIcon = find
+          .descendant(of: options, matching: find.byType(WalletAssetIcon))
+          .first;
+      final selection = find.descendant(
+        of: options,
+        matching: find.byIcon(Icons.check),
+      );
+      expect(tester.getRect(firstIcon).left, closeTo(contentLeft + 20, 0.5));
+      expect(tester.getRect(selection).right, closeTo(contentRight - 20, 0.5));
+      expect(tester.takeException(), isNull);
+    }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
+  }
 
   testWidgets('Swap loading exposes one truthful live node', (tester) async {
     final gate = Completer<List<WalletPaymentCapability>>();
@@ -234,6 +279,7 @@ Future<void> _pump(
   PaymentFlowTestHarness harness, {
   TextScaler? textScaler,
   Size viewport = const Size(390, 844),
+  bool openDuoLandscape = false,
 }) {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = viewport;
@@ -248,7 +294,9 @@ Future<void> _pump(
           final content = AsterFeedbackScope(
             haptics: harness.haptics,
             toasts: harness.toasts,
-            child: child!,
+            child: openDuoLandscape
+                ? AsterDuoLandscapeScope(child: child!)
+                : child!,
           );
           return textScaler == null
               ? content

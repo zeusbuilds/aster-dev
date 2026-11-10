@@ -705,6 +705,64 @@ void main() {
     }
   }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
 
+  for (final (label, bottomTabs, tabClearance) in [
+    ('standalone', false, 0.0),
+    ('shell', true, 64.0),
+  ]) {
+    testWidgets('open Duo landscape $label scanner clears its footer', (
+      tester,
+    ) async {
+      const viewport = Size(951, 669);
+      const channel = EventChannel('com.aster.wallet/cover_navigation');
+      final messenger = tester.binding.defaultBinaryMessenger;
+      messenger.setMockStreamHandler(
+        channel,
+        MockStreamHandler.inline(
+          onListen: (_, events) => events.success({
+            'inner': true,
+            'width': viewport.width,
+            'height': viewport.height,
+          }),
+        ),
+      );
+      addTearDown(() => messenger.setMockStreamHandler(channel, null));
+      tester.view.physicalSize = viewport;
+      tester.view.devicePixelRatio = 1;
+      const padding = FakeViewPadding(bottom: 34);
+      tester.view.padding = padding;
+      tester.view.viewPadding = padding;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPadding);
+      addTearDown(tester.view.resetViewPadding);
+
+      final router = _launcherRouter(bottomTabs: bottomTabs);
+      addTearDown(router.dispose);
+      final harness = _ScanWidgetHarness(
+        session: FakeScanSession(),
+        router: router,
+        purpose: ScanPurpose.sendLauncher,
+      );
+      addTearDown(harness.dispose);
+      await tester.pumpWidget(harness.buildApp(openDuoLandscape: true));
+      harness.activateScanTab();
+      await tester.pumpAndSettle();
+
+      final manual = find.byType(ScanEnterAddressButton);
+      final manualRect = tester.getRect(manual);
+      final frame = tester.getRect(find.byType(ScanFrame));
+      expect(manualRect.bottom, viewport.height - 34 - 16 - tabClearance);
+      expect(frame.bottom, lessThan(manualRect.top));
+      expect(tester.getRect(find.byType(ScanWalletHeader)).top, 12);
+      expect(
+        tester.widget<ScanCamera>(find.byType(ScanCamera)).cutoutRect,
+        frame,
+      );
+      expect(manual.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
+  }
+
   testWidgets('camera failure is silent while gallery remains available', (
     tester,
   ) async {
@@ -1071,13 +1129,17 @@ GoRoute _configuredScanRoute() {
   );
 }
 
-GoRouter _launcherRouter() {
+GoRouter _launcherRouter({bool bottomTabs = false}) {
   return GoRouter(
     routes: [
       GoRoute(
         path: '/',
-        builder: (context, state) =>
-            const ScanScreen(purpose: ScanPurpose.sendLauncher),
+        builder: (context, state) {
+          const scan = ScanScreen(purpose: ScanPurpose.sendLauncher);
+          return bottomTabs
+              ? const CoverTabRail(bounds: null, child: scan)
+              : scan;
+        },
       ),
       GoRoute(
         path: RoutePaths.send,
@@ -1148,12 +1210,20 @@ final class _ScanWidgetHarness {
         .setIndex(appShellScanTabIndex);
   }
 
-  Widget get app => UncontrolledProviderScope(
+  Widget get app => buildApp();
+
+  Widget buildApp({bool openDuoLandscape = false}) => UncontrolledProviderScope(
     container: container,
     child: AsterFeedbackScope(
       haptics: haptics,
       toasts: toasts,
-      child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
+      child: MaterialApp.router(
+        theme: AppTheme.light(),
+        routerConfig: router,
+        builder: openDuoLandscape
+            ? (_, child) => AsterDuoLandscapeScope(child: child!)
+            : null,
+      ),
     ),
   );
 

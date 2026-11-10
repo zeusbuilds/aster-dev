@@ -11,7 +11,9 @@ import '../../../../shared/shared.dart';
 
 /// Device security preferences shared by every wallet in this installation.
 class SecuritySettingsScreen extends ConsumerStatefulWidget {
-  const SecuritySettingsScreen({super.key});
+  const SecuritySettingsScreen({super.key, this.embedded = false});
+
+  final bool embedded;
 
   @override
   ConsumerState<SecuritySettingsScreen> createState() =>
@@ -22,8 +24,14 @@ class _SecuritySettingsScreenState
     extends ConsumerState<SecuritySettingsScreen> {
   bool _changing = false;
 
+  bool get _sourceCurrent =>
+      mounted &&
+      (!widget.embedded ||
+          (TickerMode.valuesOf(context).enabled &&
+              ModalRoute.of(context)?.isCurrent == true));
+
   Future<void> _changeLock(bool enabled) async {
-    if (_changing) return;
+    if (_changing || !_sourceCurrent) return;
     final controller = ref.read(securityControllerProvider);
     final toasts = context.toasts;
     setState(() => _changing = true);
@@ -41,10 +49,11 @@ class _SecuritySettingsScreenState
             confirmText: 'Turn off',
           ),
         );
-        if (confirmed != true || !mounted) return;
+        if (confirmed != true || !_sourceCurrent) return;
       }
       await controller.setAppLockEnabled(enabled);
     } catch (error, stackTrace) {
+      if (!_sourceCurrent) return;
       final failure = FailureMapper.from(error, stackTrace);
       toasts.show(
         title: 'Security setting not changed',
@@ -68,9 +77,10 @@ class _SecuritySettingsScreenState
         final busy = _changing || controller.isAuthenticating;
         return Scaffold(
           backgroundColor: context.colorScheme.surface,
-          appBar: const CustomAppBar(
+          appBar: CustomAppBar(
             title: 'Security',
-            leadingIcon: true,
+            leadingIcon: !widget.embedded,
+            automaticallyImplyLeading: !widget.embedded,
             fallbackLocation: RoutePaths.settings,
           ),
           body: AsterHorizontalSafeArea(

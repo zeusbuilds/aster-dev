@@ -14,6 +14,10 @@ import '../models/models.dart';
 import '../view_model/view_models.dart';
 import '../widgets/widgets.dart';
 
+double _detailsBottomInset(BuildContext context) =>
+    context.windowInsets.bottomSafe +
+    (context.isOpenDuoLandscape ? context.spacing.lg : context.spacing.xxl);
+
 /// Details for one opaque Activity ID resolved from the active wallet.
 class TransactionDetailsScreen extends ConsumerWidget {
   const TransactionDetailsScreen({
@@ -171,7 +175,7 @@ class _DetailsBody extends ConsumerWidget {
               context.spacing.screenPadding,
               context.spacing.xl,
               context.spacing.screenPadding,
-              context.spacing.xxl + context.windowInsets.bottomSafe,
+              _detailsBottomInset(context),
             ),
             sliver: SliverList.list(
               children: [
@@ -549,7 +553,7 @@ class _SubmissionDetails extends StatelessWidget {
             context.spacing.screenPadding,
             context.spacing.xl,
             context.spacing.screenPadding,
-            context.spacing.xxl + context.windowInsets.bottomSafe,
+            _detailsBottomInset(context),
           ),
           sliver: SliverList.list(
             children: [
@@ -791,7 +795,7 @@ class _DetailsLoadingView extends StatelessWidget {
             context.spacing.screenPadding,
             context.spacing.xl,
             context.spacing.screenPadding,
-            context.spacing.xxl + context.windowInsets.bottomSafe,
+            _detailsBottomInset(context),
           ),
           child: Column(
             children: [

@@ -38,6 +38,7 @@ class MarketTile extends StatelessWidget {
   /// Optional tint applied to the decorative texture shadow.
   final Color? shadowColor;
   final MarketContentTone contentTone;
+  final bool compact;
 
   const MarketTile({
     super.key,
@@ -51,6 +52,7 @@ class MarketTile extends StatelessWidget {
     required this.gradient,
     this.shadowColor,
     this.contentTone = MarketContentTone.light,
+    this.compact = false,
   });
 
   @override
@@ -69,10 +71,14 @@ class MarketTile extends StatelessWidget {
     final capsuleBase = darkContent
         ? colors.onMarketTile
         : colors.marketDarkText;
+    final artworkSize = compact
+        ? metrics.marketTextureSize * 0.75
+        : metrics.marketTextureSize;
     final artworkDecodeDimension =
-        (metrics.marketTextureSize * MediaQuery.devicePixelRatioOf(context))
-            .ceil()
-            .clamp(1, _marketArtworkMaximumDecodeDimension);
+        (artworkSize * MediaQuery.devicePixelRatioOf(context)).ceil().clamp(
+          1,
+          _marketArtworkMaximumDecodeDimension,
+        );
 
     void activate() {
       if (onTap == null) return;
@@ -101,8 +107,8 @@ class MarketTile extends StatelessWidget {
             child: Stack(
               children: [
                 Positioned(
-                  top: -spacing.md,
-                  right: -spacing.xl,
+                  top: compact ? -spacing.xs : -spacing.md,
+                  right: compact ? -spacing.md : -spacing.xl,
                   child: Container(
                     decoration: BoxDecoration(
                       boxShadow: shadowColor != null
@@ -114,8 +120,8 @@ class MarketTile extends StatelessWidget {
                     child: ExcludeSemantics(
                       child: Image.asset(
                         artworkAsset,
-                        width: metrics.marketTextureSize,
-                        height: metrics.marketTextureSize,
+                        width: artworkSize,
+                        height: artworkSize,
                         cacheWidth: artworkDecodeDimension,
                         cacheHeight: artworkDecodeDimension,
                         filterQuality: FilterQuality.medium,
@@ -124,7 +130,10 @@ class MarketTile extends StatelessWidget {
                   ),
                 ),
                 Padding(
-                  padding: EdgeInsets.all(spacing.lg),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: spacing.lg,
+                    vertical: compact ? spacing.md : spacing.lg,
+                  ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -147,7 +156,9 @@ class MarketTile extends StatelessWidget {
                                 ),
                               ),
                             if (tipText case final value?) ...[
-                              SizedBox(height: spacing.xxl),
+                              SizedBox(
+                                height: compact ? spacing.sm : spacing.xxl,
+                              ),
                               AsterPill(
                                 padding: EdgeInsets.fromLTRB(
                                   spacing.xs,

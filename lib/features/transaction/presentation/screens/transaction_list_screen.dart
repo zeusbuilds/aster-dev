@@ -227,6 +227,11 @@ class _ActivityBody extends StatelessWidget {
           );
         });
 
+    final landscape = context.isOpenDuoLandscape;
+    final omitLastItemGap = isDuoCover || landscape;
+    final bottomInset =
+        context.windowInsets.bottomSafe +
+        (landscape ? context.spacing.lg : context.spacing.xxl);
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
@@ -258,7 +263,10 @@ class _ActivityBody extends StatelessWidget {
         if (entries.isEmpty)
           SliverFillRemaining(
             hasScrollBody: false,
-            child: _EmptyActivity(assetKind: assetKind),
+            child: _EmptyActivity(
+              assetKind: assetKind,
+              bottomInset: landscape ? bottomInset : 0,
+            ),
           )
         else
           SliverPadding(
@@ -303,18 +311,15 @@ class _ActivityBody extends StatelessWidget {
                             ? null
                             : () => onOpenDetails!(pending.id),
                       ),
-                    if (!isDuoCover || index < entries.length - 1)
+                    if (!omitLastItemGap || index < entries.length - 1)
                       SizedBox(height: context.spacing.md),
                   ],
                 );
               },
             ),
           ),
-        SliverToBoxAdapter(
-          child: SizedBox(
-            height: context.spacing.xxl + context.windowInsets.bottomSafe,
-          ),
-        ),
+        if (entries.isNotEmpty || !landscape)
+          SliverToBoxAdapter(child: SizedBox(height: bottomInset)),
       ],
     );
   }
@@ -392,14 +397,17 @@ class _ActivityFailureView extends ConsumerWidget {
 }
 
 class _EmptyActivity extends StatelessWidget {
-  const _EmptyActivity({required this.assetKind});
+  const _EmptyActivity({required this.assetKind, required this.bottomInset});
 
   final WalletAssetKind assetKind;
+  final double bottomInset;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.all(context.spacing.screenPadding),
+      padding:
+          EdgeInsets.all(context.spacing.screenPadding) +
+          EdgeInsets.only(bottom: bottomInset),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -428,6 +436,11 @@ class _ActivityLoadingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final landscape = context.isOpenDuoLandscape;
+    final omitLastItemGap = isDuoCover || landscape;
+    final bottomInset =
+        context.windowInsets.bottomSafe +
+        (landscape ? context.spacing.lg : context.spacing.xxl);
     return Semantics(
       container: true,
       liveRegion: true,
@@ -472,7 +485,7 @@ class _ActivityLoadingView extends StatelessWidget {
                 itemCount: _placeholderCount,
                 itemBuilder: (context, index) => Padding(
                   padding: EdgeInsets.only(
-                    bottom: !isDuoCover || index < _placeholderCount - 1
+                    bottom: !omitLastItemGap || index < _placeholderCount - 1
                         ? context.spacing.md
                         : 0,
                   ),
@@ -480,11 +493,7 @@ class _ActivityLoadingView extends StatelessWidget {
                 ),
               ),
             ),
-            SliverToBoxAdapter(
-              child: SizedBox(
-                height: context.spacing.xxl + context.windowInsets.bottomSafe,
-              ),
-            ),
+            SliverToBoxAdapter(child: SizedBox(height: bottomInset)),
           ],
         ),
       ),

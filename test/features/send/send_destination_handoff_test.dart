@@ -20,8 +20,8 @@ void main() {
     expect(value?.value, 'lightning:invoice');
     expect(value.toString(), 'SendDestinationHandoffValue(redacted)');
     expect(value.toString(), isNot(contains('invoice')));
-    expect(handoff.take(), 'lightning:invoice');
-    expect(handoff.take(), isNull);
+    expect(handoff.take(value!), 'lightning:invoice');
+    expect(handoff.take(value), isNull);
 
     final invalid = handoff.stage(
       'x' * (SendDestinationHandoffValue.maximumCharacters + 1),
@@ -68,4 +68,22 @@ void main() {
       expect(harness.container.read(sendDestinationHandoffProvider), isNull);
     },
   );
+
+  test('an already opening Send form leaves a later scan staged', () async {
+    final harness = await PaymentFlowTestHarness.create();
+    addTearDown(harness.dispose);
+    final opening = harness.container.read(
+      sendFlowViewModelProvider(WalletPaymentTarget.bitcoinOnchain).future,
+    );
+    final handoff = harness.container.read(
+      sendDestinationHandoffProvider.notifier,
+    );
+    expect(handoff.stage('rgb:later-scan'), isA<AppSuccess<void>>());
+
+    expect((await opening).destination, isEmpty);
+    expect(
+      harness.container.read(sendDestinationHandoffProvider)?.value,
+      'rgb:later-scan',
+    );
+  });
 }

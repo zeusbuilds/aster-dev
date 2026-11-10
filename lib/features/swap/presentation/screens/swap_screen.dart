@@ -22,6 +22,7 @@ class SwapScreen extends ConsumerWidget {
             .value
             ?.appliesTo(MediaQuery.sizeOf(context)) ==
         true;
+    final scrollsToBottom = isDuoCover || context.isOpenDuoLandscape;
     return Scaffold(
       backgroundColor: context.colorScheme.surface,
       appBar: const CustomAppBar(
@@ -31,7 +32,7 @@ class SwapScreen extends ConsumerWidget {
       ),
       body: SafeArea(
         top: false,
-        bottom: !isDuoCover || swap.isLoading || swap.hasError,
+        bottom: !scrollsToBottom || swap.isLoading || swap.hasError,
         child: Padding(
           padding: EdgeInsets.symmetric(
             horizontal: context.spacing.screenPadding,
@@ -42,7 +43,7 @@ class SwapScreen extends ConsumerWidget {
               state: state,
               bottomPadding:
                   context.spacing.lg +
-                  (isDuoCover ? context.windowInsets.bottomSafe : 0),
+                  (scrollsToBottom ? context.windowInsets.bottomSafe : 0),
             ),
             loading: () => const _SwapLoading(),
             error: (error, stackTrace) => _SwapFailure(

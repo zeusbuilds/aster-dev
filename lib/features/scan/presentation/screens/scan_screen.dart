@@ -197,6 +197,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
             .value
             ?.appliesTo(MediaQuery.sizeOf(context)) ==
         true;
+    final usesCompactBottom = isDuoCover || context.isOpenDuoLandscape;
     final manualEntryLabel = _bridge
         ? 'Enter connection link manually'
         : widget.purpose == ScanPurpose.destinationPicker
@@ -222,10 +223,11 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
             final controlsRight = insets.right + spacing.screenPadding;
             final persistentNavClearance =
                 widget.purpose == ScanPurpose.sendLauncher &&
-                    (!isDuoCover || CoverTabRail.hasBottomFallbackOf(context))
+                    (!usesCompactBottom ||
+                        CoverTabRail.hasBottomFallbackOf(context))
                 ? metrics.floatingNavClearance
                 : 0.0;
-            final actionMargin = isDuoCover ? spacing.lg : spacing.xxl;
+            final actionMargin = usesCompactBottom ? spacing.lg : spacing.xxl;
             final ctaBottom =
                 insets.bottom + persistentNavClearance + actionMargin;
             final frameTop = insets.top + metrics.scanHeaderExtent;

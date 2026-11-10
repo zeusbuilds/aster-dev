@@ -11,7 +11,10 @@ import '../widgets/widgets.dart';
 
 /// Selects the app-wide Bitcoin denomination without changing stored values.
 class BitcoinUnitSelectionScreen extends ConsumerWidget {
-  const BitcoinUnitSelectionScreen({super.key});
+  const BitcoinUnitSelectionScreen({super.key, this.onClose});
+
+  /// Returns an embedded chooser to its Settings panel.
+  final VoidCallback? onClose;
 
   static const _exampleSatoshis = 12345678;
 
@@ -19,75 +22,75 @@ class BitcoinUnitSelectionScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsViewModelProvider);
     final saving = settings.value?.isSaving ?? false;
-    return AsterNavigationScope(
-      child: Builder(
-        builder: (context) {
-          final navigation = AsterNavigationScope.of(context);
-          final navigationLocked = saving || navigation.inFlight;
-          return PopScope(
-            canPop: !navigationLocked,
-            child: Scaffold(
-              backgroundColor: context.colorScheme.surface,
-              appBar: CustomAppBar(
-                title: 'Bitcoin Unit',
-                leadingIcon: true,
-                leadingEnabled: !navigationLocked,
-                fallbackLocation: RoutePaths.settings,
-              ),
-              body: settings.when(
-                skipLoadingOnRefresh: false,
-                loading: () => const AsterHorizontalSafeArea(
-                  child: Center(
-                    child: GridLoader(semanticLabel: 'Loading Bitcoin units'),
-                  ),
-                ),
-                error: (error, stackTrace) => SettingsLoadFailure(
-                  failure: FailureMapper.from(error, stackTrace),
-                  onRetry: () =>
-                      ref.read(settingsViewModelProvider.notifier).retry(),
-                ),
-                data: (state) {
-                  final selected = state.snapshot.preferences.bitcoinUnit;
-                  return Stack(
-                    children: [
-                      SafeArea(
-                        top: false,
-                        bottom: false,
-                        child: ListView.separated(
-                          padding: EdgeInsets.only(
-                            bottom:
-                                context.windowInsets.bottomSafe +
-                                context.spacing.lg,
-                          ),
-                          itemCount: BitcoinUnit.values.length,
-                          separatorBuilder: (context, index) =>
-                              const AsterDivider.inset(),
-                          itemBuilder: (context, index) {
-                            final unit = BitcoinUnit.values[index];
-                            return SettingsChoiceRow(
-                              title: unit.displayName,
-                              subtitle: BitcoinAmountFormatter(unit: unit)
-                                  .format(_exampleSatoshis),
-                              selected: selected == unit,
-                              onTap: navigationLocked
-                                  ? null
-                                  : () => unawaited(
-                                      _select(context, ref, navigation, unit),
-                                    ),
-                            );
-                          },
-                        ),
-                      ),
-                      if (saving) const SettingsSavingIndicator(),
-                    ],
-                  );
-                },
-              ),
+    final content = Builder(
+      builder: (context) {
+        final navigation = AsterNavigationScope.of(context);
+        final navigationLocked = saving || navigation.inFlight;
+        return PopScope(
+          canPop: !navigationLocked,
+          child: Scaffold(
+            backgroundColor: context.colorScheme.surface,
+            appBar: CustomAppBar(
+              title: 'Bitcoin Unit',
+              leadingIcon: true,
+              leadingEnabled: !navigationLocked,
+              onBack: onClose,
+              fallbackLocation: RoutePaths.settings,
             ),
-          );
-        },
-      ),
+            body: settings.when(
+              skipLoadingOnRefresh: false,
+              loading: () => const AsterHorizontalSafeArea(
+                child: Center(
+                  child: GridLoader(semanticLabel: 'Loading Bitcoin units'),
+                ),
+              ),
+              error: (error, stackTrace) => SettingsLoadFailure(
+                failure: FailureMapper.from(error, stackTrace),
+                onRetry: () =>
+                    ref.read(settingsViewModelProvider.notifier).retry(),
+              ),
+              data: (state) {
+                final selected = state.snapshot.preferences.bitcoinUnit;
+                return Stack(
+                  children: [
+                    SafeArea(
+                      top: false,
+                      bottom: false,
+                      child: ListView.separated(
+                        padding: EdgeInsets.only(
+                          bottom:
+                              context.windowInsets.bottomSafe +
+                              context.spacing.lg,
+                        ),
+                        itemCount: BitcoinUnit.values.length,
+                        separatorBuilder: (context, index) =>
+                            const AsterDivider.inset(),
+                        itemBuilder: (context, index) {
+                          final unit = BitcoinUnit.values[index];
+                          return SettingsChoiceRow(
+                            title: unit.displayName,
+                            subtitle: BitcoinAmountFormatter(unit: unit)
+                                .format(_exampleSatoshis),
+                            selected: selected == unit,
+                            onTap: navigationLocked
+                                ? null
+                                : () => unawaited(
+                                    _select(context, ref, navigation, unit),
+                                  ),
+                          );
+                        },
+                      ),
+                    ),
+                    if (saving) const SettingsSavingIndicator(),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+      },
     );
+    return onClose == null ? AsterNavigationScope(child: content) : content;
   }
 
   Future<void> _select(
@@ -123,6 +126,10 @@ class BitcoinUnitSelectionScreen extends ConsumerWidget {
     );
     if (!accepted || !saved || !context.mounted) return;
     unawaited(context.haptics.trigger(HapticIntent.selection));
-    context.pop();
+    if (onClose case final close?) {
+      close();
+    } else {
+      context.pop();
+    }
   }
 }

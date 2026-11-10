@@ -17,9 +17,19 @@ import '../widgets/widgets.dart';
 
 /// Second Send step: validate an address, URI, or Lightning invoice.
 class SendAddressScreen extends ConsumerStatefulWidget {
-  const SendAddressScreen({super.key, required this.target});
+  const SendAddressScreen({super.key, required this.target})
+    : embedded = false,
+      onBack = null;
+
+  const SendAddressScreen.embedded({
+    super.key,
+    required this.target,
+    this.onBack,
+  }) : embedded = true;
 
   final WalletPaymentTarget target;
+  final bool embedded;
+  final VoidCallback? onBack;
 
   @override
   ConsumerState<SendAddressScreen> createState() => _SendAddressScreenState();
@@ -81,6 +91,8 @@ class _SendAddressScreenState extends ConsumerState<SendAddressScreen> {
     BuildContext routeContext,
     AsterNavigationCommandOwner navigation,
   ) async {
+    final target = widget.target;
+    final walletId = ref.read(walletViewModelProvider).value?.activeWallet?.id;
     final outcome = await navigation.openRouteForResult<String>(
       command: () => routeContext.push<String>(
         RoutePaths.scan,
@@ -89,9 +101,16 @@ class _SendAddressScreenState extends ConsumerState<SendAddressScreen> {
       failureTitle: 'Scanner could not open',
     );
     final result = outcome.value;
-    if (!outcome.accepted || !mounted || result == null) return;
+    if (!outcome.accepted ||
+        !mounted ||
+        result == null ||
+        target != widget.target ||
+        walletId == null ||
+        walletId != ref.read(walletViewModelProvider).value?.activeWallet?.id) {
+      return;
+    }
     ref
-        .read(sendFlowViewModelProvider(widget.target).notifier)
+        .read(sendFlowViewModelProvider(target).notifier)
         .updateDestination(result.trim());
   }
 
@@ -255,67 +274,67 @@ class _SendAddressScreenState extends ConsumerState<SendAddressScreen> {
     final current = flow.value;
     final controlsEnabled = current?.canChangeDestination ?? false;
 
-    return AsterNavigationScope(
-      child: Builder(
-        builder: (context) {
-          final navigation = AsterNavigationScope.of(context);
-          return GestureDetector(
-            onTap: () => FocusScope.of(context).unfocus(),
-            child: Scaffold(
-              backgroundColor: context.colorScheme.surface,
-              appBar: CustomAppBar(
-                title: widget.target.sendTitle,
-                leadingIcon: true,
-                centerTitle: false,
-                fallbackLocation: RoutePaths.send,
-                action: AsterIconButton(
-                  onPressed: controlsEnabled && !navigation.inFlight
-                      ? () => _openScan(context, navigation)
-                      : null,
-                  hapticIntent: null,
-                  icon: MingCuteIcons.mgc_scan_line,
-                  tooltip:
-                      'Scan ${widget.target.destinationLabel.toLowerCase()}',
-                  alignment: Alignment.centerLeft,
-                ),
+    final content = Builder(
+      builder: (context) {
+        final navigation = AsterNavigationScope.of(context);
+        return GestureDetector(
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: Scaffold(
+            backgroundColor: context.colorScheme.surface,
+            appBar: CustomAppBar(
+              title: widget.target.sendTitle,
+              leadingIcon: !widget.embedded || widget.onBack != null,
+              onBack: widget.onBack,
+              automaticallyImplyLeading: !widget.embedded,
+              centerTitle: false,
+              fallbackLocation: RoutePaths.send,
+              action: AsterIconButton(
+                onPressed: controlsEnabled && !navigation.inFlight
+                    ? () => _openScan(context, navigation)
+                    : null,
+                hapticIntent: null,
+                icon: MingCuteIcons.mgc_scan_line,
+                tooltip: 'Scan ${widget.target.destinationLabel.toLowerCase()}',
+                alignment: Alignment.centerLeft,
               ),
-              body: SafeArea(
-                top: false,
-                bottom: false,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: context.spacing.screenPadding,
+            ),
+            body: SafeArea(
+              top: false,
+              bottom: false,
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: context.spacing.screenPadding,
+                ),
+                child: flow.when(
+                  skipLoadingOnRefresh: false,
+                  data: (state) => _DestinationBody(
+                    state: state,
+                    commandsEnabled: !navigation.inFlight,
+                    controller: _destinationController,
+                    onChanged: ref.read(provider.notifier).updateDestination,
+                    onClear: () {
+                      _destinationController.clear();
+                      ref.read(provider.notifier).updateDestination('');
+                    },
+                    onPaste: () => unawaited(_paste()),
+                    onSubmitted: () => _continue(context, navigation),
+                    onContinue: () => _continue(context, navigation),
                   ),
-                  child: flow.when(
-                    skipLoadingOnRefresh: false,
-                    data: (state) => _DestinationBody(
-                      state: state,
-                      commandsEnabled: !navigation.inFlight,
-                      controller: _destinationController,
-                      onChanged: ref.read(provider.notifier).updateDestination,
-                      onClear: () {
-                        _destinationController.clear();
-                        ref.read(provider.notifier).updateDestination('');
-                      },
-                      onPaste: () => unawaited(_paste()),
-                      onSubmitted: () => _continue(context, navigation),
-                      onContinue: () => _continue(context, navigation),
-                    ),
-                    loading: () => _DestinationLoading(target: widget.target),
-                    error: (error, stackTrace) => _DestinationFailure(
-                      failure: error is AppFailureException
-                          ? error.failure
-                          : FailureMapper.from(error, stackTrace),
-                      onRetry: ref.read(provider.notifier).retry,
-                    ),
+                  loading: () => _DestinationLoading(target: widget.target),
+                  error: (error, stackTrace) => _DestinationFailure(
+                    failure: error is AppFailureException
+                        ? error.failure
+                        : FailureMapper.from(error, stackTrace),
+                    onRetry: ref.read(provider.notifier).retry,
                   ),
                 ),
               ),
             ),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
+    return widget.embedded ? content : AsterNavigationScope(child: content);
   }
 }
 

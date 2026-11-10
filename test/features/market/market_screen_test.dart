@@ -2,6 +2,8 @@ import 'package:aster/features/market/presentation/screens/market_screen.dart';
 import 'package:aster/features/market/presentation/widgets/widgets.dart';
 import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
@@ -84,6 +86,89 @@ void main() {
     expect(find.text('Coming soon'), findsOneWidget);
     expect(haptics.intents, isEmpty);
   });
+
+  testWidgets('Market uses a gallery only in open Duo landscape', (
+    tester,
+  ) async {
+    const channel = EventChannel('com.aster.wallet/cover_navigation');
+    final messenger = tester.binding.defaultBinaryMessenger;
+    late MockStreamHandlerEventSink geometry;
+    messenger.setMockStreamHandler(
+      channel,
+      MockStreamHandler.inline(
+        onListen: (_, events) {
+          geometry = events;
+          events.success(null);
+        },
+      ),
+    );
+    addTearDown(() => messenger.setMockStreamHandler(channel, null));
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(951, 669);
+    tester.view.padding = const FakeViewPadding(right: 84, bottom: 34);
+    tester.view.viewPadding = tester.view.padding;
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetPadding);
+    addTearDown(tester.view.resetViewPadding);
+    final router = _router();
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        child: _app(router, _RecordingHaptics(), useDuoLayout: true),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    Rect tile(String label) =>
+        tester.getRect(find.widgetWithText(MarketTile, label));
+    void expectSingleColumn() {
+      final send = tile('Send');
+      final receive = tile('Receive');
+      final swap = tile('Swap');
+      expect(receive.left, send.left);
+      expect(swap.left, send.left);
+      expect(receive.right, send.right);
+      expect(swap.right, send.right);
+      expect(receive.top, greaterThan(send.bottom));
+      expect(swap.top, greaterThan(receive.bottom));
+    }
+
+    expectSingleColumn();
+    geometry.success({'inner': true, 'width': 951.0, 'height': 669.0});
+    await tester.pumpAndSettle();
+    final send = tile('Send');
+    final receive = tile('Receive');
+    final swap = tile('Swap');
+    expect(send.top, receive.top);
+    expect(send.size, receive.size);
+    expect(receive.left - send.right, 16);
+    expect(swap.left, send.left);
+    expect(swap.right, receive.right);
+    expect(swap.top - send.bottom, 16);
+    expect(swap.height, lessThan(send.height));
+    expect(swap.right, 951 - 84 - 20);
+
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await tester.pumpAndSettle();
+    expect(tile('Send').size, tile('Receive').size);
+    expect(tile('Swap').top - tile('Send').bottom, 16);
+    for (final label in ['Send', 'Receive', 'Swap']) {
+      expect(
+        find.widgetWithText(MarketTile, label).hitTestable(),
+        findsOneWidget,
+      );
+    }
+    expect(tester.takeException(), isNull);
+    tester.platformDispatcher.clearTextScaleFactorTestValue();
+
+    tester.view.physicalSize = const Size(466, 678);
+    geometry.success({'width': 466.0, 'height': 678.0});
+    await tester.pumpAndSettle();
+    expectSingleColumn();
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
 
   testWidgets('Send and Receive enter typed target-selection routes', (
     tester,
@@ -192,6 +277,7 @@ Widget _app(
   GoRouter router,
   HapticFeedbackService haptics, {
   TextScaler? textScaler,
+  bool useDuoLayout = false,
 }) {
   return MaterialApp.router(
     theme: AppTheme.light(),
@@ -200,7 +286,7 @@ Widget _app(
       final content = AsterFeedbackScope(
         haptics: haptics,
         toasts: ToastController(),
-        child: child!,
+        child: useDuoLayout ? AsterDuoLandscapeScope(child: child!) : child!,
       );
       return textScaler == null
           ? content

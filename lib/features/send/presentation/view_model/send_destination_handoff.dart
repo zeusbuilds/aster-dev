@@ -30,11 +30,11 @@ class SendDestinationHandoff extends _$SendDestinationHandoff {
     }
   }
 
-  /// Returns and clears the staged value so it cannot leak into another flow.
-  String? take() {
-    final value = state?.value;
+  /// Consumes only the scan that was pending when this form began loading.
+  String? take(SendDestinationHandoffValue staged) {
+    if (!identical(state, staged)) return null;
     state = null;
-    return value;
+    return staged.value;
   }
 
   /// Removes any unconsumed destination when its owning Send flow exits.

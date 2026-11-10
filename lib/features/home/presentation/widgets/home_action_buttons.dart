@@ -9,7 +9,9 @@ import '../../../../shared/shared.dart';
 
 /// Equal-width entry commands for the three wallet flows.
 class HomeActionButtons extends StatelessWidget {
-  const HomeActionButtons({super.key});
+  const HomeActionButtons({this.stacked = false, super.key});
+
+  final bool stacked;
 
   @override
   Widget build(BuildContext context) {
@@ -39,6 +41,7 @@ class HomeActionButtons extends StatelessWidget {
               spacing.xs +
               spacing.md * 2;
           final vertical =
+              stacked ||
               constraints.maxWidth < minimumButtonWidth * 3 + spacing.md * 2;
           final buttons = [
             for (final (label, icon, route) in [

@@ -22,6 +22,10 @@ class WalletUnavailableScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final spacing = context.spacing;
+    final bottomGap = context.isOpenDuoLandscape
+        ? spacing.lg
+        : spacing.screenPadding;
     final canRetry =
         (failure.retryable || canResumeCommittedDeletion) && onRetry != null;
     return Scaffold(
@@ -30,10 +34,10 @@ class WalletUnavailableScreen extends StatelessWidget {
         child: Center(
           child: SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(
-              context.spacing.screenPadding,
-              context.spacing.screenPadding,
-              context.spacing.screenPadding,
-              context.spacing.screenPadding + context.windowInsets.bottomSafe,
+              spacing.screenPadding,
+              spacing.screenPadding,
+              spacing.screenPadding,
+              bottomGap + context.windowInsets.bottomSafe,
             ),
             child: Semantics(
               container: true,

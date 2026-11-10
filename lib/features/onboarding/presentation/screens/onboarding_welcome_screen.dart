@@ -752,7 +752,7 @@ class _WalletSetupWelcomeContent extends StatelessWidget {
     return Scaffold(
       backgroundColor: context.appColors.transparentSurface,
       body: OnboardingScrollSafeArea(
-        builder: (isDuoCover, scrollBottomInset) => CustomScrollView(
+        builder: (scrollsBottomInset, scrollBottomInset) => CustomScrollView(
           slivers: [
             ...switch (origin) {
               WalletCreationOrigin.onboarding => [
@@ -870,7 +870,8 @@ class _WalletSetupWelcomeContent extends StatelessWidget {
                   spacing.xxl,
                   0,
                   spacing.xxl,
-                  (isDuoCover ? spacing.lg : spacing.xxl) + scrollBottomInset,
+                  (scrollsBottomInset ? spacing.lg : spacing.xxl) +
+                      scrollBottomInset,
                 ),
                 child: OnboardingChoreographyItem(
                   id: 'welcome-actions-motion',

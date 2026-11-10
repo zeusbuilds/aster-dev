@@ -642,18 +642,24 @@ class SendFlowViewModel extends _$SendFlowViewModel {
 
   Future<SendFlowState> _load({Future<String?>? walletIdentity}) async {
     try {
+      final generation = _generation;
+      final handoff = ref.read(sendDestinationHandoffProvider);
       final identity =
           await (walletIdentity ??
               ref
                   .read(walletViewModelProvider.future)
                   .then((wallet) => wallet.activeWallet?.id));
-      return await _loadUnsafe(identity);
+      return await _loadUnsafe(identity, handoff, generation);
     } catch (error, stackTrace) {
       throw AppFailureException(FailureMapper.from(error, stackTrace));
     }
   }
 
-  Future<SendFlowState> _loadUnsafe(String? walletId) async {
+  Future<SendFlowState> _loadUnsafe(
+    String? walletId,
+    SendDestinationHandoffValue? handoff,
+    int generation,
+  ) async {
     if (walletId == null) {
       throw const AppFailureException(
         AppFailure(
@@ -696,9 +702,10 @@ class SendFlowViewModel extends _$SendFlowViewModel {
           feeFailure = failure;
       }
     }
-    final stagedDestination = ref
-        .read(sendDestinationHandoffProvider.notifier)
-        .take();
+    final stagedDestination =
+        handoff != null && ref.mounted && generation == _generation
+        ? ref.read(sendDestinationHandoffProvider.notifier).take(handoff)
+        : null;
     return SendFlowState(
       route: route,
       walletId: walletId,

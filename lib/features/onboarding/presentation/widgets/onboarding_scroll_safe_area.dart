@@ -3,12 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../shared/layout/layout.dart';
 
-/// Lets scrolling onboarding content run to the bottom edge on the Duo cover.
-/// Its final action owns the unobscured inset so it scrolls with the content.
+/// Lets onboarding content scroll to the bottom edge on the Duo cover and
+/// open landscape display. The final action owns the unobscured inset.
 class OnboardingScrollSafeArea extends ConsumerWidget {
   const OnboardingScrollSafeArea({required this.builder, super.key});
 
-  final Widget Function(bool isDuoCover, double scrollBottomInset) builder;
+  final Widget Function(bool scrollsInset, double scrollBottomInset) builder;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -18,11 +18,12 @@ class OnboardingScrollSafeArea extends ConsumerWidget {
             .value
             ?.appliesTo(MediaQuery.sizeOf(context)) ==
         true;
+    final scrollsBottomInset = isDuoCover || context.isOpenDuoLandscape;
     return SafeArea(
-      bottom: !isDuoCover,
+      bottom: !scrollsBottomInset,
       child: builder(
-        isDuoCover,
-        isDuoCover ? MediaQuery.paddingOf(context).bottom : 0,
+        scrollsBottomInset,
+        scrollsBottomInset ? context.windowInsets.bottomSafe : 0,
       ),
     );
   }

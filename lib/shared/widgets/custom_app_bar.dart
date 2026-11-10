@@ -20,6 +20,8 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.centerTitle = false,
     this.leadingIconData,
     this.action,
+    this.onBack,
+    this.automaticallyImplyLeading = true,
     this.fallbackLocation = RoutePaths.home,
   });
 
@@ -35,6 +37,8 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool centerTitle;
   final IconData? leadingIconData;
   final Widget? action;
+  final VoidCallback? onBack;
+  final bool automaticallyImplyLeading;
 
   /// Replacement destination used only when a root deep link has no page to
   /// pop. Flow screens should point this at their logical preceding step.
@@ -57,7 +61,9 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
         unawaited(
           navigation.run(
             command: () {
-              if (context.canPop()) {
+              if (onBack case final handler?) {
+                handler();
+              } else if (context.canPop()) {
                 context.pop();
               } else {
                 context.go(fallbackLocation);
@@ -79,6 +85,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     }
 
     return AppBar(
+      automaticallyImplyLeading: automaticallyImplyLeading,
       toolbarHeight: metrics.appBarHeight,
       backgroundColor: context.colorScheme.surface,
       elevation: 0,

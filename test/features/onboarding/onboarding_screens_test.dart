@@ -1532,6 +1532,89 @@ void main() {
     expect(tester.takeException(), isNull);
   }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
 
+  testWidgets('open Duo landscape scrolls onboarding actions into safe space', (
+    tester,
+  ) async {
+    late MockStreamHandlerEventSink geometry;
+    tester.binding.defaultBinaryMessenger.setMockStreamHandler(
+      const EventChannel('com.aster.wallet/cover_navigation'),
+      MockStreamHandler.inline(
+        onListen: (_, events) {
+          geometry = events;
+          events.success({'width': 951.0, 'height': 669.0, 'inner': true});
+        },
+      ),
+    );
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(951, 669);
+    tester.view.padding = const FakeViewPadding(right: 84, bottom: 34);
+    tester.view.viewPadding = tester.view.padding;
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetPadding);
+    addTearDown(tester.view.resetViewPadding);
+    addTearDown(tester.view.resetViewInsets);
+    final harness = await OnboardingTestHarness.create();
+    addTearDown(() => _disposeHarness(tester, harness));
+
+    final viewport = find.byType(CustomScrollView);
+    Future<void> expectFooter(
+      Finder action, {
+      required double viewportBottom,
+      required double actionBottom,
+    }) async {
+      final scrollable = find.descendant(
+        of: viewport,
+        matching: find.byType(Scrollable),
+      );
+      final position = tester.state<ScrollableState>(scrollable.first).position;
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      expect(tester.getBottomLeft(viewport).dy, closeTo(viewportBottom, 0.5));
+      expect(tester.getBottomLeft(action).dy, closeTo(actionBottom, 0.5));
+    }
+
+    for (final screen in [
+      const OnboardingWelcomeScreen(),
+      const AddWalletScreen(),
+    ]) {
+      await _pumpScreen(
+        tester,
+        harness,
+        screen,
+        disableAnimations: true,
+        useDuoLandscapeScope: true,
+      );
+      await expectFooter(
+        find.widgetWithText(OnboardingTextAction, 'Import Wallet'),
+        viewportBottom: 669,
+        actionBottom: 619,
+      );
+    }
+
+    await _pumpScreen(
+      tester,
+      harness,
+      const OnboardingImportWalletScreen(),
+      disableAnimations: true,
+      useDuoLandscapeScope: true,
+    );
+    final continueButton = find.widgetWithText(CustomButton, 'Continue');
+    await expectFooter(continueButton, viewportBottom: 669, actionBottom: 619);
+
+    tester.view.padding = const FakeViewPadding(right: 84);
+    tester.view.viewInsets = const FakeViewPadding(bottom: 260);
+    await tester.pumpAndSettle();
+    await expectFooter(continueButton, viewportBottom: 409, actionBottom: 393);
+
+    geometry.success(null);
+    tester.view.padding = tester.view.viewPadding;
+    tester.view.viewInsets = const FakeViewPadding();
+    await tester.pumpAndSettle();
+    await expectFooter(continueButton, viewportBottom: 635, actionBottom: 619);
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
+
   testWidgets('import grid follows copy while only the action tracks height', (
     tester,
   ) async {
@@ -4313,6 +4396,7 @@ Future<void> _pumpScreen(
   Widget screen, {
   TextScaler textScaler = TextScaler.noScaling,
   bool disableAnimations = false,
+  bool useDuoLandscapeScope = false,
 }) async {
   // These mobile screens need a phone viewport; compact/large scenarios above
   // set their own dimensions and exercise scrolling explicitly.
@@ -4332,7 +4416,9 @@ Future<void> _pumpScreen(
             textScaler: textScaler,
             disableAnimations: disableAnimations,
           ),
-          child: child!,
+          child: useDuoLandscapeScope
+              ? AsterDuoLandscapeScope(child: child!)
+              : child!,
         ),
         home: AsterFeedbackScope(
           haptics: harness.haptics,

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,7 +17,11 @@ import 'shared/shared.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  // UIKit applies the portrait declaration to the cover and regular iPhones.
+  // Let the Duo inner display follow its window geometry at runtime.
+  if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) {
+    await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  }
 
   late SharedPreferences preferences;
   final security = SecurityController(
@@ -167,19 +172,21 @@ class _AsterAppState extends ConsumerState<AsterApp>
       routerConfig: router,
       debugShowCheckedModeBanner: false,
       builder: (context, child) {
-        return AsterFeedbackScope(
-          haptics: haptics,
-          toasts: toasts,
-          child: SecurityGate(
-            controller: _security,
-            child: WalletLifecycleGate(
-              state: lifecycle,
-              onRetry: () => unawaited(
-                ref.read(walletLifecycleViewModelProvider.notifier).retry(),
-              ),
-              child: HostedBridgeScope(
-                navigatorKey: router.routerDelegate.navigatorKey,
-                child: ToastHost(child: child ?? const SizedBox.shrink()),
+        return AsterDuoLandscapeScope(
+          child: AsterFeedbackScope(
+            haptics: haptics,
+            toasts: toasts,
+            child: SecurityGate(
+              controller: _security,
+              child: WalletLifecycleGate(
+                state: lifecycle,
+                onRetry: () => unawaited(
+                  ref.read(walletLifecycleViewModelProvider.notifier).retry(),
+                ),
+                child: HostedBridgeScope(
+                  navigatorKey: router.routerDelegate.navigatorKey,
+                  child: ToastHost(child: child ?? const SizedBox.shrink()),
+                ),
               ),
             ),
           ),

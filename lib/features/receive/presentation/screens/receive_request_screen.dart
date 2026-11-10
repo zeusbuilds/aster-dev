@@ -19,9 +19,19 @@ import '../widgets/widgets.dart';
 
 /// Displays one real generated address or invoice for the selected route.
 class ReceiveRequestScreen extends ConsumerStatefulWidget {
-  const ReceiveRequestScreen({super.key, required this.target});
+  const ReceiveRequestScreen({super.key, required this.target})
+    : embedded = false,
+      onBack = null;
+
+  const ReceiveRequestScreen.embedded({
+    super.key,
+    required this.target,
+    this.onBack,
+  }) : embedded = true;
 
   final WalletPaymentTarget target;
+  final bool embedded;
+  final VoidCallback? onBack;
 
   @override
   ConsumerState<ReceiveRequestScreen> createState() =>
@@ -228,75 +238,75 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
     final sharing =
         flow.value?.operation == ReceiveFlowOperation.sharingRequest;
     final durableGenerationOwnsRoute = flow.value?.isGenerating ?? false;
-    return AsterNavigationScope(
-      child: Builder(
-        builder: (context) {
-          final navigation = AsterNavigationScope.of(context);
-          final generationOwnsRoute =
-              durableGenerationOwnsRoute || navigation.inFlight;
-          return PopScope(
-            canPop: !generationOwnsRoute,
-            child: Scaffold(
-              backgroundColor: context.colorScheme.surface,
-              appBar: CustomAppBar(
-                title: 'Receive ${widget.target.assetLabel}',
-                leadingIcon: true,
-                leadingEnabled: !generationOwnsRoute,
-                centerTitle: false,
-                fallbackLocation: RoutePaths.receive,
-              ),
-              body: IgnorePointer(
-                ignoring: sharing,
-                child: SafeArea(
-                  top: false,
-                  bottom: false,
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: context.spacing.screenPadding,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          child: flow.when(
-                            skipLoadingOnRefresh: false,
-                            data: (state) => _RequestBody(
-                              // The platform sheet owns input while opening.
-                              // Keep the request surface visually unchanged;
-                              // the real state and command guards remain busy.
-                              state: sharing
-                                  ? state.copyWith(operation: null)
-                                  : state,
-                              now: _now,
-                              commandsEnabled: !navigation.inFlight,
-                              onCopy: () => unawaited(_copy()),
-                              onShare: () => unawaited(_share()),
-                              onRegenerate: () =>
-                                  unawaited(_regenerate(navigation)),
-                              onSetAmount: () => unawaited(
-                                _showAmountSheet(context, navigation),
-                              ),
-                            ),
-                            loading: () =>
-                                _RequestLoading(target: widget.target),
-                            error: (error, stackTrace) => _RequestFailure(
-                              failure: error is AppFailureException
-                                  ? error.failure
-                                  : FailureMapper.from(error, stackTrace),
-                              onRetry: () => unawaited(_retryRequest()),
+    final content = Builder(
+      builder: (context) {
+        final navigation = AsterNavigationScope.of(context);
+        final generationOwnsRoute =
+            durableGenerationOwnsRoute || navigation.inFlight;
+        return PopScope(
+          canPop: !generationOwnsRoute,
+          child: Scaffold(
+            backgroundColor: context.colorScheme.surface,
+            appBar: CustomAppBar(
+              title: 'Receive ${widget.target.assetLabel}',
+              leadingIcon: !widget.embedded || widget.onBack != null,
+              leadingEnabled: !generationOwnsRoute,
+              onBack: widget.onBack,
+              automaticallyImplyLeading: !widget.embedded,
+              centerTitle: false,
+              fallbackLocation: RoutePaths.receive,
+            ),
+            body: IgnorePointer(
+              ignoring: sharing,
+              child: SafeArea(
+                top: false,
+                bottom: false,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: context.spacing.screenPadding,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: flow.when(
+                          skipLoadingOnRefresh: false,
+                          data: (state) => _RequestBody(
+                            // The platform sheet owns input while opening.
+                            // Keep the request surface visually unchanged;
+                            // the real state and command guards remain busy.
+                            state: sharing
+                                ? state.copyWith(operation: null)
+                                : state,
+                            now: _now,
+                            commandsEnabled: !navigation.inFlight,
+                            onCopy: () => unawaited(_copy()),
+                            onShare: () => unawaited(_share()),
+                            onRegenerate: () =>
+                                unawaited(_regenerate(navigation)),
+                            onSetAmount: () => unawaited(
+                              _showAmountSheet(context, navigation),
                             ),
                           ),
+                          loading: () => _RequestLoading(target: widget.target),
+                          error: (error, stackTrace) => _RequestFailure(
+                            failure: error is AppFailureException
+                                ? error.failure
+                                : FailureMapper.from(error, stackTrace),
+                            onRetry: () => unawaited(_retryRequest()),
+                          ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
+    return widget.embedded ? content : AsterNavigationScope(child: content);
   }
 }
 

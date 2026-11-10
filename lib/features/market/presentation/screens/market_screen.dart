@@ -25,6 +25,8 @@ class MarketScreen extends StatelessWidget {
           final metrics = context.metrics;
           final gradients = context.gradients;
           final navigation = AsterNavigationScope.of(context);
+          final gallery = context.fitsDuoLandscapePanes;
+          final omitLastTileGap = isDuoCover || context.isOpenDuoLandscape;
 
           VoidCallback? open(String location, String failureTitle) {
             if (navigation.inFlight) return null;
@@ -74,6 +76,7 @@ class MarketScreen extends StatelessWidget {
               shadowColor: colors.overlay.withValues(
                 alpha: effects.marketShadowOpacity,
               ),
+              compact: gallery,
               tipText: 'Coming soon',
               hapticIntent: null,
               onTap: open(RoutePaths.swap, 'Swap could not open'),
@@ -95,17 +98,32 @@ class MarketScreen extends StatelessWidget {
                           ? metrics.floatingNavClearance
                           : 0),
                 ),
-                children: [
-                  for (var i = 0; i < tiles.length; i++)
-                    Padding(
-                      padding: EdgeInsets.only(
-                        bottom: !isDuoCover || i < tiles.length - 1
-                            ? spacing.md
-                            : 0,
-                      ),
-                      child: tiles[i],
-                    ),
-                ],
+                children: gallery
+                    ? [
+                        IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Expanded(child: tiles[0]),
+                              SizedBox(width: spacing.lg),
+                              Expanded(child: tiles[1]),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: spacing.lg),
+                        tiles[2],
+                      ]
+                    : [
+                        for (var i = 0; i < tiles.length; i++)
+                          Padding(
+                            padding: EdgeInsets.only(
+                              bottom: !omitLastTileGap || i < tiles.length - 1
+                                  ? spacing.md
+                                  : 0,
+                            ),
+                            child: tiles[i],
+                          ),
+                      ],
               ),
             ),
           );

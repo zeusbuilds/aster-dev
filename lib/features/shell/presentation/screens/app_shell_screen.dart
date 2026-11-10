@@ -18,19 +18,22 @@ class AppShellScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final index = ref.watch(appShellIndexProvider);
-    final cover = ref.watch(duoCoverLayoutProvider).value;
-    final isDuoCover = cover?.appliesTo(MediaQuery.sizeOf(context)) == true;
+    final layout = ref.watch(duoDisplayLayoutProvider).value;
+    final isDuoCover =
+        layout != null &&
+        layout.isCover &&
+        layout.appliesTo(MediaQuery.sizeOf(context));
 
     final screens = <Widget>[
       const HomeScreen(),
       const ScanScreen(purpose: ScanPurpose.sendLauncher),
       MarketScreen(isDuoCover: isDuoCover),
-      const SettingsScreen(),
+      SettingsScreen(isActiveTab: index == appShellSettingsTabIndex),
     ];
-    final coverRail = CoverTabRail.resolve(context, cover, appShellTabCount);
+    final rail = CoverTabRail.resolve(context, layout, appShellTabCount);
 
     return CoverTabRail(
-      bounds: coverRail,
+      bounds: rail,
       child: Scaffold(
         body: Stack(
           children: [

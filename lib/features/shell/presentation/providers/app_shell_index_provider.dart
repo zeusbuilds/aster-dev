@@ -8,6 +8,9 @@ const int appShellTabCount = 4;
 /// Index of the Scan destination in the app shell.
 const int appShellScanTabIndex = 1;
 
+/// Index of the Settings destination in the app shell.
+const int appShellSettingsTabIndex = 3;
+
 /// Owns the selected destination in the persistent application shell.
 @riverpod
 class AppShellIndex extends _$AppShellIndex {

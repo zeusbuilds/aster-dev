@@ -59,9 +59,7 @@ class AssetSelectorSheet extends StatelessWidget {
         borderColor: context.appColors.transparentSurface,
         borderWidth: 0,
         padding: EdgeInsets.zero,
-        child: SafeArea(
-          top: false,
-          bottom: false,
+        child: AsterSheetSafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [

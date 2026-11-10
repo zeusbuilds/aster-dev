@@ -102,6 +102,9 @@ class ErrorScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
+    final bottomGap = context.isOpenDuoLandscape
+        ? spacing.lg
+        : spacing.screenPadding;
     final colors = context.appColors;
     final brightness = context.colorScheme.brightness;
 
@@ -122,7 +125,7 @@ class ErrorScreen extends StatelessWidget {
                 spacing.screenPadding,
                 spacing.screenPadding,
                 spacing.screenPadding,
-                spacing.screenPadding + context.windowInsets.bottomSafe,
+                bottomGap + context.windowInsets.bottomSafe,
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,

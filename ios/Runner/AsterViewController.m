@@ -3,12 +3,12 @@
 #import <TargetConditionals.h>
 #import <UIKit/UIKit.h>
 
-@interface AsterCoverNavigationStream : NSObject <FlutterStreamHandler>
+@interface AsterDuoGeometryStream : NSObject <FlutterStreamHandler>
 @property(nonatomic, copy, nullable) FlutterEventSink sink;
 @property(nonatomic, copy, nullable) NSDictionary<NSString *, NSNumber *> *geometry;
 @end
 
-@implementation AsterCoverNavigationStream
+@implementation AsterDuoGeometryStream
 
 - (FlutterError *)onListenWithArguments:(id)arguments eventSink:(FlutterEventSink)events {
   self.sink = events;
@@ -38,27 +38,28 @@
 // UIKit reruns updateConstraints when a reserved region queried there changes.
 // Keep this observer in the Flutter view's coordinate space and out of input.
 API_AVAILABLE(ios(27.1))
-@interface AsterCoverGeometryView : UIView
-@property(nonatomic, weak) AsterCoverNavigationStream *stream;
+@interface AsterDuoGeometryView : UIView
+@property(nonatomic, weak) AsterDuoGeometryStream *stream;
 @end
 
-@implementation AsterCoverGeometryView {
-  BOOL _hingeClosed;
+@implementation AsterDuoGeometryView {
+  UIHingeStatus _hingeStatus;
 }
 
-- (instancetype)initWithStream:(AsterCoverNavigationStream *)stream {
+- (instancetype)initWithStream:(AsterDuoGeometryStream *)stream {
   self = [super initWithFrame:CGRectZero];
   if (self) {
     self.stream = stream;
     self.userInteractionEnabled = NO;
     self.accessibilityElementsHidden = YES;
-    __weak AsterCoverGeometryView *weakSelf = self;
+    __weak AsterDuoGeometryView *weakSelf = self;
     UIHingeInteraction *hinge = [[UIHingeInteraction alloc]
         initWithUpdateHandler:^(__unused UIHingeInteraction *interaction,
                                 UIHingeInteractionUpdate *update) {
-          AsterCoverGeometryView *view = weakSelf;
-          if (view && view->_hingeClosed != (update.hinge.status == UIHingeStatusClosed)) {
-            view->_hingeClosed = update.hinge.status == UIHingeStatusClosed;
+          AsterDuoGeometryView *view = weakSelf;
+          UIHingeStatus status = update.hinge.status;
+          if (view && view->_hingeStatus != status) {
+            view->_hingeStatus = status;
             [view setNeedsUpdateConstraints];
             [view reportGeometry];
           }
@@ -67,7 +68,7 @@ API_AVAILABLE(ios(27.1))
     [self registerForTraitChanges:UITraitCollection.systemTraitsAffectingVerticalBarEdge
                       withHandler:^(id<UITraitEnvironment> environment,
                                     __unused UITraitCollection *previousTraits) {
-      AsterCoverGeometryView *view = (AsterCoverGeometryView *)environment;
+      AsterDuoGeometryView *view = (AsterDuoGeometryView *)environment;
       [view setNeedsUpdateConstraints];
       [view reportGeometry];
     }];
@@ -99,29 +100,49 @@ API_AVAILABLE(ios(27.1))
 - (void)reportGeometry {
   UIWindowScene *scene = self.window.windowScene;
   CGRect viewport = self.bounds;
-  if (!_hingeClosed || !scene || CGRectIsEmpty(viewport)) {
+  if (_hingeStatus == UIHingeStatusUnknown || !scene || CGRectIsEmpty(viewport)) {
     self.stream.geometry = nil;
     return;
   }
 
-  // Cover spacing still applies when system controls leave no room for tabs.
-  NSDictionary<NSString *, NSNumber *> *size = @{
-    @"width": @(CGRectGetWidth(viewport)),
-    @"height": @(CGRectGetHeight(viewport)),
-  };
-  UIVerticalBarEdge edge = self.traitCollection.verticalBarEdge;
-  if (edge == UIVerticalBarEdgeUnspecified) {
-    self.stream.geometry = size;
+  BOOL isInner = _hingeStatus == UIHingeStatusFullyOpen || _hingeStatus == UIHingeStatusPartiallyOpen;
+  if (!isInner && _hingeStatus != UIHingeStatusClosed) {
+    self.stream.geometry = nil;
     return;
   }
 
-  BOOL rightToLeft = self.effectiveUserInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft;
-  BOOL onRight = (edge == UIVerticalBarEdgeTrailing) != rightToLeft;
+  // Report the display even when system controls leave no room for tabs.
+  NSMutableDictionary<NSString *, NSNumber *> *geometry = [@{
+    @"width": @(CGRectGetWidth(viewport)),
+    @"height": @(CGRectGetHeight(viewport)),
+  } mutableCopy];
+  if (isInner) {
+    geometry[@"inner"] = @YES;
+    if (CGRectGetWidth(viewport) <= CGRectGetHeight(viewport)) {
+      self.stream.geometry = geometry;
+      return;
+    }
+  }
+
+  UIVerticalBarEdge edge = self.traitCollection.verticalBarEdge;
+  if (!isInner && edge == UIVerticalBarEdgeUnspecified) {
+    self.stream.geometry = geometry;
+    return;
+  }
+
   UIEdgeInsets insets = self.safeAreaInsets;
+  BOOL rightToLeft = self.effectiveUserInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft;
+  BOOL onRight = edge == UIVerticalBarEdgeUnspecified
+      ? insets.right >= insets.left
+      : (edge == UIVerticalBarEdgeTrailing) != rightToLeft;
   CGFloat width = onRight ? insets.right : insets.left;
   CGFloat left = onRight ? CGRectGetMaxX(viewport) - width : CGRectGetMinX(viewport);
   CGFloat top = CGRectGetMinY(viewport) + insets.top;
   CGFloat bottom = CGRectGetMaxY(viewport) - insets.bottom;
+  if (width <= 0 || top >= bottom) {
+    self.stream.geometry = geometry;
+    return;
+  }
   CGRect strip = CGRectMake(left, top, width, bottom - top);
 
   // The bar belongs below the system UI. Reserved-region frames already
@@ -140,18 +161,13 @@ API_AVAILABLE(ios(27.1))
     }
   }
 
-  if (width <= 0 || top >= bottom) {
-    self.stream.geometry = size;
-    return;
+  if (top < bottom) {
+    geometry[@"left"] = @(left - CGRectGetMinX(viewport));
+    geometry[@"top"] = @(top - CGRectGetMinY(viewport));
+    geometry[@"right"] = @(left + width - CGRectGetMinX(viewport));
+    geometry[@"bottom"] = @(bottom - CGRectGetMinY(viewport));
   }
-  self.stream.geometry = @{
-    @"left": @(left - CGRectGetMinX(viewport)),
-    @"top": @(top - CGRectGetMinY(viewport)),
-    @"right": @(left + width - CGRectGetMinX(viewport)),
-    @"bottom": @(bottom - CGRectGetMinY(viewport)),
-    @"width": @(CGRectGetWidth(viewport)),
-    @"height": @(CGRectGetHeight(viewport)),
-  };
+  self.stream.geometry = geometry;
 }
 
 @end
@@ -165,7 +181,7 @@ API_AVAILABLE(ios(27.1))
 
 - (void)viewDidLoad {
   [super viewDidLoad];
-  AsterCoverNavigationStream *stream = [[AsterCoverNavigationStream alloc] init];
+  AsterDuoGeometryStream *stream = [[AsterDuoGeometryStream alloc] init];
   FlutterEventChannel *channel = [FlutterEventChannel
       eventChannelWithName:@"com.aster.wallet/cover_navigation"
            binaryMessenger:self.binaryMessenger];
@@ -173,7 +189,7 @@ API_AVAILABLE(ios(27.1))
 
 #if __IPHONE_OS_VERSION_MAX_ALLOWED >= 270100 && !TARGET_OS_MACCATALYST
   if (@available(iOS 27.1, *)) {
-    UIView *observer = [[AsterCoverGeometryView alloc] initWithStream:stream];
+    UIView *observer = [[AsterDuoGeometryView alloc] initWithStream:stream];
     observer.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:observer];
     [NSLayoutConstraint activateConstraints:@[

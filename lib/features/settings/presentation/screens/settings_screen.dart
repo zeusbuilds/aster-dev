@@ -8,16 +8,58 @@ import 'package:ming_cute_icons/ming_cute_icons.dart';
 
 import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
+import '../../../bridge/presentation/hosted_bridge_screen.dart';
 import '../../../bridge/presentation/view_model/hosted_bridge_controller.dart';
 import '../../../wallet/domain/models/models.dart';
+import '../../../wallet/presentation/pages/wallet_selection_screen.dart';
 import '../../../wallet/presentation/view_model/view_models.dart';
 import '../../domain/models/models.dart';
 import '../view_model/view_models.dart';
 import '../widgets/widgets.dart';
+import 'advanced_settings_screen.dart';
+import 'bitcoin_unit_selection_screen.dart';
+import 'network_configuration_screen.dart';
+import 'security_settings_screen.dart';
+import 'wallet_details_screen.dart';
+
+enum _SettingsPanel {
+  walletDetails(RouteNames.walletDetails, 'Wallet details could not open'),
+  security(RouteNames.security, 'Security settings could not open'),
+  advanced(RouteNames.advancedSettings, 'Advanced settings could not open'),
+  devBridge(RouteNames.hostedBridge, 'Dev Bridge could not open'),
+  wallets(
+    RouteNames.walletSelection,
+    'Wallet selector could not open',
+    canClose: true,
+  ),
+  bitcoinUnit(
+    RouteNames.bitcoinUnitSelection,
+    'Bitcoin unit selector could not open',
+    canClose: true,
+  ),
+  network(
+    RouteNames.networkConfiguration,
+    'Network configuration could not open',
+    canClose: true,
+  );
+
+  const _SettingsPanel(
+    this.routeName,
+    this.failureTitle, {
+    this.canClose = false,
+  });
+
+  final String routeName;
+  final String failureTitle;
+  final bool canClose;
+}
 
 /// Presents independent wallet, preference, package, and public-link state.
 class SettingsScreen extends ConsumerStatefulWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({super.key, this.isActiveTab});
+
+  /// Selection state when mounted as a tab. Standalone routes omit it.
+  final bool? isActiveTab;
 
   @override
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
@@ -36,6 +78,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   var _retryIndex = 0;
   var _recovering = false;
   var _foreground = true;
+  final _panelKey = GlobalKey();
+  var _panel = _SettingsPanel.walletDetails;
+  var _returnPanel = _SettingsPanel.walletDetails;
+  var _retainPanel = false;
+  var _resetPanelWhenIdle = false;
 
   @override
   void initState() {
@@ -54,6 +101,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     ModalRoute.isCurrentOf(context);
     TickerMode.valuesOf(context);
     _scheduleRecovery();
+  }
+
+  @override
+  void didUpdateWidget(SettingsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActiveTab == true && widget.isActiveTab == false) {
+      _resetPanelWhenIdle = true;
+    }
   }
 
   @override
@@ -150,6 +205,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     }
   }
 
+  void _openPanel(_SettingsPanel panel) {
+    if (_panel == panel) return;
+    setState(() {
+      if (panel.canClose && !_panel.canClose) _returnPanel = _panel;
+      _panel = panel;
+    });
+  }
+
+  void _closePanel(_SettingsPanel panel) {
+    if (mounted && _panel == panel) _openPanel(_returnPanel);
+  }
+
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
@@ -162,7 +229,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
             ?.appliesTo(MediaQuery.sizeOf(context)) ==
         true;
     final hasBottomTabs =
-        !isDuoCover || CoverTabRail.hasBottomFallbackOf(context);
+        !(isDuoCover || context.isOpenDuoLandscape) ||
+        CoverTabRail.hasBottomFallbackOf(context);
+    final split = context.fitsDuoLandscapePanes;
+    final tabClearance = hasBottomTabs ? metrics.floatingNavClearance : 0.0;
     final walletState = ref.watch(walletViewModelProvider);
     final settings = ref.watch(settingsViewModelProvider);
     final appInfo = ref.watch(settingsAppViewModelProvider);
@@ -200,18 +270,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
       child: Builder(
         builder: (context) {
           final navigation = AsterNavigationScope.of(context);
+          if (_resetPanelWhenIdle && !navigation.inFlight) {
+            // Keep an in-flight panel mounted until its completion is handled.
+            _panel = _SettingsPanel.walletDetails;
+            _returnPanel = _SettingsPanel.walletDetails;
+            _resetPanelWhenIdle = false;
+          }
 
-          VoidCallback? openNamed(String routeName, String failureTitle) {
+          VoidCallback? open(_SettingsPanel panel) {
             if (navigation.inFlight) return null;
+            if (split) {
+              return () {
+                if (navigation.inFlight || _panel == panel) return;
+                FocusScope.of(context).unfocus();
+                unawaited(context.haptics.trigger(HapticIntent.selection));
+                _openPanel(panel);
+              };
+            }
             return () => unawaited(
               navigation.openRoute(
-                command: () => context.pushNamed<void>(routeName),
-                failureTitle: failureTitle,
+                command: () => context.pushNamed<void>(panel.routeName),
+                failureTitle: panel.failureTitle,
               ),
             );
           }
 
-          return Scaffold(
+          final options = Scaffold(
             backgroundColor: context.colorScheme.surface,
             appBar: CustomAppBar(title: 'Settings'),
             body: AsterHorizontalSafeArea(
@@ -235,10 +319,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                                 walletFailure != null ||
                                 navigation.inFlight
                             ? null
-                            : openNamed(
-                                RouteNames.walletSelection,
-                                'Wallet selector could not open',
-                              ),
+                            : open(_SettingsPanel.wallets),
                       ),
                     ),
                     SizedBox(height: spacing.xxl),
@@ -254,10 +335,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                             prefixIcon: MingCuteIcons.mgc_information_line,
                             hapticIntent: null,
                             onTap: walletDetailsEnabled
-                                ? openNamed(
-                                    RouteNames.walletDetails,
-                                    'Wallet details could not open',
-                                  )
+                                ? open(_SettingsPanel.walletDetails)
                                 : null,
                           ),
                           const AsterDivider.inset(),
@@ -265,20 +343,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                             title: 'Security',
                             prefixIcon: MingCuteIcons.mgc_shield_line,
                             hapticIntent: null,
-                            onTap: openNamed(
-                              RouteNames.security,
-                              'Security settings could not open',
-                            ),
+                            onTap: open(_SettingsPanel.security),
                           ),
                           const AsterDivider.inset(),
                           AsterOptionRow(
                             title: 'Advanced',
                             prefixIcon: MingCuteIcons.mgc_tool_line,
                             hapticIntent: null,
-                            onTap: openNamed(
-                              RouteNames.advancedSettings,
-                              'Advanced settings could not open',
-                            ),
+                            onTap: open(_SettingsPanel.advanced),
                           ),
                           if (hostedBridge != null)
                             ListenableBuilder(
@@ -290,10 +362,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                                         AsterOptionRow(
                                           title: 'Dev Bridge',
                                           prefixIcon: Icons.link,
-                                          onTap: openNamed(
-                                            RouteNames.hostedBridge,
-                                            'Dev Bridge could not open',
-                                          ),
+                                          onTap: open(_SettingsPanel.devBridge),
                                         ),
                                       ],
                                     )
@@ -316,10 +385,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                             prefixIcon: MingCuteIcons.mgc_coin_2_line,
                             hapticIntent: null,
                             onTap: settingsEnabled && !navigation.inFlight
-                                ? openNamed(
-                                    RouteNames.bitcoinUnitSelection,
-                                    'Bitcoin unit selector could not open',
-                                  )
+                                ? open(_SettingsPanel.bitcoinUnit)
                                 : null,
                           ),
                           const AsterDivider.inset(),
@@ -363,13 +429,93 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                       height:
                           context.windowInsets.bottomSystem +
                           spacing.lg +
-                          (hasBottomTabs ? metrics.floatingNavClearance : 0),
+                          tabClearance,
                     ),
                   ],
                 ),
               ),
             ),
           );
+
+          if (split) {
+            _retainPanel = true;
+          } else if (!navigation.inFlight) {
+            _retainPanel = false;
+          }
+          if (!_retainPanel) return options;
+
+          Widget withPanel(bool bridgeAvailable) {
+            final panel =
+                _panel == _SettingsPanel.devBridge &&
+                    !bridgeAvailable &&
+                    !navigation.inFlight
+                ? _SettingsPanel.walletDetails
+                : _panel;
+            final content = switch (panel) {
+              _SettingsPanel.walletDetails => const WalletDetailsScreen(
+                embedded: true,
+              ),
+              _SettingsPanel.security => const SecuritySettingsScreen(
+                embedded: true,
+              ),
+              _SettingsPanel.advanced => AdvancedSettingsScreen(
+                embedded: true,
+                onOpenNetworkConfiguration: open(_SettingsPanel.network),
+              ),
+              _SettingsPanel.network => NetworkConfigurationScreen(
+                onClose: () => _closePanel(panel),
+              ),
+              _SettingsPanel.wallets => WalletSelectionScreen(
+                onClose: () => _closePanel(panel),
+              ),
+              _SettingsPanel.bitcoinUnit => BitcoinUnitSelectionScreen(
+                onClose: () => _closePanel(panel),
+              ),
+              _SettingsPanel.devBridge => const HostedBridgeScreen(
+                embedded: true,
+              ),
+            };
+            final detail = KeyedSubtree(
+              key: _panelKey,
+              child: KeyedSubtree(key: ValueKey(panel), child: content),
+            );
+            if (!split) {
+              // A pending operation keeps its owner through a fold. Only the
+              // original Settings list remains visible and interactive.
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  Offstage(
+                    child: ExcludeFocus(
+                      child: TickerMode(enabled: false, child: detail),
+                    ),
+                  ),
+                  options,
+                ],
+              );
+            }
+            final media = MediaQuery.of(context);
+            return MediaQuery(
+              // Detail panels already place the bottom inset inside their
+              // content. Include any horizontal tab fallback in that inset.
+              data: media.copyWith(
+                padding: media.padding.copyWith(
+                  bottom: media.padding.bottom + tabClearance,
+                ),
+                viewPadding: media.viewPadding.copyWith(
+                  bottom: media.viewPadding.bottom + tabClearance,
+                ),
+              ),
+              child: DuoLandscapePanes(left: options, right: detail),
+            );
+          }
+
+          return hostedBridge == null
+              ? withPanel(false)
+              : ListenableBuilder(
+                  listenable: hostedBridge,
+                  builder: (context, _) => withPanel(hostedBridge.available),
+                );
         },
       ),
     );

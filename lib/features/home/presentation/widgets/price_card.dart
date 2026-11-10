@@ -14,7 +14,9 @@ import 'candle_chart.dart';
 
 /// Bitcoin market card backed by injected repository state.
 class PriceCard extends ConsumerStatefulWidget {
-  const PriceCard({super.key});
+  const PriceCard({this.chartHeight, super.key});
+
+  final double? chartHeight;
 
   @override
   ConsumerState<PriceCard> createState() => _PriceCardState();
@@ -127,6 +129,7 @@ class _PriceCardState extends ConsumerState<PriceCard> {
     final chart = CandleChart(
       data: chartData,
       isSkeleton: chartUnavailable || _showStartupWave,
+      height: widget.chartHeight,
     );
 
     return Column(

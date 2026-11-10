@@ -20,9 +20,10 @@ import 'asset_row.dart';
 
 /// Portfolio section backed by active-wallet, settings, and market state.
 class AssetsSection extends ConsumerStatefulWidget {
-  const AssetsSection({required this.home, super.key});
+  const AssetsSection({required this.home, this.showTopGap = true, super.key});
 
   final AsyncValue<HomeState> home;
+  final bool showTopGap;
 
   @override
   ConsumerState<AssetsSection> createState() => _AssetsSectionState();
@@ -112,7 +113,8 @@ class _AssetsSectionState extends ConsumerState<AssetsSection> {
       padding: EdgeInsets.symmetric(horizontal: context.spacing.screenPadding),
       child: Column(
         children: [
-          SizedBox(height: context.spacing.screenPadding),
+          if (widget.showTopGap)
+            SizedBox(height: context.spacing.screenPadding),
           Row(
             children: [
               Expanded(child: Text('Assets', style: context.type.sectionTitle)),

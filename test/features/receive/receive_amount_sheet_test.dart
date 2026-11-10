@@ -22,6 +22,7 @@ void main() {
     WidgetTester tester, {
     WalletPaymentTarget target = WalletPaymentTarget.bitcoinOnchain,
     bool duoCover = false,
+    bool openDuoLandscape = false,
   }) async {
     final harness = await PaymentFlowTestHarness.create(
       engine: FakeWalletEngine(),
@@ -37,17 +38,23 @@ void main() {
       await disposal;
     });
     tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = duoCover
-        ? const Size(466, 678)
-        : const Size(390, 1000);
-    if (duoCover) {
+    final viewport = switch ((duoCover, openDuoLandscape)) {
+      (true, _) => const Size(466, 678),
+      (_, true) => const Size(951, 669),
+      _ => const Size(390, 1000),
+    };
+    tester.view.physicalSize = viewport;
+    if (duoCover || openDuoLandscape) {
       const channel = EventChannel('com.aster.wallet/cover_navigation');
       final messenger = tester.binding.defaultBinaryMessenger;
       messenger.setMockStreamHandler(
         channel,
         MockStreamHandler.inline(
-          onListen: (_, events) =>
-              events.success({'width': 466.0, 'height': 678.0}),
+          onListen: (_, events) => events.success({
+            'width': viewport.width,
+            'height': viewport.height,
+            if (openDuoLandscape) 'inner': true,
+          }),
         ),
       );
       const padding = FakeViewPadding(right: 84, bottom: 34);
@@ -67,7 +74,9 @@ void main() {
           builder: (context, child) => AsterFeedbackScope(
             haptics: harness.haptics,
             toasts: harness.toasts,
-            child: child!,
+            child: openDuoLandscape
+                ? AsterDuoLandscapeScope(child: child!)
+                : child!,
           ),
           home: Builder(
             builder: (context) => Scaffold(
@@ -92,7 +101,11 @@ void main() {
     }
     expect(harness.container.read(provider).hasValue, isTrue);
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Set amount'));
+    if (openDuoLandscape) {
+      await tester.scrollUntilVisible(find.text('Set amount'), 240);
+    } else {
+      await tester.ensureVisible(find.text('Set amount'));
+    }
     await tester.tap(find.text('Set amount'));
     await tester.pumpAndSettle();
     expect(find.byType(ReceiveAmountSheet), findsOneWidget);
@@ -315,10 +328,18 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets(
-    'Duo cover amount editor fits at rest and scrolls above the keyboard',
-    (tester) async {
-      final harness = await mount(tester, duoCover: true);
+  for (final (label, cover, height) in [
+    ('Duo cover', true, 678.0),
+    ('open Duo landscape', false, 669.0),
+  ]) {
+    testWidgets('$label amount editor scrolls above the keyboard', (
+      tester,
+    ) async {
+      final harness = await mount(
+        tester,
+        duoCover: cover,
+        openDuoLandscape: !cover,
+      );
       harness.container
           .read(
             receiveFlowViewModelProvider(WalletPaymentTarget.bitcoinOnchain)
@@ -327,6 +348,10 @@ void main() {
           .updateAmount('0.0001');
       await tester.pumpAndSettle();
       final sheet = find.byType(ReceiveAmountSheet);
+      final header = find.descendant(
+        of: sheet,
+        matching: find.byType(AsterSheetHeader),
+      );
       final viewport = find.descendant(
         of: sheet,
         matching: find.byWidgetPredicate(
@@ -341,10 +366,26 @@ void main() {
       );
       final scrollable = Scrollable.of(tester.element(submit));
 
-      expect(scrollable.position.maxScrollExtent, 0);
-      expect(tester.getSize(sheet).height, lessThan(678 * 0.85));
-      expect(tester.getRect(viewport).bottom, closeTo(678, 0.5));
-      expect(tester.getRect(submit).bottom, closeTo(628, 0.5));
+      if (cover) {
+        expect(scrollable.position.maxScrollExtent, 0);
+        expect(tester.getSize(sheet).height, lessThan(height * 0.85));
+      }
+      scrollable.position.jumpTo(scrollable.position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      final sheetBounds = tester.getRect(sheet);
+      expect(sheetBounds.width, closeTo(cover ? 466 : 640, 0.5));
+      expect(sheetBounds.center.dx, closeTo(cover ? 233 : 475.5, 0.5));
+      final contentRight = sheetBounds.right - (cover ? 84 : 0);
+      for (final content in [header, viewport]) {
+        final bounds = tester.getRect(content);
+        expect(bounds.left, closeTo(sheetBounds.left, 0.5));
+        expect(bounds.right, closeTo(contentRight, 0.5));
+      }
+      final submitBounds = tester.getRect(submit);
+      expect(submitBounds.left, closeTo(sheetBounds.left + 20, 0.5));
+      expect(submitBounds.right, closeTo(contentRight - 20, 0.5));
+      expect(tester.getRect(viewport).bottom, closeTo(height, 0.5));
+      expect(tester.getRect(submit).bottom, closeTo(height - 34 - 16, 0.5));
       expect(submit.hitTestable(), findsOneWidget);
 
       // The modal rises above the keyboard once. The home indicator no longer
@@ -356,10 +397,9 @@ void main() {
       expect(scrollable.position.maxScrollExtent, greaterThan(0));
       scrollable.position.jumpTo(scrollable.position.maxScrollExtent);
       await tester.pumpAndSettle();
-      expect(tester.getRect(viewport).bottom, closeTo(498, 0.5));
-      expect(tester.getRect(submit).bottom, closeTo(482, 0.5));
+      expect(tester.getRect(viewport).bottom, closeTo(height - 180, 0.5));
+      expect(tester.getRect(submit).bottom, closeTo(height - 180 - 16, 0.5));
       expect(tester.takeException(), isNull);
-    },
-    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
-  );
+    }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
+  }
 }

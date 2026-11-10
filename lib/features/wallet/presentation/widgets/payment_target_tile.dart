@@ -12,6 +12,7 @@ class PaymentTargetTile extends StatelessWidget {
     super.key,
     required this.capability,
     this.onSelected,
+    this.selected,
   });
 
   /// Deployment-resolved support for this asset and payment rail.
@@ -19,6 +20,9 @@ class PaymentTargetTile extends StatelessWidget {
 
   /// Selection owner, or `null` for a noninteractive placeholder.
   final ValueChanged<WalletPaymentTarget>? onSelected;
+
+  /// Inline selection state. A null value keeps the route navigation style.
+  final bool? selected;
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +44,7 @@ class PaymentTargetTile extends StatelessWidget {
     return Semantics(
       button: true,
       enabled: enabled,
+      selected: selected,
       label: target.semanticLabel,
       value: capability.unavailableReason,
       onTap: enabled ? select : null,
@@ -97,7 +102,10 @@ class PaymentTargetTile extends StatelessWidget {
                         color: context.appColors.bitcoin,
                       ),
                     ],
-                    if (enabled) ...[
+                    if (selected case final isSelected? when configured) ...[
+                      SizedBox(width: context.spacing.sm),
+                      AsterSelectionIndicator(selected: isSelected),
+                    ] else if (enabled) ...[
                       SizedBox(width: context.spacing.sm),
                       Icon(
                         MingCuteIcons.mgc_right_line,

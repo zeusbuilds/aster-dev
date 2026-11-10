@@ -33,6 +33,9 @@ class _HomeScreenState extends ConsumerState<_HomeBalanceRefreshSurface>
     with WidgetsBindingObserver {
   static const _refreshInterval = Duration(seconds: 30);
 
+  // Keep chart animation and asset quote state when the two panes reparent.
+  final _priceCardKey = GlobalKey();
+  final _assetsKey = GlobalKey();
   Timer? _refreshTimer;
   var _visible = false;
   var _hasBeenVisible = false;
@@ -172,6 +175,7 @@ class _HomeScreenState extends ConsumerState<_HomeBalanceRefreshSurface>
     final heroMinimumHeight =
         viewport.height * context.metrics.homeHeroHeightFactor;
     final systemPadding = context.windowInsets.systemPadding;
+    final split = context.fitsDuoLandscapePanes;
     // Draw the chart behind the status indicators and keep its controls inside
     // the safe edges.
     final horizontalInsets = EdgeInsets.only(
@@ -187,75 +191,170 @@ class _HomeScreenState extends ConsumerState<_HomeBalanceRefreshSurface>
     final bottomContentInset =
         context.windowInsets.bottomSystem +
         bottomNavSpace +
-        context.spacing.xxl;
+        (context.isOpenDuoLandscape ? context.spacing.lg : context.spacing.xxl);
+    final chartHeight = context.metrics.chartHeight;
+    final actions = Padding(
+      padding: EdgeInsets.only(top: context.spacing.lg),
+      child: HomeActionButtons(stacked: split),
+    );
+    final heroContent = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const HomeHeader(),
+        PriceCard(
+          key: _priceCardKey,
+          chartHeight: split
+              ? (viewport.height / 3).clamp(chartHeight, chartHeight * 2)
+              : null,
+        ),
+        if (!split) actions,
+      ],
+    );
+    final assets = AssetsSection(
+      key: _assetsKey,
+      home: home,
+      showTopGap: !split,
+    );
+    final bottomGap = SliverToBoxAdapter(
+      child: SizedBox(height: bottomContentInset),
+    );
+    final lightStatus = !split || systemPadding.left > systemPadding.right;
 
     return AsterNavigationScope(
       child: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle(
           statusBarColor: context.appColors.transparentSurface,
-          statusBarIconBrightness: Brightness.light,
-          statusBarBrightness: Brightness.dark,
+          statusBarIconBrightness: lightStatus
+              ? Brightness.light
+              : Brightness.dark,
+          statusBarBrightness: lightStatus ? Brightness.dark : Brightness.light,
         ),
         child: Scaffold(
           backgroundColor: context.colorScheme.surface,
-          body: NotificationListener<OverscrollIndicatorNotification>(
-            onNotification: (notification) {
-              // Android paints stretch independently of the scroll position.
-              // Suppress only this viewport's top effect; nested scrollables and
-              // the permitted bottom-edge bounce retain their own behavior.
-              if (notification.depth == 0 && notification.leading) {
-                notification.disallowIndicator();
-              }
-              return false;
-            },
-            child: CustomScrollView(
-              physics: const _HomeScrollPhysics(
-                parent: AlwaysScrollableScrollPhysics(),
-              ),
-              slivers: [
-                SliverToBoxAdapter(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(minHeight: heroMinimumHeight),
-                    child: ClipRect(
-                      child: Stack(
-                        fit: StackFit.passthrough,
-                        children: [
-                          const Positioned.fill(
-                            child: MeshGradientBackground(),
-                          ),
-                          Padding(
-                            padding:
-                                horizontalInsets +
-                                EdgeInsets.only(
-                                  top: topInset,
-                                  bottom: context.spacing.lg,
-                                ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const HomeHeader(),
-                                const PriceCard(),
-                                SizedBox(height: context.spacing.lg),
-                                const HomeActionButtons(),
-                              ],
+          body: split
+              ? Row(
+                  textDirection: TextDirection.ltr,
+                  children: [
+                    Expanded(
+                      child: ClipRect(
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            const MeshGradientBackground(),
+                            LayoutBuilder(
+                              builder: (context, constraints) =>
+                                  _HomeScrollView(
+                                    primary: false,
+                                    slivers: [
+                                      SliverToBoxAdapter(
+                                        child: ConstrainedBox(
+                                          constraints: BoxConstraints(
+                                            minHeight: constraints.maxHeight,
+                                          ),
+                                          child: Padding(
+                                            padding: EdgeInsets.only(
+                                              top: topInset,
+                                              left: horizontalInsets.left,
+                                              bottom: bottomContentInset,
+                                            ),
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment
+                                                      .spaceBetween,
+                                              children: [heroContent, actions],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: _HomeScrollView(
+                        primary: false,
+                        slivers: [
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: EdgeInsets.only(
+                                top: topInset,
+                                right: horizontalInsets.right,
+                              ),
+                              child: assets,
                             ),
                           ),
+                          bottomGap,
                         ],
                       ),
                     ),
-                  ),
+                  ],
+                )
+              : _HomeScrollView(
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: heroMinimumHeight,
+                        ),
+                        child: ClipRect(
+                          child: Stack(
+                            fit: StackFit.passthrough,
+                            children: [
+                              const Positioned.fill(
+                                child: MeshGradientBackground(),
+                              ),
+                              Padding(
+                                padding:
+                                    horizontalInsets +
+                                    EdgeInsets.only(
+                                      top: topInset,
+                                      bottom: context.spacing.lg,
+                                    ),
+                                child: heroContent,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    SliverToBoxAdapter(
+                      child: Padding(padding: horizontalInsets, child: assets),
+                    ),
+                    bottomGap,
+                  ],
                 ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: horizontalInsets,
-                    child: AssetsSection(home: home),
-                  ),
-                ),
-                SliverToBoxAdapter(child: SizedBox(height: bottomContentInset)),
-              ],
-            ),
-          ),
         ),
+      ),
+    );
+  }
+}
+
+class _HomeScrollView extends StatelessWidget {
+  const _HomeScrollView({this.primary, required this.slivers});
+
+  final bool? primary;
+  final List<Widget> slivers;
+
+  @override
+  Widget build(BuildContext context) {
+    return NotificationListener<OverscrollIndicatorNotification>(
+      onNotification: (notification) {
+        // Keep the top edge fixed while allowing the bottom-edge bounce.
+        if (notification.depth == 0 && notification.leading) {
+          notification.disallowIndicator();
+        }
+        return false;
+      },
+      child: CustomScrollView(
+        primary: primary,
+        physics: const _HomeScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
+        ),
+        slivers: slivers,
       ),
     );
   }

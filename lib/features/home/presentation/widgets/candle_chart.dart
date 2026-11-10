@@ -15,10 +15,16 @@ const _kCandleCount = 24;
 /// Shows 24 candles for the last 24 hours as rounded rectangles with
 /// smooth loading animation and transition effects.
 class CandleChart extends StatefulWidget {
-  const CandleChart({super.key, required this.data, required this.isSkeleton});
+  const CandleChart({
+    super.key,
+    required this.data,
+    required this.isSkeleton,
+    this.height,
+  });
 
   final List<BitcoinPricePoint>? data;
   final bool isSkeleton;
+  final double? height;
 
   @override
   State<CandleChart> createState() => _CandleChartState();
@@ -152,10 +158,9 @@ class _CandleChartState extends State<CandleChart>
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
-    final metrics = context.metrics;
 
     return SizedBox(
-      height: metrics.chartHeight,
+      height: widget.height ?? context.metrics.chartHeight,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final candleSpacing = spacing.xxs;

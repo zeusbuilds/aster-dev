@@ -22,11 +22,15 @@ class PaymentTargetSelectionView extends StatelessWidget {
     required this.capabilities,
     required this.onSelected,
     required this.onRetry,
+    this.selectedTarget,
+    this.selectionEnabled = true,
   });
 
   final AsyncValue<List<WalletPaymentCapability>> capabilities;
   final Future<void> Function(WalletPaymentTarget target) onSelected;
   final VoidCallback onRetry;
+  final WalletPaymentTarget? selectedTarget;
+  final bool selectionEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +46,8 @@ class PaymentTargetSelectionView extends StatelessWidget {
       skipLoadingOnRefresh: false,
       data: (items) => _PaymentTargetList(
         capabilities: items,
-        onSelected: navigation.inFlight
+        selectedTarget: selectedTarget,
+        onSelected: !selectionEnabled || navigation.inFlight
             ? null
             : (target) => unawaited(
                 navigation.openRoute(
@@ -64,10 +69,15 @@ class PaymentTargetSelectionView extends StatelessWidget {
 }
 
 final class _PaymentTargetList extends StatelessWidget {
-  const _PaymentTargetList({required this.capabilities, this.onSelected});
+  const _PaymentTargetList({
+    required this.capabilities,
+    this.onSelected,
+    this.selectedTarget,
+  });
 
   final List<WalletPaymentCapability> capabilities;
   final ValueChanged<WalletPaymentTarget>? onSelected;
+  final WalletPaymentTarget? selectedTarget;
 
   @override
   Widget build(BuildContext context) {
@@ -85,8 +95,13 @@ final class _PaymentTargetList extends StatelessWidget {
       itemCount: items.length,
       separatorBuilder: (context, index) =>
           SizedBox(height: context.spacing.md),
-      itemBuilder: (context, index) =>
-          PaymentTargetTile(capability: items[index], onSelected: onSelected),
+      itemBuilder: (context, index) => PaymentTargetTile(
+        capability: items[index],
+        onSelected: onSelected,
+        selected: selectedTarget == null
+            ? null
+            : selectedTarget == items[index].target,
+      ),
     );
   }
 }
