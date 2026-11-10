@@ -191,6 +191,17 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     final spacing = context.spacing;
     final colors = context.appColors;
     final metrics = context.metrics;
+    final isDuoCover =
+        ref
+            .watch(duoCoverLayoutProvider)
+            .value
+            ?.appliesTo(MediaQuery.sizeOf(context)) ==
+        true;
+    final manualEntryLabel = _bridge
+        ? 'Enter connection link manually'
+        : widget.purpose == ScanPurpose.destinationPicker
+        ? 'Enter payment details manually'
+        : 'Enter payment details to send';
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
@@ -202,27 +213,41 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
         backgroundColor: colors.scanOverlayBase,
         body: LayoutBuilder(
           builder: (context, constraints) {
-            final safeTop = context.windowInsets.topSystem;
+            final insets = context.windowInsets.systemPadding;
+            final safeWidth = math.max(
+              0.0,
+              constraints.maxWidth - insets.horizontal,
+            );
+            final controlsLeft = insets.left + spacing.screenPadding;
+            final controlsRight = insets.right + spacing.screenPadding;
             final persistentNavClearance =
-                widget.purpose == ScanPurpose.sendLauncher
-                ? metrics.floatingNavClearance + spacing.xxl
-                : spacing.xxl;
+                widget.purpose == ScanPurpose.sendLauncher &&
+                    (!isDuoCover || CoverTabRail.hasBottomFallbackOf(context))
+                ? metrics.floatingNavClearance
+                : 0.0;
+            final actionMargin = isDuoCover ? spacing.lg : spacing.xxl;
             final ctaBottom =
-                context.windowInsets.bottomSystem + persistentNavClearance;
-            final frameTop = safeTop + metrics.scanHeaderExtent;
-            final footerExtent =
-                metrics.minTouchTarget + spacing.xl + ctaBottom;
+                insets.bottom + persistentNavClearance + actionMargin;
+            final frameTop = insets.top + metrics.scanHeaderExtent;
+            final ctaHeight = ScanEnterAddressButton.heightForWidth(
+              context,
+              label: manualEntryLabel,
+              width: safeWidth - spacing.screenPadding * 2,
+            );
+            final footerExtent = ctaHeight + spacing.xl + ctaBottom;
             final availableFrameHeight = math.max(
               0.0,
               constraints.maxHeight - frameTop - footerExtent,
             );
-            final widthBasedSize =
-                constraints.maxWidth * metrics.scanFrameSizeFactor;
+            final widthBasedSize = safeWidth * metrics.scanFrameSizeFactor;
             final frameSize = math.min(
               metrics.scanFrameMaximumSize,
               math.min(widthBasedSize, availableFrameHeight),
             );
-            final frameLeft = (constraints.maxWidth - frameSize) / 2;
+            // The camera and overlay remain edge to edge. Keep their shared
+            // window in that coordinate space while centering the frame inside
+            // the safe content area.
+            final frameLeft = insets.left + (safeWidth - frameSize) / 2;
             final cutoutRect = Rect.fromLTWH(
               frameLeft,
               frameTop,
@@ -251,9 +276,9 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                     ),
                   ),
                   Positioned(
-                    top: safeTop,
-                    left: spacing.screenPadding,
-                    right: spacing.screenPadding,
+                    top: insets.top,
+                    left: controlsLeft,
+                    right: controlsRight,
                     height: metrics.scanHeaderExtent,
                     child: FocusTraversalOrder(
                       order: const NumericFocusOrder(0),
@@ -281,17 +306,13 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                     ),
                   ),
                   Positioned(
-                    left: spacing.screenPadding,
-                    right: spacing.screenPadding,
+                    left: controlsLeft,
+                    right: controlsRight,
                     bottom: ctaBottom,
                     child: FocusTraversalOrder(
                       order: const NumericFocusOrder(4),
                       child: ScanEnterAddressButton(
-                        label: _bridge
-                            ? 'Enter connection link manually'
-                            : widget.purpose == ScanPurpose.destinationPicker
-                            ? 'Enter payment details manually'
-                            : 'Enter payment details to send',
+                        label: manualEntryLabel,
                         onTap:
                             !scanState.canEnterManually ||
                                 _navigationInFlight ||

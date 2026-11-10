@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
+import 'package:remixicon/remixicon.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
@@ -275,7 +277,8 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
                                 _showAmountSheet(context, navigation),
                               ),
                             ),
-                            loading: () => const _RequestLoading(),
+                            loading: () =>
+                                _RequestLoading(target: widget.target),
                             error: (error, stackTrace) => _RequestFailure(
                               failure: error is AppFailureException
                                   ? error.failure
@@ -330,126 +333,228 @@ final class _RequestBody extends StatelessWidget {
             route: state.route,
             bitcoinUnit: state.bitcoinUnit,
           );
-    return ListView(
-      padding: EdgeInsets.only(
-        bottom: context.windowInsets.bottomSafe + context.spacing.lg,
-      ),
-      children: [
-        if (request == null)
-          _AmountRequiredCard(target: state.route.target)
-        else
-          Squircle(
-            borderRadius: context.radii.card,
-            padding: EdgeInsets.all(context.spacing.xxl),
-            child: Column(
-              children: [
-                if (expired)
-                  AspectRatio(
-                    aspectRatio: 1,
-                    child: Center(
-                      child: Icon(
-                        MingCuteIcons.mgc_time_line,
-                        size: context.icons.xl,
-                        color: context.appColors.textSecondary,
-                        semanticLabel:
-                            'Expired payment request, QR code removed',
-                      ),
-                    ),
-                  )
-                else
-                  ReceiveRequestQr(
-                    encodedRequest: request.encodedRequest,
-                    semanticLabel: '${state.route.target.requestLabel} QR code',
-                    assetKind: state.route.asset.kind,
-                  ),
-                SizedBox(height: context.spacing.lg),
-                if (!expired &&
-                    state.route.target == WalletPaymentTarget.usdtOnchain)
-                  ReceiveRequestAddress(value: request.displayValue)
-                else if (!expired)
-                  Text(
-                    request.displayValue,
-                    style: context.type.addressSmall,
-                    textAlign: TextAlign.center,
-                    maxLines: 4,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                if (appliedAmount != null) ...[
-                  SizedBox(height: context.spacing.sm),
-                  AmountText(
-                    appliedAmount.text,
-                    style: context.type.rowValue,
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-                if (expired) ...[
-                  SizedBox(height: context.spacing.sm),
-                  Semantics(
-                    container: true,
-                    label: 'Expired',
-                    excludeSemantics: true,
-                    liveRegion: true,
-                    child: Text('Expired', style: context.type.rowValue),
-                  ),
-                ] else if (request.expiresAt case final expiry?) ...[
-                  SizedBox(height: context.spacing.sm),
-                  NumericText(
-                    'Expires ${DateFormat.yMMMd(Localizations.localeOf(context).toString()).add_jms().format(expiry.toLocal())}',
-                    style: context.type.rowMeta.copyWith(
-                      color: context.appColors.textSecondary,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-                SizedBox(height: context.spacing.md),
-                CustomButton.compact(
-                  text: 'Copy',
-                  variant: ButtonVariant.secondary,
-                  prefixIcon: MingCuteIcons.mgc_copy_2_line,
-                  enabled: commandsEnabled && state.canReadRequest && !expired,
-                  hapticIntent: null,
-                  onTap: onCopy,
-                ),
-              ],
-            ),
-          ),
-        SizedBox(height: context.spacing.xxl),
-        Squircle(
-          padding: EdgeInsets.symmetric(vertical: context.spacing.xs),
-          child: Column(
-            children: [
-              AsterOptionRow(
-                title: 'Set amount',
-                amountDetails: appliedAmount?.text,
-                prefixIcon: MingCuteIcons.mgc_edit_2_line,
-                onTap: commandsEnabled && state.canEditAmount
-                    ? onSetAmount
-                    : null,
-              ),
-              if (request != null) ...[
-                const AsterDivider.inset(),
-                AsterOptionRow(
-                  title: 'Generate new request',
-                  prefixIcon: MingCuteIcons.mgc_refresh_2_line,
-                  hapticIntent: null,
-                  onTap: commandsEnabled && state.canRegenerate
-                      ? onRegenerate
-                      : null,
-                ),
-                const AsterDivider.inset(),
-                AsterOptionRow(
-                  title: 'Share',
-                  prefixIcon: MingCuteIcons.mgc_share_forward_line,
-                  hapticIntent: null,
-                  onTap: commandsEnabled && state.canReadRequest && !expired
-                      ? onShare
-                      : null,
-                ),
-              ],
-            ],
+    final actions = _RequestActions(
+      appliedAmount: appliedAmount?.text,
+      hasRequest: request != null,
+      onSetAmount: commandsEnabled && state.canEditAmount ? onSetAmount : null,
+      onRegenerate: commandsEnabled && state.canRegenerate
+          ? onRegenerate
+          : null,
+      onShare: commandsEnabled && state.canReadRequest && !expired
+          ? onShare
+          : null,
+    );
+    final spacing = context.spacing;
+    if (request == null) {
+      return ListView(
+        padding: EdgeInsets.only(
+          bottom: context.windowInsets.bottomSafe + spacing.lg,
+        ),
+        children: [
+          _AmountRequiredCard(target: state.route.target),
+          SizedBox(height: spacing.xxl),
+          actions,
+        ],
+      );
+    }
+
+    return _RequestLayout(
+      qr: _qr(context, request, expired),
+      details: _details(context, request, appliedAmount?.text, expired),
+      actions: actions,
+    );
+  }
+
+  Widget _qr(BuildContext context, WalletReceiveRequest request, bool expired) {
+    if (expired) {
+      return AspectRatio(
+        aspectRatio: 1,
+        child: Center(
+          child: Icon(
+            MingCuteIcons.mgc_time_line,
+            size: context.icons.xl,
+            color: context.appColors.textSecondary,
+            semanticLabel: 'Expired payment request, QR code removed',
           ),
         ),
+      );
+    }
+    return ReceiveRequestQr(
+      encodedRequest: request.encodedRequest,
+      semanticLabel: '${state.route.target.requestLabel} QR code',
+      assetKind: state.route.asset.kind,
+    );
+  }
+
+  List<Widget> _details(
+    BuildContext context,
+    WalletReceiveRequest request,
+    String? appliedAmount,
+    bool expired,
+  ) {
+    return [
+      if (!expired && state.route.target == WalletPaymentTarget.usdtOnchain)
+        ReceiveRequestAddress(value: request.displayValue)
+      else if (!expired)
+        Text(
+          request.displayValue,
+          style: context.type.addressSmall,
+          textAlign: TextAlign.center,
+          maxLines: 4,
+          overflow: TextOverflow.ellipsis,
+        ),
+      if (appliedAmount != null) ...[
+        SizedBox(height: context.spacing.sm),
+        AmountText(
+          appliedAmount,
+          style: context.type.rowValue,
+          textAlign: TextAlign.center,
+        ),
       ],
+      if (expired) ...[
+        SizedBox(height: context.spacing.sm),
+        Semantics(
+          container: true,
+          label: 'Expired',
+          excludeSemantics: true,
+          liveRegion: true,
+          child: Text('Expired', style: context.type.rowValue),
+        ),
+      ] else if (request.expiresAt case final expiry?) ...[
+        SizedBox(height: context.spacing.sm),
+        NumericText(
+          'Expires ${DateFormat.yMMMd(Localizations.localeOf(context).toString()).add_jms().format(expiry.toLocal())}',
+          style: context.type.rowMeta.copyWith(
+            color: context.appColors.textSecondary,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+      SizedBox(height: context.spacing.md),
+      _requestCopyButton(
+        onTap: commandsEnabled && state.canReadRequest && !expired
+            ? onCopy
+            : null,
+      ),
+    ];
+  }
+}
+
+Widget _requestCopyButton({VoidCallback? onTap}) => CustomButton.compact(
+  text: 'Copy',
+  variant: ButtonVariant.secondary,
+  prefixIcon: MingCuteIcons.mgc_copy_2_line,
+  enabled: onTap != null,
+  hapticIntent: null,
+  onTap: onTap,
+);
+
+/// Positions the same cards in both the ready and loading states.
+final class _RequestLayout extends StatelessWidget {
+  const _RequestLayout({
+    required this.qr,
+    required this.details,
+    required this.actions,
+    this.loading = false,
+  });
+
+  final Widget qr;
+  final List<Widget> details;
+  final Widget actions;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    final spacing = context.spacing;
+    final children = [
+      _requestCard(context, [qr, SizedBox(height: spacing.lg), ...details]),
+      SizedBox(height: spacing.xxl),
+      actions,
+    ];
+    return ListView(
+      padding: EdgeInsets.only(
+        bottom: context.windowInsets.bottomSafe + spacing.lg,
+      ),
+      children: loading
+          ? [
+              Semantics(
+                container: true,
+                liveRegion: true,
+                label: 'Loading payment request',
+                excludeSemantics: true,
+                child: AppSkeletonizer(
+                  enabled: true,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: children,
+                  ),
+                ),
+              ),
+            ]
+          : children,
+    );
+  }
+
+  Widget _requestCard(BuildContext context, List<Widget> children) {
+    return Squircle(
+      borderRadius: context.radii.card,
+      padding: EdgeInsets.all(context.spacing.xxl),
+      child: Column(children: children),
+    );
+  }
+}
+
+final class _RequestActions extends StatelessWidget {
+  const _RequestActions({
+    required this.hasRequest,
+    this.appliedAmount,
+    this.onSetAmount,
+    this.onRegenerate,
+    this.onShare,
+    this.loading = false,
+  });
+
+  final bool hasRequest;
+  final String? appliedAmount;
+  final VoidCallback? onSetAmount;
+  final VoidCallback? onRegenerate;
+  final VoidCallback? onShare;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    final placeholderChevron = loading ? RemixIcons.arrow_right_s_line : null;
+    return Squircle(
+      padding: EdgeInsets.symmetric(vertical: context.spacing.xs),
+      child: Column(
+        children: [
+          AsterOptionRow(
+            title: 'Set amount',
+            amountDetails: appliedAmount,
+            prefixIcon: MingCuteIcons.mgc_edit_2_line,
+            suffixIcon: placeholderChevron,
+            onTap: onSetAmount,
+          ),
+          if (hasRequest) ...[
+            const AsterDivider.inset(),
+            AsterOptionRow(
+              title: 'Generate new request',
+              prefixIcon: MingCuteIcons.mgc_refresh_2_line,
+              suffixIcon: placeholderChevron,
+              hapticIntent: null,
+              onTap: onRegenerate,
+            ),
+            const AsterDivider.inset(),
+            AsterOptionRow(
+              title: 'Share',
+              prefixIcon: MingCuteIcons.mgc_share_forward_line,
+              suffixIcon: placeholderChevron,
+              hapticIntent: null,
+              onTap: onShare,
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -485,25 +590,54 @@ final class _AmountRequiredCard extends StatelessWidget {
 }
 
 final class _RequestLoading extends StatelessWidget {
-  const _RequestLoading();
+  const _RequestLoading({required this.target});
+
+  final WalletPaymentTarget target;
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      container: true,
-      liveRegion: true,
-      label: 'Loading payment request',
-      excludeSemantics: true,
-      child: AppSkeletonizer(
-        enabled: true,
-        child: Squircle(
-          borderRadius: context.radii.card,
-          child: AspectRatio(
-            aspectRatio: 1,
-            child: ColoredBox(color: context.appColors.surfaceSubtle),
-          ),
+    final spacing = context.spacing;
+    final type = context.type;
+    final scaler = MediaQuery.textScalerOf(context);
+    // Bone lays out the supplied style without applying the system scaler.
+    TextStyle scaled(TextStyle style) {
+      final size = style.fontSize;
+      return size == null
+          ? style
+          : style.apply(fontSizeFactor: scaler.scale(size) / size);
+    }
+
+    final isRgb = target == WalletPaymentTarget.usdtOnchain;
+    final expectsExpiry = isRgb || target.rail == PaymentRail.lightning;
+    return _RequestLayout(
+      loading: true,
+      qr: Padding(
+        padding: EdgeInsets.all(spacing.lg),
+        child: AspectRatio(
+          aspectRatio: 1,
+          child: ColoredBox(color: context.appColors.surfaceSubtle),
         ),
       ),
+      details: [
+        Bone.multiText(
+          key: const ValueKey('receive-loading-address'),
+          lines: isRgb ? 2 : 1,
+          style: scaled(type.addressSmall),
+          textAlign: TextAlign.center,
+        ),
+        if (expectsExpiry) ...[
+          SizedBox(height: spacing.sm),
+          Bone.multiText(
+            key: const ValueKey('receive-loading-expiry'),
+            lines: 1,
+            style: scaled(type.rowMeta),
+            textAlign: TextAlign.center,
+          ),
+        ],
+        SizedBox(height: spacing.md),
+        Skeleton.shade(child: _requestCopyButton()),
+      ],
+      actions: const _RequestActions(hasRequest: true, loading: true),
     );
   }
 }

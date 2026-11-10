@@ -140,6 +140,7 @@ class _CurrencyLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final insets = context.windowInsets.safePadding;
     return Semantics(
       container: true,
       liveRegion: true,
@@ -149,7 +150,9 @@ class _CurrencyLoading extends StatelessWidget {
         enabled: true,
         child: ListView.separated(
           padding: EdgeInsets.only(
-            bottom: context.windowInsets.bottomSafe + context.spacing.lg,
+            left: insets.left,
+            right: insets.right,
+            bottom: insets.bottom + context.spacing.lg,
           ),
           itemCount: 8,
           separatorBuilder: (context, index) => const AsterDivider.inset(),

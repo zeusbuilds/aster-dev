@@ -55,7 +55,15 @@ class AsterLockScreen extends StatelessWidget {
   final SecurityController controller;
 
   @override
-  Widget build(BuildContext context) => ListenableBuilder(
+  Widget build(BuildContext context) => StreamBuilder<DuoCoverLayout?>(
+    stream: DuoCoverLayout.platformUpdates,
+    initialData: DuoCoverLayout.currentPlatformLayout,
+    builder: (context, snapshot) => _buildLockScreen(
+      snapshot.data?.appliesTo(MediaQuery.sizeOf(context)) == true,
+    ),
+  );
+
+  Widget _buildLockScreen(bool isDuoCover) => ListenableBuilder(
     listenable: controller,
     builder: (context, _) => BlockSemantics(
       child: Stack(
@@ -68,9 +76,15 @@ class AsterLockScreen extends StatelessWidget {
               !controller.isAuthenticating &&
               !controller.isObscured)
             Positioned(
-              left: context.spacing.screenPadding,
-              right: context.spacing.screenPadding,
-              bottom: context.windowInsets.bottomSafe + context.spacing.xxxl,
+              left:
+                  context.windowInsets.systemPadding.left +
+                  context.spacing.screenPadding,
+              right:
+                  context.windowInsets.systemPadding.right +
+                  context.spacing.screenPadding,
+              bottom:
+                  context.windowInsets.bottomSafe +
+                  (isDuoCover ? context.spacing.lg : context.spacing.xxxl),
               child: Material(
                 color: context.appColors.transparentSurface,
                 child: Column(

@@ -73,52 +73,54 @@ class _SecuritySettingsScreenState
             leadingIcon: true,
             fallbackLocation: RoutePaths.settings,
           ),
-          body: ListView(
-            padding: EdgeInsets.fromLTRB(
-              context.spacing.screenPadding,
-              context.spacing.lg,
-              context.spacing.screenPadding,
-              context.spacing.lg + context.windowInsets.bottomSafe,
+          body: AsterHorizontalSafeArea(
+            child: ListView(
+              padding: EdgeInsets.fromLTRB(
+                context.spacing.screenPadding,
+                context.spacing.lg,
+                context.spacing.screenPadding,
+                context.spacing.lg + context.windowInsets.bottomSafe,
+              ),
+              children: [
+                Squircle(
+                  padding: EdgeInsets.symmetric(vertical: context.spacing.xs),
+                  child: Column(
+                    children: [
+                      AsterOptionRow.toggle(
+                        key: const ValueKey('security-app-lock-switch'),
+                        title: 'App lock',
+                        prefixIcon: MingCuteIcons.mgc_lock_line,
+                        value: enabled,
+                        onChanged: secured && !busy
+                            ? (value) => unawaited(_changeLock(value))
+                            : null,
+                      ),
+                      const AsterDivider.inset(),
+                      AsterOptionRow(
+                        key: const ValueKey('security-lock-now'),
+                        title: 'Lock now',
+                        prefixIcon: MingCuteIcons.mgc_shield_line,
+                        hapticIntent: null,
+                        onTap: enabled && !busy ? controller.lock : null,
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: context.spacing.xxl),
+                Squircle(
+                  padding: EdgeInsets.symmetric(vertical: context.spacing.xs),
+                  child: AsterOptionRow(
+                    title: 'Device screen lock',
+                    details: !statusKnown
+                        ? 'Unavailable'
+                        : secured
+                        ? 'On'
+                        : 'Off',
+                    prefixIcon: MingCuteIcons.mgc_cellphone_line,
+                  ),
+                ),
+              ],
             ),
-            children: [
-              Squircle(
-                padding: EdgeInsets.symmetric(vertical: context.spacing.xs),
-                child: Column(
-                  children: [
-                    AsterOptionRow.toggle(
-                      key: const ValueKey('security-app-lock-switch'),
-                      title: 'App lock',
-                      prefixIcon: MingCuteIcons.mgc_lock_line,
-                      value: enabled,
-                      onChanged: secured && !busy
-                          ? (value) => unawaited(_changeLock(value))
-                          : null,
-                    ),
-                    const AsterDivider.inset(),
-                    AsterOptionRow(
-                      key: const ValueKey('security-lock-now'),
-                      title: 'Lock now',
-                      prefixIcon: MingCuteIcons.mgc_shield_line,
-                      hapticIntent: null,
-                      onTap: enabled && !busy ? controller.lock : null,
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(height: context.spacing.xxl),
-              Squircle(
-                padding: EdgeInsets.symmetric(vertical: context.spacing.xs),
-                child: AsterOptionRow(
-                  title: 'Device screen lock',
-                  details: !statusKnown
-                      ? 'Unavailable'
-                      : secured
-                      ? 'On'
-                      : 'Off',
-                  prefixIcon: MingCuteIcons.mgc_cellphone_line,
-                ),
-              ),
-            ],
           ),
         );
       },

@@ -27,8 +27,10 @@ class WalletSelectionScreen extends ConsumerWidget {
           final spacing = context.spacing;
           return walletState.when(
             loading: () => const _WalletSelectionScaffold(
-              child: Center(
-                child: GridLoader(semanticLabel: 'Loading wallets'),
+              child: AsterHorizontalSafeArea(
+                child: Center(
+                  child: GridLoader(semanticLabel: 'Loading wallets'),
+                ),
               ),
             ),
             error: (error, stackTrace) {

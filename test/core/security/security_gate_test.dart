@@ -4,6 +4,8 @@ import 'package:aster/core/core.dart';
 import 'package:aster/core/security/security_gate.dart';
 import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -166,6 +168,79 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Wallet'), findsOneWidget);
   });
+
+  testWidgets(
+    'startup and warm lock share live Duo cover spacing with the router',
+    (tester) async {
+      final security = SecurityController(const _SecuredDevice());
+      addTearDown(security.dispose);
+      await security.initialize(hasWallet: true);
+      security.lock();
+
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(466, 678);
+      tester.view.padding = const FakeViewPadding(bottom: 34);
+      tester.view.viewPadding = const FakeViewPadding(bottom: 34);
+      addTearDown(tester.view.reset);
+
+      var nativeListens = 0;
+      var nativeCancels = 0;
+      late MockStreamHandlerEventSink geometry;
+      tester.binding.defaultBinaryMessenger.setMockStreamHandler(
+        const EventChannel('com.aster.wallet/cover_navigation'),
+        MockStreamHandler.inline(
+          onListen: (_, events) {
+            nativeListens++;
+            geometry = events;
+            events.success({'width': 466.0, 'height': 678.0});
+          },
+          onCancel: (_) => nativeCancels++,
+        ),
+      );
+
+      final unlock = find.widgetWithText(CustomButton, 'Unlock');
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: AsterLockScreen(controller: security),
+        ),
+      );
+      await tester.pump();
+      expect(tester.getBottomLeft(unlock).dy, 628);
+
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final routerLayout = container.listen(duoCoverLayoutProvider, (_, _) {});
+      await tester.pump();
+      expect(routerLayout.read().value?.viewport, const Size(466, 678));
+      expect(nativeListens, 1);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: SecurityGate(controller: security, child: const Text('Wallet')),
+        ),
+      );
+      expect(tester.getBottomLeft(unlock).dy, 628);
+
+      // Flutter's viewport can change before the native cover event arrives.
+      tester.view.physicalSize = const Size(670, 915);
+      await tester.pump();
+      expect(tester.getBottomLeft(unlock).dy, 849);
+      geometry.success(null);
+      await tester.pump();
+      expect(tester.getBottomLeft(unlock).dy, 849);
+      expect(routerLayout.read().value, isNull);
+      expect(nativeListens, 1);
+      expect(nativeCancels, 0);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      container.dispose();
+      await tester.pump();
+      expect(nativeCancels, 1);
+    },
+    variant: const TargetPlatformVariant({TargetPlatform.iOS}),
+  );
 }
 
 final class _HeldDevice

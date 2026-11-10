@@ -48,35 +48,40 @@ class CreateWalletQuizScreen extends ConsumerWidget {
               backgroundColor: onBrandArt
                   ? context.appColors.transparentSurface
                   : context.colorScheme.surface,
-              body: SafeArea(
-                child: switch (asyncState) {
-                  AsyncData<CreateWalletState>(:final value)
-                      when !value.completed =>
-                    _QuizContent(
+              body: switch (asyncState) {
+                AsyncData<CreateWalletState>(:final value)
+                    when !value.completed =>
+                  OnboardingScrollSafeArea(
+                    builder: (_, scrollBottomInset) => _QuizContent(
                       state: value,
                       navigation: navigation,
                       onBack: onBack,
                       onContinue: onContinue,
                       onBrandArt: onBrandArt,
                       showNavigationBar: showNavigationBar,
+                      scrollBottomInset: scrollBottomInset,
                     ),
-                  AsyncError<CreateWalletState>(
-                    :final error,
-                    :final stackTrace,
-                  ) =>
-                    _QuizFailure(
+                  ),
+                AsyncError<CreateWalletState>(
+                  :final error,
+                  :final stackTrace,
+                ) =>
+                  SafeArea(
+                    child: _QuizFailure(
                       error: error,
                       stackTrace: stackTrace,
                       onBack: onBack,
                       onBrandArt: onBrandArt,
                       showNavigationBar: showNavigationBar,
                     ),
-                  _ => OnboardingStatusPanel.loading(
+                  ),
+                _ => SafeArea(
+                  child: OnboardingStatusPanel.loading(
                     message: 'Preparing recovery check...',
                     onBrandArt: onBrandArt,
                   ),
-                },
-              ),
+                ),
+              },
             ),
           );
         },
@@ -93,6 +98,7 @@ class _QuizContent extends ConsumerWidget {
     required this.onContinue,
     required this.onBrandArt,
     required this.showNavigationBar,
+    required this.scrollBottomInset,
   });
 
   final CreateWalletState state;
@@ -101,6 +107,7 @@ class _QuizContent extends ConsumerWidget {
   final VoidCallback? onContinue;
   final bool onBrandArt;
   final bool showNavigationBar;
+  final double scrollBottomInset;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -213,7 +220,7 @@ class _QuizContent extends ConsumerWidget {
               spacing.screenPadding,
               0,
               spacing.screenPadding,
-              spacing.lg,
+              spacing.lg + scrollBottomInset,
             ),
             child: OnboardingChoreographyItem(
               id: 'create-quiz-actions-motion',

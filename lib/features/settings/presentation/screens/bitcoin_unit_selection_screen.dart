@@ -36,8 +36,10 @@ class BitcoinUnitSelectionScreen extends ConsumerWidget {
               ),
               body: settings.when(
                 skipLoadingOnRefresh: false,
-                loading: () => const Center(
-                  child: GridLoader(semanticLabel: 'Loading Bitcoin units'),
+                loading: () => const AsterHorizontalSafeArea(
+                  child: Center(
+                    child: GridLoader(semanticLabel: 'Loading Bitcoin units'),
+                  ),
                 ),
                 error: (error, stackTrace) => SettingsLoadFailure(
                   failure: FailureMapper.from(error, stackTrace),

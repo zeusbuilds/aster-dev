@@ -637,6 +637,74 @@ void main() {
     expect(session.galleryCalls, 1);
   });
 
+  testWidgets('Duo cover keeps the scanner usable inside the system inset', (
+    tester,
+  ) async {
+    const viewportSize = Size(466, 678);
+    const coverChannel = EventChannel('com.aster.wallet/cover_navigation');
+    final messenger = tester.binding.defaultBinaryMessenger;
+    messenger.setMockStreamHandler(
+      coverChannel,
+      MockStreamHandler.inline(
+        onListen: (_, events) => events.success({
+          'width': viewportSize.width,
+          'height': viewportSize.height,
+        }),
+      ),
+    );
+    addTearDown(() => messenger.setMockStreamHandler(coverChannel, null));
+    tester.view.physicalSize = viewportSize;
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 3;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPadding);
+    addTearDown(tester.view.resetViewPadding);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final router = _launcherRouter();
+    addTearDown(router.dispose);
+    final harness = _ScanWidgetHarness(
+      session: FakeScanSession(),
+      router: router,
+      purpose: ScanPurpose.sendLauncher,
+    );
+    addTearDown(harness.dispose);
+    await tester.pumpWidget(harness.app);
+    harness.activateScanTab();
+
+    for (final insets in [
+      const FakeViewPadding(right: 84, bottom: 34),
+      const FakeViewPadding(left: 84, bottom: 34),
+    ]) {
+      tester.view.padding = insets;
+      tester.view.viewPadding = insets;
+      await tester.pumpAndSettle();
+
+      final camera = find.byType(ScanCamera);
+      final frame = tester.getRect(find.byType(ScanFrame));
+      final header = tester.getRect(find.byType(ScanWalletHeader));
+      final manual = find.byType(ScanEnterAddressButton);
+      final manualRect = tester.getRect(manual);
+      final safeLeft = insets.left;
+      final safeRight = viewportSize.width - insets.right;
+      for (final rect in [frame, header, manualRect]) {
+        expect(rect.left, greaterThanOrEqualTo(safeLeft));
+        expect(rect.right, lessThanOrEqualTo(safeRight));
+        expect(rect.center.dx, (safeLeft + safeRight) / 2);
+      }
+      expect(frame.bottom, lessThan(manualRect.top));
+      expect(manualRect.bottom, viewportSize.height - insets.bottom - 16);
+      expect(tester.getRect(camera), Offset.zero & viewportSize);
+      expect(tester.widget<ScanCamera>(camera).cutoutRect, frame);
+      expect(
+        tester.widget<ScanBackground>(find.byType(ScanBackground)).cutoutRect,
+        frame,
+      );
+      expect(manual.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    }
+  }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
+
   testWidgets('camera failure is silent while gallery remains available', (
     tester,
   ) async {

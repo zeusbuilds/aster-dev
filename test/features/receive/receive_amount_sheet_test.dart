@@ -8,6 +8,7 @@ import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:aster/features/wallet/presentation/widgets/widgets.dart';
 import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -20,6 +21,7 @@ void main() {
   Future<PaymentFlowTestHarness> mount(
     WidgetTester tester, {
     WalletPaymentTarget target = WalletPaymentTarget.bitcoinOnchain,
+    bool duoCover = false,
   }) async {
     final harness = await PaymentFlowTestHarness.create(
       engine: FakeWalletEngine(),
@@ -35,7 +37,26 @@ void main() {
       await disposal;
     });
     tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(390, 1000);
+    tester.view.physicalSize = duoCover
+        ? const Size(466, 678)
+        : const Size(390, 1000);
+    if (duoCover) {
+      const channel = EventChannel('com.aster.wallet/cover_navigation');
+      final messenger = tester.binding.defaultBinaryMessenger;
+      messenger.setMockStreamHandler(
+        channel,
+        MockStreamHandler.inline(
+          onListen: (_, events) =>
+              events.success({'width': 466.0, 'height': 678.0}),
+        ),
+      );
+      const padding = FakeViewPadding(right: 84, bottom: 34);
+      tester.view.padding = padding;
+      tester.view.viewPadding = padding;
+      addTearDown(tester.view.resetPadding);
+      addTearDown(tester.view.resetViewPadding);
+      addTearDown(() => messenger.setMockStreamHandler(channel, null));
+    }
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.view.resetPhysicalSize);
     await tester.pumpWidget(
@@ -293,4 +314,52 @@ void main() {
     expect(tester.getTopLeft(card).dy - tester.getBottomLeft(header).dy, 4);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'Duo cover amount editor fits at rest and scrolls above the keyboard',
+    (tester) async {
+      final harness = await mount(tester, duoCover: true);
+      harness.container
+          .read(
+            receiveFlowViewModelProvider(WalletPaymentTarget.bitcoinOnchain)
+                .notifier,
+          )
+          .updateAmount('0.0001');
+      await tester.pumpAndSettle();
+      final sheet = find.byType(ReceiveAmountSheet);
+      final viewport = find.descendant(
+        of: sheet,
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is SingleChildScrollView &&
+              widget.scrollDirection == Axis.vertical,
+        ),
+      );
+      final submit = find.descendant(
+        of: sheet,
+        matching: find.widgetWithText(CustomButton, 'Set amount'),
+      );
+      final scrollable = Scrollable.of(tester.element(submit));
+
+      expect(scrollable.position.maxScrollExtent, 0);
+      expect(tester.getSize(sheet).height, lessThan(678 * 0.85));
+      expect(tester.getRect(viewport).bottom, closeTo(678, 0.5));
+      expect(tester.getRect(submit).bottom, closeTo(628, 0.5));
+      expect(submit.hitTestable(), findsOneWidget);
+
+      // The modal rises above the keyboard once. The home indicator no longer
+      // overlaps the visible scroll area, so just the design gap remains.
+      tester.view.viewInsets = const FakeViewPadding(bottom: 180);
+      tester.view.padding = const FakeViewPadding(right: 84);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pumpAndSettle();
+      expect(scrollable.position.maxScrollExtent, greaterThan(0));
+      scrollable.position.jumpTo(scrollable.position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      expect(tester.getRect(viewport).bottom, closeTo(498, 0.5));
+      expect(tester.getRect(submit).bottom, closeTo(482, 0.5));
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+  );
 }

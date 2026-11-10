@@ -289,95 +289,98 @@ class _HostedBridgeScreenState extends ConsumerState<HostedBridgeScreen> {
         leadingIcon: true,
         fallbackLocation: RoutePaths.settings,
       ),
-      body: bridge == null
-          ? const SizedBox.shrink()
-          : ListenableBuilder(
-              listenable: bridge,
-              builder: (context, _) {
-                if (!bridge.available) return const SizedBox.shrink();
-                return ListView(
-                  padding: EdgeInsets.fromLTRB(
-                    spacing.screenPadding,
-                    spacing.lg,
-                    spacing.screenPadding,
-                    spacing.lg + context.windowInsets.bottomSafe,
-                  ),
-                  children: [
-                    if (bridge.connected)
-                      AsterOptionRow(
-                        title: 'dev.mint.utexo.com',
-                        details: 'Connected',
-                        prefixIcon: Icons.link,
-                        onTap: null,
-                      )
-                    else ...[
-                      TextField(
-                        controller: _link,
-                        decoration: const InputDecoration(
-                          labelText: 'WalletConnect link',
-                        ),
-                        obscureText: true,
-                        autocorrect: false,
-                        enableSuggestions: false,
-                        keyboardType: TextInputType.url,
-                        textInputAction: TextInputAction.go,
-                        inputFormatters: [
-                          LengthLimitingTextInputFormatter(
-                            HostedBridgeController.maxLinkLength,
+      body: AsterHorizontalSafeArea(
+        child: bridge == null
+            ? const SizedBox.shrink()
+            : ListenableBuilder(
+                listenable: bridge,
+                builder: (context, _) {
+                  if (!bridge.available) return const SizedBox.shrink();
+                  return ListView(
+                    padding: EdgeInsets.fromLTRB(
+                      spacing.screenPadding,
+                      spacing.lg,
+                      spacing.screenPadding,
+                      spacing.lg + context.windowInsets.bottomSafe,
+                    ),
+                    children: [
+                      if (bridge.connected)
+                        AsterOptionRow(
+                          title: 'dev.mint.utexo.com',
+                          details: 'Connected',
+                          prefixIcon: Icons.link,
+                          onTap: null,
+                        )
+                      else ...[
+                        TextField(
+                          controller: _link,
+                          decoration: const InputDecoration(
+                            labelText: 'WalletConnect link',
                           ),
-                        ],
-                        onSubmitted: (value) => unawaited(_pair(bridge, value)),
-                      ),
-                      SizedBox(height: spacing.lg),
-                      CustomButton(
-                        text: 'Connect',
-                        loading: _pairing,
-                        onTap: () => unawaited(_pair(bridge, _link.text)),
-                      ),
+                          obscureText: true,
+                          autocorrect: false,
+                          enableSuggestions: false,
+                          keyboardType: TextInputType.url,
+                          textInputAction: TextInputAction.go,
+                          inputFormatters: [
+                            LengthLimitingTextInputFormatter(
+                              HostedBridgeController.maxLinkLength,
+                            ),
+                          ],
+                          onSubmitted: (value) =>
+                              unawaited(_pair(bridge, value)),
+                        ),
+                        SizedBox(height: spacing.lg),
+                        CustomButton(
+                          text: 'Connect',
+                          loading: _pairing,
+                          onTap: () => unawaited(_pair(bridge, _link.text)),
+                        ),
+                        SizedBox(height: spacing.md),
+                        CustomButton(
+                          text: 'Scan connection QR',
+                          variant: ButtonVariant.secondary,
+                          enabled: !_pairing && !_scanning,
+                          onTap: () => unawaited(_scan(bridge)),
+                        ),
+                      ],
+                      SizedBox(height: spacing.xl),
+                      if (bridge.connected)
+                        CustomButton(
+                          text: 'Disconnect',
+                          variant: ButtonVariant.secondary,
+                          loading: _disconnecting,
+                          onTap: () => unawaited(_disconnect(bridge)),
+                        )
+                      else
+                        CustomButton(
+                          text: 'Prepare RGB outputs',
+                          variant: ButtonVariant.secondary,
+                          loading: _preparing,
+                          onTap: () => unawaited(_prepare()),
+                        ),
                       SizedBox(height: spacing.md),
                       CustomButton(
-                        text: 'Scan connection QR',
+                        text: 'Saved burns',
                         variant: ButtonVariant.secondary,
-                        enabled: !_pairing && !_scanning,
-                        onTap: () => unawaited(_scan(bridge)),
+                        loading: _loadingBurns,
+                        onTap: () => unawaited(_showBurns(bridge)),
                       ),
-                    ],
-                    SizedBox(height: spacing.xl),
-                    if (bridge.connected)
-                      CustomButton(
-                        text: 'Disconnect',
-                        variant: ButtonVariant.secondary,
-                        loading: _disconnecting,
-                        onTap: () => unawaited(_disconnect(bridge)),
-                      )
-                    else
-                      CustomButton(
-                        text: 'Prepare RGB outputs',
-                        variant: ButtonVariant.secondary,
-                        loading: _preparing,
-                        onTap: () => unawaited(_prepare()),
-                      ),
-                    SizedBox(height: spacing.md),
-                    CustomButton(
-                      text: 'Saved burns',
-                      variant: ButtonVariant.secondary,
-                      loading: _loadingBurns,
-                      onTap: () => unawaited(_showBurns(bridge)),
-                    ),
-                    for (final burn in _burns.where(bridge.ownsBurn))
-                      Builder(
-                        builder: (rowContext) => AsterOptionRow(
-                          title: 'Export burn proof',
-                          details: '${burn.txid.substring(0, 12)}…',
-                          prefixIcon: Icons.ios_share,
-                          onTap: () =>
-                              unawaited(_shareBurn(bridge, burn, rowContext)),
+                      for (final burn in _burns.where(bridge.ownsBurn))
+                        Builder(
+                          builder: (rowContext) => AsterOptionRow(
+                            title: 'Export burn proof',
+                            details: '${burn.txid.substring(0, 12)}…',
+                            prefixIcon: Icons.ios_share,
+                            onTap: () =>
+                                unawaited(_shareBurn(bridge, burn, rowContext)),
+                          ),
                         ),
-                      ),
-                  ],
-                );
-              },
-            ),
+                    ],
+                  );
+                },
+              ),
+      ),
     );
   }
 }

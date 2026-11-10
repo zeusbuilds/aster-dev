@@ -27,7 +27,7 @@ class AsterComponentMetrics extends ThemeExtension<AsterComponentMetrics> {
     this.bottomNavIndicatorHeight = 40,
     this.sheetHandleWidth = 56,
     this.sheetHandleHeight = 4,
-    this.sheetMaxHeightFactor = 0.7,
+    this.sheetMaxHeightFactor = 0.85,
     this.chartHeight = 100,
     this.chartMinimumBodyHeight = 2,
     this.chartLoadingBaseHeightFactor = 0.8,

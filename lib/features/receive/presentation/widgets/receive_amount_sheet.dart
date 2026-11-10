@@ -117,9 +117,13 @@ class ReceiveAmountSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final provider = receiveFlowViewModelProvider(target);
     final flow = ref.watch(provider);
-    final maxHeight =
-        MediaQuery.sizeOf(context).height *
-        context.metrics.sheetMaxHeightFactor;
+    final viewport = MediaQuery.sizeOf(context);
+    final maxHeight = viewport.height * context.metrics.sheetMaxHeightFactor;
+    final isDuoCover =
+        ref.watch(duoCoverLayoutProvider).value?.appliesTo(viewport) == true;
+    final coverBottomPadding = isDuoCover
+        ? context.windowInsets.bottomSafe + context.spacing.lg
+        : null;
 
     return AsterNavigationScope(
       child: Builder(
@@ -141,7 +145,10 @@ class ReceiveAmountSheet extends ConsumerWidget {
                 padding: EdgeInsets.zero,
                 child: SafeArea(
                   top: false,
-                  minimum: EdgeInsets.only(bottom: context.spacing.lg),
+                  bottom: !isDuoCover,
+                  minimum: isDuoCover
+                      ? EdgeInsets.zero
+                      : EdgeInsets.only(bottom: context.spacing.lg),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -155,6 +162,7 @@ class ReceiveAmountSheet extends ConsumerWidget {
                           skipLoadingOnRefresh: false,
                           data: (value) => _AmountSheetBody(
                             state: value,
+                            bottomPadding: coverBottomPadding ?? 0,
                             commandsEnabled: !navigation.inFlight,
                             onChanged: ref.read(provider.notifier).updateAmount,
                             onApply: () => unawaited(
@@ -166,9 +174,14 @@ class ReceiveAmountSheet extends ConsumerWidget {
                               ),
                             ),
                           ),
-                          loading: () => const Center(
-                            child: GridLoader(
-                              semanticLabel: 'Loading amount editor',
+                          loading: () => Padding(
+                            padding: EdgeInsets.only(
+                              bottom: coverBottomPadding ?? 0,
+                            ),
+                            child: const Center(
+                              child: GridLoader(
+                                semanticLabel: 'Loading amount editor',
+                              ),
                             ),
                           ),
                           error: (error, stackTrace) => _SheetFailure(
@@ -176,6 +189,7 @@ class ReceiveAmountSheet extends ConsumerWidget {
                                 ? error.failure
                                 : FailureMapper.from(error, stackTrace),
                             onRetry: () => unawaited(_retry(context, ref)),
+                            coverBottomPadding: coverBottomPadding,
                           ),
                         ),
                       ),
@@ -194,12 +208,14 @@ class ReceiveAmountSheet extends ConsumerWidget {
 final class _AmountSheetBody extends StatelessWidget {
   const _AmountSheetBody({
     required this.state,
+    required this.bottomPadding,
     required this.commandsEnabled,
     required this.onChanged,
     required this.onApply,
   });
 
   final ReceiveFlowState state;
+  final double bottomPadding;
   final bool commandsEnabled;
   final ValueChanged<String> onChanged;
   final VoidCallback onApply;
@@ -213,7 +229,12 @@ final class _AmountSheetBody extends StatelessWidget {
         ? 'Clear amount'
         : 'Set amount';
     return SingleChildScrollView(
-      padding: EdgeInsets.symmetric(horizontal: context.spacing.screenPadding),
+      padding: EdgeInsets.fromLTRB(
+        context.spacing.screenPadding,
+        0,
+        context.spacing.screenPadding,
+        bottomPadding,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -257,33 +278,43 @@ final class _AmountSheetBody extends StatelessWidget {
 }
 
 final class _SheetFailure extends StatelessWidget {
-  const _SheetFailure({required this.failure, required this.onRetry});
+  const _SheetFailure({
+    required this.failure,
+    required this.onRetry,
+    required this.coverBottomPadding,
+  });
 
   final AppFailure failure;
   final VoidCallback onRetry;
+  final double? coverBottomPadding;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.all(context.spacing.screenPadding),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Semantics(
-            liveRegion: true,
-            child: Text(
-              'Amount editor unavailable',
-              style: context.type.statusMessage,
-              textAlign: TextAlign.center,
-            ),
+    final padding = context.spacing.screenPadding;
+    final content = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Semantics(
+          liveRegion: true,
+          child: Text(
+            'Amount editor unavailable',
+            style: context.type.statusMessage,
+            textAlign: TextAlign.center,
           ),
-          if (failure.retryable) ...[
-            SizedBox(height: context.spacing.lg),
-            CustomButton(text: 'Retry', onTap: onRetry),
-          ],
+        ),
+        if (failure.retryable) ...[
+          SizedBox(height: context.spacing.lg),
+          CustomButton(text: 'Retry', onTap: onRetry),
         ],
-      ),
+      ],
     );
+    if (coverBottomPadding case final bottom?) {
+      return SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(padding, padding, padding, bottom),
+        child: content,
+      );
+    }
+    return Padding(padding: EdgeInsets.all(padding), child: content);
   }
 }
 

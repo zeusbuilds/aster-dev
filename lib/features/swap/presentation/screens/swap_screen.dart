@@ -16,6 +16,12 @@ class SwapScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final swap = ref.watch(swapViewModelProvider);
+    final isDuoCover =
+        ref
+            .watch(duoCoverLayoutProvider)
+            .value
+            ?.appliesTo(MediaQuery.sizeOf(context)) ==
+        true;
     return Scaffold(
       backgroundColor: context.colorScheme.surface,
       appBar: const CustomAppBar(
@@ -25,13 +31,19 @@ class SwapScreen extends ConsumerWidget {
       ),
       body: SafeArea(
         top: false,
+        bottom: !isDuoCover || swap.isLoading || swap.hasError,
         child: Padding(
           padding: EdgeInsets.symmetric(
             horizontal: context.spacing.screenPadding,
           ),
           child: swap.when(
             skipLoadingOnRefresh: false,
-            data: (state) => _SwapContent(state: state),
+            data: (state) => _SwapContent(
+              state: state,
+              bottomPadding:
+                  context.spacing.lg +
+                  (isDuoCover ? context.windowInsets.bottomSafe : 0),
+            ),
             loading: () => const _SwapLoading(),
             error: (error, stackTrace) => _SwapFailure(
               failure: error is AppFailureException
@@ -47,9 +59,10 @@ class SwapScreen extends ConsumerWidget {
 }
 
 class _SwapContent extends ConsumerWidget {
-  const _SwapContent({required this.state});
+  const _SwapContent({required this.state, required this.bottomPadding});
 
   final SwapState state;
+  final double bottomPadding;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -71,6 +84,7 @@ class _SwapContent extends ConsumerWidget {
     }
 
     return AsterFormBody(
+      bottomPadding: bottomPadding,
       content: Column(
         children: [
           SwapCard(
@@ -81,10 +95,7 @@ class _SwapContent extends ConsumerWidget {
           ),
         ],
       ),
-      actions: [
-        const CustomButton(text: 'Coming soon', enabled: false),
-        SizedBox(height: context.spacing.lg),
-      ],
+      actions: const [CustomButton(text: 'Coming soon', enabled: false)],
     );
   }
 }

@@ -165,90 +165,94 @@ class _WalletDisclosureScreenState
         leadingIcon: true,
         fallbackLocation: RoutePaths.advancedSettingsLocation,
       ),
-      body: !ready
-          ? const SizedBox.shrink()
-          : _isSeed
-          ? ListView(
-              padding: EdgeInsets.fromLTRB(
-                context.spacing.screenPadding,
-                context.spacing.lg,
-                context.spacing.screenPadding,
-                context.spacing.lg + context.windowInsets.bottomSafe,
-              ),
-              children: [
-                OnboardingRecoveryPhraseGrid(
-                  words: _mnemonic!.trim().split(RegExp(r'\s+')),
+      body: AsterHorizontalSafeArea(
+        child: !ready
+            ? const SizedBox.shrink()
+            : _isSeed
+            ? ListView(
+                padding: EdgeInsets.fromLTRB(
+                  context.spacing.screenPadding,
+                  context.spacing.lg,
+                  context.spacing.screenPadding,
+                  context.spacing.lg + context.windowInsets.bottomSafe,
                 ),
-                SizedBox(height: context.spacing.xl),
-                Text(
-                  'Keep these words private. Anyone with them can access your funds.',
-                  style: context.type.supportingMeta,
-                ),
-              ],
-            )
-          : Column(
-              children: [
-                Expanded(
-                  child: ListView(
+                children: [
+                  OnboardingRecoveryPhraseGrid(
+                    words: _mnemonic!.trim().split(RegExp(r'\s+')),
+                  ),
+                  SizedBox(height: context.spacing.xl),
+                  Text(
+                    'Keep these words private. Anyone with them can access your funds.',
+                    style: context.type.supportingMeta,
+                  ),
+                ],
+              )
+            : Column(
+                children: [
+                  Expanded(
+                    child: ListView(
+                      padding: EdgeInsets.fromLTRB(
+                        context.spacing.screenPadding,
+                        context.spacing.lg,
+                        context.spacing.screenPadding,
+                        context.spacing.lg,
+                      ),
+                      children: [
+                        _PublicKey(
+                          label: 'Bitcoin account',
+                          value: _keys!.bitcoin,
+                        ),
+                        SizedBox(height: context.spacing.xl),
+                        _PublicKey(label: 'RGB account', value: _keys!.rgb),
+                      ],
+                    ),
+                  ),
+                  Padding(
                     padding: EdgeInsets.fromLTRB(
                       context.spacing.screenPadding,
                       context.spacing.lg,
                       context.spacing.screenPadding,
-                      context.spacing.lg,
+                      context.spacing.lg + context.windowInsets.bottomSafe,
                     ),
-                    children: [
-                      _PublicKey(
-                        label: 'Bitcoin account',
-                        value: _keys!.bitcoin,
-                      ),
-                      SizedBox(height: context.spacing.xl),
-                      _PublicKey(label: 'RGB account', value: _keys!.rgb),
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    context.spacing.screenPadding,
-                    context.spacing.lg,
-                    context.spacing.screenPadding,
-                    context.spacing.lg + context.windowInsets.bottomSafe,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        'Extended public keys can reveal your wallet activity. Share them only with services you trust.',
-                        style: context.type.supportingMeta,
-                      ),
-                      SizedBox(height: context.spacing.lg),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: CustomButton(
-                              text: 'Copy',
-                              variant: ButtonVariant.secondary,
-                              onTap: _copying ? null : () => unawaited(_copy()),
-                            ),
-                          ),
-                          SizedBox(width: context.spacing.md),
-                          Expanded(
-                            child: Builder(
-                              builder: (buttonContext) => CustomButton(
-                                text: 'Share',
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'Extended public keys can reveal your wallet activity. Share them only with services you trust.',
+                          style: context.type.supportingMeta,
+                        ),
+                        SizedBox(height: context.spacing.lg),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: CustomButton(
+                                text: 'Copy',
                                 variant: ButtonVariant.secondary,
-                                onTap: _sharing
+                                onTap: _copying
                                     ? null
-                                    : () => unawaited(_share(buttonContext)),
+                                    : () => unawaited(_copy()),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
+                            SizedBox(width: context.spacing.md),
+                            Expanded(
+                              child: Builder(
+                                builder: (buttonContext) => CustomButton(
+                                  text: 'Share',
+                                  variant: ButtonVariant.secondary,
+                                  onTap: _sharing
+                                      ? null
+                                      : () => unawaited(_share(buttonContext)),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+      ),
     );
   }
 }

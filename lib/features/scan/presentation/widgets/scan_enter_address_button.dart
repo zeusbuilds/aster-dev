@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import 'package:remixicon/remixicon.dart';
@@ -14,6 +16,35 @@ class ScanEnterAddressButton extends StatelessWidget {
 
   final VoidCallback? onTap;
   final String label;
+
+  static const _labelMaxLines = 2;
+
+  /// Reserves enough room beneath the scanner frame for wrapped labels.
+  static double heightForWidth(
+    BuildContext context, {
+    required String label,
+    required double width,
+  }) {
+    final spacing = context.spacing;
+    final iconSize = context.icons.sm;
+    final painter = TextPainter(
+      text: TextSpan(text: label, style: context.type.scanCta),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      locale: Localizations.maybeLocaleOf(context),
+      maxLines: _labelMaxLines,
+      ellipsis: '…',
+    );
+    try {
+      painter.layout(maxWidth: math.max(0.0, width - iconSize - spacing.xxs));
+      return math.max(
+        context.metrics.minTouchTarget,
+        math.max(painter.height, iconSize) + spacing.md * 2,
+      );
+    } finally {
+      painter.dispose();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +81,7 @@ class ScanEnterAddressButton extends StatelessWidget {
                       child: Text(
                         label,
                         style: context.type.scanCta,
-                        maxLines: 2,
+                        maxLines: _labelMaxLines,
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
                       ),

@@ -8,6 +8,7 @@ import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:aster/features/wallet/presentation/view_model/view_models.dart';
 import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -113,6 +114,42 @@ void main() {
     expect(tester, meetsGuideline(textContrastGuideline));
   });
 
+  testWidgets('Duo cover Swap scrolls through the bottom inset', (
+    tester,
+  ) async {
+    const channel = EventChannel('com.aster.wallet/cover_navigation');
+    final messenger = tester.binding.defaultBinaryMessenger;
+    messenger.setMockStreamHandler(
+      channel,
+      MockStreamHandler.inline(
+        onListen: (_, events) =>
+            events.success({'width': 466.0, 'height': 678.0}),
+      ),
+    );
+    addTearDown(() => messenger.setMockStreamHandler(channel, null));
+    const padding = FakeViewPadding(right: 84, bottom: 34);
+    tester.view.padding = padding;
+    tester.view.viewPadding = padding;
+    addTearDown(tester.view.resetPadding);
+    addTearDown(tester.view.resetViewPadding);
+    final harness = await PaymentFlowTestHarness.create(
+      services: testRgbServices,
+    );
+    addTearDown(() => _disposeHarness(tester, harness));
+    await _pump(tester, harness, viewport: const Size(466, 678));
+    final action = find.widgetWithText(CustomButton, 'Coming soon');
+    await _pumpUntil(tester, () => action.evaluate().isNotEmpty);
+    final scrollable = tester.state<ScrollableState>(find.byType(Scrollable));
+    scrollable.position.jumpTo(scrollable.position.maxScrollExtent);
+    await tester.pumpAndSettle();
+    expect(
+      tester.getRect(find.byType(CustomScrollView)).bottom,
+      closeTo(678, 0.5),
+    );
+    expect(tester.getRect(action).bottom, closeTo(628, 0.5));
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
+
   testWidgets('Swap loading exposes one truthful live node', (tester) async {
     final gate = Completer<List<WalletPaymentCapability>>();
     final haptics = RecordingHapticFeedbackService();
@@ -196,9 +233,10 @@ Future<void> _pump(
   WidgetTester tester,
   PaymentFlowTestHarness harness, {
   TextScaler? textScaler,
+  Size viewport = const Size(390, 844),
 }) {
   tester.view.devicePixelRatio = 1;
-  tester.view.physicalSize = const Size(390, 844);
+  tester.view.physicalSize = viewport;
   addTearDown(tester.view.resetDevicePixelRatio);
   addTearDown(tester.view.resetPhysicalSize);
   return tester.pumpWidget(

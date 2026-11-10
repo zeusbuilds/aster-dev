@@ -146,22 +146,23 @@ class _OnboardingImportWalletScreenState
                   ? context.appColors.transparentSurface
                   : context.colorScheme.surface,
               resizeToAvoidBottomInset: true,
-              body: SafeArea(
-                child: switch (asyncState) {
-                  AsyncData<ImportWalletState>(:final value) => _buildContent(
-                    value,
-                    navigation,
+              body: switch (asyncState) {
+                AsyncData<ImportWalletState>(:final value) =>
+                  OnboardingScrollSafeArea(
+                    builder: (_, scrollBottomInset) =>
+                        _buildContent(value, navigation, scrollBottomInset),
                   ),
-                  AsyncError<ImportWalletState>(
-                    :final error,
-                    :final stackTrace,
-                  ) =>
-                    _buildFailure(navigation, error, stackTrace),
-                  _ => OnboardingStatusPanel.loading(
+                AsyncError<ImportWalletState>(
+                  :final error,
+                  :final stackTrace,
+                ) =>
+                  SafeArea(child: _buildFailure(navigation, error, stackTrace)),
+                _ => SafeArea(
+                  child: OnboardingStatusPanel.loading(
                     onBrandArt: widget.onBrandArt,
                   ),
-                },
-              ),
+                ),
+              },
             ),
           );
         },
@@ -192,6 +193,7 @@ class _OnboardingImportWalletScreenState
   Widget _buildContent(
     ImportWalletState state,
     AsterNavigationCommandOwner navigation,
+    double scrollBottomInset,
   ) {
     final context = this.context;
     final spacing = context.spacing;
@@ -206,6 +208,7 @@ class _OnboardingImportWalletScreenState
         state.failure?.retryable == true;
 
     return AsterFormBody(
+      bottomPadding: scrollBottomInset,
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

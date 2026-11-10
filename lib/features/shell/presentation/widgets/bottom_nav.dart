@@ -43,82 +43,111 @@ class BottomNav extends ConsumerWidget {
     final selectedIndex = ref.watch(appShellIndexProvider);
     final spacing = context.spacing;
     final metrics = context.metrics;
+    final insets = context.windowInsets.systemPadding;
+    final items = [
+      for (var index = 0; index < _destinations.length; index += 1)
+        Expanded(
+          child: _NavItem(
+            destination: _destinations[index],
+            selected: selectedIndex == index,
+            ordinal: index.toDouble(),
+            onSelect: () =>
+                ref.read(appShellIndexProvider.notifier).setIndex(index),
+          ),
+        ),
+    ];
+    if (CoverTabRail.boundsOf(context) case final bounds?) {
+      return Positioned.fromRect(
+        rect: bounds,
+        child: _NavigationCapsule(
+          axis: Axis.vertical,
+          selectedIndex: selectedIndex,
+          items: items,
+        ),
+      );
+    }
     final availableWidth = math.max(
       0.0,
-      MediaQuery.sizeOf(context).width - (spacing.xxl * 2),
+      MediaQuery.sizeOf(context).width - insets.horizontal - (spacing.xxl * 2),
     );
     final width = math.min(availableWidth, metrics.bottomNavMaxWidth);
-    final capsuleShape = const StadiumBorder();
-
     return Positioned(
-      left: 0,
-      right: 0,
-      bottom: context.windowInsets.bottomSystem + spacing.sm,
+      left: insets.left,
+      right: insets.right,
+      bottom: insets.bottom + spacing.sm,
       child: Center(
         child: SizedBox(
           width: width,
           height: metrics.bottomNavHeight,
-          child: DecoratedBox(
-            decoration: ShapeDecoration(
-              color: context.appColors.surfaceRaised,
-              shape: capsuleShape,
-              shadows: context.shadows.raised,
-            ),
-            child: ClipPath(
-              clipper: ShapeBorderClipper(shape: capsuleShape),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  AnimatedAlign(
-                    alignment: Alignment(
-                      _alignmentFor(selectedIndex, _destinations.length),
-                      0,
-                    ),
-                    duration: context.motionPolicy.duration(
-                      context.motion.navIndicatorDuration,
-                    ),
-                    curve: context.motion.navIndicatorCurve,
-                    child: FractionallySizedBox(
-                      widthFactor: 1 / _destinations.length,
-                      child: Center(
-                        child: SizedBox(
-                          key: const ValueKey('bottom-nav-indicator'),
-                          width: metrics.bottomNavIndicatorWidth,
-                          height: metrics.bottomNavIndicatorHeight,
-                          child: DecoratedBox(
-                            decoration: ShapeDecoration(
-                              color: context.appColors.surfaceRaised,
-                              shape: const StadiumBorder(),
-                              shadows: context.shadows.raised,
-                            ),
-                          ),
-                        ),
+          child: _NavigationCapsule(
+            axis: Axis.horizontal,
+            selectedIndex: selectedIndex,
+            items: items,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NavigationCapsule extends StatelessWidget {
+  const _NavigationCapsule({
+    required this.axis,
+    required this.selectedIndex,
+    required this.items,
+  });
+
+  final Axis axis;
+  final int selectedIndex;
+  final List<Widget> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final metrics = context.metrics;
+    const shape = StadiumBorder();
+    final vertical = axis == Axis.vertical;
+    final offset = _alignmentFor(selectedIndex, items.length);
+    final fraction = 1 / items.length;
+    return DecoratedBox(
+      decoration: ShapeDecoration(
+        color: context.appColors.surfaceRaised,
+        shape: shape,
+        shadows: context.shadows.raised,
+      ),
+      child: ClipPath(
+        clipper: ShapeBorderClipper(shape: shape),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            AnimatedAlign(
+              alignment: vertical ? Alignment(0, offset) : Alignment(offset, 0),
+              duration: context.motionPolicy.duration(
+                context.motion.navIndicatorDuration,
+              ),
+              curve: context.motion.navIndicatorCurve,
+              child: FractionallySizedBox(
+                widthFactor: vertical ? null : fraction,
+                heightFactor: vertical ? fraction : null,
+                child: Center(
+                  child: SizedBox(
+                    key: const ValueKey('bottom-nav-indicator'),
+                    width: vertical
+                        ? metrics.bottomNavIndicatorHeight
+                        : metrics.bottomNavIndicatorWidth,
+                    height: metrics.bottomNavIndicatorHeight,
+                    child: DecoratedBox(
+                      decoration: ShapeDecoration(
+                        color: context.appColors.surfaceRaised,
+                        shape: shape,
+                        shadows: context.shadows.raised,
                       ),
                     ),
                   ),
-                  Row(
-                    children: [
-                      for (
-                        var index = 0;
-                        index < _destinations.length;
-                        index += 1
-                      )
-                        Expanded(
-                          child: _NavItem(
-                            destination: _destinations[index],
-                            selected: selectedIndex == index,
-                            ordinal: index.toDouble(),
-                            onSelect: () => ref
-                                .read(appShellIndexProvider.notifier)
-                                .setIndex(index),
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
+            Flex(direction: axis, children: items),
+          ],
         ),
       ),
     );

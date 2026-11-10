@@ -1458,6 +1458,80 @@ void main() {
     );
   });
 
+  testWidgets('Duo cover scrolls the system inset with onboarding actions', (
+    tester,
+  ) async {
+    tester.binding.defaultBinaryMessenger.setMockStreamHandler(
+      const EventChannel('com.aster.wallet/cover_navigation'),
+      MockStreamHandler.inline(
+        onListen: (_, events) =>
+            events.success({'width': 466.0, 'height': 678.0}),
+      ),
+    );
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(466, 678);
+    tester.view.padding = const FakeViewPadding(right: 84, bottom: 34);
+    tester.view.viewPadding = tester.view.padding;
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetPadding);
+    addTearDown(tester.view.resetViewPadding);
+    addTearDown(tester.view.resetViewInsets);
+    final harness = await OnboardingTestHarness.create();
+    addTearDown(() => _disposeHarness(tester, harness));
+
+    final viewport = find.byType(CustomScrollView);
+    Future<void> expectFooter(
+      Finder action, {
+      required double viewportBottom,
+      required double actionBottom,
+    }) async {
+      final scrollable = find.descendant(
+        of: viewport,
+        matching: find.byType(Scrollable),
+      );
+      final position = tester.state<ScrollableState>(scrollable.first).position;
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      expect(tester.getBottomLeft(viewport).dy, closeTo(viewportBottom, 0.5));
+      expect(tester.getBottomLeft(action).dy, closeTo(actionBottom, 0.5));
+    }
+
+    for (final screen in [
+      const OnboardingWelcomeScreen(),
+      const AddWalletScreen(),
+    ]) {
+      await _pumpScreen(tester, harness, screen, disableAnimations: true);
+      await expectFooter(
+        find.widgetWithText(OnboardingTextAction, 'Import Wallet'),
+        viewportBottom: 678,
+        actionBottom: 628,
+      );
+    }
+
+    await _pumpScreen(
+      tester,
+      harness,
+      const OnboardingImportWalletScreen(),
+      disableAnimations: true,
+    );
+    final continueButton = find.widgetWithText(CustomButton, 'Continue');
+    await expectFooter(continueButton, viewportBottom: 678, actionBottom: 628);
+
+    tester.view.padding = const FakeViewPadding(right: 84);
+    tester.view.viewInsets = const FakeViewPadding(bottom: 260);
+    await tester.pumpAndSettle();
+    await expectFooter(continueButton, viewportBottom: 418, actionBottom: 402);
+
+    tester.view.viewInsets = const FakeViewPadding();
+    tester.view.physicalSize = const Size(669, 951);
+    tester.view.padding = const FakeViewPadding(top: 82, bottom: 34);
+    tester.view.viewPadding = tester.view.padding;
+    await tester.pumpAndSettle();
+    await expectFooter(continueButton, viewportBottom: 917, actionBottom: 901);
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
+
   testWidgets('import grid follows copy while only the action tracks height', (
     tester,
   ) async {

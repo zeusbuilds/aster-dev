@@ -51,29 +51,40 @@ class OnboardingCreateWalletScreen extends ConsumerWidget {
               backgroundColor: onBrandArt
                   ? context.appColors.transparentSurface
                   : context.colorScheme.surface,
-              body: SafeArea(
-                child: switch (asyncState) {
-                  AsyncData<CreateWalletState>(:final value)
-                      when !value.completed =>
-                    _CreateWalletContent(
+              body: switch (asyncState) {
+                AsyncData<CreateWalletState>(:final value)
+                    when !value.completed =>
+                  OnboardingScrollSafeArea(
+                    builder: (_, scrollBottomInset) => _CreateWalletContent(
                       state: value,
                       navigation: navigation,
                       onBack: onBack,
                       onContinue: onContinue,
                       onBrandArt: onBrandArt,
                       showNavigationBar: showNavigationBar,
+                      scrollBottomInset: scrollBottomInset,
                     ),
-                  AsyncError<CreateWalletState>(
-                    :final error,
-                    :final stackTrace,
-                  ) =>
-                    _buildFailure(context, ref, navigation, error, stackTrace),
-                  _ => OnboardingStatusPanel.loading(
+                  ),
+                AsyncError<CreateWalletState>(
+                  :final error,
+                  :final stackTrace,
+                ) =>
+                  SafeArea(
+                    child: _buildFailure(
+                      context,
+                      ref,
+                      navigation,
+                      error,
+                      stackTrace,
+                    ),
+                  ),
+                _ => SafeArea(
+                  child: OnboardingStatusPanel.loading(
                     message: 'Generating your recovery phrase...',
                     onBrandArt: onBrandArt,
                   ),
-                },
-              ),
+                ),
+              },
             ),
           );
         },
@@ -112,6 +123,7 @@ class _CreateWalletContent extends ConsumerStatefulWidget {
     required this.onContinue,
     required this.onBrandArt,
     required this.showNavigationBar,
+    required this.scrollBottomInset,
   });
 
   final CreateWalletState state;
@@ -120,6 +132,7 @@ class _CreateWalletContent extends ConsumerStatefulWidget {
   final VoidCallback? onContinue;
   final bool onBrandArt;
   final bool showNavigationBar;
+  final double scrollBottomInset;
 
   @override
   ConsumerState<_CreateWalletContent> createState() =>
@@ -258,7 +271,7 @@ class _CreateWalletContentState extends ConsumerState<_CreateWalletContent>
               spacing.screenPadding,
               0,
               spacing.screenPadding,
-              spacing.lg,
+              spacing.lg + widget.scrollBottomInset,
             ),
             child: OnboardingChoreographyItem(
               id: 'create-recovery-actions-motion',

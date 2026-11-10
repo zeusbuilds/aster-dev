@@ -111,6 +111,12 @@ class _WalletDetailsScreenState extends ConsumerState<WalletDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     final wallet = ref.watch(walletViewModelProvider);
+    final isDuoCover =
+        ref
+            .watch(duoCoverLayoutProvider)
+            .value
+            ?.appliesTo(MediaQuery.sizeOf(context)) ==
+        true;
     final profile = wallet.value?.activeWallet;
     final loading = wallet.isLoading || wallet.value?.switchingWalletId != null;
     final failure = wallet.hasError
@@ -129,105 +135,117 @@ class _WalletDetailsScreenState extends ConsumerState<WalletDetailsScreen> {
           leadingEnabled: !_deleting,
           fallbackLocation: RoutePaths.settings,
         ),
-        body: loading
-            ? const Center(
-                child: GridLoader(semanticLabel: 'Loading wallet details'),
-              )
-            : failure != null ||
-                  profile == null ||
-                  profile.state != WalletProfileState.ready
-            ? _Unavailable(
-                onRetry:
-                    failure?.retryable == true ||
-                        (failure != null &&
-                            WalletViewModel.canResumeDeletion(failure))
-                    ? () => unawaited(
-                        ref.read(walletViewModelProvider.notifier).reload(),
-                      )
-                    : null,
-              )
-            : Column(
-                children: [
-                  Expanded(child: _WalletDetails(profile: profile)),
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      context.spacing.screenPadding,
-                      context.spacing.lg,
-                      context.spacing.screenPadding,
-                      context.spacing.lg + context.windowInsets.bottomSafe,
+        body: AsterHorizontalSafeArea(
+          child: loading
+              ? const Center(
+                  child: GridLoader(semanticLabel: 'Loading wallet details'),
+                )
+              : failure != null ||
+                    profile == null ||
+                    profile.state != WalletProfileState.ready
+              ? _Unavailable(
+                  onRetry:
+                      failure?.retryable == true ||
+                          (failure != null &&
+                              WalletViewModel.canResumeDeletion(failure))
+                      ? () => unawaited(
+                          ref.read(walletViewModelProvider.notifier).reload(),
+                        )
+                      : null,
+                )
+              : Column(
+                  children: [
+                    Expanded(
+                      child: _WalletDetails(
+                        profile: profile,
+                        footerOwnsBottomInset: isDuoCover,
+                      ),
                     ),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final size = unwrappedSpanSize(
-                          context,
-                          TextSpan(
-                            text: 'Delete wallet',
-                            style: context.type.buttonLabel,
-                          ),
-                        );
-                        final labelLines = size.width > constraints.maxWidth
-                            ? 2
-                            : 1;
-                        return Theme(
-                          data: Theme.of(context).copyWith(
-                            extensions: [
-                              ...Theme.of(context).extensions.values.where(
-                                (extension) =>
-                                    extension is! AsterComponentMetrics &&
-                                    extension is! AsterSpacing,
-                              ),
-                              context.metrics.copyWith(
-                                buttonHeight: math.max(
-                                  context.metrics.buttonHeight,
-                                  size.height * labelLines +
-                                      context.spacing.sm * 2,
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        context.spacing.screenPadding,
+                        context.spacing.lg,
+                        context.spacing.screenPadding,
+                        context.spacing.lg + context.windowInsets.bottomSafe,
+                      ),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final size = unwrappedSpanSize(
+                            context,
+                            TextSpan(
+                              text: 'Delete wallet',
+                              style: context.type.buttonLabel,
+                            ),
+                          );
+                          final labelLines = size.width > constraints.maxWidth
+                              ? 2
+                              : 1;
+                          return Theme(
+                            data: Theme.of(context).copyWith(
+                              extensions: [
+                                ...Theme.of(context).extensions.values.where(
+                                  (extension) =>
+                                      extension is! AsterComponentMetrics &&
+                                      extension is! AsterSpacing,
                                 ),
-                              ),
-                              context.spacing.copyWith(
-                                xxl: math.min(
-                                  context.spacing.xxl,
-                                  labelLines > 1
-                                      ? context.spacing.xxl
-                                      : math.max(
-                                          0,
-                                          (constraints.maxWidth - size.width) /
-                                              2,
-                                        ),
+                                context.metrics.copyWith(
+                                  buttonHeight: math.max(
+                                    context.metrics.buttonHeight,
+                                    size.height * labelLines +
+                                        context.spacing.sm * 2,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          child: CustomButton(
-                            key: const ValueKey('delete-wallet'),
-                            text: 'Delete wallet',
-                            labelMaxLines: labelLines,
-                            variant: ButtonVariant.danger,
-                            loading: _deleting,
-                            enabled:
-                                !_confirming &&
-                                wallet.value?.isChangingWallet != true,
-                            onTap: () => unawaited(
-                              _delete(
-                                profile,
-                                wallet.value!.wallets.length == 1,
+                                context.spacing.copyWith(
+                                  xxl: math.min(
+                                    context.spacing.xxl,
+                                    labelLines > 1
+                                        ? context.spacing.xxl
+                                        : math.max(
+                                            0,
+                                            (constraints.maxWidth -
+                                                    size.width) /
+                                                2,
+                                          ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            child: CustomButton(
+                              key: const ValueKey('delete-wallet'),
+                              text: 'Delete wallet',
+                              labelMaxLines: labelLines,
+                              variant: ButtonVariant.danger,
+                              loading: _deleting,
+                              enabled:
+                                  !_confirming &&
+                                  wallet.value?.isChangingWallet != true,
+                              onTap: () => unawaited(
+                                _delete(
+                                  profile,
+                                  wallet.value!.wallets.length == 1,
+                                ),
                               ),
                             ),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+        ),
       ),
     );
   }
 }
 
 final class _WalletDetails extends StatelessWidget {
-  const _WalletDetails({required this.profile});
+  const _WalletDetails({
+    required this.profile,
+    required this.footerOwnsBottomInset,
+  });
 
   final WalletProfile profile;
+  final bool footerOwnsBottomInset;
 
   @override
   Widget build(BuildContext context) {
@@ -256,7 +274,9 @@ final class _WalletDetails extends StatelessWidget {
       bottom: false,
       child: ListView.separated(
         padding: EdgeInsets.only(
-          bottom: context.spacing.lg + context.windowInsets.bottomSafe,
+          bottom:
+              context.spacing.lg +
+              (footerOwnsBottomInset ? 0 : context.windowInsets.bottomSafe),
         ),
         itemCount: rows.length,
         separatorBuilder: (context, index) => const AsterDivider.inset(),

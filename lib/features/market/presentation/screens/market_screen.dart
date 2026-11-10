@@ -10,7 +10,9 @@ import '../widgets/widgets.dart';
 
 /// Presents Send, Receive, and Swap using the authored Market artwork.
 class MarketScreen extends StatelessWidget {
-  const MarketScreen({super.key});
+  const MarketScreen({super.key, this.isDuoCover = false});
+
+  final bool isDuoCover;
 
   @override
   Widget build(BuildContext context) {
@@ -81,22 +83,30 @@ class MarketScreen extends StatelessWidget {
           return Scaffold(
             backgroundColor: context.colorScheme.surface,
             appBar: const CustomAppBar(title: 'Market'),
-            body: ListView(
-              padding: EdgeInsets.only(
-                left: spacing.screenPadding,
-                right: spacing.screenPadding,
-                bottom:
-                    context.windowInsets.bottomSystem +
-                    spacing.lg +
-                    metrics.floatingNavClearance,
+            body: AsterHorizontalSafeArea(
+              child: ListView(
+                padding: EdgeInsets.only(
+                  left: spacing.screenPadding,
+                  right: spacing.screenPadding,
+                  bottom:
+                      context.windowInsets.bottomSystem +
+                      spacing.lg +
+                      (CoverTabRail.boundsOf(context) == null
+                          ? metrics.floatingNavClearance
+                          : 0),
+                ),
+                children: [
+                  for (var i = 0; i < tiles.length; i++)
+                    Padding(
+                      padding: EdgeInsets.only(
+                        bottom: !isDuoCover || i < tiles.length - 1
+                            ? spacing.md
+                            : 0,
+                      ),
+                      child: tiles[i],
+                    ),
+                ],
               ),
-              children: [
-                for (final tile in tiles)
-                  Padding(
-                    padding: EdgeInsets.only(bottom: spacing.md),
-                    child: tile,
-                  ),
-              ],
             ),
           );
         },

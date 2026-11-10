@@ -133,32 +133,36 @@ class _WalletNameScreenState extends ConsumerState<WalletNameScreen> {
                   ? context.appColors.transparentSurface
                   : context.colorScheme.surface,
               resizeToAvoidBottomInset: true,
-              body: SafeArea(
-                child: switch (asyncState) {
-                  AsyncData<_WalletNameViewState>(:final value)
-                      when value.previousStepComplete || value.completed =>
-                    _buildForm(value, navigation),
-                  AsyncData<_WalletNameViewState>() =>
-                    OnboardingStatusPanel.failure(
-                      title: 'Finish the previous step',
-                      message: widget._source == _WalletNameSource.create
-                          ? 'Confirm your recovery phrase before naming the wallet.'
-                          : 'Enter and validate your recovery phrase before naming the wallet.',
-                      onBack: widget.showNavigationBar
-                          ? widget.onBack ?? () => context.pop()
-                          : null,
-                      onBrandArt: widget.onBrandArt,
-                    ),
-                  AsyncError<_WalletNameViewState>(
-                    :final error,
-                    :final stackTrace,
-                  ) =>
-                    _buildFailure(error, stackTrace),
-                  _ => OnboardingStatusPanel.loading(
+              body: switch (asyncState) {
+                AsyncData<_WalletNameViewState>(:final value)
+                    when value.previousStepComplete || value.completed =>
+                  OnboardingScrollSafeArea(
+                    builder: (_, scrollBottomInset) =>
+                        _buildForm(value, navigation, scrollBottomInset),
+                  ),
+                AsyncData<_WalletNameViewState>() => SafeArea(
+                  child: OnboardingStatusPanel.failure(
+                    title: 'Finish the previous step',
+                    message: widget._source == _WalletNameSource.create
+                        ? 'Confirm your recovery phrase before naming the wallet.'
+                        : 'Enter and validate your recovery phrase before naming the wallet.',
+                    onBack: widget.showNavigationBar
+                        ? widget.onBack ?? () => context.pop()
+                        : null,
                     onBrandArt: widget.onBrandArt,
                   ),
-                },
-              ),
+                ),
+                AsyncError<_WalletNameViewState>(
+                  :final error,
+                  :final stackTrace,
+                ) =>
+                  SafeArea(child: _buildFailure(error, stackTrace)),
+                _ => SafeArea(
+                  child: OnboardingStatusPanel.loading(
+                    onBrandArt: widget.onBrandArt,
+                  ),
+                ),
+              },
             ),
           );
         },
@@ -169,6 +173,7 @@ class _WalletNameScreenState extends ConsumerState<WalletNameScreen> {
   Widget _buildForm(
     _WalletNameViewState state,
     AsterNavigationCommandOwner navigation,
+    double scrollBottomInset,
   ) {
     final context = this.context;
     final spacing = context.spacing;
@@ -177,6 +182,7 @@ class _WalletNameScreenState extends ConsumerState<WalletNameScreen> {
     final canNavigateBack =
         !state.busy && !state.requiresReconciliation && !navigation.inFlight;
     return AsterFormBody(
+      bottomPadding: scrollBottomInset,
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

@@ -2069,31 +2069,153 @@ void main() {
     expect(find.bySemanticsLabel(RegExp('a{32}')), findsNothing);
   });
 
-  testWidgets('Receive request loading exposes no fabricated request', (
-    tester,
-  ) async {
-    final engine = FakeWalletEngine()..createReceiveGate = Completer<void>();
-    final harness = await PaymentFlowTestHarness.create(engine: engine);
-    addTearDown(() => _disposeHarness(tester, harness));
-    await _pumpWidget(
-      tester,
-      harness,
-      const ReceiveRequestScreen(target: WalletPaymentTarget.bitcoinOnchain),
-    );
-    await _pumpUntil(
-      tester,
-      () => engine.calls.contains('createReceiveRequest:start'),
-    );
+  for (final target in [
+    WalletPaymentTarget.bitcoinOnchain,
+    WalletPaymentTarget.usdtOnchain,
+  ]) {
+    testWidgets(
+      '${target.name} Receive loading matches request layout without actions',
+      (tester) async {
+        final isRgb = target == WalletPaymentTarget.usdtOnchain;
+        final now = DateTime.utc(2026, 11, 7, 12);
+        final address = isRgb
+            ? 'rgb:loading-geometry-${'abcd' * 45}'
+            : 'request-bitcoin-onchain';
+        final route = isRgb
+            ? testRgbRoute
+            : const PaymentRoute(
+                asset: WalletAsset.bitcoin,
+                rail: PaymentRail.onchain,
+              );
+        final gate = Completer<void>();
+        final engine = FakeWalletEngine()
+          ..createReceiveGate = gate
+          ..createdReceiveRequest = WalletReceiveRequest(
+            route: route,
+            encodedRequest: address,
+            displayValue: address,
+            expiresAt: isRgb ? now.add(const Duration(hours: 1)) : null,
+          );
+        final harness = await PaymentFlowTestHarness.create(
+          engine: engine,
+          services: testRgbServices,
+          clock: () => now,
+        );
+        addTearDown(() {
+          if (!gate.isCompleted) gate.complete();
+          return _disposeHarness(tester, harness);
+        });
+        await _pumpWidget(
+          tester,
+          harness,
+          ReceiveRequestScreen(target: target),
+        );
+        await _pumpUntil(
+          tester,
+          () => engine.calls.contains('createReceiveRequest:start'),
+        );
 
-    expect(find.bySemanticsLabel('Loading payment request'), findsOneWidget);
-    expect(find.byType(PrettyQrView), findsNothing);
+        expect(
+          find.bySemanticsLabel('Loading payment request'),
+          findsOneWidget,
+        );
+        expect(find.byType(PrettyQrView), findsNothing);
+        expect(find.text(address), findsNothing);
+        expect(find.textContaining('Expires '), findsNothing);
+        expect(
+          find.bySemanticsLabel(
+            RegExp(r'^(Copy|Set amount|Generate new request|Share)$'),
+          ),
+          findsNothing,
+        );
 
-    engine.createReceiveGate!.complete();
-    await _pumpUntil(
-      tester,
-      () => find.byType(PrettyQrView).evaluate().isNotEmpty,
+        final skeleton = find.byType(AppSkeletonizer);
+        expect(skeleton, findsOneWidget);
+        expect(
+          find.descendant(of: skeleton, matching: find.byType(Squircle)),
+          findsNWidgets(2),
+        );
+        final placeholder = find.descendant(
+          of: skeleton,
+          matching: find.byType(AspectRatio),
+        );
+        expect(tester.getSize(placeholder), const Size(270, 270));
+
+        tester.view.physicalSize = const Size(466, 678);
+        const coverPadding = FakeViewPadding(right: 84, bottom: 34);
+        tester.view.padding = coverPadding;
+        tester.view.viewPadding = coverPadding;
+        addTearDown(tester.view.resetPadding);
+        addTearDown(tester.view.resetViewPadding);
+        await tester.pump();
+        final coverPlaceholder = tester.getRect(placeholder);
+        expect(coverPlaceholder.size, const Size(262, 262));
+
+        final addressPlaceholder = find.byKey(
+          const ValueKey('receive-loading-address'),
+        );
+        final expiryPlaceholder = find.byKey(
+          const ValueKey('receive-loading-expiry'),
+        );
+        expect(addressPlaceholder, findsOneWidget);
+        expect(expiryPlaceholder, isRgb ? findsOneWidget : findsNothing);
+        final addressHeight = tester.getSize(addressPlaceholder).height;
+        expect(addressHeight, isRgb ? greaterThan(24) : lessThan(24));
+        final loadingTextHeight =
+            addressHeight +
+            (isRgb ? tester.getSize(expiryPlaceholder).height : 0);
+        final copy = find.widgetWithText(CustomButton, 'Copy');
+        expect(tester.widget<CustomButton>(copy).onTap, isNull);
+        final loadingCopy = tester.getRect(copy);
+        const labels = ['Set amount', 'Generate new request', 'Share'];
+        Finder action(String label) =>
+            find.widgetWithText(AsterOptionRow, label);
+        final loadingActions = [
+          for (final label in labels) tester.getRect(action(label)),
+        ];
+        for (final label in labels) {
+          expect(tester.widget<AsterOptionRow>(action(label)).onTap, isNull);
+        }
+
+        gate.complete();
+        final readyQr = find.byType(PrettyQrView);
+        await _pumpUntil(tester, () => readyQr.evaluate().isNotEmpty);
+        expect(tester.getRect(readyQr), coverPlaceholder);
+        expect(skeleton, findsNothing);
+        final readyCopy = tester.getRect(copy);
+        expect(readyCopy.size, loadingCopy.size);
+        expect(readyCopy.left, closeTo(loadingCopy.left, 0.5));
+        final readyAddress = isRgb
+            ? find.byType(ReceiveRequestAddress)
+            : find.text(address);
+        final readyExpiry = find.byWidgetPredicate(
+          (widget) =>
+              widget is NumericText && widget.text.startsWith('Expires '),
+        );
+        expect(readyExpiry, isRgb ? findsOneWidget : findsNothing);
+        // The native result can wrap differently from a generic text bone.
+        // That is the only vertical shift the controls should inherit.
+        final readyTextHeight =
+            tester.getSize(readyAddress).height +
+            (isRgb ? tester.getSize(readyExpiry).height : 0);
+        expect(
+          readyCopy.top - loadingCopy.top,
+          closeTo(readyTextHeight - loadingTextHeight, 1),
+        );
+        for (var index = 0; index < labels.length; index++) {
+          final readyRow = tester.getRect(action(labels[index]));
+          final loadingRow = loadingActions[index];
+          expect(readyRow.size, loadingRow.size);
+          expect(readyRow.left, closeTo(loadingRow.left, 0.5));
+          expect(
+            readyRow.top - readyCopy.bottom,
+            closeTo(loadingRow.top - loadingCopy.bottom, 0.5),
+          );
+        }
+        expect(tester.takeException(), isNull);
+      },
     );
-  });
+  }
 
   testWidgets('Receive expiry timer reschedules until the UTC boundary', (
     tester,

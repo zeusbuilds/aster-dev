@@ -80,6 +80,12 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
     final assetKind = widget.assetKind;
     final activity = ref.watch(activityViewModelProvider(assetKind));
     final settings = ref.watch(settingsViewModelProvider);
+    final isDuoCover =
+        ref
+            .watch(duoCoverLayoutProvider)
+            .value
+            ?.appliesTo(MediaQuery.sizeOf(context)) ==
+        true;
 
     Future<void> refresh() async {
       final toasts = context.toasts;
@@ -149,6 +155,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
                   now: _now,
                   formatter: TransactionListScreen._formatter,
                   onOpenDetails: navigation.inFlight ? null : openDetails,
+                  isDuoCover: isDuoCover,
                 ),
               ),
             ),
@@ -167,6 +174,7 @@ class _ActivityBody extends StatelessWidget {
     required this.now,
     required this.formatter,
     required this.onOpenDetails,
+    required this.isDuoCover,
   });
 
   final AsyncValue<ActivityState> activity;
@@ -175,11 +183,12 @@ class _ActivityBody extends StatelessWidget {
   final DateTime now;
   final ActivityDisplayFormatter formatter;
   final ValueChanged<String>? onOpenDetails;
+  final bool isDuoCover;
 
   @override
   Widget build(BuildContext context) {
     if (activity.isLoading || settings.isLoading) {
-      return const _ActivityLoadingView();
+      return _ActivityLoadingView(isDuoCover: isDuoCover);
     }
     if (activity case AsyncError(:final error, :final stackTrace)) {
       return _ActivityFailureView(
@@ -294,7 +303,8 @@ class _ActivityBody extends StatelessWidget {
                             ? null
                             : () => onOpenDetails!(pending.id),
                       ),
-                    SizedBox(height: context.spacing.md),
+                    if (!isDuoCover || index < entries.length - 1)
+                      SizedBox(height: context.spacing.md),
                   ],
                 );
               },
@@ -411,7 +421,10 @@ class _EmptyActivity extends StatelessWidget {
 }
 
 class _ActivityLoadingView extends StatelessWidget {
-  const _ActivityLoadingView();
+  const _ActivityLoadingView({required this.isDuoCover});
+
+  static const _placeholderCount = 4;
+  final bool isDuoCover;
 
   @override
   Widget build(BuildContext context) {
@@ -456,9 +469,13 @@ class _ActivityLoadingView extends StatelessWidget {
                 horizontal: context.spacing.screenPadding,
               ),
               sliver: SliverList.builder(
-                itemCount: 4,
+                itemCount: _placeholderCount,
                 itemBuilder: (context, index) => Padding(
-                  padding: EdgeInsets.only(bottom: context.spacing.md),
+                  padding: EdgeInsets.only(
+                    bottom: !isDuoCover || index < _placeholderCount - 1
+                        ? context.spacing.md
+                        : 0,
+                  ),
                   child: _ActivityItemLoading(index: index),
                 ),
               ),

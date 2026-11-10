@@ -44,6 +44,15 @@ import 'wallet_fakes.dart';
 const visualCatalogBoundary = ValueKey('visual-catalog-boundary');
 typedef VisualCapture = Future<void> Function(WidgetTester tester, String name);
 
+// Host fixture matching the closed iPhone Duo simulator window.
+const _duoCover = bool.fromEnvironment('ASTER_VISUAL_DUO_COVER');
+const _duoCoverSize = Size(466, 678);
+const _catalogSafePadding = EdgeInsets.only(
+  top: _duoCover ? 0 : 62,
+  right: _duoCover ? 84 : 0,
+  bottom: 34,
+);
+
 final _now = DateTime.utc(2026, 9, 9, 12);
 const _services = WalletServiceConfiguration(
   environment: BlockchainEnvironment.regtest,
@@ -607,7 +616,7 @@ void registerVisualCatalog({required VisualCapture capture}) {
       expect(find.text('Retry'), findsOneWidget);
       await _shot(tester, capture, '06-activity/failure');
       engine.activityError = null;
-      if (tester.binding is AutomatedTestWidgetsFlutterBinding) {
+      if (!_duoCover && tester.binding is AutomatedTestWidgetsFlutterBinding) {
         tester.view.physicalSize = const Size(320, 568);
       }
       for (final (name, screen) in <(String, Widget)>[
@@ -642,7 +651,7 @@ void registerVisualCatalog({required VisualCapture capture}) {
 void _phone(WidgetTester tester) {
   if (tester.binding is! AutomatedTestWidgetsFlutterBinding) return;
   tester.view.devicePixelRatio = 1;
-  tester.view.physicalSize = const Size(420, 912);
+  tester.view.physicalSize = _duoCover ? _duoCoverSize : const Size(420, 912);
   addTearDown(tester.view.resetDevicePixelRatio);
   addTearDown(tester.view.resetPhysicalSize);
 }
@@ -683,11 +692,10 @@ Future<void> _mount(
                 data: media.copyWith(
                   textScaler: TextScaler.linear(textScale),
                   disableAnimations: true,
-                  padding: EdgeInsets.only(
-                    top: 62,
-                    bottom: keyboardInset > 0 ? 0 : 34,
+                  padding: _catalogSafePadding.copyWith(
+                    bottom: keyboardInset > 0 ? 0 : _catalogSafePadding.bottom,
                   ),
-                  viewPadding: const EdgeInsets.only(top: 62, bottom: 34),
+                  viewPadding: _catalogSafePadding,
                   viewInsets: EdgeInsets.only(bottom: keyboardInset),
                 ),
                 child: InheritedGoRouter(

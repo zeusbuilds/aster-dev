@@ -22,8 +22,10 @@ class NetworkConfigurationScreen extends ConsumerWidget {
         fallbackLocation: RoutePaths.advancedSettingsLocation,
       ),
       body: configuration.when(
-        loading: () => const Center(
-          child: GridLoader(semanticLabel: 'Loading network configuration'),
+        loading: () => const AsterHorizontalSafeArea(
+          child: Center(
+            child: GridLoader(semanticLabel: 'Loading network configuration'),
+          ),
         ),
         error: (error, stackTrace) => SettingsLoadFailure(
           failure: FailureMapper.from(error, stackTrace),

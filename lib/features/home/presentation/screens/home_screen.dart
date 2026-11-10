@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -165,13 +166,27 @@ class _HomeScreenState extends ConsumerState<_HomeBalanceRefreshSurface>
   Widget build(BuildContext context) {
     final home = ref.watch(homeViewModelProvider);
     ref.watch(settingsViewModelProvider);
+    final viewport = MediaQuery.sizeOf(context);
+    final isDuoCover =
+        ref.watch(duoCoverLayoutProvider).value?.appliesTo(viewport) == true;
     final heroMinimumHeight =
-        MediaQuery.sizeOf(context).height *
-        context.metrics.homeHeroHeightFactor;
+        viewport.height * context.metrics.homeHeroHeightFactor;
+    final systemPadding = context.windowInsets.systemPadding;
+    // Draw the chart behind the status indicators and keep its controls inside
+    // the safe edges.
+    final horizontalInsets = EdgeInsets.only(
+      left: systemPadding.left,
+      right: systemPadding.right,
+    );
+    final topInset = isDuoCover
+        ? math.max(systemPadding.top, context.spacing.md)
+        : systemPadding.top;
+    final bottomNavSpace = CoverTabRail.boundsOf(context) == null
+        ? context.spacing.sm + context.metrics.bottomNavHeight
+        : 0.0;
     final bottomContentInset =
         context.windowInsets.bottomSystem +
-        context.spacing.sm +
-        context.metrics.bottomNavHeight +
+        bottomNavSpace +
         context.spacing.xxl;
 
     return AsterNavigationScope(
@@ -209,10 +224,12 @@ class _HomeScreenState extends ConsumerState<_HomeBalanceRefreshSurface>
                             child: MeshGradientBackground(),
                           ),
                           Padding(
-                            padding: EdgeInsets.only(
-                              top: context.windowInsets.topSystem,
-                              bottom: context.spacing.lg,
-                            ),
+                            padding:
+                                horizontalInsets +
+                                EdgeInsets.only(
+                                  top: topInset,
+                                  bottom: context.spacing.lg,
+                                ),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -228,7 +245,12 @@ class _HomeScreenState extends ConsumerState<_HomeBalanceRefreshSurface>
                     ),
                   ),
                 ),
-                SliverToBoxAdapter(child: AssetsSection(home: home)),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: horizontalInsets,
+                    child: AssetsSection(home: home),
+                  ),
+                ),
                 SliverToBoxAdapter(child: SizedBox(height: bottomContentInset)),
               ],
             ),
