@@ -1716,6 +1716,15 @@ void main() {
 
         if (addWallet) {
           expectRailBack();
+          expect(find.byType(OnboardingWelcomeIconGrid), findsNWidgets(3));
+          expect(find.text('Multiple wallets,\none Aster'), findsOneWidget);
+          expect(
+            find.text(
+              'Create or import another wallet, then switch '
+              'between your wallets whenever you need.',
+            ),
+            findsOneWidget,
+          );
         } else {
           expect(back, findsNothing);
         }
@@ -1803,6 +1812,121 @@ void main() {
       variant: TargetPlatformVariant.only(TargetPlatform.iOS),
     );
   }
+
+  testWidgets(
+    'Add Wallet uses the first-launch welcome on the Duo inner display only',
+    (tester) async {
+      const channel = EventChannel('com.aster.wallet/cover_navigation');
+      final messenger = tester.binding.defaultBinaryMessenger;
+      late MockStreamHandlerEventSink geometry;
+      messenger.setMockStreamHandler(
+        channel,
+        MockStreamHandler.inline(
+          onListen: (_, events) {
+            geometry = events;
+            events.success(null);
+          },
+        ),
+      );
+      addTearDown(() => messenger.setMockStreamHandler(channel, null));
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetPadding);
+      addTearDown(tester.view.resetViewPadding);
+
+      void setViewport(Size size, FakeViewPadding padding) {
+        tester.view.physicalSize = size;
+        tester.view.padding = padding;
+        tester.view.viewPadding = padding;
+      }
+
+      setViewport(
+        const Size(420, 932),
+        const FakeViewPadding(top: 62, bottom: 34),
+      );
+      final harness = await OnboardingTestHarness.create();
+      addTearDown(() => _disposeHarness(tester, harness));
+      final route = await _pumpOnboardingRoute(
+        tester,
+        harness,
+        path: '/test-add-wallet-welcome-display',
+        screen: const AddWalletScreen(),
+        useDuoLandscapeScope: true,
+      );
+      addTearDown(route.router.dispose);
+      await tester.pumpAndSettle();
+
+      final header = find.byType(OnboardingWelcomeHeader);
+      final grid = find.byType(OnboardingWelcomeIconGrid);
+      final headline = find.text('Multiple wallets,\none Aster');
+      final description = find.text(
+        'Create or import another wallet, then switch '
+        'between your wallets whenever you need.',
+      );
+      final create = find.widgetWithText(CustomButton, 'Add New Wallet');
+      final import = find.widgetWithText(OnboardingTextAction, 'Import Wallet');
+      final back = _dictionaryWelcomeBack();
+
+      void expectExistingWelcome() {
+        expect(headline, findsOneWidget);
+        expect(description, findsOneWidget);
+        expect(header, findsNothing);
+        expect(grid, findsNothing);
+        expect(back.hitTestable(), findsOneWidget);
+      }
+
+      expectExistingWelcome();
+
+      setViewport(
+        const Size(466, 678),
+        const FakeViewPadding(right: 84, bottom: 34),
+      );
+      geometry.success({'width': 466.0, 'height': 678.0});
+      await tester.pumpAndSettle();
+      expectExistingWelcome();
+
+      setViewport(
+        const Size(669, 951),
+        const FakeViewPadding(top: 82, bottom: 34),
+      );
+      geometry.success({'width': 669.0, 'height': 951.0, 'inner': true});
+      await tester.pumpAndSettle();
+      expect(header, findsOneWidget);
+      expect(grid, findsOneWidget);
+      expect(description, findsOneWidget);
+      expect(
+        tester.getTopLeft(grid).dy,
+        greaterThan(tester.getBottomLeft(header).dy),
+      );
+      expect(
+        tester.getTopLeft(headline).dy,
+        greaterThan(tester.getBottomLeft(grid).dy),
+      );
+      expect(back.hitTestable(), findsOneWidget);
+      expect(create.hitTestable(), findsOneWidget);
+      expect(import.hitTestable(), findsOneWidget);
+
+      // During a fold, stale inner geometry cannot opt the cover into the hero.
+      setViewport(
+        const Size(466, 678),
+        const FakeViewPadding(right: 84, bottom: 34),
+      );
+      await tester.pumpAndSettle();
+      expectExistingWelcome();
+
+      setViewport(
+        const Size(669, 951),
+        const FakeViewPadding(top: 82, bottom: 34),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(back);
+      await tester.pumpAndSettle();
+      expect(find.text('Welcome destination'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+  );
 
   testWidgets(
     'open Duo Welcome connects the two grid sections inside the safe area',

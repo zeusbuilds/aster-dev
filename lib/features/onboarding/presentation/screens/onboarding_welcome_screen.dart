@@ -773,7 +773,7 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
   }
 }
 
-class _WalletSetupWelcomeContent extends StatelessWidget {
+class _WalletSetupWelcomeContent extends ConsumerWidget {
   const _WalletSetupWelcomeContent({
     required this.origin,
     required this.onBack,
@@ -783,6 +783,11 @@ class _WalletSetupWelcomeContent extends StatelessWidget {
     required this.usesRail,
   });
 
+  static const _addWalletHeadline = 'Multiple wallets,\none Aster';
+  static const _addWalletDescription =
+      'Create or import another wallet, then switch '
+      'between your wallets whenever you need.';
+
   final WalletCreationOrigin origin;
   final VoidCallback? onBack;
   final VoidCallback onCreateWallet;
@@ -791,13 +796,55 @@ class _WalletSetupWelcomeContent extends StatelessWidget {
   final bool usesRail;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final spacing = context.spacing;
     final type = context.type;
-    final expandsHero =
-        origin == WalletCreationOrigin.onboarding &&
-        context.fitsDuoLandscapePanes;
+    final isAddingWallet = origin == WalletCreationOrigin.walletSelector;
+    final viewport = MediaQuery.sizeOf(context);
+    final showsHero =
+        !isAddingWallet ||
+        ref.watch(
+          duoDisplayLayoutProvider.select((state) {
+            final display = state.value;
+            return display != null &&
+                !display.isCover &&
+                display.appliesTo(viewport);
+          }),
+        );
+    final expandsHero = showsHero && context.fitsDuoLandscapePanes;
     final actionMaxWidth = context.duoLandscapeActionMaxWidth;
+    final inlineBack = isAddingWallet && !usesRail
+        ? AsterIconButton(
+            icon: MingCuteIcons.mgc_left_line,
+            tooltip: 'Back',
+            onPressed: onBack,
+            color: context.appColors.onBrandArt,
+            hapticIntent: null,
+            alignment: Alignment.centerRight,
+          )
+        : null;
+    const wordmark = OnboardingWelcomeHeader(onBrandArt: true);
+    final header = OnboardingChoreographyItem(
+      id: 'welcome-header-motion',
+      visualIndex: 0,
+      child: inlineBack == null
+          ? wordmark
+          : Row(
+              children: [
+                const Expanded(child: wordmark),
+                inlineBack,
+              ],
+            ),
+    );
+    final message = isAddingWallet
+        ? const _WelcomeMessage(
+            headline: _addWalletHeadline,
+            description: _addWalletDescription,
+          )
+        : const _WelcomeMessage(
+            headline: 'Built for\nUSDT on Bitcoin',
+            description: 'One wallet for Bitcoin, USDT and RGB assets.',
+          );
     final actions = OnboardingChoreographyItem(
       id: 'welcome-actions-motion',
       visualIndex: 3,
@@ -839,108 +886,93 @@ class _WalletSetupWelcomeContent extends StatelessWidget {
             return _StaggeredWelcome(
               actionMaxWidth: actionMaxWidth,
               bottomPadding: bottomPadding,
+              header: header,
+              message: message,
               actions: actions,
             );
           }
           return CustomScrollView(
             slivers: [
-              ...switch (origin) {
-                WalletCreationOrigin.onboarding => [
-                  SliverPadding(
-                    padding: EdgeInsets.fromLTRB(
-                      spacing.xxl,
-                      spacing.xxl,
-                      spacing.xxl,
-                      spacing.lg,
+              if (showsHero)
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(
+                    spacing.xxl,
+                    spacing.xxl,
+                    spacing.xxl,
+                    spacing.lg,
+                  ),
+                  sliver: SliverToBoxAdapter(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        header,
+                        SizedBox(height: spacing.huge),
+                        OnboardingChoreographyItem(
+                          id: 'welcome-grid-motion',
+                          visualIndex: 1,
+                          child: const OnboardingWelcomeIconGrid(),
+                        ),
+                        SizedBox(height: spacing.xxxl),
+                        OnboardingChoreographyItem(
+                          id: 'welcome-message-motion',
+                          visualIndex: 2,
+                          child: message,
+                        ),
+                      ],
                     ),
-                    sliver: SliverToBoxAdapter(
+                  ),
+                )
+              else ...[
+                if (inlineBack != null)
+                  SliverToBoxAdapter(
+                    child: OnboardingChoreographyItem(
+                      id: 'add-wallet-nav-motion',
+                      visualIndex: 0,
+                      child: SizedBox(
+                        height: context.metrics.appBarHeight,
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: inlineBack,
+                        ),
+                      ),
+                    ),
+                  ),
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(
+                    spacing.screenPadding,
+                    spacing.lg,
+                    spacing.screenPadding,
+                    spacing.lg,
+                  ),
+                  sliver: SliverToBoxAdapter(
+                    child: OnboardingChoreographyItem(
+                      id: 'add-wallet-copy-motion',
+                      visualIndex: 1,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          OnboardingChoreographyItem(
-                            id: 'welcome-header-motion',
-                            visualIndex: 0,
-                            child: const OnboardingWelcomeHeader(
-                              onBrandArt: true,
+                          Text(
+                            _addWalletHeadline,
+                            style: type.pageTitle.copyWith(
+                              color: context.appColors.onBrandArt,
                             ),
                           ),
-                          SizedBox(height: spacing.huge),
-                          OnboardingChoreographyItem(
-                            id: 'welcome-grid-motion',
-                            visualIndex: 1,
-                            child: const OnboardingWelcomeIconGrid(),
-                          ),
-                          SizedBox(height: spacing.xxxl),
-                          OnboardingChoreographyItem(
-                            id: 'welcome-message-motion',
-                            visualIndex: 2,
-                            child: const _WelcomeMessage(),
+                          SizedBox(height: spacing.sm),
+                          Text(
+                            _addWalletDescription,
+                            style: type.rowMeta.copyWith(
+                              color: context.appColors.onBrandArt.withValues(
+                                alpha:
+                                    context.effects.brandContentStrongOpacity,
+                              ),
+                            ),
                           ),
                         ],
                       ),
                     ),
                   ),
-                ],
-                WalletCreationOrigin.walletSelector => [
-                  if (!usesRail)
-                    SliverToBoxAdapter(
-                      child: OnboardingChoreographyItem(
-                        id: 'add-wallet-nav-motion',
-                        visualIndex: 0,
-                        child: SizedBox(
-                          height: context.metrics.appBarHeight,
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: AsterIconButton(
-                              icon: MingCuteIcons.mgc_left_line,
-                              tooltip: 'Back',
-                              onPressed: onBack,
-                              color: context.appColors.onBrandArt,
-                              hapticIntent: null,
-                              alignment: Alignment.centerRight,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  SliverPadding(
-                    padding: EdgeInsets.fromLTRB(
-                      spacing.screenPadding,
-                      spacing.lg,
-                      spacing.screenPadding,
-                      spacing.lg,
-                    ),
-                    sliver: SliverToBoxAdapter(
-                      child: OnboardingChoreographyItem(
-                        id: 'add-wallet-copy-motion',
-                        visualIndex: 1,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Multiple wallets,\none Aster',
-                              style: type.pageTitle.copyWith(
-                                color: context.appColors.onBrandArt,
-                              ),
-                            ),
-                            SizedBox(height: spacing.sm),
-                            Text(
-                              'Create or import another wallet, then switch '
-                              'between your wallets whenever you need.',
-                              style: type.rowMeta.copyWith(
-                                color: context.appColors.onBrandArt.withValues(
-                                  alpha:
-                                      context.effects.brandContentStrongOpacity,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              },
+                ),
+              ],
               SliverFillRemaining(
                 hasScrollBody: false,
                 child: Padding(
@@ -970,10 +1002,10 @@ class _WalletSetupWelcomeContent extends StatelessWidget {
 }
 
 class _WelcomeMessage extends StatelessWidget {
-  const _WelcomeMessage();
+  const _WelcomeMessage({required this.headline, required this.description});
 
-  static const _headline = 'Built for\nUSDT on Bitcoin';
-  static const _description = 'One wallet for Bitcoin, USDT and RGB assets.';
+  final String headline;
+  final String description;
 
   @override
   Widget build(BuildContext context) {
@@ -981,9 +1013,9 @@ class _WelcomeMessage extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(_headline, style: type.brandHero),
+        Text(headline, style: type.brandHero),
         SizedBox(height: context.spacing.md),
-        Text(_description, style: type.brandBody),
+        Text(description, style: type.brandBody),
       ],
     );
   }
@@ -994,11 +1026,15 @@ class _StaggeredWelcome extends StatelessWidget {
   const _StaggeredWelcome({
     required this.actionMaxWidth,
     required this.bottomPadding,
+    required this.header,
+    required this.message,
     required this.actions,
   });
 
   final double actionMaxWidth;
   final double bottomPadding;
+  final Widget header;
+  final Widget message;
   final Widget actions;
 
   @override
@@ -1061,13 +1097,7 @@ class _StaggeredWelcome extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const OnboardingChoreographyItem(
-                                id: 'welcome-header-motion',
-                                visualIndex: 0,
-                                child: OnboardingWelcomeHeader(
-                                  onBrandArt: true,
-                                ),
-                              ),
+                              header,
                               SizedBox(height: spacing.xxxl),
                               OnboardingChoreographyItem(
                                 id: 'welcome-grid-leading-motion',
@@ -1095,10 +1125,10 @@ class _StaggeredWelcome extends StatelessWidget {
                               left: copyInset,
                               bottom: copyInset,
                             ),
-                            child: const OnboardingChoreographyItem(
+                            child: OnboardingChoreographyItem(
                               id: 'welcome-message-motion',
                               visualIndex: 1,
-                              child: _WelcomeMessage(),
+                              child: message,
                             ),
                           ),
                         ),
