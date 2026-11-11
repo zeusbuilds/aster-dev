@@ -382,8 +382,13 @@ void main() {
         expect(bounds.right, closeTo(contentRight, 0.5));
       }
       final submitBounds = tester.getRect(submit);
-      expect(submitBounds.left, closeTo(sheetBounds.left + 20, 0.5));
-      expect(submitBounds.right, closeTo(contentRight - 20, 0.5));
+      if (cover) {
+        expect(submitBounds.left, closeTo(sheetBounds.left + 20, 0.5));
+        expect(submitBounds.right, closeTo(contentRight - 20, 0.5));
+      } else {
+        expect(submitBounds.width, closeTo(427.5, 0.5));
+        expect(submitBounds.center.dx, closeTo(sheetBounds.center.dx, 0.5));
+      }
       expect(tester.getRect(viewport).bottom, closeTo(height, 0.5));
       expect(tester.getRect(submit).bottom, closeTo(height - 34 - 16, 0.5));
       expect(submit.hitTestable(), findsOneWidget);

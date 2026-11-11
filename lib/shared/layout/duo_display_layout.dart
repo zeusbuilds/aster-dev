@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -72,6 +73,12 @@ final class DuoDisplayLayout {
 
   bool isOpenLandscapeFor(Size size) =>
       !isCover && size.width > size.height && appliesTo(size);
+
+  /// One half of the inner display with the Welcome side gutters removed.
+  double? actionMaxWidthFor(Size size, double sideGutter) =>
+      isOpenLandscapeFor(size)
+      ? math.max(0.0, size.width / 2 - 2 * sideGutter)
+      : null;
 
   static DuoDisplayLayout? _fromPlatform(Object? event) {
     if (event case {'width': final num width, 'height': final num height}

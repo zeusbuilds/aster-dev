@@ -377,10 +377,18 @@ class _BootstrapFailureView extends StatelessWidget {
                     ValueListenableBuilder<bool>(
                       valueListenable: retrying,
                       builder: (context, loading, _) {
-                        return CustomButton(
-                          text: 'Retry',
-                          loading: loading,
-                          onTap: loading ? null : onRetry,
+                        return StreamBuilder<DuoDisplayLayout?>(
+                          stream: DuoDisplayLayout.platformUpdates,
+                          initialData: DuoDisplayLayout.currentPlatformLayout,
+                          builder: (context, snapshot) => CustomButton(
+                            text: 'Retry',
+                            width: snapshot.data?.actionMaxWidthFor(
+                              MediaQuery.sizeOf(context),
+                              themedSpacing.xxl,
+                            ),
+                            loading: loading,
+                            onTap: loading ? null : onRetry,
+                          ),
                         );
                       },
                     ),

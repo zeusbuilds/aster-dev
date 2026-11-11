@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -749,18 +750,53 @@ class _WalletSetupWelcomeContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final spacing = context.spacing;
     final type = context.type;
+    final expandsHero =
+        origin == WalletCreationOrigin.onboarding &&
+        context.fitsDuoLandscapePanes;
+    final actionMaxWidth = context.duoLandscapeActionMaxWidth;
+    final insets = MediaQuery.paddingOf(context);
+    // On the inner display, the hero uses the horizontal safe area while
+    // equal safe margins center the actions on the display itself.
+    final actionGutter =
+        spacing.xxl + (expandsHero ? math.max(insets.left, insets.right) : 0);
+    final actions = Column(
+      mainAxisAlignment: MainAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        CustomButton(
+          text: switch (origin) {
+            WalletCreationOrigin.onboarding => 'Create Wallet',
+            WalletCreationOrigin.walletSelector => 'Add New Wallet',
+          },
+          variant: ButtonVariant.translucent,
+          hapticIntent: null,
+          loading: checkingDictionary,
+          enabled: !checkingDictionary,
+          onTap: onCreateWallet,
+        ),
+        SizedBox(height: spacing.sm),
+        OnboardingTextAction(
+          label: 'Import Wallet',
+          onBrandArt: true,
+          hapticIntent: null,
+          enabled: !checkingDictionary,
+          onPressed: onImportWallet,
+        ),
+      ],
+    );
     return Scaffold(
       backgroundColor: context.appColors.transparentSurface,
       body: OnboardingScrollSafeArea(
+        includeHorizontalInsets: !expandsHero,
         builder: (scrollsBottomInset, scrollBottomInset) => CustomScrollView(
           slivers: [
             ...switch (origin) {
               WalletCreationOrigin.onboarding => [
                 SliverPadding(
                   padding: EdgeInsets.fromLTRB(
+                    spacing.xxl + (expandsHero ? insets.left : 0),
                     spacing.xxl,
-                    spacing.xxl,
-                    spacing.xxl,
+                    spacing.xxl + (expandsHero ? insets.right : 0),
                     spacing.lg,
                   ),
                   sliver: SliverToBoxAdapter(
@@ -774,13 +810,19 @@ class _WalletSetupWelcomeContent extends StatelessWidget {
                             onBrandArt: true,
                           ),
                         ),
-                        SizedBox(height: spacing.huge),
+                        SizedBox(
+                          height: expandsHero ? spacing.xxxl : spacing.huge,
+                        ),
                         OnboardingChoreographyItem(
                           id: 'welcome-grid-motion',
                           visualIndex: 1,
-                          child: const OnboardingWelcomeIconGrid(),
+                          child: OnboardingWelcomeIconGrid(
+                            referenceWidth: expandsHero ? actionMaxWidth : null,
+                          ),
                         ),
-                        SizedBox(height: spacing.xxxl),
+                        SizedBox(
+                          height: expandsHero ? spacing.xxl : spacing.xxxl,
+                        ),
                         OnboardingChoreographyItem(
                           id: 'welcome-message-motion',
                           visualIndex: 2,
@@ -788,7 +830,9 @@ class _WalletSetupWelcomeContent extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Built for\nUSDT on Bitcoin',
+                                expandsHero
+                                    ? 'Built for USDT on Bitcoin'
+                                    : 'Built for\nUSDT on Bitcoin',
                                 style: type.brandHero,
                               ),
                               SizedBox(height: spacing.md),
@@ -867,41 +911,24 @@ class _WalletSetupWelcomeContent extends StatelessWidget {
               hasScrollBody: false,
               child: Padding(
                 padding: EdgeInsets.fromLTRB(
-                  spacing.xxl,
+                  actionGutter,
                   0,
-                  spacing.xxl,
+                  actionGutter,
                   (scrollsBottomInset ? spacing.lg : spacing.xxl) +
                       scrollBottomInset,
                 ),
                 child: OnboardingChoreographyItem(
                   id: 'welcome-actions-motion',
                   visualIndex: 3,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      CustomButton(
-                        text: switch (origin) {
-                          WalletCreationOrigin.onboarding => 'Create Wallet',
-                          WalletCreationOrigin.walletSelector =>
-                            'Add New Wallet',
-                        },
-                        variant: ButtonVariant.translucent,
-                        hapticIntent: null,
-                        loading: checkingDictionary,
-                        enabled: !checkingDictionary,
-                        onTap: onCreateWallet,
-                      ),
-                      SizedBox(height: spacing.sm),
-                      OnboardingTextAction(
-                        label: 'Import Wallet',
-                        onBrandArt: true,
-                        hapticIntent: null,
-                        enabled: !checkingDictionary,
-                        onPressed: onImportWallet,
-                      ),
-                    ],
-                  ),
+                  child: actionMaxWidth == null
+                      ? actions
+                      : Align(
+                          alignment: Alignment.bottomCenter,
+                          child: SizedBox(
+                            width: actionMaxWidth,
+                            child: actions,
+                          ),
+                        ),
                 ),
               ),
             ),

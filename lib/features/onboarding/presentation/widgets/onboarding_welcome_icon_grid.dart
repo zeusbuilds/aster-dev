@@ -3,21 +3,50 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../shared/shared.dart';
 
-/// 4×7 icon grid used on the onboarding welcome hero.
+/// Four rows of square tiles used on the onboarding welcome hero.
 class OnboardingWelcomeIconGrid extends StatelessWidget {
-  const OnboardingWelcomeIconGrid({super.key});
+  const OnboardingWelcomeIconGrid({super.key, this.referenceWidth});
+
+  /// The width of the original grid when expanding it across a wider window.
+  final double? referenceWidth;
 
   @override
   Widget build(BuildContext context) {
     final art = context.art;
+    final rows = art.onboardingIconRows;
+    final baseColumns = art.onboardingIconColumns;
+    final gap = art.onboardingIconGridGap;
+    if (referenceWidth case final width?) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          // Include a trailing gap when comparing tile pitches. Round to the
+          // nearest odd column count to keep one highlighted tile centered.
+          final pitch = (width + gap) / baseColumns;
+          final columns = ((constraints.maxWidth + gap) / pitch - 1) / 2;
+          final count = 2 * columns.round() + 1;
+          final tileSize = (constraints.maxWidth + gap) / count - gap;
+          return SizedBox(
+            height: rows * tileSize + (rows - 1) * gap,
+            child: _buildGrid(context, count, padding: EdgeInsets.zero),
+          );
+        },
+      );
+    }
+    return AspectRatio(
+      aspectRatio: baseColumns / rows,
+      child: _buildGrid(context, baseColumns),
+    );
+  }
+
+  Widget _buildGrid(BuildContext context, int cols, {EdgeInsets? padding}) {
+    final art = context.art;
     final effects = context.effects;
     final rows = art.onboardingIconRows;
-    final cols = art.onboardingIconColumns;
-    final total = rows * cols;
-
+    final extraBefore = (cols - art.onboardingIconColumns) ~/ 2;
     final centerIndex =
         art.onboardingIconHighlightRow * cols +
-        art.onboardingIconHighlightColumn;
+        art.onboardingIconHighlightColumn +
+        extraBefore;
     // Authored tile composition in row-major order. Visual effect values stay
     // in the semantic effects system.
     const faintTiles = <List<bool>>[
@@ -27,33 +56,31 @@ class OnboardingWelcomeIconGrid extends StatelessWidget {
       [false, true, false, false, true, false, true],
     ];
 
-    return AspectRatio(
-      aspectRatio: cols / rows,
-      child: GridView.builder(
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: cols,
-          mainAxisSpacing: art.onboardingIconGridGap,
-          crossAxisSpacing: art.onboardingIconGridGap,
-        ),
-        itemCount: total,
-        itemBuilder: (context, index) {
-          if (index == centerIndex) {
-            return const _CenterTile();
-          }
-
-          final row = index ~/ cols;
-          final col = index % cols;
-          final faint = faintTiles[row][col];
-
-          return _GlassTile(
-            opacity: faint
-                ? effects.onboardingIconTileFaintOpacity
-                : effects.onboardingIconTileStrongOpacity,
-            outlined: faint,
-          );
-        },
+    return GridView.builder(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: padding,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: cols,
+        mainAxisSpacing: art.onboardingIconGridGap,
+        crossAxisSpacing: art.onboardingIconGridGap,
       ),
+      itemCount: rows * cols,
+      itemBuilder: (context, index) {
+        if (index == centerIndex) {
+          return const _CenterTile();
+        }
+
+        final row = index ~/ cols;
+        final col = (index % cols - extraBefore) % art.onboardingIconColumns;
+        final faint = faintTiles[row][col];
+
+        return _GlassTile(
+          opacity: faint
+              ? effects.onboardingIconTileFaintOpacity
+              : effects.onboardingIconTileStrongOpacity,
+          outlined: faint,
+        );
+      },
     );
   }
 }

@@ -13,6 +13,7 @@ import 'package:aster/features/onboarding/presentation/widgets/widgets.dart';
 import 'package:aster/features/wallet/presentation/view_model/wallet_view_model.dart';
 import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -1574,23 +1575,18 @@ void main() {
       expect(tester.getBottomLeft(action).dy, closeTo(actionBottom, 0.5));
     }
 
-    for (final screen in [
-      const OnboardingWelcomeScreen(),
+    await _pumpScreen(
+      tester,
+      harness,
       const AddWalletScreen(),
-    ]) {
-      await _pumpScreen(
-        tester,
-        harness,
-        screen,
-        disableAnimations: true,
-        useDuoLandscapeScope: true,
-      );
-      await expectFooter(
-        find.widgetWithText(OnboardingTextAction, 'Import Wallet'),
-        viewportBottom: 669,
-        actionBottom: 619,
-      );
-    }
+      disableAnimations: true,
+      useDuoLandscapeScope: true,
+    );
+    await expectFooter(
+      find.widgetWithText(OnboardingTextAction, 'Import Wallet'),
+      viewportBottom: 669,
+      actionBottom: 619,
+    );
 
     await _pumpScreen(
       tester,
@@ -1614,6 +1610,222 @@ void main() {
     await expectFooter(continueButton, viewportBottom: 635, actionBottom: 619);
     expect(tester.takeException(), isNull);
   }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
+
+  testWidgets(
+    'open Duo Welcome fits the grid inside the safe area and centers its actions',
+    (tester) async {
+      const channel = EventChannel('com.aster.wallet/cover_navigation');
+      final messenger = tester.binding.defaultBinaryMessenger;
+      late MockStreamHandlerEventSink geometry;
+      messenger.setMockStreamHandler(
+        channel,
+        MockStreamHandler.inline(
+          onListen: (_, events) {
+            geometry = events;
+            events.success({'width': 951.0, 'height': 669.0, 'inner': true});
+          },
+        ),
+      );
+      addTearDown(() => messenger.setMockStreamHandler(channel, null));
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetPadding);
+      addTearDown(tester.view.resetViewPadding);
+
+      void setViewport(
+        Size size, {
+        double top = 0,
+        double left = 0,
+        double right = 84,
+      }) {
+        tester.view.physicalSize = size;
+        tester.view.padding = FakeViewPadding(
+          top: top,
+          left: left,
+          right: right,
+          bottom: 34,
+        );
+        tester.view.viewPadding = tester.view.padding;
+      }
+
+      setViewport(const Size(951, 669));
+      final harness = await OnboardingTestHarness.create();
+      addTearDown(() => _disposeHarness(tester, harness));
+      await _pumpScreen(
+        tester,
+        harness,
+        const OnboardingWelcomeScreen(),
+        disableAnimations: true,
+        useDuoLandscapeScope: true,
+      );
+      await tester.pumpAndSettle();
+
+      final header = find.byType(OnboardingWelcomeHeader);
+      final grid = find.byType(OnboardingWelcomeIconGrid);
+      final message = find.byWidgetPredicate(
+        (widget) =>
+            widget is OnboardingChoreographyItem &&
+            widget.id == 'welcome-message-motion',
+      );
+      final create = find.widgetWithText(CustomButton, 'Create Wallet');
+      final import = find.widgetWithText(OnboardingTextAction, 'Import Wallet');
+      const description = 'One wallet for Bitcoin, USDT and RGB assets.';
+      final descriptionText = find.text(description);
+      final gridView = find.descendant(
+        of: grid,
+        matching: find.byType(GridView),
+      );
+      final tiles = find.descendant(of: grid, matching: find.byType(Squircle));
+
+      void expectStackedWelcome() {
+        final headerBounds = tester.getRect(header);
+        final gridBounds = tester.getRect(grid);
+        final messageBounds = tester.getRect(message);
+        final descriptionBounds = tester.getRect(descriptionText);
+        expect(descriptionBounds.left, closeTo(headerBounds.left, 0.5));
+        expect(descriptionBounds.right, lessThanOrEqualTo(gridBounds.right));
+        expect(gridBounds.top, greaterThan(headerBounds.bottom));
+        expect(messageBounds.top, greaterThan(gridBounds.bottom));
+      }
+
+      void expectWideGridInSafeArea({required int expectedColumns}) {
+        final gridBounds = tester.getRect(grid);
+        final insets = tester.view.padding;
+        final width = tester.view.physicalSize.width;
+        expect(gridBounds.left, closeTo(insets.left + 24, 0.5));
+        expect(gridBounds.right, closeTo(width - insets.right - 24, 0.5));
+        expect(tester.getRect(header).left, closeTo(insets.left + 24, 0.5));
+        expect(
+          tester.getRect(descriptionText).right,
+          lessThanOrEqualTo(width - insets.right - 24),
+        );
+
+        final delegate =
+            tester.widget<GridView>(gridView).gridDelegate
+                as SliverGridDelegateWithFixedCrossAxisCount;
+        final columns = delegate.crossAxisCount;
+        expect(columns, expectedColumns);
+        expect(tiles, findsNWidgets(columns * 4));
+        final tileWidth = (gridBounds.width - (columns - 1) * 6) / columns;
+        expect(gridBounds.height, closeTo(4 * tileWidth + 3 * 6, 0.5));
+        final firstTile = tester.getRect(tiles.first);
+        final lastColumn = tester.getRect(tiles.at(columns - 1));
+        expect(firstTile.left, closeTo(gridBounds.left, 0.5));
+        expect(lastColumn.right, closeTo(gridBounds.right, 0.5));
+        expect(firstTile.width, closeTo(tileWidth, 0.5));
+        expect(firstTile.height, closeTo(tileWidth, 0.5));
+        expect(
+          tester.getRect(tiles.at(1)).left - firstTile.right,
+          closeTo(6, 0.5),
+        );
+        expect(
+          tester.getRect(tiles.at(columns)).top - firstTile.bottom,
+          closeTo(6, 0.5),
+        );
+      }
+
+      void expectOneLine(String copy) {
+        final paragraph = tester.renderObject<RenderParagraph>(
+          find.descendant(of: find.text(copy), matching: find.byType(RichText)),
+        );
+        final lines = paragraph
+            .getBoxesForSelection(
+              TextSelection(baseOffset: 0, extentOffset: copy.length),
+            )
+            .map((box) => box.top)
+            .toSet();
+        expect(lines, hasLength(1));
+      }
+
+      void expectCenteredActions() {
+        for (final action in [create, import]) {
+          expect(action.hitTestable(), findsOneWidget);
+          expect(tester.getCenter(action).dx, closeTo(951 / 2, 0.5));
+          expect(tester.getSize(action).width, closeTo(951 / 2 - 2 * 24, 0.5));
+        }
+      }
+
+      expectStackedWelcome();
+      expectWideGridInSafeArea(expectedColumns: 13);
+      expectOneLine('Built for USDT on Bitcoin');
+      expectOneLine(description);
+      expect(
+        tester.getRect(find.byType(OnboardingWelcomeMeshBackground)),
+        Offset.zero & const Size(951, 669),
+      );
+      expect(
+        tester.getRect(create).top,
+        greaterThanOrEqualTo(tester.getRect(message).bottom),
+      );
+      expect(
+        tester.getRect(import).top,
+        greaterThan(tester.getRect(create).bottom),
+      );
+      final defaultPosition = Scrollable.of(tester.element(import)).position;
+      expect(defaultPosition.maxScrollExtent, closeTo(0, 0.5));
+      expectCenteredActions();
+      expect(tester.getRect(import).bottom, closeTo(669 - 34 - 16, 0.5));
+
+      setViewport(const Size(951, 669), left: 84, right: 0);
+      await tester.pumpAndSettle();
+      expectStackedWelcome();
+      expectWideGridInSafeArea(expectedColumns: 13);
+      expectCenteredActions();
+
+      setViewport(const Size(951, 669), right: 0);
+      await tester.pumpAndSettle();
+      expectWideGridInSafeArea(expectedColumns: 15);
+      expectCenteredActions();
+
+      setViewport(const Size(951, 669));
+      geometry.success(null);
+      await tester.pumpAndSettle();
+      expectStackedWelcome();
+      expect(tiles, findsNWidgets(28));
+      expect(find.text('Built for\nUSDT on Bitcoin'), findsOneWidget);
+
+      setViewport(const Size(466, 678));
+      geometry.success({'width': 466.0, 'height': 678.0});
+      await tester.pumpAndSettle();
+      expectStackedWelcome();
+      expect(tiles, findsNWidgets(28));
+      expect(tester.getSize(create).width, closeTo(466 - 84 - 2 * 24, 0.5));
+
+      setViewport(const Size(669, 951), top: 82, right: 0);
+      geometry.success({'width': 669.0, 'height': 951.0, 'inner': true});
+      await tester.pumpAndSettle();
+      expectStackedWelcome();
+      expect(tiles, findsNWidgets(28));
+      expect(tester.getSize(create).width, closeTo(669 - 2 * 24, 0.5));
+
+      // Keep the authored typography at larger text sizes and let the
+      // shortened inner viewport scroll to both actions.
+      setViewport(const Size(951, 420));
+      geometry.success({'width': 951.0, 'height': 420.0, 'inner': true});
+      await _pumpScreen(
+        tester,
+        harness,
+        const OnboardingWelcomeScreen(),
+        textScaler: const TextScaler.linear(2),
+        disableAnimations: true,
+        useDuoLandscapeScope: true,
+      );
+      final viewport = find.byType(CustomScrollView);
+      final scrollable = find.descendant(
+        of: viewport,
+        matching: find.byType(Scrollable),
+      );
+      final position = tester.state<ScrollableState>(scrollable.first).position;
+      expect(position.maxScrollExtent, greaterThan(0));
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      expectCenteredActions();
+      expect(tester.getRect(import).bottom, closeTo(420 - 34 - 16, 0.5));
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+  );
 
   testWidgets('import grid follows copy while only the action tracks height', (
     tester,

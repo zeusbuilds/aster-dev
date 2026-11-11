@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:aster/core/core.dart';
 import 'package:aster/features/home/presentation/widgets/widgets.dart';
@@ -45,6 +46,95 @@ const _openNavigationBounds = {
 const _openRailBand = Rect.fromLTRB(867, 162, 951, 635);
 
 void main() {
+  testWidgets(
+    'open Duo caps a stretched button without widening its tap target',
+    (tester) async {
+      final messenger = tester.binding.defaultBinaryMessenger;
+      late MockStreamHandlerEventSink geometry;
+      messenger.setMockStreamHandler(
+        _coverNavigationChannel,
+        MockStreamHandler.inline(
+          onListen: (_, events) {
+            geometry = events;
+            events.success(_openLandscape);
+          },
+        ),
+      );
+      addTearDown(
+        () => messenger.setMockStreamHandler(_coverNavigationChannel, null),
+      );
+      _setViewport(tester, size: const Size(951, 669), right: 84);
+
+      const wideLabel = 'Wide action';
+      const paneLabel = 'Pane action';
+      var taps = 0;
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            builder: (context, child) => AsterDuoLandscapeScope(child: child!),
+            home: Scaffold(
+              body: SafeArea(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    CustomButton(
+                      text: wideLabel,
+                      hapticIntent: null,
+                      onTap: () => taps++,
+                    ),
+                    const Center(
+                      child: SizedBox(
+                        width: 300,
+                        child: CustomButton(text: paneLabel),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      Rect visibleButton(String label) => tester.getRect(
+        find.descendant(
+          of: find.widgetWithText(CustomButton, label),
+          matching: find.byType(Material),
+        ),
+      );
+
+      final wide = visibleButton(wideLabel);
+      expect(wide.width, closeTo(427.5, 0.5));
+      expect(wide.center.dx, closeTo(867 / 2, 0.5));
+      expect(visibleButton(paneLabel).width, closeTo(300, 0.5));
+      final action = tester.getSemantics(find.bySemanticsLabel(wideLabel));
+      expect(action.rect.size, wide.size);
+      expect(
+        action.getSemanticsData().hasAction(ui.SemanticsAction.tap),
+        isTrue,
+      );
+
+      await tester.tapAt(Offset(wide.left - 10, wide.center.dy));
+      expect(taps, 0);
+      await tester.tapAt(wide.center);
+      expect(taps, 1);
+      await tester.pumpAndSettle();
+
+      geometry.success(null);
+      await tester.pumpAndSettle();
+      expect(visibleButton(wideLabel).width, closeTo(867, 0.5));
+
+      _resizeViewport(tester, size: const Size(466, 678), right: 84);
+      geometry.success(_closedCover);
+      await tester.pumpAndSettle();
+      expect(visibleButton(wideLabel).width, closeTo(382, 0.5));
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+  );
+
   testWidgets(
     'closed Duo uses the right tab rail and keeps tab selection when opened',
     (tester) async {

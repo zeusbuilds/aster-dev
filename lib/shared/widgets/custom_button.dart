@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
 import '../feedback/feedback.dart';
+import '../layout/duo_landscape_scope.dart';
 import '../motion/motion.dart';
 import '../theme/theme.dart';
 import 'grid_loader.dart';
@@ -144,7 +146,11 @@ class _CustomButtonState extends State<CustomButton> {
     final tapTargetHeight = visualHeight < metrics.minTouchTarget
         ? metrics.minTouchTarget
         : visualHeight;
-    final buttonWidth = widget.width ?? (isCompact ? null : double.infinity);
+    final requestedWidth = widget.width ?? (isCompact ? null : double.infinity);
+    final duoWidth = context.duoLandscapeActionMaxWidth;
+    final buttonWidth = duoWidth != null && requestedWidth != null
+        ? math.min(duoWidth, requestedWidth)
+        : requestedWidth;
     final foregroundColor = switch (widget.variant) {
       ButtonVariant.primary ||
       ButtonVariant.danger => context.colorScheme.onPrimary,
@@ -197,7 +203,7 @@ class _CustomButtonState extends State<CustomButton> {
       widget.onTap?.call();
     }
 
-    return Semantics(
+    final button = Semantics(
       button: true,
       enabled: isEnabled,
       label: widget.text,
@@ -329,5 +335,10 @@ class _CustomButtonState extends State<CustomButton> {
         ),
       ),
     );
+    // A stretched parent can be wider than the control. Keep its tap target
+    // and semantics within the same centered bounds as the visible button.
+    return duoWidth != null && requestedWidth != null
+        ? Center(widthFactor: 1, heightFactor: 1, child: button)
+        : button;
   }
 }

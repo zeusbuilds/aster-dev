@@ -6,9 +6,14 @@ import '../../../../shared/layout/layout.dart';
 /// Lets onboarding content scroll to the bottom edge on the Duo cover and
 /// open landscape display. The final action owns the unobscured inset.
 class OnboardingScrollSafeArea extends ConsumerWidget {
-  const OnboardingScrollSafeArea({required this.builder, super.key});
+  const OnboardingScrollSafeArea({
+    required this.builder,
+    this.includeHorizontalInsets = true,
+    super.key,
+  });
 
   final Widget Function(bool scrollsInset, double scrollBottomInset) builder;
+  final bool includeHorizontalInsets;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -20,6 +25,8 @@ class OnboardingScrollSafeArea extends ConsumerWidget {
         true;
     final scrollsBottomInset = isDuoCover || context.isOpenDuoLandscape;
     return SafeArea(
+      left: includeHorizontalInsets,
+      right: includeHorizontalInsets,
       bottom: !scrollsBottomInset,
       child: builder(
         scrollsBottomInset,

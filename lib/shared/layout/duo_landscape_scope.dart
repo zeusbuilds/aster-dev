@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/theme.dart';
 import 'duo_display_layout.dart';
 
-/// Provides a single top margin for open Duo landscape content and app bars.
+/// Provides the top margin and action width for open Duo landscape.
 /// Its wrappers stay mounted as the device folds so the navigator keeps state.
 class AsterDuoLandscapeScope extends ConsumerWidget {
   const AsterDuoLandscapeScope({required this.child, super.key});
@@ -16,17 +16,16 @@ class AsterDuoLandscapeScope extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final media = MediaQuery.of(context);
-    final isLandscape =
-        ref
-            .watch(duoDisplayLayoutProvider)
-            .value
-            ?.isOpenLandscapeFor(media.size) ==
-        true;
-    final top = math.max(media.viewPadding.top, context.spacing.md);
+    final spacing = context.spacing;
+    final actionMaxWidth = ref
+        .watch(duoDisplayLayoutProvider)
+        .value
+        ?.actionMaxWidthFor(media.size, spacing.xxl);
+    final top = math.max(media.viewPadding.top, spacing.md);
     return _DuoLandscape(
-      active: isLandscape,
+      actionMaxWidth: actionMaxWidth,
       child: MediaQuery(
-        data: isLandscape
+        data: actionMaxWidth != null
             ? media.copyWith(
                 viewPadding: media.viewPadding.copyWith(top: top),
                 padding: media.padding.copyWith(
@@ -41,19 +40,22 @@ class AsterDuoLandscapeScope extends ConsumerWidget {
 }
 
 class _DuoLandscape extends InheritedWidget {
-  const _DuoLandscape({required this.active, required super.child});
+  const _DuoLandscape({required this.actionMaxWidth, required super.child});
 
-  final bool active;
+  final double? actionMaxWidth;
 
   @override
   bool updateShouldNotify(_DuoLandscape oldWidget) =>
-      active != oldWidget.active;
+      actionMaxWidth != oldWidget.actionMaxWidth;
 }
 
 extension AsterDuoLandscapeContext on BuildContext {
   /// Whether the current native Duo inner window is wider than it is tall.
-  bool get isOpenDuoLandscape =>
-      dependOnInheritedWidgetOfExactType<_DuoLandscape>()?.active == true;
+  bool get isOpenDuoLandscape => duoLandscapeActionMaxWidth != null;
+
+  /// The landscape action width before individual pane or sheet constraints.
+  double? get duoLandscapeActionMaxWidth =>
+      dependOnInheritedWidgetOfExactType<_DuoLandscape>()?.actionMaxWidth;
 
   /// Both equal-width panes must fit a compact phone layout inside their
   /// respective horizontal system insets.

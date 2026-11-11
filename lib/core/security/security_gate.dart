@@ -65,11 +65,15 @@ class AsterLockScreen extends StatelessWidget {
           layout != null &&
           ((layout.isCover && layout.appliesTo(viewport)) ||
               layout.isOpenLandscapeFor(viewport));
-      return _buildLockScreen(useCompactBottom);
+      final actionWidth = layout?.actionMaxWidthFor(
+        viewport,
+        context.spacing.xxl,
+      );
+      return _buildLockScreen(useCompactBottom, actionWidth);
     },
   );
 
-  Widget _buildLockScreen(bool useCompactBottom) => ListenableBuilder(
+  Widget _buildLockScreen(bool compact, double? width) => ListenableBuilder(
     listenable: controller,
     builder: (context, _) => BlockSemantics(
       child: Stack(
@@ -90,9 +94,7 @@ class AsterLockScreen extends StatelessWidget {
                   context.spacing.screenPadding,
               bottom:
                   context.windowInsets.bottomSafe +
-                  (useCompactBottom
-                      ? context.spacing.lg
-                      : context.spacing.xxxl),
+                  (compact ? context.spacing.lg : context.spacing.xxxl),
               child: Material(
                 color: context.appColors.transparentSurface,
                 child: Column(
@@ -122,6 +124,7 @@ class AsterLockScreen extends StatelessWidget {
                     CustomButton(
                       text: 'Unlock',
                       variant: ButtonVariant.primary,
+                      width: width,
                       onTap: () => unawaited(controller.unlock()),
                     ),
                   ],
