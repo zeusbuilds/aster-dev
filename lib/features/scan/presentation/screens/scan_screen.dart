@@ -204,131 +204,141 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
         ? 'Enter payment details manually'
         : 'Enter payment details to send';
 
+    final page = Scaffold(
+      backgroundColor: colors.scanOverlayBase,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final insets = context.windowInsets.systemPadding;
+          final safeWidth = math.max(
+            0.0,
+            constraints.maxWidth - insets.horizontal,
+          );
+          final controlsLeft = insets.left + spacing.screenPadding;
+          final controlsRight = insets.right + spacing.screenPadding;
+          final persistentNavClearance =
+              widget.purpose == ScanPurpose.sendLauncher &&
+                  (!usesCompactBottom ||
+                      CoverTabRail.hasBottomFallbackOf(context))
+              ? metrics.floatingNavClearance
+              : 0.0;
+          final actionMargin = usesCompactBottom ? spacing.lg : spacing.xxl;
+          final ctaBottom =
+              insets.bottom + persistentNavClearance + actionMargin;
+          final frameTop = insets.top + metrics.scanHeaderExtent;
+          final ctaHeight = ScanEnterAddressButton.heightForWidth(
+            context,
+            label: manualEntryLabel,
+            width: safeWidth - spacing.screenPadding * 2,
+          );
+          final footerExtent = ctaHeight + spacing.xl + ctaBottom;
+          final availableFrameHeight = math.max(
+            0.0,
+            constraints.maxHeight - frameTop - footerExtent,
+          );
+          final widthBasedSize = safeWidth * metrics.scanFrameSizeFactor;
+          final frameSize = math.min(
+            metrics.scanFrameMaximumSize,
+            math.min(widthBasedSize, availableFrameHeight),
+          );
+          // The camera and overlay remain edge to edge. Keep their shared
+          // window in that coordinate space while centering the frame inside
+          // the safe content area.
+          final frameLeft = insets.left + (safeWidth - frameSize) / 2;
+          final cutoutRect = Rect.fromLTWH(
+            frameLeft,
+            frameTop,
+            frameSize,
+            frameSize,
+          );
+
+          return FocusTraversalGroup(
+            policy: OrderedTraversalPolicy(),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: shouldShowCamera
+                      ? ScanCamera(
+                          purpose: widget.purpose,
+                          cutoutRect: cutoutRect,
+                          placeholderColor: colors.scanOverlayBase,
+                          onCaptured: (payload) =>
+                              unawaited(_handleCameraPayload(payload)),
+                        )
+                      : ColoredBox(color: colors.scanOverlayBase),
+                ),
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: ScanBackground(cutoutRect: cutoutRect),
+                  ),
+                ),
+                Positioned(
+                  top: insets.top,
+                  left: controlsLeft,
+                  right: controlsRight,
+                  height: metrics.scanHeaderExtent,
+                  child: FocusTraversalOrder(
+                    order: const NumericFocusOrder(0),
+                    child: ScanWalletHeader(
+                      walletName: activeWallet?.name,
+                      walletId: activeWallet?.displayId,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: frameTop,
+                  left: frameLeft,
+                  child: ScanFrame(
+                    size: frameSize,
+                    state: scanState,
+                    onGalleryTap: scanState.canUseGallery && shouldShowCamera
+                        ? () => unawaited(_scanGallery())
+                        : null,
+                    onFlashTap: scanState.canToggleFlash
+                        ? () => unawaited(_toggleFlash())
+                        : null,
+                    onZoomTap: scanState.canChangeZoom
+                        ? () => unawaited(_cycleZoom())
+                        : null,
+                  ),
+                ),
+                Positioned(
+                  left: controlsLeft,
+                  right: controlsRight,
+                  bottom: ctaBottom,
+                  child: FocusTraversalOrder(
+                    order: const NumericFocusOrder(4),
+                    child: ScanEnterAddressButton(
+                      label: manualEntryLabel,
+                      onTap:
+                          !scanState.canEnterManually ||
+                              _navigationInFlight ||
+                              !shouldShowCamera
+                          ? null
+                          : () => unawaited(_enterManually()),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: colors.transparentSurface,
         statusBarIconBrightness: Brightness.light,
         statusBarBrightness: Brightness.dark,
       ),
-      child: Scaffold(
-        backgroundColor: colors.scanOverlayBase,
-        body: LayoutBuilder(
-          builder: (context, constraints) {
-            final insets = context.windowInsets.systemPadding;
-            final safeWidth = math.max(
-              0.0,
-              constraints.maxWidth - insets.horizontal,
-            );
-            final controlsLeft = insets.left + spacing.screenPadding;
-            final controlsRight = insets.right + spacing.screenPadding;
-            final persistentNavClearance =
-                widget.purpose == ScanPurpose.sendLauncher &&
-                    (!usesCompactBottom ||
-                        CoverTabRail.hasBottomFallbackOf(context))
-                ? metrics.floatingNavClearance
-                : 0.0;
-            final actionMargin = usesCompactBottom ? spacing.lg : spacing.xxl;
-            final ctaBottom =
-                insets.bottom + persistentNavClearance + actionMargin;
-            final frameTop = insets.top + metrics.scanHeaderExtent;
-            final ctaHeight = ScanEnterAddressButton.heightForWidth(
-              context,
-              label: manualEntryLabel,
-              width: safeWidth - spacing.screenPadding * 2,
-            );
-            final footerExtent = ctaHeight + spacing.xl + ctaBottom;
-            final availableFrameHeight = math.max(
-              0.0,
-              constraints.maxHeight - frameTop - footerExtent,
-            );
-            final widthBasedSize = safeWidth * metrics.scanFrameSizeFactor;
-            final frameSize = math.min(
-              metrics.scanFrameMaximumSize,
-              math.min(widthBasedSize, availableFrameHeight),
-            );
-            // The camera and overlay remain edge to edge. Keep their shared
-            // window in that coordinate space while centering the frame inside
-            // the safe content area.
-            final frameLeft = insets.left + (safeWidth - frameSize) / 2;
-            final cutoutRect = Rect.fromLTWH(
-              frameLeft,
-              frameTop,
-              frameSize,
-              frameSize,
-            );
-
-            return FocusTraversalGroup(
-              policy: OrderedTraversalPolicy(),
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: shouldShowCamera
-                        ? ScanCamera(
-                            purpose: widget.purpose,
-                            cutoutRect: cutoutRect,
-                            placeholderColor: colors.scanOverlayBase,
-                            onCaptured: (payload) =>
-                                unawaited(_handleCameraPayload(payload)),
-                          )
-                        : ColoredBox(color: colors.scanOverlayBase),
-                  ),
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: ScanBackground(cutoutRect: cutoutRect),
-                    ),
-                  ),
-                  Positioned(
-                    top: insets.top,
-                    left: controlsLeft,
-                    right: controlsRight,
-                    height: metrics.scanHeaderExtent,
-                    child: FocusTraversalOrder(
-                      order: const NumericFocusOrder(0),
-                      child: ScanWalletHeader(
-                        walletName: activeWallet?.name,
-                        walletId: activeWallet?.displayId,
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: frameTop,
-                    left: frameLeft,
-                    child: ScanFrame(
-                      size: frameSize,
-                      state: scanState,
-                      onGalleryTap: scanState.canUseGallery && shouldShowCamera
-                          ? () => unawaited(_scanGallery())
-                          : null,
-                      onFlashTap: scanState.canToggleFlash
-                          ? () => unawaited(_toggleFlash())
-                          : null,
-                      onZoomTap: scanState.canChangeZoom
-                          ? () => unawaited(_cycleZoom())
-                          : null,
-                    ),
-                  ),
-                  Positioned(
-                    left: controlsLeft,
-                    right: controlsRight,
-                    bottom: ctaBottom,
-                    child: FocusTraversalOrder(
-                      order: const NumericFocusOrder(4),
-                      child: ScanEnterAddressButton(
-                        label: manualEntryLabel,
-                        onTap:
-                            !scanState.canEnterManually ||
-                                _navigationInFlight ||
-                                !shouldShowCamera
-                            ? null
-                            : () => unawaited(_enterManually()),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
+      child: DuoBackNavigation(
+        showBack:
+            widget.purpose != ScanPurpose.sendLauncher &&
+            Navigator.canPop(context),
+        onBack: _navigationInFlight
+            ? null
+            : () => unawaited(Navigator.of(context).maybePop()),
+        builder: (context, _) => page,
       ),
     );
   }

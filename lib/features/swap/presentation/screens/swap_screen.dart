@@ -23,7 +23,7 @@ class SwapScreen extends ConsumerWidget {
             ?.appliesTo(MediaQuery.sizeOf(context)) ==
         true;
     final scrollsToBottom = isDuoCover || context.isOpenDuoLandscape;
-    return Scaffold(
+    return AsterPageScaffold(
       backgroundColor: context.colorScheme.surface,
       appBar: const CustomAppBar(
         title: 'Swap',

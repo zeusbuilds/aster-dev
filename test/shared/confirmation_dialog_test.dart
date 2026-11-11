@@ -24,6 +24,60 @@ void main() {
     )..addFont(rootBundle.load('assets/fonts/DMSans-Variable.ttf'))).load();
   });
 
+  testWidgets('inner landscape confirmation uses one centered pane width', (
+    tester,
+  ) async {
+    final view = tester.view;
+    view.devicePixelRatio = 1;
+    view.physicalSize = const Size(951, 669);
+    view.padding = const FakeViewPadding(right: 84, bottom: 34);
+    view.viewPadding = view.padding;
+    addTearDown(view.reset);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: const _DialogCaller(
+          title: 'Delete wallet?',
+          body: _deleteBody,
+          action: 'Delete',
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(_openKey));
+    await tester.pumpAndSettle();
+
+    final surface = find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.byWidgetPredicate(
+        (widget) => widget is Material && widget.type == MaterialType.card,
+      ),
+    );
+    final cancel = find.widgetWithText(CustomButton, 'Cancel');
+    final confirm = find.widgetWithText(CustomButton, 'Delete');
+    final bounds = tester.getRect(surface);
+    expect(bounds.width, 427.5);
+    expect(bounds.center.dx, (951 - 84) / 2);
+    expect(tester.getTopLeft(cancel).dy, tester.getTopLeft(confirm).dy);
+
+    tester.platformDispatcher.textScaleFactorTestValue = 3;
+    await tester.pumpAndSettle();
+    expect(tester.getRect(surface).width, 427.5);
+    expect(
+      tester.getBottomLeft(cancel).dy,
+      lessThan(tester.getTopLeft(confirm).dy),
+    );
+    expect(confirm.hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    view.physicalSize = const Size(466, 678);
+    await tester.pumpAndSettle();
+    expect(tester.getRect(surface).width, 466 - 84 - 48);
+    await tester.tap(cancel);
+    await tester.pumpAndSettle();
+    expect(surface, findsNothing);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
+
   for (final sample in [
     (title: 'Turn off App lock?', body: _lockBody, action: 'Turn off'),
     (title: 'Delete wallet?', body: _deleteBody, action: 'Delete'),

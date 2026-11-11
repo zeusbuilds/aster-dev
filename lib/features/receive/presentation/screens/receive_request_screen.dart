@@ -245,7 +245,7 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
             durableGenerationOwnsRoute || navigation.inFlight;
         return PopScope(
           canPop: !generationOwnsRoute,
-          child: Scaffold(
+          child: AsterPageScaffold(
             backgroundColor: context.colorScheme.surface,
             appBar: CustomAppBar(
               title: 'Receive ${widget.target.assetLabel}',

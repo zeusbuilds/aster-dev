@@ -297,20 +297,23 @@ class _OnboardingImportWalletScreenState
             spacing.screenPadding,
             spacing.lg,
           ),
-          child: OnboardingChoreographyItem(
-            id: 'import-actions-motion',
-            visualIndex: 3,
-            child: CustomButton(
-              text: 'Continue',
-              variant: widget.onBrandArt
-                  ? ButtonVariant.translucent
-                  : ButtonVariant.primary,
-              enabled:
-                  (state.canContinue || canRetryChecksum) &&
-                  !navigation.inFlight,
-              loading: state.checksumStatus == MnemonicChecksumStatus.checking,
-              hapticIntent: null,
-              onTap: () => unawaited(_continueImport(navigation)),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: OnboardingChoreographyItem(
+              id: 'import-actions-motion',
+              visualIndex: 3,
+              child: CustomButton(
+                text: 'Continue',
+                variant: widget.onBrandArt
+                    ? ButtonVariant.translucent
+                    : ButtonVariant.primary,
+                enabled:
+                    (state.canContinue || canRetryChecksum) &&
+                    !navigation.inFlight,
+                loading: state.checksumStatus == MnemonicChecksumStatus.checking,
+                hapticIntent: null,
+                onTap: () => unawaited(_continueImport(navigation)),
+              ),
             ),
           ),
         ),

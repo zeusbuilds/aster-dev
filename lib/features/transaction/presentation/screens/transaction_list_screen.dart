@@ -135,7 +135,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
             );
           }
 
-          return Scaffold(
+          return AsterPageScaffold(
             backgroundColor: context.colorScheme.surface,
             appBar: CustomAppBar(
               title:

@@ -35,7 +35,7 @@ class TransactionDetailsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final activity = ref.watch(activityViewModelProvider(assetKind));
     final settings = ref.watch(settingsViewModelProvider);
-    return Scaffold(
+    return AsterPageScaffold(
       backgroundColor: context.colorScheme.surface,
       appBar: CustomAppBar(
         title: 'Transaction details',

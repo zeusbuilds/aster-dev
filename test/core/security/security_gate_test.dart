@@ -179,8 +179,8 @@ void main() {
 
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(466, 678);
-    tester.view.padding = const FakeViewPadding(bottom: 34);
-    tester.view.viewPadding = const FakeViewPadding(bottom: 34);
+    tester.view.padding = const FakeViewPadding(right: 84, bottom: 34);
+    tester.view.viewPadding = tester.view.padding;
     addTearDown(tester.view.reset);
 
     var nativeListens = 0;
@@ -199,6 +199,23 @@ void main() {
     );
 
     final unlock = find.widgetWithText(CustomButton, 'Unlock');
+    final unlockSurface = find.descendant(
+      of: unlock,
+      matching: find.byType(Material),
+    );
+    void expectCenteredActions({
+      required double width,
+      required double bottom,
+    }) {
+      final logoCenter = tester.getCenter(find.byType(AnimatedSplashScreen));
+      final titleCenter = tester.getCenter(find.text('Aster locked'));
+      final button = tester.getRect(unlockSurface);
+      expect(titleCenter.dx, logoCenter.dx);
+      expect(button.center.dx, logoCenter.dx);
+      expect(button.width, width);
+      expect(button.bottom, bottom);
+    }
+
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light(),
@@ -206,7 +223,7 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(tester.getBottomLeft(unlock).dy, 628);
+    expectCenteredActions(width: 258, bottom: 628);
 
     final container = ProviderContainer();
     addTearDown(container.dispose);
@@ -221,21 +238,29 @@ void main() {
         home: SecurityGate(controller: security, child: const Text('Wallet')),
       ),
     );
-    expect(tester.getBottomLeft(unlock).dy, 628);
+    expectCenteredActions(width: 258, bottom: 628);
 
     // Flutter's viewport can change before the native cover event arrives.
     tester.view.physicalSize = const Size(670, 915);
+    tester.view.padding = const FakeViewPadding(bottom: 34);
+    tester.view.viewPadding = tester.view.padding;
     await tester.pump();
-    expect(tester.getBottomLeft(unlock).dy, 849);
+    expectCenteredActions(width: 630, bottom: 849);
     geometry.success(null);
     await tester.pump();
-    expect(tester.getBottomLeft(unlock).dy, 849);
+    expectCenteredActions(width: 630, bottom: 849);
     expect(routerLayout.read().value, isNull);
 
     tester.view.physicalSize = const Size(951, 669);
+    tester.view.padding = const FakeViewPadding(right: 84, bottom: 34);
+    tester.view.viewPadding = tester.view.padding;
     geometry.success({'inner': true, 'width': 951.0, 'height': 669.0});
     await tester.pump();
-    expect(tester.getBottomLeft(unlock).dy, 619);
+    expectCenteredActions(width: 427.5, bottom: 619);
+    tester.view.padding = const FakeViewPadding(left: 84, bottom: 34);
+    tester.view.viewPadding = tester.view.padding;
+    await tester.pump();
+    expectCenteredActions(width: 427.5, bottom: 619);
     expect(routerLayout.read().value, isNull);
     expect(nativeListens, 1);
     expect(nativeCancels, 0);

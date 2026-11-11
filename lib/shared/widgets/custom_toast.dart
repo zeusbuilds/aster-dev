@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
 
 import '../feedback/toast_message.dart';
+import '../layout/duo_display_layout.dart';
 import '../theme/theme.dart';
 import 'aster_icon_button.dart';
 import 'squircle.dart';
@@ -50,6 +51,10 @@ class CustomToast extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
+    final landscapeWidth = DuoDisplayLayout.landscapeOverlayMaxWidth(
+      MediaQuery.sizeOf(context),
+      spacing.xxl,
+    );
     final semanticLabel = [
       _semanticKind,
       title,
@@ -63,54 +68,60 @@ class CustomToast extends StatelessWidget {
         minimum: EdgeInsets.only(bottom: spacing.lg),
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: spacing.screenPadding),
-          child: Semantics(
-            container: true,
-            explicitChildNodes: true,
-            liveRegion: true,
-            label: semanticLabel,
-            onDidGainAccessibilityFocus: onAccessibilityFocus,
-            onDismiss: onDismiss,
-            child: Squircle(
-              color: context.colorScheme.surface,
-              padding: EdgeInsets.symmetric(
-                horizontal: spacing.lg,
-                vertical: spacing.md,
-              ),
-              shadows: context.shadows.raised,
-              child: Row(
-                children: [
-                  ExcludeSemantics(
-                    child: Icon(
-                      _icon,
-                      color: _iconColor(context),
-                      size: context.icons.md,
-                    ),
+          child: Center(
+            heightFactor: 1,
+            child: SizedBox(
+              width: landscapeWidth,
+              child: Semantics(
+                container: true,
+                explicitChildNodes: true,
+                liveRegion: true,
+                label: semanticLabel,
+                onDidGainAccessibilityFocus: onAccessibilityFocus,
+                onDismiss: onDismiss,
+                child: Squircle(
+                  color: context.colorScheme.surface,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: spacing.lg,
+                    vertical: spacing.md,
                   ),
-                  SizedBox(width: spacing.md),
-                  Expanded(
-                    child: ExcludeSemantics(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(title, style: context.type.toastTitle),
-                          if (message case final message?
-                              when message.isNotEmpty) ...[
-                            SizedBox(height: spacing.xxs),
-                            Text(message, style: context.type.toastMessage),
-                          ],
-                        ],
+                  shadows: context.shadows.raised,
+                  child: Row(
+                    children: [
+                      ExcludeSemantics(
+                        child: Icon(
+                          _icon,
+                          color: _iconColor(context),
+                          size: context.icons.md,
+                        ),
                       ),
-                    ),
+                      SizedBox(width: spacing.md),
+                      Expanded(
+                        child: ExcludeSemantics(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(title, style: context.type.toastTitle),
+                              if (message case final message?
+                                  when message.isNotEmpty) ...[
+                                SizedBox(height: spacing.xxs),
+                                Text(message, style: context.type.toastMessage),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: spacing.sm),
+                      AsterIconButton(
+                        onPressed: onDismiss,
+                        tooltip: 'Dismiss',
+                        icon: MingCuteIcons.mgc_close_line,
+                        showTooltip: false,
+                      ),
+                    ],
                   ),
-                  SizedBox(width: spacing.sm),
-                  AsterIconButton(
-                    onPressed: onDismiss,
-                    tooltip: 'Dismiss',
-                    icon: MingCuteIcons.mgc_close_line,
-                    showTooltip: false,
-                  ),
-                ],
+                ),
               ),
             ),
           ),

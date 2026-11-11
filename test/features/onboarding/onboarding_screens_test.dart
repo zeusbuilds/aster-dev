@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:aster/core/bootstrap/app_bootstrap.dart';
@@ -13,9 +14,9 @@ import 'package:aster/features/onboarding/presentation/widgets/widgets.dart';
 import 'package:aster/features/wallet/presentation/view_model/wallet_view_model.dart';
 import 'package:aster/shared/shared.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mesh/mesh.dart';
@@ -1588,6 +1589,51 @@ void main() {
       actionBottom: 619,
     );
 
+    Finder primarySurface(String label) => find.descendant(
+      of: find.widgetWithText(CustomButton, label),
+      matching: find.byType(Material),
+    );
+
+    void expectPrimaryBounds(Finder surface, {required double width}) {
+      final bounds = tester.getRect(surface);
+      expect(bounds.left, closeTo(20, 0.5));
+      expect(bounds.width, closeTo(width, 0.5));
+    }
+
+    const openDuoButtonWidth = 427.5;
+    Future<void> expectOpenDuoPrimaryFooter(String label) async {
+      final surface = primarySurface(label);
+      await expectFooter(surface, viewportBottom: 669, actionBottom: 619);
+      expectPrimaryBounds(surface, width: openDuoButtonWidth);
+    }
+
+    for (final screen in [
+      const OnboardingCreateWalletScreen(),
+      const CreateWalletQuizScreen(),
+    ]) {
+      await _pumpScreen(
+        tester,
+        harness,
+        screen,
+        disableAnimations: true,
+        useDuoLandscapeScope: true,
+      );
+      await expectOpenDuoPrimaryFooter('Continue');
+    }
+
+    for (final source in _walletNameTestSources) {
+      await _prepareWalletNameSource(tester, harness, source);
+      addTearDown(_keepWalletNameSourceAlive(harness, source));
+      await _pumpScreen(
+        tester,
+        harness,
+        source.screen,
+        disableAnimations: true,
+        useDuoLandscapeScope: true,
+      );
+      await expectOpenDuoPrimaryFooter(source.submitLabel);
+    }
+
     await _pumpScreen(
       tester,
       harness,
@@ -1595,24 +1641,171 @@ void main() {
       disableAnimations: true,
       useDuoLandscapeScope: true,
     );
-    final continueButton = find.widgetWithText(CustomButton, 'Continue');
-    await expectFooter(continueButton, viewportBottom: 669, actionBottom: 619);
+    await expectOpenDuoPrimaryFooter('Continue');
+    final continueSurface = primarySurface('Continue');
 
     tester.view.padding = const FakeViewPadding(right: 84);
     tester.view.viewInsets = const FakeViewPadding(bottom: 260);
     await tester.pumpAndSettle();
-    await expectFooter(continueButton, viewportBottom: 409, actionBottom: 393);
+    await expectFooter(continueSurface, viewportBottom: 409, actionBottom: 393);
+    expectPrimaryBounds(continueSurface, width: openDuoButtonWidth);
 
     geometry.success(null);
     tester.view.padding = tester.view.viewPadding;
     tester.view.viewInsets = const FakeViewPadding();
     await tester.pumpAndSettle();
-    await expectFooter(continueButton, viewportBottom: 635, actionBottom: 619);
+    await expectFooter(continueSurface, viewportBottom: 635, actionBottom: 619);
+    expectPrimaryBounds(continueSurface, width: 827);
     expect(tester.takeException(), isNull);
   }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
 
+  for (final addWallet in [false, true]) {
+    testWidgets(
+      'Duo inner Back follows the ${addWallet ? 'add-wallet import' : 'first-wallet create'} journey',
+      (tester) async {
+        const channel = EventChannel('com.aster.wallet/cover_navigation');
+        final messenger = tester.binding.defaultBinaryMessenger;
+        messenger.setMockStreamHandler(
+          channel,
+          MockStreamHandler.inline(
+            onListen: (_, events) => events.success({
+              'width': 951.0,
+              'height': 669.0,
+              'left': 867.0,
+              'top': 124.0,
+              'right': 951.0,
+              'bottom': 669.0,
+              'inner': true,
+            }),
+          ),
+        );
+        addTearDown(() => messenger.setMockStreamHandler(channel, null));
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(951, 669);
+        tester.view.padding = const FakeViewPadding(right: 84, bottom: 34);
+        tester.view.viewPadding = tester.view.padding;
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetPadding);
+        addTearDown(tester.view.resetViewPadding);
+        final harness = await OnboardingTestHarness.create();
+        addTearDown(() => _disposeHarness(tester, harness));
+        final route = await _pumpOnboardingRoute(
+          tester,
+          harness,
+          path: '/test-duo-onboarding-back',
+          screen: addWallet
+              ? const AddWalletScreen()
+              : const OnboardingWelcomeScreen(),
+          useDuoLandscapeScope: true,
+        );
+        addTearDown(route.router.dispose);
+        await tester.pumpAndSettle();
+        final back = _dictionaryWelcomeBack();
+        void expectRailBack() {
+          expect(back, findsOneWidget);
+          expect(tester.getRect(back), const Rect.fromLTWH(879, 124, 48, 48));
+          expect(back.hitTestable(), findsOneWidget);
+        }
+
+        Future<void> goBack() async {
+          expectRailBack();
+          await tester.tap(back);
+          await _pumpOnboardingTransition(tester);
+        }
+
+        if (addWallet) {
+          expectRailBack();
+        } else {
+          expect(back, findsNothing);
+        }
+        await _tapSetupAction(
+          tester,
+          addWallet: addWallet,
+          importing: addWallet,
+        );
+        await _pumpOnboardingTransition(tester);
+
+        if (addWallet) {
+          expect(find.byType(OnboardingImportWalletScreen), findsOneWidget);
+          expectRailBack();
+          harness.container
+              .read(importWalletViewModelProvider.notifier)
+              .updateWords(0, validTestMnemonicWords);
+          await _pumpUntil(
+            tester,
+            () =>
+                harness.container
+                    .read(importWalletViewModelProvider)
+                    .value
+                    ?.phraseValid ==
+                true,
+          );
+          tester
+              .widget<OnboardingImportWalletScreen>(
+                find.byType(OnboardingImportWalletScreen),
+              )
+              .onContinue!();
+        } else {
+          expect(find.byType(OnboardingCreateWalletScreen), findsOneWidget);
+          expectRailBack();
+          tester
+              .widget<OnboardingCreateWalletScreen>(
+                find.byType(OnboardingCreateWalletScreen),
+              )
+              .onContinue!();
+          await _pumpOnboardingTransition(tester);
+          expect(find.byType(CreateWalletQuizScreen), findsOneWidget);
+          expectRailBack();
+          final quiz = harness.container
+              .read(createWalletViewModelProvider)
+              .value!;
+          final notifier = harness.container.read(
+            createWalletViewModelProvider.notifier,
+          );
+          for (final question in quiz.questions) {
+            notifier.selectQuizOption(
+              wordNumber: question.wordNumber,
+              word: question.expectedWord,
+            );
+          }
+          tester
+              .widget<CreateWalletQuizScreen>(
+                find.byType(CreateWalletQuizScreen),
+              )
+              .onContinue!();
+        }
+        await _pumpOnboardingTransition(tester);
+        expect(find.byType(WalletNameScreen), findsOneWidget);
+        await goBack();
+        if (addWallet) {
+          expect(find.byType(OnboardingImportWalletScreen), findsOneWidget);
+        } else {
+          expect(find.byType(CreateWalletQuizScreen), findsOneWidget);
+          await goBack();
+          expect(find.byType(OnboardingCreateWalletScreen), findsOneWidget);
+        }
+        await goBack();
+        expect(find.byType(WalletNameScreen), findsNothing);
+        if (addWallet) {
+          await goBack();
+          await tester.pumpAndSettle();
+          expect(find.text('Welcome destination'), findsOneWidget);
+        } else {
+          expect(back, findsNothing);
+          expect(
+            find.widgetWithText(CustomButton, 'Create Wallet'),
+            findsOneWidget,
+          );
+          expect(route.router.canPop(), isTrue);
+        }
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+    );
+  }
+
   testWidgets(
-    'open Duo Welcome fits the grid inside the safe area and centers its actions',
+    'open Duo Welcome connects the two grid sections inside the safe area',
     (tester) async {
       const channel = EventChannel('com.aster.wallet/cover_navigation');
       final messenger = tester.binding.defaultBinaryMessenger;
@@ -1672,13 +1865,27 @@ void main() {
       final import = find.widgetWithText(OnboardingTextAction, 'Import Wallet');
       const description = 'One wallet for Bitcoin, USDT and RGB assets.';
       final descriptionText = find.text(description);
-      final gridView = find.descendant(
-        of: grid,
-        matching: find.byType(GridView),
-      );
-      final tiles = find.descendant(of: grid, matching: find.byType(Squircle));
+      Finder tilesIn(Finder section) =>
+          find.descendant(of: section, matching: find.byType(Squircle));
+
+      Finder tokenIconsIn(Finder parent) =>
+          find.descendant(of: parent, matching: find.byType(SvgPicture));
+
+      void expectToken(Finder section, int tileIndex, String token) {
+        final icon = tokenIconsIn(tilesIn(section).at(tileIndex));
+        expect(icon, findsOneWidget);
+        final loader = tester.widget<SvgPicture>(icon).bytesLoader;
+        expect(
+          (loader as SvgAssetLoader).assetName,
+          'assets/icons/tokens/$token.svg',
+        );
+      }
 
       void expectStackedWelcome() {
+        expect(grid, findsOneWidget);
+        expect(tilesIn(grid), findsNWidgets(28));
+        expect(tokenIconsIn(grid), findsOneWidget);
+        expectToken(grid, 10, 'usdt');
         final headerBounds = tester.getRect(header);
         final gridBounds = tester.getRect(grid);
         final messageBounds = tester.getRect(message);
@@ -1689,67 +1896,119 @@ void main() {
         expect(messageBounds.top, greaterThan(gridBounds.bottom));
       }
 
-      void expectWideGridInSafeArea({required int expectedColumns}) {
-        final gridBounds = tester.getRect(grid);
+      void expectStaggeredWelcome({
+        required int columns,
+        int? expectedLeftColumns,
+      }) {
+        expect(grid, findsNWidgets(3));
+        final leftSection = grid.at(0);
+        final sharedSection = grid.at(1);
+        final rightSection = grid.at(2);
+        final leftBounds = tester.getRect(leftSection);
+        final sharedBounds = tester.getRect(sharedSection);
+        final rightBounds = tester.getRect(rightSection);
         final insets = tester.view.padding;
         final width = tester.view.physicalSize.width;
-        expect(gridBounds.left, closeTo(insets.left + 24, 0.5));
-        expect(gridBounds.right, closeTo(width - insets.right - 24, 0.5));
-        expect(tester.getRect(header).left, closeTo(insets.left + 24, 0.5));
-        expect(
-          tester.getRect(descriptionText).right,
-          lessThanOrEqualTo(width - insets.right - 24),
-        );
+        const gap = 6.0;
+        final tileSize = (sharedBounds.width - (columns - 1) * gap) / columns;
+        final pitch = tileSize + gap;
+        final leftColumns = ((leftBounds.width + gap) / pitch).round();
+        final rightColumns = columns - leftColumns;
+        if (expectedLeftColumns != null) {
+          expect(leftColumns, expectedLeftColumns);
+        }
 
-        final delegate =
-            tester.widget<GridView>(gridView).gridDelegate
-                as SliverGridDelegateWithFixedCrossAxisCount;
-        final columns = delegate.crossAxisCount;
-        expect(columns, expectedColumns);
-        expect(tiles, findsNWidgets(columns * 4));
-        final tileWidth = (gridBounds.width - (columns - 1) * 6) / columns;
-        expect(gridBounds.height, closeTo(4 * tileWidth + 3 * 6, 0.5));
-        final firstTile = tester.getRect(tiles.first);
-        final lastColumn = tester.getRect(tiles.at(columns - 1));
-        expect(firstTile.left, closeTo(gridBounds.left, 0.5));
-        expect(lastColumn.right, closeTo(gridBounds.right, 0.5));
-        expect(firstTile.width, closeTo(tileWidth, 0.5));
-        expect(firstTile.height, closeTo(tileWidth, 0.5));
+        expect(sharedBounds.left, closeTo(insets.left + 24, 0.5));
+        expect(sharedBounds.right, closeTo(width - insets.right - 24, 0.5));
+        expect(leftBounds.left, closeTo(sharedBounds.left, 0.5));
+        expect(rightBounds.right, closeTo(sharedBounds.right, 0.5));
+        expect(rightBounds.left - leftBounds.right, closeTo(gap, 0.5));
         expect(
-          tester.getRect(tiles.at(1)).left - firstTile.right,
-          closeTo(6, 0.5),
+          (rightBounds.left - gap / 2 - width / 2).abs(),
+          lessThanOrEqualTo(pitch / 2 + 0.5),
         );
+        expect(sharedBounds.top - leftBounds.bottom, closeTo(gap, 0.5));
+        expect(rightBounds.top - sharedBounds.bottom, closeTo(gap, 0.5));
+
+        for (final (section, sectionColumns, rows) in [
+          (leftSection, leftColumns, 3),
+          (sharedSection, columns, 3),
+          (rightSection, rightColumns, 2),
+        ]) {
+          final sectionBounds = tester.getRect(section);
+          final tiles = tilesIn(section);
+          expect(tiles, findsNWidgets(sectionColumns * rows));
+          expect(sectionBounds.height, closeTo(rows * pitch - gap, 0.5));
+          for (var index = 0; index < sectionColumns * rows; index++) {
+            final tile = tester.getRect(tiles.at(index));
+            expect(tile.width, closeTo(tileSize, 0.5));
+            expect(tile.height, closeTo(tileSize, 0.5));
+            expect(
+              tile.left,
+              closeTo(
+                sectionBounds.left + (index % sectionColumns) * pitch,
+                0.5,
+              ),
+            );
+            expect(
+              tile.top,
+              closeTo(
+                sectionBounds.top + (index ~/ sectionColumns) * pitch,
+                0.5,
+              ),
+            );
+          }
+        }
+
+        expect(tokenIconsIn(grid), findsNWidgets(2));
+        expectToken(leftSection, 2 * leftColumns + 3, 'usdt');
+        expectToken(sharedSection, columns + columns - 4, 'btc');
+
+        final headerBounds = tester.getRect(header);
+        expect(headerBounds.left, closeTo(leftBounds.left, 0.5));
+        expect(leftBounds.top - headerBounds.bottom, closeTo(32, 0.5));
         expect(
-          tester.getRect(tiles.at(columns)).top - firstTile.bottom,
-          closeTo(6, 0.5),
+          rightBounds.bottom - headerBounds.bottom,
+          closeTo(32 + 8 * pitch - gap, 0.5),
         );
+        final copy = find.descendant(of: message, matching: find.byType(Text));
+        expect(copy, findsNWidgets(2));
+        expect(
+          tester.widget<Text>(copy.first).data?.replaceAll('\n', ' '),
+          'Built for USDT on Bitcoin',
+        );
+        expect(tester.widget<Text>(copy.last).data, description);
+        final copyLeft = math.max(width / 2 + 24, rightBounds.left + 8);
+        expect(
+          sharedBounds.top - tester.getRect(copy.last).bottom,
+          closeTo(tester.getRect(copy.last).left - leftBounds.right, 0.5),
+        );
+        for (final text in [copy.first, copy.last]) {
+          final textBounds = tester.getRect(text);
+          expect(textBounds.left, closeTo(copyLeft, 0.5));
+          expect(textBounds.right, lessThanOrEqualTo(rightBounds.right + 0.5));
+          expect(textBounds.bottom, lessThan(sharedBounds.top));
+        }
+        expect(tester.getTopLeft(create).dy, greaterThan(sharedBounds.bottom));
       }
 
-      void expectOneLine(String copy) {
-        final paragraph = tester.renderObject<RenderParagraph>(
-          find.descendant(of: find.text(copy), matching: find.byType(RichText)),
-        );
-        final lines = paragraph
-            .getBoxesForSelection(
-              TextSelection(baseOffset: 0, extentOffset: copy.length),
-            )
-            .map((box) => box.top)
-            .toSet();
-        expect(lines, hasLength(1));
-      }
-
-      void expectCenteredActions() {
+      void expectLeftActions() {
+        final leftInset = tester.view.padding.left;
+        final width = tester.view.physicalSize.width;
         for (final action in [create, import]) {
           expect(action.hitTestable(), findsOneWidget);
-          expect(tester.getCenter(action).dx, closeTo(951 / 2, 0.5));
-          expect(tester.getSize(action).width, closeTo(951 / 2 - 2 * 24, 0.5));
+          final bounds = tester.getRect(action);
+          expect(bounds.left, closeTo(leftInset + 24, 0.5));
+          expect(bounds.right, closeTo(width / 2 - 24, 0.5));
         }
       }
 
-      expectStackedWelcome();
-      expectWideGridInSafeArea(expectedColumns: 13);
-      expectOneLine('Built for USDT on Bitcoin');
-      expectOneLine(description);
+      void expectNoScroll() {
+        final position = Scrollable.of(tester.element(import)).position;
+        expect(position.maxScrollExtent, closeTo(0, 0.5));
+      }
+
+      expectStaggeredWelcome(columns: 13, expectedLeftColumns: 7);
       expect(
         tester.getRect(find.byType(OnboardingWelcomeMeshBackground)),
         Offset.zero & const Size(951, 669),
@@ -1762,41 +2021,38 @@ void main() {
         tester.getRect(import).top,
         greaterThan(tester.getRect(create).bottom),
       );
-      final defaultPosition = Scrollable.of(tester.element(import)).position;
-      expect(defaultPosition.maxScrollExtent, closeTo(0, 0.5));
-      expectCenteredActions();
+      expectNoScroll();
+      expectLeftActions();
       expect(tester.getRect(import).bottom, closeTo(669 - 34 - 16, 0.5));
 
       setViewport(const Size(951, 669), left: 84, right: 0);
       await tester.pumpAndSettle();
-      expectStackedWelcome();
-      expectWideGridInSafeArea(expectedColumns: 13);
-      expectCenteredActions();
+      expectStaggeredWelcome(columns: 13, expectedLeftColumns: 6);
+      expectNoScroll();
+      expectLeftActions();
 
       setViewport(const Size(951, 669), right: 0);
       await tester.pumpAndSettle();
-      expectWideGridInSafeArea(expectedColumns: 15);
-      expectCenteredActions();
+      expectStaggeredWelcome(columns: 15);
+      expectNoScroll();
+      expectLeftActions();
 
       setViewport(const Size(951, 669));
       geometry.success(null);
       await tester.pumpAndSettle();
       expectStackedWelcome();
-      expect(tiles, findsNWidgets(28));
       expect(find.text('Built for\nUSDT on Bitcoin'), findsOneWidget);
 
       setViewport(const Size(466, 678));
       geometry.success({'width': 466.0, 'height': 678.0});
       await tester.pumpAndSettle();
       expectStackedWelcome();
-      expect(tiles, findsNWidgets(28));
       expect(tester.getSize(create).width, closeTo(466 - 84 - 2 * 24, 0.5));
 
       setViewport(const Size(669, 951), top: 82, right: 0);
       geometry.success({'width': 669.0, 'height': 951.0, 'inner': true});
       await tester.pumpAndSettle();
       expectStackedWelcome();
-      expect(tiles, findsNWidgets(28));
       expect(tester.getSize(create).width, closeTo(669 - 2 * 24, 0.5));
 
       // Keep the authored typography at larger text sizes and let the
@@ -1820,7 +2076,7 @@ void main() {
       expect(position.maxScrollExtent, greaterThan(0));
       position.jumpTo(position.maxScrollExtent);
       await tester.pumpAndSettle();
-      expectCenteredActions();
+      expectLeftActions();
       expect(tester.getRect(import).bottom, closeTo(420 - 34 - 16, 0.5));
       expect(tester.takeException(), isNull);
     },
@@ -4651,6 +4907,7 @@ Future<({GoRouter router, Future<Object?> completion})> _pumpOnboardingRoute(
   required String path,
   required Widget screen,
   bool securityAtRoot = false,
+  bool useDuoLandscapeScope = false,
 }) async {
   final router = GoRouter(
     initialLocation: RoutePaths.onboardingWelcome,
@@ -4672,19 +4929,24 @@ Future<({GoRouter router, Future<Object?> completion})> _pumpOnboardingRoute(
       child: MaterialApp.router(
         theme: AppTheme.light(),
         routerConfig: router,
-        builder: (context, child) => AsterFeedbackScope(
-          haptics: harness.haptics,
-          toasts: harness.toasts,
-          child: securityAtRoot
-              ? _RootSecurityLifecycleHost(
-                  security: harness.security,
-                  child: SecurityGate(
-                    controller: harness.security,
-                    child: OnboardingShell(child: child!),
-                  ),
-                )
-              : OnboardingShell(child: child!),
-        ),
+        builder: (context, child) {
+          final content = AsterFeedbackScope(
+            haptics: harness.haptics,
+            toasts: harness.toasts,
+            child: securityAtRoot
+                ? _RootSecurityLifecycleHost(
+                    security: harness.security,
+                    child: SecurityGate(
+                      controller: harness.security,
+                      child: OnboardingShell(child: child!),
+                    ),
+                  )
+                : OnboardingShell(child: child!),
+          );
+          return useDuoLandscapeScope
+              ? AsterDuoLandscapeScope(child: content)
+              : content;
+        },
       ),
     ),
   );

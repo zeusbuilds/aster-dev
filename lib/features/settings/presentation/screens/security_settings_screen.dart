@@ -75,7 +75,7 @@ class _SecuritySettingsScreenState
         final statusKnown = controller.deviceStatus != null;
         final enabled = secured && controller.appLockEnabled;
         final busy = _changing || controller.isAuthenticating;
-        return Scaffold(
+        return AsterPageScaffold(
           backgroundColor: context.colorScheme.surface,
           appBar: CustomAppBar(
             title: 'Security',

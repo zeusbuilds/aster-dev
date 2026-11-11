@@ -19,17 +19,20 @@ import '../widgets/widgets.dart';
 class SendAddressScreen extends ConsumerStatefulWidget {
   const SendAddressScreen({super.key, required this.target})
     : embedded = false,
-      onBack = null;
+      onBack = null,
+      onAddressAccepted = null;
 
   const SendAddressScreen.embedded({
     super.key,
     required this.target,
+    required this.onAddressAccepted,
     this.onBack,
   }) : embedded = true;
 
   final WalletPaymentTarget target;
   final bool embedded;
   final VoidCallback? onBack;
+  final VoidCallback? onAddressAccepted;
 
   @override
   ConsumerState<SendAddressScreen> createState() => _SendAddressScreenState();
@@ -257,6 +260,10 @@ class _SendAddressScreenState extends ConsumerState<SendAddressScreen> {
             ref.read(provider).value?.balancePreparedForDestination != true) {
           return;
         }
+        if (widget.onAddressAccepted case final showAmount?) {
+          showAmount();
+          return;
+        }
         await routeContext.pushNamed<void>(
           RouteNames.sendAmount,
           pathParameters: {RoutePaths.paymentTargetParameter: target.slug},
@@ -279,7 +286,7 @@ class _SendAddressScreenState extends ConsumerState<SendAddressScreen> {
         final navigation = AsterNavigationScope.of(context);
         return GestureDetector(
           onTap: () => FocusScope.of(context).unfocus(),
-          child: Scaffold(
+          child: AsterPageScaffold(
             backgroundColor: context.colorScheme.surface,
             appBar: CustomAppBar(
               title: widget.target.sendTitle,

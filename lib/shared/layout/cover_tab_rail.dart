@@ -27,48 +27,25 @@ class CoverTabRail extends InheritedWidget {
     DuoDisplayLayout? geometry,
     int itemCount,
   ) {
-    final size = MediaQuery.sizeOf(context);
-    final band = geometry?.railBand;
-    if (geometry == null ||
-        band == null ||
-        !(geometry.isCover
-            ? geometry.appliesTo(size)
-            : geometry.isOpenLandscapeFor(size))) {
-      return null;
-    }
+    if (geometry == null) return null;
+    final rail = geometry.availableRailFor(MediaQuery.of(context));
+    if (rail == null) return null;
 
-    final insets = MediaQuery.viewPaddingOf(context);
-    final obscured = MediaQuery.viewInsetsOf(context);
-    final onRight = geometry.isCover || band.center.dx >= size.width / 2;
-    final start = math.max(
-      band.left,
-      onRight ? size.width - insets.right : obscured.left,
-    );
-    final end = math.min(
-      band.right,
-      onRight ? size.width - obscured.right : insets.left,
-    );
+    final (bounds: band, :centerX) = rail;
     final spacing = context.spacing.sm;
-    final ceiling = geometry.isCover
-        ? math.max(0.0, band.top)
-        : math.max(band.top, math.max(insets.top, obscured.top)) + spacing;
-    final floor =
-        math.min(
-          band.bottom,
-          size.height - math.max(insets.bottom, obscured.bottom),
-        ) -
-        spacing;
+    final ceiling = geometry.isCover ? band.top : band.top + spacing;
+    final floor = band.bottom - spacing;
     final availableHeight = floor - ceiling;
     final minTarget = context.metrics.minTouchTarget;
-    if (end - start < minTarget || availableHeight < itemCount * minTarget) {
+    if (band.width < minTarget || availableHeight < itemCount * minTarget) {
       return null;
     }
 
     final preferred = context.metrics.bottomNavHeight;
-    final railWidth = math.min(preferred, end - start);
+    final railWidth = math.min(preferred, band.width);
     final railHeight = math.min(preferred * itemCount, availableHeight);
     return Rect.fromLTWH(
-      (start + end - railWidth) / 2,
+      (centerX - railWidth / 2).clamp(band.left, band.right - railWidth),
       floor - railHeight,
       railWidth,
       railHeight,

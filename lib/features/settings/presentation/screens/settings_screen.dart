@@ -451,34 +451,40 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                     !navigation.inFlight
                 ? _SettingsPanel.walletDetails
                 : _panel;
-            final content = switch (panel) {
-              _SettingsPanel.walletDetails => const WalletDetailsScreen(
-                embedded: true,
-              ),
-              _SettingsPanel.security => const SecuritySettingsScreen(
-                embedded: true,
-              ),
-              _SettingsPanel.advanced => AdvancedSettingsScreen(
-                embedded: true,
-                onOpenNetworkConfiguration: open(_SettingsPanel.network),
-              ),
-              _SettingsPanel.network => NetworkConfigurationScreen(
-                onClose: () => _closePanel(panel),
-              ),
-              _SettingsPanel.wallets => WalletSelectionScreen(
-                onClose: () => _closePanel(panel),
-              ),
-              _SettingsPanel.bitcoinUnit => BitcoinUnitSelectionScreen(
-                onClose: () => _closePanel(panel),
-              ),
-              _SettingsPanel.devBridge => const HostedBridgeScreen(
-                embedded: true,
-              ),
-            };
-            final detail = KeyedSubtree(
-              key: _panelKey,
-              child: KeyedSubtree(key: ValueKey(panel), child: content),
-            );
+            Widget detailFor({required bool showNetworkBack}) {
+              final content = switch (panel) {
+                _SettingsPanel.walletDetails => const WalletDetailsScreen(
+                  embedded: true,
+                ),
+                _SettingsPanel.security => const SecuritySettingsScreen(
+                  embedded: true,
+                ),
+                _SettingsPanel.advanced => AdvancedSettingsScreen(
+                  embedded: true,
+                  onOpenNetworkConfiguration: open(_SettingsPanel.network),
+                ),
+                _SettingsPanel.network => NetworkConfigurationScreen(
+                  onClose: () => _closePanel(panel),
+                  showBack: showNetworkBack,
+                ),
+                _SettingsPanel.wallets => WalletSelectionScreen(
+                  onClose: () => _closePanel(panel),
+                  showBack: false,
+                ),
+                _SettingsPanel.bitcoinUnit => BitcoinUnitSelectionScreen(
+                  onClose: () => _closePanel(panel),
+                  showBack: false,
+                ),
+                _SettingsPanel.devBridge => const HostedBridgeScreen(
+                  embedded: true,
+                ),
+              };
+              return KeyedSubtree(
+                key: _panelKey,
+                child: KeyedSubtree(key: ValueKey(panel), child: content),
+              );
+            }
+
             if (!split) {
               // A pending operation keeps its owner through a fold. Only the
               // original Settings list remains visible and interactive.
@@ -487,7 +493,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                 children: [
                   Offstage(
                     child: ExcludeFocus(
-                      child: TickerMode(enabled: false, child: detail),
+                      child: TickerMode(
+                        enabled: false,
+                        child: detailFor(showNetworkBack: true),
+                      ),
                     ),
                   ),
                   options,
@@ -495,18 +504,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
               );
             }
             final media = MediaQuery.of(context);
-            return MediaQuery(
-              // Detail panels already place the bottom inset inside their
-              // content. Include any horizontal tab fallback in that inset.
-              data: media.copyWith(
-                padding: media.padding.copyWith(
-                  bottom: media.padding.bottom + tabClearance,
+            return DuoBackNavigation(
+              showBack: panel == _SettingsPanel.network,
+              onBack: !navigation.inFlight
+                  ? () => unawaited(
+                      navigation.run(
+                        command: () => _closePanel(panel),
+                        failureTitle: 'Previous page could not open',
+                      ),
+                    )
+                  : null,
+              builder: (context, usesRail) => MediaQuery(
+                // Detail panels already place the bottom inset inside their
+                // content. Include any horizontal tab fallback in that inset.
+                data: media.copyWith(
+                  padding: media.padding.copyWith(
+                    bottom: media.padding.bottom + tabClearance,
+                  ),
+                  viewPadding: media.viewPadding.copyWith(
+                    bottom: media.viewPadding.bottom + tabClearance,
+                  ),
                 ),
-                viewPadding: media.viewPadding.copyWith(
-                  bottom: media.viewPadding.bottom + tabClearance,
+                child: DuoLandscapePanes(
+                  left: options,
+                  right: detailFor(showNetworkBack: !usesRail),
                 ),
               ),
-              child: DuoLandscapePanes(left: options, right: detail),
             );
           }
 

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
@@ -69,11 +70,24 @@ class AsterLockScreen extends StatelessWidget {
         viewport,
         context.spacing.xxl,
       );
-      return _buildLockScreen(useCompactBottom, actionWidth);
+      final systemPadding = context.windowInsets.systemPadding;
+      // Match the splash mark's screen center while clearing both side insets.
+      final sideInset =
+          math.max(systemPadding.left, systemPadding.right) +
+          context.spacing.screenPadding;
+      return _buildLockScreen(
+        compact: useCompactBottom,
+        width: actionWidth,
+        sideInset: sideInset,
+      );
     },
   );
 
-  Widget _buildLockScreen(bool compact, double? width) => ListenableBuilder(
+  Widget _buildLockScreen({
+    required bool compact,
+    required double? width,
+    required double sideInset,
+  }) => ListenableBuilder(
     listenable: controller,
     builder: (context, _) => BlockSemantics(
       child: Stack(
@@ -86,12 +100,8 @@ class AsterLockScreen extends StatelessWidget {
               !controller.isAuthenticating &&
               !controller.isObscured)
             Positioned(
-              left:
-                  context.windowInsets.systemPadding.left +
-                  context.spacing.screenPadding,
-              right:
-                  context.windowInsets.systemPadding.right +
-                  context.spacing.screenPadding,
+              left: sideInset,
+              right: sideInset,
               bottom:
                   context.windowInsets.bottomSafe +
                   (compact ? context.spacing.lg : context.spacing.xxxl),
@@ -105,6 +115,7 @@ class AsterLockScreen extends StatelessWidget {
                       container: true,
                       child: Text(
                         'Aster locked',
+                        textAlign: TextAlign.center,
                         style: context.type.title.copyWith(
                           color: context.colorScheme.onSurface,
                         ),

@@ -9,18 +9,24 @@ import '../widgets/widgets.dart';
 
 /// Displays validated, non-secret network configuration and live node health.
 class NetworkConfigurationScreen extends ConsumerWidget {
-  const NetworkConfigurationScreen({super.key, this.onClose});
+  const NetworkConfigurationScreen({
+    super.key,
+    this.onClose,
+    this.showBack = true,
+  });
 
   final VoidCallback? onClose;
+  final bool showBack;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final configuration = ref.watch(networkConfigurationViewModelProvider);
-    return Scaffold(
+    return AsterPageScaffold(
       backgroundColor: context.colorScheme.surface,
       appBar: CustomAppBar(
         title: 'Network Configuration',
-        leadingIcon: true,
+        leadingIcon: showBack,
+        automaticallyImplyLeading: showBack,
         onBack: onClose,
         fallbackLocation: RoutePaths.advancedSettingsLocation,
       ),

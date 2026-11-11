@@ -276,21 +276,18 @@ class _CreateWalletContentState extends ConsumerState<_CreateWalletContent>
             child: OnboardingChoreographyItem(
               id: 'create-recovery-actions-motion',
               visualIndex: 3,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  CustomButton(
-                    text: 'Continue',
-                    variant: ButtonVariant.translucent,
-                    enabled:
-                        state.canContinue &&
-                        !state.requiresReconciliation &&
-                        !navigation.inFlight,
-                    hapticIntent: null,
-                    onTap: _openQuiz,
-                  ),
-                ],
+              child: Align(
+                alignment: Alignment.bottomLeft,
+                child: CustomButton(
+                  text: 'Continue',
+                  variant: ButtonVariant.translucent,
+                  enabled:
+                      state.canContinue &&
+                      !state.requiresReconciliation &&
+                      !navigation.inFlight,
+                  hapticIntent: null,
+                  onTap: _openQuiz,
+                ),
               ),
             ),
           ),

@@ -79,7 +79,7 @@ class _AdvancedSettingsScreenState
       builder: (context) {
         final spacing = context.spacing;
         final navigation = AsterNavigationScope.of(context);
-        return Scaffold(
+        return AsterPageScaffold(
           backgroundColor: context.colorScheme.surface,
           appBar: CustomAppBar(
             title: 'Advanced',

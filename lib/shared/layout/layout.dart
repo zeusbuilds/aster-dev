@@ -1,6 +1,7 @@
 // Public layout-environment API.
 export 'aster_sheet_safe_area.dart';
 export 'cover_tab_rail.dart';
+export 'duo_back_navigation.dart';
 export 'duo_display_layout.dart';
 export 'duo_landscape_panes.dart';
 export 'duo_landscape_scope.dart';

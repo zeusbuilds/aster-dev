@@ -13,10 +13,11 @@ import '../widgets/widgets.dart';
 
 /// Selects a wallet and leaves only after its native switch commits.
 class WalletSelectionScreen extends ConsumerWidget {
-  const WalletSelectionScreen({super.key, this.onClose});
+  const WalletSelectionScreen({super.key, this.onClose, this.showBack = true});
 
   /// Returns an embedded chooser to its Settings panel.
   final VoidCallback? onClose;
+  final bool showBack;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -30,6 +31,7 @@ class WalletSelectionScreen extends ConsumerWidget {
         return walletState.when(
           loading: () => _WalletSelectionScaffold(
             onClose: onClose,
+            showBack: showBack,
             child: const AsterHorizontalSafeArea(
               child: Center(
                 child: GridLoader(semanticLabel: 'Loading wallets'),
@@ -43,6 +45,7 @@ class WalletSelectionScreen extends ConsumerWidget {
             return _WalletSelectionScaffold(
               navigationLocked: navigation.inFlight,
               onClose: onClose,
+              showBack: showBack,
               child: _WalletLoadFailure(
                 failure: failure,
                 onRetry: viewModel.reload,
@@ -56,6 +59,7 @@ class WalletSelectionScreen extends ConsumerWidget {
             return _WalletSelectionScaffold(
               navigationLocked: navigationLocked,
               onClose: onClose,
+              showBack: showBack,
               onAddWallet: navigationLocked
                   ? null
                   : () => _openAddWallet(context, navigation),
@@ -205,22 +209,25 @@ class _WalletSelectionScaffold extends StatelessWidget {
     this.navigationLocked = false,
     this.onAddWallet,
     this.onClose,
+    required this.showBack,
   });
 
   final Widget child;
   final bool navigationLocked;
   final VoidCallback? onAddWallet;
   final VoidCallback? onClose;
+  final bool showBack;
 
   @override
   Widget build(BuildContext context) {
     return PopScope(
       canPop: !navigationLocked,
-      child: Scaffold(
+      child: AsterPageScaffold(
         backgroundColor: context.colorScheme.surface,
         appBar: CustomAppBar(
           title: 'Select Wallet',
-          leadingIcon: true,
+          leadingIcon: showBack,
+          automaticallyImplyLeading: showBack,
           leadingEnabled: !navigationLocked,
           onBack: onClose,
           fallbackLocation: RoutePaths.settings,

@@ -39,6 +39,82 @@ void main() {
     );
   });
 
+  testWidgets('an active toast follows the action width when the Duo unfolds', (
+    tester,
+  ) async {
+    const channel = EventChannel('com.aster.wallet/cover_navigation');
+    final messenger = tester.binding.defaultBinaryMessenger;
+    late MockStreamHandlerEventSink geometry;
+    messenger.setMockStreamHandler(
+      channel,
+      MockStreamHandler.inline(
+        onListen: (_, events) {
+          geometry = events;
+          events.success({'width': 466.0, 'height': 678.0});
+        },
+      ),
+    );
+    addTearDown(() => messenger.setMockStreamHandler(channel, null));
+    final view = tester.view;
+    view.devicePixelRatio = 1;
+    view.physicalSize = const Size(466, 678);
+    view.padding = const FakeViewPadding(right: 84, bottom: 34);
+    view.viewPadding = view.padding;
+    addTearDown(view.reset);
+
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          builder: (_, child) =>
+              AsterDuoLandscapeScope(child: ToastHost(child: child!)),
+          home: const Scaffold(body: CustomButton(text: 'Action')),
+        ),
+      ),
+    );
+    final toasts = container.read(toastControllerProvider.notifier);
+    toasts.show(
+      title: 'Copied',
+      message: 'Address copied',
+      variant: ToastVariant.success,
+    );
+    await tester.pumpAndSettle();
+    final toastCard = find.descendant(
+      of: find.byType(CustomToast),
+      matching: find.byType(Squircle),
+    );
+    final toast = tester.element(toastCard);
+    expect(
+      tester.getSize(toastCard).width,
+      382 - 2 * toast.spacing.screenPadding,
+    );
+
+    view.physicalSize = const Size(951, 669);
+    await tester.pumpAndSettle();
+    // Flutter can render the inner viewport before UIKit delivers its size.
+    expect(tester.getSize(toastCard).width, 427.5);
+    geometry.success({'inner': true, 'width': 951.0, 'height': 669.0});
+    await tester.pumpAndSettle();
+
+    final action = find.descendant(
+      of: find.byType(CustomButton),
+      matching: find.byType(Material),
+    );
+    final toastBounds = tester.getRect(toastCard);
+    expect(toastBounds.width, tester.getSize(action).width);
+    expect(toastBounds.center.dx, (951 - 84) / 2);
+    expect(toastBounds.bottom, 669 - 34);
+    expect(find.text('Address copied'), findsOneWidget);
+
+    geometry.success(null);
+    await tester.pumpAndSettle();
+    expect(tester.getRect(toastCard), toastBounds);
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
+
   testWidgets(
     'option rows reflow long values instead of clipping at large text',
     (tester) async {

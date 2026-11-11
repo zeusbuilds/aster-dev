@@ -143,7 +143,7 @@ class _WalletDetailsScreenState extends ConsumerState<WalletDetailsScreen> {
         : null;
     return PopScope(
       canPop: !_deleting,
-      child: Scaffold(
+      child: AsterPageScaffold(
         backgroundColor: context.colorScheme.surface,
         appBar: CustomAppBar(
           title: 'Wallet details',

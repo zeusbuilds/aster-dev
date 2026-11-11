@@ -126,20 +126,24 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
   Widget build(BuildContext context) {
     // Keep the same cached repository alive from preflight through the form.
     ref.watch(walletSetupPreflightViewModelProvider);
-    final operationLocked = switch (_step) {
-      _WalletSetupStep.createRecoveryPhrase ||
-      _WalletSetupStep.createRecoveryQuiz ||
-      _WalletSetupStep.createWalletName => _createOperationLocked(),
-      _WalletSetupStep.importRecoveryPhrase ||
-      _WalletSetupStep.importWalletName => _importOperationLocked(),
-      _WalletSetupStep.welcome => _checkingDictionary,
-    };
+    final step = _step;
+    final operationLocked = _operationLocked(listen: true);
 
     final canLeaveRoute =
         widget.origin == WalletCreationOrigin.walletSelector &&
         _step == _WalletSetupStep.welcome &&
         !_checkingDictionary &&
         !_transitioning;
+    final chromeStep = _journeyChromeStep;
+    final railBack = canLeaveRoute
+        ? _leaveAddWallet
+        : step != _WalletSetupStep.welcome &&
+              !_transitioning &&
+              !operationLocked
+        ? () {
+            if (_step == step) _showPreviousStep();
+          }
+        : null;
     final journey = PopScope(
       canPop: canLeaveRoute,
       onPopInvokedWithResult: (didPop, result) {
@@ -151,21 +155,36 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
         absorbing: _transitioning,
         child: ExcludeSemantics(
           excluding: _transitioning,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              if (_outgoingStep case final outgoing?)
-                _buildStepTransition(step: outgoing, ignorePointer: true),
-              _buildStepTransition(step: _step, ignorePointer: false),
-              if (_journeyChromeStep case final chromeStep?)
-                KeyedSubtree(
-                  key: const ValueKey('wallet-setup-journey-chrome'),
-                  child: _buildJourneyChrome(
-                    step: chromeStep,
-                    operationLocked: operationLocked,
+          child: DuoBackNavigation(
+            showBack:
+                chromeStep != null ||
+                widget.origin == WalletCreationOrigin.walletSelector,
+            onBack: railBack,
+            builder: (context, usesRail) => Stack(
+              fit: StackFit.expand,
+              children: [
+                if (_outgoingStep case final outgoing?)
+                  _buildStepTransition(
+                    step: outgoing,
+                    ignorePointer: true,
+                    usesRail: usesRail,
                   ),
+                _buildStepTransition(
+                  step: _step,
+                  ignorePointer: false,
+                  usesRail: usesRail,
                 ),
-            ],
+                if (chromeStep != null)
+                  KeyedSubtree(
+                    key: const ValueKey('wallet-setup-journey-chrome'),
+                    child: _buildJourneyChrome(
+                      step: chromeStep,
+                      operationLocked: operationLocked,
+                      usesRail: usesRail,
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -233,6 +252,11 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
       TickerMode.valuesOf(context).enabled &&
       (WidgetsBinding.instance.lifecycleState == null ||
           WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed);
+
+  void _leaveAddWallet() {
+    if (_checkingDictionary || !_ownsWelcomeInteraction) return;
+    Navigator.of(context).pop();
+  }
 
   Future<void> _openRecoveryStep(
     _WalletSetupStep next,
@@ -413,6 +437,7 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
   Widget _buildStepTransition({
     required _WalletSetupStep step,
     required bool ignorePointer,
+    required bool usesRail,
   }) {
     return KeyedSubtree(
       key: ValueKey(step),
@@ -421,7 +446,7 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
         child: OnboardingChoreographyScope(
           animation: _transitionController,
           exiting: ignorePointer,
-          child: _buildStep(step),
+          child: _buildStep(step, usesRail: usesRail),
         ),
       ),
     );
@@ -435,21 +460,35 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
     _disposeAbandonedBranch(previous, _step);
   }
 
-  bool _createOperationLocked() {
-    final value = ref.watch(createWalletViewModelProvider).value;
-    return value?.submitting == true ||
-        value?.completed == true ||
-        value?.requiresReconciliation == true;
+  bool _operationLocked({required bool listen}) {
+    switch (_step) {
+      case _WalletSetupStep.createRecoveryPhrase ||
+          _WalletSetupStep.createRecoveryQuiz ||
+          _WalletSetupStep.createWalletName:
+        final value =
+            (listen
+                    ? ref.watch(createWalletViewModelProvider)
+                    : ref.read(createWalletViewModelProvider))
+                .value;
+        return value?.submitting == true ||
+            value?.completed == true ||
+            value?.requiresReconciliation == true;
+      case _WalletSetupStep.importRecoveryPhrase ||
+          _WalletSetupStep.importWalletName:
+        final value =
+            (listen
+                    ? ref.watch(importWalletViewModelProvider)
+                    : ref.read(importWalletViewModelProvider))
+                .value;
+        return value?.submitting == true ||
+            value?.completed == true ||
+            value?.requiresReconciliation == true;
+      case _WalletSetupStep.welcome:
+        return _checkingDictionary;
+    }
   }
 
-  bool _importOperationLocked() {
-    final value = ref.watch(importWalletViewModelProvider).value;
-    return value?.submitting == true ||
-        value?.completed == true ||
-        value?.requiresReconciliation == true;
-  }
-
-  Widget _buildStep(_WalletSetupStep step) {
+  Widget _buildStep(_WalletSetupStep step, {required bool usesRail}) {
     return switch (step) {
       _WalletSetupStep.welcome => AsterNavigationScope(
         child: Builder(
@@ -458,15 +497,11 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
             return _WalletSetupWelcomeContent(
               origin: widget.origin,
               checkingDictionary: _checkingDictionary,
+              usesRail: usesRail,
               onBack:
                   widget.origin == WalletCreationOrigin.walletSelector &&
                       !_checkingDictionary
-                  ? () {
-                      if (_checkingDictionary || !_ownsWelcomeInteraction) {
-                        return;
-                      }
-                      Navigator.of(context).pop();
-                    }
+                  ? _leaveAddWallet
                   : null,
               onCreateWallet: () => unawaited(
                 _openRecoveryStep(
@@ -537,6 +572,7 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
   Widget _buildJourneyChrome({
     required _WalletSetupStep step,
     required bool operationLocked,
+    required bool usesRail,
   }) {
     final progress = _progressFor(step);
     if (progress == null) return const SizedBox.shrink();
@@ -549,16 +585,17 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
           height: context.metrics.appBarHeight,
           child: Row(
             children: [
-              AsterIconButton(
-                icon: MingCuteIcons.mgc_left_line,
-                tooltip: 'Back',
-                onPressed: !_transitioning && !operationLocked
-                    ? _showPreviousStep
-                    : null,
-                color: context.appColors.onBrandArt,
-                hapticIntent: null,
-                alignment: Alignment.centerRight,
-              ),
+              if (!usesRail)
+                AsterIconButton(
+                  icon: MingCuteIcons.mgc_left_line,
+                  tooltip: 'Back',
+                  onPressed: !_transitioning && !operationLocked
+                      ? _showPreviousStep
+                      : null,
+                  color: context.appColors.onBrandArt,
+                  hapticIntent: null,
+                  alignment: Alignment.centerRight,
+                ),
               const Spacer(),
               Padding(
                 padding: EdgeInsets.only(right: context.spacing.screenPadding),
@@ -604,7 +641,12 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
   void _showPreviousStep({
     HapticIntent? hapticIntent = HapticIntent.lightImpact,
   }) {
-    if (_checkingDictionary) return;
+    if (!mounted ||
+        _transitioning ||
+        _checkingDictionary ||
+        _operationLocked(listen: false)) {
+      return;
+    }
     final previous = switch (_step) {
       _WalletSetupStep.welcome => null,
       _WalletSetupStep.createRecoveryPhrase => _WalletSetupStep.welcome,
@@ -738,6 +780,7 @@ class _WalletSetupWelcomeContent extends StatelessWidget {
     required this.onCreateWallet,
     required this.onImportWallet,
     required this.checkingDictionary,
+    required this.usesRail,
   });
 
   final WalletCreationOrigin origin;
@@ -745,6 +788,7 @@ class _WalletSetupWelcomeContent extends StatelessWidget {
   final VoidCallback onCreateWallet;
   final VoidCallback onImportWallet;
   final bool checkingDictionary;
+  final bool usesRail;
 
   @override
   Widget build(BuildContext context) {
@@ -754,172 +798,158 @@ class _WalletSetupWelcomeContent extends StatelessWidget {
         origin == WalletCreationOrigin.onboarding &&
         context.fitsDuoLandscapePanes;
     final actionMaxWidth = context.duoLandscapeActionMaxWidth;
-    final insets = MediaQuery.paddingOf(context);
-    // On the inner display, the hero uses the horizontal safe area while
-    // equal safe margins center the actions on the display itself.
-    final actionGutter =
-        spacing.xxl + (expandsHero ? math.max(insets.left, insets.right) : 0);
-    final actions = Column(
-      mainAxisAlignment: MainAxisAlignment.end,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        CustomButton(
-          text: switch (origin) {
-            WalletCreationOrigin.onboarding => 'Create Wallet',
-            WalletCreationOrigin.walletSelector => 'Add New Wallet',
-          },
-          variant: ButtonVariant.translucent,
-          hapticIntent: null,
-          loading: checkingDictionary,
-          enabled: !checkingDictionary,
-          onTap: onCreateWallet,
-        ),
-        SizedBox(height: spacing.sm),
-        OnboardingTextAction(
-          label: 'Import Wallet',
-          onBrandArt: true,
-          hapticIntent: null,
-          enabled: !checkingDictionary,
-          onPressed: onImportWallet,
-        ),
-      ],
+    final actions = OnboardingChoreographyItem(
+      id: 'welcome-actions-motion',
+      visualIndex: 3,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          CustomButton(
+            text: switch (origin) {
+              WalletCreationOrigin.onboarding => 'Create Wallet',
+              WalletCreationOrigin.walletSelector => 'Add New Wallet',
+            },
+            variant: ButtonVariant.translucent,
+            hapticIntent: null,
+            loading: checkingDictionary,
+            enabled: !checkingDictionary,
+            onTap: onCreateWallet,
+          ),
+          SizedBox(height: spacing.sm),
+          OnboardingTextAction(
+            label: 'Import Wallet',
+            onBrandArt: true,
+            hapticIntent: null,
+            enabled: !checkingDictionary,
+            onPressed: onImportWallet,
+          ),
+        ],
+      ),
     );
     return Scaffold(
       backgroundColor: context.appColors.transparentSurface,
       body: OnboardingScrollSafeArea(
         includeHorizontalInsets: !expandsHero,
-        builder: (scrollsBottomInset, scrollBottomInset) => CustomScrollView(
-          slivers: [
-            ...switch (origin) {
-              WalletCreationOrigin.onboarding => [
-                SliverPadding(
-                  padding: EdgeInsets.fromLTRB(
-                    spacing.xxl + (expandsHero ? insets.left : 0),
-                    spacing.xxl,
-                    spacing.xxl + (expandsHero ? insets.right : 0),
-                    spacing.lg,
-                  ),
-                  sliver: SliverToBoxAdapter(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        OnboardingChoreographyItem(
-                          id: 'welcome-header-motion',
-                          visualIndex: 0,
-                          child: const OnboardingWelcomeHeader(
-                            onBrandArt: true,
-                          ),
-                        ),
-                        SizedBox(
-                          height: expandsHero ? spacing.xxxl : spacing.huge,
-                        ),
-                        OnboardingChoreographyItem(
-                          id: 'welcome-grid-motion',
-                          visualIndex: 1,
-                          child: OnboardingWelcomeIconGrid(
-                            referenceWidth: expandsHero ? actionMaxWidth : null,
-                          ),
-                        ),
-                        SizedBox(
-                          height: expandsHero ? spacing.xxl : spacing.xxxl,
-                        ),
-                        OnboardingChoreographyItem(
-                          id: 'welcome-message-motion',
-                          visualIndex: 2,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                expandsHero
-                                    ? 'Built for USDT on Bitcoin'
-                                    : 'Built for\nUSDT on Bitcoin',
-                                style: type.brandHero,
-                              ),
-                              SizedBox(height: spacing.md),
-                              Text(
-                                'One wallet for Bitcoin, USDT and RGB assets.',
-                                style: type.brandBody,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+        builder: (scrollsBottomInset, scrollBottomInset) {
+          final bottomPadding =
+              (scrollsBottomInset ? spacing.lg : spacing.xxl) +
+              scrollBottomInset;
+          if (expandsHero && actionMaxWidth != null) {
+            return _StaggeredWelcome(
+              actionMaxWidth: actionMaxWidth,
+              bottomPadding: bottomPadding,
+              actions: actions,
+            );
+          }
+          return CustomScrollView(
+            slivers: [
+              ...switch (origin) {
+                WalletCreationOrigin.onboarding => [
+                  SliverPadding(
+                    padding: EdgeInsets.fromLTRB(
+                      spacing.xxl,
+                      spacing.xxl,
+                      spacing.xxl,
+                      spacing.lg,
                     ),
-                  ),
-                ),
-              ],
-              WalletCreationOrigin.walletSelector => [
-                SliverToBoxAdapter(
-                  child: OnboardingChoreographyItem(
-                    id: 'add-wallet-nav-motion',
-                    visualIndex: 0,
-                    child: SizedBox(
-                      height: context.metrics.appBarHeight,
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: AsterIconButton(
-                          icon: MingCuteIcons.mgc_left_line,
-                          tooltip: 'Back',
-                          onPressed: onBack,
-                          color: context.appColors.onBrandArt,
-                          hapticIntent: null,
-                          alignment: Alignment.centerRight,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                SliverPadding(
-                  padding: EdgeInsets.fromLTRB(
-                    spacing.screenPadding,
-                    spacing.lg,
-                    spacing.screenPadding,
-                    spacing.lg,
-                  ),
-                  sliver: SliverToBoxAdapter(
-                    child: OnboardingChoreographyItem(
-                      id: 'add-wallet-copy-motion',
-                      visualIndex: 1,
+                    sliver: SliverToBoxAdapter(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Multiple wallets,\none Aster',
-                            style: type.pageTitle.copyWith(
-                              color: context.appColors.onBrandArt,
+                          OnboardingChoreographyItem(
+                            id: 'welcome-header-motion',
+                            visualIndex: 0,
+                            child: const OnboardingWelcomeHeader(
+                              onBrandArt: true,
                             ),
                           ),
-                          SizedBox(height: spacing.sm),
-                          Text(
-                            'Create or import another wallet, then switch '
-                            'between your wallets whenever you need.',
-                            style: type.rowMeta.copyWith(
-                              color: context.appColors.onBrandArt.withValues(
-                                alpha:
-                                    context.effects.brandContentStrongOpacity,
-                              ),
-                            ),
+                          SizedBox(height: spacing.huge),
+                          OnboardingChoreographyItem(
+                            id: 'welcome-grid-motion',
+                            visualIndex: 1,
+                            child: const OnboardingWelcomeIconGrid(),
+                          ),
+                          SizedBox(height: spacing.xxxl),
+                          OnboardingChoreographyItem(
+                            id: 'welcome-message-motion',
+                            visualIndex: 2,
+                            child: const _WelcomeMessage(),
                           ),
                         ],
                       ),
                     ),
                   ),
-                ),
-              ],
-            },
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  actionGutter,
-                  0,
-                  actionGutter,
-                  (scrollsBottomInset ? spacing.lg : spacing.xxl) +
-                      scrollBottomInset,
-                ),
-                child: OnboardingChoreographyItem(
-                  id: 'welcome-actions-motion',
-                  visualIndex: 3,
+                ],
+                WalletCreationOrigin.walletSelector => [
+                  if (!usesRail)
+                    SliverToBoxAdapter(
+                      child: OnboardingChoreographyItem(
+                        id: 'add-wallet-nav-motion',
+                        visualIndex: 0,
+                        child: SizedBox(
+                          height: context.metrics.appBarHeight,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: AsterIconButton(
+                              icon: MingCuteIcons.mgc_left_line,
+                              tooltip: 'Back',
+                              onPressed: onBack,
+                              color: context.appColors.onBrandArt,
+                              hapticIntent: null,
+                              alignment: Alignment.centerRight,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  SliverPadding(
+                    padding: EdgeInsets.fromLTRB(
+                      spacing.screenPadding,
+                      spacing.lg,
+                      spacing.screenPadding,
+                      spacing.lg,
+                    ),
+                    sliver: SliverToBoxAdapter(
+                      child: OnboardingChoreographyItem(
+                        id: 'add-wallet-copy-motion',
+                        visualIndex: 1,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Multiple wallets,\none Aster',
+                              style: type.pageTitle.copyWith(
+                                color: context.appColors.onBrandArt,
+                              ),
+                            ),
+                            SizedBox(height: spacing.sm),
+                            Text(
+                              'Create or import another wallet, then switch '
+                              'between your wallets whenever you need.',
+                              style: type.rowMeta.copyWith(
+                                color: context.appColors.onBrandArt.withValues(
+                                  alpha:
+                                      context.effects.brandContentStrongOpacity,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              },
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    spacing.xxl,
+                    0,
+                    spacing.xxl,
+                    bottomPadding,
+                  ),
                   child: actionMaxWidth == null
                       ? actions
                       : Align(
@@ -931,10 +961,222 @@ class _WalletSetupWelcomeContent extends StatelessWidget {
                         ),
                 ),
               ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _WelcomeMessage extends StatelessWidget {
+  const _WelcomeMessage();
+
+  static const _headline = 'Built for\nUSDT on Bitcoin';
+  static const _description = 'One wallet for Bitcoin, USDT and RGB assets.';
+
+  @override
+  Widget build(BuildContext context) {
+    final type = context.type;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(_headline, style: type.brandHero),
+        SizedBox(height: context.spacing.md),
+        Text(_description, style: type.brandBody),
+      ],
+    );
+  }
+}
+
+/// Aligns both halves to one tile pitch, with uninterrupted middle rows.
+class _StaggeredWelcome extends StatelessWidget {
+  const _StaggeredWelcome({
+    required this.actionMaxWidth,
+    required this.bottomPadding,
+    required this.actions,
+  });
+
+  final double actionMaxWidth;
+  final double bottomPadding;
+  final Widget actions;
+
+  @override
+  Widget build(BuildContext context) {
+    final spacing = context.spacing;
+    final art = context.art;
+    final insets = MediaQuery.paddingOf(context);
+    final leftGutter = spacing.xxl + insets.left;
+    final rightGutter = spacing.xxl + insets.right;
+    final hinge = MediaQuery.sizeOf(context).width / 2;
+    final gap = art.onboardingIconGridGap;
+    final preferredPitch = (actionMaxWidth + gap) / art.onboardingIconColumns;
+    const firstLeadingRow = 2;
+    const leadingRows = 3;
+    const sharedRows = 3;
+    const trailingRows = 2;
+    const firstSharedRow = firstLeadingRow + leadingRows;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final gridWidth = constraints.maxWidth - leftGutter - rightGutter;
+        // Add columns in pairs to keep the tile pattern centered.
+        final estimatedColumns = (gridWidth + gap) / preferredPitch;
+        final columns = 2 * ((estimatedColumns - 1) / 2).round() + 1;
+        final pitch = (gridWidth + gap) / columns;
+        final leftColumns = ((hinge - leftGutter + gap / 2) / pitch)
+            .round()
+            .clamp(1, columns - 1);
+        final leftWidth = leftColumns * pitch - gap;
+        final rightColumns = columns - leftColumns;
+        final rightGridStart = leftGutter + leftWidth + gap;
+        final copyInset = math.max(
+          hinge + spacing.xxl - rightGridStart,
+          spacing.sm,
+        );
+        final trailingHeight = trailingRows * pitch - gap;
+        final leftActionWidth = math.min(
+          leftWidth,
+          math.min(actionMaxWidth, hinge - leftGutter - spacing.xxl),
+        );
+
+        return CustomScrollView(
+          slivers: [
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(
+                leftGutter,
+                spacing.xxl,
+                rightGutter,
+                0,
+              ),
+              sliver: SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        SizedBox(
+                          width: leftWidth,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const OnboardingChoreographyItem(
+                                id: 'welcome-header-motion',
+                                visualIndex: 0,
+                                child: OnboardingWelcomeHeader(
+                                  onBrandArt: true,
+                                ),
+                              ),
+                              SizedBox(height: spacing.xxxl),
+                              OnboardingChoreographyItem(
+                                id: 'welcome-grid-leading-motion',
+                                visualIndex: 2,
+                                child: OnboardingWelcomeIconGrid.section(
+                                  columns: leftColumns,
+                                  rows: leadingRows,
+                                  startColumn: 0,
+                                  startRow: firstLeadingRow,
+                                  totalColumns: columns,
+                                  highlight: (
+                                    row: 2,
+                                    column: 3,
+                                    asset: 'assets/icons/tokens/usdt.svg',
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(width: gap),
+                        Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(
+                              left: copyInset,
+                              bottom: copyInset,
+                            ),
+                            child: const OnboardingChoreographyItem(
+                              id: 'welcome-message-motion',
+                              visualIndex: 1,
+                              child: _WelcomeMessage(),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: gap),
+                    OnboardingChoreographyItem(
+                      id: 'welcome-grid-motion',
+                      visualIndex: 2,
+                      child: OnboardingWelcomeIconGrid.section(
+                        columns: columns,
+                        rows: sharedRows,
+                        startColumn: 0,
+                        startRow: firstSharedRow,
+                        totalColumns: columns,
+                        highlight: (
+                          row: 1,
+                          column: columns - 4,
+                          asset: 'assets/icons/tokens/btc.svg',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  leftGutter,
+                  gap,
+                  rightGutter,
+                  bottomPadding,
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(
+                      width: leftWidth,
+                      child: Padding(
+                        padding: EdgeInsets.only(top: spacing.xxl - gap),
+                        child: Align(
+                          alignment: Alignment.bottomLeft,
+                          child: SizedBox(
+                            width: leftActionWidth,
+                            child: actions,
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: gap),
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.topRight,
+                        child: SizedBox(
+                          height: trailingHeight,
+                          child: OnboardingChoreographyItem(
+                            id: 'welcome-grid-trailing-motion',
+                            visualIndex: 2,
+                            child: OnboardingWelcomeIconGrid.section(
+                              columns: rightColumns,
+                              rows: trailingRows,
+                              startColumn: leftColumns,
+                              startRow: firstSharedRow + sharedRows,
+                              totalColumns: columns,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
-        ),
-      ),
+        );
+      },
     );
   }
 }

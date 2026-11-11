@@ -17,13 +17,12 @@ class AsterDuoLandscapeScope extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final media = MediaQuery.of(context);
     final spacing = context.spacing;
-    final actionMaxWidth = ref
-        .watch(duoDisplayLayoutProvider)
-        .value
-        ?.actionMaxWidthFor(media.size, spacing.xxl);
+    final layout = ref.watch(duoDisplayLayoutProvider).value;
+    final actionMaxWidth = layout?.actionMaxWidthFor(media.size, spacing.xxl);
     final top = math.max(media.viewPadding.top, spacing.md);
     return _DuoLandscape(
       actionMaxWidth: actionMaxWidth,
+      layout: actionMaxWidth == null ? null : layout,
       child: MediaQuery(
         data: actionMaxWidth != null
             ? media.copyWith(
@@ -40,13 +39,19 @@ class AsterDuoLandscapeScope extends ConsumerWidget {
 }
 
 class _DuoLandscape extends InheritedWidget {
-  const _DuoLandscape({required this.actionMaxWidth, required super.child});
+  const _DuoLandscape({
+    required this.actionMaxWidth,
+    required this.layout,
+    required super.child,
+  });
 
   final double? actionMaxWidth;
+  final DuoDisplayLayout? layout;
 
   @override
   bool updateShouldNotify(_DuoLandscape oldWidget) =>
-      actionMaxWidth != oldWidget.actionMaxWidth;
+      actionMaxWidth != oldWidget.actionMaxWidth ||
+      layout?.railBand != oldWidget.layout?.railBand;
 }
 
 extension AsterDuoLandscapeContext on BuildContext {
@@ -56,6 +61,9 @@ extension AsterDuoLandscapeContext on BuildContext {
   /// The landscape action width before individual pane or sheet constraints.
   double? get duoLandscapeActionMaxWidth =>
       dependOnInheritedWidgetOfExactType<_DuoLandscape>()?.actionMaxWidth;
+
+  DuoDisplayLayout? get duoLandscapeLayout =>
+      dependOnInheritedWidgetOfExactType<_DuoLandscape>()?.layout;
 
   /// Both equal-width panes must fit a compact phone layout inside their
   /// respective horizontal system insets.

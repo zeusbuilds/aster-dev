@@ -322,7 +322,7 @@ class _HostedBridgeScreenState extends ConsumerState<HostedBridgeScreen> {
       );
     }
 
-    return Scaffold(
+    return AsterPageScaffold(
       appBar: CustomAppBar(
         title: 'Dev Bridge',
         leadingIcon: !widget.embedded,

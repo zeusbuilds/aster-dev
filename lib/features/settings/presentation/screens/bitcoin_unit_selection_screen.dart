@@ -11,10 +11,15 @@ import '../widgets/widgets.dart';
 
 /// Selects the app-wide Bitcoin denomination without changing stored values.
 class BitcoinUnitSelectionScreen extends ConsumerWidget {
-  const BitcoinUnitSelectionScreen({super.key, this.onClose});
+  const BitcoinUnitSelectionScreen({
+    super.key,
+    this.onClose,
+    this.showBack = true,
+  });
 
   /// Returns an embedded chooser to its Settings panel.
   final VoidCallback? onClose;
+  final bool showBack;
 
   static const _exampleSatoshis = 12345678;
 
@@ -28,11 +33,12 @@ class BitcoinUnitSelectionScreen extends ConsumerWidget {
         final navigationLocked = saving || navigation.inFlight;
         return PopScope(
           canPop: !navigationLocked,
-          child: Scaffold(
+          child: AsterPageScaffold(
             backgroundColor: context.colorScheme.surface,
             appBar: CustomAppBar(
               title: 'Bitcoin Unit',
-              leadingIcon: true,
+              leadingIcon: showBack,
+              automaticallyImplyLeading: showBack,
               leadingEnabled: !navigationLocked,
               onBack: onClose,
               fallbackLocation: RoutePaths.settings,

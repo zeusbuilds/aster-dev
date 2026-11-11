@@ -3,76 +3,93 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../shared/shared.dart';
 
-/// Four rows of square tiles used on the onboarding welcome hero.
+/// The square tile artwork used on the onboarding welcome hero.
 class OnboardingWelcomeIconGrid extends StatelessWidget {
-  const OnboardingWelcomeIconGrid({super.key, this.referenceWidth});
+  const OnboardingWelcomeIconGrid({super.key}) : _section = null;
 
-  /// The width of the original grid when expanding it across a wider window.
-  final double? referenceWidth;
+  /// Draws a rectangle within the staggered grid using its global coordinates.
+  /// The optional highlight uses coordinates within this section.
+  const OnboardingWelcomeIconGrid.section({
+    super.key,
+    required int columns,
+    required int rows,
+    required int startColumn,
+    required int startRow,
+    required int totalColumns,
+    ({int row, int column, String asset})? highlight,
+  }) : assert(columns > 0),
+       assert(rows > 0),
+       assert(startColumn >= 0),
+       assert(startRow >= 0),
+       assert(startColumn + columns <= totalColumns),
+       _section = (
+         columns: columns,
+         rows: rows,
+         startColumn: startColumn,
+         startRow: startRow,
+         totalColumns: totalColumns,
+         highlight: highlight,
+       );
+
+  final ({
+    int columns,
+    int rows,
+    int startColumn,
+    int startRow,
+    int totalColumns,
+    ({int row, int column, String asset})? highlight,
+  })?
+  _section;
+
+  // Authored tile composition in row-major order. The wider grid repeats
+  // this pattern across its sections.
+  static const _faintTiles = [
+    [false, true, false, false, false, false, true],
+    [false, false, true, false, true, false, false],
+    [true, false, true, false, false, true, false],
+    [false, true, false, false, true, false, true],
+  ];
 
   @override
   Widget build(BuildContext context) {
     final art = context.art;
-    final rows = art.onboardingIconRows;
-    final baseColumns = art.onboardingIconColumns;
-    final gap = art.onboardingIconGridGap;
-    if (referenceWidth case final width?) {
-      return LayoutBuilder(
-        builder: (context, constraints) {
-          // Include a trailing gap when comparing tile pitches. Round to the
-          // nearest odd column count to keep one highlighted tile centered.
-          final pitch = (width + gap) / baseColumns;
-          final columns = ((constraints.maxWidth + gap) / pitch - 1) / 2;
-          final count = 2 * columns.round() + 1;
-          final tileSize = (constraints.maxWidth + gap) / count - gap;
-          return SizedBox(
-            height: rows * tileSize + (rows - 1) * gap,
-            child: _buildGrid(context, count, padding: EdgeInsets.zero),
-          );
-        },
-      );
-    }
-    return AspectRatio(
-      aspectRatio: baseColumns / rows,
-      child: _buildGrid(context, baseColumns),
-    );
-  }
-
-  Widget _buildGrid(BuildContext context, int cols, {EdgeInsets? padding}) {
-    final art = context.art;
     final effects = context.effects;
-    final rows = art.onboardingIconRows;
-    final extraBefore = (cols - art.onboardingIconColumns) ~/ 2;
-    final centerIndex =
-        art.onboardingIconHighlightRow * cols +
-        art.onboardingIconHighlightColumn +
-        extraBefore;
-    // Authored tile composition in row-major order. Visual effect values stay
-    // in the semantic effects system.
-    const faintTiles = <List<bool>>[
-      [false, true, false, false, false, false, true],
-      [false, false, true, false, true, false, false],
-      [true, false, true, false, false, true, false],
-      [false, true, false, false, true, false, true],
-    ];
-
-    return GridView.builder(
+    final section = _section;
+    final rows = section?.rows ?? art.onboardingIconRows;
+    final columns = section?.columns ?? art.onboardingIconColumns;
+    final extraBefore =
+        ((section?.totalColumns ?? columns) - art.onboardingIconColumns) ~/ 2;
+    final highlight = section == null
+        ? (
+            row: art.onboardingIconHighlightRow,
+            column: art.onboardingIconHighlightColumn,
+            asset: 'assets/icons/tokens/usdt.svg',
+          )
+        : section.highlight;
+    final gap = art.onboardingIconGridGap;
+    final grid = GridView.builder(
+      primary: section == null ? null : false,
       physics: const NeverScrollableScrollPhysics(),
-      padding: padding,
+      padding: section == null ? null : EdgeInsets.zero,
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: cols,
-        mainAxisSpacing: art.onboardingIconGridGap,
-        crossAxisSpacing: art.onboardingIconGridGap,
+        crossAxisCount: columns,
+        mainAxisSpacing: gap,
+        crossAxisSpacing: gap,
       ),
-      itemCount: rows * cols,
+      itemCount: rows * columns,
       itemBuilder: (context, index) {
-        if (index == centerIndex) {
-          return const _CenterTile();
+        final localRow = index ~/ columns;
+        final localColumn = index % columns;
+        if (highlight != null &&
+            localRow == highlight.row &&
+            localColumn == highlight.column) {
+          return _TokenTile(asset: highlight.asset);
         }
 
-        final row = index ~/ cols;
-        final col = (index % cols - extraBefore) % art.onboardingIconColumns;
-        final faint = faintTiles[row][col];
+        final row = (section?.startRow ?? 0) + localRow;
+        final column = (section?.startColumn ?? 0) + localColumn;
+        final patternRow = _faintTiles[row % _faintTiles.length];
+        final faint = patternRow[(column - extraBefore) % patternRow.length];
 
         return _GlassTile(
           opacity: faint
@@ -82,11 +99,25 @@ class OnboardingWelcomeIconGrid extends StatelessWidget {
         );
       },
     );
+    if (section == null) {
+      return AspectRatio(aspectRatio: columns / rows, child: grid);
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final tileSize = (constraints.maxWidth + gap) / columns - gap;
+        return SizedBox(
+          height: rows * tileSize + (rows - 1) * gap,
+          child: grid,
+        );
+      },
+    );
   }
 }
 
-class _CenterTile extends StatelessWidget {
-  const _CenterTile();
+class _TokenTile extends StatelessWidget {
+  const _TokenTile({required this.asset});
+
+  final String asset;
 
   @override
   Widget build(BuildContext context) {
@@ -100,7 +131,7 @@ class _CenterTile extends StatelessWidget {
       borderColor: colors.transparentSurface,
       borderWidth: 0,
       color: context.colorScheme.surface,
-      child: Center(child: SvgPicture.asset('assets/icons/tokens/usdt.svg')),
+      child: Center(child: SvgPicture.asset(asset)),
     );
   }
 }

@@ -225,20 +225,17 @@ class _QuizContent extends ConsumerWidget {
             child: OnboardingChoreographyItem(
               id: 'create-quiz-actions-motion',
               visualIndex: 3,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  CustomButton(
-                    text: 'Continue',
-                    variant: onBrandArt
-                        ? ButtonVariant.translucent
-                        : ButtonVariant.primary,
-                    enabled: state.quizComplete && !navigation.inFlight,
-                    hapticIntent: null,
-                    onTap: _openName,
-                  ),
-                ],
+              child: Align(
+                alignment: Alignment.bottomLeft,
+                child: CustomButton(
+                  text: 'Continue',
+                  variant: onBrandArt
+                      ? ButtonVariant.translucent
+                      : ButtonVariant.primary,
+                  enabled: state.quizComplete && !navigation.inFlight,
+                  hapticIntent: null,
+                  onTap: _openName,
+                ),
               ),
             ),
           ),

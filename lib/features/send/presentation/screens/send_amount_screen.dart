@@ -20,9 +20,26 @@ import '../widgets/widgets.dart';
 
 /// Final Send step: enter an exact amount and submit from the current screen.
 class SendAmountScreen extends ConsumerStatefulWidget {
-  const SendAmountScreen({super.key, required this.target});
+  const SendAmountScreen({super.key, required this.target})
+    : onBack = null,
+      onPaymentAccepted = null,
+      onSuccessContinue = null,
+      showBack = true;
+
+  const SendAmountScreen.embedded({
+    super.key,
+    required this.target,
+    required this.onBack,
+    required this.onPaymentAccepted,
+    required this.onSuccessContinue,
+    required this.showBack,
+  });
 
   final WalletPaymentTarget target;
+  final VoidCallback? onBack;
+  final VoidCallback? onPaymentAccepted;
+  final VoidCallback? onSuccessContinue;
+  final bool showBack;
 
   @override
   ConsumerState<SendAmountScreen> createState() => _SendAmountScreenState();
@@ -238,8 +255,12 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
                 },
               );
           if (submitted) await minimumDelay.future;
-          if (!mounted || submitted) return;
+          if (!mounted) return;
           final state = ref.read(provider).value;
+          if (submitted) {
+            if (state?.result != null) widget.onPaymentAccepted?.call();
+            return;
+          }
           final failure = state?.failure ?? state?.feeFailure;
           if (failure != null) {
             _showFailureFeedback(
@@ -301,6 +322,10 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
         }
         // The router rejects direct amount links without a validated recipient.
         // Also return safely if a retained flow loses its preview on this route.
+        if (widget.onBack case final back?) {
+          back();
+          return;
+        }
         GoRouter.maybeOf(context)?.goNamed(
           RouteNames.sendAddress,
           pathParameters: {
@@ -322,81 +347,87 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
         state.operation == SendFlowOperation.submitting || state.result != null,
       null => false,
     };
-    return AsterNavigationScope(
-      child: Builder(
-        builder: (context) {
-          final navigation = AsterNavigationScope.of(context);
-          if (flow case AsyncData<SendFlowState>(:final value)
-              when value.result != null && !_presentingSubmission) {
-            return PopScope(
-              canPop: false,
-              child: Scaffold(
-                backgroundColor: context.colorScheme.surface,
-                body: SendSuccessView(
-                  result: value.result!,
-                  bitcoinUnit: value.bitcoinUnit,
-                  continuing: navigation.inFlight,
-                  onContinue: () => unawaited(
-                    navigation.run(
-                      command: () => context.go(RoutePaths.home),
-                      failureTitle: 'Home could not open',
-                      hapticIntent: null,
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }
-          final submissionOwnsRoute =
-              durableSubmissionOwnsRoute || navigation.inFlight;
+    final content = Builder(
+      builder: (context) {
+        final navigation = AsterNavigationScope.of(context);
+        if (flow case AsyncData<SendFlowState>(:final value)
+            when value.result != null && !_presentingSubmission) {
+          final continueSend = widget.onSuccessContinue;
           return PopScope(
-            canPop: !submissionOwnsRoute,
+            canPop: false,
             child: Scaffold(
               backgroundColor: context.colorScheme.surface,
-              appBar: CustomAppBar(
-                title: widget.target.sendTitle,
-                leadingIcon: true,
-                leadingEnabled: !submissionOwnsRoute,
-                centerTitle: false,
-                fallbackLocation: RoutePaths.sendAddressFor(widget.target.slug),
-              ),
-              body: SafeArea(
-                top: false,
-                bottom: false,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: context.spacing.screenPadding,
-                  ),
-                  child: flow.when(
-                    skipLoadingOnRefresh: false,
-                    data: (state) => state.preview == null
-                        ? _missingRecipient()
-                        : _AmountBody(
-                            state: state,
-                            now: _now,
-                            market: market,
-                            presentingSubmission: _presentingSubmission,
-                            onAmountChanged: ref
-                                .read(provider.notifier)
-                                .updateAmount,
-                            onMax: ref.read(provider.notifier).useMaxAmount,
-                            onSubmit: () => unawaited(_submit(navigation)),
-                          ),
-                    loading: () => _AmountLoading(target: widget.target),
-                    error: (error, stackTrace) => _AmountFailure(
-                      failure: error is AppFailureException
-                          ? error.failure
-                          : FailureMapper.from(error, stackTrace),
-                      onRetry: ref.read(provider.notifier).retry,
-                    ),
+              body: SendSuccessView(
+                result: value.result!,
+                bitcoinUnit: value.bitcoinUnit,
+                continuing: navigation.inFlight,
+                onContinue: () => unawaited(
+                  navigation.run(
+                    command: continueSend ?? () => context.go(RoutePaths.home),
+                    failureTitle: continueSend == null
+                        ? 'Home could not open'
+                        : 'Previous page could not open',
+                    hapticIntent: null,
                   ),
                 ),
               ),
             ),
           );
-        },
-      ),
+        }
+        final submissionOwnsRoute =
+            durableSubmissionOwnsRoute || navigation.inFlight;
+        return PopScope(
+          canPop: !submissionOwnsRoute,
+          child: AsterPageScaffold(
+            backgroundColor: context.colorScheme.surface,
+            appBar: CustomAppBar(
+              title: widget.target.sendTitle,
+              leadingIcon: widget.showBack,
+              leadingEnabled: !submissionOwnsRoute,
+              onBack: widget.onBack,
+              automaticallyImplyLeading: widget.showBack,
+              centerTitle: false,
+              fallbackLocation: RoutePaths.sendAddressFor(widget.target.slug),
+            ),
+            body: SafeArea(
+              top: false,
+              bottom: false,
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: context.spacing.screenPadding,
+                ),
+                child: flow.when(
+                  skipLoadingOnRefresh: false,
+                  data: (state) => state.preview == null
+                      ? _missingRecipient()
+                      : _AmountBody(
+                          state: state,
+                          now: _now,
+                          market: market,
+                          presentingSubmission: _presentingSubmission,
+                          onAmountChanged: ref
+                              .read(provider.notifier)
+                              .updateAmount,
+                          onMax: ref.read(provider.notifier).useMaxAmount,
+                          onSubmit: () => unawaited(_submit(navigation)),
+                        ),
+                  loading: () => _AmountLoading(target: widget.target),
+                  error: (error, stackTrace) => _AmountFailure(
+                    failure: error is AppFailureException
+                        ? error.failure
+                        : FailureMapper.from(error, stackTrace),
+                    onRetry: ref.read(provider.notifier).retry,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
+    return widget.onBack == null
+        ? AsterNavigationScope(child: content)
+        : content;
   }
 }
 

@@ -319,24 +319,27 @@ class _WalletNameScreenState extends ConsumerState<WalletNameScreen> {
             spacing.screenPadding,
             spacing.lg,
           ),
-          child: OnboardingChoreographyItem(
-            id: 'wallet-name-actions-motion',
-            visualIndex: 3,
-            child: CustomButton(
-              text: widget._source == _WalletNameSource.create
-                  ? 'Create Wallet'
-                  : 'Import Wallet',
-              variant: widget.onBrandArt
-                  ? ButtonVariant.translucent
-                  : ButtonVariant.primary,
-              enabled:
-                  state.canSubmit &&
-                  !state.busy &&
-                  !state.requiresReconciliation &&
-                  !navigation.inFlight,
-              loading: state.busy,
-              hapticIntent: null,
-              onTap: () => unawaited(_submit(navigation)),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: OnboardingChoreographyItem(
+              id: 'wallet-name-actions-motion',
+              visualIndex: 3,
+              child: CustomButton(
+                text: widget._source == _WalletNameSource.create
+                    ? 'Create Wallet'
+                    : 'Import Wallet',
+                variant: widget.onBrandArt
+                    ? ButtonVariant.translucent
+                    : ButtonVariant.primary,
+                enabled:
+                    state.canSubmit &&
+                    !state.busy &&
+                    !state.requiresReconciliation &&
+                    !navigation.inFlight,
+                loading: state.busy,
+                hapticIntent: null,
+                onTap: () => unawaited(_submit(navigation)),
+              ),
             ),
           ),
         ),

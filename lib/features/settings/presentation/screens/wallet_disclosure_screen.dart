@@ -158,7 +158,7 @@ class _WalletDisclosureScreenState
     if (!_current && !_closing) _close();
     if (_closing) _scheduleClose();
     final ready = _current;
-    return Scaffold(
+    return AsterPageScaffold(
       backgroundColor: context.colorScheme.surface,
       appBar: CustomAppBar(
         title: _isSeed ? 'Seed phrase' : 'Export xpubs',

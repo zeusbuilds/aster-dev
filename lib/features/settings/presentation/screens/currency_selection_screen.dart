@@ -26,7 +26,7 @@ class CurrencySelectionScreen extends ConsumerWidget {
           final navigationLocked = saving || navigation.inFlight;
           return PopScope(
             canPop: !navigationLocked,
-            child: Scaffold(
+            child: AsterPageScaffold(
               backgroundColor: context.colorScheme.surface,
               appBar: CustomAppBar(
                 title: 'Select Currency',

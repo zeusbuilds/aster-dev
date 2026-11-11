@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -85,70 +87,90 @@ class _ReceiveScreenState extends ConsumerState<ReceiveScreen> {
       child: Builder(
         builder: (context) {
           final navigation = AsterNavigationScope.of(context);
-          final picker = Scaffold(
-            backgroundColor: context.colorScheme.surface,
-            appBar: CustomAppBar(
-              title: 'Receive',
-              leadingIcon: true,
-              leadingEnabled: !busy,
-            ),
-            body: SafeArea(
-              top: false,
-              bottom: false,
-              child: Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: context.spacing.screenPadding,
+          return DuoBackNavigation(
+            showBack: !compactRequest,
+            onBack: busy || navigation.inFlight
+                ? null
+                : () => unawaited(
+                    navigation.run(
+                      command: () {
+                        if (context.canPop()) {
+                          context.pop();
+                        } else {
+                          context.go(RoutePaths.home);
+                        }
+                      },
+                      failureTitle: 'Previous page could not open',
+                    ),
+                  ),
+            builder: (context, usesRail) {
+              final picker = Scaffold(
+                backgroundColor: context.colorScheme.surface,
+                appBar: CustomAppBar(
+                  title: 'Receive',
+                  leadingIcon: !usesRail,
+                  automaticallyImplyLeading: !usesRail,
+                  leadingEnabled: !busy,
                 ),
-                child: PaymentTargetSelectionView(
-                  capabilities: capabilities,
-                  selectedTarget: split ? _target : null,
-                  selectionEnabled: !busy,
-                  onRetry: () =>
-                      ref.invalidate(walletPaymentCapabilitiesProvider),
-                  onSelected: (target) async {
-                    if (split) {
-                      if (target == _target ||
-                          _isBusy(
-                            ref.read(receiveFlowViewModelProvider(_target)),
-                          )) {
-                        return;
-                      }
-                      _requests[_target]?.pause();
-                      _retainRequest(target);
-                      setState(() {
-                        _target = target;
-                        _requestKey = GlobalKey();
-                      });
-                    } else {
-                      await context.pushNamed<void>(
-                        RouteNames.receiveRequest,
-                        pathParameters: {
-                          RoutePaths.paymentTargetParameter: target.slug,
-                        },
-                      );
-                    }
-                  },
+                body: SafeArea(
+                  top: false,
+                  bottom: false,
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: context.spacing.screenPadding,
+                    ),
+                    child: PaymentTargetSelectionView(
+                      capabilities: capabilities,
+                      selectedTarget: split ? _target : null,
+                      selectionEnabled: !busy,
+                      onRetry: () =>
+                          ref.invalidate(walletPaymentCapabilitiesProvider),
+                      onSelected: (target) async {
+                        if (split) {
+                          if (target == _target ||
+                              _isBusy(
+                                ref.read(receiveFlowViewModelProvider(_target)),
+                              )) {
+                            return;
+                          }
+                          _requests[_target]?.pause();
+                          _retainRequest(target);
+                          setState(() {
+                            _target = target;
+                            _requestKey = GlobalKey();
+                          });
+                        } else {
+                          await context.pushNamed<void>(
+                            RouteNames.receiveRequest,
+                            pathParameters: {
+                              RoutePaths.paymentTargetParameter: target.slug,
+                            },
+                          );
+                        }
+                      },
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          );
-          final request = ReceiveRequestScreen.embedded(
-            key: _requestKey,
-            target: _target,
-            onBack: compactRequest ? _returnToPicker : null,
-          );
-          return PopScope<void>(
-            canPop: !compactRequest,
-            onPopInvokedWithResult: (didPop, _) {
-              if (!didPop && compactRequest && !navigation.inFlight) {
-                _returnToPicker();
-              }
+              );
+              final request = ReceiveRequestScreen.embedded(
+                key: _requestKey,
+                target: _target,
+                onBack: compactRequest ? _returnToPicker : null,
+              );
+              return PopScope<void>(
+                canPop: !compactRequest,
+                onPopInvokedWithResult: (didPop, _) {
+                  if (!didPop && compactRequest && !navigation.inFlight) {
+                    _returnToPicker();
+                  }
+                },
+                child: split
+                    ? DuoLandscapePanes(left: picker, right: request)
+                    : compactRequest
+                    ? request
+                    : picker,
+              );
             },
-            child: split
-                ? DuoLandscapePanes(left: picker, right: request)
-                : compactRequest
-                ? request
-                : picker,
           );
         },
       ),

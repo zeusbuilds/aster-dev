@@ -34,13 +34,21 @@ class AsterConfirmationDialog extends StatelessWidget {
     final inset =
         dialogTheme.insetPadding ??
         EdgeInsets.symmetric(horizontal: spacing.xxl, vertical: spacing.xxl);
+    final landscapeWidth = DuoDisplayLayout.landscapeOverlayMaxWidth(
+      MediaQuery.sizeOf(context),
+      spacing.xxl,
+    );
+    final maxWidth = math.min(
+      dialogTheme.constraints?.maxWidth ?? double.infinity,
+      landscapeWidth ?? double.infinity,
+    );
     final dialogWidth = math.max(
       0.0,
       math.min(
         constraints.maxWidth -
             inset.horizontal -
             MediaQuery.viewInsetsOf(context).horizontal,
-        dialogTheme.constraints?.maxWidth ?? double.infinity,
+        maxWidth,
       ),
     );
     final actionWidth = math.max(0.0, dialogWidth - innerPadding * 2);
