@@ -123,8 +123,6 @@ class _ReceiveScreenState extends ConsumerState<ReceiveScreen> {
                       capabilities: capabilities,
                       selectedTarget: split ? _target : null,
                       selectionEnabled: !busy,
-                      onRetry: () =>
-                          ref.invalidate(walletPaymentCapabilitiesProvider),
                       onSelected: (target) async {
                         if (split) {
                           if (target == _target ||

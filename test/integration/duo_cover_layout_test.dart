@@ -9,6 +9,7 @@ import 'package:aster/features/scan/domain/models/models.dart';
 import 'package:aster/features/scan/presentation/widgets/widgets.dart';
 import 'package:aster/features/send/presentation/widgets/widgets.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
+import 'package:aster/features/wallet/presentation/pages/wallet_selection_screen.dart';
 import 'package:aster/features/wallet/presentation/widgets/widgets.dart';
 import 'package:aster/main.dart';
 import 'package:aster/shared/shared.dart';
@@ -46,6 +47,58 @@ const _openNavigationBounds = {
 const _openRailBand = Rect.fromLTRB(867, 162, 951, 635);
 
 void main() {
+  testWidgets('status centers across the display and respects pane bounds', (
+    tester,
+  ) async {
+    const viewport = Size(951, 669);
+    _setViewport(tester, size: viewport, right: 84);
+    const status = ValueKey('status-body');
+
+    Future<void> mount({double? width, bool centered = true}) =>
+        tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Align(
+                alignment: Alignment.centerRight,
+                child: SizedBox(
+                  width: width ?? viewport.width,
+                  child: AsterCenteredSafeArea(
+                    centerHorizontally: centered,
+                    child: const SizedBox(
+                      key: status,
+                      width: double.infinity,
+                      height: double.infinity,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+    Rect bounds() => tester.getRect(find.byKey(status));
+
+    await mount();
+    expect(bounds().center.dx, viewport.width / 2);
+    expect(bounds().left, 84);
+    expect(bounds().right, viewport.width - 84);
+    expect(bounds().bottom, viewport.height - 34);
+
+    await mount(centered: false);
+    expect(bounds().left, 0);
+    expect(bounds().right, viewport.width - 84);
+
+    await mount(width: viewport.width / 2);
+    expect(bounds().left, viewport.width / 2);
+    expect(bounds().right, viewport.width - 84);
+
+    await mount();
+    _resizeViewport(tester, size: viewport, left: 84);
+    await tester.pump();
+    expect(bounds().left, 84);
+    expect(bounds().right, viewport.width - 84);
+  });
+
   testWidgets(
     'open Duo caps a stretched button without widening its tap target',
     (tester) async {
@@ -991,6 +1044,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('settings-wallet-summary')));
     final addWallet = find.byTooltip('Add wallet');
     await _waitFor(tester, addWallet);
+    expectRightPane(addWallet);
     expect(find.byTooltip('Back'), findsNothing);
     await tester.tap(walletDetails);
     await _waitFor(tester, delete);
@@ -1014,6 +1068,121 @@ void main() {
     await tester.tap(await _expectOpenRailBack(tester));
     await _waitFor(tester, networkOption);
     expect(find.byTooltip('Back'), findsNothing);
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
+
+  testWidgets('Duo landscape Home wallet selection switches the shell tab', (
+    tester,
+  ) async {
+    late MockStreamHandlerEventSink geometry;
+    final messenger = tester.binding.defaultBinaryMessenger;
+    messenger.setMockStreamHandler(
+      _coverNavigationChannel,
+      MockStreamHandler.inline(
+        onListen: (_, events) {
+          geometry = events;
+          events.success(_openNavigationBounds);
+        },
+      ),
+    );
+    addTearDown(
+      () => messenger.setMockStreamHandler(_coverNavigationChannel, null),
+    );
+    _setViewport(tester, size: const Size(951, 669), right: 84);
+    await _mountWallet(tester);
+
+    final home = find.byType(HomeHeader);
+    final router = GoRouter.of(tester.element(home));
+    final homeTab = _tab('home').hitTestable();
+    final settingsTab = _tab('settings').hitTestable();
+    final homeWallet = find.bySemanticsLabel('Select wallet, Active');
+    final shellTabElement = tester.element(settingsTab);
+    final options = find.widgetWithText(AppBar, 'Settings').hitTestable();
+    final selector = find.widgetWithText(AppBar, 'Select Wallet').hitTestable();
+    final chooser = find.byType(WalletSelectionScreen);
+    final addWallet = find.byTooltip('Add wallet').hitTestable();
+    final walletDetails = find.widgetWithText(AppBar, 'Wallet details');
+
+    void expectSettingsSelector() {
+      expect(options, findsOneWidget);
+      expect(selector, findsOneWidget);
+      expect(tester.getRect(options).right, lessThanOrEqualTo(951 / 2));
+      expect(tester.getRect(selector).left, greaterThanOrEqualTo(951 / 2));
+      expect(
+        tester
+            .widget<Semantics>(_tab('settings').hitTestable())
+            .properties
+            .selected,
+        isTrue,
+      );
+      expect(find.byTooltip('Back').hitTestable(), findsNothing);
+    }
+
+    await tester.tap(homeWallet);
+    await _waitFor(tester, selector);
+    expectSettingsSelector();
+    expect(router.state.matchedLocation, RoutePaths.home);
+    expect(router.canPop(), isFalse);
+    expect(tester.element(settingsTab), same(shellTabElement));
+    _expectVerticalRail(tester, _openRailBand, centerX: 903);
+
+    await tester.tap(addWallet);
+    await _waitFor(tester, find.text('Multiple wallets,\none Aster'));
+    await tester.tap(await _expectOpenRailBack(tester));
+    await _waitFor(tester, selector);
+    expectSettingsSelector();
+    expect(router.canPop(), isFalse);
+
+    await tester.tap(homeTab);
+    await _waitFor(tester, home.hitTestable());
+    await tester.tap(homeWallet);
+    await _waitFor(tester, selector);
+    expectSettingsSelector();
+    expect(tester.element(settingsTab), same(shellTabElement));
+
+    await tester.tap(homeTab);
+    await _waitFor(tester, home.hitTestable());
+    await tester.tap(settingsTab);
+    await _waitFor(tester, walletDetails.hitTestable());
+    expect(selector, findsNothing);
+
+    router.goNamed(RouteNames.walletSelection);
+    await _waitFor(tester, selector);
+    expectSettingsSelector();
+
+    final chooserElement = tester.element(chooser);
+    _resizeViewport(tester, size: const Size(669, 951), top: 48);
+    geometry.success({'inner': true, 'width': 669.0, 'height': 951.0});
+    await _waitFor(tester, find.byTooltip('Back').hitTestable());
+    expect(options, findsNothing);
+    expect(selector, findsOneWidget);
+    expect(tester.element(chooser), same(chooserElement));
+
+    _resizeViewport(tester, size: const Size(466, 678), right: 84);
+    geometry.success(_closedNavigationBounds);
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(options, findsNothing);
+    expect(selector, findsOneWidget);
+    _expectSafe(tester, find.byTooltip('Back').hitTestable());
+    expect(tester.element(chooser), same(chooserElement));
+
+    _resizeViewport(tester, size: const Size(951, 669), right: 84);
+    geometry.success(_openNavigationBounds);
+    await _waitFor(tester, options);
+    expectSettingsSelector();
+    expect(tester.element(chooser), same(chooserElement));
+
+    await tester.tap(_tab('market').hitTestable());
+    await _waitFor(tester, find.widgetWithText(AppBar, 'Market').hitTestable());
+    expect(
+      tester
+          .widget<Semantics>(_tab('market').hitTestable())
+          .properties
+          .selected,
+      isTrue,
+    );
+    expect(router.state.matchedLocation, RoutePaths.home);
+    expect(selector, findsNothing);
     expect(tester.takeException(), isNull);
   }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
 

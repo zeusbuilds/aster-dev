@@ -35,12 +35,26 @@ const _destinations = <_NavDestination>[
 
 /// Persistent four-destination navigation capsule.
 class BottomNav extends ConsumerWidget {
-  const BottomNav({super.key});
+  const BottomNav({super.key}) : _settingsRouteSelection = null, enabled = true;
+
+  /// Uses the shell's tabs on a routed Settings panel without changing the
+  /// originating shell's tab until the user selects a destination.
+  const BottomNav.settingsRoute({
+    super.key,
+    required ValueChanged<int> onSelect,
+    required this.enabled,
+  }) : _settingsRouteSelection = onSelect;
+
+  final ValueChanged<int>? _settingsRouteSelection;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     assert(_destinations.length == appShellTabCount);
-    final selectedIndex = ref.watch(appShellIndexProvider);
+    final selectFromSettings = _settingsRouteSelection;
+    final selectedIndex = selectFromSettings == null
+        ? ref.watch(appShellIndexProvider)
+        : appShellSettingsTabIndex;
     final spacing = context.spacing;
     final metrics = context.metrics;
     final insets = context.windowInsets.systemPadding;
@@ -51,8 +65,15 @@ class BottomNav extends ConsumerWidget {
             destination: _destinations[index],
             selected: selectedIndex == index,
             ordinal: index.toDouble(),
-            onSelect: () =>
-                ref.read(appShellIndexProvider.notifier).setIndex(index),
+            onSelect: !enabled
+                ? null
+                : () {
+                    if (selectFromSettings != null) {
+                      selectFromSettings(index);
+                    } else {
+                      ref.read(appShellIndexProvider.notifier).setIndex(index);
+                    }
+                  },
           ),
         ),
     ];
@@ -184,29 +205,30 @@ class _NavItem extends StatelessWidget {
   final _NavDestination destination;
   final bool selected;
   final double ordinal;
-  final VoidCallback onSelect;
+  final VoidCallback? onSelect;
 
   @override
   Widget build(BuildContext context) {
+    final action = onSelect;
     void select() {
-      if (selected) return;
+      if (selected || action == null) return;
       unawaited(context.haptics.trigger(HapticIntent.selection));
-      onSelect();
+      action();
     }
 
     return Semantics(
       key: ValueKey('bottom-nav-${destination.label.toLowerCase()}'),
       button: true,
       selected: selected,
-      enabled: true,
+      enabled: action != null,
       label: destination.label,
       sortKey: OrdinalSortKey(ordinal),
-      onTap: select,
+      onTap: action == null ? null : select,
       excludeSemantics: true,
       child: Material(
         color: context.appColors.transparentSurface,
         child: InkWell(
-          onTap: select,
+          onTap: action == null ? null : select,
           child: Center(
             child: Icon(
               selected ? destination.selectedIcon : destination.icon,

@@ -208,15 +208,6 @@ void main() {
         );
         addTearDown(() => _disposeHarness(tester, harness));
         await _pumpWidget(tester, harness, screen);
-        await _pumpUntil(
-          tester,
-          () => tester
-              .widget<PaymentTargetSelectionView>(
-                find.byType(PaymentTargetSelectionView),
-              )
-              .capabilities
-              .hasValue,
-        );
         await tester.pumpAndSettle();
 
         final tiles = tester.widgetList<PaymentTargetTile>(
@@ -723,15 +714,6 @@ void main() {
   ) async {
     final harness = await PaymentFlowTestHarness.create();
     addTearDown(() => _disposeHarness(tester, harness));
-    final capabilitySubscription = harness.container.listen(
-      walletPaymentCapabilitiesProvider,
-      (_, _) {},
-      fireImmediately: true,
-    );
-    addTearDown(capabilitySubscription.close);
-    await tester.runAsync(
-      () => harness.container.read(walletPaymentCapabilitiesProvider.future),
-    );
     final router = GoRouter(
       initialLocation: RoutePaths.send,
       routes: [
@@ -835,42 +817,18 @@ void main() {
     try {
       final harness = await PaymentFlowTestHarness.create();
       addTearDown(() => _disposeHarness(tester, harness));
-      final capabilities = Completer<List<WalletPaymentCapability>>();
       await _pumpWidget(
         tester,
         harness,
-        ProviderScope(
-          overrides: [
-            walletPaymentCapabilitiesProvider.overrideWith(
-              (ref) => capabilities.future,
-            ),
-          ],
-          child: const SendScreen(),
-        ),
+        const SendScreen(),
         textScaler: const TextScaler.linear(2),
       );
       final selection = find.byType(PaymentTargetSelectionView);
-      final activeSkeleton = find.byWidgetPredicate(
-        (widget) => widget is AppSkeletonizer && widget.enabled,
-      );
-      // Loading placeholders already contain tiles. They must not satisfy the
-      // readiness check or receive this test's accessibility/gesture checks.
-      expect(find.byType(PaymentTargetTile), findsWidgets);
-      expect(activeSkeleton, findsOneWidget);
       expect(
         tester.widget<PaymentTargetSelectionView>(selection).capabilities,
-        isA<AsyncLoading<List<WalletPaymentCapability>>>(),
+        hasLength(4),
       );
-      capabilities.complete(harness.repository.paymentCapabilities);
-      await _pumpUntil(
-        tester,
-        () =>
-            tester.widget<PaymentTargetSelectionView>(selection).capabilities
-                is AsyncData<List<WalletPaymentCapability>> &&
-            activeSkeleton.evaluate().isEmpty,
-      );
-      await tester.pumpAndSettle();
-      expect(activeSkeleton, findsNothing);
+      expect(find.bySemanticsLabel('Loading payment options'), findsNothing);
 
       expect(tester.takeException(), isNull);
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
@@ -930,12 +888,11 @@ void main() {
       tester,
       harness,
       PaymentTargetSelectionView(
-        capabilities: AsyncData([capability]),
+        capabilities: [capability],
         onSelected: (target) async {
           selectionCount += 1;
           await navigationGate.future;
         },
-        onRetry: () {},
       ),
     );
 
@@ -973,9 +930,8 @@ void main() {
       tester,
       harness,
       PaymentTargetSelectionView(
-        capabilities: AsyncData([capability]),
+        capabilities: [capability],
         onSelected: (_) => throw const _SecretNavigationError(),
-        onRetry: () {},
       ),
     );
     final reported = <FlutterErrorDetails>[];
@@ -1003,62 +959,6 @@ void main() {
     expect(
       tester.getSemantics(tile).flagsCollection.isEnabled,
       ui.Tristate.isTrue,
-    );
-  });
-
-  testWidgets('payment target loading exposes one truthful live node', (
-    tester,
-  ) async {
-    final harness = await PaymentFlowTestHarness.create();
-    addTearDown(() => _disposeHarness(tester, harness));
-    await _pumpWidget(
-      tester,
-      harness,
-      PaymentTargetSelectionView(
-        capabilities: const AsyncLoading(),
-        onSelected: (_) async {},
-        onRetry: () {},
-      ),
-    );
-
-    expect(find.bySemanticsLabel('Loading payment options'), findsOneWidget);
-    expect(find.bySemanticsLabel('Bitcoin on-chain payment'), findsNothing);
-    expect(find.bySemanticsLabel('Bitcoin Lightning payment'), findsNothing);
-  });
-
-  testWidgets('payment target failure is announced without hiding retry', (
-    tester,
-  ) async {
-    final harness = await PaymentFlowTestHarness.create();
-    addTearDown(() => _disposeHarness(tester, harness));
-    const failure = AppFailure(
-      code: 'payment_options_unavailable',
-      kind: AppFailureKind.unavailable,
-      userMessage: 'Payment options are temporarily unavailable.',
-      retryable: true,
-    );
-    await _pumpWidget(
-      tester,
-      harness,
-      PaymentTargetSelectionView(
-        capabilities: AsyncError(
-          AppFailureException(failure),
-          StackTrace.empty,
-        ),
-        onSelected: (_) async {},
-        onRetry: () {},
-      ),
-    );
-
-    final message = find.bySemanticsLabel(failure.userMessage);
-    expect(message, findsOneWidget);
-    expect(tester.getSemantics(message).flagsCollection.isLiveRegion, isTrue);
-    expect(
-      tester
-          .getSemantics(find.bySemanticsLabel('Retry'))
-          .getSemanticsData()
-          .hasAction(ui.SemanticsAction.tap),
-      isTrue,
     );
   });
 
@@ -1352,7 +1252,7 @@ void main() {
     expect(find.bySemanticsLabel('1'), findsNothing);
   });
 
-  testWidgets('initial Send failures are live on both flow steps', (
+  testWidgets('initial Send failure belongs to the recipient step', (
     tester,
   ) async {
     const failure = AppFailure(
@@ -1380,18 +1280,6 @@ void main() {
       isTrue,
     );
 
-    await _pumpWidget(tester, harness, const SendAmountScreen(target: target));
-    await _pumpUntil(
-      tester,
-      () => find.text(failure.userMessage).evaluate().isNotEmpty,
-    );
-    expect(
-      tester
-          .getSemantics(find.bySemanticsLabel(failure.userMessage))
-          .flagsCollection
-          .isLiveRegion,
-      isTrue,
-    );
     expect(
       tester
           .getSemantics(find.bySemanticsLabel('Retry'))
@@ -1437,6 +1325,53 @@ void main() {
     );
     expect(harness.engine.sentPaymentCommand, isNull);
     expect(harness.toasts.messages, isEmpty);
+  });
+
+  testWidgets('Send returns to Recipient when its retained flow fails', (
+    tester,
+  ) async {
+    final harness = await PaymentFlowTestHarness.create();
+    addTearDown(() => _disposeHarness(tester, harness));
+    const target = WalletPaymentTarget.bitcoinOnchain;
+    final provider = sendFlowViewModelProvider(target);
+    final subscription = harness.container.listen(provider, (_, _) {});
+    addTearDown(subscription.close);
+    await tester.runAsync(() => harness.container.read(provider.future));
+    final notifier = harness.container.read(provider.notifier);
+    notifier.updateDestination('mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn');
+    expect(await tester.runAsync(notifier.validateDestination), isTrue);
+    final router = GoRouter(
+      initialLocation: '/send/${target.slug}/amount',
+      routes: [
+        GoRoute(
+          path: RoutePaths.sendAddress,
+          name: RouteNames.sendAddress,
+          builder: (_, _) => const SendAddressScreen(target: target),
+        ),
+        GoRoute(
+          path: RoutePaths.sendAmount,
+          name: RouteNames.sendAmount,
+          builder: (_, _) => const SendAmountScreen(target: target),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await _pumpRouter(tester, harness, router);
+    expect(find.byType(SendAmountScreen), findsOneWidget);
+
+    harness.engine.balanceError = StateError('test wallet unavailable');
+    harness.container.invalidate(provider);
+    await _pumpUntil(
+      tester,
+      () =>
+          router.state.uri.path == RoutePaths.sendAddressFor(target.slug) &&
+          find.byType(SendAmountScreen).evaluate().isEmpty,
+    );
+
+    expect(find.byType(SendAmountScreen), findsNothing);
+    expect(find.byType(SendAddressScreen), findsOneWidget);
+    expect(harness.engine.sentPaymentCommand, isNull);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('send removes a USD quote at its exact freshness boundary', (
@@ -2315,7 +2250,7 @@ void main() {
     expect(find.text('Generate new request'), findsOneWidget);
   });
 
-  testWidgets('initial Receive failure is live on request and amount views', (
+  testWidgets('initial Receive failure belongs to the request card', (
     tester,
   ) async {
     const failure = AppFailure(
@@ -2347,22 +2282,6 @@ void main() {
       isTrue,
     );
 
-    await _pumpWidget(
-      tester,
-      harness,
-      const ReceiveAmountSheet(target: target),
-    );
-    await _pumpUntil(
-      tester,
-      () => find.text('Amount editor unavailable').evaluate().isNotEmpty,
-    );
-    expect(
-      tester
-          .getSemantics(find.bySemanticsLabel('Amount editor unavailable'))
-          .flagsCollection
-          .isLiveRegion,
-      isTrue,
-    );
     expect(
       tester
           .getSemantics(find.bySemanticsLabel('Retry'))

@@ -10,6 +10,8 @@ import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
 import '../../../bridge/presentation/hosted_bridge_screen.dart';
 import '../../../bridge/presentation/view_model/hosted_bridge_controller.dart';
+import '../../../shell/presentation/providers/app_shell_index_provider.dart';
+import '../../../shell/presentation/widgets/bottom_nav.dart';
 import '../../../wallet/domain/models/models.dart';
 import '../../../wallet/presentation/pages/wallet_selection_screen.dart';
 import '../../../wallet/presentation/view_model/view_models.dart';
@@ -56,10 +58,25 @@ enum _SettingsPanel {
 
 /// Presents independent wallet, preference, package, and public-link state.
 class SettingsScreen extends ConsumerStatefulWidget {
-  const SettingsScreen({super.key, this.isActiveTab});
+  const SettingsScreen({
+    super.key,
+    this.isActiveTab,
+    this.walletSelectionRequest = 0,
+  }) : _walletSelectionRoute = false;
+
+  /// Opens the selector in Settings when there is space for both Duo panes.
+  /// Compact layouts keep the standalone selector.
+  const SettingsScreen.walletSelection({super.key})
+    : isActiveTab = null,
+      walletSelectionRequest = 0,
+      _walletSelectionRoute = true;
 
   /// Selection state when mounted as a tab. Standalone routes omit it.
   final bool? isActiveTab;
+
+  /// Changes when the app shell opens this tab with the selector requested.
+  final int walletSelectionRequest;
+  final bool _walletSelectionRoute;
 
   @override
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
@@ -79,10 +96,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   var _recovering = false;
   var _foreground = true;
   final _panelKey = GlobalKey();
-  var _panel = _SettingsPanel.walletDetails;
+  // Keep the same selector mounted when it moves out of the right pane.
+  final _routedSelectorKey = GlobalKey();
+  late var _panel = widget._walletSelectionRoute
+      ? _SettingsPanel.wallets
+      : _SettingsPanel.walletDetails;
   var _returnPanel = _SettingsPanel.walletDetails;
   var _retainPanel = false;
-  var _resetPanelWhenIdle = false;
+  _SettingsPanel? _panelOnIdle;
 
   @override
   void initState() {
@@ -107,7 +128,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   void didUpdateWidget(SettingsScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.isActiveTab == true && widget.isActiveTab == false) {
-      _resetPanelWhenIdle = true;
+      _panelOnIdle = _SettingsPanel.walletDetails;
+    }
+    if (widget.walletSelectionRequest != oldWidget.walletSelectionRequest) {
+      _panelOnIdle = _SettingsPanel.wallets;
     }
   }
 
@@ -158,6 +182,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   bool get _visible =>
       mounted &&
       _foreground &&
+      (!widget._walletSelectionRoute || context.fitsDuoLandscapePanes) &&
       (ModalRoute.of(context)?.isCurrent ?? true) &&
       TickerMode.valuesOf(context).enabled &&
       !ref.read(walletLifecycleViewModelProvider).blocksInteraction;
@@ -217,8 +242,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     if (mounted && _panel == panel) _openPanel(_returnPanel);
   }
 
+  void _selectTab(int index) {
+    ref.read(appShellIndexProvider.notifier).setIndex(index);
+    context.goNamed(RouteNames.home);
+  }
+
+  WalletSelectionScreen _routedSelector({required bool showBack}) =>
+      WalletSelectionScreen(
+        key: _routedSelectorKey,
+        showBack: showBack,
+        onClose: () {
+          if (context.canPop()) {
+            context.pop();
+          } else if (context.fitsDuoLandscapePanes) {
+            _selectTab(appShellSettingsTabIndex);
+          } else {
+            context.goNamed(RouteNames.settings);
+          }
+        },
+      );
+
   @override
   Widget build(BuildContext context) {
+    final split = context.fitsDuoLandscapePanes;
+    if (widget._walletSelectionRoute && !split && !_retainPanel) {
+      return AsterNavigationScope(child: _routedSelector(showBack: true));
+    }
+
     final spacing = context.spacing;
     final metrics = context.metrics;
     final type = context.type;
@@ -228,10 +278,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
             .value
             ?.appliesTo(MediaQuery.sizeOf(context)) ==
         true;
-    final hasBottomTabs =
-        !(isDuoCover || context.isOpenDuoLandscape) ||
-        CoverTabRail.hasBottomFallbackOf(context);
-    final split = context.fitsDuoLandscapePanes;
+    final routeRail = widget._walletSelectionRoute && split
+        ? CoverTabRail.resolve(
+            context,
+            context.duoLandscapeLayout,
+            appShellTabCount,
+          )
+        : null;
+    final hasBottomTabs = widget._walletSelectionRoute
+        ? split && routeRail == null
+        : !(isDuoCover || context.isOpenDuoLandscape) ||
+              CoverTabRail.hasBottomFallbackOf(context);
     final tabClearance = hasBottomTabs ? metrics.floatingNavClearance : 0.0;
     final walletState = ref.watch(walletViewModelProvider);
     final settings = ref.watch(settingsViewModelProvider);
@@ -249,10 +306,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
         walletState.value?.isChangingWallet != true &&
         activeWallet?.state == WalletProfileState.ready;
     final settingsState = settings.value;
-    // Defaults are a display fallback only, never written over a preference
-    // whose storage could not be read (including balance-visibility choices).
-    final preferences =
-        settingsState?.snapshot.preferences ?? AppPreferences.defaults;
+    // Only the displayed unit defaults while the preferences are unavailable.
+    final bitcoinUnit =
+        settingsState?.snapshot.preferences.bitcoinUnit ??
+        AppPreferences.defaults.bitcoinUnit;
     final settingsEnabled =
         !settings.hasError &&
         !settings.isLoading &&
@@ -270,11 +327,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
       child: Builder(
         builder: (context) {
           final navigation = AsterNavigationScope.of(context);
-          if (_resetPanelWhenIdle && !navigation.inFlight) {
+          if (_panelOnIdle case final panel? when !navigation.inFlight) {
             // Keep an in-flight panel mounted until its completion is handled.
-            _panel = _SettingsPanel.walletDetails;
+            _panel = panel;
             _returnPanel = _SettingsPanel.walletDetails;
-            _resetPanelWhenIdle = false;
+            _panelOnIdle = null;
           }
 
           VoidCallback? open(_SettingsPanel panel) {
@@ -297,7 +354,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
 
           final options = Scaffold(
             backgroundColor: context.colorScheme.surface,
-            appBar: CustomAppBar(title: 'Settings'),
+            appBar: CustomAppBar(
+              title: 'Settings',
+              automaticallyImplyLeading: !widget._walletSelectionRoute,
+            ),
             body: AsterHorizontalSafeArea(
               child: SingleChildScrollView(
                 padding: EdgeInsets.symmetric(
@@ -381,7 +441,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                         children: [
                           AsterOptionRow(
                             title: 'Bitcoin unit',
-                            details: preferences.bitcoinUnit.label,
+                            details: bitcoinUnit.label,
                             prefixIcon: MingCuteIcons.mgc_coin_2_line,
                             hapticIntent: null,
                             onTap: settingsEnabled && !navigation.inFlight
@@ -442,7 +502,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
           } else if (!navigation.inFlight) {
             _retainPanel = false;
           }
-          if (!_retainPanel) return options;
+          Widget compact() => widget._walletSelectionRoute
+              ? _routedSelector(showBack: true)
+              : options;
+          if (!_retainPanel) return compact();
 
           Widget withPanel(bool bridgeAvailable) {
             final panel =
@@ -467,10 +530,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                   onClose: () => _closePanel(panel),
                   showBack: showNetworkBack,
                 ),
-                _SettingsPanel.wallets => WalletSelectionScreen(
-                  onClose: () => _closePanel(panel),
-                  showBack: false,
-                ),
+                _SettingsPanel.wallets =>
+                  widget._walletSelectionRoute
+                      ? _routedSelector(showBack: false)
+                      : WalletSelectionScreen(
+                          onClose: () => _closePanel(panel),
+                          showBack: false,
+                        ),
                 _SettingsPanel.bitcoinUnit => BitcoinUnitSelectionScreen(
                   onClose: () => _closePanel(panel),
                   showBack: false,
@@ -486,8 +552,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
             }
 
             if (!split) {
+              if (widget._walletSelectionRoute &&
+                  panel == _SettingsPanel.wallets) {
+                return compact();
+              }
               // A pending operation keeps its owner through a fold. Only the
-              // original Settings list remains visible and interactive.
+              // compact surface remains visible and interactive.
               return Stack(
                 fit: StackFit.expand,
                 children: [
@@ -499,7 +569,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                       ),
                     ),
                   ),
-                  options,
+                  compact(),
                 ],
               );
             }
@@ -533,12 +603,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
             );
           }
 
-          return hostedBridge == null
+          final settings = hostedBridge == null
               ? withPanel(false)
               : ListenableBuilder(
                   listenable: hostedBridge,
                   builder: (context, _) => withPanel(hostedBridge.available),
                 );
+          if (!widget._walletSelectionRoute || !split) return settings;
+          return CoverTabRail(
+            bounds: routeRail,
+            child: Scaffold(
+              body: Stack(
+                fit: StackFit.expand,
+                children: [
+                  settings,
+                  BottomNav.settingsRoute(
+                    onSelect: (index) {
+                      if (!navigation.inFlight) _selectTab(index);
+                    },
+                    enabled: !navigation.inFlight,
+                  ),
+                ],
+              ),
+            ),
+          );
         },
       ),
     );

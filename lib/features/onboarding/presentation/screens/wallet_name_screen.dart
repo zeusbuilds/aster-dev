@@ -113,16 +113,19 @@ class _WalletNameScreenState extends ConsumerState<WalletNameScreen> {
               ),
             ),
     };
-    final value = asyncState.value;
+    final state = asyncState.asData?.value;
+    if (asyncState.isLoading ||
+        state == null ||
+        (!state.previousStepComplete && !state.completed)) {
+      return const SizedBox.shrink();
+    }
 
     return AsterNavigationScope(
       child: Builder(
         builder: (context) {
           final navigation = AsterNavigationScope.of(context);
           final locked =
-              navigation.inFlight ||
-              value?.busy == true ||
-              value?.requiresReconciliation == true;
+              navigation.inFlight || state.busy || state.requiresReconciliation;
           return PopScope(
             canPop: !locked,
             onPopInvokedWithResult: (didPop, result) {
@@ -133,36 +136,10 @@ class _WalletNameScreenState extends ConsumerState<WalletNameScreen> {
                   ? context.appColors.transparentSurface
                   : context.colorScheme.surface,
               resizeToAvoidBottomInset: true,
-              body: switch (asyncState) {
-                AsyncData<_WalletNameViewState>(:final value)
-                    when value.previousStepComplete || value.completed =>
-                  OnboardingScrollSafeArea(
-                    builder: (_, scrollBottomInset) =>
-                        _buildForm(value, navigation, scrollBottomInset),
-                  ),
-                AsyncData<_WalletNameViewState>() => SafeArea(
-                  child: OnboardingStatusPanel.failure(
-                    title: 'Finish the previous step',
-                    message: widget._source == _WalletNameSource.create
-                        ? 'Confirm your recovery phrase before naming the wallet.'
-                        : 'Enter and validate your recovery phrase before naming the wallet.',
-                    onBack: widget.showNavigationBar
-                        ? widget.onBack ?? () => context.pop()
-                        : null,
-                    onBrandArt: widget.onBrandArt,
-                  ),
-                ),
-                AsyncError<_WalletNameViewState>(
-                  :final error,
-                  :final stackTrace,
-                ) =>
-                  SafeArea(child: _buildFailure(error, stackTrace)),
-                _ => SafeArea(
-                  child: OnboardingStatusPanel.loading(
-                    onBrandArt: widget.onBrandArt,
-                  ),
-                ),
-              },
+              body: OnboardingScrollSafeArea(
+                builder: (_, scrollBottomInset) =>
+                    _buildForm(state, navigation, scrollBottomInset),
+              ),
             ),
           );
         },
@@ -344,18 +321,6 @@ class _WalletNameScreenState extends ConsumerState<WalletNameScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildFailure(Object error, StackTrace stackTrace) {
-    final failure = FailureMapper.from(error, stackTrace);
-    return OnboardingStatusPanel.failure(
-      title: 'Wallet name unavailable',
-      message: failure.userMessage,
-      onBack: widget.showNavigationBar
-          ? widget.onBack ?? () => context.pop()
-          : null,
-      onBrandArt: widget.onBrandArt,
     );
   }
 

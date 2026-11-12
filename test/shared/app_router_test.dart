@@ -343,6 +343,10 @@ void main() {
   testWidgets('the removed skeleton location recovers to canonical Home', (
     tester,
   ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(951, 669);
+    tester.view.padding = const FakeViewPadding(right: 84, bottom: 34);
+    addTearDown(tester.view.reset);
     tester.binding.platformDispatcher.defaultRouteNameTestValue = '/skeleton';
     addTearDown(
       tester.binding.platformDispatcher.clearDefaultRouteNameTestValue,
@@ -409,6 +413,48 @@ void main() {
     await _pumpFrames(tester);
     expect(_location(router), RoutePaths.home);
     expect(find.byType(BottomNav), findsOneWidget);
+  });
+
+  testWidgets('disabled payment routes return to their own selector', (
+    tester,
+  ) async {
+    final (harness, transport) = await _createActiveHarness();
+    addTearDown(transport.close);
+    addTearDown(() => _disposeHarness(tester, harness));
+    final router = await _pumpRouter(tester, harness);
+
+    final nativeCalls = List.of(harness.engine.calls);
+    for (final (location, expected) in [
+      ('/send/bitcoin-lightning/address', RoutePaths.send),
+      ('/send/usdt-lightning/amount', RoutePaths.send),
+      ('/send/usdt-onchain/address', RoutePaths.send),
+      ('/receive/bitcoin-lightning', RoutePaths.receive),
+      ('/receive/usdt-lightning', RoutePaths.receive),
+      ('/receive/usdt-onchain', RoutePaths.receive),
+    ]) {
+      router.go(location);
+      await _pumpFrames(tester);
+      expect(_location(router), expected, reason: location);
+      expect(find.textContaining('Coming later'), findsNWidgets(2));
+    }
+    expect(harness.engine.calls, nativeCalls);
+  });
+
+  testWidgets('retired preference links return to Settings', (tester) async {
+    final (harness, transport) = await _createActiveHarness();
+    addTearDown(transport.close);
+    addTearDown(() => _disposeHarness(tester, harness));
+    final router = await _pumpRouter(tester, harness);
+
+    for (final path in [
+      RoutePaths.countrySelection,
+      RoutePaths.currencySelection,
+    ]) {
+      router.go('${RoutePaths.settings}/$path');
+      await _pumpFrames(tester);
+      expect(_location(router), RoutePaths.settings);
+      expect(find.byType(SettingsScreen), findsOneWidget);
+    }
   });
 
   testWidgets('a direct Send destination Back returns to target selection', (
@@ -1014,6 +1060,7 @@ void _expectUnavailablePage(WidgetTester tester) {
       tester.view.physicalSize.width / tester.view.devicePixelRatio / 2;
   expect(tester.getCenter(find.byIcon(Icons.error_outline)).dx, centerX);
   expect(tester.getCenter(find.text('Page unavailable')).dx, centerX);
+  expect(tester.getCenter(find.text('Go to Home')).dx, centerX);
 }
 
 Future<(OnboardingTestHarness, ResilientHttpClient)> _createHarness() async {

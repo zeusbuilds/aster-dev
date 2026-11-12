@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
 import '../models/models.dart';
 import '../view_model/view_models.dart';
@@ -32,26 +31,16 @@ class SwapScreen extends ConsumerWidget {
       ),
       body: SafeArea(
         top: false,
-        bottom: !scrollsToBottom || swap.isLoading || swap.hasError,
+        bottom: !scrollsToBottom,
         child: Padding(
           padding: EdgeInsets.symmetric(
             horizontal: context.spacing.screenPadding,
           ),
-          child: swap.when(
-            skipLoadingOnRefresh: false,
-            data: (state) => _SwapContent(
-              state: state,
-              bottomPadding:
-                  context.spacing.lg +
-                  (scrollsToBottom ? context.windowInsets.bottomSafe : 0),
-            ),
-            loading: () => const _SwapLoading(),
-            error: (error, stackTrace) => _SwapFailure(
-              failure: error is AppFailureException
-                  ? error.failure
-                  : FailureMapper.from(error, stackTrace),
-              onRetry: () => ref.read(swapViewModelProvider.notifier).retry(),
-            ),
+          child: _SwapContent(
+            state: swap,
+            bottomPadding:
+                context.spacing.lg +
+                (scrollsToBottom ? context.windowInsets.bottomSafe : 0),
           ),
         ),
       ),
@@ -97,67 +86,6 @@ class _SwapContent extends ConsumerWidget {
         ],
       ),
       actions: const [CustomButton(text: 'Coming soon', enabled: false)],
-    );
-  }
-}
-
-class _SwapLoading extends StatelessWidget {
-  const _SwapLoading();
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      container: true,
-      liveRegion: true,
-      label: 'Loading swap options',
-      excludeSemantics: true,
-      child: AppSkeletonizer(
-        enabled: true,
-        child: Column(
-          children: [
-            for (var index = 0; index < 2; index += 1) ...[
-              Squircle(
-                padding: EdgeInsets.all(context.spacing.xl),
-                child: Text(
-                  index == 0 ? 'Bitcoin · On-chain' : 'USDT · On-chain',
-                  style: context.type.title,
-                ),
-              ),
-              if (index == 0) SizedBox(height: context.spacing.sm),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SwapFailure extends StatelessWidget {
-  const _SwapFailure({required this.failure, required this.onRetry});
-
-  final AppFailure failure;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Semantics(
-            liveRegion: true,
-            child: Text(
-              failure.userMessage,
-              style: context.type.statusMessage,
-              textAlign: TextAlign.center,
-            ),
-          ),
-          if (failure.retryable) ...[
-            SizedBox(height: context.spacing.lg),
-            CustomButton(text: 'Retry', onTap: onRetry),
-          ],
-        ],
-      ),
     );
   }
 }

@@ -1770,8 +1770,8 @@ void main() {
       );
       addTearDown(subscription.close);
 
-      final capabilities = await harness.container.read(
-        walletPaymentCapabilitiesProvider.future,
+      final capabilities = harness.container.read(
+        walletPaymentCapabilitiesProvider,
       );
 
       expect(

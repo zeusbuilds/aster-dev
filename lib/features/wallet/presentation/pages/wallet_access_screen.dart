@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -8,24 +10,42 @@ import '../view_model/wallet_view_model.dart';
 import 'wallet_unavailable_screen.dart';
 
 /// Route-level wallet access gate shown only while session state is unresolved.
-class WalletAccessScreen extends ConsumerWidget {
+class WalletAccessScreen extends ConsumerStatefulWidget {
   const WalletAccessScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<WalletAccessScreen> createState() => _WalletAccessScreenState();
+}
+
+class _WalletAccessScreenState extends ConsumerState<WalletAccessScreen> {
+  AppFailure? _retryingFailure;
+
+  Future<void> _retry(AppFailure failure) async {
+    if (_retryingFailure != null) return;
+    setState(() => _retryingFailure = failure);
+    try {
+      await ref.read(walletViewModelProvider.notifier).reload();
+    } finally {
+      if (mounted) setState(() => _retryingFailure = null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(walletViewModelProvider);
-    return switch (state) {
-      AsyncError<WalletState>(:final error, :final stackTrace) =>
-        WalletUnavailableScreen(
-          failure: FailureMapper.from(error, stackTrace),
-          title: 'Wallet access unavailable',
-          retrying: false,
-          canResumeCommittedDeletion: WalletViewModel.canResumeDeletion(
+    final failure =
+        _retryingFailure ??
+        switch (state) {
+          AsyncError<WalletState>(:final error, :final stackTrace) =>
             FailureMapper.from(error, stackTrace),
-          ),
-          onRetry: () => ref.read(walletViewModelProvider.notifier).reload(),
-        ),
-      _ => const SplashScreen(),
-    };
+          _ => null,
+        };
+    if (failure == null) return const SplashScreen();
+    return WalletUnavailableScreen(
+      failure: failure,
+      title: 'Wallet access unavailable',
+      retrying: _retryingFailure != null,
+      onRetry: () => unawaited(_retry(failure)),
+    );
   }
 }

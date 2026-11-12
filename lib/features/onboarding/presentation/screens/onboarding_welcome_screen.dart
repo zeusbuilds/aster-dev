@@ -60,8 +60,18 @@ enum _WalletSetupStep {
   createRecoveryQuiz,
   createWalletName,
   importRecoveryPhrase,
-  importWalletName,
+  importWalletName;
+
+  _WalletSetupStep? get recoveryEntry => switch (this) {
+    welcome => null,
+    createRecoveryPhrase ||
+    createRecoveryQuiz ||
+    createWalletName => createRecoveryPhrase,
+    importRecoveryPhrase || importWalletName => importRecoveryPhrase,
+  };
 }
+
+enum _WalletSetupInterruption { startAgain, reopenApp }
 
 class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
@@ -74,6 +84,7 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
   var _authenticatingSetup = false;
   late final SecurityController _security;
   var _sensitiveLease = false;
+  _WalletSetupInterruption? _interruption;
   ProviderSubscription<AsyncValue<CreateWalletState>>? _preparedCreate;
   ProviderSubscription<AsyncValue<ImportWalletState>>? _preparedImport;
 
@@ -128,13 +139,14 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
     ref.watch(walletSetupPreflightViewModelProvider);
     final step = _step;
     final operationLocked = _operationLocked(listen: true);
+    final interruption = _interruption;
 
     final canLeaveRoute =
         widget.origin == WalletCreationOrigin.walletSelector &&
         _step == _WalletSetupStep.welcome &&
         !_checkingDictionary &&
         !_transitioning;
-    final chromeStep = _journeyChromeStep;
+    final chromeStep = interruption == null ? _journeyChromeStep : null;
     final railBack = canLeaveRoute
         ? _leaveAddWallet
         : step != _WalletSetupStep.welcome &&
@@ -157,23 +169,37 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
           excluding: _transitioning,
           child: DuoBackNavigation(
             showBack:
-                chromeStep != null ||
-                widget.origin == WalletCreationOrigin.walletSelector,
+                interruption == null &&
+                (chromeStep != null ||
+                    widget.origin == WalletCreationOrigin.walletSelector),
             onBack: railBack,
             builder: (context, usesRail) => Stack(
               fit: StackFit.expand,
               children: [
-                if (_outgoingStep case final outgoing?)
+                if (interruption == null) ...[
+                  if (_outgoingStep case final outgoing?)
+                    _buildStepTransition(
+                      step: outgoing,
+                      ignorePointer: true,
+                      usesRail: usesRail,
+                    ),
                   _buildStepTransition(
-                    step: outgoing,
-                    ignorePointer: true,
+                    step: _step,
+                    ignorePointer: false,
                     usesRail: usesRail,
                   ),
-                _buildStepTransition(
-                  step: _step,
-                  ignorePointer: false,
-                  usesRail: usesRail,
-                ),
+                ] else if (interruption == _WalletSetupInterruption.reopenApp)
+                  const Material(
+                    type: MaterialType.transparency,
+                    child: _InterruptedProvisioning(),
+                  )
+                else
+                  IgnorePointer(
+                    child: _buildStep(
+                      _WalletSetupStep.welcome,
+                      usesRail: usesRail,
+                    ),
+                  ),
                 if (chromeStep != null)
                   KeyedSubtree(
                     key: const ValueKey('wallet-setup-journey-chrome'),
@@ -373,13 +399,13 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
       case _WalletSetupStep.createRecoveryPhrase:
         _preparedCreate ??= ref.listenManual(
           createWalletViewModelProvider,
-          (_, _) {},
+          _checkCreateSession,
         );
         await ref.read(createWalletViewModelProvider.future);
       case _WalletSetupStep.importRecoveryPhrase:
         _preparedImport ??= ref.listenManual(
           importWalletViewModelProvider,
-          (_, _) {},
+          _checkImportSession,
         );
         await ref.read(importWalletViewModelProvider.future);
       case _WalletSetupStep.welcome ||
@@ -388,6 +414,86 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
           _WalletSetupStep.importWalletName:
         throw StateError('Only a recovery entry can be prepared from Welcome.');
     }
+  }
+
+  void _checkCreateSession(
+    AsyncValue<CreateWalletState>? previous,
+    AsyncValue<CreateWalletState> next,
+  ) {
+    const entry = _WalletSetupStep.createRecoveryPhrase;
+    if (_step.recoveryEntry != entry) return;
+    final value = next.asData?.value;
+    if (!next.isLoading &&
+        value != null &&
+        (_step != _WalletSetupStep.createWalletName ||
+            value.completed ||
+            value.quizComplete)) {
+      return;
+    }
+    final last = previous?.value;
+    _interruptSetup(
+      entry,
+      provisioningMayHaveRun:
+          last != null &&
+          (last.submitting || last.completed || last.requiresReconciliation),
+    );
+  }
+
+  void _checkImportSession(
+    AsyncValue<ImportWalletState>? previous,
+    AsyncValue<ImportWalletState> next,
+  ) {
+    const entry = _WalletSetupStep.importRecoveryPhrase;
+    if (_step.recoveryEntry != entry) return;
+    final value = next.asData?.value;
+    if (!next.isLoading &&
+        value != null &&
+        (_step != _WalletSetupStep.importWalletName ||
+            value.completed ||
+            value.phraseValid)) {
+      return;
+    }
+    final last = previous?.value;
+    _interruptSetup(
+      entry,
+      provisioningMayHaveRun:
+          last != null &&
+          (last.submitting || last.completed || last.requiresReconciliation),
+    );
+  }
+
+  void _interruptSetup(
+    _WalletSetupStep entry, {
+    required bool provisioningMayHaveRun,
+  }) {
+    if (_interruption != null) return;
+    // A provider rebuild can replace the phrase or discard a provisioning
+    // result. Hide the invalid session before the new provider can paint.
+    _interruption = provisioningMayHaveRun
+        ? _WalletSetupInterruption.reopenApp
+        : _WalletSetupInterruption.startAgain;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _transitionController.stop();
+      setState(() {
+        _outgoingStep = null;
+        if (!provisioningMayHaveRun) {
+          _step = _WalletSetupStep.welcome;
+          _interruption = null;
+        }
+      });
+      // Startup checks the durable registry before allowing another attempt.
+      if (provisioningMayHaveRun) return;
+      _disposeAbandonedBranch(entry, _WalletSetupStep.welcome);
+      if (_ownsWelcomeInteraction && !_security.isCaptured) {
+        context.toasts.show(
+          title: 'Wallet setup interrupted',
+          message: 'Start wallet setup again from here.',
+          variant: ToastVariant.failure,
+        );
+      }
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   void _discardPreparedBranch(
@@ -461,6 +567,7 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
   }
 
   bool _operationLocked({required bool listen}) {
+    if (_interruption != null) return true;
     switch (_step) {
       case _WalletSetupStep.createRecoveryPhrase ||
           _WalletSetupStep.createRecoveryQuiz ||
@@ -663,7 +770,7 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
   }
 
   void _completeJourney() {
-    if (!mounted) return;
+    if (!mounted || _interruption != null) return;
     context.go(RoutePaths.home);
   }
 
@@ -689,7 +796,9 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
     required _WalletSetupStep from,
     required _WalletSetupStep to,
   }) {
-    if (!mounted || _step != from || _transitioning) return;
+    if (!mounted || _step != from || _transitioning || _interruption != null) {
+      return;
+    }
     final create =
         from == _WalletSetupStep.createRecoveryPhrase ||
             from == _WalletSetupStep.createRecoveryQuiz
@@ -770,6 +879,45 @@ class _WalletSetupJourneyState extends ConsumerState<_WalletSetupJourney>
     // as the user abandons it. Drop the retained subscription now, then clear
     // the branch once its old presentation has unmounted.
     _discardPreparedBranch(previous, afterOutgoingUnmounts: true);
+  }
+}
+
+class _InterruptedProvisioning extends StatelessWidget {
+  const _InterruptedProvisioning();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return SafeArea(
+      child: Center(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.all(context.spacing.xxl),
+          child: Semantics(
+            liveRegion: true,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Wallet setup interrupted',
+                  style: context.type.brandTitle.copyWith(
+                    color: colors.onBrandArt,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: context.spacing.sm),
+                Text(
+                  'Reopen Aster to check whether your wallet was set up.',
+                  style: context.type.brandBody.copyWith(
+                    color: colors.onBrandArt,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

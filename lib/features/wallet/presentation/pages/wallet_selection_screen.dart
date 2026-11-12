@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:remixicon/remixicon.dart';
 
-import '../../../../core/errors/errors.dart';
 import '../../../../shared/shared.dart';
 import '../view_model/view_models.dart';
 import '../widgets/widgets.dart';
@@ -22,13 +21,12 @@ class WalletSelectionScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final walletState = ref.watch(walletViewModelProvider);
-    final viewModel = ref.read(walletViewModelProvider.notifier);
-
     final content = Builder(
       builder: (context) {
         final navigation = AsterNavigationScope.of(context);
         final spacing = context.spacing;
         return walletState.when(
+          skipLoadingOnRefresh: false,
           loading: () => _WalletSelectionScaffold(
             onClose: onClose,
             showBack: showBack,
@@ -38,20 +36,14 @@ class WalletSelectionScreen extends ConsumerWidget {
               ),
             ),
           ),
-          error: (error, stackTrace) {
-            final failure = error is AppFailureException
-                ? error.failure
-                : FailureMapper.from(error, stackTrace);
-            return _WalletSelectionScaffold(
-              navigationLocked: navigation.inFlight,
-              onClose: onClose,
-              showBack: showBack,
-              child: _WalletLoadFailure(
-                failure: failure,
-                onRetry: viewModel.reload,
-              ),
-            );
-          },
+          // The router hands a registry error to Wallet Access. Do not expose
+          // saved wallet names or a second recovery action while it redirects.
+          error: (_, _) => _WalletSelectionScaffold(
+            navigationLocked: navigation.inFlight,
+            onClose: onClose,
+            showBack: showBack,
+            child: const SizedBox.shrink(),
+          ),
           data: (data) {
             final switchingWalletId = data.switchingWalletId;
             final navigationLocked =
@@ -165,41 +157,6 @@ class WalletSelectionScreen extends ConsumerWidget {
     } else {
       context.pop();
     }
-  }
-}
-
-class _WalletLoadFailure extends StatelessWidget {
-  const _WalletLoadFailure({required this.failure, required this.onRetry});
-
-  final AppFailure failure;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: context.spacing.screenPadding,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Semantics(
-              liveRegion: true,
-              child: Text(
-                failure.userMessage,
-                style: context.type.errorMessage,
-                textAlign: TextAlign.center,
-              ),
-            ),
-            if (failure.retryable) ...[
-              SizedBox(height: context.spacing.xxl),
-              CustomButton(text: 'Retry', onTap: onRetry),
-            ],
-          ],
-        ),
-      ),
-    );
   }
 }
 

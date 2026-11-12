@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
 
-import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
 import '../models/models.dart';
 import '../view_model/view_models.dart';
@@ -33,55 +32,35 @@ class CreateWalletQuizScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncState = ref.watch(createWalletViewModelProvider);
-    final value = asyncState.value;
+    final state = asyncState.asData?.value;
+    if (asyncState.isLoading || state == null || state.completed) {
+      return const SizedBox.shrink();
+    }
     return AsterNavigationScope(
       child: Builder(
         builder: (context) {
           final navigation = AsterNavigationScope.of(context);
           final locked =
               navigation.inFlight ||
-              value?.submitting == true ||
-              value?.requiresReconciliation == true;
+              state.submitting ||
+              state.requiresReconciliation;
           return PopScope(
             canPop: !locked,
             child: Scaffold(
               backgroundColor: onBrandArt
                   ? context.appColors.transparentSurface
                   : context.colorScheme.surface,
-              body: switch (asyncState) {
-                AsyncData<CreateWalletState>(:final value)
-                    when !value.completed =>
-                  OnboardingScrollSafeArea(
-                    builder: (_, scrollBottomInset) => _QuizContent(
-                      state: value,
-                      navigation: navigation,
-                      onBack: onBack,
-                      onContinue: onContinue,
-                      onBrandArt: onBrandArt,
-                      showNavigationBar: showNavigationBar,
-                      scrollBottomInset: scrollBottomInset,
-                    ),
-                  ),
-                AsyncError<CreateWalletState>(
-                  :final error,
-                  :final stackTrace,
-                ) =>
-                  SafeArea(
-                    child: _QuizFailure(
-                      error: error,
-                      stackTrace: stackTrace,
-                      onBack: onBack,
-                      onBrandArt: onBrandArt,
-                      showNavigationBar: showNavigationBar,
-                    ),
-                  ),
-                _ => SafeArea(
-                  child: OnboardingStatusPanel.loading(
-                    message: 'Preparing recovery check...',
-                    onBrandArt: onBrandArt,
-                  ),
+              body: OnboardingScrollSafeArea(
+                builder: (_, scrollBottomInset) => _QuizContent(
+                  state: state,
+                  navigation: navigation,
+                  onBack: onBack,
+                  onContinue: onContinue,
+                  onBrandArt: onBrandArt,
+                  showNavigationBar: showNavigationBar,
+                  scrollBottomInset: scrollBottomInset,
                 ),
-              },
+              ),
             ),
           );
         },
@@ -432,33 +411,6 @@ class _QuizOption extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _QuizFailure extends StatelessWidget {
-  const _QuizFailure({
-    required this.error,
-    required this.stackTrace,
-    required this.onBack,
-    required this.onBrandArt,
-    required this.showNavigationBar,
-  });
-
-  final Object error;
-  final StackTrace stackTrace;
-  final VoidCallback? onBack;
-  final bool onBrandArt;
-  final bool showNavigationBar;
-
-  @override
-  Widget build(BuildContext context) {
-    final failure = FailureMapper.from(error, stackTrace);
-    return OnboardingStatusPanel.failure(
-      title: 'Recovery check unavailable',
-      message: failure.userMessage,
-      onBack: showNavigationBar ? onBack ?? () => context.pop() : null,
-      onBrandArt: onBrandArt,
     );
   }
 }

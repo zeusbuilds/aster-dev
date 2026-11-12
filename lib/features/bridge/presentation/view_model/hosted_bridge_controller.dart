@@ -142,6 +142,9 @@ final class HostedBridgeController extends ChangeNotifier {
       >{};
 
   bool get available => _bridgeAvailable && !_storageFailed;
+
+  /// Whether the current wallet's bridge availability is still resolving.
+  bool get restoring => _restoring;
   bool get connected => _grant != null;
   HostedBridgeApproval? get approval => _approval;
   int get _now => _clock().millisecondsSinceEpoch ~/ 1000;

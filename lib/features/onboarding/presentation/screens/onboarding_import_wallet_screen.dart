@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
 
-import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
 import '../../domain/models/models.dart';
 import '../models/models.dart';
@@ -130,15 +129,18 @@ class _OnboardingImportWalletScreenState
   @override
   Widget build(BuildContext context) {
     final asyncState = ref.watch(importWalletViewModelProvider);
-    final value = asyncState.value;
+    final state = asyncState.asData?.value;
+    if (asyncState.isLoading || state == null) {
+      return const SizedBox.shrink();
+    }
     return AsterNavigationScope(
       child: Builder(
         builder: (context) {
           final navigation = AsterNavigationScope.of(context);
           final navigationLocked =
               navigation.inFlight ||
-              (value != null &&
-                  (value.submitting || value.requiresReconciliation));
+              state.submitting ||
+              state.requiresReconciliation;
           return PopScope(
             canPop: !navigationLocked,
             child: Scaffold(
@@ -146,47 +148,14 @@ class _OnboardingImportWalletScreenState
                   ? context.appColors.transparentSurface
                   : context.colorScheme.surface,
               resizeToAvoidBottomInset: true,
-              body: switch (asyncState) {
-                AsyncData<ImportWalletState>(:final value) =>
-                  OnboardingScrollSafeArea(
-                    builder: (_, scrollBottomInset) =>
-                        _buildContent(value, navigation, scrollBottomInset),
-                  ),
-                AsyncError<ImportWalletState>(
-                  :final error,
-                  :final stackTrace,
-                ) =>
-                  SafeArea(child: _buildFailure(navigation, error, stackTrace)),
-                _ => SafeArea(
-                  child: OnboardingStatusPanel.loading(
-                    onBrandArt: widget.onBrandArt,
-                  ),
-                ),
-              },
+              body: OnboardingScrollSafeArea(
+                builder: (_, scrollBottomInset) =>
+                    _buildContent(state, navigation, scrollBottomInset),
+              ),
             ),
           );
         },
       ),
-    );
-  }
-
-  Widget _buildFailure(
-    AsterNavigationCommandOwner navigation,
-    Object error,
-    StackTrace stackTrace,
-  ) {
-    final failure = FailureMapper.from(error, stackTrace);
-    return OnboardingStatusPanel.failure(
-      title: 'Recovery phrase unavailable',
-      message: failure.userMessage,
-      primaryLabel: failure.retryable ? 'Retry' : null,
-      onPrimary: failure.retryable
-          ? () => ref.invalidate(importWalletViewModelProvider)
-          : null,
-      onBack: widget.showNavigationBar
-          ? widget.onBack ?? () => _navigateToWelcome(context, navigation)
-          : null,
-      onBrandArt: widget.onBrandArt,
     );
   }
 
@@ -310,7 +279,8 @@ class _OnboardingImportWalletScreenState
                 enabled:
                     (state.canContinue || canRetryChecksum) &&
                     !navigation.inFlight,
-                loading: state.checksumStatus == MnemonicChecksumStatus.checking,
+                loading:
+                    state.checksumStatus == MnemonicChecksumStatus.checking,
                 hapticIntent: null,
                 onTap: () => unawaited(_continueImport(navigation)),
               ),

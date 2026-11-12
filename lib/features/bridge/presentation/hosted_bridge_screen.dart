@@ -28,6 +28,7 @@ class _HostedBridgeScreenState extends ConsumerState<HostedBridgeScreen> {
   bool _disconnecting = false;
   bool _loadingBurns = false;
   bool _sharingBurn = false;
+  bool _returnToSettingsScheduled = false;
   List<HostedBridgeBurn> _burns = const [];
 
   @override
@@ -41,6 +42,22 @@ class _HostedBridgeScreenState extends ConsumerState<HostedBridgeScreen> {
       TickerMode.valuesOf(context).enabled &&
       (source?.isCurrent ?? true) &&
       identical(ModalRoute.of(context), source);
+
+  Widget _unavailable() {
+    if (!widget.embedded &&
+        !_returnToSettingsScheduled &&
+        ModalRoute.isCurrentOf(context) == true) {
+      _returnToSettingsScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _returnToSettingsScheduled = false;
+        if (!mounted || !_ownsSurface(ModalRoute.of(context))) return;
+        final bridge = ref.read(hostedBridgeControllerProvider);
+        if (bridge?.available == true || bridge?.restoring == true) return;
+        GoRouter.maybeOf(context)?.go(RoutePaths.settings);
+      });
+    }
+    return const SizedBox.shrink();
+  }
 
   Future<void> _pair(HostedBridgeController bridge, String input) async {
     final source = ModalRoute.of(context);
@@ -331,11 +348,11 @@ class _HostedBridgeScreenState extends ConsumerState<HostedBridgeScreen> {
       ),
       body: AsterHorizontalSafeArea(
         child: bridge == null
-            ? const SizedBox.shrink()
+            ? _unavailable()
             : ListenableBuilder(
                 listenable: bridge,
                 builder: (context, _) {
-                  if (!bridge.available) return const SizedBox.shrink();
+                  if (!bridge.available) return _unavailable();
                   return ListView(
                     padding: EdgeInsets.fromLTRB(
                       spacing.screenPadding,

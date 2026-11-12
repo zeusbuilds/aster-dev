@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../core/errors/errors.dart';
 import '../../../../shared/shared.dart';
+import '../../domain/models/wallet_access_recovery.dart';
 
-/// Full-screen, persistent wallet failure with an optional in-place retry.
+/// Shared blocking view for startup, wallet access and foreground recovery.
 class WalletUnavailableScreen extends StatelessWidget {
   const WalletUnavailableScreen({
     super.key,
@@ -11,14 +13,12 @@ class WalletUnavailableScreen extends StatelessWidget {
     required this.title,
     required this.retrying,
     this.onRetry,
-    this.canResumeCommittedDeletion = false,
   });
 
   final AppFailure failure;
   final String title;
   final bool retrying;
   final VoidCallback? onRetry;
-  final bool canResumeCommittedDeletion;
 
   @override
   Widget build(BuildContext context) {
@@ -26,23 +26,33 @@ class WalletUnavailableScreen extends StatelessWidget {
     final bottomGap = context.isOpenDuoLandscape
         ? spacing.lg
         : spacing.screenPadding;
-    final canRetry =
-        (failure.retryable || canResumeCommittedDeletion) && onRetry != null;
-    return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: Center(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(
-              spacing.screenPadding,
-              spacing.screenPadding,
-              spacing.screenPadding,
-              bottomGap + context.windowInsets.bottomSafe,
-            ),
-            child: Semantics(
-              container: true,
-              liveRegion: true,
-              explicitChildNodes: true,
+    final action = switch (WalletAccessRecovery.forFailure(failure)) {
+      WalletAccessRecovery.retry => 'Retry',
+      WalletAccessRecovery.finishRemoval => 'Finish removal',
+      WalletAccessRecovery.openNextWallet => 'Open wallet',
+      null => null,
+    };
+    final surface = context.colorScheme.surface;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: context.appColors.transparentSurface,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+        systemNavigationBarColor: surface,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+      child: Material(
+        color: surface,
+        child: AsterCenteredSafeArea(
+          bottom: false,
+          child: Center(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(
+                spacing.screenPadding,
+                spacing.screenPadding,
+                spacing.screenPadding,
+                bottomGap + context.windowInsets.bottomSafe,
+              ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -58,17 +68,26 @@ class WalletUnavailableScreen extends StatelessWidget {
                     textAlign: TextAlign.center,
                   ),
                   SizedBox(height: context.spacing.sm),
-                  Text(
-                    failure.userMessage,
-                    style: context.type.statusMessage,
-                    textAlign: TextAlign.center,
+                  Semantics(
+                    container: true,
+                    liveRegion: true,
+                    label: failure.userMessage,
+                    excludeSemantics: true,
+                    child: Text(
+                      failure.userMessage,
+                      style: context.type.statusMessage,
+                      textAlign: TextAlign.center,
+                    ),
                   ),
-                  if (canRetry) ...[
+                  if (action != null && onRetry != null) ...[
                     SizedBox(height: context.spacing.xxl),
                     CustomButton(
-                      text: 'Retry',
+                      text: action,
+                      width: DuoDisplayLayout.landscapeOverlayMaxWidth(
+                        MediaQuery.sizeOf(context),
+                        spacing.xxl,
+                      ),
                       loading: retrying,
-                      enabled: !retrying,
                       hapticIntent: null,
                       onTap: onRetry,
                     ),

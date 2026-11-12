@@ -791,6 +791,7 @@ void main() {
         assetKind: WalletAssetKind.bitcoin,
         activityId: 'activity-${'f' * 64}',
       ),
+      asymmetricViewport: true,
     );
     await _pumpUntil(
       tester,
@@ -817,6 +818,13 @@ void main() {
 
     harness.engine.syncGate = Completer<void>();
     final retry = find.widgetWithText(CustomButton, 'Retry');
+    expect(
+      tester
+          .getCenter(find.text('This transaction is no longer available.'))
+          .dx,
+      951 / 2,
+    );
+    expect(tester.getCenter(retry).dx, 951 / 2);
     await tester.tap(retry);
     await tester.pump();
     expect(
@@ -855,6 +863,7 @@ void main() {
       tester,
       harness,
       const TransactionListScreen(assetKind: WalletAssetKind.bitcoin),
+      asymmetricViewport: true,
     );
     await _pumpUntil(
       tester,
@@ -862,6 +871,8 @@ void main() {
     );
 
     final message = find.bySemanticsLabel(failure.userMessage);
+    expect(tester.getCenter(find.text(failure.userMessage)).dx, 951 / 2);
+    expect(tester.getCenter(find.text('Retry')).dx, 951 / 2);
     expect(tester.getSemantics(message).flagsCollection.isLiveRegion, isTrue);
     expect(
       tester
@@ -992,6 +1003,13 @@ void main() {
   });
 }
 
+void _useAsymmetricViewport(WidgetTester tester) {
+  tester.view.devicePixelRatio = 1;
+  tester.view.physicalSize = const Size(951, 669);
+  tester.view.padding = const FakeViewPadding(right: 84, bottom: 34);
+  addTearDown(tester.view.reset);
+}
+
 final class _InitiallyFailingSettingsViewModel extends SettingsViewModel {
   _InitiallyFailingSettingsViewModel(this.failure);
 
@@ -1115,8 +1133,13 @@ Future<void> _pump(
   Widget child, {
   TextScaler? textScaler,
   ProviderContainer? container,
+  bool asymmetricViewport = false,
 }) {
-  _configurePhone(tester);
+  if (asymmetricViewport) {
+    _useAsymmetricViewport(tester);
+  } else {
+    _configurePhone(tester);
+  }
   return tester.pumpWidget(
     UncontrolledProviderScope(
       container: container ?? harness.container,

@@ -9,6 +9,8 @@ part 'wallet_view_model.g.dart';
 /// Loads wallet metadata and coordinates transactional wallet switching.
 @Riverpod(keepAlive: true)
 class WalletViewModel extends _$WalletViewModel {
+  Future<AppResult<void>>? _deletionRecoveryInFlight;
+
   @override
   Future<WalletState> build() => _loadWallets();
 
@@ -18,27 +20,64 @@ class WalletViewModel extends _$WalletViewModel {
         (!state.hasError && state.value?.isChangingWallet == true)) {
       return;
     }
-    var resumeDeletion = false;
     if (state case AsyncError(:final error, :final stackTrace)) {
       final failure = FailureMapper.from(error, stackTrace);
-      resumeDeletion = canResumeDeletion(failure);
-      if (!failure.retryable && !resumeDeletion) return;
+      if (canResumeDeletion(failure)) {
+        await recoverCommittedDeletion(failure);
+        return;
+      }
+      if (!failure.retryable) return;
     }
     state = const AsyncLoading();
-    final next = await AsyncValue.guard(
-      () => _loadWallets(resumeDeletion: resumeDeletion),
-    );
+    final next = await AsyncValue.guard(_loadWallets);
     if (ref.mounted) state = next;
   }
 
   /// These commands resume an already-authorized durable deletion. Retrying
   /// ordinary mutations with uncertain outcomes remains prohibited.
   static bool canResumeDeletion(AppFailure failure) =>
-      failure.requiresReconciliation &&
-      const {
-        'wallet_deletion_incomplete',
-        'wallet_deleted_activation_failed',
-      }.contains(failure.code);
+      WalletAccessRecovery.forFailure(failure)?.resumesDeletion == true;
+
+  /// Finishes persisted deletion work or opens the surviving selection before
+  /// publishing the registry. Foreground and route recovery share this command.
+  Future<AppResult<void>> recoverCommittedDeletion(AppFailure failure) async {
+    if (!canResumeDeletion(failure)) return AppResult.failure(failure);
+    final inFlight = _deletionRecoveryInFlight;
+    if (inFlight != null) return inFlight;
+    if (state.isLoading ||
+        (!state.hasError && state.value?.isChangingWallet == true)) {
+      return AppResult.failure(failure);
+    }
+
+    final attempt = Future<AppResult<void>>.microtask(
+      () => _recoverCommittedDeletion(failure),
+    );
+    _deletionRecoveryInFlight = attempt;
+    state = const AsyncLoading();
+    try {
+      return await attempt;
+    } finally {
+      _deletionRecoveryInFlight = null;
+    }
+  }
+
+  Future<AppResult<void>> _recoverCommittedDeletion(AppFailure previous) async {
+    final next = await AsyncValue.guard(
+      () => _loadWallets(resumeDeletion: true),
+    );
+    if (next case AsyncError(:final error, :final stackTrace)) {
+      final failure = FailureMapper.from(error, stackTrace);
+      // A transient read/open failure does not establish that the native wallet
+      // is active. Keep the durable recovery command for the next attempt.
+      final blocked = failure.retryable ? previous : failure;
+      if (ref.mounted) {
+        state = AsyncError(AppFailureException(blocked), stackTrace);
+      }
+      return AppResult.failure(blocked);
+    }
+    if (ref.mounted) state = next;
+    return const AppResult.success(null);
+  }
 
   /// Clears a transient switch failure after presentation consumes it.
   void clearOperationFailure() {
@@ -169,7 +208,7 @@ class WalletViewModel extends _$WalletViewModel {
         ? await repository.recoverWalletDeletion()
         : await repository.load();
     if (result case AppSuccess<WalletRegistry>(:final value)
-        when resumeDeletion && value.profiles.isEmpty) {
+        when ref.mounted && resumeDeletion && value.profiles.isEmpty) {
       ref.read(securityControllerProvider).clearWalletPresence();
     }
     return switch (result) {

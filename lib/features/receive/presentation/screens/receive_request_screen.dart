@@ -41,6 +41,7 @@ class ReceiveRequestScreen extends ConsumerStatefulWidget {
 class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
     with WidgetsBindingObserver {
   Timer? _expiryTimer;
+  AppFailure? _requestFailureBeingRetried;
   late DateTime _now;
   late ProviderSubscription<AsyncValue<ReceiveFlowState>> _requestSubscription;
 
@@ -50,12 +51,25 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
   }
 
   Future<void> _retryRequest() async {
-    if (_requestActionInProgress) return;
+    final failure = _currentFailure();
+    if (_requestActionInProgress ||
+        _requestFailureBeingRetried != null ||
+        failure?.retryable != true) {
+      return;
+    }
     final toasts = context.toasts;
-    await ref
-        .read(receiveFlowViewModelProvider(widget.target).notifier)
-        .retry();
-    if (mounted) _showCurrentFailure(toasts, 'Could not create request');
+    final target = widget.target;
+    setState(() => _requestFailureBeingRetried = failure);
+    try {
+      await ref.read(receiveFlowViewModelProvider(target).notifier).retry();
+      if (mounted && widget.target == target) {
+        _showCurrentFailure(toasts, 'Could not create request');
+      }
+    } finally {
+      if (mounted && widget.target == target) {
+        setState(() => _requestFailureBeingRetried = null);
+      }
+    }
   }
 
   void _showCurrentFailure(ToastPresentationService toasts, String title) {
@@ -92,6 +106,7 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
   void didUpdateWidget(ReceiveRequestScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.target == widget.target) return;
+    _requestFailureBeingRetried = null;
     _requestSubscription.close();
     _listenToRequest();
   }
@@ -237,6 +252,7 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
     final flow = ref.watch(provider);
     final sharing =
         flow.value?.operation == ReceiveFlowOperation.sharingRequest;
+    final retrying = _requestFailureBeingRetried;
     final durableGenerationOwnsRoute = flow.value?.isGenerating ?? false;
     final content = Builder(
       builder: (context) {
@@ -288,7 +304,13 @@ class _ReceiveRequestScreenState extends ConsumerState<ReceiveRequestScreen>
                               _showAmountSheet(context, navigation),
                             ),
                           ),
-                          loading: () => _RequestLoading(target: widget.target),
+                          loading: () => retrying == null
+                              ? _RequestLoading(target: widget.target)
+                              : _RequestFailure(
+                                  failure: retrying,
+                                  retrying: true,
+                                  onRetry: () => unawaited(_retryRequest()),
+                                ),
                           error: (error, stackTrace) => _RequestFailure(
                             failure: error is AppFailureException
                                 ? error.failure
@@ -653,37 +675,55 @@ final class _RequestLoading extends StatelessWidget {
 }
 
 final class _RequestFailure extends StatelessWidget {
-  const _RequestFailure({required this.failure, required this.onRetry});
+  const _RequestFailure({
+    required this.failure,
+    required this.onRetry,
+    this.retrying = false,
+  });
 
   final AppFailure failure;
   final VoidCallback onRetry;
+  final bool retrying;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            MingCuteIcons.mgc_information_line,
-            size: context.icons.xl,
-            color: context.appColors.textSecondary,
-          ),
-          SizedBox(height: context.spacing.md),
-          Semantics(
-            liveRegion: true,
-            child: Text(
-              'Request unavailable',
-              style: context.type.title,
-              textAlign: TextAlign.center,
-            ),
-          ),
-          if (failure.retryable) ...[
-            SizedBox(height: context.spacing.lg),
-            CustomButton(text: 'Retry', onTap: onRetry),
-          ],
-        ],
+    final spacing = context.spacing;
+    return ListView(
+      padding: EdgeInsets.only(
+        bottom: context.windowInsets.bottomSafe + spacing.lg,
       ),
+      children: [
+        Squircle(
+          borderRadius: context.radii.card,
+          padding: EdgeInsets.all(spacing.xxl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                MingCuteIcons.mgc_information_line,
+                size: context.icons.xl,
+                color: context.appColors.textSecondary,
+              ),
+              SizedBox(height: spacing.md),
+              Semantics(
+                container: true,
+                liveRegion: true,
+                excludeSemantics: true,
+                label: 'Request unavailable',
+                child: Text(
+                  'Request unavailable',
+                  style: context.type.title,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              if (failure.retryable) ...[
+                SizedBox(height: spacing.lg),
+                CustomButton(text: 'Retry', loading: retrying, onTap: onRetry),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

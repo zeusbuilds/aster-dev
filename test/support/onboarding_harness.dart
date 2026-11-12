@@ -115,6 +115,7 @@ final class OnboardingTestHarness {
       overrides: [
         securityControllerProvider.overrideWithValue(security),
         walletRepositoryProvider.overrideWith((ref) async => repository),
+        walletServiceConfigurationProvider.overrideWithValue(services),
         bip39WordListRepositoryProvider.overrideWithValue(
           Bip39WordListRepository(onboardingAssets ?? rootBundle),
         ),

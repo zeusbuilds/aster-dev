@@ -7,7 +7,7 @@ import '../../features/send/presentation/models/models.dart';
 import '../../features/send/presentation/view_model/view_models.dart';
 import '../../features/shell/presentation/providers/app_shell_index_provider.dart';
 import '../../features/wallet/domain/models/models.dart';
-import '../../features/wallet/presentation/view_model/wallet_view_model.dart';
+import '../../features/wallet/presentation/view_model/view_models.dart';
 import '../feedback/toast_controller.dart';
 import '../layout/layout.dart';
 import '../theme/theme.dart';
@@ -40,7 +40,7 @@ GoRouter appRouter(Ref ref) {
           location: state.matchedLocation,
           walletState: ref.read(walletViewModelProvider),
         ) ??
-        _sendAmountRedirect(ref, state),
+        _paymentRedirect(ref, state),
     errorBuilder: (context, state) => const ErrorScreen(),
     debugLogDiagnostics: false,
   );
@@ -68,14 +68,24 @@ GoRouter appRouter(Ref ref) {
   return router;
 }
 
-String? _sendAmountRedirect(Ref ref, GoRouterState state) {
-  if (state.fullPath != RoutePaths.sendAmount) return null;
+String? _paymentRedirect(Ref ref, GoRouterState state) {
+  final fallback = switch (state.fullPath) {
+    RoutePaths.sendAddress || RoutePaths.sendAmount => RoutePaths.send,
+    RoutePaths.receiveRequest => RoutePaths.receive,
+    _ => null,
+  };
+  if (fallback == null) return null;
   final target = WalletPaymentTarget.tryParse(
     state.pathParameters[RoutePaths.paymentTargetParameter],
   );
-  // The route graph owns malformed target handling. Only inspect Send state
-  // when its amount location is requested, avoiding eager wallet operations.
-  if (target == null) return null;
+  if (target == null ||
+      !ref
+          .read(walletPaymentCapabilitiesProvider)
+          .any((item) => item.target == target && item.isAvailable)) {
+    return fallback;
+  }
+  // Only an available Send amount link may read the wallet flow.
+  if (state.fullPath != RoutePaths.sendAmount) return null;
   final flow = ref.read(sendFlowViewModelProvider(target));
   final current = flow.value;
   if (flow.isLoading ||
@@ -117,7 +127,7 @@ class ErrorScreen extends StatelessWidget {
         statusBarBrightness: brightness,
       ),
       child: Scaffold(
-        body: SafeArea(
+        body: AsterCenteredSafeArea(
           bottom: false,
           child: Center(
             child: SingleChildScrollView(

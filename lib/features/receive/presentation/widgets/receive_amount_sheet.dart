@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
 import '../../../wallet/domain/models/models.dart';
 import '../../../wallet/presentation/widgets/widgets.dart';
@@ -52,8 +51,9 @@ class ReceiveAmountSheet extends ConsumerWidget {
   ) async {
     final toasts = context.toasts;
     final route = ModalRoute.of(context);
-    final current = ref.read(receiveFlowViewModelProvider(target)).value;
-    if (current == null) return;
+    final flow = ref.read(receiveFlowViewModelProvider(target));
+    final current = flow.value;
+    if (current == null || flow.hasError || flow.isLoading) return;
     final validationMessage = _amountValidationMessage(current);
     if (validationMessage != null) {
       toasts.show(
@@ -92,22 +92,6 @@ class ReceiveAmountSheet extends ConsumerWidget {
     Navigator.of(context).pop();
   }
 
-  Future<void> _retry(BuildContext context, WidgetRef ref) async {
-    final toasts = context.toasts;
-    final route = ModalRoute.of(context);
-    await ref.read(receiveFlowViewModelProvider(target).notifier).retry();
-    if (!context.mounted || route?.isCurrent != true) return;
-    final next = ref.read(receiveFlowViewModelProvider(target));
-    if (next case AsyncError(:final error, :final stackTrace)) {
-      final failure = FailureMapper.from(error, stackTrace);
-      toasts.show(
-        title: 'Amount editor unavailable',
-        message: failure.userMessage,
-        variant: ToastVariant.failure,
-      );
-    }
-  }
-
   void _close(BuildContext context) {
     if (ModalRoute.of(context)?.isCurrent != true) return;
     Navigator.of(context).pop();
@@ -117,6 +101,19 @@ class ReceiveAmountSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final provider = receiveFlowViewModelProvider(target);
     final flow = ref.watch(provider);
+    final state = flow.value;
+    if (state == null || flow.hasError) {
+      // The request screen owns recovery. Only dismiss this sheet if it is
+      // still the current modal, so a late update cannot pop another route.
+      if (ModalRoute.of(context) is PopupRoute) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!context.mounted) return;
+          final latest = ref.read(provider);
+          if (!latest.hasValue || latest.hasError) _close(context);
+        });
+      }
+      return const SizedBox.shrink();
+    }
     final viewport = MediaQuery.sizeOf(context);
     final maxHeight = viewport.height * context.metrics.sheetMaxHeightFactor;
     final isDuoCover =
@@ -158,38 +155,19 @@ class ReceiveAmountSheet extends ConsumerWidget {
                         onClose: () => _close(context),
                       ),
                       Flexible(
-                        child: flow.when(
-                          skipLoadingOnRefresh: false,
-                          data: (value) => _AmountSheetBody(
-                            state: value,
-                            bottomPadding: scrollBottomPadding ?? 0,
-                            commandsEnabled: !navigation.inFlight,
-                            onChanged: ref.read(provider.notifier).updateAmount,
-                            onApply: () => unawaited(
-                              _apply(
-                                context,
-                                ref,
-                                ref.read(provider.notifier),
-                                navigation,
-                              ),
+                        child: _AmountSheetBody(
+                          state: state,
+                          bottomPadding: scrollBottomPadding ?? 0,
+                          commandsEnabled:
+                              !navigation.inFlight && !flow.isLoading,
+                          onChanged: ref.read(provider.notifier).updateAmount,
+                          onApply: () => unawaited(
+                            _apply(
+                              context,
+                              ref,
+                              ref.read(provider.notifier),
+                              navigation,
                             ),
-                          ),
-                          loading: () => Padding(
-                            padding: EdgeInsets.only(
-                              bottom: scrollBottomPadding ?? 0,
-                            ),
-                            child: const Center(
-                              child: GridLoader(
-                                semanticLabel: 'Loading amount editor',
-                              ),
-                            ),
-                          ),
-                          error: (error, stackTrace) => _SheetFailure(
-                            failure: error is AppFailureException
-                                ? error.failure
-                                : FailureMapper.from(error, stackTrace),
-                            onRetry: () => unawaited(_retry(context, ref)),
-                            scrollBottomPadding: scrollBottomPadding,
                           ),
                         ),
                       ),
@@ -274,47 +252,6 @@ final class _AmountSheetBody extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-
-final class _SheetFailure extends StatelessWidget {
-  const _SheetFailure({
-    required this.failure,
-    required this.onRetry,
-    required this.scrollBottomPadding,
-  });
-
-  final AppFailure failure;
-  final VoidCallback onRetry;
-  final double? scrollBottomPadding;
-
-  @override
-  Widget build(BuildContext context) {
-    final padding = context.spacing.screenPadding;
-    final content = Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Semantics(
-          liveRegion: true,
-          child: Text(
-            'Amount editor unavailable',
-            style: context.type.statusMessage,
-            textAlign: TextAlign.center,
-          ),
-        ),
-        if (failure.retryable) ...[
-          SizedBox(height: context.spacing.lg),
-          CustomButton(text: 'Retry', onTap: onRetry),
-        ],
-      ],
-    );
-    if (scrollBottomPadding case final bottom?) {
-      return SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(padding, padding, padding, bottom),
-        child: content,
-      );
-    }
-    return Padding(padding: EdgeInsets.all(padding), child: content);
   }
 }
 

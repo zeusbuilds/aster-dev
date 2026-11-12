@@ -143,9 +143,13 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen>
               leadingIcon: true,
               centerTitle: false,
             ),
-            body: SafeArea(
+            body: AsterCenteredSafeArea(
               top: false,
               bottom: false,
+              centerHorizontally:
+                  !activity.isLoading &&
+                  !settings.isLoading &&
+                  (activity.hasError || settings.hasError),
               child: RefreshIndicator(
                 onRefresh: refresh,
                 child: _ActivityBody(

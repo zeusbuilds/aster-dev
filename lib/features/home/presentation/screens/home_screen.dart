@@ -15,15 +15,19 @@ import '../widgets/widgets.dart';
 
 /// Active-wallet overview with truthful market and cross-rail balance states.
 class HomeScreen extends ConsumerWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.onOpenWalletSelection});
+
+  final VoidCallback? onOpenWalletSelection;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) =>
-      const _HomeBalanceRefreshSurface();
+      _HomeBalanceRefreshSurface(onOpenWalletSelection: onOpenWalletSelection);
 }
 
 class _HomeBalanceRefreshSurface extends ConsumerStatefulWidget {
-  const _HomeBalanceRefreshSurface();
+  const _HomeBalanceRefreshSurface({this.onOpenWalletSelection});
+
+  final VoidCallback? onOpenWalletSelection;
 
   @override
   ConsumerState<_HomeBalanceRefreshSurface> createState() => _HomeScreenState();
@@ -200,7 +204,7 @@ class _HomeScreenState extends ConsumerState<_HomeBalanceRefreshSurface>
     final heroContent = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const HomeHeader(),
+        HomeHeader(onOpenWalletSelection: widget.onOpenWalletSelection),
         PriceCard(
           key: _priceCardKey,
           chartHeight: split

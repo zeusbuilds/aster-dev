@@ -42,38 +42,8 @@ final class WalletPaymentOperations {
   static const _activityTipRevalidationAttempts = 3;
   static const _activityTipRevalidationDelay = Duration(seconds: 1);
 
-  List<WalletPaymentCapability> get capabilities {
-    final usdt = _services.usdtAsset;
-    final capabilities = <WalletPaymentCapability>[
-      WalletPaymentCapability.available(
-        const PaymentRoute(
-          asset: WalletAsset.bitcoin,
-          rail: PaymentRail.onchain,
-        ),
-      ),
-      const WalletPaymentCapability.unavailable(
-        WalletPaymentTarget.bitcoinLightning,
-      ),
-      if (usdt == null) ...const [
-        WalletPaymentCapability.unavailable(WalletPaymentTarget.usdtOnchain),
-        WalletPaymentCapability.unavailable(WalletPaymentTarget.usdtLightning),
-      ] else ...[
-        WalletPaymentCapability.available(
-          PaymentRoute(
-            asset: WalletAsset.rgbUsdt(
-              assetId: usdt.contractId,
-              precision: usdt.precision,
-            ),
-            rail: PaymentRail.onchain,
-          ),
-        ),
-        const WalletPaymentCapability.unavailable(
-          WalletPaymentTarget.usdtLightning,
-        ),
-      ],
-    ];
-    return List<WalletPaymentCapability>.unmodifiable(capabilities);
-  }
+  List<WalletPaymentCapability> get capabilities =>
+      WalletPaymentCapability.forServices(_services);
 
   AppResult<PaymentRoute> resolveTarget(WalletPaymentTarget target) {
     if (target.rail == PaymentRail.lightning) {

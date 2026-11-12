@@ -79,7 +79,12 @@ class SettingsViewModel extends _$SettingsViewModel {
     Future<AppResult<SettingsSnapshot>> Function(SettingsRepository) action,
   ) async {
     final current = state.value;
-    if (current == null || current.isSaving) return false;
+    if (state.isLoading ||
+        state.hasError ||
+        current == null ||
+        current.isSaving) {
+      return false;
+    }
     final generation = _stateGeneration;
     state = AsyncData(
       current.copyWith(operation: operation, operationFailure: null),

@@ -43,16 +43,12 @@ class TransactionDetailsScreen extends ConsumerWidget {
         centerTitle: false,
         fallbackLocation: RoutePaths.transactionListFor(assetKind.slug),
       ),
-      body: SafeArea(
-        top: false,
-        bottom: false,
-        child: _DetailsBody(
-          activity: activity,
-          settings: settings,
-          assetKind: assetKind,
-          activityId: activityId,
-          formatter: _formatter,
-        ),
+      body: _DetailsBody(
+        activity: activity,
+        settings: settings,
+        assetKind: assetKind,
+        activityId: activityId,
+        formatter: _formatter,
       ),
     );
   }
@@ -76,7 +72,7 @@ class _DetailsBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (activity.isLoading || settings.isLoading) {
-      return const _DetailsLoadingView();
+      return const AsterHorizontalSafeArea(child: _DetailsLoadingView());
     }
     if (activity case AsyncError(:final error, :final stackTrace)) {
       return _DetailsFailure(
@@ -104,15 +100,17 @@ class _DetailsBody extends ConsumerWidget {
       // up, and use its authoritative confirmation/status as soon as known.
       record = display.nativeActivityIn(state.feed);
       if (record == null) {
-        return _SubmissionDetails(
-          routeContext: context,
-          display: display,
-          state: state,
-          bitcoinUnit: settings.requireValue.snapshot.preferences.bitcoinUnit,
-          valuesVisible:
-              settings.requireValue.snapshot.preferences.balancesVisible,
-          formatter: formatter,
-          assetKind: assetKind,
+        return AsterHorizontalSafeArea(
+          child: _SubmissionDetails(
+            routeContext: context,
+            display: display,
+            state: state,
+            bitcoinUnit: settings.requireValue.snapshot.preferences.bitcoinUnit,
+            valuesVisible:
+                settings.requireValue.snapshot.preferences.balancesVisible,
+            formatter: formatter,
+            assetKind: assetKind,
+          ),
         );
       }
     }
@@ -165,7 +163,7 @@ class _DetailsBody extends ConsumerWidget {
       notifier.clearRefreshFailure();
     }
 
-    return RefreshIndicator(
+    final content = RefreshIndicator(
       onRefresh: refresh,
       child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -281,6 +279,7 @@ class _DetailsBody extends ConsumerWidget {
         ],
       ),
     );
+    return AsterHorizontalSafeArea(child: content);
   }
 
   static AppFailure _failure(Object error, StackTrace stackTrace) =>
@@ -732,7 +731,7 @@ class _DetailsFailure extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CustomScrollView(
+    final content = CustomScrollView(
       slivers: [
         SliverFillRemaining(
           hasScrollBody: false,
@@ -775,6 +774,7 @@ class _DetailsFailure extends StatelessWidget {
         ),
       ],
     );
+    return AsterCenteredSafeArea(top: false, bottom: false, child: content);
   }
 }
 

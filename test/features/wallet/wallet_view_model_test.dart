@@ -7,7 +7,10 @@ import 'package:aster/features/wallet/data/runtime/runtime.dart';
 import 'package:aster/features/wallet/data/storage/storage.dart';
 import 'package:aster/features/wallet/domain/models/models.dart';
 import 'package:aster/features/wallet/presentation/models/models.dart';
+import 'package:aster/features/wallet/presentation/view_model/wallet_lifecycle_view_model.dart';
 import 'package:aster/features/wallet/presentation/view_model/wallet_view_model.dart';
+import 'package:aster/shared/feedback/feedback.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -380,9 +383,12 @@ void main() {
     () async {
       final failedOpen = FakeWalletEngine()
         ..openPersistedError = StateError('unavailable');
+      final retryOpen = FakeWalletEngine()
+        ..openPersistedError = TimeoutException('temporary open failure');
+      final survivor = FakeWalletEngine();
       final h = await _createHarness(
         seedWalletProfiles: true,
-        engines: [FakeWalletEngine(), failedOpen, FakeWalletEngine()],
+        engines: [FakeWalletEngine(), failedOpen, retryOpen, survivor],
       );
       addTearDown(h.dispose);
       await h.repository.bootstrap();
@@ -395,12 +401,71 @@ void main() {
       expect(WalletViewModel.canResumeDeletion(failure), isTrue);
       expect(failure.code, 'wallet_deleted_activation_failed');
       await vm.reload();
+      final retryFailure = h.container.read(walletViewModelProvider);
+      expect(retryFailure.hasError, isTrue);
+      expect(
+        FailureMapper.from(retryFailure.error!, retryFailure.stackTrace!).code,
+        'wallet_deleted_activation_failed',
+      );
+      expect(survivor.calls, isEmpty);
+
+      await vm.reload();
       final after = h.container.read(walletViewModelProvider).requireValue;
       expect(after.activeWallet?.id, _secondWalletId);
       expect(after.wallets, hasLength(1));
       expect(after.wallets.any((p) => p.id == _firstWalletId), isFalse);
+      expect(survivor.calls, contains('openPersisted'));
     },
   );
+
+  test('foreground recovery honors the committed deletion action', () async {
+    final deleted = FakeWalletEngine();
+    final survivor = FakeWalletEngine();
+    final h = await _createHarness(
+      seedWalletProfiles: true,
+      engines: [deleted, survivor],
+    );
+    addTearDown(h.dispose);
+    await h.repository.bootstrap();
+    await h.container.read(walletViewModelProvider.future);
+    final wallets = h.container.read(walletViewModelProvider.notifier);
+    final lifecycle = h.container.read(
+      walletLifecycleViewModelProvider.notifier,
+    );
+
+    // The deletion was authorized and recorded, but native cleanup failed.
+    deleted.destroyError = StateError('could not close wallet');
+    expect(await wallets.deleteWallet(_firstWalletId), isFalse);
+    final access = h.container.read(walletViewModelProvider);
+    final failure = FailureMapper.from(access.error!, access.stackTrace!);
+    expect(failure.code, 'wallet_deletion_incomplete');
+    await lifecycle.handle(AppLifecycleState.paused);
+    expect(await lifecycle.handle(AppLifecycleState.resumed), isFalse);
+    expect(
+      h.container.read(walletLifecycleViewModelProvider).showsFailure,
+      true,
+    );
+
+    deleted.destroyError = null;
+    final recovery = lifecycle.retry(accessFailure: failure);
+    expect(
+      h.container.read(walletLifecycleViewModelProvider).transitioning,
+      true,
+    );
+    expect(await lifecycle.retry(accessFailure: failure), isFalse);
+    expect(await recovery, isTrue);
+    final ready = h.container.read(walletViewModelProvider).requireValue;
+    expect(ready.activeWallet?.id, _secondWalletId);
+    expect(ready.wallets.map((wallet) => wallet.id), [_secondWalletId]);
+    expect(
+      survivor.calls.where((call) => call == 'openPersisted'),
+      hasLength(1),
+    );
+    expect(
+      h.container.read(walletLifecycleViewModelProvider).blocksInteraction,
+      false,
+    );
+  });
 
   test('only durable deletion failures qualify for explicit resume', () {
     expect(
@@ -477,6 +542,9 @@ Future<_WalletViewModelHarness> _createHarness({
   final container = ProviderContainer(
     retry: (retryCount, error) => null,
     overrides: [
+      hapticFeedbackServiceProvider.overrideWithValue(
+        const NoopHapticFeedbackService(),
+      ),
       walletRepositoryProvider.overrideWith((ref) async {
         if (delayRepository) await Future<void>.delayed(Duration.zero);
         return repository;

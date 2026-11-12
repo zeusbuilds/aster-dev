@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:ming_cute_icons/ming_cute_icons.dart';
 
 import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
@@ -134,13 +133,11 @@ class _WalletDetailsScreenState extends ConsumerState<WalletDetailsScreen> {
             ?.appliesTo(MediaQuery.sizeOf(context)) ==
         true;
     final profile = wallet.value?.activeWallet;
-    final loading = wallet.isLoading || wallet.value?.switchingWalletId != null;
-    final failure = wallet.hasError
-        ? FailureMapper.from(
-            wallet.error!,
-            wallet.stackTrace ?? StackTrace.current,
-          )
-        : null;
+    final ready =
+        !wallet.isLoading &&
+        !wallet.hasError &&
+        wallet.value?.switchingWalletId == null &&
+        profile?.state == WalletProfileState.ready;
     return PopScope(
       canPop: !_deleting,
       child: AsterPageScaffold(
@@ -153,23 +150,9 @@ class _WalletDetailsScreenState extends ConsumerState<WalletDetailsScreen> {
           fallbackLocation: RoutePaths.settings,
         ),
         body: AsterHorizontalSafeArea(
-          child: loading
-              ? const Center(
-                  child: GridLoader(semanticLabel: 'Loading wallet details'),
-                )
-              : failure != null ||
-                    profile == null ||
-                    profile.state != WalletProfileState.ready
-              ? _Unavailable(
-                  onRetry:
-                      failure?.retryable == true ||
-                          (failure != null &&
-                              WalletViewModel.canResumeDeletion(failure))
-                      ? () => unawaited(
-                          ref.read(walletViewModelProvider.notifier).reload(),
-                        )
-                      : null,
-                )
+          // Wallet access owns registry failures and interrupted deletion.
+          child: !ready || profile == null
+              ? const SizedBox.shrink()
               : Column(
                   children: [
                     Expanded(
@@ -315,49 +298,6 @@ final class _WalletDetails extends StatelessWidget {
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-final class _Unavailable extends StatelessWidget {
-  const _Unavailable({this.onRetry});
-
-  final VoidCallback? onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(
-          context.spacing.screenPadding,
-          context.spacing.lg,
-          context.spacing.screenPadding,
-          context.spacing.lg + context.windowInsets.bottomSafe,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              MingCuteIcons.mgc_information_line,
-              color: context.appColors.textSecondary,
-              size: context.icons.xl,
-            ),
-            SizedBox(height: context.spacing.md),
-            Semantics(
-              liveRegion: true,
-              child: Text(
-                'Wallet unavailable',
-                style: context.type.title,
-                textAlign: TextAlign.center,
-              ),
-            ),
-            if (onRetry != null) ...[
-              SizedBox(height: context.spacing.lg),
-              CustomButton(text: 'Retry', hapticIntent: null, onTap: onRetry),
-            ],
-          ],
         ),
       ),
     );

@@ -311,13 +311,22 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
   }
 
   Widget _missingRecipient() {
-    if (!_recipientRedirectScheduled) {
+    if (!_recipientRedirectScheduled &&
+        ModalRoute.isCurrentOf(context) != false) {
       _recipientRedirectScheduled = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _recipientRedirectScheduled = false;
-        if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? true)) return;
-        final state = ref.read(sendFlowViewModelProvider(widget.target)).value;
-        if (state == null || state.preview != null || state.result != null) {
+        if (!mounted ||
+            _presentingSubmission ||
+            !(ModalRoute.of(context)?.isCurrent ?? true)) {
+          return;
+        }
+        final flow = ref.read(sendFlowViewModelProvider(widget.target));
+        final state = flow.value;
+        if (flow.isLoading ||
+            state?.result != null ||
+            state?.operation == SendFlowOperation.submitting ||
+            (!flow.hasError && state?.preview != null)) {
           return;
         }
         // The router rejects direct amount links without a validated recipient.
@@ -326,12 +335,13 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
           back();
           return;
         }
-        GoRouter.maybeOf(context)?.goNamed(
-          RouteNames.sendAddress,
-          pathParameters: {
-            RoutePaths.paymentTargetParameter: widget.target.slug,
-          },
-        );
+        final router = GoRouter.maybeOf(context);
+        if (router == null) return;
+        if (router.canPop()) {
+          router.pop();
+        } else {
+          router.go(RoutePaths.sendAddressFor(widget.target.slug));
+        }
       });
     }
     return _AmountLoading(target: widget.target);
@@ -350,7 +360,7 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
     final content = Builder(
       builder: (context) {
         final navigation = AsterNavigationScope.of(context);
-        if (flow case AsyncData<SendFlowState>(:final value)
+        if (flow.value case final value?
             when value.result != null && !_presentingSubmission) {
           final continueSend = widget.onSuccessContinue;
           return PopScope(
@@ -412,12 +422,7 @@ class _SendAmountScreenState extends ConsumerState<SendAmountScreen>
                           onSubmit: () => unawaited(_submit(navigation)),
                         ),
                   loading: () => _AmountLoading(target: widget.target),
-                  error: (error, stackTrace) => _AmountFailure(
-                    failure: error is AppFailureException
-                        ? error.failure
-                        : FailureMapper.from(error, stackTrace),
-                    onRetry: ref.read(provider.notifier).retry,
-                  ),
+                  error: (_, _) => _missingRecipient(),
                 ),
               ),
             ),
@@ -640,37 +645,6 @@ final class _AmountLoading extends StatelessWidget {
           ),
           SizedBox(height: context.spacing.xxxl),
           const CustomButton(text: 'Send'),
-        ],
-      ),
-    );
-  }
-}
-
-final class _AmountFailure extends StatelessWidget {
-  const _AmountFailure({required this.failure, required this.onRetry});
-
-  final AppFailure failure;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return AsterFormBody(
-      bottomPadding: context.windowInsets.bottomSystem + context.spacing.lg,
-      actions: const [],
-      content: Column(
-        children: [
-          Semantics(
-            liveRegion: true,
-            child: Text(
-              failure.userMessage,
-              style: context.type.statusMessage,
-              textAlign: TextAlign.center,
-            ),
-          ),
-          if (failure.retryable) ...[
-            SizedBox(height: context.spacing.lg),
-            CustomButton(text: 'Retry', onTap: onRetry),
-          ],
         ],
       ),
     );

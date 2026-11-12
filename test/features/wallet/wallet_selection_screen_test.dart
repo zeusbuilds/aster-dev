@@ -243,35 +243,27 @@ void main() {
     },
   );
 
-  for (final vector in <({bool retryable, bool showsRetry})>[
-    (retryable: true, showsRetry: true),
-    (retryable: false, showsRetry: false),
-  ]) {
-    testWidgets('wallet load failure respects retryable=${vector.retryable}', (
+  for (final retryable in [true, false]) {
+    testWidgets('wallet access owns registry failure retryable=$retryable', (
       tester,
     ) async {
       final failure = AppFailure(
         code: 'wallet_test_load',
         kind: AppFailureKind.storage,
-        userMessage: vector.retryable
+        userMessage: retryable
             ? 'Wallet storage is temporarily unavailable.'
             : 'Wallet storage requires recovery.',
-        retryable: vector.retryable,
+        retryable: retryable,
       );
       await _pumpWalletSelection(tester, _FailingWalletViewModel(failure));
 
-      expect(find.text(failure.userMessage), findsOneWidget);
-      expect(
-        tester
-            .getSemantics(find.bySemanticsLabel(failure.userMessage))
-            .flagsCollection
-            .isLiveRegion,
-        isTrue,
-      );
-      expect(
-        find.widgetWithText(CustomButton, 'Retry'),
-        vector.showsRetry ? findsOneWidget : findsNothing,
-      );
+      expect(find.text(failure.userMessage), findsNothing);
+      expect(find.widgetWithText(CustomButton, 'Retry'), findsNothing);
+      final addWallet = tester
+          .getSemantics(find.bySemanticsLabel('Add wallet'))
+          .getSemanticsData();
+      expect(addWallet.hasAction(ui.SemanticsAction.tap), isFalse);
+      expect(find.bySemanticsLabel(_primaryLabel), findsNothing);
     });
   }
 }

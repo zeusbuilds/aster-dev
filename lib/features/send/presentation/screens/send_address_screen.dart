@@ -305,9 +305,10 @@ class _SendAddressScreenState extends ConsumerState<SendAddressScreen> {
                 alignment: Alignment.centerLeft,
               ),
             ),
-            body: SafeArea(
+            body: AsterCenteredSafeArea(
               top: false,
               bottom: false,
+              centerHorizontally: flow.hasError && !flow.isLoading,
               child: Padding(
                 padding: EdgeInsets.symmetric(
                   horizontal: context.spacing.screenPadding,

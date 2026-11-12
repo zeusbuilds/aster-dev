@@ -1,6 +1,5 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../../../core/core.dart';
 import '../../../wallet/domain/models/models.dart';
 import '../../../wallet/presentation/view_model/view_models.dart';
 import '../models/models.dart';
@@ -11,26 +10,8 @@ part 'swap_view_model.g.dart';
 @riverpod
 class SwapViewModel extends _$SwapViewModel {
   @override
-  Future<SwapState> build() async {
-    final capabilities = await ref.watch(
-      walletPaymentCapabilitiesProvider.future,
-    );
-    return _initialState(capabilities);
-  }
-
-  /// Retries capability loading only when the typed failure permits replay.
-  void retry() {
-    final failure = switch (state) {
-      AsyncError(:final error, :final stackTrace) => FailureMapper.from(
-        error,
-        stackTrace,
-      ),
-      _ => null,
-    };
-    if (failure == null || !failure.retryable) return;
-    ref.invalidate(walletPaymentCapabilitiesProvider);
-    ref.invalidateSelf();
-  }
+  SwapState build() =>
+      _initialState(ref.watch(walletPaymentCapabilitiesProvider));
 
   bool selectFrom(WalletPaymentTarget target) =>
       _select(target, updateFrom: true);
@@ -39,15 +20,14 @@ class SwapViewModel extends _$SwapViewModel {
       _select(target, updateFrom: false);
 
   bool reverse() {
-    final current = state.value;
-    if (current == null || !current.canReverse) return false;
-    state = AsyncData(current.copyWith(from: current.to, to: current.from));
+    final current = state;
+    if (!current.canReverse) return false;
+    state = current.copyWith(from: current.to, to: current.from);
     return true;
   }
 
   bool _select(WalletPaymentTarget target, {required bool updateFrom}) {
-    final current = state.value;
-    if (current == null) return false;
+    final current = state;
     final capability = current.capabilities
         .where((item) => item.target == target)
         .firstOrNull;
@@ -58,19 +38,15 @@ class SwapViewModel extends _$SwapViewModel {
     }
     if (updateFrom) {
       if (target == current.from) return false;
-      state = AsyncData(
-        target == current.to
-            ? current.copyWith(from: target, to: current.from)
-            : current.copyWith(from: target),
-      );
+      state = target == current.to
+          ? current.copyWith(from: target, to: current.from)
+          : current.copyWith(from: target);
       return true;
     }
     if (target == current.to) return false;
-    state = AsyncData(
-      target == current.from
-          ? current.copyWith(from: current.to, to: target)
-          : current.copyWith(to: target),
-    );
+    state = target == current.from
+        ? current.copyWith(from: current.to, to: target)
+        : current.copyWith(to: target);
     return true;
   }
 

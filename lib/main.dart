@@ -164,6 +164,19 @@ class _AsterAppState extends ConsumerState<AsterApp>
     final haptics = ref.watch(hapticFeedbackServiceProvider);
     final toasts = ref.watch(toastControllerProvider.notifier);
     final lifecycle = ref.watch(walletLifecycleViewModelProvider);
+    final accessFailure = lifecycle.showsFailure
+        ? ref.watch(
+            walletViewModelProvider.select((wallet) {
+              final error = wallet.error;
+              return error == null
+                  ? null
+                  : FailureMapper.from(
+                      error,
+                      wallet.stackTrace ?? StackTrace.current,
+                    );
+            }),
+          )
+        : null;
 
     return MaterialApp.router(
       title: AppConstants.appName,
@@ -180,8 +193,11 @@ class _AsterAppState extends ConsumerState<AsterApp>
               controller: _security,
               child: WalletLifecycleGate(
                 state: lifecycle,
+                accessFailure: accessFailure,
                 onRetry: () => unawaited(
-                  ref.read(walletLifecycleViewModelProvider.notifier).retry(),
+                  ref
+                      .read(walletLifecycleViewModelProvider.notifier)
+                      .retry(accessFailure: accessFailure),
                 ),
                 child: HostedBridgeScope(
                   navigatorKey: router.routerDelegate.navigatorKey,

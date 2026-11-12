@@ -5,6 +5,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/core.dart';
 import '../../../../shared/feedback/feedback.dart';
+import '../../../wallet/data/repository/repository.dart';
 import '../../../wallet/domain/models/models.dart';
 import '../../../wallet/presentation/view_model/view_models.dart';
 import '../models/models.dart';
@@ -30,7 +31,9 @@ class NetworkConfigurationViewModel extends _$NetworkConfigurationViewModel {
   /// Refreshes health and discards a previous status if the check fails.
   Future<bool> refreshHealth() async {
     final current = state.value;
-    if (current == null ||
+    if (state.isLoading ||
+        state.hasError ||
+        current == null ||
         current.refreshing ||
         current.healthFailure?.retryable == false) {
       return false;
@@ -38,7 +41,9 @@ class NetworkConfigurationViewModel extends _$NetworkConfigurationViewModel {
     final generation = _stateGeneration;
     final toasts = ref.read(toastControllerProvider.notifier).captureOrigin();
     state = AsyncData(current.copyWith(refreshing: true));
-    final result = await _readNetworkStatus();
+    final result = await _readNetworkStatus(
+      ref.read(walletRepositoryProvider.future),
+    );
     if (!ref.mounted || generation != _stateGeneration) return false;
     state = AsyncData(switch (result) {
       AppSuccess(:final value) => current.copyWith(
@@ -66,8 +71,9 @@ class NetworkConfigurationViewModel extends _$NetworkConfigurationViewModel {
 
   Future<NetworkConfigurationState> _load() async {
     final configuration = ref.watch(walletServiceConfigurationProvider);
-    final repository = await ref.watch(walletRepositoryProvider.future);
-    final result = await repository.networkStatus();
+    final result = await _readNetworkStatus(
+      ref.watch(walletRepositoryProvider.future),
+    );
     return switch (result) {
       AppSuccess(:final value) => NetworkConfigurationState(
         configuration: configuration,
@@ -80,10 +86,12 @@ class NetworkConfigurationViewModel extends _$NetworkConfigurationViewModel {
     };
   }
 
-  Future<AppResult<WalletNetworkStatus>> _readNetworkStatus() async {
+  Future<AppResult<WalletNetworkStatus>> _readNetworkStatus(
+    Future<WalletRepository> repository,
+  ) async {
     try {
-      final repository = await ref.read(walletRepositoryProvider.future);
-      return await repository.networkStatus();
+      final resolved = await repository;
+      return await resolved.networkStatus();
     } catch (error, stackTrace) {
       return AppResult.failure(FailureMapper.from(error, stackTrace));
     }

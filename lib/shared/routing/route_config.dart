@@ -58,16 +58,12 @@ abstract final class RouteConfig {
       GoRoute(
         path: RoutePaths.sendAddress,
         name: RouteNames.sendAddress,
-        redirect: (context, state) =>
-            _invalidPaymentTargetRedirect(state, fallback: RoutePaths.send),
         builder: (context, state) =>
             SendAddressScreen(target: _paymentTarget(state)),
       ),
       GoRoute(
         path: RoutePaths.sendAmount,
         name: RouteNames.sendAmount,
-        redirect: (context, state) =>
-            _invalidPaymentTargetRedirect(state, fallback: RoutePaths.send),
         builder: (context, state) =>
             SendAmountScreen(target: _paymentTarget(state)),
       ),
@@ -79,8 +75,6 @@ abstract final class RouteConfig {
       GoRoute(
         path: RoutePaths.receiveRequest,
         name: RouteNames.receiveRequest,
-        redirect: (context, state) =>
-            _invalidPaymentTargetRedirect(state, fallback: RoutePaths.receive),
         builder: (context, state) =>
             ReceiveRequestScreen(target: _paymentTarget(state)),
       ),
@@ -129,7 +123,7 @@ abstract final class RouteConfig {
       GoRoute(
         path: RoutePaths.walletSelectionLocation,
         name: RouteNames.walletSelection,
-        builder: (context, state) => const WalletSelectionScreen(),
+        builder: (context, state) => const SettingsScreen.walletSelection(),
         routes: [
           GoRoute(
             path: RoutePaths.addWallet,
@@ -164,12 +158,12 @@ abstract final class RouteConfig {
           GoRoute(
             path: RoutePaths.countrySelection,
             name: RouteNames.countrySelection,
-            builder: (context, state) => const CountrySelectionScreen(),
+            redirect: (context, state) => RoutePaths.settings,
           ),
           GoRoute(
             path: RoutePaths.currencySelection,
             name: RouteNames.currencySelection,
-            builder: (context, state) => const CurrencySelectionScreen(),
+            redirect: (context, state) => RoutePaths.settings,
           ),
           GoRoute(
             path: RoutePaths.bitcoinUnitSelection,
@@ -255,17 +249,5 @@ abstract final class RouteConfig {
     return WalletActivity.isValidId(activityId)
         ? null
         : RoutePaths.transactionListFor(kind.slug);
-  }
-
-  static String? _invalidPaymentTargetRedirect(
-    GoRouterState state, {
-    required String fallback,
-  }) {
-    return WalletPaymentTarget.tryParse(
-              state.pathParameters[RoutePaths.paymentTargetParameter],
-            ) ==
-            null
-        ? fallback
-        : null;
   }
 }

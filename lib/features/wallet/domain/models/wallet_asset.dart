@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../../core/config/app_environment.dart';
 import '../validation/validation.dart';
 
 /// Payment rail used to move an asset.
@@ -214,6 +215,40 @@ final class WalletPaymentCapability {
 
   const WalletPaymentCapability.unavailable(WalletPaymentTarget target)
     : this._(target: target);
+
+  static List<WalletPaymentCapability> forServices(
+    WalletServiceConfiguration services,
+  ) {
+    final usdt = services.usdtAsset;
+    return List<WalletPaymentCapability>.unmodifiable([
+      WalletPaymentCapability.available(
+        const PaymentRoute(
+          asset: WalletAsset.bitcoin,
+          rail: PaymentRail.onchain,
+        ),
+      ),
+      const WalletPaymentCapability.unavailable(
+        WalletPaymentTarget.bitcoinLightning,
+      ),
+      if (usdt == null) ...const [
+        WalletPaymentCapability.unavailable(WalletPaymentTarget.usdtOnchain),
+        WalletPaymentCapability.unavailable(WalletPaymentTarget.usdtLightning),
+      ] else ...[
+        WalletPaymentCapability.available(
+          PaymentRoute(
+            asset: WalletAsset.rgbUsdt(
+              assetId: usdt.contractId,
+              precision: usdt.precision,
+            ),
+            rail: PaymentRail.onchain,
+          ),
+        ),
+        const WalletPaymentCapability.unavailable(
+          WalletPaymentTarget.usdtLightning,
+        ),
+      ],
+    ]);
+  }
 
   final WalletPaymentTarget target;
   final PaymentRoute? route;

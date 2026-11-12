@@ -5,8 +5,8 @@ import 'package:flutter/widgets.dart';
 import '../theme/theme.dart';
 import 'duo_display_layout.dart';
 
-/// The tab capsule's footprint on either Duo display. Only the app shell
-/// installs this scope, so pushed routes retain their own spacing.
+/// The tab capsule's footprint on either Duo display. Routes with tabs
+/// install this scope so other routes retain their own spacing.
 class CoverTabRail extends InheritedWidget {
   const CoverTabRail({required this.bounds, required super.child, super.key});
 

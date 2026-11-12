@@ -5,13 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:ming_cute_icons/ming_cute_icons.dart';
 
-import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
 import '../models/models.dart';
 import '../view_model/view_models.dart';
 import '../widgets/widgets.dart';
 
-/// Generates and displays a flow-owned 12-word recovery phrase.
+/// Displays the recovery phrase prepared by the wallet setup journey.
 class OnboardingCreateWalletScreen extends ConsumerWidget {
   const OnboardingCreateWalletScreen({
     super.key,
@@ -36,81 +35,39 @@ class OnboardingCreateWalletScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncState = ref.watch(createWalletViewModelProvider);
-    final value = asyncState.value;
+    final state = asyncState.asData?.value;
+    if (asyncState.isLoading || state == null || state.completed) {
+      return const SizedBox.shrink();
+    }
     return AsterNavigationScope(
       child: Builder(
         builder: (context) {
           final navigation = AsterNavigationScope.of(context);
           final navigationLocked =
               navigation.inFlight ||
-              (value != null &&
-                  (value.submitting || value.requiresReconciliation));
+              state.submitting ||
+              state.requiresReconciliation;
           return PopScope(
             canPop: !navigationLocked,
             child: Scaffold(
               backgroundColor: onBrandArt
                   ? context.appColors.transparentSurface
                   : context.colorScheme.surface,
-              body: switch (asyncState) {
-                AsyncData<CreateWalletState>(:final value)
-                    when !value.completed =>
-                  OnboardingScrollSafeArea(
-                    builder: (_, scrollBottomInset) => _CreateWalletContent(
-                      state: value,
-                      navigation: navigation,
-                      onBack: onBack,
-                      onContinue: onContinue,
-                      onBrandArt: onBrandArt,
-                      showNavigationBar: showNavigationBar,
-                      scrollBottomInset: scrollBottomInset,
-                    ),
-                  ),
-                AsyncError<CreateWalletState>(
-                  :final error,
-                  :final stackTrace,
-                ) =>
-                  SafeArea(
-                    child: _buildFailure(
-                      context,
-                      ref,
-                      navigation,
-                      error,
-                      stackTrace,
-                    ),
-                  ),
-                _ => SafeArea(
-                  child: OnboardingStatusPanel.loading(
-                    message: 'Generating your recovery phrase...',
-                    onBrandArt: onBrandArt,
-                  ),
+              body: OnboardingScrollSafeArea(
+                builder: (_, scrollBottomInset) => _CreateWalletContent(
+                  state: state,
+                  navigation: navigation,
+                  onBack: onBack,
+                  onContinue: onContinue,
+                  onBrandArt: onBrandArt,
+                  showNavigationBar: showNavigationBar,
+                  scrollBottomInset: scrollBottomInset,
                 ),
-              },
+              ),
             ),
           );
         },
       ),
-    );
-  }
-
-  Widget _buildFailure(
-    BuildContext context,
-    WidgetRef ref,
-    AsterNavigationCommandOwner navigation,
-    Object error,
-    StackTrace stackTrace,
-  ) {
-    final failure = FailureMapper.from(error, stackTrace);
-    return OnboardingStatusPanel.failure(
-      title: 'Wallet could not be prepared',
-      message: failure.userMessage,
-      primaryLabel: failure.retryable ? 'Retry' : null,
-      onPrimary: failure.retryable
-          ? () => ref.invalidate(createWalletViewModelProvider)
-          : null,
-      onBack: showNavigationBar
-          ? onBack ?? () => _navigateBack(context, navigation)
-          : null,
-      onBrandArt: onBrandArt,
     );
   }
 }

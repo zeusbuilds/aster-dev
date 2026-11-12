@@ -12,11 +12,23 @@ import '../providers/app_shell_index_provider.dart';
 import '../widgets/bottom_nav.dart';
 
 /// Main shell containing the persistent navigation and feature screen stack.
-class AppShellScreen extends ConsumerWidget {
+class AppShellScreen extends ConsumerStatefulWidget {
   const AppShellScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AppShellScreen> createState() => _AppShellScreenState();
+}
+
+class _AppShellScreenState extends ConsumerState<AppShellScreen> {
+  var _walletSelectionRequest = 0;
+
+  void _openWalletSelection() {
+    setState(() => _walletSelectionRequest += 1);
+    ref.read(appShellIndexProvider.notifier).setIndex(appShellSettingsTabIndex);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final index = ref.watch(appShellIndexProvider);
     final layout = ref.watch(duoDisplayLayoutProvider).value;
     final isDuoCover =
@@ -25,10 +37,17 @@ class AppShellScreen extends ConsumerWidget {
         layout.appliesTo(MediaQuery.sizeOf(context));
 
     final screens = <Widget>[
-      const HomeScreen(),
+      HomeScreen(
+        onOpenWalletSelection: context.fitsDuoLandscapePanes
+            ? _openWalletSelection
+            : null,
+      ),
       const ScanScreen(purpose: ScanPurpose.sendLauncher),
       MarketScreen(isDuoCover: isDuoCover),
-      SettingsScreen(isActiveTab: index == appShellSettingsTabIndex),
+      SettingsScreen(
+        isActiveTab: index == appShellSettingsTabIndex,
+        walletSelectionRequest: _walletSelectionRequest,
+      ),
     ];
     final rail = CoverTabRail.resolve(context, layout, appShellTabCount);
 

@@ -128,8 +128,6 @@ class _SendScreenState extends ConsumerState<SendScreen> {
                           ? target
                           : null,
                       selectionEnabled: canPickAsset,
-                      onRetry: () =>
-                          ref.invalidate(walletPaymentCapabilitiesProvider),
                       onSelected: (selected) async {
                         if (_step != _SendStep.asset &&
                             _step != _SendStep.address) {

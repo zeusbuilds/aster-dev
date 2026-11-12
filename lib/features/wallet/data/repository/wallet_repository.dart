@@ -132,6 +132,7 @@ final class WalletRepository implements WalletLifecycleRepository {
       return registryResult;
     }
     var registry = (registryResult as AppSuccess<WalletRegistry>).value;
+    final resumingDeletion = registry.deletingProfiles.isNotEmpty;
     // Deletion authority was committed before any resource was removed. Finish
     // only those exact records; never infer deletions from missing native data.
     for (final deleting in registry.deletingProfiles) {
@@ -187,14 +188,16 @@ final class WalletRepository implements WalletLifecycleRepository {
     final active = registry.activeProfile;
     if (active == null) return AppResult.success(registry);
     final restore = await _runtime.restore(active);
-    if (restore is AppSuccess<void>) {
-      final paymentFence = await _restorePaymentFenceUnsafe();
-      if (paymentFence case AppFailureResult<void>(:final failure)) {
-        return AppResult.failure(failure);
-      }
-    }
-    return switch (restore) {
+    final result = restore is AppSuccess<void>
+        ? await _restorePaymentFenceUnsafe()
+        : restore;
+    return switch (result) {
       AppSuccess<void>() => AppResult.success(registry),
+      AppFailureResult<void>(:final failure)
+          when resumingDeletion && failure.retryable =>
+        AppResult.failure(
+          _deletionRecoveryFailure(cause: failure, committed: true),
+        ),
       AppFailureResult<void>(:final failure) => AppResult.failure(failure),
     };
   }

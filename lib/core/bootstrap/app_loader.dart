@@ -8,6 +8,8 @@ import 'package:flutter/services.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../features/wallet/domain/models/wallet_access_recovery.dart';
+import '../../features/wallet/presentation/pages/wallet_unavailable_screen.dart';
 import '../../shared/shared.dart';
 import '../errors/errors.dart';
 import '../security/security_controller.dart';
@@ -192,7 +194,6 @@ class _AppLoaderState extends State<AppLoader>
   }
 
   Future<void> _load() async {
-    _failure.value = null;
     _isRetrying.value = true;
     try {
       final container = await widget.initialize();
@@ -201,6 +202,7 @@ class _AppLoaderState extends State<AppLoader>
         return;
       }
       _container.value = container;
+      _failure.value = null;
       _scheduleReveal();
     } catch (error, stackTrace) {
       if (!mounted) return;
@@ -222,7 +224,12 @@ class _AppLoaderState extends State<AppLoader>
   }
 
   void _retry() {
-    if (_isRetrying.value || _failure.value?.retryable != true) return;
+    final failure = _failure.value;
+    if (_isRetrying.value ||
+        failure == null ||
+        WalletAccessRecovery.forFailure(failure) == null) {
+      return;
+    }
     _resetReveal();
     _isSplashScreenVisible.value = true;
     _loader = _load();
@@ -255,52 +262,14 @@ class _AppLoaderState extends State<AppLoader>
                     );
                   },
                 ),
-                ValueListenableBuilder<AppFailure?>(
-                  valueListenable: _failure,
-                  builder: (context, failure, _) {
-                    if (failure != null) {
-                      return _BootstrapFailureView(
-                        failure: failure,
-                        retrying: _isRetrying,
-                        onRetry: _retry,
-                      );
-                    }
-                    return ValueListenableBuilder<bool>(
-                      valueListenable: _isSplashScreenVisible,
-                      builder: (context, isVisible, splash) {
-                        if (!isVisible) return const SizedBox.shrink();
-                        return splash!;
-                      },
-                      child: AnnotatedRegion<SystemUiOverlayStyle>(
-                        value: SystemUiOverlayStyle(
-                          statusBarColor: context.appColors.transparentSurface,
-                          statusBarIconBrightness: Brightness.dark,
-                          statusBarBrightness: Brightness.light,
-                          systemNavigationBarColor:
-                              context.appColors.transparentSurface,
-                          systemNavigationBarIconBrightness: Brightness.dark,
-                        ),
-                        child: widget.security == null
-                            ? AnimatedSplashScreen(
-                                controller: _controller,
-                                colorTransition: _colorController,
-                              )
-                            : ListenableBuilder(
-                                listenable: widget.security!,
-                                builder: (context, _) =>
-                                    widget.security!.isLocked ||
-                                        widget.security!.isObscured
-                                    ? AsterLockScreen(
-                                        controller: widget.security!,
-                                      )
-                                    : AnimatedSplashScreen(
-                                        controller: _controller,
-                                        colorTransition: _colorController,
-                                      ),
-                              ),
-                      ),
-                    );
-                  },
+                ListenableBuilder(
+                  listenable: Listenable.merge([
+                    _failure,
+                    _isRetrying,
+                    _isSplashScreenVisible,
+                    widget.security,
+                  ]),
+                  builder: (context, _) => _buildOverlay(context),
                 ),
               ],
             ),
@@ -309,96 +278,40 @@ class _AppLoaderState extends State<AppLoader>
       ),
     );
   }
-}
 
-class _BootstrapFailureView extends StatelessWidget {
-  const _BootstrapFailureView({
-    required this.failure,
-    required this.retrying,
-    required this.onRetry,
-  });
-
-  final AppFailure failure;
-  final ValueListenable<bool> retrying;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final themedSpacing = context.spacing;
-    final surface = context.colorScheme.surface;
+  Widget _buildOverlay(BuildContext context) {
+    if (!_isSplashScreenVisible.value) return const SizedBox.shrink();
+    final security = widget.security;
+    final failure = _failure.value;
+    // A retry after a pre-authentication storage failure can reach device
+    // authentication for the first time. It must be possible to unlock even
+    // if the user cancels the automatic system prompt during that retry.
+    final locked =
+        security != null &&
+        (security.isObscured ||
+            (security.isLocked && (security.initialized || failure == null)));
+    if (!locked && failure != null) {
+      return WalletUnavailableScreen(
+        failure: failure,
+        title: 'Wallet could not be opened',
+        retrying: _isRetrying.value,
+        onRetry: _retry,
+      );
+    }
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: context.appColors.transparentSurface,
         statusBarIconBrightness: Brightness.dark,
         statusBarBrightness: Brightness.light,
-        systemNavigationBarColor: surface,
+        systemNavigationBarColor: context.appColors.transparentSurface,
         systemNavigationBarIconBrightness: Brightness.dark,
       ),
-      child: Material(
-        color: surface,
-        child: SafeArea(
-          bottom: false,
-          child: Center(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(
-                themedSpacing.screenPadding,
-                themedSpacing.screenPadding,
-                themedSpacing.screenPadding,
-                themedSpacing.screenPadding + context.windowInsets.bottomSafe,
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.lock_outline,
-                    size: context.icons.xl,
-                    color: context.appColors.danger,
-                  ),
-                  SizedBox(height: themedSpacing.lg),
-                  Text(
-                    'Wallet could not be opened',
-                    style: context.type.title,
-                    textAlign: TextAlign.center,
-                  ),
-                  SizedBox(height: themedSpacing.sm),
-                  Semantics(
-                    container: true,
-                    liveRegion: true,
-                    label: failure.userMessage,
-                    excludeSemantics: true,
-                    child: Text(
-                      failure.userMessage,
-                      style: context.type.errorMessage,
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  if (failure.retryable) ...[
-                    SizedBox(height: themedSpacing.xxl),
-                    ValueListenableBuilder<bool>(
-                      valueListenable: retrying,
-                      builder: (context, loading, _) {
-                        return StreamBuilder<DuoDisplayLayout?>(
-                          stream: DuoDisplayLayout.platformUpdates,
-                          initialData: DuoDisplayLayout.currentPlatformLayout,
-                          builder: (context, snapshot) => CustomButton(
-                            text: 'Retry',
-                            width: snapshot.data?.actionMaxWidthFor(
-                              MediaQuery.sizeOf(context),
-                              themedSpacing.xxl,
-                            ),
-                            loading: loading,
-                            onTap: loading ? null : onRetry,
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ],
-              ),
+      child: locked
+          ? AsterLockScreen(controller: security)
+          : AnimatedSplashScreen(
+              controller: _controller,
+              colorTransition: _colorController,
             ),
-          ),
-        ),
-      ),
     );
   }
 }

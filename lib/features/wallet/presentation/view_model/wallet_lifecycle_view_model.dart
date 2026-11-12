@@ -6,7 +6,9 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../../core/core.dart';
 import '../../../../shared/feedback/feedback.dart';
 import '../../data/repository/repository.dart';
+import '../../domain/models/wallet_access_recovery.dart';
 import '../models/models.dart';
+import 'wallet_view_model.dart';
 
 part 'wallet_lifecycle_view_model.g.dart';
 
@@ -28,37 +30,37 @@ class WalletLifecycleViewModel extends _$WalletLifecycleViewModel {
 
   /// Applies one Flutter lifecycle event in arrival order.
   Future<bool> handle(AppLifecycleState lifecycle) {
-    return _schedule(lifecycle, userInitiated: false);
+    return _schedule(lifecycle);
   }
 
   /// Retries a failed foreground resume while retaining its failure surface.
-  Future<bool> retry() {
-    final failure = state.failure;
+  Future<bool> retry({AppFailure? accessFailure}) {
+    final failure = state.recoveryFailure(accessFailure);
     if (state.obscured ||
         state.transitioning ||
         failure == null ||
-        !failure.retryable) {
+        WalletAccessRecovery.forFailure(failure) == null) {
       return Future<bool>.value(false);
     }
-    return _schedule(AppLifecycleState.resumed, userInitiated: true);
+    return _schedule(AppLifecycleState.resumed, retryFailure: failure);
   }
 
   Future<bool> _schedule(
     AppLifecycleState lifecycle, {
-    required bool userInitiated,
+    AppFailure? retryFailure,
   }) {
+    final userInitiated = retryFailure != null;
     final revision = ++_revision;
-    final previous = state;
     state = WalletLifecycleState(
-      obscured: userInitiated ? false : true,
+      obscured: !userInitiated,
       transitioning: lifecycle != AppLifecycleState.inactive,
-      foregroundGeneration: previous.foregroundGeneration,
-      failure: userInitiated ? previous.failure : null,
+      foregroundGeneration: state.foregroundGeneration,
+      failure: retryFailure,
     );
 
     final completer = Completer<bool>();
     _tail = _tail.then((_) async {
-      final result = await _apply(lifecycle);
+      final result = await _apply(lifecycle, retryFailure);
       final succeeded = result is AppSuccess<void>;
       final current = ref.mounted && revision == _revision;
       if (current) {
@@ -77,11 +79,20 @@ class WalletLifecycleViewModel extends _$WalletLifecycleViewModel {
     return completer.future;
   }
 
-  Future<AppResult<void>> _apply(AppLifecycleState lifecycle) async {
+  Future<AppResult<void>> _apply(
+    AppLifecycleState lifecycle,
+    AppFailure? retryFailure,
+  ) async {
     if (lifecycle == AppLifecycleState.inactive) {
       return const AppResult.success(null);
     }
     try {
+      if (retryFailure != null &&
+          WalletViewModel.canResumeDeletion(retryFailure)) {
+        return await ref
+            .read(walletViewModelProvider.notifier)
+            .recoverCommittedDeletion(retryFailure);
+      }
       final repository = await ref.read(
         walletLifecycleOperationsProvider.future,
       );

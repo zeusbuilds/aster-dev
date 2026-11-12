@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:collection';
 
+import 'package:aster/core/bootstrap/app_bootstrap.dart';
 import 'package:aster/core/core.dart';
 import 'package:aster/features/wallet/data/repository/repository.dart';
 import 'package:aster/features/wallet/presentation/models/models.dart';
+import 'package:aster/features/wallet/presentation/pages/wallet_access_screen.dart';
 import 'package:aster/features/wallet/presentation/view_model/view_models.dart';
 import 'package:aster/features/wallet/presentation/widgets/widgets.dart';
 import 'package:aster/shared/shared.dart';
@@ -14,6 +16,46 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../support/presentation_fakes.dart';
 
 void main() {
+  testWidgets('wallet access keeps Retry visible while the registry reloads', (
+    tester,
+  ) async {
+    final model = _RetryingWalletAccess();
+    final container = ProviderContainer(
+      retry: applicationProviderRetryPolicy,
+      overrides: [walletViewModelProvider.overrideWith(() => model)],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const WalletAccessScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.text('Retry'));
+    await tester.pump();
+    expect(find.text('Wallet access unavailable'), findsOneWidget);
+    expect(find.byType(SplashScreen), findsNothing);
+    expect(
+      tester.widget<CustomButton>(find.byType(CustomButton)).loading,
+      true,
+    );
+    await tester.tap(find.byType(CustomButton), warnIfMissed: false);
+    expect(model.attempts, 1);
+
+    model.reloadComplete.complete();
+    await tester.pump();
+    await tester.pump();
+    expect(
+      find.text('Local wallet data could not be verified.'),
+      findsOneWidget,
+    );
+    expect(find.byType(CustomButton), findsNothing);
+  });
+
   test(
     'serializes rapid lifecycle events without revealing stale UI',
     () async {
@@ -203,6 +245,33 @@ void main() {
       findsOneWidget,
     );
   });
+}
+
+final class _RetryingWalletAccess extends WalletViewModel {
+  final reloadComplete = Completer<void>();
+  var attempts = 0;
+
+  @override
+  Future<WalletState> build() async => throw TimeoutException('temporary');
+
+  @override
+  Future<void> reload() async {
+    attempts += 1;
+    state = const AsyncLoading();
+    await reloadComplete.future;
+    state = AsyncError(
+      const AppFailureException(
+        AppFailure(
+          code: 'wallet_storage_invalid',
+          kind: AppFailureKind.storage,
+          userMessage: 'Local wallet data could not be verified.',
+          retryable: false,
+          requiresReconciliation: true,
+        ),
+      ),
+      StackTrace.current,
+    );
+  }
 }
 
 ProviderContainer _container(

@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/errors/errors.dart';
+import '../../../../core/core.dart';
 import '../../../../shared/shared.dart';
 import '../models/models.dart';
 import '../view_model/view_models.dart';
-import '../widgets/widgets.dart';
 
 /// Displays validated, non-secret network configuration and live node health.
 class NetworkConfigurationScreen extends ConsumerWidget {
@@ -20,7 +19,19 @@ class NetworkConfigurationScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final configuration = ref.watch(networkConfigurationViewModelProvider);
+    final health = ref.watch(networkConfigurationViewModelProvider);
+    final state = health.when(
+      skipLoadingOnRefresh: false,
+      loading: () => NetworkConfigurationState(
+        configuration: ref.watch(walletServiceConfigurationProvider),
+        refreshing: true,
+      ),
+      error: (error, stackTrace) => NetworkConfigurationState(
+        configuration: ref.watch(walletServiceConfigurationProvider),
+        healthFailure: FailureMapper.from(error, stackTrace),
+      ),
+      data: (state) => state,
+    );
     return AsterPageScaffold(
       backgroundColor: context.colorScheme.surface,
       appBar: CustomAppBar(
@@ -30,29 +41,32 @@ class NetworkConfigurationScreen extends ConsumerWidget {
         onBack: onClose,
         fallbackLocation: RoutePaths.advancedSettingsLocation,
       ),
-      body: configuration.when(
-        loading: () => const AsterHorizontalSafeArea(
-          child: Center(
-            child: GridLoader(semanticLabel: 'Loading network configuration'),
-          ),
-        ),
-        error: (error, stackTrace) => SettingsLoadFailure(
-          failure: FailureMapper.from(error, stackTrace),
-          onRetry: () => ref.invalidate(networkConfigurationViewModelProvider),
-        ),
-        data: (state) => _NetworkConfigurationContent(state: state),
+      body: _NetworkConfigurationContent(
+        state: state,
+        showRefreshControl: !health.isLoading,
+        onRefresh: health.hasError
+            ? () => ref.invalidate(networkConfigurationViewModelProvider)
+            : () => ref
+                  .read(networkConfigurationViewModelProvider.notifier)
+                  .refreshHealth(),
       ),
     );
   }
 }
 
-class _NetworkConfigurationContent extends ConsumerWidget {
-  const _NetworkConfigurationContent({required this.state});
+class _NetworkConfigurationContent extends StatelessWidget {
+  const _NetworkConfigurationContent({
+    required this.state,
+    required this.showRefreshControl,
+    required this.onRefresh,
+  });
 
   final NetworkConfigurationState state;
+  final bool showRefreshControl;
+  final VoidCallback onRefresh;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final spacing = context.spacing;
     final configuration = state.configuration;
     // Only a successful, completed check may present live node metrics.
@@ -141,9 +155,10 @@ class _NetworkConfigurationContent extends ConsumerWidget {
               ],
             ],
           ),
-          if (state.refreshing ||
-              healthFailure?.retryable == true ||
-              (healthFailure == null && status != null)) ...[
+          if (showRefreshControl &&
+              (state.refreshing ||
+                  healthFailure?.retryable == true ||
+                  (healthFailure == null && status != null))) ...[
             SizedBox(height: spacing.md),
             CustomButton(
               text: state.healthFailure == null
@@ -152,11 +167,7 @@ class _NetworkConfigurationContent extends ConsumerWidget {
               variant: ButtonVariant.secondary,
               loading: state.refreshing,
               hapticIntent: null,
-              onTap: state.refreshing
-                  ? null
-                  : () => ref
-                        .read(networkConfigurationViewModelProvider.notifier)
-                        .refreshHealth(),
+              onTap: state.refreshing ? null : onRefresh,
             ),
           ],
         ],

@@ -7,6 +7,7 @@ import 'package:aster/core/security/security_controller.dart';
 import 'package:aster/core/security/security_gate.dart';
 import 'package:aster/shared/screens/screens.dart';
 import 'package:aster/shared/theme/theme.dart';
+import 'package:aster/shared/widgets/custom_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -741,7 +742,12 @@ void main() {
   testWidgets('shows redacted bootstrap failure and can recover on retry', (
     tester,
   ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(951, 669);
+    tester.view.padding = const FakeViewPadding(right: 84, bottom: 34);
+    addTearDown(tester.view.reset);
     var attempts = 0;
+    final retry = Completer<ProviderContainer>();
     await tester.pumpWidget(
       AppLoader(
         initialize: () async {
@@ -756,7 +762,7 @@ void main() {
               ),
             );
           }
-          return ProviderContainer();
+          return retry.future;
         },
         child: const MaterialApp(home: Text('Ready')),
       ),
@@ -768,6 +774,14 @@ void main() {
       find.text('Wallet data could not be opened safely.'),
       findsOneWidget,
     );
+    for (final content in [
+      find.byIcon(Icons.lock_outline),
+      find.text('Wallet could not be opened'),
+      find.text('Wallet data could not be opened safely.'),
+      find.text('Retry'),
+    ]) {
+      expect(tester.getCenter(content).dx, 951 / 2);
+    }
     final failure = find.bySemanticsLabel(
       'Wallet data could not be opened safely.',
     );
@@ -806,11 +820,106 @@ void main() {
 
     await tester.tap(find.text('Retry'));
     await tester.pump();
+    expect(find.text('Wallet could not be opened'), findsOneWidget);
+    expect(_runningSplash, findsNothing);
+    expect(
+      tester.widget<CustomButton>(find.byType(CustomButton)).loading,
+      true,
+    );
+    await tester.tap(find.byType(CustomButton), warnIfMissed: false);
+    expect(attempts, 2);
+
+    retry.complete(ProviderContainer());
+    await tester.pump();
     await tester.pumpAndSettle();
 
     expect(attempts, 2);
     expect(find.text('Ready'), findsOneWidget);
     expect(find.text('Wallet could not be opened'), findsNothing);
+  });
+
+  testWidgets('startup offers the command for the persisted deletion stage', (
+    tester,
+  ) async {
+    var attempts = 0;
+    await tester.pumpWidget(
+      AppLoader(
+        initialize: () async {
+          switch (attempts++) {
+            case 0:
+              throw const AppFailureException(
+                AppFailure(
+                  code: 'wallet_deletion_incomplete',
+                  kind: AppFailureKind.storage,
+                  userMessage: 'Wallet removal could not finish.',
+                  retryable: false,
+                  requiresReconciliation: true,
+                ),
+              );
+            case 1:
+              throw const AppFailureException(
+                AppFailure(
+                  code: 'wallet_deleted_activation_failed',
+                  kind: AppFailureKind.storage,
+                  userMessage:
+                      'Wallet deleted. Try again to open the next wallet.',
+                  retryable: false,
+                  requiresReconciliation: true,
+                ),
+              );
+            default:
+              return ProviderContainer();
+          }
+        },
+        child: const MaterialApp(home: Text('Ready')),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('Retry'), findsNothing);
+    await tester.tap(find.text('Finish removal'));
+    await tester.pump();
+    expect(find.text('Finish removal'), findsNothing);
+    await tester.tap(find.text('Open wallet'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ready'), findsOneWidget);
+    expect(attempts, 3);
+  });
+
+  testWidgets('device unlock remains available during a startup retry', (
+    tester,
+  ) async {
+    final device = _LoaderDevice();
+    final security = SecurityController(device);
+    addTearDown(security.dispose);
+    final prompt = device.nextPrompt();
+    var attempts = 0;
+    await tester.pumpWidget(
+      AppLoader(
+        security: security,
+        initialize: () async {
+          if (attempts++ == 0) {
+            throw TimeoutException('Registry temporarily unavailable');
+          }
+          await security.initialize(hasWallet: true);
+          await WidgetsBinding.instance.endOfFrame;
+          await security.waitForUnlock();
+          return ProviderContainer();
+        },
+        child: const MaterialApp(home: Text('Ready')),
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.text('Retry'));
+    await _pumpForPrompt(tester, device, 1);
+    expect(find.text('Unlock'), findsNothing);
+
+    prompt.complete(DeviceAuthenticationResult.cancelled);
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('Wallet could not be opened'), findsNothing);
+    await tester.tap(find.text('Unlock'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ready'), findsOneWidget);
   });
 
   testWidgets('does not offer retry when startup outcome is unknown', (

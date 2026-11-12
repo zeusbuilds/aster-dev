@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../../core/errors/errors.dart';
+import '../../domain/models/wallet_access_recovery.dart';
 
 /// Root presentation state for serialized native wallet lifecycle changes.
 @immutable
@@ -35,6 +36,18 @@ final class WalletLifecycleState {
 
   /// Whether a foreground failure should replace the wallet UI.
   bool get showsFailure => !obscured && failure != null;
+
+  /// A failed reopen can cover the wallet access route. Keep an already-known
+  /// deletion recovery actionable while the lifecycle gate owns presentation.
+  AppFailure? recoveryFailure(AppFailure? accessFailure) {
+    if (failure == null) return null;
+    if (accessFailure != null &&
+        WalletAccessRecovery.forFailure(accessFailure)?.resumesDeletion ==
+            true) {
+      return accessFailure;
+    }
+    return failure;
+  }
 
   @override
   bool operator ==(Object other) =>

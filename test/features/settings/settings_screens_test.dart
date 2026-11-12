@@ -104,21 +104,6 @@ void main() {
     expect(toasts.messages, isEmpty);
   });
 
-  testWidgets('choice loading exposes status without fabricated options', (
-    tester,
-  ) async {
-    await _pumpPendingSelection(
-      tester,
-      screen: const CurrencySelectionScreen(),
-    );
-    expect(find.bySemanticsLabel('Loading currencies'), findsOneWidget);
-    expect(find.bySemanticsLabel('Loading currency'), findsNothing);
-
-    await _pumpPendingSelection(tester, screen: const CountrySelectionScreen());
-    expect(find.bySemanticsLabel('Loading regions'), findsOneWidget);
-    expect(find.bySemanticsLabel('Loading region'), findsNothing);
-  });
-
   testWidgets('app-information loading keeps rows quiet and disabled', (
     tester,
   ) async {
@@ -168,92 +153,89 @@ void main() {
     },
   );
 
-  for (final screen in const [
-    CountrySelectionScreen(),
-    CurrencySelectionScreen(),
-    BitcoinUnitSelectionScreen(),
-  ]) {
-    testWidgets('${screen.runtimeType} scrolls through the bottom safe area', (
-      tester,
-    ) async {
-      tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = const Size(420, 932);
-      tester.view.padding = const FakeViewPadding(bottom: 34);
-      tester.view.viewPadding = const FakeViewPadding(bottom: 34);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetPadding);
-      addTearDown(tester.view.resetViewPadding);
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            settingsViewModelProvider.overrideWith(
-              () => _StaticSettingsViewModel(_selectionState),
-            ),
-          ],
-          child: MaterialApp(theme: AppTheme.light(), home: screen),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      final list = find.byType(ListView);
-      expect(tester.getBottomLeft(list).dy, 932);
-      final padding = tester
-          .widget<ListView>(list)
-          .padding!
-          .resolve(TextDirection.ltr);
-      expect(padding.bottom, 34 + tester.element(list).spacing.lg);
-      expect(tester.takeException(), isNull);
-    });
-  }
-
-  for (final retryable in [true, false]) {
-    for (final scenario in const [
-      (name: 'currency', screen: CurrencySelectionScreen()),
-      (name: 'region', screen: CountrySelectionScreen()),
-      (name: 'Bitcoin unit', screen: BitcoinUnitSelectionScreen()),
-    ]) {
-      testWidgets(
-        '${scenario.name} load ${retryable ? 'shows' : 'hides'} retry',
-        (tester) async {
-          final failure = AppFailure(
-            code: retryable
-                ? 'settings_temporarily_unavailable'
-                : 'settings_configuration_invalid',
-            kind: retryable
-                ? AppFailureKind.unavailable
-                : AppFailureKind.configuration,
-            userMessage: retryable
-                ? 'Settings are temporarily unavailable.'
-                : 'Settings are not configured.',
-            retryable: retryable,
-          );
-          await tester.pumpWidget(
-            ProviderScope(
-              retry: applicationProviderRetryPolicy,
-              overrides: [
-                settingsViewModelProvider.overrideWith(
-                  () => _FailingSettingsViewModel(failure),
-                ),
-              ],
-              child: MaterialApp(
-                theme: AppTheme.light(),
-                home: scenario.screen,
-              ),
-            ),
-          );
-          await tester.pumpAndSettle();
-
-          expect(find.text(failure.userMessage), findsOneWidget);
-          expect(find.text('Retry'), retryable ? findsOneWidget : findsNothing);
-        },
-      );
-    }
-  }
-
-  testWidgets('all choice screens honor a foreign preference save', (
+  testWidgets('Bitcoin unit scrolls through the bottom safe area', (
     tester,
   ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(420, 932);
+    tester.view.padding = const FakeViewPadding(bottom: 34);
+    tester.view.viewPadding = const FakeViewPadding(bottom: 34);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetPadding);
+    addTearDown(tester.view.resetViewPadding);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsViewModelProvider.overrideWith(
+            () => _StaticSettingsViewModel(_selectionState),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const BitcoinUnitSelectionScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final list = find.byType(ListView);
+    expect(tester.getBottomLeft(list).dy, 932);
+    final padding = tester
+        .widget<ListView>(list)
+        .padding!
+        .resolve(TextDirection.ltr);
+    expect(padding.bottom, 34 + tester.element(list).spacing.lg);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final retryable in [true, false]) {
+    testWidgets(
+      'Bitcoin unit stays read-only when preferences fail ($retryable)',
+      (tester) async {
+        final failure = AppFailure(
+          code: retryable
+              ? 'settings_temporarily_unavailable'
+              : 'settings_configuration_invalid',
+          kind: retryable
+              ? AppFailureKind.unavailable
+              : AppFailureKind.configuration,
+          userMessage: retryable
+              ? 'Settings are temporarily unavailable.'
+              : 'Settings are not configured.',
+          retryable: retryable,
+        );
+        await tester.pumpWidget(
+          ProviderScope(
+            retry: applicationProviderRetryPolicy,
+            overrides: [
+              settingsViewModelProvider.overrideWith(
+                () => _FailingSettingsViewModel(failure),
+              ),
+            ],
+            child: MaterialApp(
+              theme: AppTheme.light(),
+              home: const BitcoinUnitSelectionScreen(),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text(failure.userMessage), findsNothing);
+        expect(find.text('Retry'), findsNothing);
+        for (final label in ['Bitcoin', 'Satoshis']) {
+          final row = tester
+              .getSemantics(find.bySemanticsLabel(RegExp('^$label,')))
+              .getSemanticsData();
+          expect(row.flagsCollection.isEnabled, ui.Tristate.isFalse);
+          expect(row.flagsCollection.isSelected, ui.Tristate.isFalse);
+          expect(row.hasAction(ui.SemanticsAction.tap), isFalse);
+        }
+      },
+    );
+  }
+
+  testWidgets('Bitcoin unit honors a foreign preference save', (tester) async {
     final state = SettingsState(
       snapshot: SettingsSnapshot(
         preferences: AppPreferences.defaults,
@@ -269,189 +251,106 @@ void main() {
       ),
       operation: SettingsOperation.balanceVisibility,
     );
-    final scenarios = <({Widget screen, Finder option})>[
-      (
-        screen: const CurrencySelectionScreen(),
-        option: find.bySemanticsLabel(r'United States Dollar, $ USD'),
-      ),
-      (
-        screen: const CountrySelectionScreen(),
-        option: find.bySemanticsLabel('United States'),
-      ),
-      (
-        screen: const BitcoinUnitSelectionScreen(),
-        option: find.bySemanticsLabel(RegExp(r'^Bitcoin,')),
-      ),
-    ];
-
-    for (final scenario in scenarios) {
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            settingsViewModelProvider.overrideWith(
-              () => _StaticSettingsViewModel(state),
-            ),
-          ],
-          child: MaterialApp(theme: AppTheme.light(), home: scenario.screen),
-        ),
-      );
-      await tester.pump();
-      await tester.pump();
-
-      final semantics = tester.getSemantics(scenario.option).getSemanticsData();
-      expect(semantics.flagsCollection.isEnabled, ui.Tristate.isFalse);
-      expect(semantics.hasAction(ui.SemanticsAction.tap), isFalse);
-      expect(find.bySemanticsLabel('Saving preference'), findsOneWidget);
-      final back = tester
-          .getSemantics(find.bySemanticsLabel('Back'))
-          .getSemanticsData();
-      expect(back.flagsCollection.isEnabled, ui.Tristate.isFalse);
-      expect(back.hasAction(ui.SemanticsAction.tap), isFalse);
-      await tester.binding.handlePopRoute();
-      await tester.pump();
-      expect(scenario.option, findsOneWidget);
-    }
-  });
-
-  for (final scenario in const [
-    (name: 'currency', screen: CurrencySelectionScreen()),
-    (name: 'region', screen: CountrySelectionScreen()),
-    (name: 'Bitcoin unit', screen: BitcoinUnitSelectionScreen()),
-  ]) {
-    testWidgets('${scenario.name} save blocks same-frame Back and system pop', (
-      tester,
-    ) async {
-      final viewModel = _ControlledSettingsViewModel(_selectionState);
-      final router = GoRouter(
-        routes: [
-          GoRoute(
-            path: '/',
-            builder: (context, state) => const Text('Settings root'),
-          ),
-          GoRoute(
-            path: '/choice',
-            builder: (context, state) => scenario.screen,
+    final option = find.bySemanticsLabel(RegExp(r'^Bitcoin,'));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsViewModelProvider.overrideWith(
+            () => _StaticSettingsViewModel(state),
           ),
         ],
-      );
-      addTearDown(router.dispose);
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [settingsViewModelProvider.overrideWith(() => viewModel)],
-          child: MaterialApp.router(
-            theme: AppTheme.light(),
-            routerConfig: router,
-            builder: (context, child) => AsterFeedbackScope(
-              haptics: _RecordingHaptics(),
-              toasts: _RecordingToasts(),
-              child: child!,
-            ),
-          ),
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const BitcoinUnitSelectionScreen(),
         ),
-      );
-      unawaited(router.push<Object?>('/choice'));
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
 
-      final back = tester.widget<AsterIconButton>(
-        find.byWidgetPredicate(
-          (widget) => widget is AsterIconButton && widget.tooltip == 'Back',
-        ),
-      );
-      final navigation = AsterNavigationScope.of(
-        tester.element(find.bySemanticsLabel('Back')),
-      );
-      expect(navigation.inFlight, isFalse);
-      expect(router.canPop(), isTrue);
-      expect(find.text('Settings root'), findsNothing);
-      switch (scenario.name) {
-        case 'currency':
-          tester
-              .widget<CurrencySelectOptionRow>(
-                find.byWidgetPredicate(
-                  (widget) =>
-                      widget is CurrencySelectOptionRow &&
-                      widget.currency.code == 'EUR',
-                ),
-              )
-              .onTap!();
-        case 'region':
-          tester
-              .widget<CountrySelectOptionRow>(
-                find.byWidgetPredicate(
-                  (widget) =>
-                      widget is CountrySelectOptionRow &&
-                      widget.country.code == 'DE',
-                ),
-              )
-              .onTap!();
-        case 'Bitcoin unit':
-          tester
-              .widget<SettingsChoiceRow>(
-                find.widgetWithText(SettingsChoiceRow, 'Satoshis'),
-              )
-              .onTap!();
-      }
-      expect(navigation.inFlight, isTrue);
-      expect(router.canPop(), isTrue);
-      back.onPressed!();
-      expect(router.canPop(), isTrue);
-      await tester.binding.handlePopRoute();
-      await tester.pump();
+    final semantics = tester.getSemantics(option).getSemanticsData();
+    expect(semantics.flagsCollection.isEnabled, ui.Tristate.isFalse);
+    expect(semantics.hasAction(ui.SemanticsAction.tap), isFalse);
+    expect(find.bySemanticsLabel('Saving preference'), findsOneWidget);
+    final back = tester
+        .getSemantics(find.bySemanticsLabel('Back'))
+        .getSemanticsData();
+    expect(back.flagsCollection.isEnabled, ui.Tristate.isFalse);
+    expect(back.hasAction(ui.SemanticsAction.tap), isFalse);
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    expect(option, findsOneWidget);
+  });
 
-      expect(router.canPop(), isTrue);
-      expect(find.byType(scenario.screen.runtimeType), findsOneWidget);
-      expect(find.text('Settings root'), findsNothing);
-
-      viewModel.complete();
-      await tester.pump();
-      await tester.pump();
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-
-      expect(find.text('Settings root'), findsOneWidget);
-      expect(router.canPop(), isFalse);
-    });
-  }
-
-  testWidgets('region and currency rows expose available choice semantics', (
+  testWidgets('Bitcoin unit save blocks same-frame Back and system pop', (
     tester,
   ) async {
+    final viewModel = _ControlledSettingsViewModel(_selectionState);
+    final router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) => const Text('Settings root'),
+        ),
+        GoRoute(
+          path: '/choice',
+          builder: (context, state) => const BitcoinUnitSelectionScreen(),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
     await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.light(),
-        home: Scaffold(
-          body: Column(
-            children: [
-              CountrySelectOptionRow(
-                country: Region(name: 'United States', code: 'US'),
-                selected: true,
-                onTap: () {},
-              ),
-              CurrencySelectOptionRow(
-                currency: FiatCurrency(
-                  name: 'United States Dollar',
-                  symbol: r'$',
-                  code: 'USD',
-                  countryCode: 'US',
-                ),
-                selected: true,
-                onTap: () {},
-              ),
-            ],
+      ProviderScope(
+        overrides: [settingsViewModelProvider.overrideWith(() => viewModel)],
+        child: MaterialApp.router(
+          theme: AppTheme.light(),
+          routerConfig: router,
+          builder: (context, child) => AsterFeedbackScope(
+            haptics: _RecordingHaptics(),
+            toasts: _RecordingToasts(),
+            child: child!,
           ),
         ),
       ),
     );
+    unawaited(router.push<Object?>('/choice'));
+    await tester.pumpAndSettle();
 
-    for (final label in ['United States', r'United States Dollar, $ USD']) {
-      final semantics = tester
-          .getSemantics(find.bySemanticsLabel(label))
-          .getSemanticsData();
-      expect(semantics.flagsCollection.isEnabled, ui.Tristate.isTrue);
-      expect(semantics.flagsCollection.isSelected, ui.Tristate.isTrue);
-      expect(semantics.flagsCollection.isInMutuallyExclusiveGroup, isTrue);
-      expect(semantics.hasAction(ui.SemanticsAction.tap), isFalse);
-    }
+    final back = tester.widget<AsterIconButton>(
+      find.byWidgetPredicate(
+        (widget) => widget is AsterIconButton && widget.tooltip == 'Back',
+      ),
+    );
+    final navigation = AsterNavigationScope.of(
+      tester.element(find.bySemanticsLabel('Back')),
+    );
+    expect(navigation.inFlight, isFalse);
+    expect(router.canPop(), isTrue);
+    expect(find.text('Settings root'), findsNothing);
+    tester
+        .widget<SettingsChoiceRow>(
+          find.widgetWithText(SettingsChoiceRow, 'Satoshis'),
+        )
+        .onTap!();
+    expect(navigation.inFlight, isTrue);
+    expect(router.canPop(), isTrue);
+    back.onPressed!();
+    expect(router.canPop(), isTrue);
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+
+    expect(router.canPop(), isTrue);
+    expect(find.byType(BitcoinUnitSelectionScreen), findsOneWidget);
+    expect(find.text('Settings root'), findsNothing);
+
+    viewModel.complete();
+    await tester.pump();
+    await tester.pump();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Settings root'), findsOneWidget);
+    expect(router.canPop(), isFalse);
   });
 
   testWidgets('failed preference save is presented and consumed once', (
@@ -623,7 +522,7 @@ void main() {
   });
 
   for (final retryable in [true, false]) {
-    testWidgets('network load ${retryable ? 'shows' : 'hides'} retry', (
+    testWidgets('network repository failure keeps configuration visible', (
       tester,
     ) async {
       final failure = AppFailure(
@@ -642,8 +541,15 @@ void main() {
         ProviderScope(
           retry: applicationProviderRetryPolicy,
           overrides: [
-            networkConfigurationViewModelProvider.overrideWith(
-              () => _FailingNetworkConfigurationViewModel(failure),
+            walletServiceConfigurationProvider.overrideWithValue(
+              const WalletServiceConfiguration(
+                environment: BlockchainEnvironment.regtest,
+                sdkNetwork: 'regtest',
+                indexerUrl: 'http://127.0.0.1:50002/api',
+              ),
+            ),
+            walletRepositoryProvider.overrideWith(
+              (_) async => throw AppFailureException(failure),
             ),
           ],
           child: MaterialApp(
@@ -654,8 +560,14 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text(failure.userMessage), findsOneWidget);
-      expect(find.text('Retry'), retryable ? findsOneWidget : findsNothing);
+      expect(find.text('http://127.0.0.1:50002/api'), findsOneWidget);
+      await tester.scrollUntilVisible(find.text('Unavailable'), 300);
+      expect(find.text(failure.userMessage), findsNothing);
+      expect(find.text('Unavailable'), findsOneWidget);
+      expect(
+        find.text('Retry health check'),
+        retryable ? findsOneWidget : findsNothing,
+      );
     });
   }
 
@@ -1453,22 +1365,6 @@ void main() {
   });
 }
 
-Future<void> _pumpPendingSelection(
-  WidgetTester tester, {
-  required Widget screen,
-}) async {
-  final pending = Completer<SettingsRepository>();
-  await tester.pumpWidget(
-    ProviderScope(
-      overrides: [
-        settingsRepositoryProvider.overrideWith((ref) => pending.future),
-      ],
-      child: MaterialApp(theme: AppTheme.light(), home: screen),
-    ),
-  );
-  await tester.pump();
-}
-
 final _walletProfile = WalletProfile(
   id: '0123456789abcdef0123456789abcdef',
   name: 'Primary wallet',
@@ -1627,18 +1523,6 @@ final class _StaticNetworkConfigurationViewModel
   Future<NetworkConfigurationState> build() async => value;
 }
 
-final class _FailingNetworkConfigurationViewModel
-    extends NetworkConfigurationViewModel {
-  _FailingNetworkConfigurationViewModel(this.failure);
-
-  final AppFailure failure;
-
-  @override
-  Future<NetworkConfigurationState> build() {
-    return Future.error(AppFailureException(failure), StackTrace.current);
-  }
-}
-
 final class _PendingSettingsViewModel extends SettingsViewModel {
   _PendingSettingsViewModel(this._future);
 
@@ -1684,12 +1568,6 @@ final class _ControlledSettingsViewModel extends SettingsViewModel {
 
   @override
   Future<SettingsState> build() async => initialState;
-
-  @override
-  Future<bool> selectCurrency(String code) => _hold(SettingsOperation.currency);
-
-  @override
-  Future<bool> selectRegion(String code) => _hold(SettingsOperation.region);
 
   @override
   Future<bool> selectBitcoinUnit(BitcoinUnit unit) =>

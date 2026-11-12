@@ -241,8 +241,6 @@ void registerVisualCatalog({required VisualCapture capture}) {
         ('02-home/market', const MarketScreen()),
         ('08-settings/settings', const SettingsScreen()),
         ('08-settings/wallet-selection', const WalletSelectionScreen()),
-        ('08-settings/currency', const CurrencySelectionScreen()),
-        ('08-settings/region', const CountrySelectionScreen()),
         ('08-settings/bitcoin-unit', const BitcoinUnitSelectionScreen()),
         ('08-settings/advanced', const AdvancedSettingsScreen()),
         ('08-settings/network', const NetworkConfigurationScreen()),

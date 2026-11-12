@@ -69,7 +69,7 @@ void main() {
     final refresh = Completer<WalletState>();
     viewModel.refreshFrom(refresh.future);
     await tester.pump();
-    expect(find.bySemanticsLabel('Loading wallet details'), findsOneWidget);
+    expect(find.bySemanticsLabel('Loading wallet details'), findsNothing);
     expect(find.text(first.name), findsNothing);
     expect(find.text(first.displayId), findsNothing);
     refresh.complete(_state(first));
@@ -79,7 +79,7 @@ void main() {
       AsyncData(_state(first).copyWith(switchingWalletId: second.id)),
     );
     await tester.pump();
-    expect(find.bySemanticsLabel('Loading wallet details'), findsOneWidget);
+    expect(find.bySemanticsLabel('Loading wallet details'), findsNothing);
     expect(find.text(first.name), findsNothing);
     expect(find.text(second.name), findsNothing);
 
@@ -99,7 +99,7 @@ void main() {
       StackTrace.current,
     );
     await tester.pump();
-    expect(find.text('Wallet unavailable'), findsOneWidget);
+    expect(find.text('Wallet unavailable'), findsNothing);
     expect(find.text(second.name), findsNothing);
     expect(find.text(second.displayId), findsNothing);
     expect(find.text(_retryableFailure.userMessage), findsNothing);
@@ -117,7 +117,7 @@ void main() {
           ),
         );
 
-        expect(find.text('Wallet unavailable'), findsOneWidget);
+        expect(find.text('Wallet unavailable'), findsNothing);
         expect(find.text(profile.name), findsNothing);
         expect(find.text(profile.displayId), findsNothing);
         expect(find.text('Retry'), findsNothing);
@@ -129,7 +129,7 @@ void main() {
 
   for (final retryable in [true, false]) {
     testWidgets(
-      '${retryable ? 'retryable' : 'terminal'} load failure has a compact owned recovery',
+      '${retryable ? 'retryable' : 'terminal'} registry failure leaves recovery to wallet access',
       (tester) async {
         final failure = retryable
             ? _retryableFailure
@@ -145,17 +145,11 @@ void main() {
         initial.completeError(AppFailureException(failure), StackTrace.current);
         await tester.pump();
 
-        expect(find.text('Wallet unavailable'), findsOneWidget);
+        expect(find.text('Wallet unavailable'), findsNothing);
         expect(find.text(failure.userMessage), findsNothing);
         expect(find.bySemanticsLabel('Back'), findsOneWidget);
-        expect(find.text('Retry'), retryable ? findsOneWidget : findsNothing);
-        if (retryable) {
-          await tester.tap(find.text('Retry'));
-          await tester.pump();
-          expect(viewModel.reloads, 1);
-          expect(find.text(_profile().name), findsOneWidget);
-          expect(find.text('Wallet unavailable'), findsNothing);
-        }
+        expect(find.text('Retry'), findsNothing);
+        expect(find.text('Delete wallet'), findsNothing);
       },
     );
   }
@@ -243,7 +237,6 @@ final class _ControlledWalletViewModel extends WalletViewModel {
   _ControlledWalletViewModel(this.initial);
 
   Future<WalletState> initial;
-  int reloads = 0;
 
   @override
   Future<WalletState> build() => initial;
@@ -253,11 +246,5 @@ final class _ControlledWalletViewModel extends WalletViewModel {
   void refreshFrom(Future<WalletState> next) {
     initial = next;
     ref.invalidateSelf();
-  }
-
-  @override
-  Future<void> reload() async {
-    reloads++;
-    state = AsyncData(_state(_profile()));
   }
 }

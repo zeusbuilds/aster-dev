@@ -12,7 +12,9 @@ import '../../../wallet/presentation/view_model/view_models.dart';
 
 /// Active wallet identity and wallet-selection command.
 class HomeHeader extends ConsumerWidget {
-  const HomeHeader({super.key});
+  const HomeHeader({super.key, this.onOpenWalletSelection});
+
+  final VoidCallback? onOpenWalletSelection;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -34,8 +36,9 @@ class HomeHeader extends ConsumerWidget {
         ? null
         : () => unawaited(
             navigation.openRoute(
-              command: () =>
-                  context.pushNamed<void>(RouteNames.walletSelection),
+              command:
+                  onOpenWalletSelection ??
+                  () => context.pushNamed<void>(RouteNames.walletSelection),
               failureTitle: 'Wallet selector could not open',
             ),
           );

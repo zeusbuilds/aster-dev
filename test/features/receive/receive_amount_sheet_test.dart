@@ -250,9 +250,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('retry failure during dismissal has no orphaned feedback', (
-    tester,
-  ) async {
+  testWidgets('lost request context closes only its editor', (tester) async {
     final harness = await mount(tester);
     final provider = receiveFlowViewModelProvider(
       WalletPaymentTarget.bitcoinOnchain,
@@ -267,37 +265,13 @@ void main() {
     );
     harness.container.invalidate(provider);
     await tester.pumpAndSettle();
-    expect(find.text('Amount editor unavailable'), findsOneWidget);
-    final gate = Completer<void>();
-    harness.engine.createReceiveGate = gate;
-    addTearDown(() {
-      if (!gate.isCompleted) gate.complete();
-    });
-    final callsBefore = harness.engine.calls
-        .where((call) => call == 'createReceiveRequest:start')
-        .length;
-    await tester.tap(
-      find.descendant(
-        of: find.byType(ReceiveAmountSheet),
-        matching: find.widgetWithText(CustomButton, 'Retry'),
-      ),
-    );
-    for (var frame = 0; frame < 20; frame += 1) {
-      await tester.pump(const Duration(milliseconds: 16));
-      if (harness.engine.calls
-              .where((call) => call == 'createReceiveRequest:start')
-              .length >
-          callsBefore) {
-        break;
-      }
-    }
-    expect(harness.container.read(provider).isLoading, isTrue);
-    await tester.tapAt(const Offset(20, 40));
-    expect(find.byType(ReceiveAmountSheet), findsOneWidget);
-    gate.complete();
-    await tester.pumpAndSettle();
+
     expect(find.byType(ReceiveAmountSheet), findsNothing);
     expect(find.byType(ReceiveRequestScreen), findsOneWidget);
+    expect(find.text('Request unavailable'), findsOneWidget);
+    expect(find.widgetWithText(CustomButton, 'Retry'), findsOneWidget);
+    expect(find.text('Amount editor unavailable'), findsNothing);
+    expect(find.text('Open receive'), findsNothing);
     expect(harness.toasts.messages, isEmpty);
     expect(tester.takeException(), isNull);
   });

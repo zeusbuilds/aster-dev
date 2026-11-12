@@ -280,10 +280,20 @@ void main() {
         hasLength(1),
       );
       h.secure.deleteError = null;
+      h.engines.first.openPersistedError = TimeoutException(
+        'temporary open failure',
+      );
       final restarted = h.restart();
-      expect(await restarted.bootstrap(), isA<AppSuccess<WalletRegistry>>());
+      final restartFailure = _failure(await restarted.bootstrap());
+      expect(restartFailure.code, 'wallet_deleted_activation_failed');
+      expect(restartFailure.requiresReconciliation, isTrue);
       expect(h.secure.values, hasLength(1));
       expect(h.directories.storageTokens.keys, [_second]);
+      expect(
+        await restarted.recoverWalletDeletion(),
+        isA<AppSuccess<WalletRegistry>>(),
+      );
+      expect(h.runtime.activeProfile?.id, _second);
     },
   );
 
