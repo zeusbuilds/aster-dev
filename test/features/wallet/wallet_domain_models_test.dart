@@ -142,7 +142,7 @@ void main() {
       transferIndex: 7,
       batchTransferIndex: 8,
       receiveOutpoint: 'receive-fixture:0',
-      changeOutpoint: 'change-fixture:1',
+      changeOutpoints: const ['change-fixture:1', 'change-fixture:2'],
       transportEndpointCount: 2,
       usedTransportEndpointCount: 1,
       transportTypes: const ['JsonRpc'],
@@ -163,13 +163,42 @@ void main() {
     expect(reviewed.transferIndex, native.transferIndex);
     expect(reviewed.batchTransferIndex, native.batchTransferIndex);
     expect(reviewed.receiveOutpoint, native.receiveOutpoint);
-    expect(reviewed.changeOutpoint, native.changeOutpoint);
+    expect(reviewed.changeOutpoints, native.changeOutpoints);
+    expect(
+      () => reviewed.changeOutpoints.add('another-change:3'),
+      throwsUnsupportedError,
+    );
     expect(reviewed.transportEndpointCount, native.transportEndpointCount);
     expect(
       reviewed.usedTransportEndpointCount,
       native.usedTransportEndpointCount,
     );
     expect(reviewed.transportTypes, native.transportTypes);
+  });
+
+  test('RGB change output lists are immutable and take part in identity', () {
+    final asset = WalletAsset.rgbUsdt(assetId: 'rgb:fixture', precision: 6);
+    WalletActivity activity(List<String> changes) => WalletActivity(
+      id: 'activity-${'f' * 64}',
+      source: WalletActivitySource.rgbTransfer,
+      operation: WalletActivityOperation.rgbSend,
+      asset: asset,
+      rail: PaymentRail.onchain,
+      direction: WalletActivityDirection.sent,
+      status: WalletActivityStatus.succeeded,
+      transferIndex: 1,
+      changeOutpoints: changes,
+    );
+    final source = ['txid:0', 'txid:1'];
+    final original = activity(source);
+    source[1] = 'txid:2';
+    expect(original.changeOutpoints, ['txid:0', 'txid:1']);
+    final same = activity(['txid:0', 'txid:1']);
+    final different = activity(['txid:0', 'txid:2']);
+    expect(original, same);
+    expect(original.hashCode, same.hashCode);
+    expect(original, isNot(different));
+    expect(() => activity(['txid:0', '']), throwsArgumentError);
   });
 
   WalletBalance accountingBalance(

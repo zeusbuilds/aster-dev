@@ -865,6 +865,82 @@ library_count=1
     );
   });
 
+  test('hosted bridge retains exact service and account wire identities', () {
+    for (final path in <String>[
+      'lib/features/bridge/presentation/hosted_bridge_scope.dart',
+      'lib/features/bridge/presentation/hosted_bridge_screen.dart',
+      'lib/features/bridge/presentation/view_model/hosted_bridge_controller.dart',
+    ]) {
+      _write(
+        repository,
+        path,
+        "const host = 'dev.mint.utexo.com';\n"
+        r"final account = 'rgb:utexo:${wallet.id}';"
+        '\n'
+        "Grant(network: 'utexo');\n"
+        r"RegExp(r'^rgb:utexo:[a-f0-9]{64}$');",
+      );
+    }
+    final result = _verify(
+      repository,
+      flutterVersionMetadata,
+      flutterExtension,
+      flutterGradleUtils,
+    );
+    expect(result.failures, isEmpty);
+  });
+
+  for (final copy in <String>[
+    "const label = 'dev.mint.utexo.com — UTEXO Wallet';",
+    r"final account = 'rgb:utexo:${wallet.id}'; const label = 'UTEXO Wallet';",
+    "const host = 'dev.mint.utexo.com.evil.example';",
+    "const host = 'fake-dev.mint.utexo.com';",
+    "const host = 'other.utexo.com';",
+    r"final account = 'other:rgb:utexo:${wallet.id}';",
+    "Grant(network: 'utexo'); const label = 'UTEXO Wallet';",
+    "Grant(network: 'utexo wallet');",
+  ]) {
+    test('bridge identity exception still rejects unrelated copy: $copy', () {
+      _write(
+        repository,
+        'lib/features/bridge/presentation/hosted_bridge_scope.dart',
+        copy,
+      );
+      final result = _verify(
+        repository,
+        flutterVersionMetadata,
+        flutterExtension,
+        flutterGradleUtils,
+      );
+      expect(
+        result.failures,
+        contains(
+          contains('presents the protocol name as Aster product identity'),
+        ),
+      );
+    });
+  }
+
+  test('bridge identity exception does not allow other presentation files', () {
+    _write(
+      repository,
+      'lib/features/home/presentation/protocol_brand.dart',
+      "const host = 'dev.mint.utexo.com';",
+    );
+    final result = _verify(
+      repository,
+      flutterVersionMetadata,
+      flutterExtension,
+      flutterGradleUtils,
+    );
+    expect(
+      result.failures,
+      contains(
+        contains('presents the protocol name as Aster product identity'),
+      ),
+    );
+  });
+
   test(
     'handoff metadata can identify sibling repos without rebranding app',
     () {

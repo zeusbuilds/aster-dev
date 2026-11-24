@@ -778,6 +778,53 @@ void main() {
     );
   });
 
+  testWidgets('RGB details retain and copy every change outpoint', (
+    tester,
+  ) async {
+    final record = WalletActivity(
+      id: 'activity-${'c' * 64}',
+      source: WalletActivitySource.rgbTransfer,
+      operation: WalletActivityOperation.rgbSend,
+      asset: testRgbRoute.asset,
+      rail: PaymentRail.onchain,
+      direction: WalletActivityDirection.sent,
+      status: WalletActivityStatus.succeeded,
+      transferIndex: 9,
+      changeOutpoints: ['${'d' * 64}:2', '${'d' * 64}:3'],
+    );
+    final harness = await PaymentFlowTestHarness.create(
+      services: testRgbServices,
+      engine: FakeWalletEngine()
+        ..balance = testRgbBalance(100)
+        ..activities = [record],
+    );
+    addTearDown(() => _disposeHarness(tester, harness));
+    await _pump(
+      tester,
+      harness,
+      TransactionDetailsScreen(
+        assetKind: WalletAssetKind.usdt,
+        activityId: record.id,
+      ),
+    );
+    final first = find.byTooltip('Copy Change outpoint 1');
+    final second = find.byTooltip('Copy Change outpoint 2');
+    await _pumpUntil(tester, () => second.evaluate().isNotEmpty);
+    expect(first, findsOneWidget);
+    expect(second, findsOneWidget);
+    for (final (copy, value) in [
+      (first, record.changeOutpoints[0]),
+      (second, record.changeOutpoints[1]),
+    ]) {
+      await tester.ensureVisible(copy);
+      await tester.pumpAndSettle();
+      await tester.tap(copy);
+      await tester.pump();
+      expect(harness.clipboard.text, value);
+    }
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Details fails honestly when an opaque ID is not in the wallet', (
     tester,
   ) async {

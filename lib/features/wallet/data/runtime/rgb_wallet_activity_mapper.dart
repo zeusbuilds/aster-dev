@@ -177,7 +177,10 @@ final class RgbWalletActivityMapper {
         transfer.receiveUtxo,
         'CoreTransfer.receiveUtxo',
       ),
-      changeOutpoint: _outpoint(transfer.changeUtxo, 'CoreTransfer.changeUtxo'),
+      changeOutpoints: [
+        for (final (index, outpoint) in transfer.changeUtxos.indexed)
+          _outpoint(outpoint, 'CoreTransfer.changeUtxos[$index]')!,
+      ],
       transportEndpointCount: endpoints.length,
       usedTransportEndpointCount: endpoints
           .where((endpoint) => endpoint.used)

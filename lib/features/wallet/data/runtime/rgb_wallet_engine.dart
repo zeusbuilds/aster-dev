@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
-import 'package:rgb_sdk_flutter/rgb_sdk_flutter.dart';
+import 'package:rgb_sdk_flutter/rgb_sdk_flutter.dart' hide WalletEngine;
 
 import '../../../../core/config/config.dart';
 import '../../../../core/errors/app_failure.dart';
@@ -154,8 +154,10 @@ final class RgbWalletEngineFactory implements WalletEngineFactory {
         evmChainValidator: _evmChainValidator,
       );
     }
-    final wallet = _sdk.wallet(
-      config: UtexoWalletConfig(
+    // The SDK default is RGB_L1. Existing RLN profiles must explicitly retain
+    // their engine, native storage format, credentials, and recovery journal.
+    final wallet = _sdk.rlnWallet(
+      config: RlnWalletConfig(
         storageDirPath: configuration.storageDirectory,
         network: services.sdkNetwork,
         daemonListeningPort: services.daemonListeningPort,

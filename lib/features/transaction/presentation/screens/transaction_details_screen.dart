@@ -457,10 +457,12 @@ class _DetailsBody extends ConsumerWidget {
         ),
       );
     }
-    if (record.changeOutpoint case final value?) {
+    for (final (index, value) in record.changeOutpoints.indexed) {
       entries.add(
         _DetailEntry(
-          'Change outpoint',
+          record.changeOutpoints.length == 1
+              ? 'Change outpoint'
+              : 'Change outpoint ${index + 1}',
           formatter.compactIdentifier(value),
           copyField: TransactionDetailField.changeOutpoint,
           copyValue: value,

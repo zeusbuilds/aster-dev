@@ -3172,7 +3172,18 @@ void _verifyRetiredProductIdentity(String root, List<String> failures) {
       );
     }
     if (_isProductPresentationSurface(relativePath)) {
-      final productCopy = protocolProductCopy.firstMatch(source);
+      final bridgeIdentitySpans = _hostedBridgeProtocolIdentitySpans(
+        relativePath,
+        source,
+      );
+      final productCopy = protocolProductCopy
+          .allMatches(source)
+          .where(
+            (match) => !bridgeIdentitySpans.any(
+              (span) => span.start <= match.start && span.end >= match.end,
+            ),
+          )
+          .firstOrNull;
       if (productCopy != null) {
         failures.add(
           '$relativePath:${_lineNumberAt(source, productCopy.start)} presents '
@@ -3181,6 +3192,26 @@ void _verifyRetiredProductIdentity(String root, List<String> failures) {
       }
     }
   }
+}
+
+Iterable<RegExpMatch> _hostedBridgeProtocolIdentitySpans(
+  String relativePath,
+  String source,
+) {
+  // These exact service/namespace identities are wire protocol, not product
+  // branding. Exclude only their bounded spans so adjacent copy is still read.
+  const bridgePresentationFiles = <String>{
+    'lib/features/bridge/presentation/hosted_bridge_scope.dart',
+    'lib/features/bridge/presentation/hosted_bridge_screen.dart',
+    'lib/features/bridge/presentation/view_model/hosted_bridge_controller.dart',
+  };
+  if (!bridgePresentationFiles.contains(relativePath)) return const [];
+  return RegExp(
+    r'(?<![\p{L}\p{N}_.:-])(?:dev\.mint\.utexo\.com'
+    r'(?![\p{L}\p{N}_.-])|rgb:utexo:(?=\$\{|\[a-f0-9\]\{64\}\$))'
+    r"|(?<=network: ')utexo(?=')",
+    unicode: true,
+  ).allMatches(source);
 }
 
 Iterable<RegExpMatch> _externalInfrastructureIdentitySpans(

@@ -6,20 +6,24 @@ architecture boundaries.
 
 ## Reproducible Dependency
 
-Aster pins the SDK in the private repository
+Aster pins the SDK in the public review repository
 `https://github.com/zeusbuilds/rgb-sdk-flutter.git` at immutable commit
-`349978fbeaac1f43ca563d103b271346c55fe0f1`. The manifest and portable Git lock
-name the same full commit, with no local SDK override. It includes the explicit
-RGB_L1 backend, React Native beta.40 compatibility and the sealed BFA.7 Flutter
-`.2` integration: standalone registration, durable payment discovery/receipts,
-explicit dispatched revocation and existing-only open. Aster defaults to RLN
-and rejects RGB_L1 before opening product wallet storage. Final-source native
-and actual isolated iOS/Android Aster funded/restart mechanisms are qualified;
-portable restore freshness, approved public deployment, aggregate privacy and
-signed delivery remain separate gates. See
-[the adapter contract](RGB_L1_ADAPTER.md) and
-[the exact mobile qualification record](../handoff/BFA7_ASTER_MOBILE_QUALIFICATION_20261108.md), plus
-[current Dev team inputs](DEV_USDT_TEAM_INPUTS.md).
+`890546733e1434c6cdb7b30fda27eae525dc0f47`, recorded identically in
+`pubspec.yaml` and the portable `pubspec.lock`. Committed
+builds never use a local SDK override. The single package now exposes independent
+RLN and RGB_L1 engines behind a delegating `UtexoWallet` facade. Its default is
+RGB_L1; Aster explicitly selects RLN for existing RLN profiles and retains its
+separate qualified Debug Dev RGB_L1 adapter.
+
+The SDK source includes React Native beta.41 parity and a sealed BFA.8 build
+candidate. Ordinary package installation still resolves the published BFA.7
+Flutter `.2` archives. Candidate BFA.8 source and smoke evidence do not change
+those published archive pins. Contract registration, durable payment discovery,
+receipts, explicit dispatched revocation and existing-only opening remain in
+their owning engine. Production RGB_L1 stays gated independently of the SDK
+default. See [the adapter contract](RGB_L1_ADAPTER.md),
+[the BFA.7 mobile qualification record](../handoff/BFA7_ASTER_MOBILE_QUALIFICATION_20261108.md)
+and [current Dev team inputs](DEV_USDT_TEAM_INPUTS.md).
 
 Verification resolves the pushed Git commit with authenticated access and no
 local SDK override. The earlier restoration of `68a6909` matched 74 SDK Dart
@@ -96,7 +100,7 @@ immutable Git publication. No new signed release build is inferred from Pub
 resolution. Physical-device, signed-delivery and public-deployment acceptance
 remain separate gates.
 
-The published legacy RLN baseline targets RN `1.0.0-beta.39` (commit
+The original published legacy RLN baseline targeted RN `1.0.0-beta.39` (commit
 `41ff170f794edff2a1822a672ddab37e29505f14`), core `1.0.0-beta.9`, WebRGB
 `0.1.3`, and RLN `0.17.0-beta.3`. The app's Flutter 3.47.7 / Dart 3.13.5,
 iOS 18.5 minimum, Android compile/target SDK 37 and Java 17 compilation already
@@ -139,6 +143,26 @@ The app explicitly disables Swift Package Manager through
 locked CocoaPods graph while the SDK lacks SwiftPM support. This also avoids
 missing plugin modules in a clean hybrid restore.
 
+## Engine selection
+
+The SDK has one package with independent `RlnWallet` and `RgbLibWallet` engines.
+`UtexoWallet` delegates to one explicitly owned engine. The SDK default is
+RGB_L1, while Aster's stored `WalletBackend` remains the source of truth for
+choosing the native engine and storage format.
+
+The RLN branch of `RgbWalletEngineFactory` uses `RgbSdkFlutter.rlnWallet` with
+`RlnWalletConfig`. It never relies on the SDK default. Existing RLN profiles
+therefore retain their session, credentials, native directory, endpoint policy
+and durable payment journal. The RGB_L1 adapter continues to own a typed
+`RgbLibWallet` directly for its existing-only open, runtime attestation, contract
+registration, online configuration and durable operation APIs. Selecting an
+engine does not convert a wallet store or authorize another backend to open it.
+
+Production RGB_L1 remains rejected by both `WalletBackend.activationAllowed`
+and the release manifest validator. The dedicated Debug Dev profile retains
+its exact chain, contract and capability checks. An SDK default change does not
+clear Aster's deployment or recovery qualification gates.
+
 ## Upgrade Contract And Feature Coverage
 
 | App path | Stable SDK contract | Upgrade handling |
@@ -146,7 +170,7 @@ missing plugin modules in a clean hybrid restore.
 | Create/import | generateKeys, validateBip39Mnemonic, init, unlock | App owns secrets and commit/rollback; no new-store init on persisted data. |
 | Restore/switch/resume/dispose | reinit, shutdown, destroy | One serialized app owner; native deadlines and quarantines remain authoritative. |
 | Home/balances | getBtcBalance, getAssetBalance, getNodeInfo, listChannels | RGB read values are BigInt. Narrow only after non-negative signed-64 range checks; sum exactly, never via double. |
-| Activity/details | listTransactions, listTransfers(assetId), listPayments | WaitingBroadcast has a dedicated app status. An unallocated pending/failed receive has unknown amount, never its requestedAssignment amount. Settled fungible records still require actual positive allocations. |
+| Activity/details | listTransactions, listTransfers(assetId), listPayments | Every RGB change outpoint is retained, validated and individually copyable. WaitingBroadcast has a dedicated app status. An unallocated pending/failed receive has unknown amount, never its requestedAssignment amount. Settled fungible records still require actual positive allocations. |
 | Send/receive | getAddress, decodeRgbInvoice, decodeLnInvoice, onchainReceive, onchainSend, sendBtc, createLightningInvoice, payLightningInvoice | Identity, network, expiry, amount and mutation-outcome checks are retained. RGB decoded amounts use checked BigInt conversion; non-fungible instructions are rejected. |
 | Fees/settings | estimateFeeRate, getNetworkInfo, getNodeInfo | Fees remain sat/vbyte; network metadata and account xpubs stay behind the adapter. |
 | Network policy | getNetworkDefaults | SDK owns indexer/proxy defaults. The LSP resolver is not exported, so the reviewed UTEXO signet LSP URL remains explicit app deployment policy, validated and shown in Settings. |

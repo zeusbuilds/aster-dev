@@ -86,11 +86,12 @@ final class WalletActivity {
     this.transferIndex,
     this.batchTransferIndex,
     this.receiveOutpoint,
-    this.changeOutpoint,
+    List<String> changeOutpoints = const <String>[],
     this.transportEndpointCount = 0,
     this.usedTransportEndpointCount = 0,
     List<String> transportTypes = const <String>[],
-  }) : transportTypes = List<String>.unmodifiable(transportTypes) {
+  }) : changeOutpoints = List<String>.unmodifiable(changeOutpoints),
+       transportTypes = List<String>.unmodifiable(transportTypes) {
     if (!_activityId.hasMatch(id)) {
       throw ArgumentError.value(id, 'id', 'Invalid opaque activity ID.');
     }
@@ -124,7 +125,9 @@ final class WalletActivity {
     _requireEncoded(recipientId, 'recipientId');
     _requireIdentifier(payeePublicKey, 'payeePublicKey');
     _requireIdentifier(receiveOutpoint, 'receiveOutpoint');
-    _requireIdentifier(changeOutpoint, 'changeOutpoint');
+    for (final outpoint in changeOutpoints) {
+      _requireIdentifier(outpoint, 'changeOutpoints');
+    }
     if (transportEndpointCount < 0 ||
         usedTransportEndpointCount < 0 ||
         usedTransportEndpointCount > transportEndpointCount) {
@@ -170,7 +173,9 @@ final class WalletActivity {
   final int? transferIndex;
   final int? batchTransferIndex;
   final String? receiveOutpoint;
-  final String? changeOutpoint;
+
+  /// Every RGB change output, in native order.
+  final List<String> changeOutpoints;
 
   /// Counts and transport type names are retained; endpoint URLs are not
   /// carried into presentation because they may contain deployment secrets.
@@ -194,7 +199,7 @@ final class WalletActivity {
             transferIndex != null ||
             batchTransferIndex != null ||
             receiveOutpoint != null ||
-            changeOutpoint != null ||
+            changeOutpoints.isNotEmpty ||
             transportEndpointCount != 0 ||
             usedTransportEndpointCount != 0 ||
             transportTypes.isNotEmpty ||
@@ -225,7 +230,7 @@ final class WalletActivity {
             transferIndex != null ||
             batchTransferIndex != null ||
             receiveOutpoint != null ||
-            changeOutpoint != null ||
+            changeOutpoints.isNotEmpty ||
             confirmationHeight != null ||
             confirmedAt != null ||
             transportEndpointCount != 0 ||
@@ -276,7 +281,7 @@ final class WalletActivity {
       transferIndex: transferIndex,
       batchTransferIndex: batchTransferIndex,
       receiveOutpoint: receiveOutpoint,
-      changeOutpoint: changeOutpoint,
+      changeOutpoints: changeOutpoints,
       transportEndpointCount: transportEndpointCount,
       usedTransportEndpointCount: usedTransportEndpointCount,
       transportTypes: transportTypes,
@@ -350,7 +355,7 @@ final class WalletActivity {
       other.transferIndex == transferIndex &&
       other.batchTransferIndex == batchTransferIndex &&
       other.receiveOutpoint == receiveOutpoint &&
-      other.changeOutpoint == changeOutpoint &&
+      listEquals(other.changeOutpoints, changeOutpoints) &&
       other.transportEndpointCount == transportEndpointCount &&
       other.usedTransportEndpointCount == usedTransportEndpointCount &&
       listEquals(other.transportTypes, transportTypes);
@@ -379,7 +384,7 @@ final class WalletActivity {
     transferIndex,
     batchTransferIndex,
     receiveOutpoint,
-    changeOutpoint,
+    Object.hashAll(changeOutpoints),
     transportEndpointCount,
     usedTransportEndpointCount,
     Object.hashAll(transportTypes),

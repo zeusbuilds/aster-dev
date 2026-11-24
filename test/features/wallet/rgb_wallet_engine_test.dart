@@ -76,7 +76,7 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(UtexoUnlockConfig());
-    registerFallbackValue(UtexoWalletConfig(storageDirPath: '/wallet'));
+    registerFallbackValue(RlnWalletConfig(storageDirPath: '/wallet'));
     registerFallbackValue(const RgbInvoiceRequest());
     registerFallbackValue(
       const RgbSendRequest(invoice: 'rgb:fallback', amount: 1),
@@ -116,10 +116,10 @@ void main() {
     verifyZeroInteractions(sdk);
   });
 
-  test('forwards validated local VSS transport policy to the SDK', () {
+  test('explicit RLN factory retains validated native transport and storage policy', () {
     final sdk = MockRgbSdkFlutter();
     final wallet = MockUtexoWallet();
-    when(() => sdk.wallet(config: any(named: 'config'))).thenReturn(wallet);
+    when(() => sdk.rlnWallet(config: any(named: 'config'))).thenReturn(wallet);
     const localServices = WalletServiceConfiguration(
       environment: BlockchainEnvironment.regtest,
       sdkNetwork: 'regtest',
@@ -140,14 +140,17 @@ void main() {
     );
 
     final config =
-        verify(() => sdk.wallet(config: captureAny(named: 'config')))
+        verify(() => sdk.rlnWallet(config: captureAny(named: 'config')))
                 .captured
                 .single
-            as UtexoWalletConfig;
+            as RlnWalletConfig;
+    expect(config.storageDirPath, '/wallet');
+    expect(config.network, 'regtest');
     expect(config.vssUrl, localServices.vssUrl);
     expect(config.vssAllowHttp, isTrue);
     expect(config.daemonListeningPort, 19735);
     expect(config.ldkPeerListeningPort, 19736);
+    verifyNoMoreInteractions(sdk);
   });
 
   test(
@@ -230,7 +233,7 @@ void main() {
   test('factory forwards Ethereum validation to native unlock', () async {
     final sdk = MockRgbSdkFlutter();
     final wallet = MockUtexoWallet();
-    when(() => sdk.wallet(config: any(named: 'config'))).thenReturn(wallet);
+    when(() => sdk.rlnWallet(config: any(named: 'config'))).thenReturn(wallet);
     when(
       () => wallet.reinit(
         password: any(named: 'password'),
@@ -285,7 +288,8 @@ void main() {
       final wallet = MockUtexoWallet();
       final chain = MockEvmChainValidator();
       final access = MockLocalNetworkAccess();
-      when(() => sdk.wallet(config: any(named: 'config'))).thenReturn(wallet);
+      when(() => sdk.rlnWallet(config: any(named: 'config')))
+          .thenReturn(wallet);
       when(() => access.ensureFor(configured)).thenAnswer((_) async {});
       when(() => chain.verify(configured))
           .thenThrow(const AppConfigurationException());
@@ -392,7 +396,7 @@ void main() {
       ),
       throwsA(isA<AppConfigurationException>()),
     );
-    verifyNever(() => sdk.wallet(config: any(named: 'config')));
+    verifyNever(() => sdk.rlnWallet(config: any(named: 'config')));
   });
 
   test('provisions and unlocks through the stable wallet facade', () async {
@@ -2304,6 +2308,45 @@ void main() {
     });
   }
 
+  test(
+    'RGB activity validates every change output, including later entries',
+    () async {
+      final wallet = MockUtexoWallet();
+      final asset = WalletAsset.rgbUsdt(assetId: 'rgb-usdt', precision: 6);
+      when(() => wallet.listTransfers(assetId: 'rgb-usdt')).thenAnswer(
+        (_) async => [
+          CoreTransfer(
+            idx: 7,
+            status: 'Settled',
+            assignments: [],
+            kind: 'Send',
+            requestedAssignment: Assignment(
+              type: 'Fungible',
+              amount: BigInt.one,
+            ),
+            changeUtxos: const [
+              Outpoint(txid: 'valid-change', vout: 0),
+              Outpoint(txid: 'invalid-change', vout: -1),
+            ],
+            transportEndpoints: [],
+          ),
+        ],
+      );
+      when(() => wallet.listPayments()).thenAnswer((_) async => []);
+      final engine = RgbWalletEngine(wallet, services, UtexoUnlockConfig());
+      await expectLater(
+        engine.listActivity(asset),
+        throwsA(
+          isA<NativeProtocolException>().having(
+            (error) => error.field,
+            'field',
+            'CoreTransfer.changeUtxos[1].vout',
+          ),
+        ),
+      );
+    },
+  );
+
   test('normalizes configured RGB onchain and Lightning activity', () async {
     final wallet = MockUtexoWallet();
     final asset = WalletAsset.rgbUsdt(assetId: 'rgb-usdt', precision: 6);
@@ -2327,7 +2370,10 @@ void main() {
           txid: 'rgb-anchor-txid',
           recipientId: 'rgb-recipient',
           receiveUtxo: const Outpoint(txid: 'receive-txid', vout: 1),
-          changeUtxo: const Outpoint(txid: 'change-txid', vout: 2),
+          changeUtxos: const [
+            Outpoint(txid: 'change-txid', vout: 2),
+            Outpoint(txid: 'change-txid', vout: 3),
+          ],
           expiration: 2000,
           transportEndpoints: const <CoreTransferTransportEndpoint>[
             CoreTransferTransportEndpoint(
@@ -2371,7 +2417,7 @@ void main() {
     expect(transfer.amount?.units, 10);
     expect(transfer.status, WalletActivityStatus.waitingConfirmations);
     expect(transfer.receiveOutpoint, 'receive-txid:1');
-    expect(transfer.changeOutpoint, 'change-txid:2');
+    expect(transfer.changeOutpoints, ['change-txid:2', 'change-txid:3']);
     expect(transfer.transportEndpointCount, 1);
     expect(transfer.usedTransportEndpointCount, 1);
     expect(transfer.transportTypes, ['JsonRpc']);
