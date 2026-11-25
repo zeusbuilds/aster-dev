@@ -8,17 +8,20 @@ architecture boundaries.
 
 Aster pins the SDK in the public review repository
 `https://github.com/zeusbuilds/rgb-sdk-flutter.git` at immutable commit
-`890546733e1434c6cdb7b30fda27eae525dc0f47`, recorded identically in
+`82bb992edd64e6d779b7cfc96f805bf9b9f92aad`, recorded identically in
 `pubspec.yaml` and the portable `pubspec.lock`. Committed
 builds never use a local SDK override. The single package now exposes independent
 RLN and RGB_L1 engines behind a delegating `UtexoWallet` facade. Its default is
 RGB_L1; Aster explicitly selects RLN for existing RLN profiles and retains its
 separate qualified Debug Dev RGB_L1 adapter.
 
-The SDK source includes React Native beta.41 parity and a sealed BFA.8 build
-candidate. Ordinary package installation still resolves the published BFA.7
-Flutter `.2` archives. Candidate BFA.8 source and smoke evidence do not change
-those published archive pins. Contract registration, durable payment discovery,
+The SDK default now selects BFA.8 Flutter `.1` native archives, built from
+`v0.3.0-beta.7-upstream-dev-bfa.8` at source revision
+`cafe66e49d58038a69dd05f8065e3fe96a9d1601`, with bridge version 6 and
+integration tree `fa09a59c55cc61b5321e554759d7c456ebe0e559`. The leading
+`0.3.0-beta.7` belongs to the upstream release name; the BFA revision is `.8`.
+The same package also includes the RN beta.42 received-mint contract: asset
+identity and an explicit optional incoming-transfer refresh. Contract registration, durable payment discovery,
 receipts, explicit dispatched revocation and existing-only opening remain in
 their owning engine. Production RGB_L1 stays gated independently of the SDK
 default. See [the adapter contract](RGB_L1_ADAPTER.md),
@@ -48,15 +51,22 @@ and global/system Git configuration disabled. Credential mode was `0600`, and
 cleanup removed its runner directory. Eight offline helper tests and 23 focused
 governance tests pass. These local checks do not claim a remote workflow result.
 
-The legacy RLN and new RGB_L1 native pins are independent. The BFA.7 candidate
-uses a separately versioned Flutter integration built from a sealed source,
-overlay and lock with exact archive digests; it never relabels official RN
-BFA.5 bytes. Runtime metadata is checked before key access. Authenticated Git
+The legacy RLN and RGB_L1 native pins are independent. The BFA.8 default uses
+a separately versioned Flutter integration built from a sealed source, overlay
+and lock with exact archive digests. Its Android AAR SHA-256 is
+`c32f7a4bc0b287e9a6d08c7dc695e7451621dfcb62c331f86d42de0688221320` and
+iOS archive SHA-256 is
+`4b2958a1bfe3db94a8dfee37a13eec2037255bfaedf7ce63536a23db69933cec`.
+The SDK points to the published
+[native BFA.8 beta](https://github.com/UTEXO-Protocol/flutter-sdk/releases/tag/native-bfa8-flutter.1).
+Fresh anonymous downloads of both archives matched the pinned byte counts and
+SHA-256 digests. They are byte-identical to the archives used in the native
+Aster verification below. Runtime metadata is checked before key access. Authenticated Git
 restoration and host tests alone do not establish funded production readiness.
-Any local artifact-directory override qualifies only that machine. The exact
-pinned BFA.7 archives are now available in the public
+Any local artifact-directory override qualifies only that machine. The previous
+BFA.7 Flutter `.2` archives remain available in the public
 [native beta .2](https://github.com/UTEXO-Protocol/flutter-sdk/releases/tag/native-bfa7-flutter.2).
-All seven release assets passed fresh anonymous acquisition. The actual SDK
+For that historical BFA.7 release, all seven assets passed fresh anonymous acquisition. The actual SDK
 Android Gradle verifier acquired the public URL without local artifact overrides;
 the unmodified iOS installer acquired and checked 47 files from an empty native
 cache. All six linked iOS binary pairs passed the native DiskSpace disposition
@@ -142,6 +152,29 @@ The app explicitly disables Swift Package Manager through
 `flutter.config.enable-swift-package-manager: false`. All native plugins use the
 locked CocoaPods graph while the SDK lacks SwiftPM support. This also avoids
 missing plugin modules in a clean hybrid restore.
+
+## BFA.8 native consumer verification
+
+`integration_test/sdk_native_runtime_test.dart` runs inside Aster under a
+separate `com.aster.nativeqa.*.debug` identity. It reads the real platform
+runtime before opening any wallet, checks the exact BFA.8 source/overlay/lock
+and bridge identity, verifies contract registration and durable recovery/bridge
+capabilities, and asserts that production RGB_L1 remains disabled.
+
+Its second case creates a disposable offline Dev wallet from a public fixture
+mnemonic and imports the public contract passed as
+`ASTER_QA_DEV_CONTRACT_BASE64`. It requires the checksum and asset identity in
+`UtexoDevSignetPolicy`, validates BUSDT metadata and precision 6, and checks
+idempotent registration. It never calls `goOnline`, contacts a hosted service,
+uses existing wallet data, or performs funded operations.
+
+On November 25, 2026, both cases and four SDK native lifecycle/recovery smoke
+cases passed in Aster on iOS 27 and Android 17 using the exact sealed BFA.8
+archives. A further 651 wallet, bridge, configuration and release-policy host
+tests passed. Subsequent anonymous downloads verified the published archives
+against these exact tested bytes. Aster resolves the immutable Git commit with
+its committed lockfile and no SDK path override. These checks do not establish
+hosted mint/burn/payout, production backup freshness or release approval.
 
 ## Engine selection
 
